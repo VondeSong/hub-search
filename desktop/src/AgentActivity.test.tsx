@@ -243,6 +243,13 @@ it("keeps DeepSeek streamed summaries and answer previews provisional",async()=>
  expect(host.querySelector('[aria-label="正在生成回答"]')).toBeNull();
  expect(host.textContent).toContain("查看未发布的模型答复");
 });
+it("shows a DeepSeek public summary once when the validated intent repeats it",async()=>{
+ const summary={id:"r",origin:"deepseek",kind:"reasoning" as const,state:"completed",label:"核对资料后直接回答",createdAt:10};
+ const intent={id:"i",kind:"message" as const,state:"completed",label:summary.label,createdAt:11};
+ await act(async()=>root.render(<AgentActivity value={{...run,events:[summary,intent]}}/>));
+ expect(host.textContent?.split(summary.label)).toHaveLength(2);
+ expect(host.querySelector('.agent-commentary')).toBeNull();
+});
 it("streams public summaries without presenting them as completed tool actions",async()=>{
   const current={...run,native:true,events:[{id:"summary",kind:"reasoning" as const,state:"running",label:"核对日期范围",createdAt:1200},run.events[1]]};
   await act(async()=>root.render(<AgentActivity value={current}/>));

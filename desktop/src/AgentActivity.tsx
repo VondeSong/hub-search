@@ -141,7 +141,8 @@ export function AgentActivity({ value }: { value: ActivityRun }) {
   const answerStartedAt=value.events.find(event=>event.kind==="answer"&&event.label.trim())?.createdAt;
   const duration=elapsed((value.finishedAt ?? answerStartedAt ?? now)-value.startedAt);
   const timeLabel=value.running&&!answer?"已处理":"用时";
-  const processEvents=value.events.filter(event=>event.kind!=="answer"&&!isThinkingPlaceholder(event)).sort((a,b)=>a.createdAt-b.createdAt);
+  const publicSummaries=value.events.filter(event=>event.kind==="reasoning"&&event.origin==="deepseek");
+  const processEvents=value.events.filter(event=>event.kind!=="answer"&&!isThinkingPlaceholder(event)&&!(event.kind==="message"&&publicSummaries.some(summary=>summary.label.trim()===event.label.trim()&&summary.createdAt<=event.createdAt))).sort((a,b)=>a.createdAt-b.createdAt);
   const hasActiveStep=processEvents.some(event=>["tool","skill","webSearch","reasoning","status"].includes(event.kind)&&event.state==="running");
   const stopped = !value.running && ["failed","interrupted","needsDecision"].includes(value.state);
   const failure = stopped && newest.find(event=>event.state==="failed" || event.state==="interrupted");
