@@ -146,7 +146,7 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
                 "agentStream" => {
                     if body["text"].as_str().is_some_and(|s| !s.trim().is_empty()) {
                         events.push(json!({"id":sequence.to_string(),"kind":body["kind"],"state":body["state"],"label":body["text"],"url":body["url"],"createdAt":time,"origin":body["origin"].as_str().unwrap_or("codex-app-server"),
-                            "action":body["action"],"queries":body["queries"],"pattern":body["pattern"],"sourceRefs":body["sourceRefs"],"resultCount":body["resultCount"],"errorCount":body["errorCount"],"errors":body["errors"],"omittedSourceCount":body["omittedSourceCount"]}));
+                            "truncated":body["truncated"]==true,"action":body["action"],"queries":body["queries"],"pattern":body["pattern"],"sourceRefs":body["sourceRefs"],"resultCount":body["resultCount"],"errorCount":body["errorCount"],"errors":body["errors"],"omittedSourceCount":body["omittedSourceCount"]}));
                     }
                 }
                 "activity" => {
@@ -421,12 +421,14 @@ mod context_lifecycle_tests {
             &f.root,
             &w,
             &r,
-            &json!({"id":"a","kind":"answer","text":"正在写出的文字","state":"running"}),
+            &json!({"id":"a","kind":"answer","text":"正在写出的文字","state":"running","origin":"deepseek","truncated":true}),
             &crate::model_runtime::Control::default(),
         )
         .unwrap();
         let read = read_on(&f.root, &f.c(), &w).unwrap();
         assert_eq!(read[0]["events"][0]["kind"], "answer");
+        assert_eq!(read[0]["events"][0]["origin"], "deepseek");
+        assert_eq!(read[0]["events"][0]["truncated"], true);
         assert!(store::load(&f.c(), &id).unwrap().report.is_none());
         let mut stopped = w.clone();
         stopped.active_run = None;
@@ -440,6 +442,7 @@ mod context_lifecycle_tests {
             read_on(&f.root, &f.c(), &stopped).unwrap()[0]["events"][0]["kind"],
             "unpublishedAnswer"
         );
+        assert_eq!(read_on(&f.root, &f.c(), &stopped).unwrap()[0]["events"][0]["truncated"], true);
         f.c()
             .execute(
                 "UPDATE agent_runs SET state='investigating' WHERE id=?1",

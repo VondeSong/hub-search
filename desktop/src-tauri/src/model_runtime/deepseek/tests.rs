@@ -9,6 +9,9 @@ fn fixture(
     fixture_parts(status, vec![(body, delay)])
 }
 fn fixture_parts(status: u16, parts: Vec<(String, Duration)>) -> (String, std::thread::JoinHandle<String>) {
+    fixture_parts_held(status, parts, Duration::ZERO)
+}
+fn fixture_parts_held(status: u16, parts: Vec<(String, Duration)>, hold: Duration) -> (String, std::thread::JoinHandle<String>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
     let join = std::thread::spawn(move || {
@@ -39,14 +42,15 @@ fn fixture_parts(status: u16, parts: Vec<(String, Duration)>) -> (String, std::t
                 }
             }
         }
-        let size:usize=parts.iter().map(|(s,_)|s.len()).sum();
-        let head=format!("HTTP/1.1 {status} Test\r\nContent-Type: text/event-stream\r\nContent-Length: {size}\r\nConnection: close\r\n\r\n");
+        let length = if hold.is_zero() { format!("Content-Length: {}\r\n", parts.iter().map(|(s, _)| s.len()).sum::<usize>()) } else { String::new() };
+        let head=format!("HTTP/1.1 {status} Test\r\nContent-Type: text/event-stream\r\n{length}Connection: close\r\n\r\n");
         let _ = stream.write_all(head.as_bytes());
         for (part, delay) in parts {
             std::thread::sleep(delay);
             if stream.write_all(part.as_bytes()).is_err() { break; }
             let _ = stream.flush();
         }
+        std::thread::sleep(hold);
         String::from_utf8(bytes).unwrap()
     });
     (url, join)
@@ -59,6 +63,20 @@ fn response(content: &str, reason: &str) -> String {
     format!("data: {}\n\ndata: {}\n\ndata: [DONE]\n\n",
         json!({"choices":[{"index":0,"delta":{"reasoning_content":"PRIVATE_REASONING","content":content},"finish_reason":null}]}),
         json!({"model":raw["model"],"choices":[{"index":0,"delta":{},"finish_reason":reason}],"usage":raw["usage"]}))
+}
+pub(super) fn framing_response() -> String {
+    let frame = format!("data: {}\n\n", json!({"id":"a".repeat(64),"object":"chat.completion.chunk","created":1718345013,"model":"deepseek-flash","system_fingerprint":"f".repeat(32),"choices":[{"index":0,"delta":{"reasoning_content":"r"},"finish_reason":null,"logprobs":null}]}));
+    format!("{}{}", frame.repeat(7000), response("{\"answer\":\"ok\"}", "stop"))
+}
+#[test]
+fn http_stream_accepts_framing_overhead_above_the_catalog_response_limit() {
+    let wire = framing_response();
+    assert!(wire.len() > 2 * 1024 * 1024);
+    let (url, server) = fixture(200, wire, Duration::ZERO);
+    let control = Control::default();
+    assert_eq!(run_at(&url, "fixture-secret", &json!({}), &schema(), &control).unwrap()["answer"], "ok");
+    server.join().unwrap();
+    assert!(control.execution_receipts()[0].stream_bytes > 2 * 1024 * 1024);
 }
 fn settings() -> Settings {
     Settings {
@@ -114,6 +132,21 @@ fn streamed_preview_cancellation_never_delivers_and_missing_done_preserves_known
 }
 fn schema() -> Value {
     json!({"type":"object","required":["answer"],"additionalProperties":false,"properties":{"answer":{"type":"string"}}})
+}
+#[test]
+fn done_finishes_before_transport_close_without_skipping_final_validation() {
+    for (content, valid) in [("{\"answer\":\"ok\"}", true), ("{}", false)] {
+        let (url, server) = fixture_parts_held(200, vec![(response(content, "stop"), Duration::ZERO)], Duration::from_millis(900));
+        let control = Control::bounded(Duration::from_millis(500));
+        let result = run_at(&url, "fixture-secret", &json!({}), &schema(), &control);
+        server.join().unwrap();
+        if valid {
+            assert_eq!(result.unwrap()["answer"], "ok");
+            assert_eq!(control.execution_receipts()[0].outcome, "completedOutput");
+        } else {
+            assert!(super::super::schema::is_rejection(&result.unwrap_err()));
+        }
+    }
 }
 #[test]
 fn direct_wire_contract_and_real_response_usage_are_host_validated() {

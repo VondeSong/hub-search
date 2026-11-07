@@ -55,5 +55,40 @@ fn missing_done_finish_truncation_tool_calls_and_invalid_data_never_validate() {
 fn oversized_stream_is_bounded_without_publishing_raw_data() {
     let mut publish=|_:&Value|Ok(());
         let mut stream=Stream::new(&mut publish);
-    assert_eq!(stream.feed(&vec![b'x';2*1024*1024+1]).unwrap_err(),TOO_LARGE);
+    assert_eq!(stream.feed(&vec![b'x';MAX_WIRE_BYTES+1]).unwrap_err(),TOO_LARGE);
+}
+
+#[test]
+fn capped_preview_reports_truncation_even_when_its_visible_prefix_does_not_change() {
+    let mut events = vec![];
+    let mut publish = |v: &Value| { events.push(v.clone()); Ok(()) };
+    let mut stream = Stream::new(&mut publish);
+    stream.content = format!("{{\"report\":{{\"markdown\":\"{}", "字".repeat(6000));
+    stream.preview("running", true).unwrap();
+    stream.content.push('后');
+    stream.last = Instant::now() - Duration::from_millis(151);
+    stream.preview("running", false).unwrap();
+    let answers: Vec<_> = events.iter().filter(|e| e["kind"] == "answer").collect();
+    assert_eq!(answers.len(), 2);
+    assert_ne!(answers[0]["truncated"], true);
+    assert_eq!(answers[1]["truncated"], true);
+    assert_eq!(answers[1]["text"].as_str().unwrap().chars().count(), 6000);
+}
+
+#[test]
+fn sse_framing_does_not_exhaust_text_budget_and_raw_reasoning_remains_bounded() {
+    let wire = super::super::tests::framing_response();
+    assert!(wire.len() > 2 * 1024 * 1024 && wire.len() < MAX_WIRE_BYTES);
+    let mut events = vec![];
+    let mut publish = |v: &Value| { events.push(v.clone()); Ok(()) };
+    let mut stream = Stream::new(&mut publish);
+    for chunk in wire.as_bytes().chunks(4096) { stream.feed(chunk).unwrap(); }
+    assert_eq!(parse_response(&stream.finish().unwrap(), &mut execution::Trace::new().finish("running", None)).unwrap()["answer"], "ok");
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0]["text"], "正在思考，等待公开摘要…");
+    let mut publish = |_: &Value| Ok(());
+    let mut stream = Stream::new(&mut publish);
+    assert_eq!(stream.feed(event(json!({"reasoning_content":"x".repeat(MAX_TEXT_BYTES+1)}),Value::Null).as_bytes()).unwrap_err(), TOO_LARGE);
+    let mut stream = Stream::new(&mut publish);
+    assert_eq!(stream.feed(event(json!({"content":"x".repeat(super::super::super::MAX_OUTPUT_BYTES+1)}),Value::Null).as_bytes()).unwrap_err(), TOO_LARGE);
 }

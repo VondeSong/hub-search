@@ -87,7 +87,7 @@ export function useAgentUiTiming(view: View | null, visible: boolean, accepting:
       }
       else t.rendersOmitted++;
       for (const e of t.events) if (e.snapshotReady && e.visibleMs === undefined) e.visibleMs = painted;
-      const feedback = shown.activity?.some(run => run.runId === t.runId && run.events.some(e => e.kind === "tool" || ((e.kind === "message" || e.kind === "reasoning") && e.label.trim())));
+      const feedback = shown.activity?.some(run => run.runId === t.runId && run.events.some(e => e.kind === "tool" || ((e.kind === "message" || e.kind === "reasoning") && e.label.trim() && e.label.trim() !== "正在思考，等待公开摘要…")));
       const deliveredAnswer = !shown.validity && Boolean(shown.work.report);
       if ((feedback || deliveredAnswer) && t.uiFirstFeedbackMs === null) t.uiFirstFeedbackMs = painted;
       if (!shown.validity && (shown.work.report || shown.analysisArtifacts?.some(a => a.state === "checked")) && t.uiUsefulMs === null) t.uiUsefulMs = painted;

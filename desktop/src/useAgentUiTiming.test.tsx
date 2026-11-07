@@ -78,6 +78,18 @@ it("persists failed terminal observations without inventing useful or delivered 
   const saved = invoke.mock.calls.find(([, x]) => x.args.action === "uiTiming")![1].args.sample;
   expect(saved.terminalState).toBe("failed"); expect(saved.uiDoneMs).toBeNull(); expect(saved.uiUsefulMs).toBeNull();
 });
+it("excludes the DeepSeek waiting marker from real feedback but counts a public summary", async () => {
+  setup();
+  for (const [label, real] of [["正在思考，等待公开摘要…", false], ["核对分类与标签的用途", true]] as const) {
+    await render(null); api.begin("submit");
+    const failed = view("new", "failed", "reasoning");
+    failed.activity![0].events[0].label = label;
+    api.snapshotReceived(failed); await render(failed); await paint();
+    const saved = invoke.mock.calls.filter(([, x]) => x.args.action === "uiTiming").slice(-1)[0][1].args.sample;
+    expect(saved.uiFirstFeedbackMs !== null).toBe(real);
+    expect(saved.uiUsefulMs).toBeNull(); expect(saved.uiDoneMs).toBeNull();
+  }
+});
 it("counts a direct validated answer as first real feedback without requiring a process message", async () => {
   setup(); await render(null); api.begin("submit");
   const running = view("new"); api.snapshotReceived(running); await render(running); await paint();

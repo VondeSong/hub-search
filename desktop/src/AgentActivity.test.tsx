@@ -250,6 +250,15 @@ it("shows a DeepSeek public summary once when the validated intent repeats it",a
  expect(host.textContent?.split(summary.label)).toHaveLength(2);
  expect(host.querySelector('.agent-commentary')).toBeNull();
 });
+it("explains a capped DeepSeek preview while receiving and after interruption",async()=>{
+ const answer={id:"answer",origin:"deepseek",kind:"answer" as const,state:"running",label:"部分正文",truncated:true,createdAt:1300};
+ await act(async()=>root.render(<AgentActivity value={{...run,events:[answer]}}/>));
+ expect(host.querySelector('[aria-label="正在生成回答"]')?.textContent).toContain("预览已达显示上限，仍在接收");
+ await act(async()=>root.render(<AgentActivity value={{...run,running:false,state:"interrupted",events:[{...answer,kind:"unpublishedAnswer"}]}}/>));
+ const details=host.querySelector<HTMLDetailsElement>('.agent-tool-result')!;
+ await act(async()=>{details.open=true;details.dispatchEvent(new Event('toggle'));});
+ expect(details.textContent).toContain("仅保留了部分回答预览");
+});
 it("streams public summaries without presenting them as completed tool actions",async()=>{
   const current={...run,native:true,events:[{id:"summary",kind:"reasoning" as const,state:"running",label:"核对日期范围",createdAt:1200},run.events[1]]};
   await act(async()=>root.render(<AgentActivity value={current}/>));

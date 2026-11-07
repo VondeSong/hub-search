@@ -108,17 +108,20 @@ async fn request(
         }
         if response
             .content_length()
-            .is_some_and(|n| n > 2 * 1024 * 1024)
+            .is_some_and(|n| n > if stream.is_some() { streaming::MAX_WIRE_BYTES as u64 } else { 2 * 1024 * 1024 })
         {
             return Err(TOO_LARGE.into());
         }
         let mut bytes = Vec::new();
         while let Some(chunk) = response.chunk().await.map_err(|_| NETWORK.to_string())? {
             control.check()?;
-            if bytes.len() + chunk.len() > 2 * 1024 * 1024 {
+            if stream.is_none() && bytes.len() + chunk.len() > 2 * 1024 * 1024 {
                 return Err(TOO_LARGE.into());
             }
-            if let Some(stream) = stream.as_deref_mut() { stream.feed(&chunk)?; }
+            if let Some(stream) = stream.as_deref_mut() {
+                stream.feed(&chunk)?;
+                if stream.is_done() { break; }
+            }
             else { bytes.extend_from_slice(&chunk); }
         }
         if let Some(stream) = stream { bytes = stream.finish()?; }

@@ -3206,7 +3206,7 @@ V1 首批用例按 14.11.5 的十项冻结；V2 增加来源保存/冲突/未知
 | 当前冻结Token预算 | supported | supported（限定文本scope） | nativeAgentOnly/材料计划仍不接受DeepSeek；新显式scope真实计量及终态结算9.151/154 |
 | 当前材料计划 | supported | unsupported | 正式preflight不创建Run/预留/队列即拒绝；不以body计量冒充原生材料计划 |
 | 工具并行 | unverified | unverified | 批请求或FIFO不等于已证明并行 |
-| 公开内容流 | supported | unsupported | 当前DeepSeek适配器stream=false |
+| 公开内容流 | supported | unsupported（当时基线） | 当时DeepSeek适配器stream=false；2026-11-07增量见下 |
 | 当前轮追加 | supported | unsupported | 原生实际追加证据复用；直连只在下一请求消费保存指令，不声称in-flight steer |
 | 每事项下一轮队列 | unverified | unverified | 不将全局FIFO算作该能力 |
 | 中断 | supported | supported（原受控范围） | 当前Control及已有证据，不新增HTTP取消实测主张 |
@@ -3214,6 +3214,8 @@ V1 首批用例按 14.11.5 的十项冻结；V2 增加来源保存/冲突/未知
 | 普通原线程压缩续跑 | unsupported | unsupported | Codex未解决/普通入口关闭；自动干预按D-121延期，M2封存 |
 | 用量报告 | supported | supported（可证明字段） | 原生completion或绑定HTTP回执；缺失/unknown保留，实际模型及费用不可得 |
 | 图像/成果视觉检查 | unverified | unverified | 有传输不等于Work图像授权/计量/出处完成；尚未启用或实测 |
+
+2026-11-07增量：DeepSeek直连的公开内容流已在0.16.396桌面开发模式限定范围验收为 supported，实时投影公开 `rationale` 与报告正文；不展示内部推理原文，不据预览执行工具或发布成果。正常交付、超限拒绝、主动停止及受控SSE故障有独立证据，见 `artifacts/deepseek-streaming-20261107/report.md` 和 `artifacts/deepseek-streaming-review-20261107/report.md`。这项增量只替代上表公开内容流的历史状态，不将其他能力或安装包自动提升为已验证。
 
 真实降级只采用已存在的显式事项模型选择：9.155在同一Work从DeepSeek失败状态改用Codex，读取、草稿、回读、预览交付真实完成，原额度、旧失败及授权保留；这不是DeepSeek失败系列通过。未验证业务不得由已支持服务商别名推断，未自动切换提供方、清零用量或扩大授权。
 
