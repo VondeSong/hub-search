@@ -1,0 +1,175 @@
+{
+  "report": {
+    "completion": {
+      "goalBinding": {
+        "authorizationVersion": 1,
+        "commandWatermark": 0,
+        "lastCommandId": null,
+        "schemaVersion": 1,
+        "workId": "work-nyWeJL0Y2bSiJrY8MjFxftpy",
+        "workRevision": 1
+      },
+      "items": [
+        {
+          "criterion": "比较范围差异",
+          "explanation": "依据两份全文比较，B 多丙。",
+          "refs": [],
+          "requiredResult": "response",
+          "requirementId": "work-nyWeJL0Y2bSiJrY8MjFxftpy-goal",
+          "status": "satisfied",
+          "supersededBy": null
+        },
+        {
+          "criterion": "比较验证次数",
+          "explanation": "列明3次与5次及差2次，不推断执行完成。",
+          "refs": [],
+          "requiredResult": "response",
+          "requirementId": "work-nyWeJL0Y2bSiJrY8MjFxftpy-goal",
+          "status": "satisfied",
+          "supersededBy": null
+        },
+        {
+          "criterion": "比较交付授权",
+          "explanation": "区分确认后保存与仅预览未授权，未声称已经确认或保存。",
+          "refs": [],
+          "requiredResult": "response",
+          "requirementId": "work-nyWeJL0Y2bSiJrY8MjFxftpy-goal",
+          "status": "satisfied",
+          "supersededBy": null
+        },
+        {
+          "criterion": "核对实际验证完成情况并说明资料缺失",
+          "explanation": "全文无完成记录，两份均无法确认而非断言未完成，并列明缺失信息。",
+          "refs": [],
+          "requiredResult": "response",
+          "requirementId": "work-nyWeJL0Y2bSiJrY8MjFxftpy-goal",
+          "status": "satisfied",
+          "supersededBy": null
+        },
+        {
+          "criterion": "仅使用授权输入、原文只读，按冻结清单核对出处版本完成与预算",
+          "explanation": "仅完整读取授权A与B，A按已知版本绑定读取，B取得当前版本；未作业务写入，引用本轮原文，未超预算。",
+          "refs": [],
+          "requiredResult": "response",
+          "requirementId": "work-nyWeJL0Y2bSiJrY8MjFxftpy-criteria",
+          "status": "satisfied",
+          "supersededBy": null
+        }
+      ]
+    },
+    "findings": [],
+    "limitations": [
+      "两份原文均无验证完成记录，不能确定实际完成情况。",
+      "来源为授权本地缓存，未与远端核验。"
+    ],
+    "nextSteps": [],
+    "prose": {
+      "citations": [
+        {
+          "evidenceId": "e2",
+          "quote": "范围：甲、乙。"
+        },
+        {
+          "evidenceId": "e3",
+          "quote": "范围：甲、乙、丙。"
+        },
+        {
+          "evidenceId": "e2",
+          "quote": "验证次数：3 次。"
+        },
+        {
+          "evidenceId": "e3",
+          "quote": "验证次数：5 次。"
+        },
+        {
+          "evidenceId": "e2",
+          "quote": "交付条件：先预览，经确认再保存。"
+        },
+        {
+          "evidenceId": "e3",
+          "quote": "交付条件：仅预览，尚未授权保存。"
+        }
+      ],
+      "markdown": "| 比较项 | 方案 A | 方案 B | 差异 |\n|---|---|---|---|\n| 范围 | 甲、乙。[1] | 甲、乙、丙。[2] | B 比 A 多“丙”。 |\n| 原文所列验证次数 | 3 次。[3] | 5 次。[4] | B 比 A 多 2 次；原文未说明这些次数是计划次数还是已执行次数。 |\n| 交付授权条件 | 先预览，经确认再保存。[5] | 仅预览，尚未授权保存。[6] | A 的保存以确认为前提，不能视为已经确认；B 明确未获保存授权。 |\n\n**实际验证完成情况：两份均无法确认已完成验证。** 两份全文都未写明验证完成状态、执行记录或验证结果，不能把“3 次／5 次”直接当作实际完成的证明。这不等于认定两份都未验证。\n\n资料也未说明甲、乙、丙的具体含义、验证方法或通过标准，以及 A 是否已取得确认、任一方案是否已实际保存。\n\n本次仅核对授权的两份本地原文，未修改来源；本地资料未与远端核验。"
+    },
+    "questions": [],
+    "status": "completed",
+    "summary": "| 比较项 | 方案 A | 方案 B | 差异 |\n|---|---|---|---|\n| 范围 | 甲、乙。[1] | 甲、乙、丙。[2] | B 比 A 多“丙”。 |\n| 原文所列验证次数 | 3 次。[3] | 5 次。[4] | B 比 A 多 2 次；原文未说明这些次数是计划次数还是已执行次数。 |\n| 交付授权条件 | 先预览，经确认再保存。[5] | 仅预览，尚未授权保存。[6] | A 的保存以确认为前提，不能视为已经确认；B 明确未获保存授权。 |\n\n**实际验证完成情况：两份均无法确认已完成验证。** 两份全文都未写明验证完成状态、执行记录或验证结果，不能把“3 次／5 次”直接当作实际完成的证明。这不等于认定两份都未验证。\n\n资料也未说明甲、乙、丙的具体含义、验证方法或通过标准，以及 A 是否已取得确认、任一方案是否已实际保存。\n\n本次仅核对授权的两份本地原文，未修改来源；本地资料未与远端核验。",
+    "waitCondition": ""
+  },
+  "evidence": [
+    {
+      "content": "# 方案 A\r\n范围：甲、乙。\r\n验证次数：3 次。\r\n交付条件：先预览，经确认再保存。\r\n",
+      "endChar": 46,
+      "facts": {
+        "provider": "obsidian",
+        "sourceFreshness": "notVerifiedWithRemote",
+        "sourceHash": "7db187604cadc954e3b30c04fb694b77f29076cfe00125a0fd7671edc5897e07"
+      },
+      "locator": {
+        "documentId": "comparison-a",
+        "kind": "note",
+        "libraryId": "v1-fixtures",
+        "pageId": null
+      },
+      "sourcePath": "comparison-a.md",
+      "startChar": 0,
+      "title": "comparison-a",
+      "totalChars": 46,
+      "truncated": false,
+      "version": {
+        "fingerprint": "78cc43341f13213f3714d36a359b3be5ff0f624c4938b5d0b4a118fdb3560336",
+        "kind": "document"
+      }
+    },
+    {
+      "content": "# 方案 A\r\n范围：甲、乙。\r\n验证次数：3 次。\r\n交付条件：先预览，经确认再保存。\r\n",
+      "endChar": 46,
+      "facts": {
+        "provider": "obsidian",
+        "sourceFreshness": "notVerifiedWithRemote",
+        "sourceHash": "7db187604cadc954e3b30c04fb694b77f29076cfe00125a0fd7671edc5897e07"
+      },
+      "locator": {
+        "documentId": "comparison-a",
+        "kind": "note",
+        "libraryId": "v1-fixtures",
+        "pageId": null
+      },
+      "sourcePath": "comparison-a.md",
+      "startChar": 0,
+      "title": "comparison-a",
+      "totalChars": 46,
+      "truncated": false,
+      "version": {
+        "fingerprint": "78cc43341f13213f3714d36a359b3be5ff0f624c4938b5d0b4a118fdb3560336",
+        "kind": "document"
+      }
+    },
+    {
+      "content": "# 方案 B\r\n范围：甲、乙、丙。\r\n验证次数：5 次。\r\n交付条件：仅预览，尚未授权保存。\r\n",
+      "endChar": 48,
+      "facts": {
+        "provider": "obsidian",
+        "sourceFreshness": "notVerifiedWithRemote",
+        "sourceHash": "84dfd71c8fdcad80c1e606e9566c856cb17894326ac2492099531ff0366f8a56"
+      },
+      "locator": {
+        "documentId": "comparison-b",
+        "kind": "note",
+        "libraryId": "v1-fixtures",
+        "pageId": null
+      },
+      "sourcePath": "comparison-b.md",
+      "startChar": 0,
+      "title": "comparison-b",
+      "totalChars": 48,
+      "truncated": false,
+      "version": {
+        "fingerprint": "9b5ea4f30a2f0acf6f4919f6b589a20118d05a7aa4b543ee75c3b90fc7eac6ec",
+        "kind": "document"
+      }
+    }
+  ],
+  "runId": "run-PjMR2mRsCQMfMMeiDIYHi0OW"
+}

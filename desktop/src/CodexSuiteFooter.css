@@ -1,0 +1,17 @@
+.codex-suite-footer { position: relative; flex: 0 1 auto; min-width: 0; }
+.codex-suite-status { display: flex; align-items: center; gap: 5px; border: 0; border-radius: 5px; padding: 3px 5px; background: transparent; color: var(--hub-text-secondary, #777); max-width: 300px; font: inherit; cursor: pointer; }
+.codex-suite-status > svg { flex: none; }
+.codex-suite-status > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.codex-suite-status:hover, .codex-suite-status[aria-expanded="true"] { background: var(--hub-control-fill, #f0f0f1); }
+.codex-suite-status.has-error { color: #b64b46; }
+.codex-suite-popover { position: absolute; bottom: 30px; left: 0; z-index: 40; width: min(420px, calc(100vw - 36px)); max-height: min(520px, calc(100vh - 70px)); overflow: auto; box-sizing: border-box; padding: 16px; border: 1px solid var(--hub-separator, #ddd); border-radius: 14px; background: var(--hub-content-surface, #fff); color: var(--hub-text-primary, #222); box-shadow: 0 8px 30px #0002; font-size: 12px; line-height: 1.65; cursor: default; }
+.codex-suite-popover header, .codex-suite-job > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.codex-suite-popover header > button { border: 0; color: inherit; background: transparent; display: grid; place-items: center; width: 26px; height: 26px; cursor: pointer; }
+.codex-suite-popover small, .codex-suite-popover > p { color: var(--hub-text-secondary, #888); }
+.codex-suite-open-settings { display: flex; align-items: center; gap: 6px; border: 0; border-radius: 6px; padding: 6px 9px; margin-bottom: 10px; color: var(--hub-accent, #3780f7); background: var(--hub-accent-soft, #edf5ff); font: inherit; cursor: pointer; }
+.codex-suite-jobs { margin-top: 10px; }
+.codex-suite-job { padding: 10px 0; border-top: 1px solid var(--hub-separator, #eee); }
+.codex-suite-job > div > span { flex: none; color: var(--hub-text-secondary, #888); }
+.codex-suite-job.running > div > span { color: var(--hub-accent, #3780f7); }
+.codex-suite-popover .codex-suite-job-error { color: #b64b46; overflow-wrap: anywhere; margin: 5px 0; }
+html[data-runtime-platform="android"] .codex-suite-footer { display: none; }

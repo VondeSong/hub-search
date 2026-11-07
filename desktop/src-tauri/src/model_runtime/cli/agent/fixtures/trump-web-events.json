@@ -1,0 +1,103 @@
+[
+  {
+    "id": "exec-77a1f8d4-cef7-41e9-ab42-740c0c2db82e",
+    "type": "webSearch",
+    "query": "",
+    "action": {
+      "type": "other"
+    },
+    "results": [
+      {
+        "type": "text_result",
+        "title": "Internal Error"
+      },
+      {
+        "type": "text_result",
+        "title": "2016 Electoral College Results | National Archives",
+        "url": "https://www.archives.gov/electoral-college/2016"
+      },
+      {
+        "type": "text_result",
+        "title": "2020 Electoral College Results | National Archives",
+        "url": "https://www.archives.gov/electoral-college/2020"
+      },
+      {
+        "type": "text_result",
+        "title": "2024 Electoral College Results | National Archives",
+        "url": "https://www.archives.gov/electoral-college/2024"
+      },
+      {
+        "type": "text_result",
+        "title": "The Inaugural Address – The White House",
+        "url": "https://www.whitehouse.gov/remarks/2025/01/the-inaugural-address/"
+      },
+      {
+        "type": "text_result",
+        "title": "Update on the FBI Investigation of the Attempted Assassination of Former President Donald Trump — FBI",
+        "url": "https://www.fbi.gov/news/press-releases/update-on-the-fbi-investigation-of-the-attempted-assassination-of-former-president-donald-trump"
+      }
+    ]
+  },
+  {
+    "id": "exec-7696409c-e764-4af8-be44-8ba65397bf48",
+    "type": "webSearch",
+    "query": "https://www.fec.gov/resources/cms-content/documents/federalelections2016.pdf",
+    "action": {
+      "type": "openPage",
+      "url": "https://www.fec.gov/resources/cms-content/documents/federalelections2016.pdf"
+    },
+    "results": [
+      {
+        "type": "text_result",
+        "title": "Internal Error"
+      },
+      {
+        "type": "text_result",
+        "title": "How Changes in Turnout and Vote Choice Powered Trump’s Victory in 2024 | Pew Research Center",
+        "url": "https://www.pewresearch.org/feature/how-changes-in-turnout-and-vote-choice-powered-trumps-victory-in-2024/"
+      },
+      {
+        "type": "text_result",
+        "title": "Donald Trump: Life Before the Presidency | Miller Center",
+        "url": "https://millercenter.org/president/trump/life-presidency"
+      },
+      {
+        "type": "text_result",
+        "title": "U.S. HOUSE OF REPRESENTATIVESFINAL REPORT OF FINDINGS",
+        "url": "https://www.congress.gov/118/crpt/hrpt873/CRPT-118hrpt873.pdf"
+      },
+      {
+        "type": "text_result",
+        "title": "Donald Trump: Life Before the Presidency | Miller Center",
+        "url": "https://millercenter.org/president/trump/life-presidency"
+      }
+    ]
+  },
+  {
+    "id": "exec-c74b72d9-ec22-4eb6-b536-91771e4b2d52",
+    "type": "webSearch",
+    "query": "'65,853,514'",
+    "action": {
+      "type": "findInPage",
+      "url": null,
+      "pattern": "65,853,514"
+    },
+    "results": [
+      {
+        "type": "text_result",
+        "title": "Election Results for the",
+        "url": "https://www.fec.gov/documents/1889/federalelections2016.pdf"
+      },
+      {
+        "type": "text_result",
+        "title": "Roll Call Factba.se - Speech: Donald Trump Announces His 2024 Presidential Bid at Mar-a-Lago - November 15, 2022",
+        "url": "https://rollcall.com/factbase/trump/transcript/donald-trump-speech-presidential-big-palm-beach-florida-november-15-2022/"
+      },
+      {
+        "type": "text_result",
+        "title": "Donald Trump: Life Before the Presidency | Miller Center",
+        "url": "https://millercenter.org/president/trump/life-presidency"
+      }
+    ]
+  }
+]

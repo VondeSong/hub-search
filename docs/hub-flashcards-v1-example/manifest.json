@@ -1,0 +1,10 @@
+{
+  "format": "hub-flashcards-v1",
+  "version": 1,
+  "deckName": "Codex 导入示例",
+  "cardsFile": "cards.jsonl",
+  "generator": {
+    "agent": "codex",
+    "workflow": "deep-flashcards-v1"
+  }
+}

@@ -1,0 +1,91 @@
+[package]
+name = "craft-search"
+version = "0.16.396"
+description = "A fast local search companion for Craft"
+authors = ["Craft Search"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "craft_search_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+default = []
+custom-protocol = ["tauri/custom-protocol"]
+experimental-feishu-task-sync = []
+# Explicit local integration executable only; never enabled in release defaults.
+integration-dida-source = []
+integration-agent-acceptance = []
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+regex = "1"
+base64 = "0.22"
+chrono = "0.4"
+chacha20poly1305 = "0.10"
+fsrs = "=6.6.2"
+futures = "0.3"
+infer = "0.22"
+hmac = "0.12"
+icu_casemap = "=2.3.0"
+icu_collator = "=2.3.1"
+icu_locale = "=2.3.0"
+keyring = { version = "3", features = ["windows-native"] }
+lopdf = "0.44"
+notify = "8"
+pinyin = "0.11.0"
+pbkdf2 = "0.12"
+percent-encoding = "2"
+pulldown-cmark = "0.13"
+rand = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls", "stream"] }
+quick-xml = "0.41"
+quircs = "=0.10.3"
+rusqlite = { version = "0.37", features = ["bundled", "backup", "functions", "collation", "hooks", "blob"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+sha2 = "0.10"
+tantivy = "0.22"
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-deep-link = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "sync", "time"] }
+url = "2"
+vt100 = "=0.15.2"
+zip = { version = "=2.4.2", default-features = false, features = ["deflate-flate2", "flate2"] }
+
+[dev-dependencies]
+qrcode = { version = "=0.14.1", default-features = false }
+
+[target.'cfg(windows)'.dependencies]
+portable-pty = { version = "=0.9.0", path = "vendor/portable-pty" }
+winreg = "0.55"
+windows = { version = "0.61.3", features = [
+  "Data_Pdf",
+  "Foundation",
+  "Globalization",
+  "Graphics_Imaging",
+  "Media_Ocr",
+  "Networking_Connectivity",
+  "Storage",
+  "Storage_Streams",
+  "Win32_Foundation",
+  "Win32_Storage_FileSystem",
+  "Win32_Security",
+  "Win32_Graphics_Dwm",
+  "Win32_System_Threading",
+  "Win32_System_JobObjects",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_WindowsAndMessaging",
+] }

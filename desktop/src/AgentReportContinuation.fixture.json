@@ -1,0 +1,1629 @@
+{
+  "work": {
+    "activeRun": null,
+    "anchor": {
+      "documentId": "current",
+      "kind": "note",
+      "libraryId": "v1-fixtures",
+      "pageId": null
+    },
+    "authorizationVersion": 1,
+    "goal": "这是受控合成资料验收，不代表真实业务或人类确认。请明确使用 $v5-sleep-review，读取其 references/evidence.md、references/sleep-method.md 和 assets/report-template.md，再完整读取唯一获准笔记。按日期标题的记录日归属、不回拨昨夜日期，仅分析2025年1月实际主睡眠精确时长。逐段保留候选、出处和排除原因；午睡、旧估计、起止时间不能冒充实际睡眠，2月记录不纳入1月。由宿主数据集和图表工具计算月均并核验，不能手填汇总。持久保存带结果引用的工作记录，记下数据集、图表及其版本，供同事项后续纠正继续使用。按模板交付简短有原文出处的报告，说明覆盖范围、未知和限制。不要读取其他资料、修改原笔记、执行外部保存、压缩线程或发起其他业务动作。",
+    "grant": {
+      "libraryIds": [],
+      "notes": [
+        {
+          "documentId": "current",
+          "kind": "note",
+          "libraryId": "v1-fixtures",
+          "pageId": null
+        }
+      ],
+      "readingItemKeys": []
+    },
+    "id": "work-GhyxzTl5PEnrrFYwmyw1OBZ8",
+    "report": null,
+    "revision": 2,
+    "state": "interrupted",
+    "successCriteria": "同一受控笔记和固定方法版本，实际读取方法、配套参考和模板，逐段核对原文与精确出处。按指定月份计算实际主睡眠均值，保留缺值和排除原因；存有出处的工作记录和可核对报告。数据、图表及后续纠正的版本关系真实，未知不补零，原笔记不变，未发生外部保存不能声称已保存。",
+    "updatedAt": 1793152955162
+  },
+  "lifecycle": {
+    "activeRunId": null,
+    "canResume": false,
+    "controlRevision": 6,
+    "executionBudget": {
+      "canAdmitModes": {
+        "deep": true,
+        "quick": true
+      },
+      "chargedOrReserved": {
+        "agentSessions": 3,
+        "bodyChars": 1410,
+        "elapsedMs": 293819,
+        "entitiesRead": 6,
+        "modelCalls": 0,
+        "modelRetries": 0,
+        "outputRepairs": 0,
+        "requestBytes": 1079186,
+        "summaries": 0,
+        "toolSteps": 50
+      },
+      "exhausted": false,
+      "limits": {
+        "agentSessions": 40,
+        "bodyChars": 1200000,
+        "elapsedMs": 18000000,
+        "entitiesRead": 200,
+        "modelCalls": 360,
+        "modelRetries": 20,
+        "outputRepairs": 20,
+        "requestBytes": 62914560,
+        "summaries": 800,
+        "toolSteps": 960
+      },
+      "providerTokensOrFeesBounded": false,
+      "remaining": {
+        "agentSessions": 37,
+        "bodyChars": 1198590,
+        "elapsedMs": 17706181,
+        "entitiesRead": 194,
+        "modelCalls": 360,
+        "modelRetries": 20,
+        "outputRepairs": 20,
+        "requestBytes": 61835374,
+        "summaries": 800,
+        "toolSteps": 910
+      },
+      "rootWorkId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8",
+      "schemaVersion": 1,
+      "scope": "host execution counters; provider token/fee usage and recovery quota are separate",
+      "unsettledRunIds": []
+    },
+    "executionModes": {
+      "deep": false,
+      "quick": false
+    },
+    "lastCommand": null,
+    "providerBudget": {
+      "canAdmitRun": false,
+      "chargedOrReserved": {
+        "inputTokens": 2453834,
+        "outputTokens": 23666,
+        "uncachedInputTokens": 662474
+      },
+      "feesKnown": false,
+      "limits": {
+        "inputTokens": 2700000,
+        "outputTokens": 24576,
+        "uncachedInputTokens": 900000
+      },
+      "perRun": {
+        "inputTokens": 900000,
+        "outputTokens": 8192,
+        "uncachedInputTokens": 300000
+      },
+      "providerTokensBounded": true,
+      "rootWorkId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8",
+      "scope": "estimated admission and observed stop; not provider-side absolute billing cap",
+      "state": "exhausted",
+      "unmeasuredRunIds": [
+        "run-MhuDaRS-wJMW0ptNZvSJpka2",
+        "run--u520hbvb8J-Y96NesiBJ1W4"
+      ]
+    },
+    "reason": "事项执行额度不可用，已暂停新分析；旧成果与待核对结果仍可查看",
+    "recordedUsage": {
+      "agentSessions": 3,
+      "bodyChars": 1410,
+      "elapsedMs": 293819,
+      "entitiesRead": 6,
+      "modelCalls": 0,
+      "modelRetries": 0,
+      "outputRepairs": 0,
+      "requestBytes": 1079186,
+      "summaries": 0,
+      "toolSteps": 50
+    },
+    "recordedUsageIsLowerBound": true,
+    "recoveryMode": "newRunWithRevalidatedContext",
+    "requiresExplicitResume": false,
+    "runLimit": null,
+    "runsUsed": 6,
+    "schemaVersion": 1,
+    "state": "interrupted",
+    "traceBudget": {
+      "canAdmitRun": true,
+      "dataBytes": 20971520,
+      "nextRunReservationBytes": 1048576,
+      "physicalDiskGuarantee": false,
+      "reservedControlBytes": 262144,
+      "runLimit": null,
+      "state": "managed",
+      "storedPayloadBytes": 758841
+    },
+    "unmeasuredRunIds": [
+      "run-MhuDaRS-wJMW0ptNZvSJpka2",
+      "run--u520hbvb8J-Y96NesiBJ1W4"
+    ],
+    "unresolvedActions": 0,
+    "usageCompleteness": "incomplete",
+    "workRevision": 2
+  },
+  "analysisArtifacts": [
+    {
+      "artifactId": "chart-nmahqij09J8wK92uuVnEHcYb",
+      "content": {
+        "analysis": {
+          "aggregation": "monthlyMean",
+          "datasetId": "sleep-3Hfi9cndjyvDy0dQTDHC8dxQ",
+          "datasetRevision": 2,
+          "expectedSnapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689",
+          "source": "sleepDataset"
+        },
+        "artifactId": "chart-nmahqij09J8wK92uuVnEHcYb",
+        "authorizationVersion": 1,
+        "baseRevision": 1,
+        "changeSummary": "本轮AI受控纠正将1月2日分析值8改为7.5小时，绑定同一数据集修订2重算1月均值；保留图表修订1。",
+        "contentHash": "d71e1dabfb57751ba8cb86613df4378713a21d2d93dea48b53f866ab7125707e",
+        "createdAt": 1793140768783,
+        "data": {
+          "datasetRevision": "bdb915fc6cb025b56482b0d9809373bf719bf1116932bd819f40f67240261e67",
+          "extractionDataset": {
+            "aggregation": "monthlyMean",
+            "coverage": {
+              "dates": {
+                "denominator": "captured date headings; undated text is not assigned a date",
+                "recognizedSections": 3,
+                "unassignedCharacters": 0,
+                "uniqueDates": 3
+              },
+              "history": {
+                "basis": "authorized captured local cache, not a complete calendar or remote history",
+                "status": "unknown"
+              },
+              "material": {
+                "basis": "hostReadAllCapturedMembers",
+                "matched": 1,
+                "read": 1
+              },
+              "metric": {
+                "accepted": 2,
+                "ambiguous": 2,
+                "candidates": 6,
+                "conflicting": 0,
+                "datesWithoutAcceptedValue": 1,
+                "denominator": "candidate events; accepted exact main-sleep events only, never imputed zero",
+                "excluded": 4,
+                "missing": 0
+              }
+            },
+            "datasetId": "sleep-3Hfi9cndjyvDy0dQTDHC8dxQ",
+            "dateRule": "按日期标题记录日归属，不回拨昨夜日期；仅2025年1月",
+            "inclusionRule": "仅2025年1月精确实际主睡眠；明确更正替代旧值，午睡、旧估计、起止推算和2月排除；未知null不补零",
+            "methodRef": "method-7ac53e4aa0c67dd10d88efd6e408641c7e5313a6c8e060a0344c19c71872d5f6",
+            "metric": "sleep_duration_hours",
+            "revision": 2,
+            "rows": [
+              {
+                "ambiguity": "",
+                "correctionSource": null,
+                "dateBasis": "recordedDay",
+                "eventDate": "2025-01-01",
+                "eventRef": "jan1",
+                "evidenceRefs": [
+                  {
+                    "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    "end": 36,
+                    "itemIndex": 0,
+                    "sourceRevision": {
+                      "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                      "evidenceVersion": {
+                        "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                        "kind": "document"
+                      },
+                      "metadata": [
+                        "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                        null,
+                        141
+                      ]
+                    },
+                    "start": 23,
+                    "text": "昨夜主睡眠实际睡了7小时。"
+                  }
+                ],
+                "exclusionReason": "被同段明确复核更正6.5小时替代",
+                "normalizedValue": 7,
+                "rawValue": "昨夜主睡眠实际睡了7小时。",
+                "reviewBasis": {
+                  "kind": "modelReview",
+                  "reason": "完整读取固定原文，按用户指定2025年1月记录日口径逐段评审；被同段明确复核更正6.5小时替代",
+                  "sourceRef": null
+                },
+                "reviewState": "rejected",
+                "rowId": "jan1-old",
+                "supersedes": null,
+                "timezone": "Asia/Shanghai",
+                "unit": "hours",
+                "valueKind": "exact"
+              },
+              {
+                "ambiguity": "",
+                "correctionSource": null,
+                "dateBasis": "recordedDay",
+                "eventDate": "2025-01-01",
+                "eventRef": "jan1",
+                "evidenceRefs": [
+                  {
+                    "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    "end": 52,
+                    "itemIndex": 0,
+                    "sourceRevision": {
+                      "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                      "evidenceVersion": {
+                        "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                        "kind": "document"
+                      },
+                      "metadata": [
+                        "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                        null,
+                        141
+                      ]
+                    },
+                    "start": 36,
+                    "text": "复核更正：实际主睡眠6.5小时。"
+                  }
+                ],
+                "exclusionReason": "",
+                "normalizedValue": 6.5,
+                "rawValue": "复核更正：实际主睡眠6.5小时。",
+                "reviewBasis": {
+                  "kind": "modelReview",
+                  "reason": "完整读取固定原文，按用户指定2025年1月记录日口径逐段评审；原文明示精确实际主睡眠时长，采用明确更正后的值，不是人类确认",
+                  "sourceRef": null
+                },
+                "reviewState": "accepted_for_analysis",
+                "rowId": "jan1",
+                "supersedes": null,
+                "timezone": "Asia/Shanghai",
+                "unit": "hours",
+                "valueKind": "exact"
+              },
+              {
+                "ambiguity": "",
+                "correctionSource": null,
+                "dateBasis": "recordedDay",
+                "eventDate": "2025-01-01",
+                "eventRef": "nap",
+                "evidenceRefs": [
+                  {
+                    "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    "end": 58,
+                    "itemIndex": 0,
+                    "sourceRevision": {
+                      "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                      "evidenceVersion": {
+                        "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                        "kind": "document"
+                      },
+                      "metadata": [
+                        "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                        null,
+                        141
+                      ]
+                    },
+                    "start": 52,
+                    "text": "午睡半小时。"
+                  }
+                ],
+                "exclusionReason": "午睡不是主睡眠",
+                "normalizedValue": 0.5,
+                "rawValue": "午睡半小时。",
+                "reviewBasis": {
+                  "kind": "modelReview",
+                  "reason": "完整读取固定原文，按用户指定2025年1月记录日口径逐段评审；午睡不是主睡眠",
+                  "sourceRef": null
+                },
+                "reviewState": "rejected",
+                "rowId": "nap",
+                "supersedes": null,
+                "timezone": "Asia/Shanghai",
+                "unit": "hours",
+                "valueKind": "exact"
+              },
+              {
+                "ambiguity": "",
+                "correctionSource": {
+                  "kind": "userCorrection",
+                  "reason": "本轮对话明确为AI受控纠正输入：2025-01-02实际主睡眠改为7.5小时；不是人类确认。原文8小时保持原样。",
+                  "sourceRef": "vWIV02KSeKd1UP8Gpsdq8BJo"
+                },
+                "dateBasis": "recordedDay",
+                "eventDate": "2025-01-02",
+                "eventRef": "jan2",
+                "evidenceRefs": [
+                  {
+                    "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    "end": 88,
+                    "itemIndex": 0,
+                    "sourceRevision": {
+                      "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                      "evidenceVersion": {
+                        "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                        "kind": "document"
+                      },
+                      "metadata": [
+                        "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                        null,
+                        141
+                      ]
+                    },
+                    "start": 75,
+                    "text": "昨夜主睡眠实际睡了8小时。"
+                  }
+                ],
+                "exclusionReason": "",
+                "normalizedValue": 7.5,
+                "rawValue": "昨夜主睡眠实际睡了8小时。",
+                "reviewBasis": {
+                  "kind": "modelReview",
+                  "reason": "重新完整核对当前唯一笔记与固定快照一致。按本轮对话AI受控纠正采用7.5小时，非人类确认；rawValue和evidenceRefs仍保留原笔记8小时说法，旧数据修订1可复核。",
+                  "sourceRef": null
+                },
+                "reviewState": "accepted_for_analysis",
+                "rowId": "jan2",
+                "supersedes": "1:jan2",
+                "timezone": "Asia/Shanghai",
+                "unit": "hours",
+                "valueKind": "exact"
+              },
+              {
+                "ambiguity": "六个多小时非精确值",
+                "correctionSource": null,
+                "dateBasis": "recordedDay",
+                "eventDate": "2025-01-02",
+                "eventRef": "jan2",
+                "evidenceRefs": [
+                  {
+                    "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    "end": 98,
+                    "itemIndex": 0,
+                    "sourceRevision": {
+                      "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                      "evidenceVersion": {
+                        "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                        "kind": "document"
+                      },
+                      "metadata": [
+                        "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                        null,
+                        141
+                      ]
+                    },
+                    "start": 88,
+                    "text": "六个多小时是旧估计。"
+                  }
+                ],
+                "exclusionReason": "原文明示旧估计且非精确时长",
+                "normalizedValue": null,
+                "rawValue": "六个多小时是旧估计。",
+                "reviewBasis": {
+                  "kind": "modelReview",
+                  "reason": "完整读取固定原文，按用户指定2025年1月记录日口径逐段评审；原文明示旧估计且非精确时长",
+                  "sourceRef": null
+                },
+                "reviewState": "rejected",
+                "rowId": "jan2-old",
+                "supersedes": null,
+                "timezone": "Asia/Shanghai",
+                "unit": "hours",
+                "valueKind": "ambiguous"
+              },
+              {
+                "ambiguity": "实际时长不清楚",
+                "correctionSource": null,
+                "dateBasis": "recordedDay",
+                "eventDate": "2025-02-01",
+                "eventRef": "feb1",
+                "evidenceRefs": [
+                  {
+                    "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    "end": 140,
+                    "itemIndex": 0,
+                    "sourceRevision": {
+                      "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                      "evidenceVersion": {
+                        "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                        "kind": "document"
+                      },
+                      "metadata": [
+                        "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                        null,
+                        141
+                      ]
+                    },
+                    "start": 115,
+                    "text": "昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。"
+                  }
+                ],
+                "exclusionReason": "2月超出1月范围；起止时刻非实际睡眠，实际时长未知",
+                "normalizedValue": null,
+                "rawValue": "昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。",
+                "reviewBasis": {
+                  "kind": "modelReview",
+                  "reason": "完整读取固定原文，按用户指定2025年1月记录日口径逐段评审；2月超出1月范围；起止时刻非实际睡眠，实际时长未知",
+                  "sourceRef": null
+                },
+                "reviewState": "rejected",
+                "rowId": "feb1",
+                "supersedes": null,
+                "timezone": "Asia/Shanghai",
+                "unit": "hours",
+                "valueKind": "ambiguous"
+              }
+            ]
+          },
+          "rows": [
+            {
+              "group": "2025-01",
+              "sampleCount": 2,
+              "value": 7.0
+            }
+          ],
+          "statistics": {
+            "documentsAnalyzed": 1,
+            "duplicateDateSections": 0,
+            "inputSet": {
+              "byteCount": 317,
+              "consistency": "immutableCapturedInput",
+              "coverage": "authorizedLocalCache",
+              "createdAt": 1793140544,
+              "expiresAt": 1793745344,
+              "itemsTotal": 1,
+              "manifestDigest": "b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689",
+              "methodVersion": "literal-analysis-v1",
+              "parserVersion": "note-page-v1",
+              "scopeRevision": "dc966ea51d9a84914eaa7502f16d5c7a3ffddba44b96d78c77741808bd0c289b",
+              "snapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689",
+              "sourceAsOf": 1793140544,
+              "sourceFreshness": "capturedLocalCacheNotVerifiedWithRemote",
+              "status": "ready",
+              "supersedes": null,
+              "unavailableItems": 0
+            },
+            "unassignedCharacters": 0
+          },
+          "unit": "主睡眠平均时长（小时）"
+        },
+        "goalBinding": {
+          "authorizationVersion": 1,
+          "commandWatermark": 0,
+          "lastCommandId": null,
+          "schemaVersion": 1,
+          "workId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8",
+          "workRevision": 2
+        },
+        "goalRevision": 2,
+        "operationId": "jan-chart-correct-rev2",
+        "requestHash": "dd4714ccad5958f598d25847f055d4c819bbf1579b9a5c9b1b3239add59b3aa3",
+        "revision": 2,
+        "runId": "run-MhuDaRS-wJMW0ptNZvSJpka2",
+        "spec": {
+          "mark": "bar",
+          "metric": "sleep_duration_hours",
+          "sort": "groupAsc",
+          "term": null,
+          "title": "2025年1月记录日实际主睡眠精确时长均值（仅有值记录）"
+        },
+        "specVersion": 1,
+        "workId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8"
+      },
+      "currentRevision": 2,
+      "published": false,
+      "revision": 2,
+      "state": "checked",
+      "validation": {
+        "artifactId": "chart-nmahqij09J8wK92uuVnEHcYb",
+        "checkKind": "structureAndNumbers",
+        "checkedAt": 1793152931285,
+        "contentHash": "d71e1dabfb57751ba8cb86613df4378713a21d2d93dea48b53f866ab7125707e",
+        "findings": [],
+        "receiptId": "chart-check-V5mX7dogXK4ex0-7",
+        "revision": 2,
+        "status": "passed",
+        "validatorVersion": "literal-chart-v1",
+        "visualCheck": "unavailable"
+      },
+      "visualCheck": "unavailable"
+    }
+  ],
+  "sleepDatasets": [
+    {
+      "content": {
+        "authorizationVersion": 1,
+        "contentHash": "9b8a132e939e55eb7d93c08de56a02042e2bb05dc61b7f6b6c04c046710b8827",
+        "coverage": {
+          "dates": {
+            "denominator": "captured date headings; undated text is not assigned a date",
+            "recognizedSections": 3,
+            "unassignedCharacters": 0,
+            "uniqueDates": 3
+          },
+          "history": {
+            "basis": "authorized captured local cache, not a complete calendar or remote history",
+            "status": "unknown"
+          },
+          "material": {
+            "basis": "hostReadAllCapturedMembers",
+            "matched": 1,
+            "read": 1
+          },
+          "metric": {
+            "accepted": 2,
+            "ambiguous": 2,
+            "candidates": 6,
+            "conflicting": 0,
+            "datesWithoutAcceptedValue": 1,
+            "denominator": "candidate events; accepted exact main-sleep events only, never imputed zero",
+            "excluded": 4,
+            "missing": 0
+          }
+        },
+        "createdAt": 1793140764050,
+        "datasetId": "sleep-3Hfi9cndjyvDy0dQTDHC8dxQ",
+        "dateRule": "按日期标题记录日归属，不回拨昨夜日期；仅2025年1月",
+        "goalBinding": {
+          "authorizationVersion": 1,
+          "commandWatermark": 0,
+          "lastCommandId": null,
+          "schemaVersion": 1,
+          "workId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8",
+          "workRevision": 2
+        },
+        "inclusionRule": "仅2025年1月精确实际主睡眠；明确更正替代旧值，午睡、旧估计、起止推算和2月排除；未知null不补零",
+        "inputSet": {
+          "byteCount": 317,
+          "consistency": "immutableCapturedInput",
+          "coverage": "authorizedLocalCache",
+          "createdAt": 1793140544,
+          "expiresAt": 1793745344,
+          "itemsTotal": 1,
+          "manifestDigest": "b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689",
+          "methodVersion": "literal-analysis-v1",
+          "parserVersion": "note-page-v1",
+          "scopeRevision": "dc966ea51d9a84914eaa7502f16d5c7a3ffddba44b96d78c77741808bd0c289b",
+          "snapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689",
+          "sourceAsOf": 1793140544,
+          "sourceFreshness": "capturedLocalCacheNotVerifiedWithRemote",
+          "status": "ready",
+          "supersedes": null,
+          "unavailableItems": 0
+        },
+        "methodRef": "method-7ac53e4aa0c67dd10d88efd6e408641c7e5313a6c8e060a0344c19c71872d5f6",
+        "metric": "sleep_duration_hours",
+        "offsetUnit": "unicodeScalarValue",
+        "operationId": "jan2-ai-correction-rev2",
+        "parserVersion": "note-page-v1",
+        "requestHash": "7004557bd48419df071f60cd99082355661f84b3bb0712ed03d1c0fda6b81c33",
+        "revision": 2,
+        "rows": [
+          {
+            "ambiguity": "",
+            "correctionSource": null,
+            "dateBasis": "recordedDay",
+            "eventDate": "2025-01-01",
+            "eventRef": "jan1",
+            "evidenceRefs": [
+              {
+                "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                "end": 36,
+                "itemIndex": 0,
+                "sourceRevision": {
+                  "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                  "evidenceVersion": {
+                    "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                    "kind": "document"
+                  },
+                  "metadata": [
+                    "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    null,
+                    141
+                  ]
+                },
+                "start": 23,
+                "text": "昨夜主睡眠实际睡了7小时。"
+              }
+            ],
+            "exclusionReason": "被同段明确复核更正6.5小时替代",
+            "normalizedValue": 7,
+            "rawValue": "昨夜主睡眠实际睡了7小时。",
+            "reviewBasis": {
+              "kind": "modelReview",
+              "reason": "完整读取固定原文，按用户指定2025年1月记录日口径逐段评审；被同段明确复核更正6.5小时替代",
+              "sourceRef": null
+            },
+            "reviewState": "rejected",
+            "rowId": "jan1-old",
+            "supersedes": null,
+            "timezone": "Asia/Shanghai",
+            "unit": "hours",
+            "valueKind": "exact"
+          },
+          {
+            "ambiguity": "",
+            "correctionSource": null,
+            "dateBasis": "recordedDay",
+            "eventDate": "2025-01-01",
+            "eventRef": "jan1",
+            "evidenceRefs": [
+              {
+                "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                "end": 52,
+                "itemIndex": 0,
+                "sourceRevision": {
+                  "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                  "evidenceVersion": {
+                    "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                    "kind": "document"
+                  },
+                  "metadata": [
+                    "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    null,
+                    141
+                  ]
+                },
+                "start": 36,
+                "text": "复核更正：实际主睡眠6.5小时。"
+              }
+            ],
+            "exclusionReason": "",
+            "normalizedValue": 6.5,
+            "rawValue": "复核更正：实际主睡眠6.5小时。",
+            "reviewBasis": {
+              "kind": "modelReview",
+              "reason": "完整读取固定原文，按用户指定2025年1月记录日口径逐段评审；原文明示精确实际主睡眠时长，采用明确更正后的值，不是人类确认",
+              "sourceRef": null
+            },
+            "reviewState": "accepted_for_analysis",
+            "rowId": "jan1",
+            "supersedes": null,
+            "timezone": "Asia/Shanghai",
+            "unit": "hours",
+            "valueKind": "exact"
+          },
+          {
+            "ambiguity": "",
+            "correctionSource": null,
+            "dateBasis": "recordedDay",
+            "eventDate": "2025-01-01",
+            "eventRef": "nap",
+            "evidenceRefs": [
+              {
+                "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                "end": 58,
+                "itemIndex": 0,
+                "sourceRevision": {
+                  "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                  "evidenceVersion": {
+                    "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                    "kind": "document"
+                  },
+                  "metadata": [
+                    "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    null,
+                    141
+                  ]
+                },
+                "start": 52,
+                "text": "午睡半小时。"
+              }
+            ],
+            "exclusionReason": "午睡不是主睡眠",
+            "normalizedValue": 0.5,
+            "rawValue": "午睡半小时。",
+            "reviewBasis": {
+              "kind": "modelReview",
+              "reason": "完整读取固定原文，按用户指定2025年1月记录日口径逐段评审；午睡不是主睡眠",
+              "sourceRef": null
+            },
+            "reviewState": "rejected",
+            "rowId": "nap",
+            "supersedes": null,
+            "timezone": "Asia/Shanghai",
+            "unit": "hours",
+            "valueKind": "exact"
+          },
+          {
+            "ambiguity": "",
+            "correctionSource": {
+              "kind": "userCorrection",
+              "reason": "本轮对话明确为AI受控纠正输入：2025-01-02实际主睡眠改为7.5小时；不是人类确认。原文8小时保持原样。",
+              "sourceRef": "vWIV02KSeKd1UP8Gpsdq8BJo"
+            },
+            "dateBasis": "recordedDay",
+            "eventDate": "2025-01-02",
+            "eventRef": "jan2",
+            "evidenceRefs": [
+              {
+                "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                "end": 88,
+                "itemIndex": 0,
+                "sourceRevision": {
+                  "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                  "evidenceVersion": {
+                    "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                    "kind": "document"
+                  },
+                  "metadata": [
+                    "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    null,
+                    141
+                  ]
+                },
+                "start": 75,
+                "text": "昨夜主睡眠实际睡了8小时。"
+              }
+            ],
+            "exclusionReason": "",
+            "normalizedValue": 7.5,
+            "rawValue": "昨夜主睡眠实际睡了8小时。",
+            "reviewBasis": {
+              "kind": "modelReview",
+              "reason": "重新完整核对当前唯一笔记与固定快照一致。按本轮对话AI受控纠正采用7.5小时，非人类确认；rawValue和evidenceRefs仍保留原笔记8小时说法，旧数据修订1可复核。",
+              "sourceRef": null
+            },
+            "reviewState": "accepted_for_analysis",
+            "rowId": "jan2",
+            "supersedes": "1:jan2",
+            "timezone": "Asia/Shanghai",
+            "unit": "hours",
+            "valueKind": "exact"
+          },
+          {
+            "ambiguity": "六个多小时非精确值",
+            "correctionSource": null,
+            "dateBasis": "recordedDay",
+            "eventDate": "2025-01-02",
+            "eventRef": "jan2",
+            "evidenceRefs": [
+              {
+                "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                "end": 98,
+                "itemIndex": 0,
+                "sourceRevision": {
+                  "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                  "evidenceVersion": {
+                    "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                    "kind": "document"
+                  },
+                  "metadata": [
+                    "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    null,
+                    141
+                  ]
+                },
+                "start": 88,
+                "text": "六个多小时是旧估计。"
+              }
+            ],
+            "exclusionReason": "原文明示旧估计且非精确时长",
+            "normalizedValue": null,
+            "rawValue": "六个多小时是旧估计。",
+            "reviewBasis": {
+              "kind": "modelReview",
+              "reason": "完整读取固定原文，按用户指定2025年1月记录日口径逐段评审；原文明示旧估计且非精确时长",
+              "sourceRef": null
+            },
+            "reviewState": "rejected",
+            "rowId": "jan2-old",
+            "supersedes": null,
+            "timezone": "Asia/Shanghai",
+            "unit": "hours",
+            "valueKind": "ambiguous"
+          },
+          {
+            "ambiguity": "实际时长不清楚",
+            "correctionSource": null,
+            "dateBasis": "recordedDay",
+            "eventDate": "2025-02-01",
+            "eventRef": "feb1",
+            "evidenceRefs": [
+              {
+                "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                "end": 140,
+                "itemIndex": 0,
+                "sourceRevision": {
+                  "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                  "evidenceVersion": {
+                    "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                    "kind": "document"
+                  },
+                  "metadata": [
+                    "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    null,
+                    141
+                  ]
+                },
+                "start": 115,
+                "text": "昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。"
+              }
+            ],
+            "exclusionReason": "2月超出1月范围；起止时刻非实际睡眠，实际时长未知",
+            "normalizedValue": null,
+            "rawValue": "昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。",
+            "reviewBasis": {
+              "kind": "modelReview",
+              "reason": "完整读取固定原文，按用户指定2025年1月记录日口径逐段评审；2月超出1月范围；起止时刻非实际睡眠，实际时长未知",
+              "sourceRef": null
+            },
+            "reviewState": "rejected",
+            "rowId": "feb1",
+            "supersedes": null,
+            "timezone": "Asia/Shanghai",
+            "unit": "hours",
+            "valueKind": "ambiguous"
+          }
+        ],
+        "schemaVersion": 1,
+        "scopeRevision": "dc966ea51d9a84914eaa7502f16d5c7a3ffddba44b96d78c77741808bd0c289b",
+        "snapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689",
+        "unit": "hours",
+        "workId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8"
+      },
+      "currentRevision": 2,
+      "datasetId": "sleep-3Hfi9cndjyvDy0dQTDHC8dxQ",
+      "revision": 2,
+      "state": "current",
+      "verification": "Host checked source identity, coordinates and structure; semantic acceptance is attributed review, not objective certification."
+    }
+  ],
+  "modelSelection": {
+    "fast": false,
+    "model": "gpt-6.1-sol",
+    "provider": "codex",
+    "reasoningEffort": "medium"
+  },
+  "assistantOptions": {
+    "autoFlashcardInbox": false,
+    "externalMcp": true,
+    "model": {
+      "fast": false,
+      "maxConcurrent": 1,
+      "model": "gpt-6.1-sol",
+      "provider": "codex",
+      "reasoningEffort": "medium"
+    }
+  },
+  "run": {
+    "error": "Agent 材料预算已用尽，成果已保留（累计 288650 字节，上限 278528 字节）",
+    "id": "run--u520hbvb8J-Y96NesiBJ1W4",
+    "state": "interrupted",
+    "usage": {
+      "agentSessions": 1,
+      "bodyChars": 282,
+      "elapsedMs": 61056,
+      "entitiesRead": 1,
+      "modelCalls": 0,
+      "modelRetries": 0,
+      "outputRepairs": 0,
+      "requestBytes": 288650,
+      "summaries": 0,
+      "toolSteps": 16
+    }
+  },
+  "runActive": false,
+  "actionActive": false,
+  "evidence": [],
+  "conversation": {
+    "hasEarlier": false,
+    "messages": [
+      {
+        "createdAt": 0,
+        "id": "work-GhyxzTl5PEnrrFYwmyw1OBZ8-goal",
+        "kind": "request",
+        "revision": 1,
+        "role": "user",
+        "text": "这是受控合成资料验收，不代表真实业务或人类确认。请明确使用 $v5-sleep-review，读取其 references/evidence.md、references/sleep-method.md 和 assets/report-template.md，再完整读取唯一获准笔记。按日期标题的记录日归属、不回拨昨夜日期，仅分析2025年1月实际主睡眠精确时长。逐段保留候选、出处和排除原因；午睡、旧估计、起止时间不能冒充实际睡眠，2月记录不纳入1月。由宿主数据集和图表工具计算月均并核验，不能手填汇总。持久保存带结果引用的工作记录，记下数据集、图表及其版本，供同事项后续纠正继续使用。按模板交付简短有原文出处的报告，说明覆盖范围、未知和限制。不要读取其他资料、修改原笔记、执行外部保存、压缩线程或发起其他业务动作。"
+      },
+      {
+        "artifactRefs": [
+          {
+            "artifactId": "chart-nmahqij09J8wK92uuVnEHcYb",
+            "contentHash": "522b5ecd329b269eed5e56c8f1db8586dbcde283a13f5de367d620e85a2dc1b5",
+            "currentRevision": 2,
+            "datasetRevision": "b69d309828629a55eeefbe5e73ee523797b39dddf31e56d25dbd70369c6116c5",
+            "revision": 1
+          }
+        ],
+        "artifactState": "stale",
+        "createdAt": 1793140656510,
+        "evidence": [
+          {
+            "content": "# 2025-01-01\n学习 学习 💤é\n昨夜主睡眠实际睡了7小时。复核更正：实际主睡眠6.5小时。午睡半小时。\n# 2025-01-02\n学习\n昨夜主睡眠实际睡了8小时。六个多小时是旧估计。\n# 2025-02-01\n学习\n昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。\n",
+            "endChar": 141,
+            "facts": {
+              "provider": "obsidian",
+              "sourceFreshness": "notVerifiedWithRemote",
+              "sourceHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848"
+            },
+            "locator": {
+              "documentId": "current",
+              "kind": "note",
+              "libraryId": "v1-fixtures",
+              "pageId": null
+            },
+            "sourcePath": "current.md",
+            "startChar": 0,
+            "title": "current",
+            "totalChars": 141,
+            "truncated": false,
+            "version": {
+              "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+              "kind": "document"
+            }
+          }
+        ],
+        "id": "dAADvccEQf3AyIUE_dLQEKx6",
+        "report": {
+          "completion": {
+            "goalBinding": {
+              "authorizationVersion": 1,
+              "commandWatermark": 0,
+              "lastCommandId": null,
+              "schemaVersion": 1,
+              "workId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8",
+              "workRevision": 1
+            },
+            "items": [
+              {
+                "criterion": "指定技能、参考、模板及完整原文读取",
+                "explanation": "实际加载v5-sleep-review固定方法，依次读取两份参考和报告模板，随后完整读取唯一授权笔记141个Unicode scalar；未读其他资料。",
+                "refs": [],
+                "requiredResult": "response",
+                "requirementId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8-goal",
+                "status": "satisfied",
+                "supersededBy": null
+              },
+              {
+                "criterion": "按记录日限定2025年1月，逐段保留候选与排除、未知",
+                "explanation": "6行候选均有精确固定出处和模型评审。1月1日采用更正6.5小时、1月2日8小时；旧7小时、午睡、旧估计和2月含糊起止排除，未知null，不回拨昨夜，不推算实际睡眠。非睡眠学习段说明已记录。",
+                "refs": [],
+                "requiredResult": "response",
+                "requirementId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8-goal",
+                "status": "satisfied",
+                "supersededBy": null
+              },
+              {
+                "criterion": "持久工作记录及后续版本连续性",
+                "explanation": "workingState修订1实际saved=true，带真实结果引用，记载数据集1版、图表1版及绑定、归日、排除和后续沿用ID的纠正规则。",
+                "refs": [],
+                "requiredResult": "response",
+                "requirementId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8-goal",
+                "status": "satisfied",
+                "supersededBy": null
+              },
+              {
+                "criterion": "按模板报告、合成限制及禁止动作",
+                "explanation": "报告包含结果口径、覆盖数据图表、更正未完成项及原文出处限制；这是受控合成模型评审，非真实业务或人类确认。未修改原文、外部保存、压缩线程或发起其他业务动作；报告交付仅当前事项留存。",
+                "refs": [],
+                "requiredResult": "response",
+                "requirementId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8-goal",
+                "status": "satisfied",
+                "supersededBy": null
+              },
+              {
+                "criterion": "宿主月均计算与图表核验",
+                "explanation": "宿主基于数据集第1版两条已接受精确主睡眠值聚合2025-01，返回7.25小时、样本2；图表第1版结构数值核验通过，未声称视觉检查或外部发布。",
+                "refs": [
+                  "chart:433eac024b86774a76a5d8b08be7574c196d5b400550e5d4e508e0ee54ed824f"
+                ],
+                "requiredResult": "chart",
+                "requirementId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8-goal",
+                "status": "satisfied",
+                "supersededBy": null
+              },
+              {
+                "criterion": "指定技能、参考、模板及完整原文读取",
+                "explanation": "实际加载v5-sleep-review固定方法，依次读取两份参考和报告模板，随后完整读取唯一授权笔记141个Unicode scalar；未读其他资料。",
+                "refs": [],
+                "requiredResult": "response",
+                "requirementId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8-criteria",
+                "status": "satisfied",
+                "supersededBy": null
+              },
+              {
+                "criterion": "按记录日限定2025年1月，逐段保留候选与排除、未知",
+                "explanation": "6行候选均有精确固定出处和模型评审。1月1日采用更正6.5小时、1月2日8小时；旧7小时、午睡、旧估计和2月含糊起止排除，未知null，不回拨昨夜，不推算实际睡眠。非睡眠学习段说明已记录。",
+                "refs": [],
+                "requiredResult": "response",
+                "requirementId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8-criteria",
+                "status": "satisfied",
+                "supersededBy": null
+              },
+              {
+                "criterion": "持久工作记录及后续版本连续性",
+                "explanation": "workingState修订1实际saved=true，带真实结果引用，记载数据集1版、图表1版及绑定、归日、排除和后续沿用ID的纠正规则。",
+                "refs": [],
+                "requiredResult": "response",
+                "requirementId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8-criteria",
+                "status": "satisfied",
+                "supersededBy": null
+              },
+              {
+                "criterion": "按模板报告、合成限制及禁止动作",
+                "explanation": "报告包含结果口径、覆盖数据图表、更正未完成项及原文出处限制；这是受控合成模型评审，非真实业务或人类确认。未修改原文、外部保存、压缩线程或发起其他业务动作；报告交付仅当前事项留存。",
+                "refs": [],
+                "requiredResult": "response",
+                "requirementId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8-criteria",
+                "status": "satisfied",
+                "supersededBy": null
+              },
+              {
+                "criterion": "宿主月均计算与图表核验",
+                "explanation": "宿主基于数据集第1版两条已接受精确主睡眠值聚合2025-01，返回7.25小时、样本2；图表第1版结构数值核验通过，未声称视觉检查或外部发布。",
+                "refs": [
+                  "chart:433eac024b86774a76a5d8b08be7574c196d5b400550e5d4e508e0ee54ed824f"
+                ],
+                "requiredResult": "chart",
+                "requirementId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8-criteria",
+                "status": "satisfied",
+                "supersededBy": null
+              }
+            ]
+          },
+          "findings": [],
+          "limitations": [
+            "仅两条1月精确记录，不代表完整月历；其余日期未知不补零。",
+            "受控合成资料及模型语义评审，非人类确认；本地缓存未远端验证。",
+            "图表仅结构数值核验，无视觉检查或外部发布；快照有期限。"
+          ],
+          "nextSteps": [],
+          "prose": {
+            "citations": [
+              {
+                "evidenceId": "e1",
+                "quote": "昨夜主睡眠实际睡了7小时。复核更正：实际主睡眠6.5小时。午睡半小时。"
+              },
+              {
+                "evidenceId": "e1",
+                "quote": "昨夜主睡眠实际睡了8小时。六个多小时是旧估计。"
+              },
+              {
+                "evidenceId": "e1",
+                "quote": "昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。"
+              }
+            ],
+            "markdown": "# 本期主睡眠复核\n\n## 结果与口径\n**2025年1月有精确值记录的实际主睡眠均值为7.25小时，样本2条**，由宿主数据集与图表工具计算并核验。按日期标题的记录日归属，不把“昨夜”回拨到前一天；这不是完整31天的月均。\n\n## 覆盖、数据和图表\n已完整读取唯一获准笔记（141字符、3个日期段），逐段保留6条候选及固定原文出处：纳入2条，排除4条。学习文字和表情不属于睡眠指标。\n\n- **1月1日：6.5小时**；原7小时被“复核更正”替代，午睡半小时排除。[1]\n- **1月2日：8小时**；“六个多小时”明确为旧估计，排除。[2]\n- **2月1日：不纳入1月**；原文有起止时刻及中途醒来，但实际时长不清楚，保留未知，不推算或补零。[3]\n\n当前数据集与月均图表均为第1版，图表绑定数据集第1版，结构和数值核验通过。带结果引用的工作记录已在本事项持久留存，记有数据集、图表身份及版本，供后续纠正沿用。\n\n## 更正与未完成项\n6.5小时是**原文明确更正**；采用、排除和归日是模型按指定口径评审，不是人类确认。已使用 `$v5-sleep-review` 固定方法并读取两份参考及报告模板。本轮要求已完成；后续纠正须更新同一数据集、重算同一图表并重新核验报告。\n\n## 出处与限制\n[1] 1月1日：“昨夜主睡眠实际睡了7小时。复核更正：实际主睡眠6.5小时。午睡半小时。”\n\n[2] 1月2日：“昨夜主睡眠实际睡了8小时。六个多小时是旧估计。”\n\n[3] 2月1日：“昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。”\n\n这是受控合成资料验收，不代表真实业务事实。其余1月日期没有获准记录，未知不补零；仅覆盖授权本地缓存，未验证远端全量。核验不包含视觉检查。原笔记未修改，未执行外部保存或其他业务动作；快照有有效期，不承诺永久保留。"
+          },
+          "questions": [],
+          "status": "completed",
+          "summary": "# 本期主睡眠复核\n\n## 结果与口径\n**2025年1月有精确值记录的实际主睡眠均值为7.25小时，样本2条**，由宿主数据集与图表工具计算并核验。按日期标题的记录日归属，不把“昨夜”回拨到前一天；这不是完整31天的月均。\n\n## 覆盖、数据和图表\n已完整读取唯一获准笔记（141字符、3个日期段），逐段保留6条候选及固定原文出处：纳入2条，排除4条。学习文字和表情不属于睡眠指标。\n\n- **1月1日：6.5小时**；原7小时被“复核更正”替代，午睡半小时排除。[1]\n- **1月2日：8小时**；“六个多小时”明确为旧估计，排除。[2]\n- **2月1日：不纳入1月**；原文有起止时刻及中途醒来，但实际时长不清楚，保留未知，不推算或补零。[3]\n\n当前数据集与月均图表均为第1版，图表绑定数据集第1版，结构和数值核验通过。带结果引用的工作记录已在本事项持久留存，记有数据集、图表身份及版本，供后续纠正沿用。\n\n## 更正与未完成项\n6.5小时是**原文明确更正**；采用、排除和归日是模型按指定口径评审，不是人类确认。已使用 `$v5-sleep-review` 固定方法并读取两份参考及报告模板。本轮要求已完成；后续纠正须更新同一数据集、重算同一图表并重新核验报告。\n\n## 出处与限制\n[1] 1月1日：“昨夜主睡眠实际睡了7小时。复核更正：实际主睡眠6.5小时。午睡半小时。”\n\n[2] 1月2日：“昨夜主睡眠实际睡了8小时。六个多小时是旧估计。”\n\n[3] 2月1日：“昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。”\n\n这是受控合成资料验收，不代表真实业务事实。其余1月日期没有获准记录，未知不补零；仅覆盖授权本地缓存，未验证远端全量。核验不包含视觉检查。原笔记未修改，未执行外部保存或其他业务动作；快照有有效期，不承诺永久保留。",
+          "waitCondition": ""
+        },
+        "revision": 1,
+        "role": "assistant",
+        "runId": "run-3A6e48s2v9XPDiFXqoRTTnLY",
+        "validity": "用户要求已更新；新增或纠正的要求需要重新核对，旧回答仅供历史查阅。图表对应的用户要求已更新；主睡眠数据已纠正，图表尚未按新数据重新计算；回答使用图表第 1 版，当前已到第 2 版；旧回答仅供历史查阅，需按新版重新生成并核对。"
+      },
+      {
+        "createdAt": 1793140730864,
+        "id": "vWIV02KSeKd1UP8Gpsdq8BJo",
+        "kind": "request",
+        "revision": 2,
+        "role": "user",
+        "text": "AI受控纠正输入（不是人类确认）：2025-01-02 的实际主睡眠改为7.5小时，原笔记里的8小时保留为原始说法。继续明确使用 $v5-sleep-review 并读取两份参考和模板，先核对当前工作记录、数据和来源，再以本条对话作为纠正来源，修订同一个数据集和同一个图表并重新核验1月均值；不得创建替代数据集或替代图表冒充修订。保留旧版、原文与纠正依据，更新带实际引用和版本的工作记录及简短报告，不修改原笔记，不扩大范围，不执行外部保存。"
+      }
+    ],
+    "nextCursor": null
+  },
+  "validity": "",
+  "decisions": [],
+  "actions": {
+    "archiveTargets": [],
+    "flashcardDecks": [],
+    "items": [],
+    "obsidianEditAvailable": false,
+    "obsidianReportTarget": null,
+    "recoveryBudget": {
+      "actionChecks": 4,
+      "attemptsUsed": 0,
+      "perAction": {},
+      "rootWorkId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8",
+      "schemaVersion": 1,
+      "scope": "post-failure Obsidian file/index verification; no model or source-write permission",
+      "state": "available",
+      "workChecks": 80
+    },
+    "standaloneModelDrafts": {
+      "allowed": false,
+      "reason": "为遵守本事项的分析额度，暂不能单独生成新草稿；未启动模型。旧草稿、报告保存和结果核对仍按原授权处理"
+    },
+    "tagOptions": []
+  },
+  "workingState": {
+    "checklistOwner": "Task",
+    "entries": [
+      {
+        "entryId": "chart-current",
+        "evidenceRefs": [
+          {
+            "recordId": "ZYhm8pE9soaSKa7EsrpQShTz",
+            "sha256": "ebf056dad718d7eedd819d93d1ae8a51c768e536e1c9d39062bf952b5d260b41"
+          },
+          {
+            "recordId": "zmAdR7kuHlDwS66PzT8yKo9N",
+            "sha256": "cb24c80f661192108dc60c19a6b9a5ecf07c0e17b9d2c23ee1275e851e74737c"
+          }
+        ],
+        "hostSemanticValidation": false,
+        "invalidReason": null,
+        "kind": "statistic",
+        "metric": {
+          "coverage": "唯一授权笔记，1月仅2个有精确值记录日，非完整月历",
+          "filters": [
+            "2025-01",
+            "accepted_for_analysis",
+            "exact"
+          ],
+          "metric": "sleep_duration_hours monthlyMean",
+          "timeBasis": "标题记录日，不回拨昨夜",
+          "unit": "hours"
+        },
+        "runId": "run--u520hbvb8J-Y96NesiBJ1W4",
+        "semanticStatusSource": "modelWorkingNote",
+        "sourceRevisions": [
+          {
+            "authorizationVersion": 1,
+            "dependencyValidation": "known recorded sources of the original Run; not semantic validation of a working note",
+            "recordId": "ZYhm8pE9soaSKa7EsrpQShTz",
+            "runId": "run--u520hbvb8J-Y96NesiBJ1W4",
+            "scopeFingerprint": "0ed67fc4b7e2ce8a013afabc0cdf3378fa72818415cedd8f4cb799488a8dacc0",
+            "sha256": "ebf056dad718d7eedd819d93d1ae8a51c768e536e1c9d39062bf952b5d260b41",
+            "sourceRevisions": [
+              {
+                "endChar": 141,
+                "locator": {
+                  "documentId": "current",
+                  "kind": "note",
+                  "libraryId": "v1-fixtures",
+                  "pageId": null
+                },
+                "startChar": 0,
+                "version": {
+                  "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                  "kind": "document"
+                }
+              },
+              {
+                "arguments": {
+                  "expectedSnapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689",
+                  "itemIndex": 0,
+                  "limit": 8000,
+                  "start": 0
+                },
+                "snapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689"
+              }
+            ],
+            "utf8Bytes": 10270,
+            "workRevision": 2
+          },
+          {
+            "authorizationVersion": 1,
+            "dependencyValidation": "known recorded sources of the original Run; not semantic validation of a working note",
+            "recordId": "zmAdR7kuHlDwS66PzT8yKo9N",
+            "runId": "run--u520hbvb8J-Y96NesiBJ1W4",
+            "scopeFingerprint": "0ed67fc4b7e2ce8a013afabc0cdf3378fa72818415cedd8f4cb799488a8dacc0",
+            "sha256": "cb24c80f661192108dc60c19a6b9a5ecf07c0e17b9d2c23ee1275e851e74737c",
+            "sourceRevisions": [
+              {
+                "endChar": 141,
+                "locator": {
+                  "documentId": "current",
+                  "kind": "note",
+                  "libraryId": "v1-fixtures",
+                  "pageId": null
+                },
+                "startChar": 0,
+                "version": {
+                  "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                  "kind": "document"
+                }
+              },
+              {
+                "arguments": {
+                  "expectedSnapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689",
+                  "itemIndex": 0,
+                  "limit": 8000,
+                  "start": 0
+                },
+                "snapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689"
+              }
+            ],
+            "utf8Bytes": 9899,
+            "workRevision": 2
+          }
+        ],
+        "status": "observed",
+        "updatedAtStep": 828,
+        "value": "同一chart-nmahqij09J8wK92uuVnEHcYb既有修订1→2，精确绑定同一数据集修订2。重读后再次validate修订2通过，receipt chart-check-V5mX7dogXK4ex0-7，contentHash=d71e1dabfb57751ba8cb86613df4378713a21d2d93dea48b53f866ab7125707e。宿主月均7.0小时，sampleCount=2，6.5与7.5。修订1的7.25仅历史且stale。无需重复patch已正确图表；未新建替代制品；仅结构数值核验，无视觉核验或外部发布。"
+      },
+      {
+        "entryId": "coverage",
+        "evidenceRefs": [
+          {
+            "recordId": "zinsrYw3Q3snL_m4iRe3CzCa",
+            "sha256": "147138c4642b4f35f78567865bed0cd73611106aa31e6554f3c1da25ea847ffb"
+          },
+          {
+            "recordId": "EhS4HR-ZTRtADOPowfCpu_ZK",
+            "sha256": "271d8031eab7341b5c405625d9c09ef89fc2d7e5217998232321d21550f90efb"
+          }
+        ],
+        "hostSemanticValidation": false,
+        "invalidReason": null,
+        "kind": "observation",
+        "metric": null,
+        "runId": "run--u520hbvb8J-Y96NesiBJ1W4",
+        "semanticStatusSource": "modelWorkingNote",
+        "sourceRevisions": [
+          {
+            "authorizationVersion": 1,
+            "dependencyValidation": "known recorded sources of the original Run; not semantic validation of a working note",
+            "recordId": "zinsrYw3Q3snL_m4iRe3CzCa",
+            "runId": "run--u520hbvb8J-Y96NesiBJ1W4",
+            "scopeFingerprint": "0ed67fc4b7e2ce8a013afabc0cdf3378fa72818415cedd8f4cb799488a8dacc0",
+            "sha256": "147138c4642b4f35f78567865bed0cd73611106aa31e6554f3c1da25ea847ffb",
+            "sourceRevisions": [
+              {
+                "endChar": 141,
+                "locator": {
+                  "documentId": "current",
+                  "kind": "note",
+                  "libraryId": "v1-fixtures",
+                  "pageId": null
+                },
+                "startChar": 0,
+                "version": {
+                  "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                  "kind": "document"
+                }
+              },
+              {
+                "arguments": {
+                  "expectedSnapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689",
+                  "itemIndex": 0,
+                  "limit": 8000,
+                  "start": 0
+                },
+                "snapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689"
+              }
+            ],
+            "utf8Bytes": 1640,
+            "workRevision": 2
+          },
+          {
+            "authorizationVersion": 1,
+            "dependencyValidation": "known recorded sources of the original Run; not semantic validation of a working note",
+            "recordId": "EhS4HR-ZTRtADOPowfCpu_ZK",
+            "runId": "run--u520hbvb8J-Y96NesiBJ1W4",
+            "scopeFingerprint": "0ed67fc4b7e2ce8a013afabc0cdf3378fa72818415cedd8f4cb799488a8dacc0",
+            "sha256": "271d8031eab7341b5c405625d9c09ef89fc2d7e5217998232321d21550f90efb",
+            "sourceRevisions": [
+              {
+                "endChar": 141,
+                "locator": {
+                  "documentId": "current",
+                  "kind": "note",
+                  "libraryId": "v1-fixtures",
+                  "pageId": null
+                },
+                "startChar": 0,
+                "version": {
+                  "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                  "kind": "document"
+                }
+              },
+              {
+                "arguments": {
+                  "expectedSnapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689",
+                  "itemIndex": 0,
+                  "limit": 8000,
+                  "start": 0
+                },
+                "snapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689"
+              }
+            ],
+            "utf8Bytes": 2083,
+            "workRevision": 2
+          }
+        ],
+        "status": "observed",
+        "updatedAtStep": 828,
+        "value": "重新完整读取唯一current.md及原固定快照，141 Unicode scalar，源版本6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80，正文哈希c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848一致。逐段核对6候选：7被6.5替代、午睡排除、1月2日原8按对话纠正7.5、旧估计排除、2月未知且超范围。2接受4排除，未记录日未知不补零。未读取其他资料、未修改原文、未执行外部保存。"
+      },
+      {
+        "entryId": "dataset-current",
+        "evidenceRefs": [
+          {
+            "recordId": "7arnXFDGfYTwNavVVWKzo4hm",
+            "sha256": "ed0946ed767cc7874a77d55eb11ca819fafd7dd3f88d0f545e1023113219e825"
+          },
+          {
+            "recordId": "cYzyCINRI--T2FpXBNBJaeWH",
+            "sha256": "40ca7d7fd5e03028aa57c81f2f64909781f6c6b1a08cc190ac87b37c2caf5311"
+          },
+          {
+            "recordId": "zinsrYw3Q3snL_m4iRe3CzCa",
+            "sha256": "147138c4642b4f35f78567865bed0cd73611106aa31e6554f3c1da25ea847ffb"
+          }
+        ],
+        "hostSemanticValidation": false,
+        "invalidReason": null,
+        "kind": "observation",
+        "metric": null,
+        "runId": "run--u520hbvb8J-Y96NesiBJ1W4",
+        "semanticStatusSource": "modelWorkingNote",
+        "sourceRevisions": [
+          {
+            "authorizationVersion": 1,
+            "dependencyValidation": "known recorded sources of the original Run; not semantic validation of a working note",
+            "recordId": "7arnXFDGfYTwNavVVWKzo4hm",
+            "runId": "run--u520hbvb8J-Y96NesiBJ1W4",
+            "scopeFingerprint": "0ed67fc4b7e2ce8a013afabc0cdf3378fa72818415cedd8f4cb799488a8dacc0",
+            "sha256": "ed0946ed767cc7874a77d55eb11ca819fafd7dd3f88d0f545e1023113219e825",
+            "sourceRevisions": [
+              {
+                "endChar": 141,
+                "locator": {
+                  "documentId": "current",
+                  "kind": "note",
+                  "libraryId": "v1-fixtures",
+                  "pageId": null
+                },
+                "startChar": 0,
+                "version": {
+                  "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                  "kind": "document"
+                }
+              },
+              {
+                "arguments": {
+                  "expectedSnapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689",
+                  "itemIndex": 0,
+                  "limit": 8000,
+                  "start": 0
+                },
+                "snapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689"
+              }
+            ],
+            "utf8Bytes": 9260,
+            "workRevision": 2
+          },
+          {
+            "authorizationVersion": 1,
+            "dependencyValidation": "known recorded sources of the original Run; not semantic validation of a working note",
+            "recordId": "cYzyCINRI--T2FpXBNBJaeWH",
+            "runId": "run--u520hbvb8J-Y96NesiBJ1W4",
+            "scopeFingerprint": "0ed67fc4b7e2ce8a013afabc0cdf3378fa72818415cedd8f4cb799488a8dacc0",
+            "sha256": "40ca7d7fd5e03028aa57c81f2f64909781f6c6b1a08cc190ac87b37c2caf5311",
+            "sourceRevisions": [
+              {
+                "endChar": 141,
+                "locator": {
+                  "documentId": "current",
+                  "kind": "note",
+                  "libraryId": "v1-fixtures",
+                  "pageId": null
+                },
+                "startChar": 0,
+                "version": {
+                  "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                  "kind": "document"
+                }
+              },
+              {
+                "arguments": {
+                  "expectedSnapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689",
+                  "itemIndex": 0,
+                  "limit": 8000,
+                  "start": 0
+                },
+                "snapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689"
+              }
+            ],
+            "utf8Bytes": 9004,
+            "workRevision": 2
+          },
+          {
+            "authorizationVersion": 1,
+            "dependencyValidation": "known recorded sources of the original Run; not semantic validation of a working note",
+            "recordId": "zinsrYw3Q3snL_m4iRe3CzCa",
+            "runId": "run--u520hbvb8J-Y96NesiBJ1W4",
+            "scopeFingerprint": "0ed67fc4b7e2ce8a013afabc0cdf3378fa72818415cedd8f4cb799488a8dacc0",
+            "sha256": "147138c4642b4f35f78567865bed0cd73611106aa31e6554f3c1da25ea847ffb",
+            "sourceRevisions": [
+              {
+                "endChar": 141,
+                "locator": {
+                  "documentId": "current",
+                  "kind": "note",
+                  "libraryId": "v1-fixtures",
+                  "pageId": null
+                },
+                "startChar": 0,
+                "version": {
+                  "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                  "kind": "document"
+                }
+              },
+              {
+                "arguments": {
+                  "expectedSnapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689",
+                  "itemIndex": 0,
+                  "limit": 8000,
+                  "start": 0
+                },
+                "snapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689"
+              }
+            ],
+            "utf8Bytes": 1640,
+            "workRevision": 2
+          }
+        ],
+        "status": "observed",
+        "updatedAtStep": 828,
+        "value": "本轮先读工作记录、同一sleep-3Hfi9cndjyvDy0dQTDHC8dxQ修订2与来源，再核对保留的修订1。纠正已完成，不重放或新建替代：jan2分析值8→7.5，supersedes=1:jan2，correctionSource.sourceRef=vWIV02KSeKd1UP8Gpsdq8BJo，明确AI受控纠正非人类确认。rawValue与[75,88)仍为原文8小时；其余5行完整沿用，行级出处/排除理由保留。快照analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689。"
+      },
+      {
+        "entryId": "method",
+        "evidenceRefs": [
+          {
+            "recordId": "ngLcB3iFWAU_qLWE_raMVSSp",
+            "sha256": "2c427f18ecc8dc76b865cc6c91a3984b655aa8b808940faf4d6ef4c3c66ad70a"
+          },
+          {
+            "recordId": "YuGbPAKG-cD4km6oNb6p637a",
+            "sha256": "c6ee812c9cd6b3a69061293d7871d5ccd3e6ba3a1ffc36adb78343cd78c7a81b"
+          },
+          {
+            "recordId": "wXwEYGcorkkog_0l6ek3Top2",
+            "sha256": "2ae3b42725f785ffbaecc2f83211f512ce671d15c271c0eb9d8d8be487637c5b"
+          }
+        ],
+        "hostSemanticValidation": false,
+        "invalidReason": null,
+        "kind": "observation",
+        "metric": null,
+        "runId": "run--u520hbvb8J-Y96NesiBJ1W4",
+        "semanticStatusSource": "modelWorkingNote",
+        "sourceRevisions": [
+          {
+            "authorizationVersion": 1,
+            "dependencyValidation": "known recorded sources of the original Run; not semantic validation of a working note",
+            "recordId": "ngLcB3iFWAU_qLWE_raMVSSp",
+            "runId": "run--u520hbvb8J-Y96NesiBJ1W4",
+            "scopeFingerprint": "0ed67fc4b7e2ce8a013afabc0cdf3378fa72818415cedd8f4cb799488a8dacc0",
+            "sha256": "2c427f18ecc8dc76b865cc6c91a3984b655aa8b808940faf4d6ef4c3c66ad70a",
+            "sourceRevisions": [
+              {
+                "endChar": 141,
+                "locator": {
+                  "documentId": "current",
+                  "kind": "note",
+                  "libraryId": "v1-fixtures",
+                  "pageId": null
+                },
+                "startChar": 0,
+                "version": {
+                  "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                  "kind": "document"
+                }
+              },
+              {
+                "arguments": {
+                  "expectedSnapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689",
+                  "itemIndex": 0,
+                  "limit": 8000,
+                  "start": 0
+                },
+                "snapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689"
+              }
+            ],
+            "utf8Bytes": 1118,
+            "workRevision": 2
+          },
+          {
+            "authorizationVersion": 1,
+            "dependencyValidation": "known recorded sources of the original Run; not semantic validation of a working note",
+            "recordId": "YuGbPAKG-cD4km6oNb6p637a",
+            "runId": "run--u520hbvb8J-Y96NesiBJ1W4",
+            "scopeFingerprint": "0ed67fc4b7e2ce8a013afabc0cdf3378fa72818415cedd8f4cb799488a8dacc0",
+            "sha256": "c6ee812c9cd6b3a69061293d7871d5ccd3e6ba3a1ffc36adb78343cd78c7a81b",
+            "sourceRevisions": [
+              {
+                "endChar": 141,
+                "locator": {
+                  "documentId": "current",
+                  "kind": "note",
+                  "libraryId": "v1-fixtures",
+                  "pageId": null
+                },
+                "startChar": 0,
+                "version": {
+                  "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                  "kind": "document"
+                }
+              },
+              {
+                "arguments": {
+                  "expectedSnapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689",
+                  "itemIndex": 0,
+                  "limit": 8000,
+                  "start": 0
+                },
+                "snapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689"
+              }
+            ],
+            "utf8Bytes": 4776,
+            "workRevision": 2
+          },
+          {
+            "authorizationVersion": 1,
+            "dependencyValidation": "known recorded sources of the original Run; not semantic validation of a working note",
+            "recordId": "wXwEYGcorkkog_0l6ek3Top2",
+            "runId": "run--u520hbvb8J-Y96NesiBJ1W4",
+            "scopeFingerprint": "0ed67fc4b7e2ce8a013afabc0cdf3378fa72818415cedd8f4cb799488a8dacc0",
+            "sha256": "2ae3b42725f785ffbaecc2f83211f512ce671d15c271c0eb9d8d8be487637c5b",
+            "sourceRevisions": [
+              {
+                "endChar": 141,
+                "locator": {
+                  "documentId": "current",
+                  "kind": "note",
+                  "libraryId": "v1-fixtures",
+                  "pageId": null
+                },
+                "startChar": 0,
+                "version": {
+                  "fingerprint": "6ba4cbdc8493f694c6c5e78d60197d1af5ca141b01e007888590d89986ac4d80",
+                  "kind": "document"
+                }
+              },
+              {
+                "arguments": {
+                  "expectedSnapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689",
+                  "itemIndex": 0,
+                  "limit": 8000,
+                  "start": 0
+                },
+                "snapshot": "analysis-v1:b36ada437c1e80625b715d3dd5860f48b3c90c56699d6a9d510567af813cb689"
+              }
+            ],
+            "utf8Bytes": 1619,
+            "workRevision": 2
+          }
+        ],
+        "status": "observed",
+        "updatedAtStep": 828,
+        "value": "本轮明确使用并实际重读v5-sleep-review及两份参考、报告模板。固定方法method-7ac53e4aa0c67dd10d88efd6e408641c7e5313a6c8e060a0344c19c71872d5f6未变；受控合成验收，非人类确认。"
+      }
+    ],
+    "goalBinding": {
+      "authorizationVersion": 1,
+      "commandWatermark": 0,
+      "lastCommandId": null,
+      "schemaVersion": 1,
+      "workId": "work-GhyxzTl5PEnrrFYwmyw1OBZ8",
+      "workRevision": 2
+    },
+    "goalOwner": "GoalRevision",
+    "grantsAuthority": false,
+    "pendingTargets": [],
+    "questionsNeedReview": false,
+    "revision": 3,
+    "schemaVersion": 1,
+    "sequence": "829",
+    "source": "persisted model working data; not personal memory, user commands or private reasoning",
+    "unresolvedQuestions": []
+  }
+}

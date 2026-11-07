@@ -1,0 +1,211 @@
+/* Android owns its navigation and reading layout, independent of desktop window width. */
+html[data-runtime-platform="android"] .mobile-app-shell,
+html[data-runtime-platform="android"] .mobile-app-shell.filters-open {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  grid-template-rows: auto minmax(0, 1fr) calc(74px + env(safe-area-inset-bottom, 0px));
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  box-shadow: none;
+}
+
+html[data-runtime-platform="android"] .mobile-app-shell .drag-strip { display: none; }
+html[data-runtime-platform="android"] .mobile-app-shell .main-content-override { min-width: 0; }
+html[data-runtime-platform="android"] .mobile-app-shell .task-workspace-header { flex-shrink: 0; min-height: calc(68px + env(safe-area-inset-top, 0px)); padding-top: calc(12px + env(safe-area-inset-top, 0px)); }
+html[data-runtime-platform="android"] .mobile-app-shell .task-source-chip { height: 44px; }
+html[data-runtime-platform="android"] .mobile-app-shell .task-sync-menu-trigger { width: 44px; height: 44px; }
+html[data-runtime-platform="android"] .mobile-app-shell .task-row-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; overflow-wrap: anywhere; line-height: 1.45; }
+html[data-runtime-platform="android"] .mobile-app-shell .tag-overview-grid > button { min-height: 48px; }
+html[data-runtime-platform="android"] .mobile-app-shell .tag-layout-switch button { width: 44px; height: 44px; }
+html[data-runtime-platform="android"] .mobile-app-shell .tag-properties-favorite { width: 44px; height: 44px; }
+html[data-runtime-platform="android"] .mobile-app-shell .tag-related-tags button { min-height: 44px; }
+html[data-runtime-platform="android"] .mobile-app-shell .mobile-active-filters { min-width: 0; min-height: 30px; grid-column: 1 / -1; grid-row: 3; display: flex; align-items: center; gap: 8px; padding: 3px 8px; border: 0; border-radius: 8px; background: #eaf3f7; color: #276a8a; text-align: left; font-size: 12px; }
+html[data-runtime-platform="android"] .mobile-app-shell .mobile-active-filters span { flex: 0 0 auto; font-weight: 620; }
+html[data-runtime-platform="android"] .mobile-app-shell .mobile-active-filters small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+html[data-runtime-platform="android"] .mobile-app-shell .mobile-filter-backdrop { position: absolute; z-index: 44; inset: 0; width: 100%; border: 0; background: rgba(23, 31, 27, .25); }
+html[data-runtime-platform="android"] .mobile-app-shell .filter-bar { z-index: 45; bottom: calc(74px + env(safe-area-inset-bottom, 0px)); }
+
+html[data-runtime-platform="android"] .mobile-navigation-footer {
+  z-index: 30;
+  min-height: calc(74px + env(safe-area-inset-bottom, 0px));
+  display: block;
+  padding: 0 8px env(safe-area-inset-bottom, 0px);
+  border-top: 1px solid #e5e8e7;
+  background: rgba(251, 252, 251, .97);
+  cursor: default;
+}
+html[data-runtime-platform="android"] .mobile-navigation-footer .footer-operation { display: none; }
+html[data-runtime-platform="android"] .mobile-navigation-footer .footer-status { display: contents; }
+html[data-runtime-platform="android"] .mobile-navigation-footer .footer-status > :not(.index-details-popover) { display: none; }
+html[data-runtime-platform="android"] .mobile-navigation-footer .index-details-popover {
+  right: 0;
+  bottom: calc(100% + 1px);
+  width: 100%;
+  max-height: min(72dvh, 640px);
+  border-radius: 18px 18px 0 0;
+}
+.mobile-primary-navigation { display: none; }
+html[data-runtime-platform="android"] .mobile-primary-navigation {
+  width: 100%;
+  height: 73px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 2px;
+}
+html[data-runtime-platform="android"] .mobile-primary-navigation button {
+  min-width: 0;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 2px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: #6b7378;
+  font-size: 12px;
+  font-weight: 550;
+}
+html[data-runtime-platform="android"] .mobile-primary-navigation button[aria-current="page"] { color: #246f9b; }
+html[data-runtime-platform="android"] .mobile-primary-navigation button[aria-current="page"] .mobile-primary-icon { background: #e5f2fa; }
+html[data-runtime-platform="android"] .mobile-primary-navigation button:active { background: #ecf1f3; }
+html[data-runtime-platform="android"] .mobile-primary-icon { position: relative; min-width: 54px; min-height: 30px; display: grid; place-items: center; border-radius: 16px; }
+html[data-runtime-platform="android"] .mobile-primary-icon small { position: absolute; top: -6px; right: -7px; min-width: 17px; height: 17px; display: grid; place-items: center; padding: 0 3px; border-radius: 9px; background: #bf5e39; color: #fff; font-size: 10px; }
+
+.mobile-browse-screen { display: none; }
+html[data-runtime-platform="android"] .mobile-browse-screen { height: 100%; min-height: 0; display: flex; flex-direction: column; background: #f7f9f8; }
+html[data-runtime-platform="android"] .mobile-browse-screen > header { min-height: calc(56px + env(safe-area-inset-top, 0px)); display: flex; align-items: end; justify-content: space-between; padding: env(safe-area-inset-top, 0px) 16px 8px; border-bottom: 1px solid #e6e9e7; background: #fff; }
+html[data-runtime-platform="android"] .mobile-browse-screen > header span { padding: 7px 0; color: #28332e; font-size: 18px; font-weight: 650; }
+html[data-runtime-platform="android"] .mobile-browse-screen > header button { min-width: 56px; min-height: 42px; border: 0; border-radius: 10px; background: transparent; color: #246f9b; font-size: 14px; }
+html[data-runtime-platform="android"] .mobile-browse-scroll { min-height: 0; overflow: auto; padding: 24px 16px 28px; overscroll-behavior: contain; }
+html[data-runtime-platform="android"] .mobile-browse-scroll h1 { margin: 0 0 15px; font-size: 24px; line-height: 1.25; }
+html[data-runtime-platform="android"] .mobile-browse-scroll h2 { margin: 26px 0 10px; color: #69736d; font-size: 13px; font-weight: 650; }
+html[data-runtime-platform="android"] .mobile-browse-group { overflow: hidden; border: 1px solid #e5eae6; border-radius: 17px; background: #fff; }
+html[data-runtime-platform="android"] .mobile-browse-group button { width: 100%; min-height: 62px; display: flex; align-items: center; gap: 13px; padding: 9px 15px; border: 0; border-bottom: 1px solid #eef0ee; background: #fff; text-align: left; }
+html[data-runtime-platform="android"] .mobile-browse-group button:last-child { border-bottom: 0; }
+html[data-runtime-platform="android"] .mobile-browse-group button:active { background: #f0f5f2; }
+html[data-runtime-platform="android"] .mobile-browse-group button > svg:first-child { flex: 0 0 auto; color: #387f93; }
+html[data-runtime-platform="android"] .mobile-browse-group button > svg:last-child { flex: 0 0 auto; color: #a9b0aa; }
+html[data-runtime-platform="android"] .mobile-browse-group button > span:not(.mobile-sync-dot) { min-width: 0; flex: 1; display: grid; gap: 3px; }
+html[data-runtime-platform="android"] .mobile-browse-group strong { color: #303933; font-size: 15px; font-weight: 600; }
+html[data-runtime-platform="android"] .mobile-browse-group small { color: #879089; font-size: 12px; }
+html[data-runtime-platform="android"] .mobile-browse-group em { color: #7b8580; font-size: 13px; font-style: normal; }
+html[data-runtime-platform="android"] .mobile-sync-dot { width: 13px; height: 13px; margin: 0 4px; border-radius: 50%; background: #6db18a; }
+html[data-runtime-platform="android"] .mobile-sync-dot.attention { background: #d6874c; }
+
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open { grid-template-rows: minmax(0, 1fr); }
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open > .search-header,
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open > .footer-bar { display: none; }
+html[data-runtime-platform="android"] .mobile-app-shell .mobile-workspace,
+html[data-runtime-platform="android"] .mobile-app-shell .mobile-workspace.with-preview { grid-template-columns: minmax(0, 1fr); }
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open .results-pane,
+html[data-runtime-platform="android"] .mobile-app-shell .pane-resizer { display: none; }
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open .preview-pane { padding: 0; }
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open .preview-card { max-width: none; border: 0; border-radius: 0; }
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open .preview-actions { top: 0; right: 0; bottom: auto; left: 0; width: 100%; min-height: calc(58px + env(safe-area-inset-top, 0px)); justify-content: flex-start; padding: env(safe-area-inset-top, 0px) 8px 0; border: 0; border-bottom: 1px solid #e8ebe9; border-radius: 0; box-shadow: none; }
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open .preview-actions > :not(.mobile-preview-back):not(.preview-copy-action):not(.preview-open-action) { display: none; }
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open .preview-actions .mobile-preview-back { min-width: 80px; height: 48px; display: flex !important; align-items: center; gap: 2px; padding: 0 7px; color: #286e91; font-size: 15px; }
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open .preview-actions .preview-copy-action { margin-left: auto; }
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open .preview-actions .preview-copy-action,
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open .preview-actions .preview-open-action { width: 48px; height: 48px; }
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open .preview-heading { min-height: calc(118px + env(safe-area-inset-top, 0px)); padding: calc(70px + env(safe-area-inset-top, 0px)) 17px 12px; }
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open .preview-content { font-size: max(16px, var(--preview-font-size)); }
+
+.mobile-preview-navigation { display: none; }
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open .mobile-preview-navigation { min-height: calc(62px + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; gap: 8px; padding: 6px 12px calc(6px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid #e8ebe9; background: #fff; }
+html[data-runtime-platform="android"] .mobile-preview-navigation button { min-width: 0; min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 3px; padding: 0 8px; border: 0; border-radius: 11px; background: #f2f5f4; color: #286e91; font-size: 14px; }
+html[data-runtime-platform="android"] .mobile-preview-navigation button:disabled { opacity: .42; }
+html[data-runtime-platform="android"] .mobile-preview-navigation > span { min-height: 48px; display: grid; place-items: center; color: #727b75; font-size: 13px; font-variant-numeric: tabular-nums; }
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open .preview-scroll-top { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+
+@media (max-width: 700px) {
+  html[data-runtime-platform="android"] .mobile-app-shell .results-pane { padding: 5px 14px 20px; }
+  html[data-runtime-platform="android"] .mobile-app-shell .recent-row { min-height: 76px; grid-template-columns: 40px minmax(0, 1fr); grid-template-rows: auto auto; gap: 2px 11px; padding: 10px 52px 10px 8px; }
+  html[data-runtime-platform="android"] .mobile-app-shell .recent-row > .library-icon { grid-row: 1 / 3; width: 40px; height: 40px; }
+  html[data-runtime-platform="android"] .mobile-app-shell .recent-title { font-size: max(16px, var(--result-font-size)); -webkit-line-clamp: 2; }
+  html[data-runtime-platform="android"] .mobile-app-shell .recent-date { grid-column: 2; grid-row: 2; display: block; padding: 0; color: #858e88; font-size: 12px; }
+  html[data-runtime-platform="android"] .mobile-app-shell .mobile-result-disclosure { display: none; }
+  html[data-runtime-platform="android"] .mobile-app-shell .result-favorite-toggle.recent { top: 50%; right: 6px; width: 44px; height: 44px; display: grid; transform: translateY(-50%); opacity: 1; }
+  html[data-runtime-platform="android"] .mobile-app-shell .quick-craft-result-group { padding: 13px 0 15px; }
+  html[data-runtime-platform="android"] .mobile-app-shell .grouped-page-hit { min-height: 48px; display: flex; flex-direction: column; justify-content: center; padding: 5px 6px; }
+  html[data-runtime-platform="android"] .mobile-app-shell .grouped-page-title { font-size: max(16px, var(--result-font-size)); line-height: 1.38; }
+  html[data-runtime-platform="android"] .mobile-app-shell .grouped-page-context { font-size: 12px; }
+  html[data-runtime-platform="android"] .mobile-app-shell .grouped-page-summary { font-size: 12px; }
+  html[data-runtime-platform="android"] .mobile-app-shell .grouped-search-favorite { width: 48px; height: 48px; flex-basis: 48px; opacity: 1; }
+  html[data-runtime-platform="android"] .mobile-app-shell .grouped-snippet-favorite { width: 44px; height: 48px; }
+  html[data-runtime-platform="android"] .mobile-app-shell .quick-craft-result-block,
+  html[data-runtime-platform="android"] .mobile-app-shell .grouped-excerpt-toggle { min-height: 48px; }
+  html[data-runtime-platform="android"] .mobile-app-shell .grouped-passage-excerpt { -webkit-line-clamp: 3; }
+  html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open .preview-content { padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-runtime-platform="android"] .mobile-app-shell .filter-bar { animation: none; }
+}
+/* Android settings and reading preferences. */
+html[data-runtime-platform="android"] .mobile-connection-group { margin: 10px 0; border: 1px solid #e2e8e4; border-radius: 14px; background: #fff; }
+html[data-runtime-platform="android"] .mobile-connection-group > summary { min-height: 52px; padding: 15px 14px; color: #286e91; font-size: 15px; font-weight: 600; cursor: pointer; }
+html[data-runtime-platform="android"] .mobile-connection-group > div { padding: 0 14px 16px; }
+html[data-runtime-platform="android"] .mobile-connection-group .add-space-title:first-child { margin-top: 8px; }
+html[data-runtime-platform="android"] .background-setting-row select { min-height: 44px; max-width: 150px; font-size: 14px; }
+html[data-runtime-platform="android"] .ocr-toggle.settings-toggle { min-height: 48px; }
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open .preview-heading h1 { font-size: max(19px, var(--preview-title-font-size)); font-weight: var(--preview-title-weight); overflow-wrap: anywhere; }
+html[data-runtime-platform="android"] .managed-space { min-width: 0; flex-wrap: wrap; }
+html[data-runtime-platform="android"] .managed-space-actions button,
+html[data-runtime-platform="android"] .managed-space-actions label { min-width: 44px; min-height: 44px; }
+html[data-runtime-platform="android"] .space-settings > .modal-close { top: calc(14px + env(safe-area-inset-top, 0px)); right: 16px; width: 48px; height: 48px; }
+
+/* Keep input and scrollable content inside the area above the Android keyboard. */
+html[data-runtime-platform="android"] .mobile-app-shell,
+html[data-runtime-platform="android"] .mobile-app-shell.filters-open { height: min(100%, var(--mobile-viewport-height, 100dvh)); --mobile-search-header-height: calc(112px + env(safe-area-inset-top, 0px)); }
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-keyboard-open { grid-template-rows: auto minmax(0, 1fr) 0; }
+html[data-runtime-platform="android"] .mobile-keyboard-open > .mobile-navigation-footer { display: none; }
+html[data-runtime-platform="android"] .mobile-app-shell .connection-overlay { height: var(--mobile-viewport-height, 100dvh); bottom: auto; }
+html[data-runtime-platform="android"] .mobile-app-shell .search-suggestions { max-height: max(48px, min(520px, calc(var(--mobile-viewport-height, 100dvh) - var(--mobile-search-header-height) - 12px))); overscroll-behavior: contain; }
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-keyboard-open .filter-bar { bottom: 0; max-height: calc(var(--mobile-viewport-height) - env(safe-area-inset-top, 0px) - 12px); }
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open { grid-template-rows: minmax(0, 1fr); }
+
+/* Landscape phones keep mobile controls instead of falling back to desktop chrome. */
+@media (orientation: landscape) and (max-height: 600px) {
+  html[data-runtime-platform="android"] .mobile-app-shell { --mobile-search-header-height: calc(60px + env(safe-area-inset-top, 0px)); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+  html[data-runtime-platform="android"] .mobile-app-shell .search-header { min-height: var(--mobile-search-header-height); display: grid; grid-template-columns: minmax(100px, 180px) minmax(0, 1fr) auto; grid-template-rows: 48px; gap: 6px 10px; padding: calc(6px + env(safe-area-inset-top, 0px)) 12px 6px; }
+  html[data-runtime-platform="android"] .mobile-app-shell .space-switcher { grid-column: 1; grid-row: 1; min-width: 0; }
+  html[data-runtime-platform="android"] .mobile-app-shell .space-button { width: 100%; max-width: 180px; height: 44px; }
+  html[data-runtime-platform="android"] .mobile-app-shell .search-box { grid-column: 2; grid-row: 1; width: 100%; max-width: none; height: 44px; margin: 0; }
+  html[data-runtime-platform="android"] .mobile-app-shell .search-header-actions { grid-column: 3; grid-row: 1; }
+  html[data-runtime-platform="android"] .mobile-app-shell .search-header-actions button { width: 44px; height: 44px; }
+  html[data-runtime-platform="android"] .mobile-app-shell .search-header input { font-size: 16px; }
+  html[data-runtime-platform="android"] .mobile-app-shell .search-shortcut-hint { display: none; }
+  html[data-runtime-platform="android"] .mobile-app-shell .mobile-active-filters { grid-row: 2; }
+  html[data-runtime-platform="android"] .mobile-app-shell .search-suggestions { position: fixed; top: var(--mobile-search-header-height); left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); width: auto; }
+  html[data-runtime-platform="android"] .mobile-app-shell .filter-bar { position: absolute; left: 0; right: 0; max-height: calc(var(--mobile-viewport-height, 100dvh) - 90px - env(safe-area-inset-top, 0px)); overflow: auto; flex-wrap: wrap; padding: 16px; border-radius: 16px 16px 0 0; background: #fff; }
+  html[data-runtime-platform="android"] .mobile-app-shell .preview-pane { min-height: 0; }
+  html[data-runtime-platform="android"] .mobile-app-shell .recent-row { min-height: 64px; }
+  html[data-runtime-platform="android"] .mobile-app-shell .recent-title,
+  html[data-runtime-platform="android"] .mobile-app-shell .grouped-page-title { font-size: max(16px, var(--result-font-size)); }
+  html[data-runtime-platform="android"] .mobile-app-shell .result-favorite-toggle { opacity: 1; min-width: 44px; min-height: 44px; }
+  html[data-runtime-platform="android"] .mobile-app-shell .connection-card.space-settings { height: 100%; max-height: 100%; padding: calc(6px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px)); }
+  html[data-runtime-platform="android"] .space-settings > .settings-brand { height: 44px; margin: 0 52px 4px 0; }
+  html[data-runtime-platform="android"] .space-settings .settings-brand .hub-mark { width: 28px; height: 28px; }
+  html[data-runtime-platform="android"] .space-settings .settings-brand h2 { font-size: 18px; }
+  html[data-runtime-platform="android"] .space-settings > p { display: none; }
+  html[data-runtime-platform="android"] .space-settings > .modal-close { top: calc(4px + env(safe-area-inset-top, 0px)); }
+  html[data-runtime-platform="android"] .space-settings .settings-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 6px; }
+  html[data-runtime-platform="android"] .space-settings .settings-category-tabs { display: flex; padding: 0; gap: 4px; overflow-x: auto; }
+  html[data-runtime-platform="android"] .space-settings .settings-category-tabs button { min-height: 44px; flex: 1; justify-content: center; white-space: nowrap; }
+  html[data-runtime-platform="android"] .space-settings .mobile-settings-category-picker { display: none; }
+  html[data-runtime-platform="android"] .space-settings .settings-detail { padding: 10px; }
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  html[data-runtime-platform="android"] .mobile-app-shell .mobile-result-disclosure { display: none; }
+  html[data-runtime-platform="android"] .mobile-app-shell .filter-bar { align-items: flex-start; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  html[data-runtime-platform="android"] .mobile-app-shell .filter-bar button { min-height: 44px; }
+  html[data-runtime-platform="android"] .mobile-app-shell .filter-bar .scope-menu { position: static; width: 100%; margin-top: 8px; max-height: max(88px, calc(var(--mobile-viewport-height, 100dvh) - 220px)); overflow-y: auto; }
+  html[data-runtime-platform="android"] .mobile-app-shell .connection-overlay { padding: 0; overflow: hidden; }
+  html[data-runtime-platform="android"] .mobile-app-shell .connection-card.space-settings { width: 100%; margin: 0; border: 0; border-radius: 0; }
+}

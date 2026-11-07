@@ -1,0 +1,11 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>补标复核与排除管理预览</title><style>:root{--hub-text-primary:#202124;--hub-text-secondary:#6e6e73;--hub-separator:#e5e5e8;--hub-content-surface:#fff;--hub-control-fill:#f6f6f8;--hub-accent:#087de0;--hub-accent-soft:#eef5ff}body{margin:24px;background:#f8f8f9;font-family:'Segoe UI',sans-serif}#root{max-width:1050px;margin:auto}</style><div id="root"></div><script type="module">
+import React from 'react';import {createRoot} from 'react-dom/client';
+window.__TAURI_INTERNALS__={invoke:async(command,{args})=>{
+if(args.action==='list')return {proposals:args.status==='pending'?[{proposalId:'p',tag:'专注',status:'pending',version:1,proposal:{title:'待进一步核对的内容',decision:'insufficient_evidence'}}]:[],nextCursor:null};
+if(args.action==='exclusion_review_due')return {count:0,hasMore:false,asOf:1788952200};
+if(args.action==='list_exclusions')return {items:[],nextCursor:null,mode:args.mode,snapshotVersion:1};
+return {};}};
+const {TagAssignmentInbox}=await import('/src/TagAssignmentInbox.tsx');
+function Preview(){React.useEffect(()=>{requestAnimationFrame(()=>{document.querySelector('.tag-exclusion-browser').open=true;});},[]);return React.createElement(TagAssignmentInbox);}
+createRoot(document.getElementById('root')).render(React.createElement(Preview));
+</script></html>

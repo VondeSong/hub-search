@@ -1,0 +1,23 @@
+import { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import type { FlashcardDeckSummary } from "./FlashcardTypes";
+
+export type QualityAIRecord = { id:string; kind:string; updatedAt:number; status?:string; task?:string; summary?:string; type?:string; reason?:string; evidence?:string; rule?:{title?:string;text:string;scopeType:string;scopeValue?:string;learningGoal?:string;exceptions?:string;positiveExample?:string;negativeExample?:string}; before?:{question:string;answer:string;explanation:string}; after?:{question:string;answer:string;explanation:string}; resultCardId?:string };
+export function FlashcardQualityAI({records,decks,refresh,onChanged}:{records:QualityAIRecord[];decks:FlashcardDeckSummary[];refresh:()=>Promise<void>;onChanged:(id?:string)=>Promise<void>}) {
+  const [deckId,setDeckId]=useState(""); const [goal,setGoal]=useState(""); const [error,setError]=useState(""); const [busy,setBusy]=useState(false); const [prompt,setPrompt]=useState(""); const [schedules,setSchedules]=useState<Record<string,string>>({});
+  const run=async(job:()=>Promise<void>)=>{setBusy(true);setError("");try{await job();}catch(e){setError(String(e));}finally{setBusy(false);}};
+  const create=(task:string)=>void run(async()=>{const request=await invoke<QualityAIRecord>("create_flashcard_quality_request",{input:{task,deckId,learningGoal:goal}});setPrompt(`请使用 hub-generate-flashcards skill，处理 Hub 闪卡质量请求 ${request.id}。调用 hub_get_flashcard_quality_work 读取全部分页，结合原文和适用规则检查；通过 hub_submit_flashcard_quality_proposals 提交有依据的待确认建议，不直接修改卡片或启用规则。`);await refresh();});
+  const resolve=(p:QualityAIRecord,accept:boolean)=>void run(async()=>{const result=await invoke<QualityAIRecord>("resolve_flashcard_quality_proposal",{id:p.id,expectedUpdatedAt:p.updatedAt,accept,schedule:schedules[p.id]??"new"});await refresh();if(accept)await onChanged(result.resultCardId);});
+  return <section className="quality-ai"><p>创建整理请求后，将下面的文字发给已连接 Hub MCP 的 Codex 等 AI。返回的建议会出现在这里，接受后才会生效。</p>
+    {error&&<p role="alert" className="quality-error">{error}</p>}
+    <div className="quality-field-row"><label>整理范围<select value={deckId} onChange={e=>setDeckId(e.target.value)}><option value="">全部牌组</option>{decks.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label><label>当前学习目标<input value={goal} onChange={e=>setGoal(e.target.value)} placeholder="例如：理解原理，配置参数按需查阅"/></label></div>
+    <footer><button disabled={busy} onClick={()=>create("summarize")}>从反馈整理规则建议</button><button disabled={busy} onClick={()=>create("audit")}>检查范围内的现有卡片</button></footer>
+    {prompt&&<label>发给 AI 的请求<textarea readOnly data-selectable="true" rows={4} value={prompt} onFocus={e=>e.target.select()}/></label>}
+    <details><summary>整理请求</summary>{records.filter(r=>r.kind==="request").map(r=><article className="quality-entry" key={r.id}><strong>{r.task==="audit"?"卡片检查":"反馈整理"} · {r.status==="completed"?"AI 已提交结果":"等待 AI 处理"}</strong><p>{r.summary}</p><code data-selectable="true">{r.id}</code><button onClick={()=>setPrompt(`请读取并处理 Hub 闪卡质量请求 ${r.id}，使用 hub_get_flashcard_quality_work 获取全部分页，通过 hub_submit_flashcard_quality_proposals 提交待确认建议。`)}>显示交接文字</button></article>)}</details>
+    {records.filter(r=>r.kind==="proposal").length===0&&<p className="quality-empty">尚无 AI 建议。创建请求不会自动启动外部 AI。</p>}
+    {records.filter(r=>r.kind==="proposal").sort((a,b)=>b.updatedAt-a.updatedAt).map(p=><article className="quality-entry" key={p.id}><header><strong>{p.type==="rule"?"规则建议":"卡片改写"}</strong><small>{p.status==="pending"?"待确认":p.status==="accepted"?"已接受":"已忽略"}</small></header><p>{p.reason}</p>
+      {p.type==="rule"&&p.rule?<><h4>{p.rule.title||"制卡规则"}</h4><p>{p.rule.text}</p><p>范围：{p.rule.scopeType==="global"?"全部任务":decks.find(d=>d.id===p.rule?.scopeValue)?.name||p.rule.scopeValue}</p><p>学习目标：{p.rule.learningGoal||"不限制学习目标"}</p><p>例外：{p.rule.exceptions||"未提供"}</p><p>正例：{p.rule.positiveExample||"未提供"}</p><p>反例：{p.rule.negativeExample||"未提供"}</p></>:<><div className="quality-comparison">{([['修改前',p.before],['建议修改后',p.after]] as const).map(([title,card])=><section key={title} data-selectable="true"><h4>{title}</h4><p>{card?.question}</p><p>答案：{card?.answer}</p><p>解释：{card?.explanation}</p></section>)}</div><p>来源依据：{p.evidence}</p>{p.status==="pending"&&<label>采用方式<select value={schedules[p.id]??"new"} onChange={e=>setSchedules({...schedules,[p.id]:e.target.value})}><option value="new">保存为新卡，重新学习（保留原卡）</option><option value="keep">替换原卡内容，保留复习进度</option></select></label>}</>}
+      {p.status==="pending"&&<footer><button disabled={busy} onClick={()=>resolve(p,true)}>接受建议</button><button disabled={busy} onClick={()=>resolve(p,false)}>忽略建议</button></footer>}
+    </article>)}
+  </section>;
+}

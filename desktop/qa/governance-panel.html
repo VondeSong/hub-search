@@ -1,0 +1,15 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/src/App.css"><title>标签治理一键分析预览</title><style>:root{--interface-font-size:15px;--hub-text-primary:#202124;--hub-text-secondary:#6e6e73;--hub-border:#e8e8eb}body{background:#f8f8f9;margin:24px;font-family:'Segoe UI',sans-serif}#root{max-width:630px;margin:auto;background:white;border:1px solid #e5e5e5;border-radius:14px;overflow:hidden}h3{font-size:15px;margin:18px 16px}hr{border:0;border-top:1px solid #eee}</style><div id="root"></div><script type="module">
+import React from 'react';import {createRoot} from 'react-dom/client';
+const audit={status:'active',stale:false,catalogReviewed:100,catalogTotal:240,tagsAnalyzed:2,pairsAnalyzed:1,candidatePending:3};
+window.__TAURI_INTERNALS__={invoke:async(command,payload={})=>{
+const args=payload.args??{};
+if(command==="list_tag_governance_proposals")return {proposals:[],total:0,nextCursor:null};
+if(command==="get_tag_taxonomy_health")return null;
+if(command==="list_tag_taxonomy_repairs")return {repairs:[],total:0,nextCursor:null};
+if(args.action==='definition_models')return {models:[{id:'gpt-6-astra',name:'GPT-6-Astra',reasoningLevels:['low','medium','high','xhigh','ultra'],defaultReasoning:'medium',fastDescription:'2x speed, increased usage'}]};
+if(args.action==='governance_audit_status')return {run:audit};
+if(args.action==='governance_analyze')return {analyzed:1,submitted:[{proposalId:'p',tags:['专注','注意力'],preview:{reviewBlocked:true}}],errors:[],coverage:'仅核对返回的证据片段，未穷尽全部标签关系。',...(args.global?{audit:{...audit,candidatePending:2}}:{})};
+throw Error(args.action);}};
+const {TagGovernanceInbox:CodexTagGovernance}=await import('/src/TagGovernanceInbox.tsx');
+createRoot(document.getElementById('root')).render(React.createElement(React.Fragment,null,React.createElement('h3',null,'标签关系整理 · 专注'),React.createElement(CodexTagGovernance,{tagId:'专注',onCompleted:()=>{}}),React.createElement('h3',null,'全局标签健康检查'),React.createElement(CodexTagGovernance,{onCompleted:()=>{}})));
+</script></html>

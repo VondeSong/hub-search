@@ -1,0 +1,176 @@
+/* Android presentation tokens. Geometry and navigation remain in MobileExperience. */
+html[data-runtime-platform="android"] {
+  --mobile-canvas: #f5f5f7;
+  --mobile-surface: #fff;
+  --mobile-ink: #1d1d1f;
+  --mobile-secondary: #606066;
+  --mobile-accent: #0066cc;
+  --mobile-selected: #e5f0ff;
+  --mobile-separator: #e2e2e7;
+  --mobile-press: #e9ebef;
+  --mobile-caption: .8125rem;
+  --mobile-label: 1rem;
+  --mobile-control: 1.0625rem;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--mobile-ink);
+  letter-spacing: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell :is(button, input, select) { font-family: inherit; }
+/* Search is a scanning surface: two lines per item, with stable touch targets. */
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-copy { height: auto; display: flex; flex-direction: column; align-items: stretch; gap: 5px; white-space: normal; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-recent-meta { min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-recent-meta .recent-path { flex: 1 1 110px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-recent-meta .recent-date { display: block; flex: 0 0 auto; padding: 0; font-size: .75rem; }
+
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-layer { position: absolute; inset: 0; z-index: 46; pointer-events: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-layer[hidden] { display: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-scrim { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: rgb(0 0 0 / .22); pointer-events: auto; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet { position: absolute; inset-inline: 0; bottom: 0; max-height: calc(var(--mobile-viewport-height, 100dvh) - env(safe-area-inset-top, 0px) - 16px); overflow-y: auto; overscroll-behavior: contain; padding: 0 20px calc(20px + env(safe-area-inset-bottom, 0px)); border-radius: 26px 26px 0 0; background: #f5f5f7; box-shadow: 0 -8px 32px rgb(0 0 0 / .12); pointer-events: auto; will-change: transform; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-grabber { height: 28px; display: grid; place-items: center; touch-action: none; cursor: grab; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-grabber span { width: 36px; height: 5px; border-radius: 4px; background: #8b8b91; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-heading h2 { margin: 0; color: var(--mobile-ink); font-size: 1.25rem; font-weight: 650; line-height: 1.4; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-heading button { min-width: 56px; min-height: 44px; border: 0; border-radius: 10px; color: var(--mobile-accent); background: transparent; font-size: 1rem; font-weight: 600; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-description { margin: 0 0 18px; color: var(--mobile-secondary); font-size: .8125rem; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet .filter-bar { position: static; display: flex; flex-direction: column; align-items: stretch; max-height: none; gap: 0; padding: 0; margin: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; animation: none; overflow: visible; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet .filter-bar::before { display: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet .scope-picker { width: 100%; max-width: none; flex: none; background: var(--mobile-surface); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet .scope-picker:first-child { border-radius: 14px 14px 0 0; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet .date-picker { border-radius: 0 0 14px 14px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet .filter-control-button { width: 100%; height: auto; min-height: 56px; display: grid; grid-template-columns: 20px auto minmax(0, 1fr) 12px; gap: 10px; padding: 13px 14px; border: 0; border-radius: 0; background: transparent; color: var(--mobile-ink); font-size: .9375rem; text-align: start; box-shadow: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet .scope-picker:not(.date-picker) > button { border-bottom: 1px solid var(--mobile-separator); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet .filter-control-button > svg:first-child { grid-column: 1; width: 19px; height: 19px; color: var(--mobile-secondary); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-label { grid-column: 2; font-weight: 500; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet .filter-chip-value { grid-column: 3; min-width: 0; text-align: end; color: var(--mobile-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet .filter-control-chevron { display: block; grid-column: 4; color: var(--mobile-secondary); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet .filter-bar .filter-control-button > svg { position: static; inset: auto; transform: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet .scope-menu { position: static; width: 100%; min-width: 0; margin: 0; padding: 4px 8px 10px; max-height: min(34dvh, 300px); overflow-y: auto; border: 0; border-radius: 0; box-shadow: none; background: var(--mobile-surface); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet .scope-menu button { min-height: 48px; color: var(--mobile-ink); font-size: .9375rem; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet .scope-menu button small { color: var(--mobile-secondary); font-size: .8125rem; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet .scope-menu button.active { background: var(--mobile-selected); color: #003f88; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet .filter-reset { align-self: flex-start; min-height: 44px; margin-top: 8px; color: var(--mobile-accent); font-size: .9375rem; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet .filter-sync-icon { width: 100%; height: auto; min-height: 48px; margin: 18px 0 0; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 12px; color: var(--mobile-accent); background: var(--mobile-surface); font-size: .9375rem; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet .filter-sync-icon:disabled { color: var(--mobile-secondary); opacity: .65; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-filter-sheet :is(button):active { background: var(--mobile-press); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell :is(button, select, summary):focus-visible {
+  outline: 2px solid var(--mobile-accent);
+  outline-offset: -3px;
+}
+
+/* A quiet content canvas with one level of grouping. */
+html[data-runtime-platform="android"] .mobile-browse-screen { background: var(--mobile-canvas); }
+html[data-runtime-platform="android"] .mobile-browse-screen > header {
+  border-bottom: 0;
+  background: var(--mobile-canvas);
+  padding-right: 20px;
+  padding-left: 20px;
+}
+html[data-runtime-platform="android"] .mobile-browse-screen > header span { color: var(--mobile-secondary); font-size: var(--mobile-label); font-weight: 500; }
+html[data-runtime-platform="android"] .mobile-browse-screen > header button { min-height: 48px; font-size: var(--mobile-control); color: var(--mobile-accent); }
+html[data-runtime-platform="android"] .mobile-browse-scroll { padding: 16px 20px 28px; }
+html[data-runtime-platform="android"] .mobile-browse-scroll h1 { margin-bottom: 24px; font-size: 1.75rem; line-height: 1.22; font-weight: 650; color: var(--mobile-ink); }
+html[data-runtime-platform="android"] .mobile-browse-scroll h2 { margin: 28px 12px 10px; color: var(--mobile-secondary); font-size: var(--mobile-caption); line-height: 1.4; font-weight: 600; }
+html[data-runtime-platform="android"] .mobile-browse-group { border: 0; border-radius: 16px; }
+html[data-runtime-platform="android"] .mobile-browse-group button { min-height: 76px; gap: 12px; padding: 14px 16px; border-color: var(--mobile-separator); background: var(--mobile-surface); }
+html[data-runtime-platform="android"] .mobile-browse-group button > svg:first-child { color: var(--mobile-accent); width: 22px; height: 22px; }
+html[data-runtime-platform="android"] .mobile-browse-group button > svg:last-child { color: #767680; width: 16px; }
+html[data-runtime-platform="android"] .mobile-browse-group strong { color: var(--mobile-ink); font-size: var(--mobile-control); line-height: 1.4; font-weight: 550; }
+html[data-runtime-platform="android"] .mobile-browse-group small { color: var(--mobile-secondary); font-size: var(--mobile-caption); line-height: 1.4; }
+html[data-runtime-platform="android"] .mobile-browse-group em { color: var(--mobile-secondary); font-size: .9375rem; font-variant-numeric: tabular-nums; }
+html[data-runtime-platform="android"] .mobile-sync-dot { background: #18733b; }
+html[data-runtime-platform="android"] .mobile-sync-dot.attention { background: #855000; }
+
+/* Keep tab hit regions stable while only the icon responds to a press. */
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-navigation-footer { background: rgba(250,250,252,.96); border-color: var(--mobile-separator); backdrop-filter: blur(16px); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-primary-navigation button { color: var(--mobile-secondary); font-size: .8125rem; font-weight: 500; gap: 3px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-primary-navigation button[aria-current="page"] { color: var(--mobile-accent); font-weight: 650; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-primary-navigation button[aria-current="page"] .mobile-primary-icon { background: var(--mobile-selected); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-primary-icon { min-width: 52px; min-height: 32px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-primary-icon small { background: var(--mobile-accent); border: 2px solid #fafafa; min-width: 20px; height: 20px; font-size: .625rem; font-weight: 650; }
+
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .search-header { background: var(--mobile-surface); border-bottom-color: transparent; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .search-box { background: #f0f0f3; border-radius: 12px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .search-box:focus-within { box-shadow: inset 0 0 0 2px var(--mobile-accent); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .search-header input { color: var(--mobile-ink); font-size: var(--mobile-control); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .search-header input::placeholder { color: var(--mobile-secondary); opacity: 1; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .space-button { color: var(--mobile-ink); font-size: var(--mobile-label); font-weight: 600; background: transparent; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .filter-toggle.active.filled { color: var(--mobile-accent); background: var(--mobile-selected); box-shadow: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-active-filters { background: var(--mobile-selected); color: #003f88; min-height: 44px; font-size: var(--mobile-caption); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-active-filters small { font-size: var(--mobile-caption); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell :is(.section-label, .recent-group-label) { color: var(--mobile-secondary); font-size: var(--mobile-caption); line-height: 1.4; font-weight: 600; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-title { max-width: 100%; color: var(--mobile-ink); line-height: 1.4; letter-spacing: 0; font-weight: 600; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-title-text { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell :is(.recent-path, .recent-date, .grouped-page-context, .grouped-page-summary) { color: var(--mobile-secondary); font-size: max(var(--mobile-caption), calc(var(--result-font-size) * .8)); line-height: 1.5; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-item.selected .recent-row { background: var(--mobile-selected); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .result-favorite-toggle.recent { color: var(--mobile-secondary); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .result-favorite-toggle.recent.active { color: var(--mobile-accent); }
+
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell.mobile-preview-open .preview-heading { padding-right: 20px; padding-left: 20px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell.mobile-preview-open .preview-heading h1 { color: var(--mobile-ink); line-height: 1.4; letter-spacing: 0; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell.mobile-preview-open .preview-content { padding-right: 20px; padding-left: 20px; line-height: 1.75; color: var(--mobile-ink); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell.mobile-preview-open .preview-actions .mobile-preview-back { color: var(--mobile-accent); font-size: var(--mobile-control); }
+html[data-runtime-platform="android"] .mobile-preview-navigation button { color: var(--mobile-accent); font-size: var(--mobile-label); background: var(--mobile-canvas); }
+
+/* Remove the nested panel frame; each setting remains a readable row. */
+html[data-runtime-platform="android"] .space-settings .settings-detail { padding: 0 0 16px; border: 0; border-radius: 0; background: transparent; scrollbar-gutter: auto; }
+html[data-runtime-platform="android"] .space-settings .background-setting-row { gap: 16px; padding: 16px 12px; }
+html[data-runtime-platform="android"] .space-settings .background-setting-row > span { min-width: 0; }
+html[data-runtime-platform="android"] .space-settings .background-setting-row strong { color: var(--mobile-ink); font-size: var(--mobile-label); line-height: 1.5; font-weight: 550; }
+html[data-runtime-platform="android"] .space-settings .background-setting-row small { margin-top: 4px; color: var(--mobile-secondary); font-size: var(--mobile-caption); line-height: 1.55; }
+html[data-runtime-platform="android"] .space-settings .background-setting-row select { min-height: 48px; font-size: var(--mobile-label); color: var(--mobile-ink); border-color: #767680; border-radius: 10px; }
+html[data-runtime-platform="android"] .space-settings .settings-section-label { color: var(--mobile-secondary); font-size: var(--mobile-caption); line-height: 1.4; padding: 16px 12px 8px; }
+html[data-runtime-platform="android"] .space-settings .mobile-settings-category-picker { background: var(--mobile-canvas); border: 0; border-radius: 12px; font-size: var(--mobile-label); color: var(--mobile-secondary); }
+html[data-runtime-platform="android"] .space-settings .mobile-settings-category-picker select { min-height: 48px; color: var(--mobile-ink); }
+html[data-runtime-platform="android"] .space-settings .ocr-toggle.settings-toggle.enabled { color: var(--mobile-accent); }
+html[data-runtime-platform="android"] .space-settings .ocr-toggle.settings-toggle i { background: #767680; }
+html[data-runtime-platform="android"] .space-settings .ocr-toggle.settings-toggle.enabled i { background: var(--mobile-accent); }
+html[data-runtime-platform="android"] .mobile-connection-group { border-color: var(--mobile-separator); border-radius: 12px; }
+html[data-runtime-platform="android"] .mobile-connection-group > summary { color: var(--mobile-accent); font-size: var(--mobile-label); line-height: 1.5; }
+
+@media (max-width: 700px) and (orientation: portrait) {
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell .search-header { grid-template-rows: 48px 50px; padding-right: 16px; padding-left: 16px; }
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell,
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell.filters-open { --mobile-search-header-height: calc(124px + env(safe-area-inset-top, 0px)); }
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell .search-suggestions { top: var(--mobile-search-header-height); }
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell .space-button { height: 48px; }
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell .search-header-actions .icon-button { width: 48px; height: 48px; flex-basis: 48px; }
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-pane { padding-right: 12px; padding-left: 12px; }
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-row { grid-template-columns: 32px minmax(0, 1fr); grid-template-rows: auto; gap: 12px; padding: 14px 48px 14px 8px; min-height: 76px; border-radius: 12px; }
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-row > .library-icon { grid-row: 1; width: 32px; height: 32px; border-radius: 9px; }
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-group-label { margin: 18px 8px 6px; }
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-group-label small { color: var(--mobile-secondary); font-size: .75rem; font-weight: 400; }
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-group .recent-item + .recent-item::before { position: absolute; inset-inline: 52px 48px; top: 0; height: 1px; background: var(--mobile-separator); content: ""; pointer-events: none; }
+  html[data-runtime-platform="android"] .space-settings > .settings-brand { min-height: 48px; margin-bottom: 8px; gap: 12px; }
+  html[data-runtime-platform="android"] .space-settings .settings-brand .hub-mark { width: 32px; height: 32px; }
+  html[data-runtime-platform="android"] .space-settings .settings-brand h2 { font-size: 1.375rem; line-height: 1.3; }
+  html[data-runtime-platform="android"] .space-settings > p { font-size: var(--mobile-caption); line-height: 1.5; color: var(--mobile-secondary); margin: 0 0 20px; }
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-row { padding-right: 60px; }
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-date { padding-right: 0; }
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell .result-favorite-toggle.recent { top: 50%; right: 6px; width: 44px; height: 44px; transform: translateY(-50%); }
+}
+
+/* Immediate pointer-down feedback, reversible transitions; no navigation delays. */
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell :is(.mobile-browse-group button, .mobile-primary-navigation button, .space-button, .recent-row, .mobile-preview-navigation button) { transition: background-color 120ms ease-out, color 120ms ease-out; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-primary-icon { transition: transform 180ms ease-out, background-color 120ms ease-out; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell :is(.mobile-browse-group button, .mobile-primary-navigation button, .space-button, .recent-row, .mobile-preview-navigation button):active { background: var(--mobile-press); transition-duration: 0ms; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-primary-navigation button:active .mobile-primary-icon { transform: scale(.94); transition-duration: 0ms; }
+@media (prefers-reduced-motion: reduce) {
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell *,
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell *::before,
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-primary-navigation button:active .mobile-primary-icon { transform: none; }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-navigation-footer { background: #fafafa; backdrop-filter: none; }
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell :is(.preview-actions, .filter-bar, .space-menu, .search-suggestions) { background: var(--mobile-surface); backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  html[data-runtime-platform="android"] { --mobile-secondary: #3b3b40; --mobile-separator: #767680; }
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-primary-navigation button[aria-current="page"] { outline: 2px solid var(--mobile-accent); outline-offset: -4px; }
+}

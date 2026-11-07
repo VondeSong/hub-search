@@ -1,0 +1,96 @@
+{
+  "work": {
+    "id": "work-03C_DkF9DzYJ_jOOTE_8GRkI",
+    "goal": "用一段话概括当前这篇隔离测试笔记中的保存顺序，引用原句，说明只核对了本篇。仅交付报告，不写文件。",
+    "state": "expired",
+    "grant": {
+      "libraryIds": [],
+      "notes": [
+        {
+          "kind": "note",
+          "libraryId": "obsidian:2480fe4da83df60f99649fdf",
+          "documentId": "7d21b137774a89fbda6b5fb4b490200cc773b5e7a4b88db10a1742630aace393",
+          "pageId": null
+        }
+      ],
+      "readingItemKeys": []
+    },
+    "report": null
+  },
+  "evidence": [],
+  "decisions": [],
+  "run": {
+    "id": "run-OMQK-X-kavWVzqQBpNcvv7Qs",
+    "usage": {}
+  },
+  "actions": {
+    "tagOptions": [],
+    "items": [
+      {
+        "id": "action-PVRHpQwq6sCuCgvwXfNiwGGf",
+        "kind": "obsidianEdit",
+        "state": "prepared",
+        "payload": {
+          "mode": "reportUndo",
+          "path": "验收目标.md",
+          "before": "---\ntags: [V2隔离验收]\naliases: [保留原属性]\n---\n# 验收目标\n\n这是一篇专用于验证保存操作的隔离测试笔记，不是用户真实资料。\n\n已确认事实：先核对目标和版本，再保存报告；回执未知时先读取目标，不重复写入。\n\n原有正文保留哨兵：V2-KEEP-20261025。\n\n\n<!-- hub-report:b3682253b25e09b27b4d3669b921515aa7c3925c6d0d3b1d6a352b641100e7af -->\n## Hub 报告\n\n本篇《验收目标》中的保存顺序是先核对目标和版本，再保存报告；如果回执未知，应先读取目标确认，而不是重复写入。原句为：“已确认事实：先核对目标和版本，再保存报告；回执未知时先读取目标，不重复写入。”[1] 本次仅核对了本篇笔记的本地缓存原文，未核对其他资料或远端状态；仅交付报告，未写入文件。\n\n### 范围与局限\n\n- 仅核对本篇本地缓存，未核验远端状态。\n\n### 出处（报告生成时的原句）\n\n1. 验收目标（验收目标.md）\n\n> 已确认事实：先核对目标和版本，再保存报告；回执未知时先读取目标，不重复写入。\n\n\n用户在报告保存之后追加的隔离验收正文：V2-S2-LATER-20261025，撤回报告时必须保留。\n",
+          "after": "---\ntags: [V2隔离验收]\naliases: [保留原属性]\n---\n# 验收目标\n\n这是一篇专用于验证保存操作的隔离测试笔记，不是用户真实资料。\n\n已确认事实：先核对目标和版本，再保存报告；回执未知时先读取目标，不重复写入。\n\n原有正文保留哨兵：V2-KEEP-20261025。\n\n\n用户在报告保存之后追加的隔离验收正文：V2-S2-LATER-20261025，撤回报告时必须保留。\n",
+          "summary": "只移除这次保存的报告段，保留原文、属性和报告后新增的正文；请比较完整文件后确认。",
+          "warnings": [
+            "这是独立撤回动作，原保存回执保留。",
+            "原文或报告段变化将停止撤回；不自动合并或恢复整篇旧快照。"
+          ]
+        },
+        "receipt": null,
+        "canRestore": false,
+        "confirmationToken": "offline-saved-host-confirmation"
+      },
+      {
+        "id": "action-lWjiLoklPOiwMISj-3M0Bee-",
+        "kind": "obsidianEdit",
+        "state": "verified",
+        "payload": {
+          "mode": "reportAppend",
+          "path": "验收目标.md",
+          "before": "---\ntags: [V2隔离验收]\naliases: [保留原属性]\n---\n# 验收目标\n\n这是一篇专用于验证保存操作的隔离测试笔记，不是用户真实资料。\n\n已确认事实：先核对目标和版本，再保存报告；回执未知时先读取目标，不重复写入。\n\n原有正文保留哨兵：V2-KEEP-20261025。\n",
+          "after": "---\ntags: [V2隔离验收]\naliases: [保留原属性]\n---\n# 验收目标\n\n这是一篇专用于验证保存操作的隔离测试笔记，不是用户真实资料。\n\n已确认事实：先核对目标和版本，再保存报告；回执未知时先读取目标，不重复写入。\n\n原有正文保留哨兵：V2-KEEP-20261025。\n\n\n<!-- hub-report:b3682253b25e09b27b4d3669b921515aa7c3925c6d0d3b1d6a352b641100e7af -->\n## Hub 报告\n\n本篇《验收目标》中的保存顺序是先核对目标和版本，再保存报告；如果回执未知，应先读取目标确认，而不是重复写入。原句为：“已确认事实：先核对目标和版本，再保存报告；回执未知时先读取目标，不重复写入。”[1] 本次仅核对了本篇笔记的本地缓存原文，未核对其他资料或远端状态；仅交付报告，未写入文件。\n\n### 范围与局限\n\n- 仅核对本篇本地缓存，未核验远端状态。\n\n### 出处（报告生成时的原句）\n\n1. 验收目标（验收目标.md）\n\n> 已确认事实：先核对目标和版本，再保存报告；回执未知时先读取目标，不重复写入。\n",
+          "summary": "在当前笔记末尾追加这份报告，保留已有正文、属性和引文；不创建新笔记、不覆盖已有段落。",
+          "warnings": [
+            "仅保存报告正文及所引用原句，不嵌入交互图表。",
+            "保存会改变来源版本；依赖原版本的分析将显示需要重新核对。"
+          ]
+        },
+        "receipt": {
+          "afterHash": "5fbb5f359ef4b2ccb66b0e867aba4d5d226c7fe854cc87960186755342468bc2",
+          "beforeHash": "ff608ca93ebc245d09917dd0ce6894224581cc478986109e03da3c2bec1b6bcc",
+          "confirmedAt": 1792918394350,
+          "confirmedBy": "user",
+          "domain": "obsidianNoteEdit",
+          "fileVerified": true,
+          "goalCompleted": false,
+          "indexed": true,
+          "observedAt": 1792918394508,
+          "operation": "appendCurrentReport",
+          "operationId": "action-lWjiLoklPOiwMISj-3M0Bee-",
+          "reportIdentity": {
+            "reportHash": "9507c87cc416b8a9d576200c6b18fceeb6a6f31a9e8191710b5977d1023d004b",
+            "runId": "run-OMQK-X-kavWVzqQBpNcvv7Qs",
+            "workId": "work-03C_DkF9DzYJ_jOOTE_8GRkI"
+          },
+          "target": {
+            "documentId": "7d21b137774a89fbda6b5fb4b490200cc773b5e7a4b88db10a1742630aace393",
+            "libraryId": "obsidian:2480fe4da83df60f99649fdf",
+            "path": "验收目标.md"
+          },
+          "writeProtection": "windowsExclusiveFileAndAncestorHandles"
+        },
+        "canRestore": true
+      }
+    ],
+    "obsidianEditAvailable": true
+  },
+  "recordVersion": 10,
+  "validity": "来源已改变",
+  "runActive": false,
+  "actionActive": false
+}

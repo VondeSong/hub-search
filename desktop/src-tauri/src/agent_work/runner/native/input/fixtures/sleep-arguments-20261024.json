@@ -1,0 +1,493 @@
+{
+  "rejected": [
+    {
+      "stage": "created",
+      "tool": "hub_sleepDataset",
+      "callId": "exec-96ee3f2f-a2f4-4d19-adaf-5ab87f1623c5",
+      "arguments": {
+        "request": {
+          "action": "create",
+          "dateRule": "Asia/Shanghai（北京时间）；按每段日期标题记录日归属，昨夜不前移；仅2025-01-01至2025-02-28。",
+          "expectedSnapshot": "analysis-v1:99a24e71aecbc3b887d0e7f05df5db8ffcdc6d5b75bdc70f2f94b45f202b0796",
+          "inclusionRule": "仅明确实际主睡眠精确小时数；明确更正覆盖旧值；午睡、旧估计、在床时间、未知排除；不由起止时间推算，不补零。",
+          "methodRef": "用户要求及hub-statistics；模型逐段语义复核",
+          "operationId": "sleep-initial",
+          "rows": [
+            {
+              "date": "2025-01-01",
+              "end": 57,
+              "hours": 6.5,
+              "itemIndex": 0,
+              "quote": "昨夜主睡眠实际睡了7小时。复核更正：实际主睡眠6.5小时。午睡半小时。",
+              "review": "明确复核更正为6.5小时，覆盖7小时；午睡半小时排除。",
+              "start": 22,
+              "status": "included"
+            },
+            {
+              "date": "2025-01-02",
+              "end": 97,
+              "hours": 8,
+              "itemIndex": 0,
+              "quote": "昨夜主睡眠实际睡了8小时。六个多小时是旧估计。",
+              "review": "8小时为明确实际主睡眠；六个多小时明确为旧估计，排除。",
+              "start": 73,
+              "status": "included"
+            },
+            {
+              "date": "2025-02-01",
+              "end": 141,
+              "hours": null,
+              "itemIndex": 0,
+              "quote": "昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。",
+              "review": "实际睡眠未知，不按两点至七点推算，不补零。",
+              "start": 113,
+              "status": "excluded"
+            }
+          ]
+        }
+      },
+      "error": "模型返回格式不符合要求，未提交结果，请重试。 [$.request.rows[0].ambiguity: required]"
+    },
+    {
+      "stage": "corrected",
+      "tool": "hub_sleepDataset",
+      "callId": "exec-46b5c0ce-0a68-4ead-9340-4966b0f70903",
+      "arguments": {
+        "request": {
+          "action": "revise",
+          "datasetId": "sleep-2Y-9btdyOqJslFmQZPT1MIOX",
+          "dateRule": "北京时间Asia/Shanghai；按段落标题记录日归属，昨夜不前移；仅2025年1月和2月。",
+          "expectedRevision": 1,
+          "inclusionRule": "仅明确实际主睡眠的精确小时数；明确更正覆盖旧值；午睡、旧估计、在床时间及未知排除。不由起止推算，不补零。",
+          "methodRef": "用户口径；hub-statistics；模型逐段语义复核",
+          "operationId": "correct-jan02-user-75",
+          "rows": [
+            {
+              "ambiguity": "",
+              "correctionSource": null,
+              "dateBasis": "recordedDay",
+              "eventDate": "2025-01-01",
+              "eventRef": "main-sleep-2025-01-01",
+              "evidenceRefs": [
+                {
+                  "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                  "end": 58,
+                  "itemIndex": 0,
+                  "sourceRevision": {
+                    "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    "evidenceVersion": {
+                      "fingerprint": "f8c0eb9f5d0186518d29a183f3f030ba1b2fb761667d86d916e02fc5f6ac5fda",
+                      "kind": "document"
+                    },
+                    "metadata": [
+                      "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                      null,
+                      141
+                    ]
+                  },
+                  "start": 23,
+                  "text": "昨夜主睡眠实际睡了7小时。复核更正：实际主睡眠6.5小时。午睡半小时。"
+                }
+              ],
+              "exclusionReason": "",
+              "normalizedValue": 6.5,
+              "rawValue": "昨夜主睡眠实际睡了7小时。复核更正：实际主睡眠6.5小时。午睡半小时。",
+              "reviewBasis": {
+                "kind": "modelReview",
+                "reason": "明确更正为6.5小时，覆盖原7小时；午睡半小时不纳入。",
+                "sourceRef": null
+              },
+              "reviewState": "accepted_for_analysis",
+              "rowId": "sleep-2025-01-01",
+              "supersedes": null,
+              "timezone": "Asia/Shanghai",
+              "unit": "hours",
+              "valueKind": "exact"
+            },
+            {
+              "ambiguity": "",
+              "correctionSource": {
+                "kind": "userCorrection",
+                "sourceRef": "ju93FGsMdZHpWuN4tSziOMfT"
+              },
+              "dateBasis": "recordedDay",
+              "eventDate": "2025-01-02",
+              "eventRef": "main-sleep-2025-01-02",
+              "evidenceRefs": [
+                {
+                  "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                  "end": 98,
+                  "itemIndex": 0,
+                  "sourceRevision": {
+                    "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    "evidenceVersion": {
+                      "fingerprint": "f8c0eb9f5d0186518d29a183f3f030ba1b2fb761667d86d916e02fc5f6ac5fda",
+                      "kind": "document"
+                    },
+                    "metadata": [
+                      "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                      null,
+                      141
+                    ]
+                  },
+                  "start": 75,
+                  "text": "昨夜主睡眠实际睡了8小时。六个多小时是旧估计。"
+                }
+              ],
+              "exclusionReason": "",
+              "normalizedValue": 7.5,
+              "rawValue": "昨夜主睡眠实际睡了8小时。六个多小时是旧估计。",
+              "reviewBasis": {
+                "kind": "userCorrection",
+                "reason": "用户本轮明确纠正2025-01-02实际主睡眠为7.5小时，原文8小时不准确；保留原文及第1版历史，其它日期与规则不变。",
+                "sourceRef": "ju93FGsMdZHpWuN4tSziOMfT"
+              },
+              "reviewState": "accepted_for_analysis",
+              "rowId": "sleep-2025-01-02",
+              "supersedes": null,
+              "timezone": "Asia/Shanghai",
+              "unit": "hours",
+              "valueKind": "exact"
+            },
+            {
+              "ambiguity": "有两点睡七点起线索但中间醒过，实际时长不清楚；不能推算。",
+              "correctionSource": null,
+              "dateBasis": "recordedDay",
+              "eventDate": "2025-02-01",
+              "eventRef": "main-sleep-2025-02-01",
+              "evidenceRefs": [
+                {
+                  "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                  "end": 140,
+                  "itemIndex": 0,
+                  "sourceRevision": {
+                    "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    "evidenceVersion": {
+                      "fingerprint": "f8c0eb9f5d0186518d29a183f3f030ba1b2fb761667d86d916e02fc5f6ac5fda",
+                      "kind": "document"
+                    },
+                    "metadata": [
+                      "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                      null,
+                      141
+                    ]
+                  },
+                  "start": 115,
+                  "text": "昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。"
+                }
+              ],
+              "exclusionReason": "有两点睡七点起线索但中间醒过，实际时长不清楚；不能推算。",
+              "normalizedValue": null,
+              "rawValue": "昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。",
+              "reviewBasis": {
+                "kind": "modelReview",
+                "reason": "有两点睡七点起线索但中间醒过，实际时长不清楚；不能推算。",
+                "sourceRef": null
+              },
+              "reviewState": "rejected",
+              "rowId": "sleep-2025-02-01",
+              "supersedes": null,
+              "timezone": "Asia/Shanghai",
+              "unit": "hours",
+              "valueKind": "ambiguous"
+            }
+          ]
+        }
+      },
+      "error": "模型返回格式不符合要求，未提交结果，请重试。 [$.request.rows[1].correctionSource.reason: required]"
+    }
+  ],
+  "accepted": [
+    {
+      "stage": "created",
+      "tool": "hub_sleepDataset",
+      "callId": "saved-valid-create",
+      "arguments": {
+        "request": {
+          "action": "create",
+          "dateRule": "北京时间Asia/Shanghai；按段落标题记录日归属，昨夜不前移；仅2025年1月和2月。",
+          "expectedSnapshot": "analysis-v1:99a24e71aecbc3b887d0e7f05df5db8ffcdc6d5b75bdc70f2f94b45f202b0796",
+          "inclusionRule": "仅明确实际主睡眠的精确小时数；明确更正覆盖旧值；午睡、旧估计、在床时间及未知排除。不由起止推算，不补零。",
+          "methodRef": "用户口径；hub-statistics；模型逐段语义复核",
+          "operationId": "sleep-reviewed",
+          "rows": [
+            {
+              "ambiguity": "",
+              "correctionSource": null,
+              "dateBasis": "recordedDay",
+              "eventDate": "2025-01-01",
+              "eventRef": "main-sleep-2025-01-01",
+              "evidenceRefs": [
+                {
+                  "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                  "end": 58,
+                  "itemIndex": 0,
+                  "sourceRevision": {
+                    "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    "evidenceVersion": {
+                      "fingerprint": "f8c0eb9f5d0186518d29a183f3f030ba1b2fb761667d86d916e02fc5f6ac5fda",
+                      "kind": "document"
+                    },
+                    "metadata": [
+                      "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                      null,
+                      141
+                    ]
+                  },
+                  "start": 23,
+                  "text": "昨夜主睡眠实际睡了7小时。复核更正：实际主睡眠6.5小时。午睡半小时。"
+                }
+              ],
+              "exclusionReason": "",
+              "normalizedValue": 6.5,
+              "rawValue": "昨夜主睡眠实际睡了7小时。复核更正：实际主睡眠6.5小时。午睡半小时。",
+              "reviewBasis": {
+                "kind": "modelReview",
+                "reason": "明确更正为6.5小时，覆盖原7小时；午睡半小时不纳入。",
+                "sourceRef": null
+              },
+              "reviewState": "accepted_for_analysis",
+              "rowId": "sleep-2025-01-01",
+              "supersedes": null,
+              "timezone": "Asia/Shanghai",
+              "unit": "hours",
+              "valueKind": "exact"
+            },
+            {
+              "ambiguity": "",
+              "correctionSource": null,
+              "dateBasis": "recordedDay",
+              "eventDate": "2025-01-02",
+              "eventRef": "main-sleep-2025-01-02",
+              "evidenceRefs": [
+                {
+                  "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                  "end": 98,
+                  "itemIndex": 0,
+                  "sourceRevision": {
+                    "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    "evidenceVersion": {
+                      "fingerprint": "f8c0eb9f5d0186518d29a183f3f030ba1b2fb761667d86d916e02fc5f6ac5fda",
+                      "kind": "document"
+                    },
+                    "metadata": [
+                      "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                      null,
+                      141
+                    ]
+                  },
+                  "start": 75,
+                  "text": "昨夜主睡眠实际睡了8小时。六个多小时是旧估计。"
+                }
+              ],
+              "exclusionReason": "",
+              "normalizedValue": 8,
+              "rawValue": "昨夜主睡眠实际睡了8小时。六个多小时是旧估计。",
+              "reviewBasis": {
+                "kind": "modelReview",
+                "reason": "8小时为明确实际主睡眠；六个多小时明确为旧估计。",
+                "sourceRef": null
+              },
+              "reviewState": "accepted_for_analysis",
+              "rowId": "sleep-2025-01-02",
+              "supersedes": null,
+              "timezone": "Asia/Shanghai",
+              "unit": "hours",
+              "valueKind": "exact"
+            },
+            {
+              "ambiguity": "有两点睡七点起线索但中间醒过，实际时长不清楚；不能推算。",
+              "correctionSource": null,
+              "dateBasis": "recordedDay",
+              "eventDate": "2025-02-01",
+              "eventRef": "main-sleep-2025-02-01",
+              "evidenceRefs": [
+                {
+                  "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                  "end": 140,
+                  "itemIndex": 0,
+                  "sourceRevision": {
+                    "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    "evidenceVersion": {
+                      "fingerprint": "f8c0eb9f5d0186518d29a183f3f030ba1b2fb761667d86d916e02fc5f6ac5fda",
+                      "kind": "document"
+                    },
+                    "metadata": [
+                      "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                      null,
+                      141
+                    ]
+                  },
+                  "start": 115,
+                  "text": "昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。"
+                }
+              ],
+              "exclusionReason": "有两点睡七点起线索但中间醒过，实际时长不清楚；不能推算。",
+              "normalizedValue": null,
+              "rawValue": "昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。",
+              "reviewBasis": {
+                "kind": "modelReview",
+                "reason": "有两点睡七点起线索但中间醒过，实际时长不清楚；不能推算。",
+                "sourceRef": null
+              },
+              "reviewState": "rejected",
+              "rowId": "sleep-2025-02-01",
+              "supersedes": null,
+              "timezone": "Asia/Shanghai",
+              "unit": "hours",
+              "valueKind": "ambiguous"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "stage": "corrected",
+      "tool": "hub_sleepDataset",
+      "callId": "saved-valid-revise",
+      "arguments": {
+        "request": {
+          "action": "revise",
+          "datasetId": "sleep-2Y-9btdyOqJslFmQZPT1MIOX",
+          "dateRule": "北京时间Asia/Shanghai；按段落标题记录日归属，昨夜不前移；仅2025年1月和2月。",
+          "expectedRevision": 1,
+          "inclusionRule": "仅明确实际主睡眠的精确小时数；明确更正覆盖旧值；午睡、旧估计、在床时间及未知排除。不由起止推算，不补零。",
+          "methodRef": "用户口径；hub-statistics；模型逐段语义复核",
+          "operationId": "correct-jan02-user-75-v2",
+          "rows": [
+            {
+              "ambiguity": "",
+              "correctionSource": null,
+              "dateBasis": "recordedDay",
+              "eventDate": "2025-01-01",
+              "eventRef": "main-sleep-2025-01-01",
+              "evidenceRefs": [
+                {
+                  "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                  "end": 58,
+                  "itemIndex": 0,
+                  "sourceRevision": {
+                    "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    "evidenceVersion": {
+                      "fingerprint": "f8c0eb9f5d0186518d29a183f3f030ba1b2fb761667d86d916e02fc5f6ac5fda",
+                      "kind": "document"
+                    },
+                    "metadata": [
+                      "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                      null,
+                      141
+                    ]
+                  },
+                  "start": 23,
+                  "text": "昨夜主睡眠实际睡了7小时。复核更正：实际主睡眠6.5小时。午睡半小时。"
+                }
+              ],
+              "exclusionReason": "",
+              "normalizedValue": 6.5,
+              "rawValue": "昨夜主睡眠实际睡了7小时。复核更正：实际主睡眠6.5小时。午睡半小时。",
+              "reviewBasis": {
+                "kind": "modelReview",
+                "reason": "明确更正为6.5小时，覆盖原7小时；午睡半小时不纳入。",
+                "sourceRef": null
+              },
+              "reviewState": "accepted_for_analysis",
+              "rowId": "sleep-2025-01-01",
+              "supersedes": null,
+              "timezone": "Asia/Shanghai",
+              "unit": "hours",
+              "valueKind": "exact"
+            },
+            {
+              "ambiguity": "",
+              "correctionSource": {
+                "kind": "userCorrection",
+                "reason": "用户确认2025年1月2日实际主睡眠为7.5小时，原文8小时不准确。",
+                "sourceRef": "ju93FGsMdZHpWuN4tSziOMfT"
+              },
+              "dateBasis": "recordedDay",
+              "eventDate": "2025-01-02",
+              "eventRef": "main-sleep-2025-01-02",
+              "evidenceRefs": [
+                {
+                  "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                  "end": 98,
+                  "itemIndex": 0,
+                  "sourceRevision": {
+                    "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    "evidenceVersion": {
+                      "fingerprint": "f8c0eb9f5d0186518d29a183f3f030ba1b2fb761667d86d916e02fc5f6ac5fda",
+                      "kind": "document"
+                    },
+                    "metadata": [
+                      "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                      null,
+                      141
+                    ]
+                  },
+                  "start": 75,
+                  "text": "昨夜主睡眠实际睡了8小时。六个多小时是旧估计。"
+                }
+              ],
+              "exclusionReason": "",
+              "normalizedValue": 7.5,
+              "rawValue": "昨夜主睡眠实际睡了8小时。六个多小时是旧估计。",
+              "reviewBasis": {
+                "kind": "userCorrection",
+                "reason": "用户确认2025年1月2日实际主睡眠为7.5小时，原文8小时不准确。",
+                "sourceRef": "ju93FGsMdZHpWuN4tSziOMfT"
+              },
+              "reviewState": "accepted_for_analysis",
+              "rowId": "sleep-2025-01-02",
+              "supersedes": "1:sleep-2025-01-02",
+              "timezone": "Asia/Shanghai",
+              "unit": "hours",
+              "valueKind": "exact"
+            },
+            {
+              "ambiguity": "有两点睡七点起线索但中间醒过，实际时长不清楚；不能推算。",
+              "correctionSource": null,
+              "dateBasis": "recordedDay",
+              "eventDate": "2025-02-01",
+              "eventRef": "main-sleep-2025-02-01",
+              "evidenceRefs": [
+                {
+                  "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                  "end": 140,
+                  "itemIndex": 0,
+                  "sourceRevision": {
+                    "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    "evidenceVersion": {
+                      "fingerprint": "f8c0eb9f5d0186518d29a183f3f030ba1b2fb761667d86d916e02fc5f6ac5fda",
+                      "kind": "document"
+                    },
+                    "metadata": [
+                      "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                      null,
+                      141
+                    ]
+                  },
+                  "start": 115,
+                  "text": "昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。"
+                }
+              ],
+              "exclusionReason": "有两点睡七点起线索但中间醒过，实际时长不清楚；不能推算。",
+              "normalizedValue": null,
+              "rawValue": "昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。",
+              "reviewBasis": {
+                "kind": "modelReview",
+                "reason": "有两点睡七点起线索但中间醒过，实际时长不清楚；不能推算。",
+                "sourceRef": null
+              },
+              "reviewState": "rejected",
+              "rowId": "sleep-2025-02-01",
+              "supersedes": null,
+              "timezone": "Asia/Shanghai",
+              "unit": "hours",
+              "valueKind": "ambiguous"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

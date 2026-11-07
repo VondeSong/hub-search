@@ -1,0 +1,9 @@
+.flashcard-attachment { min-width:0; max-width:100%; border:1px solid #e2e6eb; border-radius:10px; padding:10px; background:#fafbfd; }
+.flashcard-attachment > img,.flashcard-attachment video { max-width:100%; max-height:360px; object-fit:contain; border-radius:6px; }
+.flashcard-attachment audio { width:100%; min-width:0; }
+.flashcard-attachment-actions { display:flex; align-items:center; gap:8px; min-width:0; margin-top:5px; font-size:12px; }
+.flashcard-attachment-actions > span { flex:1; min-width:0; overflow-wrap:anywhere; }
+.flashcard-attachment-actions small { display:block; color:#7e8997; }
+.flashcard-attachment-actions button { display:flex; align-items:center; gap:4px; flex:none; padding:5px 7px; border:1px solid #dde3eb; border-radius:6px; background:white; cursor:pointer; color:#52667f; }
+.flashcard-attachment > p { color:#ac4646; font-size:12px; overflow-wrap:anywhere; }
+.flashcards-draft-copy .flashcards-media { margin:10px 0; }

@@ -1,0 +1,1691 @@
+/* Only the inbox owns its main-pane layout. Review, library and editor pages
+   retain the workspace's existing spacing and scrolling behavior. */
+.flashcards-workspace .flashcards-main.flashcards-main-inbox,
+html:not([data-runtime-platform="android"]) .flashcards-workspace .flashcards-main.flashcards-main-inbox,
+html[data-runtime-platform="android"] .flashcards-android:not(.mobile-page-library) .flashcards-main.flashcards-main-inbox {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
+.flashcards-main.flashcards-main-inbox > .flashcard-inbox {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 0;
+}
+
+.flashcards-main.flashcards-main-inbox > .flashcards-editor-recovery,
+.flashcards-main.flashcards-main-inbox > [role="alert"] {
+  flex: 0 0 auto;
+  margin: 12px 18px;
+}
+
+.flashcards-main.flashcards-main-inbox > [role="alert"] {
+  color: #a23c36;
+  font-size: 13px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.flashcard-inbox {
+  --inbox-text: #252a30;
+  --inbox-secondary: #5b626b;
+  --inbox-border: #e7e9ec;
+  --inbox-list-surface: #f8f9fb;
+  --inbox-current-border: #d9dee5;
+  --inbox-selected-border: #bfcede;
+  --inbox-control-border: #bdc3cb;
+  --inbox-accent: #0869cf;
+  --inbox-selected: #edf3fa;
+  --inbox-hover: #f5f6f8;
+  --inbox-focus: #0871df;
+  --inbox-search-focus: #4d87ca;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  color: var(--inbox-text);
+  background: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  container-type: inline-size;
+}
+
+.flashcard-inbox *,
+.flashcard-inbox *::before,
+.flashcard-inbox *::after {
+  box-sizing: border-box;
+}
+
+.flashcard-inbox button,
+.flashcard-inbox input,
+.flashcard-inbox select {
+  font: inherit;
+}
+
+.flashcard-inbox button {
+  color: inherit;
+  cursor: pointer;
+}
+
+.flashcard-inbox button:disabled {
+  color: #777e87;
+  cursor: default;
+}
+
+.flashcard-inbox button:focus-visible,
+.flashcard-inbox input:focus-visible,
+.flashcard-inbox select:focus-visible,
+.flashcard-inbox a:focus-visible,
+.flashcard-inbox summary:focus-visible {
+  outline: 2px solid var(--inbox-focus);
+  outline-offset: 3px;
+}
+
+.flashcard-inbox svg {
+  flex: 0 0 auto;
+  stroke-width: 1.8;
+}
+
+.flashcard-inbox-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  min-height: 56px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--inbox-border);
+  background: #fff;
+  z-index: 3;
+}
+
+/* The desktop shell overlays backup, sync and layout controls in this corner. */
+html:not([data-runtime-platform="android"]) .unified-shell.module-flashcards .flashcard-inbox-toolbar {
+  padding-right: 144px;
+}
+
+@container (max-width: 820px) {
+  html:not([data-runtime-platform="android"]) .unified-shell.module-flashcards .flashcard-inbox-toolbar {
+    flex-wrap: wrap;
+    height: auto;
+    padding-block: 12px;
+  }
+
+  html:not([data-runtime-platform="android"]) .unified-shell.module-flashcards .flashcard-inbox-title {
+    flex: 1 1 auto;
+    margin-right: 0;
+  }
+
+  html:not([data-runtime-platform="android"]) .unified-shell.module-flashcards .flashcard-inbox-search {
+    order: 4;
+    flex: 1 1 calc(100% - 150px);
+    min-width: 150px;
+  }
+
+  html:not([data-runtime-platform="android"]) .unified-shell.module-flashcards .flashcard-inbox-type-filter {
+    order: 5;
+  }
+}
+
+@container (max-width: 550px) {
+  html:not([data-runtime-platform="android"]) .unified-shell.module-flashcards .flashcard-inbox-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 8px;
+    padding-inline: 14px;
+  }
+
+  html:not([data-runtime-platform="android"]) .unified-shell.module-flashcards .flashcard-inbox-title {
+    grid-area: 1 / 1 / 2 / -1;
+    align-items: center;
+    min-height: 34px;
+    padding-right: 130px;
+  }
+
+  html:not([data-runtime-platform="android"]) .unified-shell.module-flashcards .flashcard-inbox-search {
+    grid-area: 2 / 1 / 3 / 3;
+    min-width: 0;
+  }
+
+  html:not([data-runtime-platform="android"]) .unified-shell.module-flashcards .flashcard-inbox-type-filter {
+    grid-area: 2 / 3 / 3 / 4;
+  }
+
+  html:not([data-runtime-platform="android"]) .unified-shell.module-flashcards .flashcard-inbox-new {
+    grid-area: 3 / 2 / 4 / 3;
+  }
+
+  html:not([data-runtime-platform="android"]) .unified-shell.module-flashcards .flashcard-inbox-popover-wrap {
+    grid-area: 3 / 3 / 4 / 4;
+    justify-self: end;
+  }
+}
+
+.flashcard-inbox-title {
+  display: flex;
+  align-items: baseline;
+  flex: 0 0 auto;
+  gap: 8px;
+  margin-right: auto;
+  white-space: nowrap;
+}
+
+.flashcard-inbox-title h1 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 650;
+}
+
+.flashcard-inbox-title > span,
+.flashcard-inbox-title > small,
+.flashcard-inbox-count {
+  color: var(--inbox-secondary);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.flashcard-inbox-search {
+  display: flex;
+  align-items: center;
+  flex: 0 1 300px;
+  gap: 8px;
+  height: 32px;
+  min-width: 130px;
+  padding: 0 10px;
+  color: var(--inbox-secondary);
+  background: #f2f3f5;
+  border: 1px solid transparent;
+  border-radius: 7px;
+}
+
+.flashcard-inbox-search:focus-within,
+.flashcard-inbox-deck-search:focus-within {
+  border-color: transparent;
+  background: #fff;
+  outline: 2px solid var(--inbox-search-focus);
+  outline-offset: 1px;
+  box-shadow: none;
+}
+
+.flashcard-inbox-search input {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  color: var(--inbox-text);
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 13px;
+}
+
+.flashcard-inbox-search input::placeholder {
+  color: var(--inbox-secondary);
+  opacity: 1;
+}
+
+/* The search wrapper owns focus. This also outranks the host's desktop input
+   rule, whose :is([role="button"]) increases its specificity to (0,3,1). */
+.flashcard-inbox label:is(.flashcard-inbox-search, .flashcard-inbox-deck-search) > input:is(:focus, :focus-visible) {
+  border: 0;
+  outline: none;
+  outline-offset: 0;
+  box-shadow: none;
+}
+
+.flashcard-inbox-search button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+}
+
+.flashcard-inbox-search button:hover {
+  background: #e2e5ea;
+}
+
+.flashcard-inbox-type-filter {
+  flex: 0 0 auto;
+}
+
+.flashcard-inbox-type-filter select,
+select.flashcard-inbox-type-filter {
+  height: 32px;
+  max-width: 160px;
+  padding: 0 24px 0 10px;
+  color: var(--inbox-secondary);
+  background: #fff;
+  border: 1px solid var(--inbox-control-border);
+  border-radius: 7px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.flashcard-inbox-new,
+.flashcard-inbox-move-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  gap: 7px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--inbox-control-border);
+  border-radius: 7px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.flashcard-inbox-new {
+  border-color: transparent;
+}
+
+.flashcard-inbox-move-trigger[aria-expanded="true"] {
+  background: #edf2f8;
+  border-color: #8da8c5;
+}
+
+.flashcard-inbox-new:hover:not(:disabled),
+.flashcard-inbox-move-trigger:hover:not(:disabled) {
+  background: var(--inbox-hover);
+}
+
+.flashcard-inbox-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, var(--inbox-list-width, 340px)) 8px minmax(0, 1fr);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.flashcard-inbox-queue {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--inbox-list-surface);
+}
+
+.flashcard-inbox-divider {
+  position: relative;
+  width: 8px;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  background: #fff;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.flashcard-inbox-divider::before {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 3px;
+  width: 1px;
+  background: var(--inbox-border);
+  content: "";
+}
+
+.flashcard-inbox-divider::after {
+  position: absolute;
+  inset-block-start: calc(50% - 18px);
+  inset-inline-start: 2px;
+  width: 3px;
+  height: 36px;
+  border-radius: 3px;
+  background: #a3aebc;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  content: "";
+}
+
+.flashcard-inbox-divider:hover::after,
+.flashcard-inbox-divider:focus-visible::after,
+.flashcard-inbox-divider[aria-grabbed="true"]::after,
+.flashcard-inbox-divider.is-resizing::after {
+  opacity: 1;
+}
+
+.flashcard-inbox-divider:focus-visible {
+  outline: 2px solid var(--inbox-focus);
+  outline-offset: -2px;
+  border-radius: 3px;
+}
+
+.flashcard-inbox-queue-bar,
+.flashcard-inbox-reading-bar {
+  display: flex;
+  align-items: center;
+  flex: 0 0 42px;
+  min-width: 0;
+  height: 42px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--inbox-border);
+  color: var(--inbox-secondary);
+  background: #fff;
+  font-size: 12px;
+}
+
+.flashcard-inbox-queue-bar {
+  justify-content: space-between;
+  gap: 10px;
+  padding-inline: 20px;
+  background: var(--inbox-list-surface);
+}
+
+.flashcard-inbox-queue-bar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  margin-right: auto;
+}
+
+.flashcard-inbox-queue-bar input,
+.flashcard-inbox-row > input,
+.flashcard-inbox-row > label input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex: 0 0 auto;
+  accent-color: var(--inbox-accent);
+  cursor: pointer;
+}
+
+.flashcard-inbox-queue-bar > button,
+.flashcard-inbox-queue-bar .flashcard-inbox-cancel-selection {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 5px;
+  color: var(--inbox-secondary);
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  font-size: 12px;
+}
+
+.flashcard-inbox-queue-bar > button:hover,
+.flashcard-inbox-queue-bar .flashcard-inbox-cancel-selection:hover {
+  background: var(--inbox-hover);
+  color: var(--inbox-text);
+}
+
+.flashcard-inbox-queue-bar .flashcard-inbox-remove-selected {
+  flex: 0 0 28px;
+  width: 28px;
+  padding: 0;
+}
+
+.flashcard-inbox-rows {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #bdc3cb transparent;
+  padding-block: 6px;
+}
+
+.flashcard-inbox-row {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: calc(100% - 16px);
+  min-height: 86px;
+  margin: 2px 8px;
+  padding: 13px 11px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.flashcard-inbox-row > input,
+.flashcard-inbox-row > label {
+  margin-top: 3px;
+}
+
+.flashcard-inbox-row > label {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.flashcard-inbox-row[data-draggable="true"] {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+}
+
+.flashcard-inbox-row[data-draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.flashcard-inbox-row[data-draggable="true"] .flashcard-inbox-row-open {
+  cursor: inherit;
+  -webkit-user-drag: none;
+}
+
+.flashcard-inbox-row:hover {
+  background: #f0f2f5;
+}
+
+.flashcard-inbox-row.is-selected,
+.flashcard-inbox-row.selected,
+.flashcard-inbox-row[aria-selected="true"] {
+  background: var(--inbox-selected);
+  border-color: var(--inbox-selected-border);
+}
+
+.flashcard-inbox-row.is-selected:hover,
+.flashcard-inbox-row.selected:hover,
+.flashcard-inbox-row[aria-selected="true"]:hover {
+  background: #e7eff8;
+}
+
+.flashcard-inbox-row.is-current:not(.is-selected):not(.selected):not([aria-selected="true"]),
+.flashcard-inbox-row.active:not(.is-selected):not(.selected):not([aria-selected="true"]) {
+  background: #fff;
+  border-color: var(--inbox-current-border);
+  box-shadow: 0 1px 3px rgb(27 35 45 / 4%);
+}
+
+.flashcard-inbox-row.is-current.is-selected,
+.flashcard-inbox-row.active.selected,
+.flashcard-inbox-row.active[aria-selected="true"] {
+  border-color: #a7bdd5;
+}
+
+.flashcard-inbox-row.is-dragging {
+  border-color: #acb8c6;
+  border-style: dashed;
+  cursor: grabbing;
+}
+
+.flashcard-inbox-drag-preview {
+  position: fixed;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 24px));
+  min-height: 36px;
+  padding: 8px 12px;
+  color: var(--inbox-text, #252a30);
+  background: #fff;
+  border: 1px solid #d8dee5;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgb(27 35 45 / 13%), 0 2px 5px rgb(27 35 45 / 6%);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+}
+
+.flashcard-inbox-drag-preview > strong {
+  flex: 0 0 auto;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.flashcard-inbox-drag-preview > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flashcard-inbox-drag-preview > small {
+  min-width: 0;
+  color: var(--inbox-secondary, #5b626b);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flashcard-inbox-drag-preview > svg {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  color: var(--inbox-accent, #0869cf);
+  stroke-width: 1.8;
+}
+
+.flashcard-inbox-row-open {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  -webkit-user-drag: none;
+}
+
+.flashcard-inbox-row-open strong,
+.flashcard-inbox-row-open .flashcard-inbox-row-question {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  width: 100%;
+  overflow: hidden;
+  color: var(--inbox-text);
+  font-size: 14px;
+  line-height: 1.55;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.flashcard-inbox-row-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  width: 100%;
+  min-width: 0;
+}
+
+.flashcard-inbox-row-title strong,
+.flashcard-inbox-row-title .flashcard-inbox-row-question {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.flashcard-inbox-row-open p {
+  display: block;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+  color: var(--inbox-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flashcard-inbox-row-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--inbox-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.flashcard-inbox-row-kind > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.flashcard-inbox-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 38px;
+  padding: 6px 16px;
+  color: var(--inbox-secondary);
+  border: 0;
+  background: var(--inbox-list-surface);
+  font-size: 12px;
+}
+
+.flashcard-inbox-more:hover {
+  background: var(--inbox-hover);
+}
+
+.flashcard-inbox-reading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #fff;
+}
+
+.flashcard-inbox-reading-bar {
+  justify-content: space-between;
+  gap: 16px;
+  padding-inline: 24px;
+}
+
+.flashcard-inbox-reading-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.flashcard-inbox-reading-meta > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flashcard-inbox-reading-meta > span + span::before {
+  content: "·";
+  margin-right: 8px;
+}
+
+.flashcard-inbox-pager {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.flashcard-inbox-pager span {
+  min-width: 43px;
+  padding-inline: 3px;
+  text-align: center;
+}
+
+.flashcard-inbox-pager button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+}
+
+.flashcard-inbox-pager button:hover:not(:disabled) {
+  background: var(--inbox-hover);
+}
+
+.flashcard-inbox-document {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 26px 32px 32px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #bdc3cb transparent;
+}
+
+.flashcard-inbox-document > * {
+  max-width: 680px;
+  margin-inline: auto;
+}
+
+.flashcard-inbox-question {
+  margin-block: 0 22px;
+  color: var(--inbox-text);
+  font-size: 18px;
+  line-height: 1.65;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.flashcard-inbox-answer,
+.flashcard-inbox-explanation {
+  margin-block: 0 20px;
+}
+
+.flashcard-inbox-answer,
+.flashcard-inbox-answer-section {
+  padding: 15px 17px 16px;
+  border: 1px solid #e5e8ed;
+  border-radius: 10px;
+  background: #f8f9fb;
+}
+
+.flashcard-inbox-explanation,
+.flashcard-inbox-explanation-section {
+  padding-block: 20px 0;
+  border-top: 1px solid var(--inbox-border);
+}
+
+.flashcard-inbox-answer h3,
+.flashcard-inbox-explanation h3,
+.flashcard-inbox-section h3 {
+  margin: 0 0 10px;
+  color: var(--inbox-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.flashcard-inbox-markdown {
+  color: var(--inbox-text);
+  font-size: 14px;
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+}
+
+.flashcard-inbox-markdown p {
+  margin: 0 0 12px;
+}
+
+.flashcard-inbox-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.flashcard-inbox-markdown strong {
+  font-weight: 600;
+}
+
+.flashcard-inbox-markdown a {
+  color: var(--inbox-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.flashcard-inbox-markdown ul,
+.flashcard-inbox-markdown ol {
+  margin-block: 8px 12px;
+  padding-left: 24px;
+}
+
+.flashcard-inbox-markdown li + li {
+  margin-top: 4px;
+}
+
+.flashcard-inbox-markdown img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-block: 14px;
+  border-radius: 8px;
+}
+
+.flashcard-inbox-markdown pre {
+  max-width: 100%;
+  padding: 12px 14px;
+  overflow: auto;
+  background: #f4f5f7;
+  border-radius: 7px;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.flashcard-inbox-markdown code {
+  color: inherit;
+  font-size: 0.9em;
+}
+
+.flashcard-inbox-evidence {
+  margin-block: 0 20px;
+  padding: 15px 17px;
+  color: var(--inbox-text);
+  background: #f5eff9;
+  border: 1px solid #ede5f3;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.85;
+}
+
+.flashcard-inbox-evidence > strong {
+  margin-right: 6px;
+  font-weight: 600;
+}
+
+.flashcard-inbox-evidence > .flashcard-inbox-markdown,
+.flashcard-inbox-evidence > .flashcard-inbox-markdown > p:first-child {
+  display: inline;
+  color: var(--inbox-text);
+}
+
+.flashcard-inbox-evidence > .flashcard-inbox-markdown > p + p {
+  display: block;
+  margin-top: 10px;
+}
+
+.flashcard-inbox-source-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  padding: 13px 15px;
+  border: 1px solid var(--inbox-border);
+  border-radius: 9px;
+  background: #fafbfc;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.flashcard-inbox-source-row > div,
+.flashcard-inbox-source-row > strong {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--inbox-secondary);
+}
+
+.flashcard-inbox-source-row > span {
+  flex: 0 0 auto;
+  color: var(--inbox-secondary);
+  font-size: 12px;
+}
+
+.flashcard-inbox-source-row > strong {
+  color: var(--inbox-text);
+  font-weight: 400;
+}
+
+.flashcard-inbox-source-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 8px;
+  color: var(--inbox-secondary);
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  font-size: 12px;
+}
+
+.flashcard-inbox-source-row button:hover {
+  background: var(--inbox-hover);
+  color: var(--inbox-text);
+}
+
+.flashcard-inbox-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.flashcard-inbox-tags > span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 23px;
+  padding: 2px 7px;
+  color: var(--inbox-secondary);
+  background: #f2f3f5;
+  border-radius: 5px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.flashcard-inbox-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--inbox-border);
+}
+
+.flashcard-inbox-detail-actions > span {
+  margin-right: auto;
+  color: var(--inbox-secondary);
+  font-size: 12px;
+}
+
+.flashcard-inbox-detail-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 8px;
+  color: var(--inbox-secondary);
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  font-size: 12px;
+}
+
+.flashcard-inbox-detail-actions button:hover {
+  color: var(--inbox-text);
+  background: var(--inbox-hover);
+}
+
+.flashcard-inbox .flashcards-generation-details {
+  margin-top: 16px;
+  padding-top: 12px;
+  color: var(--inbox-secondary);
+  border-top: 1px solid var(--inbox-border);
+  font-size: 12px;
+}
+
+.flashcard-inbox .flashcards-generation-details summary {
+  width: fit-content;
+  min-height: 28px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--inbox-secondary);
+  border-radius: 5px;
+}
+
+.flashcard-inbox .flashcards-generation-details > div {
+  padding: 8px 0 0;
+  color: var(--inbox-text);
+  line-height: 1.8;
+  user-select: text;
+}
+
+.flashcard-inbox .flashcards-generation-details p {
+  margin: 5px 0;
+  overflow-wrap: anywhere;
+}
+
+.flashcard-inbox .flashcards-generation-details section {
+  margin: 10px 0;
+  padding: 10px 12px;
+  color: var(--inbox-text);
+  background: #f4f5f7;
+  border-radius: 6px;
+}
+
+.flashcard-inbox .flashcards-media {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 12px;
+  margin-block: 16px 22px;
+}
+
+.flashcard-inbox .flashcard-attachment {
+  min-width: 0;
+  max-width: 100%;
+  padding: 10px;
+  color: var(--inbox-text);
+  background: #fafbfc;
+  border: 1px solid var(--inbox-border);
+  border-radius: 10px;
+}
+
+.flashcard-inbox .flashcard-attachment > img,
+.flashcard-inbox .flashcard-attachment video {
+  display: block;
+  width: 100%;
+  max-height: 340px;
+  object-fit: contain;
+  border-radius: 5px;
+}
+
+.flashcard-inbox .flashcard-attachment audio {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.flashcard-inbox .flashcard-attachment-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.flashcard-inbox .flashcard-attachment-actions > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.flashcard-inbox .flashcard-attachment-actions small {
+  display: block;
+  color: var(--inbox-secondary);
+  font-size: 11px;
+}
+
+.flashcard-inbox .flashcard-attachment button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  gap: 4px;
+  min-height: 30px;
+  padding: 4px 7px;
+  color: var(--inbox-secondary);
+  background: #fff;
+  border: 1px solid var(--inbox-control-border);
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.flashcard-inbox .flashcard-attachment button:hover:not(:disabled) {
+  color: var(--inbox-text);
+  background: var(--inbox-hover);
+}
+
+.flashcard-inbox .flashcard-attachment > button {
+  margin-top: 8px;
+}
+
+.flashcard-inbox .flashcard-attachment > p {
+  margin: 8px 0 0;
+  color: var(--inbox-secondary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.flashcard-inbox .flashcard-attachment > p[role="alert"] {
+  color: #a23c36;
+}
+
+.flashcard-inbox-options {
+  margin-block: 0 20px;
+  padding-left: 24px;
+  color: var(--inbox-text);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.flashcard-inbox-options li {
+  padding: 5px 8px;
+  border-radius: 5px;
+}
+
+.flashcard-inbox-options li.correct {
+  background: #eef5ef;
+}
+
+.flashcard-inbox-options li > svg {
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.flashcard-inbox-empty {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 220px;
+  padding: 32px;
+  color: var(--inbox-secondary);
+  text-align: center;
+}
+
+.flashcard-inbox-empty h2,
+.flashcard-inbox-empty h3,
+.flashcard-inbox-empty > strong {
+  margin: 0;
+  color: var(--inbox-text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.flashcard-inbox-empty p {
+  max-width: 320px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.flashcard-inbox-empty button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  margin-top: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--inbox-control-border);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+}
+
+.flashcard-inbox-popover-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.flashcard-inbox-move-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 10;
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  padding: 10px;
+  color: var(--inbox-text);
+  background: #fff;
+  border: 1px solid #d8dce2;
+  border-radius: 10px;
+  box-shadow: 0 10px 35px rgb(28 35 43 / 13%), 0 2px 7px rgb(28 35 43 / 7%);
+}
+
+.flashcard-inbox-popover-header,
+.flashcard-inbox-move-popover > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 30px;
+  margin-bottom: 7px;
+  padding-left: 6px;
+}
+
+.flashcard-inbox-popover-header strong,
+.flashcard-inbox-move-popover > header strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.flashcard-inbox-popover-header button,
+.flashcard-inbox-move-popover > header button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+}
+
+.flashcard-inbox-popover-header button:hover,
+.flashcard-inbox-move-popover > header button:hover {
+  background: var(--inbox-hover);
+}
+
+.flashcard-inbox-deck-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 34px;
+  margin-bottom: 8px;
+  padding: 0 9px;
+  color: var(--inbox-secondary);
+  background: #f2f3f5;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+input.flashcard-inbox-deck-search,
+.flashcard-inbox-deck-search input {
+  width: 100%;
+  min-width: 0;
+  color: var(--inbox-text);
+  font-size: 13px;
+}
+
+.flashcard-inbox-deck-search input {
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  outline: 0;
+}
+
+.flashcard-inbox-deck-search input::placeholder,
+input.flashcard-inbox-deck-search::placeholder {
+  color: var(--inbox-secondary);
+  opacity: 1;
+}
+
+.flashcard-inbox-deck-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 280px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.flashcard-inbox-deck-options button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 39px;
+  padding: 8px 9px;
+  text-align: left;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 13px;
+}
+
+.flashcard-inbox-deck-options button:hover:not(:disabled),
+.flashcard-inbox-deck-options button:focus-visible {
+  background: #edf2f8;
+}
+
+.flashcard-inbox-deck-options button > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.flashcard-inbox-deck-options button > small,
+.flashcard-inbox-deck-options button > .flashcard-inbox-deck-count {
+  flex: 0 0 auto;
+  color: var(--inbox-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.flashcard-inbox-popover-note {
+  margin: 9px 6px 3px;
+  color: var(--inbox-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.flashcard-inbox-popover-note[hidden] {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .flashcard-inbox-toolbar {
+    gap: 8px;
+    padding-inline: 18px;
+  }
+
+  .flashcard-inbox-search {
+    flex-basis: 230px;
+  }
+
+  .flashcard-inbox-document {
+    padding: 24px 26px 30px;
+  }
+}
+
+/* React to the space provided by the application, including a visible sidebar.
+   A 1040 px window with the 208 px sidebar retains its single-row toolbar. */
+@container (max-width: 690px) {
+  .flashcard-inbox-toolbar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 56px;
+    padding-block: 12px;
+  }
+
+  .flashcard-inbox-title {
+    flex: 1 1 auto;
+    margin-right: 0;
+  }
+
+  .flashcard-inbox-search {
+    order: 4;
+    flex: 1 1 calc(100% - 150px);
+    min-width: 150px;
+  }
+
+  .flashcard-inbox-type-filter {
+    order: 5;
+  }
+
+  .flashcard-inbox-reading-bar {
+    padding-inline: 20px;
+  }
+
+  .flashcard-inbox-document {
+    padding: 26px 24px;
+  }
+
+  .flashcard-inbox-question {
+    font-size: 18px;
+  }
+}
+
+@container (max-width: 650px) {
+  .flashcard-inbox-toolbar {
+    gap: 8px;
+    padding-inline: 14px;
+  }
+
+  .flashcard-inbox-title h1 {
+    font-size: 17px;
+  }
+
+  .flashcard-inbox-new,
+  .flashcard-inbox-move-trigger {
+    min-height: 34px;
+    padding-inline: 9px;
+  }
+
+  .flashcard-inbox-workbench {
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .flashcard-inbox-divider {
+    display: none;
+  }
+
+  .flashcard-inbox-queue {
+    flex: 0 0 clamp(120px, 40%, 220px);
+    height: auto;
+    min-height: 120px;
+    max-height: 220px;
+    border-right: 0;
+    border-bottom: 1px solid var(--inbox-border);
+  }
+
+  .flashcard-inbox-rows {
+    max-height: 178px;
+    overscroll-behavior: auto;
+  }
+
+  .flashcard-inbox-row {
+    min-height: 76px;
+    padding-block: 11px;
+  }
+
+  .flashcard-inbox-reading {
+    flex: 1 0 180px;
+    min-height: 180px;
+    overflow: hidden;
+  }
+
+  .flashcard-inbox-reading-bar {
+    padding-inline: 16px;
+  }
+
+  .flashcard-inbox-document {
+    padding: 25px 20px 32px;
+    overflow: auto;
+    overscroll-behavior: auto;
+  }
+
+  .flashcard-inbox-question {
+    margin-bottom: 20px;
+    font-size: 18px;
+  }
+
+  .flashcard-inbox-evidence {
+    padding: 14px 16px;
+  }
+
+  .flashcard-inbox-answer,
+  .flashcard-inbox-answer-section {
+    padding: 14px 16px;
+  }
+
+  .flashcard-inbox-source-row {
+    flex-wrap: wrap;
+  }
+}
+
+/* The runtime also chooses the compact arrangement on larger Android panes. */
+.flashcard-inbox-workbench.is-compact {
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.flashcard-inbox-workbench.is-compact .flashcard-inbox-divider {
+  display: none;
+}
+
+.flashcard-inbox-workbench.is-compact .flashcard-inbox-queue {
+  flex: 0 0 clamp(120px, 40%, 220px);
+  height: auto;
+  min-height: 120px;
+  max-height: 220px;
+  border-right: 0;
+  border-bottom: 1px solid var(--inbox-border);
+}
+
+.flashcard-inbox-workbench.is-compact .flashcard-inbox-rows {
+  max-height: 178px;
+  overscroll-behavior: auto;
+}
+
+.flashcard-inbox-workbench.is-compact .flashcard-inbox-reading {
+  flex: 1 0 180px;
+  min-height: 180px;
+  overflow: hidden;
+}
+
+/* A narrow page uses main-pane scrolling. Desktop panes remain bounded by the
+   host even when its navigation sidebar reduces the available content width. */
+@media (max-width: 650px) {
+  .flashcards-workspace .flashcards-main.flashcards-main-inbox,
+  html:not([data-runtime-platform="android"]) .flashcards-workspace .flashcards-main.flashcards-main-inbox,
+  html[data-runtime-platform="android"] .flashcards-android:not(.mobile-page-library) .flashcards-main.flashcards-main-inbox {
+    display: block;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .flashcard-inbox {
+    height: auto;
+    min-height: 100%;
+  }
+
+  .flashcard-inbox-toolbar {
+    position: sticky;
+    top: 0;
+  }
+
+  .flashcard-inbox-workbench,
+  .flashcard-inbox-workbench.is-compact {
+    overflow: visible;
+  }
+
+  .flashcard-inbox-queue,
+  .flashcard-inbox-workbench.is-compact .flashcard-inbox-queue {
+    flex-basis: 260px;
+    height: 260px;
+    max-height: 260px;
+  }
+
+  .flashcard-inbox-rows,
+  .flashcard-inbox-workbench.is-compact .flashcard-inbox-rows {
+    max-height: 218px;
+  }
+
+  .flashcard-inbox-reading,
+  .flashcard-inbox-workbench.is-compact .flashcard-inbox-reading {
+    flex: 1 0 auto;
+    min-height: 420px;
+    overflow: visible;
+  }
+
+  .flashcard-inbox-document {
+    overflow: visible;
+    padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Android keeps its established navigation and attachment actions. The inbox
+   gains touch-sized commands while sharing the same selection and reader. */
+html[data-runtime-platform="android"] .flashcard-inbox-new,
+html[data-runtime-platform="android"] .flashcard-inbox-move-trigger,
+html[data-runtime-platform="android"] .flashcard-inbox-detail-actions button,
+html[data-runtime-platform="android"] .flashcard-inbox-source-row button,
+html[data-runtime-platform="android"] .flashcard-inbox-deck-options button {
+  min-height: 44px;
+}
+
+html[data-runtime-platform="android"] .flashcard-inbox-search,
+html[data-runtime-platform="android"] select.flashcard-inbox-type-filter {
+  height: 40px;
+}
+
+html[data-runtime-platform="android"] .flashcard-inbox-search button,
+html[data-runtime-platform="android"] .flashcard-inbox-queue-bar > button,
+html[data-runtime-platform="android"] .flashcard-inbox-pager button {
+  min-width: 36px;
+  min-height: 36px;
+}
+
+html[data-runtime-platform="android"] .flashcard-inbox-queue-bar input,
+html[data-runtime-platform="android"] .flashcard-inbox-row > input {
+  width: 20px;
+  height: 20px;
+}
+
+html[data-runtime-platform="android"] .flashcard-inbox .flashcard-attachment button {
+  min-height: 40px;
+}
+
+html[data-runtime-platform="android"] .flashcard-inbox-deck-search {
+  min-height: 40px;
+}
+
+html[data-runtime-platform="android"] .flashcard-inbox-deck-search input {
+  height: 36px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flashcard-inbox *,
+  .flashcard-inbox *::before,
+  .flashcard-inbox *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .flashcard-inbox {
+    --inbox-border: #bdc3cb;
+    --inbox-control-border: #737c88;
+    --inbox-secondary: #414952;
+    --inbox-current-border: #737c88;
+    --inbox-selected-border: #737c88;
+    --inbox-search-focus: #0869cf;
+  }
+
+  .flashcard-inbox-search,
+  .flashcard-inbox-deck-search {
+    border-color: var(--inbox-control-border);
+  }
+}
+
+@media (forced-colors: active) {
+  .flashcard-inbox {
+    --inbox-text: CanvasText;
+    --inbox-secondary: CanvasText;
+    --inbox-border: GrayText;
+    --inbox-control-border: ButtonText;
+    --inbox-focus: Highlight;
+    --inbox-search-focus: Highlight;
+    --inbox-list-surface: Canvas;
+    --inbox-current-border: CanvasText;
+    --inbox-selected-border: Highlight;
+    color: CanvasText;
+    background: Canvas;
+  }
+
+  .flashcard-inbox-row,
+  .flashcard-inbox-toolbar,
+  .flashcard-inbox-queue,
+  .flashcard-inbox-queue-bar,
+  .flashcard-inbox-reading,
+  .flashcard-inbox-reading-bar,
+  .flashcard-inbox-divider,
+  .flashcard-inbox-answer,
+  .flashcard-inbox-answer-section,
+  .flashcard-inbox-source-row,
+  .flashcard-inbox-evidence,
+  .flashcard-inbox-move-popover {
+    color: CanvasText;
+    background: Canvas;
+  }
+
+  .flashcard-inbox-row.is-selected,
+  .flashcard-inbox-row.selected,
+  .flashcard-inbox-row[aria-selected="true"] {
+    color: HighlightText;
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+
+  .flashcard-inbox-row.is-selected *,
+  .flashcard-inbox-row.selected *,
+  .flashcard-inbox-row[aria-selected="true"] * {
+    color: HighlightText;
+  }
+
+  .flashcard-inbox-row.is-current:not(.is-selected):not(.selected):not([aria-selected="true"]),
+  .flashcard-inbox-row.active:not(.is-selected):not(.selected):not([aria-selected="true"]) {
+    outline: 1px solid CanvasText;
+    outline-offset: -2px;
+  }
+
+  .flashcard-inbox-move-popover,
+  .flashcard-inbox-evidence,
+  .flashcard-inbox-tags > span,
+  .flashcard-inbox-search,
+  .flashcard-inbox-deck-search {
+    border: 1px solid CanvasText;
+  }
+
+  .flashcard-inbox-move-popover {
+    box-shadow: none;
+  }
+
+  .flashcard-inbox-drag-preview {
+    color: CanvasText;
+    background: Canvas;
+    border-color: CanvasText;
+    box-shadow: none;
+  }
+
+  .flashcard-inbox-drag-preview > small,
+  .flashcard-inbox-drag-preview > svg {
+    color: CanvasText;
+  }
+
+  .flashcard-inbox-row.is-dragging {
+    border-color: CanvasText;
+  }
+
+  .flashcard-inbox-divider::before,
+  .flashcard-inbox-divider::after {
+    background: CanvasText;
+  }
+
+  .flashcard-inbox-answer,
+  .flashcard-inbox-answer-section,
+  .flashcard-inbox-source-row {
+    border-color: CanvasText;
+  }
+}

@@ -1,0 +1,17 @@
+.agent-obsidian-edit { border-top: 1px solid var(--hub-separator); padding-top: 12px; margin-top: 12px; }
+.agent-obsidian-edit form { display: grid; gap: 8px; }
+.agent-obsidian-edit label { display: grid; gap: 6px; }
+.agent-obsidian-edit textarea { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; padding: 8px; }
+.agent-note-comparison pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; font: inherit; line-height: 1.6; padding: 8px; background: var(--hub-control-fill); }
+.agent-note-comparison details { margin: 8px 0; }
+.agent-obsidian-edit button + button { margin-left: 8px; }
+.agent-result-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; font-size: 13px; }
+.agent-result-heading > svg { flex: 0 0 auto; color: var(--hub-text-secondary); }
+.agent-result-state { margin-inline-start: auto; color: var(--hub-text-secondary); font-size: 12px; }
+.agent-result-path { margin-block: 5px 8px; color: var(--hub-text-secondary); font-size: 12px; overflow-wrap: anywhere; }
+.agent-result-summary, .agent-result-receipt { margin-block: 8px; line-height: 1.65; }
+.agent-result-receipt { font-size: 12px; }
+.agent-result-details { margin-block: 8px 12px; color: var(--hub-text-secondary); font-size: 12px; }
+.agent-result-details > summary { cursor: pointer; }
+.agent-note-result > button { max-width: 100%; height: auto; white-space: normal; text-align: start; }
+.agent-note-result + .agent-note-result { padding-top: 12px; border-top: 1px solid var(--hub-separator); }

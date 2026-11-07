@@ -1,0 +1,351 @@
+{
+  "authorizationVersion": 1,
+  "contentHash": "25305844eb7925ec625b33cb4fb3915243a90721ee43897401cdb2ddd196806b",
+  "coverage": {
+    "dates": {
+      "denominator": "captured date headings; undated text is not assigned a date",
+      "recognizedSections": 3,
+      "unassignedCharacters": 0,
+      "uniqueDates": 3
+    },
+    "history": {
+      "basis": "authorized captured local cache, not a complete calendar or remote history",
+      "status": "unknown"
+    },
+    "material": {
+      "basis": "hostReadAllCapturedMembers",
+      "matched": 1,
+      "read": 1
+    },
+    "metric": {
+      "accepted": 2,
+      "ambiguous": 1,
+      "candidates": 6,
+      "conflicting": 0,
+      "datesWithoutAcceptedValue": 1,
+      "denominator": "candidate events; accepted exact main-sleep events only, never imputed zero",
+      "excluded": 4,
+      "missing": 1
+    }
+  },
+  "createdAt": 1792771509888,
+  "datasetId": "sleep-FGQXe95Vwi8QNaT-39Ww_8uj",
+  "dateRule": "Asia/Shanghai 北京时间；按每段标题记录日归属，昨夜不回拨一天；仅2025-01-01至2025-02-28。",
+  "goalBinding": {
+    "authorizationVersion": 1,
+    "commandWatermark": 0,
+    "lastCommandId": null,
+    "schemaVersion": 1,
+    "workId": "work-i16ucI0fCKbobuIT-AVXaLJL",
+    "workRevision": 1
+  },
+  "inclusionRule": "只纳入明确实际主睡眠精确小时数；明确更正覆盖旧值；午睡、旧估计、未知排除；在床起止不推算，不补零。",
+  "inputSet": {
+    "byteCount": 317,
+    "consistency": "immutableCapturedInput",
+    "coverage": "authorizedLocalCache",
+    "createdAt": 1792771462,
+    "expiresAt": 1793376262,
+    "itemsTotal": 1,
+    "manifestDigest": "dec984874bdcf3d966e0d30ecd28bb52e45bc4934826703e5a2e053457c631a6",
+    "methodVersion": "literal-analysis-v1",
+    "parserVersion": "note-page-v1",
+    "scopeRevision": "b9f29689e81342910c3027f0ed2f1a9a7570e4cd4d92c92b0bacad6b023426fd",
+    "snapshot": "analysis-v1:dec984874bdcf3d966e0d30ecd28bb52e45bc4934826703e5a2e053457c631a6",
+    "sourceAsOf": 1792771462,
+    "sourceFreshness": "capturedLocalCacheNotVerifiedWithRemote",
+    "status": "ready",
+    "supersedes": null,
+    "unavailableItems": 0
+  },
+  "methodRef": "modelReview: captured Diary full-text semantic review",
+  "metric": "sleep_duration_hours",
+  "offsetUnit": "unicodeScalarValue",
+  "operationId": "sleep-reviewed-v2b",
+  "parserVersion": "note-page-v1",
+  "requestHash": "5db81335ad1a8b6b5cf1b85eec821c28527acf5496cba1ee4f12cbbf11717222",
+  "revision": 2,
+  "rows": [
+    {
+      "ambiguity": "",
+      "correctionSource": {
+        "kind": "modelReview",
+        "reason": "首次完整原文评审补入候选；被紧随其后的明确复核更正6.5小时取代",
+        "sourceRef": null
+      },
+      "dateBasis": "recordedDay",
+      "eventDate": "2025-01-01",
+      "eventRef": "2025-01-01:main",
+      "evidenceRefs": [
+        {
+          "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+          "end": 36,
+          "itemIndex": 0,
+          "sourceRevision": {
+            "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+            "evidenceVersion": {
+              "fingerprint": "f8c0eb9f5d0186518d29a183f3f030ba1b2fb761667d86d916e02fc5f6ac5fda",
+              "kind": "document"
+            },
+            "metadata": [
+              "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+              null,
+              141
+            ]
+          },
+          "start": 23,
+          "text": "昨夜主睡眠实际睡了7小时。"
+        }
+      ],
+      "exclusionReason": "被紧随其后的明确复核更正6.5小时取代",
+      "normalizedValue": 7,
+      "rawValue": "昨夜主睡眠实际睡了7小时。",
+      "reviewBasis": {
+        "kind": "modelReview",
+        "reason": "被紧随其后的明确复核更正6.5小时取代",
+        "sourceRef": null
+      },
+      "reviewState": "rejected",
+      "rowId": "jan1-old",
+      "supersedes": null,
+      "timezone": "Asia/Shanghai",
+      "unit": "hours",
+      "valueKind": "exact"
+    },
+    {
+      "ambiguity": "",
+      "correctionSource": {
+        "kind": "modelReview",
+        "reason": "首次完整原文评审补入候选；明确复核更正实际主睡眠，覆盖旧7小时",
+        "sourceRef": null
+      },
+      "dateBasis": "recordedDay",
+      "eventDate": "2025-01-01",
+      "eventRef": "2025-01-01:main",
+      "evidenceRefs": [
+        {
+          "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+          "end": 52,
+          "itemIndex": 0,
+          "sourceRevision": {
+            "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+            "evidenceVersion": {
+              "fingerprint": "f8c0eb9f5d0186518d29a183f3f030ba1b2fb761667d86d916e02fc5f6ac5fda",
+              "kind": "document"
+            },
+            "metadata": [
+              "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+              null,
+              141
+            ]
+          },
+          "start": 36,
+          "text": "复核更正：实际主睡眠6.5小时。"
+        }
+      ],
+      "exclusionReason": "",
+      "normalizedValue": 6.5,
+      "rawValue": "复核更正：实际主睡眠6.5小时。",
+      "reviewBasis": {
+        "kind": "modelReview",
+        "reason": "明确复核更正实际主睡眠，覆盖旧7小时",
+        "sourceRef": null
+      },
+      "reviewState": "accepted_for_analysis",
+      "rowId": "jan1",
+      "supersedes": null,
+      "timezone": "Asia/Shanghai",
+      "unit": "hours",
+      "valueKind": "exact"
+    },
+    {
+      "ambiguity": "",
+      "correctionSource": {
+        "kind": "modelReview",
+        "reason": "首次完整原文评审补入候选；午睡非主睡眠",
+        "sourceRef": null
+      },
+      "dateBasis": "recordedDay",
+      "eventDate": "2025-01-01",
+      "eventRef": "2025-01-01:nap",
+      "evidenceRefs": [
+        {
+          "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+          "end": 58,
+          "itemIndex": 0,
+          "sourceRevision": {
+            "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+            "evidenceVersion": {
+              "fingerprint": "f8c0eb9f5d0186518d29a183f3f030ba1b2fb761667d86d916e02fc5f6ac5fda",
+              "kind": "document"
+            },
+            "metadata": [
+              "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+              null,
+              141
+            ]
+          },
+          "start": 52,
+          "text": "午睡半小时。"
+        }
+      ],
+      "exclusionReason": "午睡非主睡眠",
+      "normalizedValue": 0.5,
+      "rawValue": "午睡半小时。",
+      "reviewBasis": {
+        "kind": "modelReview",
+        "reason": "午睡非主睡眠",
+        "sourceRef": null
+      },
+      "reviewState": "rejected",
+      "rowId": "nap",
+      "supersedes": null,
+      "timezone": "Asia/Shanghai",
+      "unit": "hours",
+      "valueKind": "exact"
+    },
+    {
+      "ambiguity": "",
+      "correctionSource": {
+        "kind": "modelReview",
+        "reason": "首次完整原文评审补入候选；明确实际主睡眠8小时，后句将六个多小时标为旧估计",
+        "sourceRef": null
+      },
+      "dateBasis": "recordedDay",
+      "eventDate": "2025-01-02",
+      "eventRef": "2025-01-02:main",
+      "evidenceRefs": [
+        {
+          "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+          "end": 88,
+          "itemIndex": 0,
+          "sourceRevision": {
+            "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+            "evidenceVersion": {
+              "fingerprint": "f8c0eb9f5d0186518d29a183f3f030ba1b2fb761667d86d916e02fc5f6ac5fda",
+              "kind": "document"
+            },
+            "metadata": [
+              "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+              null,
+              141
+            ]
+          },
+          "start": 75,
+          "text": "昨夜主睡眠实际睡了8小时。"
+        }
+      ],
+      "exclusionReason": "",
+      "normalizedValue": 8,
+      "rawValue": "昨夜主睡眠实际睡了8小时。",
+      "reviewBasis": {
+        "kind": "modelReview",
+        "reason": "明确实际主睡眠8小时，后句将六个多小时标为旧估计",
+        "sourceRef": null
+      },
+      "reviewState": "accepted_for_analysis",
+      "rowId": "jan2",
+      "supersedes": null,
+      "timezone": "Asia/Shanghai",
+      "unit": "hours",
+      "valueKind": "exact"
+    },
+    {
+      "ambiguity": "旧估计且非精确数，不纳入",
+      "correctionSource": {
+        "kind": "modelReview",
+        "reason": "首次完整原文评审补入候选；旧估计且非精确数，不纳入",
+        "sourceRef": null
+      },
+      "dateBasis": "recordedDay",
+      "eventDate": "2025-01-02",
+      "eventRef": "2025-01-02:main",
+      "evidenceRefs": [
+        {
+          "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+          "end": 98,
+          "itemIndex": 0,
+          "sourceRevision": {
+            "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+            "evidenceVersion": {
+              "fingerprint": "f8c0eb9f5d0186518d29a183f3f030ba1b2fb761667d86d916e02fc5f6ac5fda",
+              "kind": "document"
+            },
+            "metadata": [
+              "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+              null,
+              141
+            ]
+          },
+          "start": 88,
+          "text": "六个多小时是旧估计。"
+        }
+      ],
+      "exclusionReason": "旧估计且非精确数，不纳入",
+      "normalizedValue": null,
+      "rawValue": "六个多小时是旧估计。",
+      "reviewBasis": {
+        "kind": "modelReview",
+        "reason": "旧估计且非精确数，不纳入",
+        "sourceRef": null
+      },
+      "reviewState": "rejected",
+      "rowId": "estimate",
+      "supersedes": null,
+      "timezone": "Asia/Shanghai",
+      "unit": "hours",
+      "valueKind": "ambiguous"
+    },
+    {
+      "ambiguity": "",
+      "correctionSource": {
+        "kind": "modelReview",
+        "reason": "首次完整原文评审补入候选；明确实际时长不清楚；起止跨度不等于实际睡眠，不推算5小时",
+        "sourceRef": null
+      },
+      "dateBasis": "recordedDay",
+      "eventDate": "2025-02-01",
+      "eventRef": "2025-02-01:main",
+      "evidenceRefs": [
+        {
+          "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+          "end": 140,
+          "itemIndex": 0,
+          "sourceRevision": {
+            "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+            "evidenceVersion": {
+              "fingerprint": "f8c0eb9f5d0186518d29a183f3f030ba1b2fb761667d86d916e02fc5f6ac5fda",
+              "kind": "document"
+            },
+            "metadata": [
+              "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+              null,
+              141
+            ]
+          },
+          "start": 115,
+          "text": "昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。"
+        }
+      ],
+      "exclusionReason": "明确实际时长不清楚；起止跨度不等于实际睡眠，不推算5小时",
+      "normalizedValue": null,
+      "rawValue": "昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。",
+      "reviewBasis": {
+        "kind": "modelReview",
+        "reason": "明确实际时长不清楚；起止跨度不等于实际睡眠，不推算5小时",
+        "sourceRef": null
+      },
+      "reviewState": "rejected",
+      "rowId": "feb1",
+      "supersedes": null,
+      "timezone": "Asia/Shanghai",
+      "unit": "hours",
+      "valueKind": "missing"
+    }
+  ],
+  "schemaVersion": 1,
+  "scopeRevision": "b9f29689e81342910c3027f0ed2f1a9a7570e4cd4d92c92b0bacad6b023426fd",
+  "snapshot": "analysis-v1:dec984874bdcf3d966e0d30ecd28bb52e45bc4934826703e5a2e053457c631a6",
+  "unit": "hours",
+  "workId": "work-i16ucI0fCKbobuIT-AVXaLJL"
+}

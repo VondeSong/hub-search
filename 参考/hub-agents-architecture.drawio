@@ -1,0 +1,1139 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="Electron" version="29.0.3" type="device" compressed="false" pages="8">
+  <diagram id="hub-agents-current" name="01 原详图 · 基线 历史1.14">
+    <mxGraphModel dx="3100" dy="7800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="3100" pageHeight="12000" math="0" shadow="0" background="#FFFFFF" adaptiveColors="auto">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="foundation-connectors" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=22;strokeWidth=1.5;fillColor=#F0FDFA;strokeColor=#CBD5E1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1150.0" width="2120" height="1000" as="geometry" />
+        </mxCell>
+        <mxCell id="foundation-projection" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=22;strokeWidth=1.5;fillColor=#EFF6FF;strokeColor=#CBD5E1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="2210.0" width="2120" height="1490" as="geometry" />
+        </mxCell>
+        <mxCell id="data-methods" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=22;strokeWidth=1.5;fillColor=#FFF7ED;strokeColor=#CBD5E1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="3760.0" width="2120" height="1050" as="geometry" />
+        </mxCell>
+        <mxCell id="capability-boundary" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=22;strokeWidth=1.5;fillColor=#F5F3FF;strokeColor=#CBD5E1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="4870.0" width="2120" height="1080" as="geometry" />
+        </mxCell>
+        <mxCell id="title" value="&lt;b&gt;Hub Agents：让分散的资料，成为 Agent 能读懂、算清楚、可靠操作的工作底座&lt;/b&gt;" style="text;html=1;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=38;fontColor=#172B4D;align=left;verticalAlign=middle;spacing=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="3000" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="principle" value="&lt;b&gt;历史基线1.14（2026-10-23）。当前合同1.15/D-121及实现范围见08页和文档0.5；旧批次、失败与未验证边界保留。&lt;/b&gt;" style="text;html=1;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=19;fontColor=#334155;align=left;verticalAlign=middle;spacing=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="40" y="112" width="3000" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="heading-context" value="&lt;b&gt;原始资料在哪里？谁说了算？&lt;/b&gt;" style="text;html=1;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=30;fontColor=#172B4D;align=left;verticalAlign=middle;spacing=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="60" y="780.0" width="2050" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="rules" value="&lt;b style=&quot;font-size:26px&quot;&gt;A. 规则上下文｜复用 knowledge_rules&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;&lt;b&gt;输入：&lt;/b&gt;来源、目标对象、目录、当前用户要求。&lt;br&gt;顺序：Hub 通用 → 库规则 → 库根 → 父目录。&lt;br&gt;每层可由 AGENTS.override.md 覆盖本层规则。&lt;br&gt;Craft 规则页须显式绑定，不能把任意正文当指令。&lt;br&gt;规则回执：rule_id / scope / version / content_hash。&lt;br&gt;用户要求与宿主授权优先；跨库规则分别作用。&lt;br&gt;读取新对象时补对应规则；规则变化后重新校验。&lt;br&gt;&lt;b&gt;输出：&lt;/b&gt;本次适用规则及版本，不新增任何权限。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="65" y="3900.0" width="650" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="model" value="&lt;b&gt;Agent 运行与交互｜模型自主选择工具，Hub 记录真实范围、事件与结果&lt;/b&gt;&lt;br&gt;目标合同 · 2026-10-23 补充；沿用 Work / Run、原生循环和现有动作系统，以下不代表已经实现。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#DBEAFE;strokeColor=#A8BDD8;fontSize=21;verticalAlign=top;spacingTop=20;" vertex="1" parent="1">
+          <mxGeometry x="40" y="6010.0" width="2120" height="1400" as="geometry" />
+        </mxCell>
+        <mxCell id="source-tools" value="&lt;b style=&quot;font-size:26px&quot;&gt;② 搜索与枚举｜search / list&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;输入：query、filters、cursor、expected_snapshot。&lt;br&gt;search：返回相关片段、对象 ID 和排序信息。&lt;br&gt;list：完整遍历授权对象，返回 next_cursor / total。&lt;br&gt;快照变化时拒绝拼接分页，要求重新枚举。&lt;br&gt;搜索命中不是全量；截断和索引滞后明确说明。&lt;br&gt;对应第二层实体 / 关系视图与 Tantivy。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="775" y="5010.0" width="650" height="310" as="geometry" />
+        </mxCell>
+        <mxCell id="stats-tools" value="&lt;b style=&quot;font-size:26px&quot;&gt;④ 查询与统计｜query / analyze&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;输入：scope、metric、time_field、group_by、filters。&lt;br&gt;明确统计单位、分母、去重和来源日期语义。&lt;br&gt;返回：数值、统计依据、snapshot、coverage、缺失。&lt;br&gt;有界计算超限时返回失败 / 可恢复任务，&lt;br&gt;不能用抽样总数冒充完整统计。&lt;br&gt;高级 SQL 只访问授权数据集，校验语句与资源。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="65" y="5355.0" width="650" height="310" as="geometry" />
+        </mxCell>
+        <mxCell id="conversation-tools" value="&lt;b style=&quot;font-size:26px&quot;&gt;C. 动作记录｜扩展现有 agent_actions&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;action_id · work_id · kind · target_ref&lt;br&gt;base_revision · authorization_version · context_hash&lt;br&gt;payload_json（候选 / 差异）· state · receipt_json&lt;br&gt;补齐：operation_key · attempt · remote_ref&lt;br&gt;verification_state · error_class · retry_after&lt;br&gt;草稿准备 → 领域校验 → 预览 → 按授权执行。&lt;br&gt;执行意图先落盘；重复请求返回已有状态 / 回执。&lt;br&gt;领域服务负责正确保存，模型不能直接改镜像表。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="1485" y="3900.0" width="650" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="data-sources" value="&lt;b style=&quot;font-size:26px&quot;&gt;① hub_items｜统一实体接口（新建）&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:20px;line-height:1.35&quot;&gt;&lt;b&gt;作用：&lt;/b&gt;笔记、页面、任务、闪卡都可用同一入口查。&lt;br&gt;&lt;b&gt;关键字段&lt;/b&gt;&lt;br&gt;item_id（稳定 ID） · source_id · source_object_id&lt;br&gt;item_type · title · parent_item_id · parent_path&lt;br&gt;created_at · updated_at · content_hash · revision&lt;br&gt;lifecycle（active / archived / deleted）&lt;br&gt;char_count · props_json · open_uri&lt;br&gt;&lt;b&gt;数据从哪里来？&lt;/b&gt;&lt;br&gt;来源适配器映射 documents、dida_tasks、闪卡。&lt;br&gt;优先视图；关联性能不足时采用只读物化投影。&lt;br&gt;任务完成状态另存 task_status，不混入 lifecycle。&lt;br&gt;字数明确按字符统计；未知字段保留 NULL。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="65" y="2350.0" width="650" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="data-memory" value="&lt;b style=&quot;font-size:26px&quot;&gt;长期记忆、方法、运行记录与成果：各自保存，按依赖关联&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:23px;line-height:1.35&quot;&gt;&lt;b&gt;原始资料：&lt;/b&gt;由来源及领域表管理；第二层统一查询。正文和索引可同步 / 重建，不等同于 Agent 的长期记忆。&lt;br&gt;&lt;b&gt;Basic Memory：&lt;/b&gt;保存用户确认的规则与决定；Hub 管 scope、version、source、status。修改、停用与遗忘后重新检索，不复活旧版本。&lt;br&gt;&lt;b&gt;Skill / AGENTS.md：&lt;/b&gt;保存方法与有范围的约定；记录实际加载版本，规则不是事实证据，Skill 也不是授权来源。&lt;br&gt;&lt;b&gt;Work / Run / Records：&lt;/b&gt;有界元数据与大载荷引用分离；配额、pin、回收和旧硬上限迁移见 8.47；界面回读不重复执行。&lt;br&gt;&lt;b&gt;成果与回执：&lt;/b&gt;报告、图表、草稿及真实业务结果保留稳定引用，关联来源快照、方法版本与动作；复用前检查依赖是否失效。&lt;br&gt;&lt;b&gt;数据变化：&lt;/b&gt;权限撤回、来源更新或删除、规则变化后，旧结果标记失效或限制展示；继续工作时重新读取 / 计算。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#F8FAFC;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10415.0" width="2120" height="400" as="geometry" />
+        </mxCell>
+        <mxCell id="data-records" value="&lt;b style=&quot;font-size:26px&quot;&gt;E. 状态与恢复｜不靠模型猜是否成功&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;draft → validated → ready → executing&lt;br&gt;executing → source_confirmed → verified&lt;br&gt;超时 / 断连 → outcome_unknown → 远端查证&lt;br&gt;源版本变化 → conflict → 重新读取 / 准备草稿&lt;br&gt;已知失败 → failed（说明能否重试）&lt;br&gt;取消只停止后续工作，不抹掉已发生的写入。&lt;br&gt;未知结果先查证；无法确认时保留未知并提示处理。&lt;br&gt;不能保证远端恰好一次；依靠去重、查证和恢复。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFF7ED;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="775" y="4290.0" width="650" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="sources-note" value="唯一交付顺序：V1 可检查成果 → V2 来源保存 → V3 长任务协作 → V4 扩展。当前缺口与体验门见第 07 页、文档 0.5 / 13.11 / 14.11。" style="text;html=1;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=24;fontColor=#334155;align=left;verticalAlign=middle;spacing=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="40" y="11490.0" width="3000" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="foundation-time" value="&lt;b style=&quot;font-size:26px&quot;&gt;支撑 C｜hub_events（新增时间投影）&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.45&quot;&gt;&lt;b&gt;为什么需要：&lt;/b&gt;一个对象可以有多个时间事实。&lt;br&gt;event_id · item_id · block_id? · event_type&lt;br&gt;event_date / occurred_at · time_zone · origin&lt;br&gt;source_revision · observed_at · coverage_ref&lt;br&gt;&lt;b&gt;如何使用&lt;/b&gt;&lt;br&gt;日记：日期段 → journal_entry，关联正文块。&lt;br&gt;任务：完成 / 重开等事件从真实历史与回执生成；&lt;br&gt;复用 task_activity，缺失历史不根据当前状态补造。&lt;br&gt;截止日仍取 task_facts.due_at；时间轴按类型展示。&lt;br&gt;char_count 由对应正文段计算并标记统计口径。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#F8FAFC;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="1485" y="2840.0" width="650" height="390" as="geometry" />
+        </mxCell>
+        <mxCell id="foundation-coverage" value="&lt;b style=&quot;font-size:26px&quot;&gt;C. hub_source_state｜新增同步状态表&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;source_id / provider_instance / stream_id · generation&lt;br&gt;每资源流独立 cursor / 成功时间 / 失败 / 重置&lt;br&gt;sync_status · last_error · next_retry_at&lt;br&gt;coverage_json（目录 / 清单 / 历史区间 / 分页）&lt;br&gt;content_generation · index_generation&lt;br&gt;missing_count · failed_count · deletion_checked_at&lt;br&gt;&lt;b&gt;用途：&lt;/b&gt;判断数据是否新鲜、是否完整、索引是否追上。&lt;br&gt;读取先验证；流失败不推进其他游标（4.8）。&lt;br&gt;正文、附件和历史任务的覆盖分别表达。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="1485" y="1290.0" width="650" height="350" as="geometry" />
+        </mxCell>
+        <mxCell id="foundation-identity" value="&lt;b style=&quot;font-size:26px&quot;&gt;② hub_blocks｜统一内容视图（新建）&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:20px;line-height:1.35&quot;&gt;&lt;b&gt;作用：&lt;/b&gt;批读段落、精确引用和回到原文。&lt;br&gt;&lt;b&gt;关键字段&lt;/b&gt;&lt;br&gt;block_id · item_id → hub_items.item_id&lt;br&gt;parent_block_id · block_kind · ordinal · text&lt;br&gt;native_block_id · heading_path · source_locator&lt;br&gt;source_revision · content_hash · anchor_json&lt;br&gt;&lt;b&gt;实际存储与生成&lt;/b&gt;&lt;br&gt;复用 content_items；新增 hub_block_anchors&lt;br&gt;保存原文位置映射（行号 / 字符范围 / 页码）。&lt;br&gt;版本变化后重算位置；引用必须核对版本。&lt;br&gt;任务子项保留独立状态；只投影其文本供阅读。&lt;br&gt;搜索切片由块派生，不冒充可直接编辑的原生块。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="775" y="2350.0" width="650" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="foundation-compute" value="&lt;b style=&quot;font-size:26px&quot;&gt;⑤ 复杂计算｜compute / inspect_job&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;输入：授权快照、脚本、运行预算和输出类型。&lt;br&gt;隔离进程：只读挂载，无默认网络 / 主机写权限。&lt;br&gt;限制时间、CPU、内存、输出体积；支持取消。&lt;br&gt;返回：job_id、状态、数据版本、日志与结果引用。&lt;br&gt;图表规范 / 数据表经校验后展示；保留来源依赖。&lt;br&gt;脚本不能调用连接器写回，业务变更仍走第三层。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="775" y="5355.0" width="650" height="310" as="geometry" />
+        </mxCell>
+        <mxCell id="source-obs-a" value="&lt;b style=&quot;font-size:26px&quot;&gt;Obsidian 库 A&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:22px;line-height:1.5&quot;&gt;本地 Markdown 文件&lt;br&gt;以磁盘原文件为准&lt;br&gt;规则：库根 / 目录 AGENTS.md&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=22;strokeWidth=1.5;fillColor=#F8FAFC;strokeColor=#CBD5E1;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="40" y="840.0" width="500" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="source-obs-b" value="&lt;b style=&quot;font-size:26px&quot;&gt;Obsidian 库 B&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:22px;line-height:1.5&quot;&gt;独立文件树、标签与双链&lt;br&gt;与库 A 分别授权、分别套用规则&lt;br&gt;可以一起查，不自动合并身份&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=22;strokeWidth=1.5;fillColor=#F8FAFC;strokeColor=#CBD5E1;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="580" y="840.0" width="500" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="source-craft" value="&lt;b style=&quot;font-size:26px&quot;&gt;Craft 空间&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:22px;line-height:1.5&quot;&gt;云端文档与原生 Block&lt;br&gt;本地 SQL 是读取用的镜像&lt;br&gt;修改须通过正式 Craft 接口&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=22;strokeWidth=1.5;fillColor=#F8FAFC;strokeColor=#CBD5E1;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="840.0" width="500" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="source-dida" value="&lt;b style=&quot;font-size:26px&quot;&gt;滴答清单&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:22px;line-height:1.5&quot;&gt;云端任务、清单与子任务&lt;br&gt;保留状态和完整时间字段&lt;br&gt;修改须通过正式滴答接口&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=22;strokeWidth=1.5;fillColor=#F8FAFC;strokeColor=#CBD5E1;fontSize=22;" vertex="1" parent="1">
+          <mxGeometry x="1660" y="840.0" width="500" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="sources-expand" value="来源注册支持多个库 / 空间 / 账号；阅读、附件、闪卡等按类型接入，不把来源数量写死为四个。" style="text;html=1;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=21;fontColor=#334155;align=left;verticalAlign=middle;spacing=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1075.0" width="2080" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="foundation-connectors-title" value="&lt;b&gt;第一层　连接与同步：把资料接进来，并说明拿到了多少&lt;/b&gt;" style="text;html=1;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=32;fontColor=#172B4D;align=left;verticalAlign=middle;spacing=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="65" y="1170.0" width="2050" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="foundation-connectors-question" value="解决的问题：这份数据新不新？是否同步完整？应该从哪里读取、往哪里保存？" style="text;html=1;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=23;fontColor=#334155;align=left;verticalAlign=middle;spacing=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="65" y="1227.0" width="2050" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="connector-obs" value="&lt;b style=&quot;font-size:26px&quot;&gt;A. 本地文件连接器｜复用并扩展&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;&lt;b&gt;输入：&lt;/b&gt;已授权库路径、监听事件和上次扫描代次。&lt;br&gt;先扫描建立清单；文件事件触发增量读取。&lt;br&gt;解析 Frontmatter、正文、标签和 WikiLinks。&lt;br&gt;读取前后核对版本，变化中重试，避免半份内容。&lt;br&gt;新增 / 改名 / 移动 / 删除进入同一变更队列。&lt;br&gt;监听丢事件时定期对账；断线重连后补扫描。&lt;br&gt;&lt;b&gt;输出：&lt;/b&gt;标准变更记录 + 原文版本 + 删除标记。&lt;br&gt;本地保存由第三层执行；连接器负责重新同步。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="65" y="1290.0" width="650" height="350" as="geometry" />
+        </mxCell>
+        <mxCell id="connector-remote" value="&lt;b style=&quot;font-size:26px&quot;&gt;B. 远端连接器｜复用正式接入&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;&lt;b&gt;输入：&lt;/b&gt;连接身份、同步游标、源能力与授权范围。&lt;br&gt;Craft：分页取得文档、原生 Block 和附件清单。&lt;br&gt;滴答：任务 / 清单 / 子项 + 状态 / 日期 / 历史。&lt;br&gt;不同接口历史能力不同，覆盖区间必须如实记录。&lt;br&gt;按分页 / 游标续传；限流与断网进入可恢复重试。&lt;br&gt;远端删除须有证据，不因单次未返回就删除本地。&lt;br&gt;&lt;b&gt;输出：&lt;/b&gt;带来源版本的变更与已遍历范围。&lt;br&gt;读本地镜像；远端修改统一走第三层写回路由。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="775" y="1290.0" width="650" height="350" as="geometry" />
+        </mxCell>
+        <mxCell id="foundation-projection-title" value="&lt;b&gt;第二层　统一数据模型：3 个统一查询入口 + 明确的身份、任务与时间结构&lt;/b&gt;" style="text;html=1;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=32;fontColor=#172B4D;align=left;verticalAlign=middle;spacing=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="65" y="2230.0" width="2050" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="foundation-projection-question" value="同一个 SQLite 内统一查询。下列是重建目标 schema：业务只使用 Hub 数据服务；现有来源表继续负责同步与领域写入。" style="text;html=1;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=23;fontColor=#334155;align=left;verticalAlign=middle;spacing=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="65" y="2287.0" width="2050" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="schema-example" value="&lt;b&gt;核心关系：&lt;/b&gt;一个 Item 对应多个 Block / Event；Relation 把 Item 相连；任务额外对应 Task Facts。视图统一“怎么查”，领域表保留“谁保存、谁同步”。" style="text;html=1;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=22;fontColor=#334155;align=left;verticalAlign=middle;spacing=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="70" y="3600.0" width="2050" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="data-methods-title" value="&lt;b&gt;第三层　规则、授权与写回：该按谁的规则做？怎样确认真的保存了？&lt;/b&gt;" style="text;html=1;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=32;fontColor=#172B4D;align=left;verticalAlign=middle;spacing=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="65" y="3780.0" width="2050" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="data-methods-question" value="解决的问题：跨库不会串规则；Agent 的建议不能自己变成权限；网络中断后不重复写入。" style="text;html=1;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=23;fontColor=#334155;align=left;verticalAlign=middle;spacing=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="65" y="3837.0" width="2050" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="capability-boundary-title" value="&lt;b&gt;第四层　Agent 工具：给模型清楚、稳定、可组合的能力&lt;/b&gt;" style="text;html=1;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=32;fontColor=#172B4D;align=left;verticalAlign=middle;spacing=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="65" y="4890.0" width="2050" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="capability-boundary-question" value="内置助手与外部 MCP 共用执行边界。工具按职责组织，不强行压成六个，也不预排固定任务步骤。" style="text;html=1;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=23;fontColor=#334155;align=left;verticalAlign=middle;spacing=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="65" y="4947.0" width="2050" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="tool-discover" value="&lt;b style=&quot;font-size:26px&quot;&gt;① 来源与能力｜discover / refresh&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;输入：source_ids、范围、所需新鲜度。&lt;br&gt;返回：来源能力、规则版本、同步覆盖与截至时间。&lt;br&gt;需要刷新时返回 sync_run_id，允许查询同步状态。&lt;br&gt;不可用能力返回具体原因，不能伪装为空结果。&lt;br&gt;内部助手与 MCP 共用定义，按当前授权筛选。&lt;br&gt;对应第一层来源注册与同步服务。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="65" y="5010.0" width="650" height="310" as="geometry" />
+        </mxCell>
+        <mxCell id="tool-read" value="&lt;b style=&quot;font-size:26px&quot;&gt;③ 原文读取｜read_items&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;输入：item_ids、mode、block_range、版本条件。&lt;br&gt;mode：全文 / 大纲 / 指定块；支持多材料。&lt;br&gt;返回：块内容、locator、引用身份与源版本。&lt;br&gt;标出缺失、权限不足、未加载或字符截断。&lt;br&gt;引用前核对原文；返回引用身份不等于已保存。&lt;br&gt;对应 hub_items / hub_blocks 与附件读取。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="1485" y="5010.0" width="650" height="310" as="geometry" />
+        </mxCell>
+        <mxCell id="tool-actions" value="&lt;b style=&quot;font-size:26px&quot;&gt;⑥ 动作与核验｜stage / apply / inspect&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;输入：operations、目标版本、授权上下文。&lt;br&gt;stage：生成差异与领域校验结果，不修改来源。&lt;br&gt;apply：程序核验有效授权后执行，不由模型授权。&lt;br&gt;inspect / verify：查询真实状态并回读结果。&lt;br&gt;返回：action_id、回执、冲突与可恢复原因。&lt;br&gt;批量动作逐项报告；已有结果不重复执行。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="1485" y="5355.0" width="650" height="310" as="geometry" />
+        </mxCell>
+        <mxCell id="tool-notes" value="&lt;b style=&quot;font-size:26px&quot;&gt;统一能力合同：Rust DTO 生成 schema / TS，提供方按协议适配（7.2.1）&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;&lt;b&gt;共同上下文：&lt;/b&gt;会话 / 运行身份、授权范围与版本、取消信号、总预算、请求身份。外部 MCP 也必须建立自己的有效授权上下文。&lt;br&gt;&lt;b&gt;共同返回：&lt;/b&gt;data / status、snapshot_id、source_versions、coverage、warnings、next_cursor / operation_id，以及精确错误原因。&lt;br&gt;&lt;b&gt;错误有区别：&lt;/b&gt;无权限、版本冲突、来源不可用、范围不完整、执行超限、结果未知；模型据此补读、缩小范围或恢复，不把失败当空数据。&lt;br&gt;&lt;b&gt;边界：&lt;/b&gt;工具数量可扩展；会话专有草稿上下文仍需要 Work / Run。Skill 说明怎样使用能力，不自动赋予脚本、网络或写入权限。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="65" y="5720.0" width="2070" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="flow-foundation-connectors" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=20;labelBackgroundColor=#FFFFFF;" edge="1" source="foundation-connectors" target="foundation-projection" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow-foundation-projection" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=20;labelBackgroundColor=#FFFFFF;" edge="1" source="foundation-projection" target="data-methods" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow-data-methods" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=20;labelBackgroundColor=#FFFFFF;" edge="1" source="data-methods" target="capability-boundary" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="flow-capability-boundary" value="调用 / 观察" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=20;labelBackgroundColor=#FFFFFF;startArrow=block;startFill=1;" edge="1" source="capability-boundary" target="model" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="scenario-title" value="&lt;b&gt;把架构放进实际使用过程&lt;/b&gt;" style="text;html=1;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=30;fontColor=#172B4D;align=left;verticalAlign=middle;spacing=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="2240" y="780.0" width="800" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="scenario-read" value="&lt;b style=&quot;font-size:27px&quot;&gt;场景一｜“帮我复盘上个月”&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:23px;line-height:1.5&quot;&gt;目标：结合日记、已完成任务和 Craft 项目资料，得到一份能核对依据的复盘。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=22;strokeWidth=1.5;fillColor=#CCFBF1;strokeColor=#CBD5E1;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="2230" y="850.0" width="800" height="165" as="geometry" />
+        </mxCell>
+        <mxCell id="read-step-0" value="&lt;b style=&quot;font-size:25px&quot;&gt;1. 先确认范围&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.5&quot;&gt;确定哪些库和清单可用；读取各自规则与数据状态。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=14;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#CBD5E1;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="2250" y="1060.0" width="760" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="read-step-1" value="&lt;b style=&quot;font-size:25px&quot;&gt;2. 判断统计能覆盖什么&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.5&quot;&gt;例如日记完整，但已完成任务只同步了半个月：先刷新，或明确标注缺口。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=14;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#CBD5E1;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="2250" y="1210.0" width="760" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="read-arrow-1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=20;labelBackgroundColor=#FFFFFF;" edge="1" source="read-step-0" target="read-step-1" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="read-step-2" value="&lt;b style=&quot;font-size:25px&quot;&gt;3. 按正确日期统计&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.5&quot;&gt;日记按记录日；完成数按完成日。定义去重、时区和完成率分母。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=14;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#CBD5E1;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="2250" y="1360.0" width="760" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="read-arrow-2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=20;labelBackgroundColor=#FFFFFF;" edge="1" source="read-step-1" target="read-step-2" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="read-step-3" value="&lt;b style=&quot;font-size:25px&quot;&gt;4. 把数据按周放在一起&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.5&quot;&gt;比较任务完成数量、日记记录天数；缺失不能当作零。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=14;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#CBD5E1;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="2250" y="1510.0" width="760" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="read-arrow-3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=20;labelBackgroundColor=#FFFFFF;" edge="1" source="read-step-2" target="read-step-3" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="read-step-4" value="&lt;b style=&quot;font-size:25px&quot;&gt;5. 寻找变化背后的原文&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.5&quot;&gt;第三周数量下降 → 读取当周日记、相关任务和项目文档。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=14;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#CBD5E1;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="2250" y="1660.0" width="760" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="read-arrow-4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=20;labelBackgroundColor=#FFFFFF;" edge="1" source="read-step-3" target="read-step-4" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="read-step-5" value="&lt;b style=&quot;font-size:25px&quot;&gt;6. 交付有依据的复盘&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.5&quot;&gt;展示数据、原文引用、口径和缺口；统计相关不自动等于因果。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=14;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#CBD5E1;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="2250" y="1810.0" width="760" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="read-arrow-5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=20;labelBackgroundColor=#FFFFFF;" edge="1" source="read-step-4" target="read-step-5" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="scenario-write" value="&lt;b style=&quot;font-size:27px&quot;&gt;场景二｜“把结论归档到 Craft，并完成这个任务”&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:23px;line-height:1.5&quot;&gt;目标：让两个应用都产生可核对的结果；任一步失败都能看清实际状态。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=22;strokeWidth=1.5;fillColor=#FFEDD5;strokeColor=#CBD5E1;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="2230" y="2030.0" width="800" height="175" as="geometry" />
+        </mxCell>
+        <mxCell id="write-step-0" value="&lt;b style=&quot;font-size:25px&quot;&gt;1. 准备两个明确动作&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.5&quot;&gt;分别展示 Craft 保存位置和正文、滴答目标任务及状态变化。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=14;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#CBD5E1;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="2250" y="2250.0" width="760" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="write-step-1" value="&lt;b style=&quot;font-size:25px&quot;&gt;2. 检查规则、版本与授权&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.5&quot;&gt;已授权范围内继续；需要具体确认的动作展示预览与确认。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=14;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#CBD5E1;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="2250" y="2400.0" width="760" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="write-arrow-1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=20;labelBackgroundColor=#FFFFFF;" edge="1" source="write-step-0" target="write-step-1" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="write-step-2" value="&lt;b style=&quot;font-size:25px&quot;&gt;3. 分别调用正式写入接口&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.5&quot;&gt;为每个动作记录操作身份和执行状态，避免重复请求造成重复对象。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=14;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#CBD5E1;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="2250" y="2550.0" width="760" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="write-arrow-2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=20;labelBackgroundColor=#FFFFFF;" edge="1" source="write-step-1" target="write-step-2" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="write-step-3" value="&lt;b style=&quot;font-size:25px&quot;&gt;4. 网络超时，先查结果&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.5&quot;&gt;Craft 可能已保存；查询远端回执或对象，不能直接重新新建。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=14;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#CBD5E1;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="2250" y="2700.0" width="760" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="write-arrow-3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=20;labelBackgroundColor=#FFFFFF;" edge="1" source="write-step-2" target="write-step-3" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="write-step-4" value="&lt;b style=&quot;font-size:25px&quot;&gt;5. 回读远端，再同步本地&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.5&quot;&gt;回读源对象 → 镜像 / 投影发布 → 索引更新；各阶段分别记录。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=14;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#CBD5E1;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="2250" y="2850.0" width="760" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="write-arrow-4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=20;labelBackgroundColor=#FFFFFF;" edge="1" source="write-step-3" target="write-step-4" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="write-step-5" value="&lt;b style=&quot;font-size:25px&quot;&gt;6. 交付每项实际结果&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.5&quot;&gt;Craft 已保存、滴答失败时逐项说明；只恢复未完成动作。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=14;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#CBD5E1;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="2250" y="3000.0" width="760" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="write-arrow-5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=20;labelBackgroundColor=#FFFFFF;" edge="1" source="write-step-4" target="write-step-5" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="scenario-standard" value="&lt;b style=&quot;font-size:27px&quot;&gt;怎样判断底座真的可用？&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:23px;line-height:1.5&quot;&gt;同一授权范围，内置助手和外部 MCP 得到一致结果。&lt;br&gt;统计可追溯到具体材料、时间口径与覆盖范围。&lt;br&gt;源资料变更后，旧引用与统计能识别失效。&lt;br&gt;重复请求、超时与重启后，不重复执行已完成动作。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=22;strokeWidth=1.5;fillColor=#F8FAFC;strokeColor=#CBD5E1;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="2230" y="3240.0" width="800" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="schema-relations" value="&lt;b style=&quot;font-size:26px&quot;&gt;③ hub_relations｜统一关系投影（新建）&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:20px;line-height:1.35&quot;&gt;&lt;b&gt;作用：&lt;/b&gt;跨库追踪标签、双链与任务引用。&lt;br&gt;&lt;b&gt;关键字段&lt;/b&gt;&lt;br&gt;relation_id · from_item_id · from_block_id?&lt;br&gt;relation_type（tag / wikilink / task_ref / parent）&lt;br&gt;to_item_id? · target_key · source_id&lt;br&gt;origin · source_revision · resolution_status&lt;br&gt;&lt;b&gt;实际存储与生成&lt;/b&gt;&lt;br&gt;从现有标签表和正文链接增量生成，可重建。&lt;br&gt;目标尚未解析：保留 target_key，不虚构对象。&lt;br&gt;同名标签先按来源隔离；跨库合并须显式映射。&lt;br&gt;来源明确链接与模型建议关系分开标记；&lt;br&gt;未确认建议不进入事实关系与统计。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="1485" y="2350.0" width="650" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="schema-identities" value="&lt;b style=&quot;font-size:26px&quot;&gt;支撑 A｜hub_object_ids（新增表）&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.45&quot;&gt;&lt;b&gt;为什么需要：&lt;/b&gt;文件改名后仍是同一份资料。&lt;br&gt;item_id（主键，不含可变路径）&lt;br&gt;source_id · source_object_id · object_kind&lt;br&gt;current_locator · deleted_at&lt;br&gt;唯一键：(source_id, object_kind, source_object_id)&lt;br&gt;&lt;b&gt;如何使用&lt;/b&gt;&lt;br&gt;来源注册复用 libraries；库 ID 就是 source_id。&lt;br&gt;远端对象使用原生 ID；本地对象登记稳定身份。&lt;br&gt;路径变化由连接器对账并更新 locator。&lt;br&gt;无法确定是否同一对象时保留待核对状态。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#F8FAFC;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="65" y="2840.0" width="650" height="390" as="geometry" />
+        </mxCell>
+        <mxCell id="schema-tasks" value="&lt;b style=&quot;font-size:26px&quot;&gt;支撑 B｜hub_task_facts（新增视图）&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.45&quot;&gt;&lt;b&gt;为什么需要：&lt;/b&gt;任务有文章没有的状态与时间。&lt;br&gt;item_id → hub_items · project_id · parent_task_id&lt;br&gt;task_status · priority · start_at · due_at&lt;br&gt;completed_at · time_zone · recurrence_json&lt;br&gt;source_status（保留来源原值）&lt;br&gt;&lt;b&gt;如何使用&lt;/b&gt;&lt;br&gt;复用 dida_tasks 等来源任务表，由适配器映射。&lt;br&gt;统一 open / completed / cancelled / unknown，&lt;br&gt;不把未知或不支持的状态强行归为未完成。&lt;br&gt;子任务 / 清单项按来源真实语义保留关系。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#F8FAFC;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="775" y="2840.0" width="650" height="390" as="geometry" />
+        </mxCell>
+        <mxCell id="schema-access" value="&lt;b style=&quot;font-size:26px&quot;&gt;业务到底怎么查？统一数据服务负责映射、授权、快照与结果说明&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.45&quot;&gt;&lt;b&gt;来源连接器&lt;/b&gt; → 更新现有领域表 → 在同一提交代次更新身份 / 块位置 / 关系 / 时间投影 → 对外发布可查询版本。&lt;br&gt;&lt;b&gt;统一读取：&lt;/b&gt;list / read 使用 hub_items + hub_blocks；过滤和关联使用 hub_relations、hub_task_facts、hub_events。&lt;br&gt;&lt;b&gt;统计示例：&lt;/b&gt;日记按 journal_entry 的日期与正文段计算月字数；任务按 completed_at 计算月完成数，再按月份关联。&lt;br&gt;&lt;b&gt;精确引用：&lt;/b&gt;结果附 item_id、block_id、source_revision 和 source_locator；原文变更后重新读取，不沿用旧位置。&lt;br&gt;&lt;b&gt;搜索：&lt;/b&gt;沿用 Tantivy，索引统一 item_id / block_id / source_revision；搜索命中后回到上述视图核对授权与原文。&lt;br&gt;&lt;b&gt;高级 SQL：&lt;/b&gt;只向模型提供当次授权的数据快照和公开 schema；不能直接查询含未授权记录的完整视图。&lt;br&gt;&lt;b&gt;每次返回：&lt;/b&gt;snapshot_id、来源覆盖、统计口径、缺失 / 截断。所有统一视图与投影对业务只读；修改走第三层动作系统。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="65" y="3280.0" width="2070" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="schema-walkthrough" value="&lt;b style=&quot;font-size:26px&quot;&gt;把一份资料从接入走到查询&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.45&quot;&gt;&lt;b&gt;例：Obsidian 一篇包含两个月日记的长文&lt;/b&gt;&lt;br&gt;① documents 保存原文与内容版本。&lt;br&gt;② hub_object_ids 为它分配稳定 item_id。&lt;br&gt;③ hub_items 将它呈现为一个 note。&lt;br&gt;④ 正文解析为日期段；hub_blocks 暴露段落，&lt;br&gt;　hub_block_anchors 记录每段对应原文位置。&lt;br&gt;⑤ 每个日期段产生 journal_entry 时间事实，&lt;br&gt;　hub_events 关联到相应 block_id。&lt;br&gt;⑥ 该段提及某个任务时，明确链接进入&lt;br&gt;　hub_relations；仅标题相似不自动认定关联。&lt;br&gt;⑦ 查询某月字数，只统计该月正文段；&lt;br&gt;　按 completed_at 取该月任务完成数量。&lt;br&gt;⑧ 报告可点击回到该段；文件改名后，&lt;br&gt;　更新 locator，保留已确认的对象身份。&lt;br&gt;&lt;br&gt;&lt;b&gt;这里哪些是设计目标？&lt;/b&gt;&lt;br&gt;所有 hub_* 统一视图与新增身份 / 位置 / 关系 /&lt;br&gt;时间投影均是本轮目标设计，不表示已落地。&lt;br&gt;现有库表、领域表、Tantivy 与动作服务继续复用。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#EFF6FF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="2230" y="3620.0" width="800" height="840" as="geometry" />
+        </mxCell>
+        <mxCell id="sync-registry" value="&lt;b style=&quot;font-size:26px&quot;&gt;D. 来源注册与能力声明｜扩展 libraries&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;source_id · provider · name · location · enabled&lt;br&gt;authority（local / remote）· credential_ref&lt;br&gt;capabilities_json · rule_binding · policy_revision&lt;br&gt;能力：list / read / history / write / delta / assets。&lt;br&gt;凭据只存安全引用，不进入查询结果或模型上下文。&lt;br&gt;新来源先实现标准读写与同步合同，声明不支持项。&lt;br&gt;相同接口可复用；特殊业务能力仍需领域适配。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#F8FAFC;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="65" y="1680.0" width="650" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="sync-contract" value="&lt;b style=&quot;font-size:26px&quot;&gt;E. 连接器输出｜统一变更信封&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;source_id · source_object_id · object_kind&lt;br&gt;change_type（upsert / delete / move）&lt;br&gt;source_revision · content_hash · observed_at&lt;br&gt;payload_ref · source_locator · sync_run_id&lt;br&gt;身份 / 原始内容 / 关系 / 时间由第二层归一化。&lt;br&gt;每源发布可用代次；提交失败不推进同步游标。&lt;br&gt;不同远端不承诺同时刻快照；记录各源截至时间。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#F8FAFC;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="775" y="1680.0" width="650" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="sync-publish" value="&lt;b style=&quot;font-size:26px&quot;&gt;F. 发布与恢复｜把“同步完成”说准确&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;拉取 → 校验 → 写领域表 → 更新投影 → 发布代次。&lt;br&gt;数据 / 投影 / 同步游标一致提交后才发布版本。&lt;br&gt;Tantivy 索引异步更新，另记索引代次与滞后。&lt;br&gt;去重使用来源对象身份与版本；重放不重复新增。&lt;br&gt;失败返回范围、阶段、原因与可继续游标。&lt;br&gt;刷新是否必要由任务的新鲜度要求决定；&lt;br&gt;可继续使用旧快照，但必须明确标注数据截至时间。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#F8FAFC;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="1485" y="1680.0" width="650" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="sync-io" value="&lt;b style=&quot;font-size:26px&quot;&gt;第一层交付给第二层的合同&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:20px;line-height:1.2&quot;&gt;&lt;b&gt;输入：&lt;/b&gt;已注册来源与范围 → &lt;b&gt;处理：&lt;/b&gt;增量拉取、变更核对、可恢复同步 → &lt;b&gt;输出：&lt;/b&gt;来源版本、变更信封、覆盖与可用代次。&lt;br&gt;&lt;b&gt;例：&lt;/b&gt;滴答今天同步成功，但只覆盖最近 30 天完成任务；半年复盘必须补历史或报告缺口，不能把缺失月份当作 0。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=12;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="65" y="2010.0" width="2070" height="125" as="geometry" />
+        </mxCell>
+        <mxCell id="policy-grants" value="&lt;b style=&quot;font-size:26px&quot;&gt;B. 授权合同｜执行时强制检查&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;grant_id · work_id · source_scope · object_scope&lt;br&gt;allowed_operations · version · expires_at?&lt;br&gt;decision_origin（用户当前指令 / 已有授权）&lt;br&gt;检查读取范围、写入目标、动作类型与有效版本。&lt;br&gt;可发现工具 ≠ 已授权；规则 / Skill 不能扩大范围。&lt;br&gt;预览与正式执行都检查授权，撤权后停止后续动作。&lt;br&gt;已有明确授权可以继续；高影响动作按策略确认。&lt;br&gt;&lt;b&gt;输出：&lt;/b&gt;允许 / 缺授权 / 冲突及具体原因。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="775" y="3900.0" width="650" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="write-routing" value="&lt;b style=&quot;font-size:26px&quot;&gt;D. 写回路由｜每个来源保留自己的规则&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;&lt;b&gt;Obsidian：&lt;/b&gt;核对原文版本与身份，受控写入，&lt;br&gt;保存备份 / 恢复依据，再读文件核验。&lt;br&gt;&lt;b&gt;Craft：&lt;/b&gt;正式接口更新目标文档 / Block，取得&lt;br&gt;远端对象或操作回执，再拉取最新对象。&lt;br&gt;&lt;b&gt;滴答：&lt;/b&gt;核对任务状态 / 版本，调用正式接口，&lt;br&gt;回读任务状态和真实完成时间。&lt;br&gt;核验后回流到第一层；镜像待同步与源写入分开。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFF7ED;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="65" y="4290.0" width="650" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="write-receipts" value="&lt;b style=&quot;font-size:26px&quot;&gt;F. 回执与部分成功｜逐项可核对&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;action_id · target_ref · source_operation_id?&lt;br&gt;before_revision · after_revision · verified_at&lt;br&gt;source_state · mirror_state · index_state · error&lt;br&gt;组合动作由 batch_id 关联，每项独立执行和核验。&lt;br&gt;Craft 成功、滴答失败：保留成功，恢复失败项。&lt;br&gt;补偿动作需要对应授权，不假装存在跨源事务。&lt;br&gt;发布、重启继续和模型切换都消费同一正式回执。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#FFF7ED;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="1485" y="4290.0" width="650" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="policy-io" value="&lt;b style=&quot;font-size:26px&quot;&gt;第三层输入与输出&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:20px;line-height:1.2&quot;&gt;&lt;b&gt;输入：&lt;/b&gt;用户意图、目标对象、来源版本、有效授权和规则 → &lt;b&gt;输出：&lt;/b&gt;可审阅差异、动作状态、已核验回执或明确未完成原因。&lt;br&gt;&lt;b&gt;双重检查：&lt;/b&gt;草稿生成时核对一次；实际执行前再次检查版本和授权，避免等待期间源资料变化后覆盖新内容。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=12;strokeWidth=1.5;fillColor=#FFFFFF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="65" y="4660.0" width="2070" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="recovery-scenario" value="&lt;b style=&quot;font-size:26px&quot;&gt;场景三｜分析到一半关闭 Hub，后来继续&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:23px;line-height:1.35&quot;&gt;① Work 保留目标和已确认范围，Run 记录停止位置。&lt;br&gt;② 已取得原文、统计与工具回执按版本保存。&lt;br&gt;③ 重启时把失去进程的运行标为中断，&lt;br&gt;　不能把上次“执行中”直接显示为完成。&lt;br&gt;④ 如果存在结果未知的写入，先向远端核实。&lt;br&gt;⑤ 核对授权、规则、来源与执行兼容清单（8.46）。&lt;br&gt;⑥ 旧数据已变：重新读取或计算相应部分。&lt;br&gt;⑦ 建立新运行，复用仍有效的进展与回执。&lt;br&gt;⑧ 模型根据当前事实决定下一步，&lt;br&gt;　不会重放整段聊天中的所有业务动作。&lt;br&gt;&lt;br&gt;&lt;b&gt;用户看到：&lt;/b&gt;已完成什么、哪些待核验、&lt;br&gt;本次继续了什么，以及还需要哪些输入。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#F5F3FF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="2230" y="4580.0" width="800" height="650" as="geometry" />
+        </mxCell>
+        <mxCell id="construction-map" value="&lt;b&gt;唯一交付路线｜第 05 / 07 页展开&lt;/b&gt;&lt;br&gt;&lt;br&gt;V1：接续 A–H，固定输入 + 统计 + 一个抽取指标；同一图表/报告可检查、修订及 Hub 内重开。&lt;br&gt;&lt;br&gt;V2：按来源接通授权保存、重读、冲突及未知结果核验。&lt;br&gt;&lt;br&gt;V3：长期连续 Run、压缩、暂停恢复与看门狗。&lt;br&gt;&lt;br&gt;V4：多提供方、扩展业务及后台触发。&lt;br&gt;&lt;br&gt;V1 保留必要权限、预算、版本与基本状态恢复；导出 / blob 按实测与需求进入；完整框架后置。&lt;br&gt;&lt;br&gt;P0–P7 为历史分类；WG/UI/SR/RL 映射到以上路线。&lt;br&gt;&lt;br&gt;正式质量 + 体验双门未执行，不把源码或单例成功视为全部交付。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#F8FAFC;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="2230" y="5300.0" width="800" height="820" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-target" value="&lt;b style=&quot;font-size:26px&quot;&gt;图中设计状态与边界&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-size:23px;line-height:1.35&quot;&gt;&lt;b&gt;复用：&lt;/b&gt;现有连接器、领域表、Tantivy、&lt;br&gt;共享能力入口、规则加载、动作与运行记录。&lt;br&gt;&lt;br&gt;&lt;b&gt;扩展：&lt;/b&gt;覆盖 / 代次、统一授权与动作回执、&lt;br&gt;跨来源查询及失效检查。&lt;br&gt;&lt;br&gt;&lt;b&gt;新增目标：&lt;/b&gt;第二层统一视图 / 投影及身份&lt;br&gt;映射，结构化统计和受控复杂计算合同。&lt;br&gt;&lt;br&gt;这些名称和字段是本轮架构设计；&lt;br&gt;不表示已经完成数据库迁移或实际功能验收。&lt;br&gt;示例工具名表示职责，可映射到现有公开接口。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontFamily=Microsoft YaHei;fontColor=#25354A;align=left;verticalAlign=top;spacing=20;strokeWidth=1.5;fillColor=#EFF6FF;strokeColor=#A8BDD8;fontSize=21;" vertex="1" parent="1">
+          <mxGeometry x="2230" y="6200.0" width="800" height="650" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest-overview-title" value="&lt;b style=&quot;font-size:26px&quot;&gt;主线①　资料进入 Hub：发布一个能可靠查询的版本&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:25px;line-height:1.35&quot;&gt;&lt;/span&gt;" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontFamily=Microsoft YaHei;fontSize=25;align=left;fontColor=#2563EB;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="175" width="2990" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest-overview-0" value="&lt;b style=&quot;font-size:26px&quot;&gt;发现来源变化&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;文件监听 / 远端增量&lt;br&gt;记录各来源截至时间&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EFF6FF;strokeColor=#2563EB;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="40" y="220" width="450" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest-overview-1" value="&lt;b style=&quot;font-size:26px&quot;&gt;拉取、暂存、校验&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;分页、版本与删除证据&lt;br&gt;失败保留可恢复游标&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EFF6FF;strokeColor=#2563EB;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="545" y="220" width="450" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest-overview-edge-1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=19;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="ingest-overview-0" target="ingest-overview-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest-overview-2" value="&lt;b style=&quot;font-size:26px&quot;&gt;归一化与更新&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;领域表 + 身份 / 块 / 关系&lt;br&gt;生成对应版本的查询投影&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EFF6FF;strokeColor=#2563EB;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="220" width="450" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest-overview-edge-2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=19;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="ingest-overview-1" target="ingest-overview-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest-overview-3" value="&lt;b style=&quot;font-size:26px&quot;&gt;提交并发布版本&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;数据、投影与游标一致提交&lt;br&gt;发布可查询 generation&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EFF6FF;strokeColor=#2563EB;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="1555" y="220" width="450" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest-overview-edge-3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=19;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="ingest-overview-2" target="ingest-overview-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest-overview-4" value="&lt;b style=&quot;font-size:26px&quot;&gt;更新搜索索引&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;Tantivy 另记 index_generation&lt;br&gt;未追上时明确标注滞后&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EFF6FF;strokeColor=#2563EB;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="2060" y="220" width="450" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest-overview-edge-4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=19;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="ingest-overview-3" target="ingest-overview-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest-overview-5" value="&lt;b style=&quot;font-size:26px&quot;&gt;统一查询与引用&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;授权范围 + 可用快照&lt;br&gt;完整统计不依赖搜索排名&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EFF6FF;strokeColor=#2563EB;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="2565" y="220" width="450" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest-overview-edge-5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=19;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="ingest-overview-4" target="ingest-overview-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="analysis-overview-title" value="&lt;b style=&quot;font-size:26px&quot;&gt;主线②　跨源复盘：先算清范围与口径，再用原文解释变化&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:25px;line-height:1.35&quot;&gt;&lt;/span&gt;" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontFamily=Microsoft YaHei;fontSize=25;align=left;fontColor=#7C3AED;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="345" width="2990" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="analysis-overview-0" value="&lt;b style=&quot;font-size:26px&quot;&gt;确认范围与覆盖&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;来源授权 / 规则 / 截至时间&lt;br&gt;缺历史先补齐或披露缺口&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#F5F3FF;strokeColor=#7C3AED;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="40" y="390" width="450" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="analysis-overview-1" value="&lt;b style=&quot;font-size:26px&quot;&gt;完整枚举材料&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;固定快照与分页&lt;br&gt;明确分母，缺失不当作零&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#F5F3FF;strokeColor=#7C3AED;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="545" y="390" width="450" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="analysis-overview-edge-1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=19;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="analysis-overview-0" target="analysis-overview-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="analysis-overview-2" value="&lt;b style=&quot;font-size:26px&quot;&gt;关联正确的事实&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;日记按日期段，任务按完成日&lt;br&gt;区分时区、状态和去重&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#F5F3FF;strokeColor=#7C3AED;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="390" width="450" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="analysis-overview-edge-2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=19;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="analysis-overview-1" target="analysis-overview-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="analysis-overview-3" value="&lt;b style=&quot;font-size:26px&quot;&gt;执行统计与比较&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;统一数据服务 / 受控 SQL&lt;br&gt;计算口径和版本随结果返回&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#F5F3FF;strokeColor=#7C3AED;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="1555" y="390" width="450" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="analysis-overview-edge-3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=19;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="analysis-overview-2" target="analysis-overview-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="analysis-overview-4" value="&lt;b style=&quot;font-size:26px&quot;&gt;补读与按需计算&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;搜索并读取异常时段原文&lt;br&gt;复杂分析才进入沙盒&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#F5F3FF;strokeColor=#7C3AED;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="2060" y="390" width="450" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="analysis-overview-edge-4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=19;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="analysis-overview-3" target="analysis-overview-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="analysis-overview-5" value="&lt;b style=&quot;font-size:26px&quot;&gt;交付可核验复盘&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;数值 + 精确引用 + 缺口&lt;br&gt;不把相关性直接解释为因果&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#F5F3FF;strokeColor=#7C3AED;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="2565" y="390" width="450" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="analysis-overview-edge-5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=19;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="analysis-overview-4" target="analysis-overview-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="write-overview-title" value="&lt;b style=&quot;font-size:26px&quot;&gt;主线③　写回并回流：准备 → 执行 → 回读源对象 → 更新 Hub → 交付回执&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:25px;line-height:1.35&quot;&gt;&lt;/span&gt;" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontFamily=Microsoft YaHei;fontSize=25;align=left;fontColor=#EA580C;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="515" width="2990" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="write-overview-0" value="&lt;b style=&quot;font-size:26px&quot;&gt;差异、规则与授权&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;核对目标对象与源版本&lt;br&gt;按已有授权或具体确认继续&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#EA580C;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="40" y="560" width="450" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="write-overview-1" value="&lt;b style=&quot;font-size:26px&quot;&gt;先保存执行意图&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;操作身份 / 版本 / 当前状态&lt;br&gt;持久化后才发起外部请求&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#EA580C;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="545" y="560" width="450" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="write-overview-edge-1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#EA580C;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=19;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="write-overview-0" target="write-overview-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="write-overview-2" value="&lt;b style=&quot;font-size:26px&quot;&gt;写入权威来源&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;Obsidian 文件 / Craft / 滴答&lt;br&gt;超时进入“结果未知”&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#EA580C;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="560" width="450" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="write-overview-edge-2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#EA580C;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=19;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="write-overview-1" target="write-overview-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="write-overview-3" value="&lt;b style=&quot;font-size:26px&quot;&gt;回读并核验结果&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;查远端对象或本地文件&lt;br&gt;未知先查证，不盲目重复写&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#EA580C;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="1555" y="560" width="450" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="write-overview-edge-3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0F766E;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=19;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="write-overview-2" target="write-overview-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="write-overview-4" value="&lt;b style=&quot;font-size:26px&quot;&gt;回流到主线①&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;镜像 → 投影 → 可查询版本&lt;br&gt;索引异步追上，分别记状态&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#EA580C;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="2060" y="560" width="450" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="write-overview-edge-4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0F766E;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=19;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="write-overview-3" target="write-overview-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="write-overview-5" value="&lt;b style=&quot;font-size:26px&quot;&gt;交付逐项真实回执&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:21px;line-height:1.35&quot;&gt;源已成功 / 镜像待同步 / 冲突&lt;br&gt;组合动作部分成功分别报告&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#EA580C;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="2565" y="560" width="450" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="write-overview-edge-5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0F766E;strokeWidth=2;endArrow=block;fontFamily=Microsoft YaHei;fontSize=19;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="write-overview-4" target="write-overview-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="overview-legend" value="&lt;b style=&quot;font-size:26px&quot;&gt;蓝色：接入与发布　紫色：查询与分析　橙色：写入请求　绿色：回读与同步回流。以下逐层展开实现合同；这三条是能力流程，不是模型必须逐步执行的固定计划。&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:22px;line-height:1.35&quot;&gt;&lt;/span&gt;" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontFamily=Microsoft YaHei;fontSize=22;align=left;fontColor=#172B4D;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="700" width="2990" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="derived-title" value="&lt;b style=&quot;font-size:26px&quot;&gt;派生数据的失效与重建：来源更新、解析规则变化和删除如何传到最终结果&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:30px;line-height:1.35&quot;&gt;&lt;/span&gt;" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontFamily=Microsoft YaHei;fontSize=30;align=left;fontColor=#172B4D;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="11010.0" width="2990" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="derived-versions" value="&lt;b style=&quot;font-size:26px&quot;&gt;① 记录生成依据，确定重建范围&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:23px;line-height:1.35&quot;&gt;source_revision：输入原文版本。&lt;br&gt;schema_version / parser_version / projection_version：&lt;br&gt;数据结构、解析逻辑和投影算法的版本。&lt;br&gt;build_id · target_generation · status · cursor · last_error。&lt;br&gt;解析规则变化 → 重算对应内容块与关系；&lt;br&gt;日期识别变化 → 重算日期事件和依赖的统计。&lt;br&gt;只重建受影响来源 / 对象，任务状态可查询与恢复。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EFF6FF;strokeColor=#CBD5E1;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="40" y="11080.0" width="950" height="350" as="geometry" />
+        </mxCell>
+        <mxCell id="derived-delete" value="&lt;b style=&quot;font-size:26px&quot;&gt;② 删除、撤权与引用失效&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:23px;line-height:1.35&quot;&gt;确认删除 → 保留 tombstone 与来源证据；&lt;br&gt;从活动实体、块、关系及搜索结果中移除 / 屏蔽。&lt;br&gt;搜索候选回读时再次核对源版本和有效资格。&lt;br&gt;授权撤回后，旧快照与历史结果按权限限制读取。&lt;br&gt;报告保留“原依据已删除 / 过期”的说明，&lt;br&gt;不把旧引文自动指向相似的新段落。&lt;br&gt;不能因一次同步未返回对象，就认定源已删除。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EFF6FF;strokeColor=#CBD5E1;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="11080.0" width="950" height="350" as="geometry" />
+        </mxCell>
+        <mxCell id="derived-publish" value="&lt;b style=&quot;font-size:26px&quot;&gt;③ 重建完成后切换可用版本&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:23px;line-height:1.35&quot;&gt;准备新代次 → 增量构建 → 完整性校验 → 原子发布。&lt;br&gt;失败保留旧可用版本与重建游标，不发布半成品。&lt;br&gt;旧版本继续可读，但仍须执行当前授权 / 删除屏蔽。&lt;br&gt;新投影发布后索引另行追上，分别报告版本状态。&lt;br&gt;旧统计按依赖失效；重新计算后才发布新结论。&lt;br&gt;用代表性关联查询评估视图与物化投影，&lt;br&gt;实现方式可调整，业务统一查询合同保持稳定。&lt;/span&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EFF6FF;strokeColor=#CBD5E1;strokeWidth=1.5;fontFamily=Microsoft YaHei;align=left;verticalAlign=middle;spacing=16;fontColor=#25354A;" vertex="1" parent="1">
+          <mxGeometry x="2080" y="11080.0" width="950" height="350" as="geometry" />
+        </mxCell>
+        <mxCell id="workspace-manifest" value="&lt;b&gt;① 工作上下文｜Workspace Manifest&lt;/b&gt;&lt;br&gt;&lt;br&gt;输入：用户目标、当前焦点、明确选中的材料。&lt;br&gt;身份：source / item / page / block + revision。&lt;br&gt;规则：rule IDs + versions，走可信规则通道。&lt;br&gt;授权由宿主决定；清单和当前页面不授予权限。&lt;br&gt;读取状态：未读 / 部分 / 已读 / 不可读 / 已变更。&lt;br&gt;输出：轻量清单 → 按需批读 → 覆盖记录。&lt;br&gt;覆盖：选择数、处理数、遗漏对象及原因。&lt;br&gt;读完不等于制卡全面：成果还需内容覆盖检查。&lt;br&gt;切换页面不静默改变运行范围。&lt;br&gt;扩展现有 32 份材料机制，不建平行授权系统。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F7FF;strokeColor=#8BAFD7;fontFamily=Microsoft YaHei;fontSize=22;align=left;verticalAlign=top;spacing=18;" vertex="1" parent="1">
+          <mxGeometry x="65" y="6140" width="650" height="650" as="geometry" />
+        </mxCell>
+        <mxCell id="execution-events" value="&lt;b&gt;公开执行事件与恢复｜详见 U1–U9&lt;/b&gt;&lt;br&gt;&lt;br&gt;当前已有持久过程记录与前端刷新兜底。&lt;br&gt;新目标：版本化局部更新 + 一致快照补齐。&lt;br&gt;公开摘要 / 工具事实 / 成果分别展示。&lt;br&gt;保留 work / run / item / call / revision。&lt;br&gt;缺口先缓存，连续应用才推进水位。&lt;br&gt;正文按授权订阅，不全局广播。&lt;br&gt;工具失败、未执行、unknown 不冒充成功。&lt;br&gt;已采纳 1.7；实现与验收待完成。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F7FF;strokeColor=#8BAFD7;fontFamily=Microsoft YaHei;fontSize=22;align=left;verticalAlign=top;spacing=18;" vertex="1" parent="1">
+          <mxGeometry x="775" y="6140" width="650" height="650" as="geometry" />
+        </mxCell>
+        <mxCell id="analysis-artifact" value="&lt;b&gt;分析成果｜7.6 / 7.7 为详细合同&lt;/b&gt;&lt;br&gt;&lt;br&gt;原文 → ExtractionDataset → 统计 → 图表 → 报告。&lt;br&gt;&lt;br&gt;值保留 exact / interval / ordinal / missing 等类型。&lt;br&gt;&lt;br&gt;原值、单位、日期依据、引用与方法版本可核对。&lt;br&gt;&lt;br&gt;模型抽取是解释，结构合法不等于事实正确。&lt;br&gt;&lt;br&gt;冻结 dataset revision；只计算声明的有效样本。&lt;br&gt;&lt;br&gt;artifact + revision + ValidationReceipt + Publication。&lt;br&gt;&lt;br&gt;同一成果局部修改，依赖变化使相关报告失效。&lt;br&gt;&lt;br&gt;缺失不补零、模糊不造精度；首期详见第 04 页。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F7FF;strokeColor=#8BAFD7;fontFamily=Microsoft YaHei;fontSize=22;align=left;verticalAlign=top;spacing=18;" vertex="1" parent="1">
+          <mxGeometry x="1485" y="6140" width="650" height="650" as="geometry" />
+        </mxCell>
+        <mxCell id="runtime-contract" value="&lt;b&gt;交互与恢复闭环｜选定材料 → 按需读取 → 确定性分析 → 核验成果 → 按授权准备 / 执行动作&lt;/b&gt;&lt;br&gt;&lt;br&gt;Work 保存目标与材料范围；Run 保存事件、覆盖、方法、来源版本和真实动作回执。历史交付以 0.16.307 为基线；A–H 新增源码与定向证据见 0.5。&lt;br&gt;进入确认 / 执行的草稿持久化到 agent_actions：目标、Diff、基线、授权版本、状态；临时内存预览不能承担恢复。&lt;br&gt;AGENTS.md 可表达方法与约定；硬拦截依赖结构化策略，不能承诺自动执行任意自然语言规则。&lt;br&gt;venv / uv 只管理环境，不等于安全沙盒；隔离机制、文件 / 网络能力、资源限制和取消回收需实际验证。&lt;br&gt;输出图表先校验规范与数据；限制外部资源和主动内容。数据、方法、授权变化后，相关成果失效。&lt;br&gt;优先完成清单、事件和成果合同，再扩展指标 / 图表 / 提供方；通用脚本执行须有需求与隔离验证。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F7FF;strokeColor=#8BAFD7;fontFamily=Microsoft YaHei;fontSize=22;align=left;verticalAlign=top;spacing=18;" vertex="1" parent="1">
+          <mxGeometry x="65" y="6830" width="2070" height="520" as="geometry" />
+        </mxCell>
+        <mxCell id="resilience-context" value="&lt;b&gt;上下文与持久工作状态｜详见右侧展开&lt;/b&gt;&lt;br&gt;&lt;br&gt;Full Trace：完整接收结果与证据独立保存。&lt;br&gt;Scratchpad：目标、结论、进度有版本更新。&lt;br&gt;Context View：每次请求选择原文 / 片段 / 存根。&lt;br&gt;本地折叠标记不改变 Codex 服务器历史。&lt;br&gt;原生循环保留；压缩由提供方适配器落实。&lt;br&gt;用户追加、未解决错误、当前任务依赖优先。&lt;br&gt;模型结论不升级成系统指令或已核实事实。&lt;br&gt;来源变化触发失效；重读核验版本与授权。&lt;br&gt;右侧 C1–C9：数据、流程、实施与验收细节。&lt;br&gt;本区首次细化 1.4；当前总基线 1.14；完整链属 V3；V1 有界返回与测量先做。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#F4F2FF;strokeColor=#9A8CCA;fontFamily=Microsoft YaHei;fontSize=22;align=left;verticalAlign=top;spacing=18;" vertex="1" parent="1">
+          <mxGeometry x="40" y="8910.0" width="950" height="650" as="geometry" />
+        </mxCell>
+        <mxCell id="resilience-concurrency" value="&lt;b&gt;并发与条件撤销｜详见 R3–R7&lt;/b&gt;&lt;br&gt;&lt;br&gt;Hash 检查不等于来源端原子 CAS；能力需实证。&lt;br&gt;&lt;br&gt;草稿/范围/规则/授权/源版本绑定，执行时再验。&lt;br&gt;&lt;br&gt;冲突保存 base/current/proposed，生成新草稿版本。&lt;br&gt;&lt;br&gt;提交前记录恢复依据与意图；结果未知先核验。&lt;br&gt;&lt;br&gt;原回执不 Pop；撤销是有幂等身份的新动作。&lt;br&gt;&lt;br&gt;后续用户编辑受保护，快照不能直接覆盖当前源。&lt;br&gt;&lt;br&gt;源成功但索引失败：只重试同步，不重放业务。&lt;br&gt;&lt;br&gt;历史引入 1.10；当前按 1.11；分来源实现与验收仍待完成。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#F4F2FF;strokeColor=#9A8CCA;fontFamily=Microsoft YaHei;fontSize=22;align=left;verticalAlign=top;spacing=18;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="8910.0" width="950" height="650" as="geometry" />
+        </mxCell>
+        <mxCell id="resilience-progress" value="&lt;b&gt;进展感知看门狗｜右侧 W1–W9 展开&lt;/b&gt;&lt;br&gt;&lt;br&gt;重复调用 ≠ 没有进展；四类模式仅作信号。&lt;br&gt;精确指纹保留 JSON 类型、版本、范围、游标。&lt;br&gt;观察 → 恢复 → 限制当前尝试 → 停止 Run。&lt;br&gt;先修复上下文缺失，不给 URI 上永久重读锁。&lt;br&gt;黑板调用不清零；真实进展关闭对应 episode。&lt;br&gt;干预与原始结果分开保存，预算继续累计。&lt;br&gt;轮询、退避、核验、诊断和交付保留通道。&lt;br&gt;保持 Codex 自主循环，接入 Hub 工具回调。&lt;br&gt;本区修订 1.6；当前总基线 1.14：完整干预按 V3 引入；V1 复用真实事件。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#F4F2FF;strokeColor=#9A8CCA;fontFamily=Microsoft YaHei;fontSize=22;align=left;verticalAlign=top;spacing=18;" vertex="1" parent="1">
+          <mxGeometry x="2080" y="8910.0" width="950" height="650" as="geometry" />
+        </mxCell>
+        <mxCell id="resilience-rules" value="&lt;b&gt;纠正与规则演进｜详见 R8&lt;/b&gt;&lt;br&gt;&lt;br&gt;本次例外 → Work；长期偏好 → 确认记忆。&lt;br&gt;&lt;br&gt;库/目录约定 → AGENTS.md；方法 → Skill。&lt;br&gt;&lt;br&gt;事实更正回资料；不把所有纠正写成规则。&lt;br&gt;&lt;br&gt;提案绑定来源消息、目标范围、差异与原版本。&lt;br&gt;&lt;br&gt;明确长期授权可沿用；推断长期性先确认。&lt;br&gt;&lt;br&gt;规则修改复用条件写入、回执及恢复合同。&lt;br&gt;&lt;br&gt;生效后刷新规则视图、重验受影响的待执行动作。&lt;br&gt;&lt;br&gt;不扩大工具权限；写入成功不自动触发规则修改。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#F4F2FF;strokeColor=#9A8CCA;fontFamily=Microsoft YaHei;fontSize=22;align=left;verticalAlign=top;spacing=18;" vertex="1" parent="1">
+          <mxGeometry x="40" y="9610.0" width="950" height="620" as="geometry" />
+        </mxCell>
+        <mxCell id="resilience-eval" value="&lt;b&gt;追踪与联合回归｜详见 R9&lt;/b&gt;&lt;br&gt;&lt;br&gt;Full Trace / UI 摘要 / 脱敏评测三类用途分开。&lt;br&gt;&lt;br&gt;Trace 横贯运行、压缩、冲突、写入和补偿。&lt;br&gt;&lt;br&gt;原事实不因折叠、撤销、暂停而被删除或改写。&lt;br&gt;&lt;br&gt;记录模型/规则/schema/源版本、预算与故障时点。&lt;br&gt;&lt;br&gt;回放默认不向真实库重发写入；真实测试用隔离源。&lt;br&gt;&lt;br&gt;指标有身份、时点和实测/估算标识。&lt;br&gt;&lt;br&gt;允许多种正确路径，衡量成果、恢复、成本。&lt;br&gt;&lt;br&gt;RL-1–5 / A-90–99：联动验收仍待执行。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#F4F2FF;strokeColor=#9A8CCA;fontFamily=Microsoft YaHei;fontSize=22;align=left;verticalAlign=top;spacing=18;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="9610.0" width="950" height="620" as="geometry" />
+        </mxCell>
+        <mxCell id="resilience-triggers" value="&lt;b&gt;长期使用③｜后台触发暂缓、边界先定义&lt;/b&gt;&lt;br&gt;&lt;br&gt;未来 Trigger → Work → Run 复用正式执行链。&lt;br&gt;明确授权范围 / 有效期 / 预算 / 通知 / 暂停。&lt;br&gt;事件身份去重，限制并发与重入。&lt;br&gt;定义休眠补跑、错过合并、退避及放弃条件。&lt;br&gt;自身产物标记因果链，避免触发无限生成。&lt;br&gt;自动草稿不自动授权正式写回。&lt;br&gt;基础门：并发 / 恢复依据 / 硬预算 / 最小回归。&lt;br&gt;长任务门：上下文 / 进展检测 / 条件撤销 / 规则提议。&lt;br&gt;扩展门：后台触发 / 自动路由 / 复杂多 Agent。&lt;br&gt;详细字段、状态、验收与待决项见架构文档 9.2 / 13.11（历史引入 1.2）。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#F4F2FF;strokeColor=#9A8CCA;fontFamily=Microsoft YaHei;fontSize=22;align=left;verticalAlign=top;spacing=18;" vertex="1" parent="1">
+          <mxGeometry x="2080" y="9610.0" width="950" height="620" as="geometry" />
+        </mxCell>
+        <mxCell id="resilience-status" value="&lt;b&gt;设计状态与关联&lt;/b&gt;&lt;br&gt;&lt;br&gt;本区补充模型运行、规则和动作层的异常路径；保留现有单页主流程与节点。所有新增能力为目标合同，尚未据此实施或验收。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#F4F2FF;strokeColor=#9A8CCA;fontFamily=Microsoft YaHei;fontSize=22;align=left;verticalAlign=top;spacing=18;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10260.0" width="2990" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="autonomous-delivery-0" value="&lt;b&gt;自主循环与真实过程&lt;/b&gt;&lt;br&gt;&lt;br&gt;模型理解目标 → 选择工具 → 观察结果 → 调整 → 继续。&lt;br&gt;计划由模型按需建立与修改，宿主不预排固定步骤。&lt;br&gt;公开说明 / 可用摘要 / 工具事件分别呈现。&lt;br&gt;不复制私有原始思维链，不补造思考文案。&lt;br&gt;简单任务可零工具，复杂任务持续对照目标。&lt;br&gt;Codex 原生循环已有定向证据，非全场景完成。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#ECFDF5;strokeColor=#67A98C;fontFamily=Microsoft YaHei;fontSize=23;align=left;verticalAlign=top;spacing=20;" vertex="1" parent="1">
+          <mxGeometry x="40" y="7470" width="950" height="650" as="geometry" />
+        </mxCell>
+        <mxCell id="autonomous-delivery-1" value="&lt;b&gt;工作环境与可组合业务能力&lt;/b&gt;&lt;br&gt;&lt;br&gt;现状：仅 Hub 工具，网页搜索关闭；通用计算待建设。&lt;br&gt;授权快照 → 分析 / 按需计算 → 表格 / 图表 / 报告。&lt;br&gt;生成后读取数据和渲染结果，修正后再次检查。&lt;br&gt;job_id 支持状态、取消、日志与结果取回。&lt;br&gt;发现对象 → 读取 → Diff → 按授权应用 → 回读。&lt;br&gt;多材料可读不等于能混合制卡或修改全部对象。&lt;br&gt;不靠解除全部主机限制代替安全工作环境。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#ECFDF5;strokeColor=#67A98C;fontFamily=Microsoft YaHei;fontSize=23;align=left;verticalAlign=top;spacing=20;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="7470" width="950" height="650" as="geometry" />
+        </mxCell>
+        <mxCell id="autonomous-delivery-2" value="&lt;b&gt;目标与成果｜详细合同 8.44 / 7.7&lt;/b&gt;&lt;br&gt;&lt;br&gt;Work GoalRevision / Requirement / Task 为权威。&lt;br&gt;&lt;br&gt;Scratchpad 的目标与进度是投影，不独立写 done。&lt;br&gt;&lt;br&gt;成果沿用 artifact_id，每次修改生成 revision。&lt;br&gt;&lt;br&gt;检查绑定精确内容、数据和方法版本。&lt;br&gt;&lt;br&gt;用户追加 → 更新目标 → 失效依赖 → 修订 → 再检。&lt;br&gt;&lt;br&gt;Run 结束 ≠ Work fulfilled；未完成逐项保留。&lt;br&gt;&lt;br&gt;发布核对目标版本、命令水位及真实动作回执。&lt;br&gt;&lt;br&gt;新增第 03/04 页：字段、所有权和数据成果闭环。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#ECFDF5;strokeColor=#67A98C;fontFamily=Microsoft YaHei;fontSize=23;align=left;verticalAlign=top;spacing=20;" vertex="1" parent="1">
+          <mxGeometry x="2080" y="7470" width="950" height="650" as="geometry" />
+        </mxCell>
+        <mxCell id="autonomous-delivery-3" value="&lt;b&gt;连续协作与恢复｜详见 S1–S9&lt;/b&gt;&lt;br&gt;&lt;br&gt;已有：持久文字追加、原生 turn/steer、发布防护。&lt;br&gt;&lt;br&gt;采用：软追加、安全点、可恢复暂停与动态材料。&lt;br&gt;修订：持久命令 + 协调器 + 逐项真实结果。&lt;br&gt;&lt;br&gt;暂停请求 ≠ 已停止 ≠ 副作用不存在。&lt;br&gt;未知写入先核验，恢复不盲目重放。&lt;br&gt;压哨追加与完成通过命令水位确定归属。&lt;br&gt;&lt;br&gt;保留原生自主循环、hub_finish 与发布事务。&lt;br&gt;1.9 采纳记录已细化；实现及功能验收待完成。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#ECFDF5;strokeColor=#67A98C;fontFamily=Microsoft YaHei;fontSize=23;align=left;verticalAlign=top;spacing=20;" vertex="1" parent="1">
+          <mxGeometry x="40" y="8170" width="950" height="650" as="geometry" />
+        </mxCell>
+        <mxCell id="autonomous-delivery-4" value="&lt;b&gt;主验收：两年日记与任务复盘&lt;/b&gt;&lt;br&gt;&lt;br&gt;用户目标：分析 → 有引用图表和报告 → 按授权保存。&lt;br&gt;覆盖不同：核对可比范围，不将缺失当零。&lt;br&gt;字段冲突：调查口径，不盲目转换。&lt;br&gt;计算失败：观察真实错误，自主修改再执行。&lt;br&gt;追加睡眠：复用有效结果、更新同一成果。&lt;br&gt;保存冲突：保留草稿；结果未知：查证不重复写。&lt;br&gt;测试只布置条件，不替模型安排工具顺序。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#ECFDF5;strokeColor=#67A98C;fontFamily=Microsoft YaHei;fontSize=23;align=left;verticalAlign=top;spacing=20;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="8170" width="950" height="650" as="geometry" />
+        </mxCell>
+        <mxCell id="autonomous-delivery-5" value="&lt;b&gt;实施顺序与能力核对边界&lt;/b&gt;&lt;br&gt;&lt;br&gt;V1：统计 + 一个抽取指标 + 图表/报告修订 + Hub 内保存与重开。&lt;br&gt;&lt;br&gt;V2：来源写回；V3：完整长期协作；V4：扩展。&lt;br&gt;&lt;br&gt;A–H 有分段实现；真实模型采用仅 V1-D 单例。&lt;br&gt;&lt;br&gt;四层覆盖、容量失败、原生体验与正式评测仍需补齐。&lt;br&gt;&lt;br&gt;简单回答不强制工具或任务树；模型仍自主选步骤。&lt;br&gt;&lt;br&gt;设计目标不等于验收成绩；产品间优劣不作结论。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#ECFDF5;strokeColor=#67A98C;fontFamily=Microsoft YaHei;fontSize=23;align=left;verticalAlign=top;spacing=20;" vertex="1" parent="1">
+          <mxGeometry x="2080" y="8170" width="950" height="650" as="geometry" />
+        </mxCell>
+        <mxCell id="context-detail-0" value="&lt;b&gt;C1 完整执行记录 → 模型表示&lt;/b&gt;&lt;br&gt;&lt;br&gt;输入：真实工具结果、错误、回执、附件。&lt;br&gt;先持久化 Full Trace，再生成模型表示。&lt;br&gt;record / work / run / turn / call IDs&lt;br&gt;raw_payload_ref + source_revision + 时间&lt;br&gt;文本 / JSON / 图片 / 文件保留类型。&lt;br&gt;原文不因折叠改写；UI 与审计读原记录。&lt;br&gt;持久化失败不得返回悬空的重读指针。&lt;br&gt;现有错误截取与 evidence 拆分需核对。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf3ff;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=22;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="3150" y="6010" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="context-detail-1" value="&lt;b&gt;C2 会话黑板｜目标与进度只投影 Work&lt;/b&gt;&lt;br&gt;&lt;br&gt;目标 / 验收条件来自 8.44 GoalRevision。&lt;br&gt;&lt;br&gt;checklist 投影 Task：pending / in_progress&lt;br&gt;&lt;br&gt;waiting_decision / blocked / done / cancelled。&lt;br&gt;&lt;br&gt;模型通过 TaskPatch 更新步骤；不能删除有效要求。&lt;br&gt;&lt;br&gt;observations / conclusions / unresolved 保留来源。&lt;br&gt;&lt;br&gt;证据：调用 ID、源版本、范围、方法和核验状态。&lt;br&gt;&lt;br&gt;operation_id + expected_revision；冲突不覆盖。&lt;br&gt;&lt;br&gt;模型笔记是工作数据，不是 System 指令。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf3ff;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=22;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="4160" y="6010" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="context-detail-2" value="&lt;b&gt;C3 请求视图：折叠状态属于此次上下文&lt;/b&gt;&lt;br&gt;&lt;br&gt;context_version / provider / policy_version&lt;br&gt;record_id → 原文 / 片段 / digest_ref&lt;br&gt;记录选取范围、估算体积及折叠原因。&lt;br&gt;同一结果允许在后续请求重新展开。&lt;br&gt;原生：请求状态与实际完成状态分开。&lt;br&gt;规则、用户追加、未解决问题优先保留。&lt;br&gt;版本 / 权限变化使黑板和派生结论失效。&lt;br&gt;历史引用编号不得直接当本轮有效引用。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf3ff;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=22;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="5170" y="6010" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="context-detail-3" value="&lt;b&gt;C4 两条执行路径：保留原生自主循环&lt;/b&gt;&lt;br&gt;&lt;br&gt;Hub 管理请求：每次组装 → 预算复算 → 发送。&lt;br&gt;Codex：thread/start 或 resume → turn/start&lt;br&gt;内部推理归 App Server，Hub 响应工具调用。&lt;br&gt;本地 is_compacted 不会移除服务端旧原文。&lt;br&gt;先检测本机能力，再触发 thread/compact/start。&lt;br&gt;等待 contextCompaction 完成；立即返回非完成。&lt;br&gt;inject_items 只追加；不能假装替换。&lt;br&gt;重建会话先检查点及核对未知写入，避免重放。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf3ff;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=22;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="3150" y="6770" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="context-detail-4" value="&lt;b&gt;C5 四槽位与预算：容量有边界&lt;/b&gt;&lt;br&gt;&lt;br&gt;① 有效 System 与规则：按范围和版本加载。&lt;br&gt;② Manifest + 黑板：置顶目标，结论仍为数据。&lt;br&gt;③ 历史：按依赖选原文、片段或存根。&lt;br&gt;④ 最近完整轮次 + 当前依赖 + 最新用户追加。&lt;br&gt;24k / 40k、热窗口 2、600 免折均为实验初值。&lt;br&gt;预留工具定义、包装、输出及模型相关预算。&lt;br&gt;超大输出首次即分页；规则也有容量策略。&lt;br&gt;累计 request_bytes ≠ 活跃 Tokens ≠ 账单。&lt;br&gt;轻量估算需校准，不保证误差 10% 或固定耗时。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf3ff;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=22;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="4160" y="6770" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="context-detail-5" value="&lt;b&gt;C6 规划 → 检查点 → 压缩 → 核验&lt;/b&gt;&lt;br&gt;&lt;br&gt;1 识别保护项与完整并行工具轮次。&lt;br&gt;2 按实际存根体积计算是否真正节省。&lt;br&gt;3 分类 TTL + 年龄 + 依赖选择候选。&lt;br&gt;4 折叠前提醒保存结论，关联 revision / 证据。&lt;br&gt;5 持久化检查点，再更新上下文表示。&lt;br&gt;6 请求路径复算硬上限；原生等待真实完成。&lt;br&gt;7 发布视图版本与原因，失败保留可恢复状态。&lt;br&gt;错误未解决不能仅因 age≥1 折叠。&lt;br&gt;不能先折叠再提醒；配置零窗口必须校验。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf3ff;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=22;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="5170" y="6770" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="context-detail-6" value="&lt;b&gt;C7 存根与按版本定向重读&lt;/b&gt;&lt;br&gt;&lt;br&gt;存根：result_ref、工具、状态、有限摘要。&lt;br&gt;来源身份 + 版本 + 范围 + 有限大纲。&lt;br&gt;关键统计、图表与附件保留真实结果引用。&lt;br&gt;当前读取：locator / start_char / max_chars&lt;br&gt;expected_version；行号接口尚不能假定存在。&lt;br&gt;若新增行号，绑定解析器与原文版本。&lt;br&gt;旧版不可读明确 stale，不静默用新版替代。&lt;br&gt;新问题的定向重读合理；只检测无进展重复。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf3ff;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=22;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="3150" y="7530" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="context-detail-7" value="&lt;b&gt;C8 前端真实状态与独立黑板工具&lt;/b&gt;&lt;br&gt;&lt;br&gt;先独立黑板更新工具，再评估 piggyback。&lt;br&gt;不能在严格 schema 随意塞入黑板参数。&lt;br&gt;若扩展 envelope：定义幂等、顺序、部分失败。&lt;br&gt;不承诺所有模型减少一次 RTT。&lt;br&gt;UI：进度、结论状态、证据、revision。&lt;br&gt;事件带 work / run / revision / sequence。&lt;br&gt;重连读快照；展开详情始终取完整记录。&lt;br&gt;徽章：模型上下文已精简；节省量仅估算。&lt;br&gt;实际保存结论后才显示已记录工作记忆。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf3ff;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=22;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="4160" y="7530" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="context-detail-8" value="&lt;b&gt;C9 实施与验收｜D-60–67 / A-48–56&lt;/b&gt;&lt;br&gt;&lt;br&gt;顺序：完整结果 → 黑板 → 有界返回 → 双路径压缩。&lt;br&gt;后续：任务依赖保护、检查点和高级协同。&lt;br&gt;native 衔接 / store 留痕 / 黑板状态模块&lt;br&gt;策略模块组装 / cli 适配原生能力。&lt;br&gt;检查重复 quoteCatalog、回执、规则传输。&lt;br&gt;测试原文哈希、真实请求、调用配对、超限。&lt;br&gt;测试并发黑板、失效重读、崩溃恢复和撤权。&lt;br&gt;真实任务比较成功率、重读、用量与延迟。&lt;br&gt;简单任务无需强制黑板；不保证零重读。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf3ff;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=22;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="5170" y="7530" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="context-detail-link" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;exitX=0.5;exitY=1;entryX=0;entryY=0.5;" edge="1" parent="1" source="resilience-context" target="context-detail-6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="515" y="9580" />
+              <mxPoint x="3090" y="9580" />
+              <mxPoint x="3090" y="7880" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="watchdog-detail-0" value="&lt;b&gt;W1 已采纳：进展感知看门狗&lt;/b&gt;&lt;br&gt;&lt;br&gt;四类信号：重复 / 压缩重读 / 盲重试 / 震荡。&lt;br&gt;判断任务、版本、结果及可核验进展。&lt;br&gt;轮询、退避、核验、分页、复核可合法重复。&lt;br&gt;先观察，再恢复；不凭次数直接停机。&lt;br&gt;弃用：两次必拦、三次全局停止、URI 永久锁。&lt;br&gt;适用于各提供方；不按品牌预判能力。&lt;br&gt;1.6：设计已采纳，代码与验收尚待完成。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4de;strokeColor=#d6b656;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="3150" y="8350" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="watchdog-detail-1" value="&lt;b&gt;W2 指纹及前置边界&lt;/b&gt;&lt;br&gt;&lt;br&gt;精确 JSON 保留类型、大小写、空白和转义。&lt;br&gt;对象键排序；数组及游标保留语义。&lt;br&gt;工具版本 / scope / snapshot / task phase&lt;br&gt;精确内容核对；相似性仅作预警。&lt;br&gt;策略与指纹带版本，哈希不假定跨发布稳定。&lt;br&gt;校验权限后检查缓存；撤权不能读旧结果。&lt;br&gt;相同 call_id 重送与新调用重复分别处理。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4de;strokeColor=#d6b656;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="4160" y="8350" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="watchdog-detail-2" value="&lt;b&gt;W3 后置结果与进展账本&lt;/b&gt;&lt;br&gt;&lt;br&gt;CallAttempt：batch / in_flight / result_ref&lt;br&gt;Outcome：empty / error / partial / success&lt;br&gt;unknown / cancelled，结合真实错误根因。&lt;br&gt;Progress：证据、分页、job、有效成果变化。&lt;br&gt;Episode：恢复记录、有效期、剩余额度。&lt;br&gt;黑板成功且有效变化后才评估进展。&lt;br&gt;空 patch、失败、重复证据不清零。&lt;br&gt;滑窗有界，任务阶段可变，总预算不重置。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4de;strokeColor=#d6b656;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="5170" y="8350" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="watchdog-detail-3" value="&lt;b&gt;W4 四级策略与配置&lt;/b&gt;&lt;br&gt;&lt;br&gt;observe_only → guidance → enforce 灰度。&lt;br&gt;观察 → 恢复 → 局部限制 → 停止当前 Run。&lt;br&gt;按读取 / 检索 / 计算 / 轮询 / 核验分类。&lt;br&gt;配置窗口、恢复额度、退避、期限和输出量。&lt;br&gt;拦截、提示和重试均计预算，预留有界收尾。&lt;br&gt;总预算不因黑板、压缩、重启而清零。&lt;br&gt;真正缺少用户信息才请求澄清。&lt;br&gt;保留诊断、状态保存、核验与 finish 通道。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4de;strokeColor=#d6b656;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="3150" y="9110" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="watchdog-detail-4" value="&lt;b&gt;W5 上下文缺失先恢复&lt;/b&gt;&lt;br&gt;&lt;br&gt;核对当前视图；原生可见性未知不强行断言。&lt;br&gt;验证版本与权限 → 恢复有效缓存片段。&lt;br&gt;locator / start_char / max_chars / expected_version&lt;br&gt;必要时允许有预算的分页或全文复核。&lt;br&gt;比较依赖暂缓折叠；结论保存来源证据。&lt;br&gt;旧版不可得明确 stale，不暗换新文本。&lt;br&gt;无大纲不强迫行号读取，恢复失败可报告缺口。&lt;br&gt;同任务 / 版本 / 范围仍无进展才升级。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4de;strokeColor=#d6b656;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="4160" y="9110" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="watchdog-detail-5" value="&lt;b&gt;W6 独立回执与真实恢复入口&lt;/b&gt;&lt;br&gt;&lt;br&gt;真实 tool_result 原样保存，guidance 单独记录。&lt;br&gt;decision / policy / episode / call IDs 可追踪。&lt;br&gt;not_executed：宿主拒绝，底层没有执行。&lt;br&gt;replayed_result：附旧结果引用、版本与新鲜度。&lt;br&gt;恢复建议来自实际能力、Schema、错误与环境。&lt;br&gt;不拼 XML 污染 JSON，不伪造执行错误。&lt;br&gt;空结果先看范围/覆盖，不擅自扩大用户口径。&lt;br&gt;适配器统一 success/error，不靠随意 status。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4de;strokeColor=#d6b656;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="5170" y="9110" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="watchdog-detail-6" value="&lt;b&gt;W7 原生接入与副作用边界&lt;/b&gt;&lt;br&gt;&lt;br&gt;调用 → 校验 → 意图记录 → 前置判定&lt;br&gt;执行 / 复用 / 拒绝 → 留痕 → 后置进展 → 响应&lt;br&gt;共享策略模块；native 衔接，Codex 自主循环保留。&lt;br&gt;并发记录在途与未执行项；取消保证协议收尾。&lt;br&gt;写入仍由 action_id、幂等、回执核验。&lt;br&gt;超时 unknown 先查询，不能换参数重做。&lt;br&gt;无 tool_calls 不代表完成；hub_finish 仍核验。&lt;br&gt;新增用户要求不能被旧停滞判断封死。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4de;strokeColor=#d6b656;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="3150" y="9870" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="watchdog-detail-7" value="&lt;b&gt;W8 UI、停止与独立审查&lt;/b&gt;&lt;br&gt;&lt;br&gt;显示已提供恢复建议；有 ProgressEvent 才称恢复。&lt;br&gt;拒绝显示未执行；缓存显示对应来源版本。&lt;br&gt;事件带 work / run / call / episode / sequence。&lt;br&gt;检查点保存完成、在途、未执行状态与成果。&lt;br&gt;恢复不重放写入、不清总预算；重连读快照。&lt;br&gt;可查判定依据、历史结果、恢复选项和真实效果。&lt;br&gt;失败说明缺口和继续条件，不销毁历史。&lt;br&gt;审查合法重复、撤权缓存、用户追加及 finish。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4de;strokeColor=#d6b656;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="4160" y="9870" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="watchdog-detail-8" value="&lt;b&gt;W9 开发工作包与上线门槛&lt;/b&gt;&lt;br&gt;&lt;br&gt;WG-1：只观察指纹/账本，验证合法重复。&lt;br&gt;WG-2：真实恢复入口与有权限的有效结果复用。&lt;br&gt;WG-3：episode 局部限制、期限及预算。&lt;br&gt;WG-4：检查点、并发、协议和 UI 重连。&lt;br&gt;WG-5：压缩 + 黑板 + 看门狗联合模型评测。&lt;br&gt;沿用 D-68–75 / A-57–66，测试尚未执行。&lt;br&gt;评测前固定口径，测成功、误拦、恢复和成本。&lt;br&gt;回退新策略保留原权限/幂等/预算及历史。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4de;strokeColor=#d6b656;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="5170" y="9870" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="watchdog-edge-0" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="watchdog-detail-0" target="watchdog-detail-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="watchdog-edge-1" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="watchdog-detail-1" target="watchdog-detail-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="watchdog-edge-3" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="watchdog-detail-3" target="watchdog-detail-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="watchdog-edge-4" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="watchdog-detail-4" target="watchdog-detail-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="watchdog-edge-6" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="watchdog-detail-6" target="watchdog-detail-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="watchdog-edge-7" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="watchdog-detail-7" target="watchdog-detail-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-stream-0" value="&lt;b&gt;U1 现有基础 → 统一公开协议&lt;/b&gt;&lt;br&gt;&lt;br&gt;现状：约 180ms 公开刷新，stable item 持久更新。&lt;br&gt;前端 60ms 防抖、1.5s 活动轮询与版本保护。&lt;br&gt;升级局部更新，不把完整文本当 Delta 追加。&lt;br&gt;schema_version / work_id / run_id&lt;br&gt;stream_id / epoch / seq / event_id&lt;br&gt;item / call / artifact + revision / base_revision&lt;br&gt;u64 跨 TS 显式编码；类型生成仍需合同测试。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5ed;strokeColor=#82b366;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="3150" y="10700" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-stream-1" value="&lt;b&gt;U2 串行提交与有界传输&lt;/b&gt;&lt;br&gt;&lt;br&gt;状态投影 + 水位一致提交，再发布。&lt;br&gt;增量窗口 / outbox 支撑失败重取。&lt;br&gt;Channel 评估高频流，Event 作轻量兼容通知。&lt;br&gt;统一逻辑契约，不强制单个全局广播。&lt;br&gt;原文、图表数据、Diff 按有权限引用加载。&lt;br&gt;AtomicU64 不保证数据库与前端一致。&lt;br&gt;日志有界，不能每 30ms 永久追加记录。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5ed;strokeColor=#82b366;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="4160" y="10700" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-stream-2" value="&lt;b&gt;U3 按对象保序与尾部刷新&lt;/b&gt;&lt;br&gt;&lt;br&gt;只合并相邻同 item / kind / revision 片段。&lt;br&gt;不同 step/message 不混合，保留段的顺序。&lt;br&gt;不可固定摘要先发、回答后发。&lt;br&gt;定时器 + 体积 + 切换 + 结束 / 错误 / 取消。&lt;br&gt;关键状态先提交其因果前文，再及时发送。&lt;br&gt;30ms 只是待测参数，不等于真实 FPS。&lt;br&gt;慢消费背压 / 有界队列 / 替换或重取快照。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5ed;strokeColor=#82b366;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="5170" y="10700" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-stream-3" value="&lt;b&gt;U4 订阅与快照水合&lt;/b&gt;&lt;br&gt;&lt;br&gt;等待订阅就绪 → 缓存事件 → 请求快照。&lt;br&gt;同一一致边界：状态 + epoch + snapshot_seq。&lt;br&gt;安装快照 → 丢弃已覆盖 → 连续重放。&lt;br&gt;同步状态 subscribing / hydrating / live&lt;br&gt;缺口 recovering，销毁 closed 清理资源。&lt;br&gt;旧请求不得覆盖新选择、新版本或撤权状态。&lt;br&gt;快照含当前视图与历史索引，不强拉全部历史。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5ed;strokeColor=#82b366;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="3150" y="11460" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-stream-4" value="&lt;b&gt;U5 缺口、重启与撤权&lt;/b&gt;&lt;br&gt;&lt;br&gt;lastReceivedSeq 与 lastAppliedSeq 分开。&lt;br&gt;10→12：缓存 12，补 11 后才连续应用。&lt;br&gt;单次补齐；增量不可得或超限重取快照。&lt;br&gt;最后通知丢失靠水位对账 / 生命周期兜底。&lt;br&gt;前端重载与后端崩溃分别验收已提交恢复。&lt;br&gt;撤权清除显示与缓存，旧快照不能恢复。&lt;br&gt;订阅过滤须明确覆盖合同，避免永远假缺口。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5ed;strokeColor=#82b366;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="4160" y="11460" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-stream-5" value="&lt;b&gt;U6 归约与对象版本&lt;/b&gt;&lt;br&gt;&lt;br&gt;同步控制器做请求；Reducer 只归约状态。&lt;br&gt;ID 索引 + 顺序列表，不挂到最后一步。&lt;br&gt;append / replace / finalize 明确语义。&lt;br&gt;缺父节点暂存补齐，不能丢弃后推进 seq。&lt;br&gt;图表/草稿按 ID+revision upsert，不重复创建。&lt;br&gt;工具：成功 / 部分 / 失败 / 取消 / 未执行 / unknown。&lt;br&gt;运行、交付、审批独立；完成仍依 hub_finish。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5ed;strokeColor=#82b366;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="5170" y="11460" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-stream-6" value="&lt;b&gt;U7 三层展示与真实徽章&lt;/b&gt;&lt;br&gt;&lt;br&gt;顶部：目标、进度、结论状态和证据入口。&lt;br&gt;时间轴：公开进度/摘要/工具，不展示私有推理。&lt;br&gt;主成果：生成中回答、图表、版本化草稿。&lt;br&gt;看门狗提示 ≠ 已恢复；压缩 ≠ 写入记忆。&lt;br&gt;逐项省 Token 无测量不显示，不平均分摊。&lt;br&gt;图表规范校验，外部数据与资源访问受控。&lt;br&gt;稳定展开与滚动、不抢焦点；键盘/减少动画。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5ed;strokeColor=#82b366;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="3150" y="12220" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-stream-7" value="&lt;b&gt;U8 审批、恢复与双向控制&lt;/b&gt;&lt;br&gt;&lt;br&gt;提交 action + draft revision + 基准 + 授权。&lt;br&gt;后端重新校验权限/规则/版本/幂等。&lt;br&gt;哈希不等于跨源原子锁；unknown 先核验。&lt;br&gt;撤销按实际能力；恢复草稿可能冲突或不可用。&lt;br&gt;追加：提交 / 已接收 / 待处理分别反馈。&lt;br&gt;暂停请求 ≠ 已停稳；在途写入保存真实状态。&lt;br&gt;不统一承诺下一工具后生效或一键撤销。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5ed;strokeColor=#82b366;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="4160" y="12220" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-stream-8" value="&lt;b&gt;U9 工作包及验收｜D-76–82 / A-67–77&lt;/b&gt;&lt;br&gt;&lt;br&gt;UI-1：事件身份、版本和序列化合同。&lt;br&gt;UI-2：一致快照、连续补齐与过期保护。&lt;br&gt;UI-3：有界聚合、Channel、局部更新与分页。&lt;br&gt;UI-4：三层界面、控制及实际恢复能力。&lt;br&gt;UI-5：多提供方/慢前端/重载/撤权联合评测。&lt;br&gt;测试尾部、交错、重复、缺口及丢失完成事件。&lt;br&gt;测内存、IPC、落盘、延迟、渲染与可访问性。&lt;br&gt;新旧路径不双重渲染；保留快照回退。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5ed;strokeColor=#82b366;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="5170" y="12220" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-stream-edge-0" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="ui-stream-0" target="ui-stream-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-stream-edge-1" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="ui-stream-1" target="ui-stream-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-stream-edge-3" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="ui-stream-3" target="ui-stream-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-stream-edge-4" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="ui-stream-4" target="ui-stream-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-stream-edge-6" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="ui-stream-6" target="ui-stream-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-stream-edge-7" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="ui-stream-7" target="ui-stream-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="steering-detail-0" value="&lt;b&gt;S1 持久命令入口｜D-84&lt;/b&gt;&lt;br&gt;&lt;br&gt;用户输入 → 验身份/Run/版本 → 保存 → 接收回执&lt;br&gt;&lt;br&gt;command_id、command_seq、payload_hash、control_revision&lt;br&gt;&lt;br&gt;同 ID 同内容复用回执；异内容冲突；限制容量。&lt;br&gt;&lt;br&gt;有界 mpsc 只唤醒；队列满或断开从数据库补读。&lt;br&gt;&lt;br&gt;watch 只广播最新状态，不保存控制历史。&lt;br&gt;&lt;br&gt;saved → dispatched → provider_accepted → incorporated&lt;br&gt;&lt;br&gt;satisfied / unfulfilled 另验，不把已收到当已完成。&lt;br&gt;&lt;br&gt;弃用：无界内存唯一来源、忽略发送失败。&lt;br&gt;&lt;br&gt;已有：conversation::steer；扩展待实现。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0eafa;strokeColor=#9673a6;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="3150" y="13050" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="steering-detail-1" value="&lt;b&gt;S2 单 Run 协调器｜D-83 / D-85 / D-89&lt;/b&gt;&lt;br&gt;&lt;br&gt;命令排序 → 控制版本 → 派发闸门 → 执行代次&lt;br&gt;&lt;br&gt;running → pause_requested → quiescing → paused&lt;br&gt;&lt;br&gt;paused → resuming（恢复核验）→ running&lt;br&gt;&lt;br&gt;Abort 收尾后为本 Run 终态，旧 Resume 不可复活。&lt;br&gt;&lt;br&gt;暂停时补充要求只保存；“追加并继续”才恢复。&lt;br&gt;&lt;br&gt;停止写入/撤回来源：先关相关新派发，再收尾。&lt;br&gt;&lt;br&gt;watch 唤醒后重读状态，不能无条件通知 Running。&lt;br&gt;&lt;br&gt;协调器锁不覆盖长执行；晚到结果按代次结算。&lt;br&gt;&lt;br&gt;多窗口过期命令返回冲突与当前权威状态。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0eafa;strokeColor=#9673a6;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="4160" y="13050" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="steering-detail-2" value="&lt;b&gt;S3 取消能力与 Token｜D-85 / D-86&lt;/b&gt;&lt;br&gt;&lt;br&gt;取消请求 ≠ 工具已停止 ≠ 副作用不存在&lt;br&gt;&lt;br&gt;未启动 → not_started；确认停止 → cancelled。&lt;br&gt;&lt;br&gt;完成与取消竞争：保留真实 success/error/partial。&lt;br&gt;&lt;br&gt;本地写入：明确 committed / rolled_back。&lt;br&gt;&lt;br&gt;远端已发出无回执 → outcome_unknown，先核验。&lt;br&gt;&lt;br&gt;沙盒停止需进程树回收、临时产物与超时确认。&lt;br&gt;&lt;br&gt;协调器一致安装 generation + Token + 派发许可。&lt;br&gt;&lt;br&gt;弃用：只替换克隆句柄字段，导致其他句柄握旧 Token。&lt;br&gt;&lt;br&gt;Run 终止与当前步骤取消分别管理；A-78/A-83。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0eafa;strokeColor=#9673a6;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="5170" y="13050" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="steering-detail-3" value="&lt;b&gt;S4 调用账本与协议安全点｜D-83 / D-86&lt;/b&gt;&lt;br&gt;&lt;br&gt;完整合法调用 → BatchLedger → 每 call_id 独立结算&lt;br&gt;&lt;br&gt;未完成流式参数不执行，不凭空补造调用身份。&lt;br&gt;&lt;br&gt;已返回真实结果不可重复填 cancelled。&lt;br&gt;&lt;br&gt;工具 await Err 必须分类收尾，不能用 ? 漏掉余项。&lt;br&gt;&lt;br&gt;并行调用不靠 idx 判断是否执行；未知项待核验。&lt;br&gt;&lt;br&gt;Hub 管消息：合法闭合后注入用户追加要求。&lt;br&gt;&lt;br&gt;原生路径：保留 turn/steer、interrupt 和原生循环。&lt;br&gt;&lt;br&gt;协议安全点与业务安全点分别记录。&lt;br&gt;&lt;br&gt;取消响应不伪造业务停止；A-81/A-82/A-88。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0eafa;strokeColor=#9673a6;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="3150" y="13810" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="steering-detail-4" value="&lt;b&gt;S5 持久边界与原子完成｜D-87&lt;/b&gt;&lt;br&gt;&lt;br&gt;命令 → 派发意图 → 每项回执 → 暂停检查点 → 发布&lt;br&gt;&lt;br&gt;仅整轮存盘会留下“已写入未记录”的崩溃窗口。&lt;br&gt;&lt;br&gt;最后 Drain 为空后仍可能收到新要求。&lt;br&gt;&lt;br&gt;接收与发布共享排序边界，核对命令水位/目标版本。&lt;br&gt;&lt;br&gt;追加先接受：旧成果不能发布为满足新目标。&lt;br&gt;&lt;br&gt;完成先提交：后到要求有明确后续归属或可重提回执。&lt;br&gt;&lt;br&gt;保留 hub_finish 与发布事务；无工具调用不等于完成。&lt;br&gt;&lt;br&gt;A-84：强制制造 Drain 后/提交前的追加竞态。&lt;br&gt;&lt;br&gt;A-85：派发后与回执前退出，恢复不盲目重写。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0eafa;strokeColor=#9673a6;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="4160" y="13810" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="steering-detail-5" value="&lt;b&gt;S6 有效目标与材料范围｜D-88&lt;/b&gt;&lt;br&gt;&lt;br&gt;指令原文完整保存 + 有版本的当前有效目标&lt;br&gt;&lt;br&gt;goal / constraints / acceptance / supersedes / scope_revision&lt;br&gt;&lt;br&gt;只看 2025 替代旧三年范围，不无限拼接 current_goal。&lt;br&gt;&lt;br&gt;ScopeChange 支持增加与移除，URI 不直接成为授权。&lt;br&gt;&lt;br&gt;验证身份/权限/版本 → 加载规则 → 一致更新清单。&lt;br&gt;&lt;br&gt;Archive 改 XV：旧依赖成果标 stale，必要时重算。&lt;br&gt;&lt;br&gt;只复用满足新范围、口径、版本与授权的结果。&lt;br&gt;&lt;br&gt;原生复用资格变化需核验，必要时明确建立新 Run。&lt;br&gt;&lt;br&gt;XML 双点锚定不提高权限，也不保证模型必然落实。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0eafa;strokeColor=#9673a6;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="5170" y="13810" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="steering-detail-6" value="&lt;b&gt;S7 恢复核验与未知副作用｜D-86 / D-89&lt;/b&gt;&lt;br&gt;&lt;br&gt;恢复检查：权限、源版本、规则、命令、动作、预算及执行兼容清单（8.46）&lt;br&gt;&lt;br&gt;action ID / 幂等能力 / 来源回执决定是否重试。&lt;br&gt;&lt;br&gt;远端已写入但响应丢失：先查证，不补取消后重写。&lt;br&gt;&lt;br&gt;未知结果进入 reconciliation_required，保留核验线索。&lt;br&gt;&lt;br&gt;暂停需关新派发、收尾稳定且检查点已保存。&lt;br&gt;&lt;br&gt;公开部分文字保留为 interrupted，不冒充最终交付。&lt;br&gt;&lt;br&gt;预算跨恢复累计，不因新 Run 或重启清零。&lt;br&gt;&lt;br&gt;恢复同一目标 ≠ 从同一 Token 原地续算。&lt;br&gt;&lt;br&gt;提供方不支持续接：明确新会话映射或能力限制。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0eafa;strokeColor=#9673a6;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="3150" y="14570" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="steering-detail-7" value="&lt;b&gt;S8 用户回执与场景｜8.42.4 / 8.42.6&lt;/b&gt;&lt;br&gt;&lt;br&gt;已接收 → 已送达 → 已纳入 → 已满足/明确未完成&lt;br&gt;&lt;br&gt;暂停请求 → 正在收尾 → 已暂停 → 恢复检查 → 继续&lt;br&gt;&lt;br&gt;画图中追加任务数：复用有效精力数据，核对日期连接。&lt;br&gt;&lt;br&gt;报告尾部追加建议：通过发布水位保证要求有归属。&lt;br&gt;&lt;br&gt;暂停换库：先结算工具，再更新权限/范围/规则。&lt;br&gt;&lt;br&gt;暂停仅补充说明：保持暂停，不偷偷唤醒。&lt;br&gt;&lt;br&gt;UI 重载从权威快照恢复，旧窗口命令不能覆盖新版。&lt;br&gt;&lt;br&gt;实测接收、送达、停稳与恢复耗时，不宣称零延迟。&lt;br&gt;&lt;br&gt;禁止以演示事件或成功文案代替真实执行回执。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0eafa;strokeColor=#9673a6;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="4160" y="14570" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="steering-detail-8" value="&lt;b&gt;S9 开发与验收｜SR-1–5 / A-78–89&lt;/b&gt;&lt;br&gt;&lt;br&gt;SR-1：持久命令、幂等/版本、有界唤醒和协调器。&lt;br&gt;&lt;br&gt;SR-2：代次 Token、派发闸门、真实取消与副作用。&lt;br&gt;&lt;br&gt;SR-3：协议账本、逐项检查点、命令水位原子发布。&lt;br&gt;&lt;br&gt;SR-4：范围增删、目标替换、成果失效与恢复资格。&lt;br&gt;&lt;br&gt;SR-5：UI/快照、多窗口、崩溃及分提供方验收。&lt;br&gt;&lt;br&gt;强制覆盖：旧 Token、Err 早退、Drain 竞态、未知写入。&lt;br&gt;&lt;br&gt;文档 8.42.1–6 / 13.9.1 / 14.9.1 给出理由及步骤。&lt;br&gt;&lt;br&gt;1.9：用户确认采纳修订版，不整体替换 native.rs。&lt;br&gt;&lt;br&gt;本轮仅文档/图形更新；运行实现与功能验收待完成。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0eafa;strokeColor=#9673a6;align=left;verticalAlign=top;spacing=24;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="5170" y="14570" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="steering-edge-0" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="steering-detail-0" target="steering-detail-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="steering-edge-1" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="steering-detail-1" target="steering-detail-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="steering-edge-3" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="steering-detail-3" target="steering-detail-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="steering-edge-4" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="steering-detail-4" target="steering-detail-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="steering-edge-6" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="steering-detail-6" target="steering-detail-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="steering-edge-7" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="steering-detail-7" target="steering-detail-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resilience-lifecycle-title" value="&lt;b&gt;韧性生命周期联动｜R1–R9｜当前总基线 1.14&lt;/b&gt;&lt;br&gt;&lt;br&gt;主流程：上下文 → 自主工具循环 → 按需草稿 → 条件执行 → 来源核验；只读任务可直接交付。&lt;br&gt;&lt;br&gt;分支：冲突重建 / 条件撤销 / 规则提案各按事件触发；Trace 横贯。实线为执行路径，虚线为条件恢复。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#eaf4ff;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=25;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="40" y="11720" width="2990" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="resilience-lifecycle-0" value="&lt;b&gt;R1 上下文视图与可重读证据&lt;/b&gt;&lt;br&gt;&lt;br&gt;完整工具事实保存在 Full Trace，压缩只改模型视图。&lt;br&gt;&lt;br&gt;规则/目标/黑板有版本及容量，引用保留来源与范围。&lt;br&gt;&lt;br&gt;25k/32k 仅演示值，按模型预算和当前依赖决定。&lt;br&gt;&lt;br&gt;预算含工具 schema、规则与预留输出，估算需标注。&lt;br&gt;&lt;br&gt;存根：result ID、source revision、锚点、重读入口。&lt;br&gt;&lt;br&gt;hub://hash 需真实解析器及访问检查，哈希不授予权限。&lt;br&gt;&lt;br&gt;源变化/撤权/过期会使旧引用失效；不伪装可重读。&lt;br&gt;&lt;br&gt;压缩后继续自主循环，不自动进入写入流程。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#eaf4ff;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=23;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="40" y="12000" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="resilience-lifecycle-1" value="&lt;b&gt;R2 自主执行与进展感知看门狗&lt;/b&gt;&lt;br&gt;&lt;br&gt;模型选择下一工具 → 前置检查 → 执行 → 真实结果。&lt;br&gt;&lt;br&gt;相同参数/错误只是线索，结合源版本和实质进展。&lt;br&gt;&lt;br&gt;正常轮询、重读、换基线恢复不按两次重复误杀。&lt;br&gt;&lt;br&gt;提示 → 局部拦截 → 无进展升级；预算持续累计。&lt;br&gt;&lt;br&gt;冲突先进入 R4，权限/限流/schema 分别处理。&lt;br&gt;&lt;br&gt;Runtime Hint 建议下一步，不证明已成功恢复。&lt;br&gt;&lt;br&gt;已有 C/W/S 合同继续生效，原生循环保持独立。&lt;br&gt;&lt;br&gt;只读成果经 hub_finish 与发布校验后即可交付。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#eaf4ff;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=23;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="12000" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="resilience-lifecycle-2" value="&lt;b&gt;R3 草稿、授权与条件执行资格&lt;/b&gt;&lt;br&gt;&lt;br&gt;draft ID/revision + payload digest + 准确目标身份。&lt;br&gt;&lt;br&gt;绑定源基线、范围、规则及授权版本。&lt;br&gt;&lt;br&gt;已有授权覆盖具体操作即可沿用；变化后重判。&lt;br&gt;&lt;br&gt;预览时 Hash 一致，不代表执行时仍然一致。&lt;br&gt;&lt;br&gt;能力：来源原子条件 / 受控本地 / 仅预检 / 不支持。&lt;br&gt;&lt;br&gt;CAS 需实际写入边界执行条件；本地锁有平台范围。&lt;br&gt;&lt;br&gt;Hash 不替代对象身份、权限、结构或来源 revision。&lt;br&gt;&lt;br&gt;条件满足 → R5；冲突 → R4，禁止强制移除条件。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#eaf4ff;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=23;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="2080" y="12000" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="resilience-lifecycle-3" value="&lt;b&gt;R4 冲突重建与有效数据复用&lt;/b&gt;&lt;br&gt;&lt;br&gt;保留冲突草稿、真实错误与 base/current/proposed。&lt;br&gt;&lt;br&gt;重读权威源，三方比较；不删除旧草稿和用户投入。&lt;br&gt;&lt;br&gt;新候选生成 revision + 新基线 + supersedes 关系。&lt;br&gt;&lt;br&gt;合并改变授权覆盖范围时，再展示差异取得确认。&lt;br&gt;&lt;br&gt;更新依赖与黑板；只让受影响结论/图表/草稿失效。&lt;br&gt;&lt;br&gt;正常换基线是进展，不清零全局预算或失败账本。&lt;br&gt;&lt;br&gt;返回 R1/R2 继续准备；再次提交仍须条件检查。&lt;br&gt;&lt;br&gt;不盲重试旧基线，不伪称所有冲突都是 E409。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#fff4de;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=23;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="40" y="12800" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="resilience-lifecycle-4" value="&lt;b&gt;R5 持久意图与来源写入&lt;/b&gt;&lt;br&gt;&lt;br&gt;验证恢复依据 → 存快照引用/执行意图 → 条件写入。&lt;br&gt;&lt;br&gt;复用 agent_actions，不创建第二套 Undo 真源。&lt;br&gt;&lt;br&gt;原子文件替换不自动等于原子比较后写入。&lt;br&gt;&lt;br&gt;来源幂等能力有范围与期限，action_id 本身不保证。&lt;br&gt;&lt;br&gt;记录操作身份、前置条件、来源返回和后置版本。&lt;br&gt;&lt;br&gt;条件失败 → R4；已发出响应未知 → R6 核验。&lt;br&gt;&lt;br&gt;暂停不抹除已发请求；写入和本地账本非全局事务。&lt;br&gt;&lt;br&gt;before/after 结构需覆盖源语义，不只存正文文本。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#fff4de;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=23;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="12800" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="resilience-lifecycle-5" value="&lt;b&gt;R6 结果核验与独立同步&lt;/b&gt;&lt;br&gt;&lt;br&gt;真实结果：source_confirmed / conflict / failed / unknown。&lt;br&gt;&lt;br&gt;unknown 查动作与目标，不能默认失败后重复提交。&lt;br&gt;&lt;br&gt;权威回读验证目标字段，保存可追溯回执。&lt;br&gt;&lt;br&gt;源成功、镜像、索引三种状态分开显示。&lt;br&gt;&lt;br&gt;索引失败只重试同步，不重放已经成功的业务写入。&lt;br&gt;&lt;br&gt;完成发布核对用户新要求、目标版本与命令水位。&lt;br&gt;&lt;br&gt;需要撤销进入 R7；用户纠正进入 R8，均非必经。&lt;br&gt;&lt;br&gt;所有结果进入 R9，未解决项明确保留。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#fff4de;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=23;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="2080" y="12800" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="resilience-lifecycle-6" value="&lt;b&gt;R7 条件撤销与补偿账本&lt;/b&gt;&lt;br&gt;&lt;br&gt;用户请求 → 读原回执 → 核对当前版本/依赖/权限。&lt;br&gt;&lt;br&gt;撤销是新 action，关联 original_action_id，不 Pop。&lt;br&gt;&lt;br&gt;满足后置条件才逆操作；后续用户编辑需合并保护。&lt;br&gt;&lt;br&gt;未知原结果先查证；快照过期/损坏明确不可恢复。&lt;br&gt;&lt;br&gt;重复撤销复用 compensation ID，不重复副作用。&lt;br&gt;&lt;br&gt;多源按依赖逐项补偿，部分成功不假称整体回滚。&lt;br&gt;&lt;br&gt;当前 Obsidian restore 生成待核对草稿，不立即还原。&lt;br&gt;&lt;br&gt;执行与核验沿 R3/R5/R6，历史事实始终保留。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#edf7ef;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=23;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="40" y="13600" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="resilience-lifecycle-7" value="&lt;b&gt;R8 用户纠正 → 规则提案&lt;/b&gt;&lt;br&gt;&lt;br&gt;临时例外留 Work；偏好/库规则/方法/事实分别路由。&lt;br&gt;&lt;br&gt;提案含原用户消息、范围、目的地、基线、差异。&lt;br&gt;&lt;br&gt;明确长期保存沿已有授权；模型推断不得自动永久化。&lt;br&gt;&lt;br&gt;条件更新规则 → 回读版本 → 缓存与上下文失效。&lt;br&gt;&lt;br&gt;受影响待执行动作和旧草稿重新校验资格。&lt;br&gt;&lt;br&gt;规则不能扩大权限，也不能反向为旧操作补授权。&lt;br&gt;&lt;br&gt;普通材料内指令不能伪装用户纠正。&lt;br&gt;&lt;br&gt;按需触发并记录 Trace，不是每次提交后的自动步骤。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#edf7ef;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=23;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="13600" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="resilience-lifecycle-8" value="&lt;b&gt;R9 Trace、指标与联合回归&lt;/b&gt;&lt;br&gt;&lt;br&gt;完整事实 / 公开 UI / 脱敏评测用途分离。&lt;br&gt;&lt;br&gt;记录 work/run/call/action、版本、用量和故障时点。&lt;br&gt;&lt;br&gt;回放不向真实业务源重发写入或撤销。&lt;br&gt;&lt;br&gt;UI 展示真实阶段，Token 注明实测/估算与预算。&lt;br&gt;&lt;br&gt;CAS 展示来源保证和时点；Undo 展示条件及期限。&lt;br&gt;&lt;br&gt;RL-1–5：能力 → 冲突账本 → 补偿 → 规则 → 联测。&lt;br&gt;&lt;br&gt;A-90–99 联动；A-122 增加独立状态机序列与失败缩减。&lt;br&gt;&lt;br&gt;本轮仅设计更新，代码实现与功能验收仍待完成。" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#edf7ef;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacing=22;fontSize=23;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry x="2080" y="13600" width="950" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="rl-context-run" source="resilience-lifecycle-0" target="resilience-lifecycle-1" value="上下文" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=20;labelBackgroundColor=#ffffff;strokeColor=#5079a3;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rl-run-draft" source="resilience-lifecycle-1" target="resilience-lifecycle-2" value="需写入" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=20;labelBackgroundColor=#ffffff;strokeColor=#5079a3;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rl-draft-commit" source="resilience-lifecycle-2" target="resilience-lifecycle-4" value="资格满足" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=20;labelBackgroundColor=#ffffff;strokeColor=#5079a3;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2555" y="12760" />
+              <mxPoint x="1555" y="12760" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rl-draft-conflict" source="resilience-lifecycle-2" target="resilience-lifecycle-3" value="冲突重建" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=20;labelBackgroundColor=#ffffff;strokeColor=#c17c24;dashed=1;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2555" y="12725" />
+              <mxPoint x="1030" y="12725" />
+              <mxPoint x="1030" y="13150" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rl-rebuild-context" source="resilience-lifecycle-3" target="resilience-lifecycle-0" value="重读" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=20;labelBackgroundColor=#ffffff;strokeColor=#c17c24;dashed=1;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rl-commit-outcome" source="resilience-lifecycle-4" target="resilience-lifecycle-5" value="回执" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=20;labelBackgroundColor=#ffffff;strokeColor=#5079a3;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rl-outcome-trace" source="resilience-lifecycle-5" target="resilience-lifecycle-8" value="追踪" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;fontSize=20;labelBackgroundColor=#ffffff;strokeColor=#5079a3;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="baseline-111-navigation" value="&lt;b&gt;当前设计基线 1.14｜七页导航&lt;/b&gt;&lt;br&gt;&lt;br&gt;01 原详图；02 执行总览；03 目标与所有权；04 数据与成果；05 交付与验收；06 工程合同；07 V1 进度与体验。&lt;br&gt;长期合同保留。A–H 已分段实施；V1 必需与暂缓见 13.11，体验目标与十个代表用例见 14.11。&lt;br&gt;图为文档投影；源码、定向测试、真实模型、原生体验与用户可用交付分别记录，不合并宣布通过。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf4ff;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=28;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-overview">
+          <mxGeometry as="geometry" x="40" y="15400" width="2990" height="250" />
+        </mxCell>
+        <mxCell id="baseline-111-link-1" value="&lt;b&gt;02 执行总览&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf4ff;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=26;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-overview">
+          <mxGeometry as="geometry" x="40" y="15700" width="710" height="80" />
+        </mxCell>
+        <mxCell id="baseline-111-link-2" value="&lt;b&gt;03 目标与所有权&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf4ff;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=26;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-contracts">
+          <mxGeometry as="geometry" x="800" y="15700" width="710" height="80" />
+        </mxCell>
+        <mxCell id="baseline-111-link-3" value="&lt;b&gt;04 数据与成果&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf4ff;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=26;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-analysis">
+          <mxGeometry as="geometry" x="1560" y="15700" width="710" height="80" />
+        </mxCell>
+        <mxCell id="baseline-111-link-4" value="&lt;b&gt;05 交付与验收&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf4ff;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=26;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-delivery">
+          <mxGeometry as="geometry" x="2320" y="15700" width="710" height="80" />
+        </mxCell>
+        <mxCell id="engineering-nav" value="&lt;b&gt;06 工程合同与成熟方案 →&lt;/b&gt;&lt;br&gt;兼容恢复 · Trace 资源 · 读取证据 · 合同生成 · 抽取坐标 · 图表 · 状态机测试" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EEF2FF;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=22;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1" link="data:page/id,hub-agents-engineering">
+          <mxGeometry x="40" y="15820" width="2990" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-status-nav" value="&lt;b&gt;07 V1 进度与体验验收 →&lt;/b&gt;&lt;br&gt;A–H 当前证据 · 首版必需 / 暂缓 · 体验目标 · 十个代表用例" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#E7F0FC;" vertex="1" parent="1" link="data:page/id,hub-agents-v1-status">
+          <mxGeometry x="40" y="15700" width="2990" height="80" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="hub-agents-overview" name="02 执行总览 · 历史1.14">
+    <mxGraphModel dx="1700" dy="1450" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1700" pageHeight="1450" adaptiveColors="auto">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="p1-title" value="&lt;b&gt;执行总览｜历史设计基线1.14。当前范围和验证状态见08页；本页保留模块职责。&lt;/b&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e7f0fc;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="20" width="1620" height="120" />
+        </mxCell>
+        <mxCell id="p1-nav-0" value="&lt;b&gt;01 原详图&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-current">
+          <mxGeometry as="geometry" x="40" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="p1-nav-1" value="&lt;b&gt;02 执行总览&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e7f0fc;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-overview">
+          <mxGeometry as="geometry" x="366" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="p1-nav-2" value="&lt;b&gt;03 目标与所有权&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-contracts">
+          <mxGeometry as="geometry" x="692" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="p1-nav-3" value="&lt;b&gt;04 数据与成果&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-analysis">
+          <mxGeometry as="geometry" x="1018" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="p1-nav-4" value="&lt;b&gt;05 交付与验收&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-delivery">
+          <mxGeometry as="geometry" x="1344" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="ov-goal" value="&lt;b&gt;1 用户委托 / 有效目标&lt;/b&gt;&lt;br&gt;&lt;br&gt;要求、范围、完成标准有版本&lt;br&gt;&lt;br&gt;追加保留原文及替代关系&lt;br&gt;&lt;br&gt;目标变化使依赖重新核验" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf4ff;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="240" width="480" height="230" />
+        </mxCell>
+        <mxCell id="ov-run" value="&lt;b&gt;模型自主执行&lt;/b&gt;&lt;br&gt;&lt;br&gt;复用原生循环与统一工具&lt;br&gt;&lt;br&gt;Run 绑定合同与恢复兼容身份&lt;br&gt;&lt;br&gt;重建会话保留动作事实与预算" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf4ff;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="610" y="240" width="480" height="230" />
+        </mxCell>
+        <mxCell id="ov-finish" value="&lt;b&gt;3 交付核验&lt;/b&gt;&lt;br&gt;&lt;br&gt;精确成果版本 + 目标版本&lt;br&gt;&lt;br&gt;最新命令水位 + 真实动作回执&lt;br&gt;&lt;br&gt;只读任务可直接交付" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf4ff;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1180" y="240" width="480" height="230" />
+        </mxCell>
+        <mxCell id="ov-data" value="&lt;b&gt;有证据的分析输入&lt;/b&gt;&lt;br&gt;&lt;br&gt;V1-A 有限固定本地输入已实现&lt;br&gt;&lt;br&gt;材料 / 日期 / 有效值 / 历史分别说明&lt;br&gt;&lt;br&gt;本地已读不等于远端全量" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f0ebfa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="580" width="480" height="230" />
+        </mxCell>
+        <mxCell id="ov-tools" value="&lt;b&gt;统一工具合同&lt;/b&gt;&lt;br&gt;&lt;br&gt;共享能力注册持有业务定义&lt;br&gt;&lt;br&gt;V1 校验实际序列化与消费一致&lt;br&gt;&lt;br&gt;全量 DTO / schema 生成按需后置" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f0ebfa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="610" y="580" width="480" height="230" />
+        </mxCell>
+        <mxCell id="ov-actions" value="&lt;b&gt;需要业务写入时&lt;/b&gt;&lt;br&gt;&lt;br&gt;草稿 + 授权 + 来源条件检查&lt;br&gt;&lt;br&gt;持久意图 → 来源写入 → 回读&lt;br&gt;&lt;br&gt;镜像/索引失败不重放业务写入" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#fff3df;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1180" y="580" width="480" height="230" />
+        </mxCell>
+        <mxCell id="ov-rules" value="&lt;b&gt;用户纠正 / 规则提案&lt;/b&gt;&lt;br&gt;&lt;br&gt;临时例外留 Work；长期要求分类&lt;br&gt;&lt;br&gt;明确授权 → 条件写入 → 回读&lt;br&gt;&lt;br&gt;规则不能扩大权限" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf7ef;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="920" width="480" height="230" />
+        </mxCell>
+        <mxCell id="ov-recover" value="&lt;b&gt;检查点与兼容恢复&lt;/b&gt;&lt;br&gt;&lt;br&gt;继续 / 显式迁移 / 重建会话 / 拒绝&lt;br&gt;&lt;br&gt;未知先核验，已知成功不重复&lt;br&gt;&lt;br&gt;跨版本清单与 Trace 配额见第 06 页" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#fff3df;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="610" y="920" width="480" height="230" />
+        </mxCell>
+        <mxCell id="ov-undo" value="&lt;b&gt;请求撤销时&lt;/b&gt;&lt;br&gt;&lt;br&gt;新补偿 action，不 Pop 原账本&lt;br&gt;&lt;br&gt;核对后续编辑、权限及恢复条件&lt;br&gt;&lt;br&gt;沿同一动作执行与核验链" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf7ef;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1180" y="920" width="480" height="230" />
+        </mxCell>
+        <mxCell id="e-ov-goal-ov-run" source="ov-goal" target="ov-run" value="目标" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e-ov-run-ov-finish" source="ov-run" target="ov-finish" value="候选交付" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e-ov-data-ov-tools" source="ov-data" target="ov-tools" value="输入" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e-ov-tools-ov-run" source="ov-tools" target="ov-run" value="真实结果" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e-ov-tools-ov-actions" source="ov-tools" target="ov-actions" value="按需写入" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;dashed=1;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e-ov-actions-ov-finish" source="ov-actions" target="ov-finish" value="核验回执" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e-ov-actions-ov-undo" source="ov-actions" target="ov-undo" value="撤销 / 补偿" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;dashed=1;startArrow=block;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e-ov-tools-ov-recover" source="ov-tools" target="ov-recover" value="需恢复" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;dashed=1;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e-ov-rules-ov-data" source="ov-rules" target="ov-data" value="后续读取遵循" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;dashed=1;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="ov-note" value="&lt;b&gt;贯穿各阶段：真实事件、预算、当前授权与材料版本&lt;/b&gt;&lt;br&gt;&lt;br&gt;目标图包含后续阶段：来源写回 V2、完整恢复 V3、扩展 V4。V1 必需保护不因收缩范围省略。&lt;br&gt;&lt;br&gt;A–H 有源码与定向证据；D 有一次真实模型生成/修订证据。完整质量、体验与安装交付仍开放。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=17;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="1200" width="1620" height="135" />
+        </mxCell>
+        <mxCell id="engineering-nav" value="&lt;b&gt;06 工程合同与成熟方案 →&lt;/b&gt;&lt;br&gt;兼容恢复 · Trace 资源 · 读取证据 · 合同生成 · 抽取坐标 · 图表 · 状态机测试" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EEF2FF;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1" link="data:page/id,hub-agents-engineering">
+          <mxGeometry x="40" y="1420" width="1620" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-status-nav" value="&lt;b&gt;07 V1 进度与体验验收 →&lt;/b&gt;&lt;br&gt;A–H 当前证据 · 首版必需 / 暂缓 · 体验目标 · 十个代表用例" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#E7F0FC;" vertex="1" parent="1" link="data:page/id,hub-agents-v1-status">
+          <mxGeometry x="40" y="1530" width="1620" height="80" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="hub-agents-contracts" name="03 目标与所有权 · 历史1.14">
+    <mxGraphModel dx="1700" dy="1450" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1700" pageHeight="1450" adaptiveColors="auto">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="p2-title" value="&lt;b&gt;目标、状态与提交的唯一权威合同｜历史基线1.14。当前D-121恢复取舍及验证范围见08页。&lt;/b&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e7f0fc;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="20" width="1620" height="120" />
+        </mxCell>
+        <mxCell id="p2-nav-0" value="&lt;b&gt;01 原详图&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-current">
+          <mxGeometry as="geometry" x="40" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="p2-nav-1" value="&lt;b&gt;02 执行总览&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-overview">
+          <mxGeometry as="geometry" x="366" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="p2-nav-2" value="&lt;b&gt;03 目标与所有权&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e7f0fc;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-contracts">
+          <mxGeometry as="geometry" x="692" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="p2-nav-3" value="&lt;b&gt;04 数据与成果&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-analysis">
+          <mxGeometry as="geometry" x="1018" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="p2-nav-4" value="&lt;b&gt;05 交付与验收&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-delivery">
+          <mxGeometry as="geometry" x="1344" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="ct-command" value="&lt;b&gt;用户命令与目标&lt;/b&gt;&lt;br&gt;&lt;br&gt;V1-H：带来源的目标解释修订&lt;br&gt;&lt;br&gt;保留原始要求、约束及解释历史&lt;br&gt;&lt;br&gt;并发 / 幂等校验；完整控制属 V3" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf4ff;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="240" width="480" height="230" />
+        </mxCell>
+        <mxCell id="ct-task" value="&lt;b&gt;Task 与完成证据&lt;/b&gt;&lt;br&gt;&lt;br&gt;V1-G：层级 / 依赖 / 重验证已实现&lt;br&gt;&lt;br&gt;保留用户要求，证据绑定实际版本&lt;br&gt;&lt;br&gt;已有定向证据；模型采用仍待验证" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf4ff;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="610" y="240" width="480" height="230" />
+        </mxCell>
+        <mxCell id="ct-finish" value="&lt;b&gt;DeliveryAssessment&lt;/b&gt;&lt;br&gt;&lt;br&gt;V1-E/F：目标版本与逐项完成判定&lt;br&gt;&lt;br&gt;最终发布再核对目标 / 成果 / 任务&lt;br&gt;&lt;br&gt;Run completed 不代替 Work fulfilled" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf4ff;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1180" y="240" width="480" height="230" />
+        </mxCell>
+        <mxCell id="ct-run" value="&lt;b&gt;Run / 执行兼容身份&lt;/b&gt;&lt;br&gt;&lt;br&gt;Runner 唯一推进运行与检查点&lt;br&gt;&lt;br&gt;绑定工具合同、协议及运行版本&lt;br&gt;&lt;br&gt;恢复保留命令、动作身份与累计预算" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#fff3df;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="570" width="480" height="230" />
+        </mxCell>
+        <mxCell id="ct-store" value="&lt;b&gt;提交与 Trace 存储&lt;/b&gt;&lt;br&gt;&lt;br&gt;V1 先测容量；载荷分离按需进入&lt;br&gt;&lt;br&gt;V3：完整 pin / 回收 / 生命周期&lt;br&gt;&lt;br&gt;回执写盘失败 → 停发并核验未知" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#fff3df;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="610" y="570" width="480" height="230" />
+        </mxCell>
+        <mxCell id="ct-ui" value="&lt;b&gt;UI 消费已提交状态&lt;/b&gt;&lt;br&gt;&lt;br&gt;正式 view 与组件已有定向证据&lt;br&gt;&lt;br&gt;V1 校验实际合同；全量生成后置&lt;br&gt;&lt;br&gt;缺口不得伪造补平，原生体验另验" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#fff3df;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1180" y="570" width="480" height="230" />
+        </mxCell>
+        <mxCell id="ct-scratch" value="&lt;b&gt;Scratchpad 与 Context View&lt;/b&gt;&lt;br&gt;&lt;br&gt;目标/进度投影 Work，不另写 done&lt;br&gt;&lt;br&gt;观察、假设、结论保留证据和状态&lt;br&gt;&lt;br&gt;压缩只改模型表示，Full Trace 保留" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf7ef;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="900" width="480" height="230" />
+        </mxCell>
+        <mxCell id="ct-budget" value="&lt;b&gt;容量与累计预算&lt;/b&gt;&lt;br&gt;&lt;br&gt;V1：承诺范围内保全，超限明示&lt;br&gt;&lt;br&gt;20 Run 限制仍在；长期协作前退出&lt;br&gt;&lt;br&gt;V3 完整回收；新 Run 不洗掉累计预算" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf7ef;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="610" y="900" width="480" height="230" />
+        </mxCell>
+        <mxCell id="ct-invariant" value="&lt;b&gt;必须保持的不变量&lt;/b&gt;&lt;br&gt;&lt;br&gt;用户要求不因清单编辑消失&lt;br&gt;&lt;br&gt;原文/成果/动作/事件身份可关联&lt;br&gt;&lt;br&gt;黑板、UI、watchdog 不另造业务真源" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf7ef;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1180" y="900" width="480" height="230" />
+        </mxCell>
+        <mxCell id="e-ct-command-ct-task" source="ct-command" target="ct-task" value="要求" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e-ct-task-ct-finish" source="ct-task" target="ct-finish" value="证据" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e-ct-run-ct-store" source="ct-run" target="ct-store" value="状态/意图" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e-ct-store-ct-ui" source="ct-store" target="ct-ui" value="提交投影" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e-ct-task-ct-store" source="ct-task" target="ct-store" value="引用事实" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="ct-note" value="&lt;b&gt;示例：分析 + 图表 + 保存，追加“只统计 2025，保存前先看”&lt;/b&gt;&lt;br&gt;&lt;br&gt;产生新目标版本；旧成果按依赖失效；尚未派发保存停止/重判资格。预览完成仍须保留保存未完成项。&lt;br&gt;&lt;br&gt;已发生的保存不会被改写为未执行。新的修改或补偿走正式动作合同。A-100 / A-101 / A-108 / A-109。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=17;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="1240" width="1620" height="135" />
+        </mxCell>
+        <mxCell id="engineering-nav" value="&lt;b&gt;06 工程合同与成熟方案 →&lt;/b&gt;&lt;br&gt;兼容恢复 · Trace 资源 · 读取证据 · 合同生成 · 抽取坐标 · 图表 · 状态机测试" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EEF2FF;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1" link="data:page/id,hub-agents-engineering">
+          <mxGeometry x="40" y="1420" width="1620" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-status-nav" value="&lt;b&gt;07 V1 进度与体验验收 →&lt;/b&gt;&lt;br&gt;A–H 当前证据 · 首版必需 / 暂缓 · 体验目标 · 十个代表用例" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#E7F0FC;" vertex="1" parent="1" link="data:page/id,hub-agents-v1-status">
+          <mxGeometry x="40" y="1530" width="1620" height="80" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="hub-agents-analysis" name="04 数据与成果 · 历史1.14">
+    <mxGraphModel dx="1700" dy="1450" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1700" pageHeight="1450" adaptiveColors="auto">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="p3-title" value="&lt;b&gt;从来源数据到持久成果、再到原文的可检查闭环｜历史基线1.14。当前实现证据见08页及文档0.5。&lt;/b&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e7f0fc;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="20" width="1620" height="120" />
+        </mxCell>
+        <mxCell id="p3-nav-0" value="&lt;b&gt;01 原详图&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-current">
+          <mxGeometry as="geometry" x="40" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="p3-nav-1" value="&lt;b&gt;02 执行总览&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-overview">
+          <mxGeometry as="geometry" x="366" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="p3-nav-2" value="&lt;b&gt;03 目标与所有权&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-contracts">
+          <mxGeometry as="geometry" x="692" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="p3-nav-3" value="&lt;b&gt;04 数据与成果&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e7f0fc;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-analysis">
+          <mxGeometry as="geometry" x="1018" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="p3-nav-4" value="&lt;b&gt;05 交付与验收&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-delivery">
+          <mxGeometry as="geometry" x="1344" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="an-snapshot" value="&lt;b&gt;固定有界输入&lt;/b&gt;&lt;br&gt;&lt;br&gt;V1-A：成员 / 版本 / 历史正文&lt;br&gt;&lt;br&gt;授权、到期和缺失须明确&lt;br&gt;&lt;br&gt;材料 / 日期 / 值 / 历史覆盖分开" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f0ebfa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="240" width="480" height="230" />
+        </mxCell>
+        <mxCell id="an-extract" value="&lt;b&gt;主睡眠：最小数据集｜7.6.1&lt;/b&gt;&lt;br&gt;&lt;br&gt;原值 / 小时数 / 日期 / 原文坐标&lt;br&gt;&lt;br&gt;事件身份 / 排除 / 修订及纠正来源&lt;br&gt;&lt;br&gt;模糊值保留并排除，通用计算后置" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f0ebfa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="610" y="240" width="480" height="230" />
+        </mxCell>
+        <mxCell id="an-check" value="&lt;b&gt;重复与字段质量&lt;/b&gt;&lt;br&gt;&lt;br&gt;日期段合并不等于事件去重&lt;br&gt;&lt;br&gt;重复正文与事件键分别核验&lt;br&gt;&lt;br&gt;无法确定保留歧义，不自动补零" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f0ebfa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1180" y="240" width="480" height="230" />
+        </mxCell>
+        <mxCell id="an-example" value="&lt;b&gt;模糊值的处理&lt;/b&gt;&lt;br&gt;&lt;br&gt;“六个多小时”不自动填 6.5&lt;br&gt;&lt;br&gt;“精力一般”不默认映射 3 分&lt;br&gt;&lt;br&gt;午睡与夜间睡眠分别建事件" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf4ff;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="570" width="480" height="230" />
+        </mxCell>
+        <mxCell id="an-compute" value="&lt;b&gt;4 确定性计算&lt;/b&gt;&lt;br&gt;&lt;br&gt;记录纳入数、有效数和分母定义&lt;br&gt;&lt;br&gt;保留方法与输入修订&lt;br&gt;&lt;br&gt;异常不能静默补零或抽样冒充全量" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf4ff;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1180" y="570" width="480" height="230" />
+        </mxCell>
+        <mxCell id="an-artifact" value="&lt;b&gt;同一成果持续修订&lt;/b&gt;&lt;br&gt;&lt;br&gt;V1-B/C：图表修订与报告依赖&lt;br&gt;&lt;br&gt;有限 bar / line + 同源表格&lt;br&gt;&lt;br&gt;已有 Recharts；扩展抽取指标待接" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf4ff;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="610" y="570" width="480" height="230" />
+        </mxCell>
+        <mxCell id="an-correct" value="&lt;b&gt;用户纠正 / 来源或方法变化&lt;/b&gt;&lt;br&gt;&lt;br&gt;生成新数据修订，不悄悄改原文&lt;br&gt;&lt;br&gt;按依赖标 stale 并重新计算&lt;br&gt;&lt;br&gt;首期可保守重算，不能混用新旧值" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf7ef;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="900" width="480" height="230" />
+        </mxCell>
+        <mxCell id="an-validate" value="&lt;b&gt;预览、检查与重开&lt;/b&gt;&lt;br&gt;&lt;br&gt;数值检查已有；原生视觉仍开放&lt;br&gt;&lt;br&gt;表格、图表、报告引用同一版本&lt;br&gt;&lt;br&gt;Hub 内可重新打开、检查并修订" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf7ef;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="610" y="900" width="480" height="230" />
+        </mxCell>
+        <mxCell id="an-publish" value="&lt;b&gt;发布 / 按授权保存&lt;/b&gt;&lt;br&gt;&lt;br&gt;V1：Hub 内持久成果及历史版本&lt;br&gt;&lt;br&gt;导出按条件；授权 / 回执 / 核验&lt;br&gt;&lt;br&gt;V2 来源写回；预览不冒充保存" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf7ef;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1180" y="900" width="480" height="230" />
+        </mxCell>
+        <mxCell id="e-an-snapshot-an-extract" source="an-snapshot" target="an-extract" value="原文" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e-an-extract-an-check" source="an-extract" target="an-check" value="候选" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e-an-check-an-compute" source="an-check" target="an-compute" value="冻结输入" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e-an-compute-an-artifact" source="an-compute" target="an-artifact" value="计算结果" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e-an-artifact-an-validate" source="an-artifact" target="an-validate" value="成果修订" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e-an-validate-an-publish" source="an-validate" target="an-publish" value="已检版本" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="an-note" value="&lt;b&gt;成果合同：读取 → 创建 / 修订 → 检查 → 交付，模型按任务选择&lt;/b&gt;&lt;br&gt;&lt;br&gt;A–C 有定向证据，D 有真实模型单例；E–H 增加目标、完成、任务依赖及解释修订。历史结果保留，不冒充整体验收。&lt;br&gt;&lt;br&gt;颜色调整与口径变化分别失效；新数据集需可追溯到原文。一个指标先闭环，通用框架暂缓。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=17;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="1240" width="1620" height="135" />
+        </mxCell>
+        <mxCell id="engineering-nav" value="&lt;b&gt;06 工程合同与成熟方案 →&lt;/b&gt;&lt;br&gt;兼容恢复 · Trace 资源 · 读取证据 · 合同生成 · 抽取坐标 · 图表 · 状态机测试" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EEF2FF;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1" link="data:page/id,hub-agents-engineering">
+          <mxGeometry x="40" y="1420" width="1620" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-status-nav" value="&lt;b&gt;07 V1 进度与体验验收 →&lt;/b&gt;&lt;br&gt;A–H 当前证据 · 首版必需 / 暂缓 · 体验目标 · 十个代表用例" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#E7F0FC;" vertex="1" parent="1" link="data:page/id,hub-agents-v1-status">
+          <mxGeometry x="40" y="1530" width="1620" height="80" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="hub-agents-delivery" name="05 交付与验收 · 历史1.14">
+    <mxGraphModel dx="1700" dy="1450" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1700" pageHeight="1450" adaptiveColors="auto">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="p4-title" value="&lt;b&gt;交付路线与证据门｜历史基线1.14。当前V1–V5范围及状态见08页、文档13.11/13.13；旧成绩不改判。&lt;/b&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e7f0fc;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=24;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="20" width="1620" height="120" />
+        </mxCell>
+        <mxCell id="p4-nav-0" value="&lt;b&gt;01 原详图&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-current">
+          <mxGeometry as="geometry" x="40" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="p4-nav-1" value="&lt;b&gt;02 执行总览&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-overview">
+          <mxGeometry as="geometry" x="366" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="p4-nav-2" value="&lt;b&gt;03 目标与所有权&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-contracts">
+          <mxGeometry as="geometry" x="692" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="p4-nav-3" value="&lt;b&gt;04 数据与成果&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-analysis">
+          <mxGeometry as="geometry" x="1018" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="p4-nav-4" value="&lt;b&gt;05 交付与验收&lt;/b&gt;&lt;br&gt;&lt;br&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e7f0fc;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=16;fontFamily=Microsoft YaHei;" vertex="1" parent="1" link="data:page/id,hub-agents-delivery">
+          <mxGeometry as="geometry" x="1344" y="155" width="310" height="48" />
+        </mxCell>
+        <mxCell id="dv-v1" value="&lt;b&gt;V1 可检查分析成果&lt;/b&gt;&lt;br&gt;&lt;br&gt;固定输入 + 统计 / 一个抽取指标&lt;br&gt;&lt;br&gt;同一图表与报告修订&lt;br&gt;&lt;br&gt;Hub 内持久成果 + 重开与修订&lt;br&gt;&lt;br&gt;质量与体验同时通过" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf4ff;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=17;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="240" width="375" height="260" />
+        </mxCell>
+        <mxCell id="dv-v2" value="&lt;b&gt;V2 来源保存闭环&lt;/b&gt;&lt;br&gt;&lt;br&gt;先贯通一种来源，再扩展组合&lt;br&gt;&lt;br&gt;条件写入、回读、冲突和未知恢复&lt;br&gt;&lt;br&gt;首次写入即有持久意图/回执" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#fff3df;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=17;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="455" y="240" width="375" height="260" />
+        </mxCell>
+        <mxCell id="dv-e1" source="dv-v1" target="dv-v2" value="增量" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="dv-v3" value="&lt;b&gt;V3 长任务连续协作&lt;/b&gt;&lt;br&gt;&lt;br&gt;暂停 / 追加 / 跨重启&lt;br&gt;&lt;br&gt;跨版本兼容与会话重建&lt;br&gt;&lt;br&gt;Trace 回收与 Work 连续性&lt;br&gt;&lt;br&gt;预算、命令、副作用不丢失" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f0ebfa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=17;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="870" y="240" width="375" height="260" />
+        </mxCell>
+        <mxCell id="dv-e2" source="dv-v2" target="dv-v3" value="增量" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="dv-v4" value="&lt;b&gt;V4 扩大适用范围&lt;/b&gt;&lt;br&gt;&lt;br&gt;逐提供方、逐业务验证能力&lt;br&gt;&lt;br&gt;后台触发按需求启用&lt;br&gt;&lt;br&gt;不把 Codex 成绩当全模型保证" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf7ef;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=17;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1285" y="240" width="375" height="260" />
+        </mxCell>
+        <mxCell id="dv-e3" source="dv-v3" target="dv-v4" value="增量" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#607b9e;fontSize=15;labelBackgroundColor=#ffffff;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="dv-gates" value="&lt;b&gt;V1 必需与条件项&lt;/b&gt;&lt;br&gt;&lt;br&gt;必需：范围 / 版本 / 证据 / 重开&lt;br&gt;&lt;br&gt;先测：代表规模 / 容量 / 各段开销&lt;br&gt;&lt;br&gt;条件：本地导出 / blob 分离&lt;br&gt;&lt;br&gt;暂缓：通用框架与完整长期恢复" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#fff3df;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="590" width="510" height="320" />
+        </mxCell>
+        <mxCell id="dv-eval" value="&lt;b&gt;分轨验证与代表用例&lt;/b&gt;&lt;br&gt;&lt;br&gt;UX-01–10，每项 3 次且 3/3&lt;br&gt;&lt;br&gt;2/3 不通过；确定性违规阻断&lt;br&gt;&lt;br&gt;小样本不证明稳定 90% 成功率&lt;br&gt;&lt;br&gt;宿主硬门 + 冻结端到端预算" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf7ef;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="600" y="590" width="510" height="320" />
+        </mxCell>
+        <mxCell id="dv-evidence" value="&lt;b&gt;当前证据与开放项&lt;/b&gt;&lt;br&gt;&lt;br&gt;A–H：源码及各自定向证据&lt;br&gt;&lt;br&gt;D：单提供方 / 单例真实模型&lt;br&gt;&lt;br&gt;原生视觉 / 正式体验未验；导出条件进入&lt;br&gt;&lt;br&gt;源码交付不等于已安装或发布" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#edf4ff;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1160" y="590" width="500" height="320" />
+        </mxCell>
+        <mxCell id="dv-closure" value="&lt;b&gt;保持唯一实施账本与证据边界&lt;/b&gt;&lt;br&gt;&lt;br&gt;0.5 导航至实施记录 9.50–9.57；13.11 明确首版范围；14.11 定义质量与体验双门。&lt;br&gt;&lt;br&gt;复用现有 Runner、能力注册、store 和 Recharts；不新增另一条流水线，不回退已实现能力。&lt;br&gt;&lt;br&gt;暂缓项有重新进入条件；旧失败与未知项继续保留，不能在结果出来后降低门槛追认通过。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#93a9c4;align=left;verticalAlign=top;spacing=18;fontSize=19;fontFamily=Microsoft YaHei;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="1000" width="1620" height="220" />
+        </mxCell>
+        <mxCell id="engineering-nav" value="&lt;b&gt;06 工程合同与成熟方案 →&lt;/b&gt;&lt;br&gt;兼容恢复 · Trace 资源 · 读取证据 · 合同生成 · 抽取坐标 · 图表 · 状态机测试" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EEF2FF;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1" link="data:page/id,hub-agents-engineering">
+          <mxGeometry x="40" y="1420" width="1620" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-status-nav" value="&lt;b&gt;07 V1 进度与体验验收 →&lt;/b&gt;&lt;br&gt;A–H 当前证据 · 首版必需 / 暂缓 · 体验目标 · 十个代表用例" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#E7F0FC;" vertex="1" parent="1" link="data:page/id,hub-agents-v1-status">
+          <mxGeometry x="40" y="1530" width="1620" height="80" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="hub-agents-engineering" name="06 工程合同与成熟方案 · 历史1.14">
+    <mxGraphModel dx="1700" dy="1600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1700" pageHeight="1600" math="0" shadow="0" background="#FFFFFF" adaptiveColors="auto">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="p6-title" value="&lt;b&gt;工程合同与成熟方案落地｜历史基线1.14。当前限定实现/延期及资源合同见08页与文档0.5。&lt;/b&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EAF1FB;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=24;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1620" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-nav-0" value="01 原详图 · 基线 1.14" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=17;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1" link="data:page/id,hub-agents-current">
+          <mxGeometry x="40" y="155" width="310" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-nav-1" value="02 执行总览 · 1.14" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=17;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1" link="data:page/id,hub-agents-overview">
+          <mxGeometry x="366" y="155" width="310" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-nav-2" value="03 目标与所有权 · 1.14" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=17;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1" link="data:page/id,hub-agents-contracts">
+          <mxGeometry x="692" y="155" width="310" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-nav-3" value="04 数据与成果 · 1.14" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=17;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1" link="data:page/id,hub-agents-analysis">
+          <mxGeometry x="1018" y="155" width="310" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-nav-4" value="05 交付与验收 · 1.14" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=17;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1" link="data:page/id,hub-agents-delivery">
+          <mxGeometry x="1344" y="155" width="310" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="en-contract" value="&lt;b&gt;① 合同单一来源｜7.2.1&lt;/b&gt;&lt;br&gt;&lt;br&gt;V1：共享能力注册，真实序列化与 UI 消费一致，版本差异可识别。&lt;br&gt;&lt;br&gt;全量 DTO / schema / TS 生成暂缓，避免阻塞首个闭环。&lt;br&gt;&lt;br&gt;Schemars / ts-rs 仍为候选；采用时完成 O-24 / A-118。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#F0F7FF;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1">
+          <mxGeometry x="40" y="270" width="480" height="290" as="geometry" />
+        </mxCell>
+        <mxCell id="en-recovery" value="&lt;b&gt;② 跨版本恢复｜8.46&lt;/b&gt;&lt;br&gt;&lt;br&gt;检查点绑定 runtime、工具合同、提供方协议与策略版本。&lt;br&gt;&lt;br&gt;兼容继续 / 显式迁移 / 重建会话 / 不兼容；已知副作用不重放。&lt;br&gt;&lt;br&gt;借鉴 Temporal / LangGraph；O-23 · A-114。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EEF2FF;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1">
+          <mxGeometry x="610" y="270" width="480" height="290" as="geometry" />
+        </mxCell>
+        <mxCell id="en-storage" value="&lt;b&gt;③ 容量与 Trace｜8.47&lt;/b&gt;&lt;br&gt;&lt;br&gt;V1：先测真实规模与边界，范围内可靠保存，超限保全已有成果。&lt;br&gt;&lt;br&gt;仅实际瓶颈触发载荷分离；采用引用须验证持久化、权限与缺失。&lt;br&gt;&lt;br&gt;V3：完整 pin / 回收与连续 Run；长期协作前退出 20 Run 上限。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="270" width="480" height="290" as="geometry" />
+        </mxCell>
+        <mxCell id="en-stream" value="&lt;b&gt;④ 实际来源读取证据｜4.8&lt;/b&gt;&lt;br&gt;&lt;br&gt;V1 只对首个采用来源及操作核验读取、分页、历史与覆盖。&lt;br&gt;&lt;br&gt;缺口标 unknown；本地匹配不声称远端全量。&lt;br&gt;&lt;br&gt;全资源流重建按需后置；复用现有领域所有者。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#ECFDF5;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1">
+          <mxGeometry x="40" y="690" width="480" height="290" as="geometry" />
+        </mxCell>
+        <mxCell id="en-extract" value="&lt;b&gt;⑤ 单指标证据与质量｜7.6&lt;/b&gt;&lt;br&gt;&lt;br&gt;V1 主睡眠最小字段；Unicode scalar 原文坐标、事件去重及修正。&lt;br&gt;&lt;br&gt;本指标人工真值核对 precision / recall，歧义不伪造数值。&lt;br&gt;&lt;br&gt;通用分块 / 多轮框架后置；实际需要才补场景子集。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#F5F3FF;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1">
+          <mxGeometry x="610" y="690" width="480" height="290" as="geometry" />
+        </mxCell>
+        <mxCell id="en-chart" value="&lt;b&gt;⑥ 有限声明式图表｜7.7.1&lt;/b&gt;&lt;br&gt;&lt;br&gt;V1-B/C：bar / line、同源表格、修订与报告依赖已接入 Recharts。&lt;br&gt;&lt;br&gt;剩余：抽取指标、原生视觉及重开链；导出条件进入，首次启用带保护。&lt;br&gt;&lt;br&gt;不承诺完整 Vega 兼容；A-121 按采用子集验收。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FDF2F8;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="690" width="480" height="290" as="geometry" />
+        </mxCell>
+        <mxCell id="en-tests" value="&lt;b&gt;⑦ 状态验证按风险引入｜14.12&lt;/b&gt;&lt;br&gt;&lt;br&gt;V1 必需：当前采用状态的不变量、版本失效、晚到结果、重连、容量与故障回归。&lt;br&gt;&lt;br&gt;随机参考模型 / 全排列 / 跨版本矩阵暂缓；V2 复杂动作或 V3 控制恢复时进入。&lt;br&gt;&lt;br&gt;真实协议、真实模型与原生界面各自留证；确定性回放不代替模型质量。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#F0FDF4;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1120" width="1620" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="en-adoption" value="&lt;b&gt;接续实施顺序｜13.11 / 14.11&lt;/b&gt;&lt;br&gt;&lt;br&gt;核对 A–H → 测实际规模 / 开销 → 一个指标接现有成果链 → Hub 重开与原生体验。&lt;br&gt;&lt;br&gt;正式运行前冻结 manifest、场景预算与逐项 3/3；导出和 blob 按条件进入。&lt;br&gt;&lt;br&gt;长期合同保留；V1 新增范围冻结，必要纠错原位记录。不以静态线索宣布性能根因或提速成绩。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1410" width="1620" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="en-e1" value="版本绑定" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#6B7F99;strokeWidth=2;fontSize=16;fontFamily=Microsoft YaHei;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="en-contract" target="en-recovery">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="en-e2" value="核验引用" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#6B7F99;strokeWidth=2;fontSize=16;fontFamily=Microsoft YaHei;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="en-recovery" target="en-storage">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="en-e3" value="同一接口合同" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#6B7F99;strokeWidth=2;fontSize=16;fontFamily=Microsoft YaHei;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="en-contract" target="en-stream">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="en-e4" value="冻结输入" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#6B7F99;strokeWidth=2;fontSize=16;fontFamily=Microsoft YaHei;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="en-stream" target="en-extract">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="en-e5" value="核验数据" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#6B7F99;strokeWidth=2;fontSize=16;fontFamily=Microsoft YaHei;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="en-extract" target="en-chart">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="en-e6" value="受控载荷引用" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#6B7F99;strokeWidth=2;fontSize=16;fontFamily=Microsoft YaHei;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="en-storage" target="en-chart">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="en-e7" value="实际状态转换 + 故障注入" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#6B7F99;strokeWidth=2;fontSize=16;fontFamily=Microsoft YaHei;labelBackgroundColor=#FFFFFF;dashed=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="en-extract" target="en-tests">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-status-nav" value="&lt;b&gt;07 V1 进度与体验验收 →&lt;/b&gt;&lt;br&gt;A–H 当前证据 · 首版必需 / 暂缓 · 体验目标 · 十个代表用例" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#E7F0FC;" vertex="1" parent="1" link="data:page/id,hub-agents-v1-status">
+          <mxGeometry x="40" y="1660" width="1620" height="80" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="hub-agents-v1-status" name="07 V1 进度与体验验收 · 历史1.14">
+    <mxGraphModel dx="1700" dy="1980" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1980" math="0" shadow="0" background="#FFFFFF">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="v1-title" value="&lt;b&gt;V1验收设计与历史阶段状态｜基线1.14（2026-10-23）。当前C9出口、失败与已接受范围见08页及实施记录。&lt;/b&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=24;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#E7F0FC;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1620" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-nav-0" value="01 原详图 · 基线 1.14" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#F1F5F9;" vertex="1" parent="1" link="data:page/id,hub-agents-current">
+          <mxGeometry x="40" y="160" width="520" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-nav-1" value="02 执行总览 · 1.14" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#F1F5F9;" vertex="1" parent="1" link="data:page/id,hub-agents-overview">
+          <mxGeometry x="590" y="160" width="520" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-nav-2" value="03 目标与所有权 · 1.14" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#F1F5F9;" vertex="1" parent="1" link="data:page/id,hub-agents-contracts">
+          <mxGeometry x="1140" y="160" width="520" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-nav-3" value="04 数据与成果 · 1.14" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#F1F5F9;" vertex="1" parent="1" link="data:page/id,hub-agents-analysis">
+          <mxGeometry x="40" y="225" width="520" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-nav-4" value="05 交付与验收 · 1.14" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#F1F5F9;" vertex="1" parent="1" link="data:page/id,hub-agents-delivery">
+          <mxGeometry x="590" y="225" width="520" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-nav-5" value="06 工程合同与成熟方案 · 1.14" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#F1F5F9;" vertex="1" parent="1" link="data:page/id,hub-agents-engineering">
+          <mxGeometry x="1140" y="225" width="520" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-progress" value="&lt;b&gt;当前进度：接续 A–H；源码、验证与发布分开&lt;/b&gt;&lt;br&gt;&lt;br&gt;A 固定输入；B 图表修订；C 报告依赖；D 真实模型单例；E 目标版本；F 完成判定；G 任务依赖；H 目标解释修订。&lt;br&gt;&lt;br&gt;D 两轮约 48 / 43 秒，累计输入约 150k / 155k；首事件计时缺失。根因未确认，当前原生体验及正式基准仍未通过。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#F0FDF4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="310" width="1620" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-required" value="&lt;b&gt;V1 必需：一个有用闭环&lt;/b&gt;&lt;br&gt;&lt;br&gt;固定输入与授权；材料、日期、有效值、历史四层覆盖。&lt;br&gt;&lt;br&gt;统计 + 主睡眠最小字段；原文坐标、单位、事件去重、排除及修正。&lt;br&gt;&lt;br&gt;复用同一图表 / 报告修订；旧报告失效；Hub 内保存、重开及检查。&lt;br&gt;&lt;br&gt;必要证据持久化、容量失败保全、版本检查与基本状态回读。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#EDF4FF;" vertex="1" parent="1">
+          <mxGeometry x="40" y="540" width="520" height="390" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-deferred" value="&lt;b&gt;暂缓 / 条件项：有依据再进入&lt;/b&gt;&lt;br&gt;&lt;br&gt;条件项：本地导出按明确需求；blob 分离按实测容量瓶颈。&lt;br&gt;&lt;br&gt;暂缓：全域表迁移、全量合同生成、通用抽取；随机状态机与完整跨版本恢复。&lt;br&gt;&lt;br&gt;高级压缩 / 看门狗、任意脚本 / SQL / 办公格式、后台及多 Agent。&lt;br&gt;&lt;br&gt;已有能力保留；权限、版本、证据与必要故障回归不暂缓。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#FFF7ED;" vertex="1" parent="1">
+          <mxGeometry x="590" y="540" width="520" height="390" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-next" value="&lt;b&gt;接续实施：先测，再闭环&lt;/b&gt;&lt;br&gt;&lt;br&gt;① 核定 A–H；测笔记 / 日期段 / 字符 / 字节规模与各段耗时、输入开销。&lt;br&gt;&lt;br&gt;② 主睡眠最小数据集 → 现有图表 / 报告，闭合纠正链。&lt;br&gt;&lt;br&gt;③ 历史证据、Hub 内重开与原生界面；按实测处理容量。&lt;br&gt;&lt;br&gt;④ 冻结 manifest 与预算；十用例逐项 3/3，质量与体验同时通过。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#F5F3FF;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="540" width="520" height="390" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-latency" value="&lt;b&gt;体验分层：均未实测通过&lt;/b&gt;&lt;br&gt;&lt;br&gt;Hub 硬门：本地接收 ≤300 ms；事件到 UI 尾部 ≤250 ms；持久化 / 渲染预算测后冻结。&lt;br&gt;&lt;br&gt;提供方等待与工具执行分段记录；同条件对照，整轮耗时不全归模型。&lt;br&gt;&lt;br&gt;端到端体验仍须放行：按规模 / 模型冻结预算；旧 5 / 10 / 30 / 20 s 及 100k 为探索目标。&lt;br&gt;&lt;br&gt;输入总量 / 缓存 / 非缓存 / 输出分列；费用未知不填 0；180 s 只是小样本执行护栏。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#EDF4FF;" vertex="1" parent="1">
+          <mxGeometry x="40" y="970" width="790" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-quality" value="&lt;b&gt;行为与证据：速度不能抵偿错误&lt;/b&gt;&lt;br&gt;&lt;br&gt;可恢复读取失败最多 2 次额外尝试；同参无效重试 ≤1 次。撤权、永久失败及未知写入正确停止或核验。&lt;br&gt;&lt;br&gt;要求、成果历史及状态保留；重连一致。原生图 / 表 / 引用可读、键盘可用。&lt;br&gt;&lt;br&gt;每项 3/3；2/3 不通过，不宣称稳定 90%。少于 20 次用最大值核对尾部，不标 P95。&lt;br&gt;&lt;br&gt;全部失败 / 超时保留；缺预算或必要证据未验证，不能事后调门槛追认。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#F0FDF4;" vertex="1" parent="1">
+          <mxGeometry x="870" y="970" width="790" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-cases" value="&lt;b&gt;十个代表用例｜14.11.5&lt;/b&gt;&lt;br&gt;&lt;br&gt;01 简单解释 / 改写　　02 两份资料查证与无答案　　03 月度统计、重复与缺月　　04 主睡眠最小抽取　　05 纠正值 / 日期&lt;br&gt;&lt;br&gt;06 同一成果改变口径　　07 可恢复故障与永久拒绝　　08 UI 重开及快照失效　　09 真实容量、阈值 / 写盘失败　　10 追加“只预览”后重开 Hub 成果与历史&lt;br&gt;&lt;br&gt;模型自主选择路径；导出启用才追加独立子场景。代表规模必须填实值，不能拿三天夹具代表实际日记。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#F8FAFC;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1350" width="1620" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-boundary" value="&lt;b&gt;交付边界&lt;/b&gt;&lt;br&gt;&lt;br&gt;V1 必需 Hub 内持久成果。导出条件进入，首次启用即有目标授权、覆盖保护、意图 / 回执、回读与未知核验；来源写回归 V2。源码和单例不能代替原生体验。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#FFF7ED;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1620" width="1620" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="v1-evidence" value="&lt;b&gt;证据导航&lt;/b&gt;&lt;br&gt;&lt;br&gt;实施记录 9.50–9.57 及各轮 artifacts。先测规模、上下文和复用资格，不预判根因或“42 → 10 秒”；一次只改一类因素，保留原始失败和 unknown。" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;strokeColor=#93A9C4;align=left;verticalAlign=top;spacing=18;fontSize=18;fontFamily=Microsoft YaHei;fontColor=#203149;fillColor=#F8FAFC;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1790" width="1620" height="130" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+<diagram id="hub-agents-current-115" name="08 当前合同与范围 · 1.16"><mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" page="1" pageWidth="1640" pageHeight="1000" adaptiveColors="auto"><root><mxCell id="0" /><mxCell id="1" parent="0" /><mxCell id="cur-title" value="&lt;b&gt;当前架构1.16 · 原生问答优化9.257&lt;/b&gt;&lt;br&gt;0.16.392 / DB85开发验收：普通回答、精确引用、业务成果分开；核心CN历史交付继续有效。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#6c8ebf;fontSize=17;align=left;verticalAlign=top;spacing=16;" vertex="1" parent="1"><mxGeometry x="40" y="30" width="1560" height="100" as="geometry" /></mxCell><mxCell id="cur-v1" value="&lt;b&gt;V1 接受限制交付&lt;/b&gt;&lt;br&gt;分析、纠正与成果闭环成立。&lt;br&gt;C9原成绩27通过/3未通过；性能与输入例外保留。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#6c8ebf;fontSize=17;align=left;verticalAlign=top;spacing=16;" vertex="1" parent="1"><mxGeometry x="40" y="170" width="296" height="180" as="geometry" /></mxCell><mxCell id="cur-v2" value="&lt;b&gt;V2 首个来源完成&lt;/b&gt;&lt;br&gt;本地Obsidian报告追加、冲突、未知核验、条件撤回。&lt;br&gt;A-93仅补同步恢复已验证。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#6c8ebf;fontSize=17;align=left;verticalAlign=top;spacing=16;" vertex="1" parent="1"><mxGeometry x="356" y="170" width="296" height="180" as="geometry" /></mxCell><mxCell id="cur-v3" value="&lt;b&gt;V3 限定完成＋预算与上下文入口&lt;/b&gt;&lt;br&gt;386同线程恢复轮按增量计量，结算与重开一致。&lt;br&gt;失败保留最新用量快照；旧未知预留不清零。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#6c8ebf;fontSize=17;align=left;verticalAlign=top;spacing=16;" vertex="1" parent="1"><mxGeometry x="672" y="170" width="296" height="180" as="geometry" /></mxCell><mxCell id="cur-v4" value="&lt;b&gt;V4 部分完成&lt;/b&gt;&lt;br&gt;能力准入、计量及显式Codex降级已验证。&lt;br&gt;复杂DeepSeek、新来源、图像、后台仍开放。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#6c8ebf;fontSize=17;align=left;verticalAlign=top;spacing=16;" vertex="1" parent="1"><mxGeometry x="988" y="170" width="296" height="180" as="geometry" /></mxCell><mxCell id="cur-v5" value="&lt;b&gt;V5 首个代表范围完成&lt;/b&gt;&lt;br&gt;Obsidian主睡眠两周期专题。&lt;br&gt;固定方法、纠正、包管理与外部Codex已有分析互通。&lt;br&gt;9.187限定退出；不外推全部指标/来源。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#6c8ebf;fontSize=17;align=left;verticalAlign=top;spacing=16;" vertex="1" parent="1"><mxGeometry x="1304" y="170" width="296" height="180" as="geometry" /></mxCell><mxCell id="cur-flow-0" source="cur-v1" target="cur-v2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell><mxCell id="cur-flow-1" source="cur-v2" target="cur-v3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell><mxCell id="cur-flow-2" source="cur-v3" target="cur-v4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell><mxCell id="cur-flow-3" source="cur-v4" target="cur-v5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell><mxCell id="cur-codex" value="&lt;b&gt;官方Codex App Server＋Hub资料与业务边界&lt;/b&gt;&lt;br&gt;普通问答：原生最终消息及文字增量直接呈现。&lt;br&gt;精确引用：轻量绑定本轮引文，发布时再核验来源。&lt;br&gt;业务成果：按需读取复杂参数，校验真实草稿及回执。&lt;br&gt;公开搜索、提问/回答、原图、预算与恢复沿用。&lt;br&gt;T3参考界面与事件机制；Hub不另造通用推理流程。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#6c8ebf;fontSize=17;align=left;verticalAlign=top;spacing=16;" vertex="1" parent="1"><mxGeometry x="40" y="390" width="760" height="205" as="geometry" /></mxCell><mxCell id="cur-deepseek" value="&lt;b&gt;DeepSeek：限定文本成功，复杂工具链未通过&lt;/b&gt;&lt;br&gt;344同Work文本修订固定2/2，345完整失败回执计量结算通过。&lt;br&gt;最后R2/2用args代替arguments，0通过/1失败/2未执行封存。&lt;br&gt;346隐藏并拒绝冻结范围的新对话草稿操作；显式选Codex继续，同事项原额度/旧失败保留。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#6c8ebf;fontSize=17;align=left;verticalAlign=top;spacing=16;" vertex="1" parent="1"><mxGeometry x="840" y="390" width="760" height="205" as="geometry" /></mxCell><mxCell id="cur-gates" value="&lt;b&gt;不变的保护与计量边界&lt;/b&gt;&lt;br&gt;预算保留旧消费和未知预留；追加只提高累计上限。&lt;br&gt;压缩/重开不清零；窗口报告不是账单硬封顶。&lt;br&gt;原图授权独立、最多2张/每张256KiB；来源与业务回执保持。&lt;br&gt;Windows认证副本随最后句柄关闭删除，强退不依赖再继续。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;align=left;verticalAlign=top;spacing=16;" vertex="1" parent="1"><mxGeometry x="40" y="635" width="760" height="190" as="geometry" /></mxCell><mxCell id="cur-open" value="&lt;b&gt;MCP：预设＋自定义匿名远程服务&lt;/b&gt;&lt;br&gt;390桌面：添加、发现、信任/选择、应用、查询、撤销通过。&lt;br&gt;Microsoft Learn代表案例；结果与撤销状态重开保留。&lt;br&gt;只读为服务声明，非远端副作用或DNS隔离。&lt;br&gt;OAuth/stdio/写插件按需；手机无Agent，Notion暂停。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#6c8ebf;fontSize=17;align=left;verticalAlign=top;spacing=16;" vertex="1" parent="1"><mxGeometry x="840" y="635" width="760" height="190" as="geometry" /></mxCell><mxCell id="cur-links" value="&lt;b&gt;当前实施与证据 · 架构/实施9.257&lt;/b&gt;&lt;br&gt;真实日记总结与追问、普通规划、联网问答和草稿预览；逐项结果见交付报告。&lt;br&gt;本轮使用开发版，不打包；用户知识库规则、授权、来源版本与业务回执保护保留。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#6c8ebf;fontSize=17;align=left;verticalAlign=top;spacing=16;" vertex="1" parent="1"><mxGeometry x="40" y="865" width="1560" height="100" as="geometry" /></mxCell></root></mxGraphModel></diagram>
+</mxfile>

@@ -1,0 +1,48 @@
+/* User display preferences take precedence over desktop layout presets. */
+.task-status-style-choice { display: flex; align-items: center; gap: 10px; }
+.task-status-style-preview { display: inline-flex; align-items: center; color: var(--hub-accent, #0a84ff); }
+.app-shell.desktop-app-shell .desktop-workspace .recent-title,
+.app-shell.desktop-app-shell .desktop-workspace .search-home-results .recent-title,
+.app-shell.desktop-app-shell .desktop-workspace .collection-list-results .recent-title {
+  font-size: var(--result-font-size);
+  font-weight: var(--list-title-weight);
+}
+.app-shell.desktop-app-shell .desktop-workspace .recent-path,
+.app-shell.desktop-app-shell .desktop-workspace .search-home-results .recent-path,
+.app-shell.desktop-app-shell .desktop-workspace .recent-date {
+  font-size: max(11px, calc(var(--result-font-size) - 1px));
+}
+.app-shell.desktop-app-shell .desktop-workspace :is(.search-home-results,.collection-list-results) .recent-date {
+  display: block;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.app-shell.desktop-app-shell .desktop-workspace .recent-item.has-favorite-action .recent-row {
+  padding-right: 38px;
+}
+.app-shell.desktop-app-shell :is(.desktop-workspace, .task-workspace, .collections-workspace) .preview-heading h1 {
+  font-size: var(--preview-title-font-size);
+  font-weight: var(--preview-title-weight);
+}
+.app-shell.desktop-app-shell :is(.desktop-workspace, .task-workspace, .collections-workspace) .preview-content {
+  font-size: var(--preview-font-size);
+}
+.app-shell.desktop-app-shell .search-header input,
+.app-shell.desktop-app-shell .workspace-chrome,
+.app-shell.desktop-app-shell .workspace-filter-summary,
+.app-shell.desktop-app-shell .space-button,
+.app-shell.desktop-app-shell .space-menu,
+.app-shell.desktop-app-shell .filter-bar,
+.app-shell.desktop-app-shell .filter-chip,
+.app-shell.desktop-app-shell .filter-reset,
+.app-shell.desktop-app-shell .sync-button,
+.app-shell.desktop-app-shell .scope-menu strong,
+.app-shell.desktop-app-shell .background-setting-row,
+.app-shell.desktop-app-shell .background-setting-row :is(strong, select, button) {
+  font-size: var(--interface-font-size);
+}
+.app-shell.desktop-app-shell .background-setting-row small,
+.app-shell.desktop-app-shell .scope-menu small,
+.app-shell.desktop-app-shell .space-menu-copy small {
+  font-size: max(11px, calc(var(--interface-font-size) - 1px));
+}

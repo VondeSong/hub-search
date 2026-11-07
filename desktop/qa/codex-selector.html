@@ -1,0 +1,28 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Hub 模型选择器预览</title>
+<style>body{margin:0;background:#f7f7f8;font:15px 'Segoe UI',sans-serif;color:#202124}main{margin:60px auto;width:min(420px,calc(100vw - 40px));padding:24px;background:white;border-radius:16px}h2{font-size:18px;margin:0 0 28px}p{color:#777;font-size:13px}.tag-definition-model{margin-bottom:20px}fieldset{margin-top:24px}:root{--hub-text-primary:#202124;--hub-text-secondary:#6e6e73;--hub-separator:rgba(60,60,67,.12);--hub-content-surface:#fff;--hub-accent:#0a84ff}</style>
+<main class="tag-assignment-inbox"><h2>补标定义与范围</h2><div id="root"></div><p>仅用于外观和交互检查，不会发起模型生成。</p></main>
+<script type="module">
+import React, {useEffect,useState} from 'react';
+import {createRoot} from 'react-dom/client';
+let suite={settings:{model:'preview-model',reasoningEffort:'medium',fast:false,maxConcurrent:2},jobs:[],revision:1};
+window.__TAURI_INTERNALS__={invoke:async(command,{args}={})=>{
+  if(command==='get_window_visibility')return {revision:'1',visible:true,minimized:false,foreground:true};
+  if(command!=='codex_suite')throw new Error(`预览不支持此命令：${command}`);
+  if(args.action==='models')return {models:[{id:'preview-model',name:'预览模型',reasoningLevels:['low','medium','high'],defaultReasoning:'medium',fastDescription:'预览 Fast 能力'}]};
+  if(args.action==='save')suite={...suite,settings:args.settings,revision:suite.revision+1};
+  return suite;
+}};
+await import('/src/TagAssignmentInbox.css');
+const {DefinitionEditor}=await import('/src/DefinitionEditor.tsx');
+const {CodexDefinitionModel}=await import('/src/CodexDefinitionModel.tsx');
+const {CodexSuiteSettings}=await import('/src/CodexSuiteSettings.tsx');
+function Preview(){
+  const [settingsOpen,setSettingsOpen]=useState(false);
+  useEffect(()=>{const open=()=>setSettingsOpen(true);window.addEventListener('hub:open-codex-settings',open);return()=>window.removeEventListener('hub:open-codex-settings',open)},[]);
+  return React.createElement('div',{className:'tag-assignment-definition'},
+    React.createElement(CodexDefinitionModel),
+    settingsOpen&&React.createElement(CodexSuiteSettings),
+    React.createElement('fieldset',{},...['标签定义','哪些内容应当打这个标签','排除哪些内容或情形'].map(label=>React.createElement('label',{key:label},label,React.createElement(DefinitionEditor,{value:'记录或讨论目标达成、取得成果或获得认可的内容。判断重点是文中是否明确呈现已实现的积极结果，而非事件本身是否看起来值得庆祝。现有样本较少，需要结合完整正文判断。',onChange:()=>{}})))));
+}
+createRoot(document.getElementById('root')).render(React.createElement(Preview));
+</script></html>

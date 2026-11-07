@@ -1,0 +1,21 @@
+.tag-source-writeback { width: 100%; min-width: 0; margin-top: 12px; font-size: 13px; }
+.tag-source-writeback button { min-height: 32px; padding: 5px 12px; border: 1px solid var(--hub-separator, #e5e5e8); border-radius: 7px; color: var(--hub-text-primary, #303238); background: var(--hub-content-surface, #fff); font: inherit; cursor: pointer; }
+.tag-source-writeback button:disabled { opacity: .5; cursor: default; }
+.tag-source-writeback button:focus-visible { outline: 2px solid var(--hub-accent, #087de0); outline-offset: 2px; }
+.tag-source-writeback button.primary { background: var(--hub-accent, #087de0); color: #fff; border-color: transparent; }
+.tag-source-writeback-body { padding: 16px; margin-top: 10px; border: 1px solid var(--hub-separator, #e5e5e8); border-radius: 10px; background: var(--hub-content-surface, #fff); }
+.tag-source-writeback p { margin: 8px 0; line-height: 1.65; }
+.tag-source-writeback-note, .tag-source-writeback small { color: var(--hub-text-secondary, #676b74); font-size: 12px; line-height: 1.65; }
+.tag-source-writeback ul { list-style: none; margin: 12px 0; padding: 0; }
+.tag-source-writeback li { padding: 12px 0; border-top: 1px solid var(--hub-separator, #e5e5e8); }
+.tag-source-writeback-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tag-source-writeback-item > span { min-width: 0; display: grid; gap: 4px; overflow-wrap: anywhere; }
+.tag-source-writeback-item > button { flex-shrink: 0; }
+.tag-source-writeback-tags { color: var(--hub-accent, #087de0); }
+.tag-source-writeback-preview { margin-top: 12px; padding: 12px; border-radius: 8px; background: var(--hub-control-fill, #f7f7f8); }
+.tag-source-writeback-preview summary { cursor: pointer; padding: 6px 0; }
+.tag-source-writeback-diff { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.tag-source-writeback pre { max-height: 280px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.65 ui-monospace, monospace; padding: 10px; background: var(--hub-content-surface, #fff); border: 1px solid var(--hub-separator, #e5e5e8); border-radius: 6px; }
+.tag-source-writeback-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.tag-source-writeback-error { color: #b34b35; overflow-wrap: anywhere; }
+@media (max-width: 760px) { .tag-source-writeback-diff { grid-template-columns: 1fr; } }

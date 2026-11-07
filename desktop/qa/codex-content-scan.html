@@ -1,0 +1,10 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>一键逐篇检查预览</title><style>:root{--hub-text-primary:#202124;--hub-text-secondary:#6e6e73;--hub-separator:#e5e5e8;--hub-content-surface:#fff;--hub-control-fill:#f6f6f8;--hub-accent:#087de0;--hub-accent-soft:#eef5ff}body{margin:24px;background:#f8f8f9;font-family:'Segoe UI',sans-serif}#root{max-width:680px;margin:auto;background:white;padding:18px;border:1px solid #e5e5e8;border-radius:12px}h3{font-size:15px;margin:0}</style><div id="root"></div><script type="module">
+import React from 'react';import {createRoot} from 'react-dom/client';
+const run={runId:'r',status:'active',stale:false,totalEntities:250,entitiesRead:12,charsRead:14800,maxEntities:30,maxChars:15000,counts:{recorded:11,unread:238,read:1}};
+window.__TAURI_INTERNALS__={invoke:async(command,{args})=>{
+if(args.action==='definition_models')return {models:[{id:'gpt-6-astra',name:'GPT-6-Astra',reasoningLevels:['low','medium','high','xhigh','ultra'],defaultReasoning:'medium',fastDescription:'2x speed, increased usage'}]};
+if(args.action==='scan_status')return {run};
+if(args.action==='scan_generate')return {run:{...run,charsRead:15000},submitted:[],unjudged:[],errors:[],pauseReason:'读取预算已用尽，进度已保存。可在进度与预算中追加额度后继续。',coverage:'保存判断不等于批准。',newEntitiesRead:0,newCharsRead:200};return {};}};
+const {CodexContentScan}=await import('/src/CodexContentScan.tsx');
+createRoot(document.getElementById('root')).render(React.createElement(React.Fragment,null,React.createElement('h3',null,'逐篇检查（可续跑）'),React.createElement(CodexContentScan,{tagId:'专注'})));
+</script></html>

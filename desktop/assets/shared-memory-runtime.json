@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "platform": "windows-x64",
+  "python": "3.12.12",
+  "basicMemory": "0.23.2",
+  "id": "90e36ecbe66b26b0370bf1d7a520eb4f4fe31f3d0ceb4bee9d0dd6e5f116cc3e",
+  "archiveSha256": "7c684b339b910c5dce5c540741abbd10822593541dad55f6ae47cc0e6dbb4202",
+  "archiveBytes": 197752377,
+  "expandedBytes": 502348690,
+  "files": 22253
+}

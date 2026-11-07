@@ -1,0 +1,39 @@
+.download-failures-entry { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin-top: 9px; padding: 9px 10px; border: 1px solid #ebe8e2; border-radius: 9px; background: #fbfaf8; color: #6d6860; text-align: left; cursor: pointer; }
+.download-failures-entry > span { display: grid; gap: 3px; }
+.download-failures-entry strong { font-size: 11px; color: #4b4945; }
+.download-failures-entry small { font-size: 10px; color: #96938c; }
+.download-failures-entry:hover { background: #f5f3ee; }
+.download-failures-panel { min-width: 0; }
+.download-failures-intro { margin: 0 0 11px; color: #858078; font-size: 11px; line-height: 1.55; }
+.download-failures-intro:focus { outline: none; }
+.download-failures-toolbar { display: flex; align-items: flex-end; gap: 8px; }
+.download-failures-toolbar label { flex: 1; min-width: 0; display: grid; gap: 4px; color: #817a71; font-size: 10px; }
+.download-failures-toolbar select { width: 100%; min-height: 31px; border: 1px solid #dedbd5; border-radius: 7px; padding: 4px 8px; background: #fff; color: #55534f; font: inherit; font-size: 11px; }
+.download-failures-panel button { min-height: 30px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 4px 9px; border: 1px solid #dedbd5; border-radius: 7px; background: #fff; color: #686158; font: inherit; font-size: 10.5px; cursor: pointer; }
+.download-failures-panel button:hover:not(:disabled) { color: #6f55d9; border-color: #9a8bdc; }
+.download-failures-panel button:disabled { opacity: .5; cursor: default; }
+.download-failures-panel button:focus-visible,.download-failures-entry:focus-visible { outline: 2px solid #9a8bdc; outline-offset: 2px; }
+.download-failures-views { display: flex; gap: 4px; margin: 11px 0; padding: 3px; border-radius: 9px; background: #f2f0eb; }
+.download-failures-views button { flex: 1; border-color: transparent; background: transparent; }
+.download-failures-views button[aria-pressed="true"] { background: #fff; color: #514b42; box-shadow: 0 1px 4px rgba(35,34,31,.08); }
+.download-failures-error { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 9px 0; padding: 8px; border-radius: 7px; background: #fff1ef; color: #a7443b; font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.download-failures-error button { flex-shrink: 0; }
+.download-failures-notice { margin: 9px 0; color: #756f65; font-size: 11px; line-height: 1.5; }
+.download-failures-empty { display: flex; align-items: center; justify-content: center; gap: 7px; margin: 28px 4px; color: #969087; font-size: 11px; }
+.download-failures-batch,.download-failures-pagination { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 0; color: #969087; font-size: 10px; }
+.download-failures-batch > div,.download-failures-pagination > div,.download-failure-actions > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.download-failures-list { display: grid; gap: 8px; }
+.download-failure-item { min-width: 0; display: grid; gap: 6px; padding: 10px; border: 1px solid #ecd9d3; border-radius: 9px; background: #fffaf7; }
+.download-failure-title { display: flex; align-items: center; gap: 6px; }
+.download-failure-title > svg { flex-shrink: 0; color: #ad6955; }
+.download-failure-title strong { min-width: 0; flex: 1; color: #514c45; font-size: 11.5px; overflow-wrap: anywhere; }
+.download-failure-title small { flex-shrink: 0; padding: 2px 5px; border-radius: 5px; background: #f3ede7; color: #887b6e; font-size: 9px; }
+.download-failure-context { display: flex; flex-wrap: wrap; gap: 3px 9px; color: #8e8579; font-size: 10px; }
+.download-failure-path { margin: 0; color: #a0978a; font-size: 9.5px; overflow-wrap: anywhere; }
+.download-failure-reason { margin: 0; padding: 6px 7px; border-radius: 6px; background: #fff1eb; color: #a05e4c; font-size: 10.5px; line-height: 1.45; overflow-wrap: anywhere; }
+.download-failure-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
+.download-failure-actions > small { color: #9c9387; font-size: 9.5px; }
+@media (max-width: 520px) {
+  .download-failure-actions { align-items: flex-start; flex-direction: column; }
+  .download-failures-panel button { min-height: 34px; }
+}

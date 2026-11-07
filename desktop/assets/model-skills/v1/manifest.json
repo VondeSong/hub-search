@@ -1,0 +1,78 @@
+{
+  "format": "hub-model-skills-v1",
+  "version": 1,
+  "files": [
+    {
+      "path": "craft-general-archive/SKILL.md",
+      "bytes": 6141,
+      "sha256": "c5ce68471627ae3f514318234756e63537d55552ca855b8f3b997ca82d21941c",
+      "source": "user-managed skill; adopted under HBM-01B authorization"
+    },
+    {
+      "path": "craft-general-archive/references/content-workflow.md",
+      "bytes": 3487,
+      "sha256": "a7205d82203442ee935f9ba6735c383072dd686590afbdec8d6ea56e1f5dd051",
+      "source": "user-managed skill; adopted under HBM-01B authorization"
+    },
+    {
+      "path": "craft-general-archive/references/craft-presentation.md",
+      "bytes": 10531,
+      "sha256": "1163f72469102a16ea767c1cc2e141981ffec54e6b1f87c4481ea12e3dfbd993",
+      "source": "user-managed skill; adopted under HBM-01B authorization"
+    },
+    {
+      "path": "craft-general-archive/references/craft-blocks.md",
+      "bytes": 7132,
+      "sha256": "c05648e5498f364ed2a4f66c31e0d2b0aa37144168f51cb884b22f943bad9f00",
+      "source": "user-managed skill; adopted under HBM-01B authorization"
+    },
+    {
+      "path": "craft-general-archive/references/write-protocol.md",
+      "bytes": 5004,
+      "sha256": "2ed1f1c648afca5cb4c35c888b81ea79c19ac0e951d064bb918dbf8a6456abf8",
+      "source": "user-managed skill; adopted under HBM-01B authorization"
+    },
+    {
+      "path": "craft-car-archive/SKILL.md",
+      "bytes": 8392,
+      "sha256": "cefed956357a4a1907c999d0c65a9003f844e57e89a3357f5d4976b4734c1ea3",
+      "source": "user-managed skill; adopted under HBM-01B authorization"
+    },
+    {
+      "path": "craft-car-archive/references/source-analysis.md",
+      "bytes": 1764,
+      "sha256": "82ad214979735e16268463cc13b8d5ecf51b49c752c4de5a48ce172742e63599",
+      "source": "user-managed skill; adopted under HBM-01B authorization"
+    },
+    {
+      "path": "craft-car-archive/references/automotive-evidence.md",
+      "bytes": 6018,
+      "sha256": "7f764262d2191bc68f8db74e7f9e37ab8a84b00268e6e30ac59ba34385beeb30",
+      "source": "user-managed skill; adopted under HBM-01B authorization"
+    },
+    {
+      "path": "content-to-tasks/SKILL.md",
+      "bytes": 2812,
+      "sha256": "a8d88eda3bbf80fb80f661858875f36cc96180d5b32a86dca122950f9a182dfa",
+      "source": "user-managed skill; adopted under HBM-01B authorization"
+    },
+    {
+      "path": "content-to-tasks/references/task-conversion.md",
+      "bytes": 7993,
+      "sha256": "1f718dcad775d591102f44798f7567ef22f16167b8443c18687ecadb45cb0234",
+      "source": "user-managed skill; adopted under HBM-01B authorization"
+    },
+    {
+      "path": "content-to-tasks/references/dida-adapter.md",
+      "bytes": 386,
+      "sha256": "04e3935dca902b591b33c8b6922f2284520438f55041f8d4a08ed013efa02764",
+      "source": "user-managed skill; adopted under HBM-01B authorization"
+    },
+    {
+      "path": "content-to-tasks/references/hub-contract.md",
+      "bytes": 5222,
+      "sha256": "8660425da6f6a0d9e98a86947abbecffa213e8d26f489d4a7f4f6db77ee46009",
+      "source": "user-managed skill; adopted under HBM-01B authorization"
+    }
+  ]
+}

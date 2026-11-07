@@ -1,0 +1,5 @@
+.shared-card-sizes{display:inline-flex;align-items:center;gap:2px;padding:3px;border-radius:8px;background:var(--hub-muted-surface,#f5f6f8)}
+.shared-card-sizes button{display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:5px;color:var(--hub-text-secondary,#68707a);background:transparent;cursor:pointer}
+.shared-card-sizes button[aria-pressed=true]{color:var(--hub-accent,#1682e5);background:var(--hub-selection,#eaf2ff)}
+.card-size-icon{flex:none;display:block}.shared-card-sizes button:focus-visible{outline:2px solid #1682e5;outline-offset:1px}
+.flashcards-card-layout-options button>.card-size-icon{position:static;width:18px;height:18px}

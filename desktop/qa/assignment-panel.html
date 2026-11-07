@@ -1,0 +1,12 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>补标面板预览</title><style>:root{--hub-text-primary:#202124;--hub-text-secondary:#6e6e73;--hub-text-tertiary:#9a9aa0;--hub-separator:rgba(60,60,67,.12);--hub-content-surface:#fff;--hub-control-fill:#f6f6f7;--hub-accent:#0a84ff}body{background:#f8f8f9;margin:24px;font-family:'Segoe UI',sans-serif}#root{max-width:630px;margin:auto}</style><div id="root"></div><script type="module">
+import React from 'react';import {createRoot} from 'react-dom/client';
+window.__TAURI_INTERNALS__={invoke:async(command,{args})=>{
+if(args.action==='definition')return {definition:{version:2,definition:{description:'记录明确取得的成果。',include:'已经达成的目标。',exclude:'尚未完成的计划。',libraryIds:['main']}},draft:null,libraries:[{libraryId:'car',name:'Car',provider:'craft'},{libraryId:'main',name:'Main',provider:'craft'},{libraryId:'obs',name:'Main',provider:'obsidian'},{libraryId:'tick',name:'滴答清单',provider:'dida365'}]};
+if(args.action==='definition_models')return {models:[{id:'gpt-6-astra',name:'GPT-6-Astra',reasoningLevels:['low','medium','high','xhigh','ultra'],defaultReasoning:'medium',fastDescription:'2x speed, increased usage'}]};
+if(args.action==='discovery_status')return {counts:{retrievedHits:91,returnedCandidates:30},readEntities:5,processedCount:5,remainingCount:25,charsRead:12852,libraryIds:['main'],queries:['成果'],submitted:Array.from({length:5},(_,i)=>({proposalId:String(i),title:'测试内容',decision:i===0?'out_of_scope':'insufficient_evidence',preview:{stale:false,reviewBlocked:true,reviewBlockers:['此结论不是补标建议']}})),unjudged:[],coverage:'未覆盖全部资料库'};
+if(args.action==='list')return {proposals:[],nextCursor:null};
+if(args.action==='exclusion_review_due')return {count:0,hasMore:false,asOf:1};
+return {items:[],nextCursor:null};}};
+const {TagAssignmentInbox}=await import('/src/TagAssignmentInbox.tsx');
+createRoot(document.getElementById('root')).render(React.createElement(TagAssignmentInbox,{tagId:'focus'}));
+</script></html>

@@ -1,0 +1,13 @@
+/* App chrome behaves like controls; document and editor content stays copyable. */
+body { -webkit-user-select: none; user-select: none; }
+input, textarea, [contenteditable="true"], [data-selectable="true"],
+.preview-content, .flashcards-draft-copy, .flashcards-inline-cell-value,
+.flashcards-review-card h2, .flashcards-answer, .error-message, pre, code {
+  -webkit-user-select: text;
+  user-select: text;
+}
+button, [role="button"], nav, summary, .preview-actions,
+.flashcards-answer-label, .flashcards-draft-actions {
+  -webkit-user-select: none;
+  user-select: none;
+}

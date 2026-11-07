@@ -1,0 +1,32 @@
+.agent-floating-launcher {
+  position: fixed;
+  z-index: 200;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--hub-separator);
+  border-radius: 999px;
+  background: var(--hub-content-surface);
+  color: var(--hub-text-primary);
+  box-shadow: 0 12px 40px #0002;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.agent-floating-launcher[hidden] { display: none; }
+.agent-floating-launcher:focus-visible { outline: 2px solid var(--hub-accent); outline-offset: 2px; }
+.agent-launcher-orb {
+  position: relative;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: conic-gradient(from 20deg, #a440ba, #e34580, #ed7854, #c14bb1, #7452bf, #4c9cd4, #53bcb9, #a440ba);
+}
+.agent-launcher-orb::after { content: ""; position: absolute; inset: 3px; border-radius: inherit; background: var(--hub-content-surface); }

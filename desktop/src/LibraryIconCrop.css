@@ -1,0 +1,20 @@
+.library-icon-crop-dialog { width:min(420px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; box-sizing:border-box; border:1px solid var(--border,#e0e3e8); border-radius:18px; padding:24px; background:var(--surface,#fff); color:var(--text,#242830); box-shadow:0 24px 80px #0003; }
+.library-icon-crop-dialog::backdrop { background:#0005; }
+.library-icon-crop-dialog header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.library-icon-crop-dialog h2 { margin:0; font-size:20px; }
+.library-icon-crop-dialog p { font-size:13px; line-height:1.6; color:var(--text-muted,#687181); }
+.library-icon-crop-dialog button { display:inline-flex; align-items:center; justify-content:center; border:0; border-radius:8px; background:transparent; color:inherit; padding:8px 12px; cursor:pointer; }
+.library-icon-crop-dialog button:hover { background:#8881; }
+.library-icon-crop-dialog button:disabled { opacity:.5; cursor:default; }
+.library-icon-crop-viewport { width:min(280px,100%); aspect-ratio:1; position:relative; overflow:hidden; margin:20px auto 12px; border-radius:12px; cursor:grab; touch-action:none; background:repeating-conic-gradient(#eee 0% 25%,#fff 0% 50%) 50% / 16px 16px; outline:1px solid #0002; }
+.library-icon-crop-viewport:active { cursor:grabbing; }
+.library-icon-crop-viewport:focus-visible { outline:2px solid #2387ff; outline-offset:3px; }
+.library-icon-crop-viewport img { position:absolute; max-width:none; max-height:none; margin:0; padding:0; user-select:none; pointer-events:none; }
+.library-icon-crop-grid { position:absolute; inset:0; pointer-events:none; background:linear-gradient(90deg,transparent 33.1%,#fff5 33.1%,#fff5 33.5%,transparent 33.5%,transparent 66.4%,#fff5 66.4%,#fff5 66.8%,transparent 66.8%),linear-gradient(transparent 33.1%,#fff5 33.1%,#fff5 33.5%,transparent 33.5%,transparent 66.4%,#fff5 66.4%,#fff5 66.8%,transparent 66.8%); }
+.library-icon-crop-zoom { display:flex; align-items:center; gap:12px; margin:0 auto; max-width:310px; }
+.library-icon-crop-zoom input { flex:1; min-width:0; accent-color:#1683ff; }
+.library-icon-crop-dialog .library-icon-crop-hint { text-align:center; font-size:12px; }
+.library-icon-crop-dialog .library-icon-crop-error { color:#d63939; }
+.library-icon-crop-dialog footer { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
+.library-icon-crop-dialog .library-icon-crop-save { background:#1683ff; color:white; }
+.library-icon-crop-dialog .library-icon-crop-save:hover { background:#0874ed; }

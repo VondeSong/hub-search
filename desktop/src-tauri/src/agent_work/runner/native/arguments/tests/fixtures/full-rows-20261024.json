@@ -1,0 +1,888 @@
+{
+  "source": "# 2025-01-01\n学习 学习 💤é\n昨夜主睡眠实际睡了7小时。复核更正：实际主睡眠6.5小时。午睡半小时。\n# 2025-01-02\n学习\n昨夜主睡眠实际睡了8小时。六个多小时是旧估计。\n# 2025-02-01\n学习\n昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。\n",
+  "sourceHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+  "goal": "请从所选日记自主整理主睡眠实际时长，按每段标题的记录日归属，时区为北京时间；区分午睡、在床时间、旧估计与明确更正，只将有充分依据的精确小时数纳入每月平均。画一张图，保留在当前事项供我继续纠正，并给出简短结论、有效样本数、原文依据、四层覆盖和排除说明。仅分析2025年1月和2月；未知不补零，也不由睡觉起止时间推算实际睡眠。",
+  "correction": "我确认纠正：2025年1月2日的实际主睡眠为7.5小时，原文8小时不准确。请将本条作为用户纠正依据，保留原始记载和更正历史，不修改源日记；沿用刚才的数据集和同一张图，重新计算月均、核对并更新报告。其它日期和规则保持不变。",
+  "rejected": {
+    "arguments": {
+      "request": {
+        "action": "revise",
+        "datasetId": "sleep-BZZrPIwGiGLQMEBQVgneDsFQ",
+        "dateRule": "Asia/Shanghai；标题记录日；仅2025年1、2月",
+        "expectedRevision": 1,
+        "inclusionRule": "精确实际主睡眠；更正优先；不推算不补零",
+        "methodRef": "hub-statistics",
+        "operationId": "sleep-revise-2",
+        "rows": [
+          {
+            "date": "2025-01-01",
+            "hours": 6.5,
+            "rowId": "jan1"
+          }
+        ]
+      }
+    },
+    "argumentsOmitted": false,
+    "argumentsSha256": "708e7f65b21f04dba2e22ccf30895449ae75603fe416498c11c44246f3f07935",
+    "argumentsUtf8Bytes": 357,
+    "callId": "exec-d3aa16ab-7842-4648-aa45-a0d8c99b4fbb",
+    "category": "toolArguments",
+    "error": "模型返回格式不符合要求，未提交结果，请重试。 [$.request.rows[0].ambiguity: required]",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "request": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "enum": [
+                    "create"
+                  ],
+                  "type": "string"
+                },
+                "dateRule": {
+                  "maxLength": 800,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "expectedSnapshot": {
+                  "maxLength": 180,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "inclusionRule": {
+                  "maxLength": 800,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "methodRef": {
+                  "maxLength": 180,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "operationId": {
+                  "maxLength": 180,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "rows": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "ambiguity": {
+                        "maxLength": 800,
+                        "type": "string"
+                      },
+                      "correctionSource": {
+                        "anyOf": [
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "kind": {
+                                "enum": [
+                                  "modelReview",
+                                  "userCorrection"
+                                ],
+                                "type": "string"
+                              },
+                              "reason": {
+                                "maxLength": 800,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "sourceRef": {
+                                "anyOf": [
+                                  {
+                                    "maxLength": 180,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "reason",
+                              "sourceRef"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "create 每行必须为 null。revise 改动已有行或新增行时必须填写实际评审来源：modelReview 的 sourceRef 为 null，reason 说明真实评审；userCorrection 的 sourceRef 必须来自当前 goalState 的真实用户命令，不是引文编号。新增行也需来源，但不能伪造被替代行。未改动行保留原字段，不重写历史。"
+                      },
+                      "dateBasis": {
+                        "enum": [
+                          "recordedDay",
+                          "userSpecified",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "eventDate": {
+                        "anyOf": [
+                          {
+                            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "eventRef": {
+                        "anyOf": [
+                          {
+                            "maxLength": 180,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "evidenceRefs": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "contentHash": {
+                              "maxLength": 180,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "end": {
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "itemIndex": {
+                              "maximum": 15,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "sourceRevision": {
+                              "type": "object"
+                            },
+                            "start": {
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "text": {
+                              "maxLength": 800,
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "contentHash",
+                            "end",
+                            "itemIndex",
+                            "sourceRevision",
+                            "start",
+                            "text"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 4,
+                        "minItems": 1,
+                        "type": "array"
+                      },
+                      "exclusionReason": {
+                        "maxLength": 800,
+                        "type": "string"
+                      },
+                      "normalizedValue": {
+                        "anyOf": [
+                          {
+                            "maximum": 24,
+                            "minimum": 0,
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "rawValue": {
+                        "maxLength": 800,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "reviewBasis": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "modelReview",
+                              "userCorrection"
+                            ],
+                            "type": "string"
+                          },
+                          "reason": {
+                            "maxLength": 800,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "sourceRef": {
+                            "anyOf": [
+                              {
+                                "maxLength": 180,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "reason",
+                          "sourceRef"
+                        ],
+                        "type": "object"
+                      },
+                      "reviewState": {
+                        "enum": [
+                          "proposed",
+                          "accepted_for_analysis",
+                          "rejected"
+                        ],
+                        "type": "string"
+                      },
+                      "rowId": {
+                        "maxLength": 180,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "supersedes": {
+                        "anyOf": [
+                          {
+                            "maxLength": 180,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "create 每行及 revise 新增行必须为 null。revise 改动已有行时为字符串 expectedRevision:rowId，例如旧修订号 2、rowId 为 record-a，则填写 \"2:record-a\"；不是新修订号，不含 datasetId，不是单独 rowId 或对象。未改动行保留旧值及其它全部字段。"
+                      },
+                      "timezone": {
+                        "enum": [
+                          "Asia/Shanghai",
+                          "UTC"
+                        ],
+                        "type": "string"
+                      },
+                      "unit": {
+                        "enum": [
+                          "hours"
+                        ],
+                        "type": "string"
+                      },
+                      "valueKind": {
+                        "description": "按同一事件的完整上下文分类，与是否纳入分析分开判断。exact：明确且无未解决冲突的实际时长。ambiguous：有睡眠时长数值或起止时间线索，但因估计、范围、在床与实际睡眠区别或中途清醒等不能确定唯一精确实际时长；即使原文说不清楚，也不能仅据此标missing。missing：既无时长数值也无起止时间线索，仅未记录、未知或只有不含时长的定性叙述。conflicting：同一事件存在不能以明确更正关系消解的矛盾记载。明确更正可消解旧值，不自动构成conflicting。后三类normalizedValue必须为null，不纳入精确均值；保留具体不确定性和排除原因。没有睡眠事件材料时不为每个日期虚构missing行，未覆盖日期由coverage表达。",
+                        "enum": [
+                          "exact",
+                          "ambiguous",
+                          "missing",
+                          "conflicting"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "ambiguity",
+                      "correctionSource",
+                      "dateBasis",
+                      "eventDate",
+                      "eventRef",
+                      "evidenceRefs",
+                      "exclusionReason",
+                      "normalizedValue",
+                      "rawValue",
+                      "reviewBasis",
+                      "reviewState",
+                      "rowId",
+                      "supersedes",
+                      "timezone",
+                      "unit",
+                      "valueKind"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 64,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "action",
+                "dateRule",
+                "expectedSnapshot",
+                "inclusionRule",
+                "methodRef",
+                "operationId",
+                "rows"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "enum": [
+                    "revise"
+                  ],
+                  "type": "string"
+                },
+                "datasetId": {
+                  "maxLength": 180,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "dateRule": {
+                  "maxLength": 800,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "expectedRevision": {
+                  "description": "先 read 当前数据集，填写所读旧修订号；改动已有行的 supersedes 使用这个号和该行 rowId，不用提交后新修订号。",
+                  "maximum": 32,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "inclusionRule": {
+                  "maxLength": 800,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "methodRef": {
+                  "maxLength": 180,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "operationId": {
+                  "maxLength": 180,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "rows": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "ambiguity": {
+                        "maxLength": 800,
+                        "type": "string"
+                      },
+                      "correctionSource": {
+                        "anyOf": [
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "kind": {
+                                "enum": [
+                                  "modelReview",
+                                  "userCorrection"
+                                ],
+                                "type": "string"
+                              },
+                              "reason": {
+                                "maxLength": 800,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "sourceRef": {
+                                "anyOf": [
+                                  {
+                                    "maxLength": 180,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "reason",
+                              "sourceRef"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "create 每行必须为 null。revise 改动已有行或新增行时必须填写实际评审来源：modelReview 的 sourceRef 为 null，reason 说明真实评审；userCorrection 的 sourceRef 必须来自当前 goalState 的真实用户命令，不是引文编号。新增行也需来源，但不能伪造被替代行。未改动行保留原字段，不重写历史。"
+                      },
+                      "dateBasis": {
+                        "enum": [
+                          "recordedDay",
+                          "userSpecified",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "eventDate": {
+                        "anyOf": [
+                          {
+                            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "eventRef": {
+                        "anyOf": [
+                          {
+                            "maxLength": 180,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "evidenceRefs": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "contentHash": {
+                              "maxLength": 180,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "end": {
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "itemIndex": {
+                              "maximum": 15,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "sourceRevision": {
+                              "type": "object"
+                            },
+                            "start": {
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "text": {
+                              "maxLength": 800,
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "contentHash",
+                            "end",
+                            "itemIndex",
+                            "sourceRevision",
+                            "start",
+                            "text"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 4,
+                        "minItems": 1,
+                        "type": "array"
+                      },
+                      "exclusionReason": {
+                        "maxLength": 800,
+                        "type": "string"
+                      },
+                      "normalizedValue": {
+                        "anyOf": [
+                          {
+                            "maximum": 24,
+                            "minimum": 0,
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "rawValue": {
+                        "maxLength": 800,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "reviewBasis": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "modelReview",
+                              "userCorrection"
+                            ],
+                            "type": "string"
+                          },
+                          "reason": {
+                            "maxLength": 800,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "sourceRef": {
+                            "anyOf": [
+                              {
+                                "maxLength": 180,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "reason",
+                          "sourceRef"
+                        ],
+                        "type": "object"
+                      },
+                      "reviewState": {
+                        "enum": [
+                          "proposed",
+                          "accepted_for_analysis",
+                          "rejected"
+                        ],
+                        "type": "string"
+                      },
+                      "rowId": {
+                        "maxLength": 180,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "supersedes": {
+                        "anyOf": [
+                          {
+                            "maxLength": 180,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "create 每行及 revise 新增行必须为 null。revise 改动已有行时为字符串 expectedRevision:rowId，例如旧修订号 2、rowId 为 record-a，则填写 \"2:record-a\"；不是新修订号，不含 datasetId，不是单独 rowId 或对象。未改动行保留旧值及其它全部字段。"
+                      },
+                      "timezone": {
+                        "enum": [
+                          "Asia/Shanghai",
+                          "UTC"
+                        ],
+                        "type": "string"
+                      },
+                      "unit": {
+                        "enum": [
+                          "hours"
+                        ],
+                        "type": "string"
+                      },
+                      "valueKind": {
+                        "description": "按同一事件的完整上下文分类，与是否纳入分析分开判断。exact：明确且无未解决冲突的实际时长。ambiguous：有睡眠时长数值或起止时间线索，但因估计、范围、在床与实际睡眠区别或中途清醒等不能确定唯一精确实际时长；即使原文说不清楚，也不能仅据此标missing。missing：既无时长数值也无起止时间线索，仅未记录、未知或只有不含时长的定性叙述。conflicting：同一事件存在不能以明确更正关系消解的矛盾记载。明确更正可消解旧值，不自动构成conflicting。后三类normalizedValue必须为null，不纳入精确均值；保留具体不确定性和排除原因。没有睡眠事件材料时不为每个日期虚构missing行，未覆盖日期由coverage表达。",
+                        "enum": [
+                          "exact",
+                          "ambiguous",
+                          "missing",
+                          "conflicting"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "ambiguity",
+                      "correctionSource",
+                      "dateBasis",
+                      "eventDate",
+                      "eventRef",
+                      "evidenceRefs",
+                      "exclusionReason",
+                      "normalizedValue",
+                      "rawValue",
+                      "reviewBasis",
+                      "reviewState",
+                      "rowId",
+                      "supersedes",
+                      "timezone",
+                      "unit",
+                      "valueKind"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 64,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "action",
+                "datasetId",
+                "dateRule",
+                "expectedRevision",
+                "inclusionRule",
+                "methodRef",
+                "operationId",
+                "rows"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "enum": [
+                    "read"
+                  ],
+                  "type": "string"
+                },
+                "datasetId": {
+                  "maxLength": 180,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "revision": {
+                  "maximum": 32,
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "action",
+                "datasetId",
+                "revision"
+              ],
+              "type": "object"
+            }
+          ],
+          "description": "仅主睡眠时长 sleep_duration_hours，标准单位 hours。先读取固定快照原文，提交带 Unicode scalar [start,end) 出处的完整候选。主睡眠不含午睡；在床起止、六个多小时、冲突及缺失不得伪造精确值。接受依据必须注明 modelReview 或真实 userCorrection 来源。仅 accepted_for_analysis 的精确值聚合；不明事件键不能接受。已读完候选时可直接 create 完整 rows，无需先创建空数据集；create 每行 correctionSource/supersedes 均为 null。revise 保留全部行，改动已有行填写 correctionSource 和字符串 supersedes（expectedRevision:rowId）；新增行 correctionSource 必填、supersedes 为 null；未改动行保留全部原字段。排除旧行请标 rejected，不静默删除。数据修订后原图表失效，须 chart patch 绑定新 dataset revision 后 validate。当前有界支持最多16篇、每篇8000字符及64行，不做通用分块。"
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "type": "object"
+    },
+    "schemaOmitted": false,
+    "schemaSha256": "1eba7a36f3514698cf15ccb40b432368da018eb63297a0b27bdf3c20d4b484fa",
+    "tool": "hub_sleepDataset"
+  },
+  "rowFieldReview": [
+    {
+      "rowId": "jan1",
+      "missingRequiredFields": [
+        "ambiguity",
+        "correctionSource",
+        "dateBasis",
+        "eventDate",
+        "eventRef",
+        "evidenceRefs",
+        "exclusionReason",
+        "normalizedValue",
+        "rawValue",
+        "reviewBasis",
+        "reviewState",
+        "supersedes",
+        "timezone",
+        "unit",
+        "valueKind"
+      ],
+      "correctionSource": null,
+      "supersedes": null
+    }
+  ],
+  "accepted": [
+    {
+      "sequence": 30,
+      "revision": 1,
+      "request": {
+        "operation": "sleepDataset",
+        "request": {
+          "action": "create",
+          "dateRule": "Asia/Shanghai；按每段标题记录日归属，不回拨到前夜。仅2025-01-01至2025-02-28。",
+          "expectedSnapshot": "analysis-v1:6879f77b7448446b5eed079ff0ce60a1acafca38303da0d61e262ceac7301571",
+          "inclusionRule": "只纳入明确精确的实际主睡眠小时数；明确更正覆盖旧值；排除午睡、旧估计、在床区间与未知，不补零、不从起止推算。",
+          "methodRef": "hub-statistics",
+          "operationId": "sleep-create-1",
+          "rows": []
+        },
+        "stepId": "exec-6ebdbe48-1ea3-4e3f-84d7-ae65c8dabc2f"
+      }
+    },
+    {
+      "sequence": 36,
+      "revision": 2,
+      "request": {
+        "operation": "sleepDataset",
+        "request": {
+          "action": "revise",
+          "datasetId": "sleep-BZZrPIwGiGLQMEBQVgneDsFQ",
+          "dateRule": "Asia/Shanghai；按标题记录日归属；仅2025年1、2月，不回拨前夜。",
+          "expectedRevision": 1,
+          "inclusionRule": "只纳入精确实际主睡眠；明确更正优先；午睡、旧估计、在床时间不计；未知不补零，不从起止推算。",
+          "methodRef": "hub-statistics",
+          "operationId": "sleep-revise-complete",
+          "rows": [
+            {
+              "ambiguity": "",
+              "correctionSource": {
+                "kind": "modelReview",
+                "reason": "读取固定原文后补充完整事件评审：明确复核更正消解7小时，采纳6.5小时；午睡半小时不属于主睡眠。",
+                "sourceRef": null
+              },
+              "dateBasis": "recordedDay",
+              "eventDate": "2025-01-01",
+              "eventRef": "main-jan1",
+              "evidenceRefs": [
+                {
+                  "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                  "end": 58,
+                  "itemIndex": 0,
+                  "sourceRevision": {
+                    "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    "evidenceVersion": {
+                      "fingerprint": "f8c0eb9f5d0186518d29a183f3f030ba1b2fb761667d86d916e02fc5f6ac5fda",
+                      "kind": "document"
+                    },
+                    "metadata": [
+                      "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                      null,
+                      141
+                    ]
+                  },
+                  "start": 23,
+                  "text": "昨夜主睡眠实际睡了7小时。复核更正：实际主睡眠6.5小时。午睡半小时。"
+                }
+              ],
+              "exclusionReason": "",
+              "normalizedValue": 6.5,
+              "rawValue": "昨夜主睡眠实际睡了7小时。复核更正：实际主睡眠6.5小时。午睡半小时。",
+              "reviewBasis": {
+                "kind": "modelReview",
+                "reason": "明确复核更正消解7小时，采纳6.5小时；午睡半小时不属于主睡眠。",
+                "sourceRef": null
+              },
+              "reviewState": "accepted_for_analysis",
+              "rowId": "jan1",
+              "supersedes": null,
+              "timezone": "Asia/Shanghai",
+              "unit": "hours",
+              "valueKind": "exact"
+            },
+            {
+              "ambiguity": "",
+              "correctionSource": {
+                "kind": "modelReview",
+                "reason": "读取固定原文后补充完整事件评审：明确实际8小时，六个多小时被明确标为旧估计，不构成未解决冲突。",
+                "sourceRef": null
+              },
+              "dateBasis": "recordedDay",
+              "eventDate": "2025-01-02",
+              "eventRef": "main-jan2",
+              "evidenceRefs": [
+                {
+                  "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                  "end": 98,
+                  "itemIndex": 0,
+                  "sourceRevision": {
+                    "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    "evidenceVersion": {
+                      "fingerprint": "f8c0eb9f5d0186518d29a183f3f030ba1b2fb761667d86d916e02fc5f6ac5fda",
+                      "kind": "document"
+                    },
+                    "metadata": [
+                      "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                      null,
+                      141
+                    ]
+                  },
+                  "start": 75,
+                  "text": "昨夜主睡眠实际睡了8小时。六个多小时是旧估计。"
+                }
+              ],
+              "exclusionReason": "",
+              "normalizedValue": 8,
+              "rawValue": "昨夜主睡眠实际睡了8小时。六个多小时是旧估计。",
+              "reviewBasis": {
+                "kind": "modelReview",
+                "reason": "明确实际8小时，六个多小时被明确标为旧估计，不构成未解决冲突。",
+                "sourceRef": null
+              },
+              "reviewState": "accepted_for_analysis",
+              "rowId": "jan2",
+              "supersedes": null,
+              "timezone": "Asia/Shanghai",
+              "unit": "hours",
+              "valueKind": "exact"
+            },
+            {
+              "ambiguity": "有起止线索但中间醒过且实际时长不清楚，不能作为5小时实际睡眠。",
+              "correctionSource": {
+                "kind": "modelReview",
+                "reason": "读取固定原文后补充完整事件评审：有起止线索但中间醒过且实际时长不清楚，不能作为5小时实际睡眠。",
+                "sourceRef": null
+              },
+              "dateBasis": "recordedDay",
+              "eventDate": "2025-02-01",
+              "eventRef": "main-feb1",
+              "evidenceRefs": [
+                {
+                  "contentHash": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                  "end": 140,
+                  "itemIndex": 0,
+                  "sourceRevision": {
+                    "bodySha256": "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                    "evidenceVersion": {
+                      "fingerprint": "f8c0eb9f5d0186518d29a183f3f030ba1b2fb761667d86d916e02fc5f6ac5fda",
+                      "kind": "document"
+                    },
+                    "metadata": [
+                      "c1764ded59b1e56ebf3147cc811e4c23ce315f5b2550a7ff9adca5607057a848",
+                      null,
+                      141
+                    ]
+                  },
+                  "start": 115,
+                  "text": "昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。"
+                }
+              ],
+              "exclusionReason": "有起止线索但中间醒过且实际时长不清楚，不能作为5小时实际睡眠。",
+              "normalizedValue": null,
+              "rawValue": "昨晚两点睡，七点起；中间醒过，实际睡眠时长不清楚。",
+              "reviewBasis": {
+                "kind": "modelReview",
+                "reason": "有起止线索但中间醒过且实际时长不清楚，不能作为5小时实际睡眠。",
+                "sourceRef": null
+              },
+              "reviewState": "rejected",
+              "rowId": "feb1",
+              "supersedes": null,
+              "timezone": "Asia/Shanghai",
+              "unit": "hours",
+              "valueKind": "ambiguous"
+            }
+          ]
+        },
+        "stepId": "exec-464826ae-79ab-4421-851d-d0649bffa2b3"
+      }
+    }
+  ],
+  "schemaValidationSha256": "f96778240c1414a48b8d50fea08686ad1568f9527bc5e6d2ef0b198c84bb40ae"
+}

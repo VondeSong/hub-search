@@ -1,0 +1,28 @@
+.task-sync-resume {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--hub-border, #e5e8ed);
+  border-radius: 10px;
+  background: var(--hub-bg-subtle, #f7f8fa);
+  font-size: 13px;
+}
+.task-sync-resume > div { flex: 1 1 240px; min-width: 0; }
+.task-sync-resume strong { color: var(--hub-text-primary, #30363d); }
+.task-sync-resume p { margin: 5px 0 0; color: var(--hub-text-secondary, #727a85); }
+.task-sync-resume button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid #bdd7ef;
+  border-radius: 8px;
+  background: #eaf3fc;
+  color: #1675c1;
+  cursor: pointer;
+}
+.task-sync-resume button:disabled { cursor: default; opacity: .55; }
+.task-sync-resume button:focus-visible { outline: 2px solid #2584df; outline-offset: 2px; }
+@media (pointer: coarse) { .task-sync-resume button { min-height: 44px; } }

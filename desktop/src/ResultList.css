@@ -1,0 +1,143 @@
+.result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.result-group {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: var(--hub-row-selection-radius, 8px);
+  background: #fff;
+  transition: background .12s ease, border-color .12s ease, box-shadow .12s ease;
+}
+
+.result-group:hover { border-color: transparent; background: var(--hub-row-hover-bg, #f3f4f5); }
+.result-group.craft.selected,
+.result-group.obsidian.selected,
+.result-group.dida365.selected,
+.result-group.feishu.selected {
+  border-color: transparent;
+  background: var(--hub-row-selection-bg, #edf1f4);
+  color: var(--hub-row-selection-text, #20242a);
+  box-shadow: var(--hub-row-selection-shadow, inset 2px 0 var(--hub-accent));
+}
+
+.result-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  text-align: left;
+  cursor: default;
+}
+
+.result-row:hover { background: transparent; }
+.result-group.has-favorite-action .result-row { padding-right: 34px; }
+
+
+.result-leading {
+  width: 40px;
+  flex: 0 0 40px;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+}
+
+.result-leading .library-icon.compact { width: 30px; height: 30px; border-radius: 8px; }
+.result-leading .library-icon.compact.craft { padding: 5px; }
+.result-leading .library-icon.compact.dida365 { padding: 4px; }
+.result-leading .library-icon.compact.feishu { padding: 0; }
+.result-leading .library-badge {
+  max-width: 40px;
+  min-height: 14px;
+  justify-content: center;
+  padding: 0 2px;
+  background: transparent;
+  font-size: 10px;
+}
+.result-leading .library-badge.craft { color: #4a4c4f; }
+.result-leading .library-badge.obsidian { color: #694acb; }
+
+.result-copy { min-width: 0; width: 100%; display: grid; gap: 2px; }
+.result-title-line { min-width: 0; min-height: 21px; display: flex; align-items: center; gap: 8px; }
+.result-title {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--hub-text-primary);
+  font-size: var(--result-font-size);
+  font-weight: 570;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.result-meta {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  overflow: hidden;
+  color: var(--hub-text-tertiary);
+  font-size: calc(var(--result-font-size) - 3px);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.result-meta > span + span::before {
+  content: "·";
+  margin: 0 5px;
+  color: #bbb8b1;
+}
+.result-meta .content-type,
+.result-page-number,
+.result-date { flex: 0 0 auto; white-space: nowrap; }
+.result-path {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--hub-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.result-date { color: var(--hub-text-tertiary); font-variant-numeric: tabular-nums; }
+.result-snippet {
+  display: block;
+  overflow: hidden;
+  color: var(--hub-text-secondary);
+  font-size: calc(var(--result-font-size) - 2px);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+.result-snippet.multiline {
+  display: -webkit-box;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.result-group.title-only .result-copy { align-self: center; }
+.result-group.empty-content .result-row,
+.result-group.empty-content .result-favorite-toggle { opacity: .5; }
+.result-group.empty-content:is(:hover, .selected) .result-row,
+.result-group.empty-content:is(:hover, .selected) .result-favorite-toggle { opacity: .7; }
+.result-title mark, .result-snippet mark { padding: 0 1px; border-radius: 2px; background: #ffe58a; color: inherit; }
+
+.result-row[draggable="true"],
+.recent-row[draggable="true"] { cursor: grab; }
+.result-row[draggable="true"]:active,
+.recent-row[draggable="true"]:active { cursor: grabbing; }
+

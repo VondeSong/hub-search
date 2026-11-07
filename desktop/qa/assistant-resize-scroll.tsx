@@ -1,0 +1,20 @@
+import {createRoot} from "react-dom/client";
+import {AgentInvestigation} from "../src/AgentInvestigation";
+import type {SearchResult} from "../src/SearchTypes";
+import "../src/App.css";
+import "../src/AgentInvestigation.css";
+const started=Date.now()-21000;
+const view={work:{id:"resize-scroll-example",goal:"总结这一天的事件",revision:1,state:"investigating",report:null,grant:{libraryIds:[],notes:[]}},evidence:[],decisions:[],run:{id:"example-run",usage:{modelCalls:0,entitiesRead:0,bodyChars:0}},validity:"",runActive:true,actionActive:false,conversation:{hasEarlier:false,messages:[{id:"example-question",role:"user",text:"总结这一天的事件",revision:1,createdAt:started}]},activity:[{runId:"example-run",revision:1,state:"investigating",running:true,startedAt:started,steps:6,events:Array.from({length:6},(_,i)=>({id:`step-${i}`,kind:"reasoning",state:"completed",label:"核对来源",detail:`示例处理过程 ${i+1}。\n这里只验证展开折叠和滚动，不调用真实模型。\n逐项核对已提供的事件记录，并整理时间顺序。\n完成来源检查后，再组织回答。`,createdAt:started+i*2000}))}]};
+Object.assign(window,{__TAURI_EVENT_PLUGIN_INTERNALS__:{unregisterListener:()=>{}},__TAURI_INTERNALS__:{transformCallback:()=>1,unregisterCallback:()=>{},invoke:async(command:string,{args}:{args:any}={args:{}})=>{
+ if(command==="plugin:event|listen")return 1;
+ if(command==="plugin:event|unlisten")return;
+ if(command==="get_window_visibility")return {revision:"1",visible:true,foreground:true,minimized:false};
+ if(command==="list_libraries")return [];
+ if(command==="shared_memory")return {configured:false,projects:[],entries:[],selection:{enabled:false,projectId:""}};
+ if(command==="model_runtime")return args.action==="models"?{models:[]}:{settings:{provider:"codex",model:"example-model",reasoningEffort:"high",fast:false,maxConcurrent:2},jobs:[],revision:1};
+ if(command==="agent_investigation"&&args.action==="list")return {works:[{id:view.work.id,goal:view.work.goal,state:view.work.state}]};
+ if(command==="agent_investigation"&&args.action==="status")return structuredClone(view);
+ throw new Error("此页面仅验证正式组件的拖拽、展开和折叠。");
+}}});
+const note:SearchResult={id:"example-note",entityKey:"page:example:day",provider:"obsidian",libraryId:"example",libraryName:"交互验收",spaceId:"example",spaceName:"交互验收",documentId:"day",contentType:"markdown",sourceType:"note",title:"这一天的事件",path:"example.md",snippet:"",matchTerms:[],matchField:"",matchCount:0,subMatches:[]};
+createRoot(document.getElementById("root")!).render(<main style={{height:"100dvh",padding:24,boxSizing:"border-box",background:"var(--hub-content-surface)"}}><h2>Hub · 浮窗高度与滚动验收</h2><p>固定示例，仅验证正式组件；没有模型请求。</p><AgentInvestigation result={note}/></main>);

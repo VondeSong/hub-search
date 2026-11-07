@@ -1,0 +1,39 @@
+.data-portability { display: grid; min-width: 0; gap: 14px; color: var(--hub-text-primary, #202124); font-size: var(--interface-font-size, 13px); }
+.data-portability h4, .data-portability p { margin: 0; line-height: 1.5; }
+.data-portability h4 { font-size: 1em; font-weight: 600; }
+.data-portability code { overflow-wrap: anywhere; word-break: break-word; white-space: normal; font-size: 1em; }
+.data-portability > details { padding-block-start: 4px; }
+.data-portability summary { width: fit-content; cursor: pointer; color: var(--hub-text-primary, #202124); font-size: 1em; line-height: 1.5; }
+.data-portability details[open] > summary { margin-block-end: 12px; }
+.data-portability .maintenance-button { min-height: 34px; height: auto; padding-block: 6px; white-space: normal; }
+.data-portability .maintenance-button:disabled { cursor: default; }
+.data-portability-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.data-portability-checkbox { display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; color: var(--hub-text-primary, #202124); font-size: 1em; }
+.data-portability-checkbox input { flex: 0 0 auto; margin: 3px 0 0; accent-color: var(--hub-accent, #0a84ff); }
+.data-portability-note { color: var(--hub-text-secondary, #6e6e73); font-size: 1em; line-height: 1.5; }
+.data-portability-error { color: var(--hub-error-text, #a12d2d); overflow-wrap: anywhere; }
+.data-portability-notice { color: var(--hub-text-primary, #202124); overflow-wrap: anywhere; }
+.data-portability-warnings { margin: 0; padding-inline-start: 20px; color: var(--hub-warning-text, #775518); font-size: 1em; line-height: 1.55; }
+.data-portability-preview { display: grid; gap: 12px; padding: 14px; border-radius: 8px; background: var(--hub-control-fill, #f4f5f6); color: var(--hub-text-primary, #202124); font-size: 1em; }
+.data-portability-options { display: grid; min-width: 0; gap: 12px; }
+.account-migration-entries { display: grid; gap: 10px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.account-migration-entries legend { padding: 0; margin-block-end: 10px; }
+.account-migration-entries small { display: block; margin-block-start: 3px; color: var(--hub-text-secondary, #6e6e73); font-size: 1em; }
+.account-migration input[type="password"] { box-sizing: border-box; width: min(100%, 420px); min-height: 34px; padding: 6px 8px; border: 1px solid var(--hub-control-border, #85858b); border-radius: 6px; background: var(--hub-content-surface, #fff); color: var(--hub-text-primary, #202124); font: inherit; }
+.data-portability-options > .maintenance-button { justify-self: start; }
+.data-portability-field { display: grid; min-width: 0; gap: 6px; color: var(--hub-text-primary, #202124); font-size: 1em; }
+.data-portability-path-field { display: flex; align-items: center; gap: 10px; }
+.data-portability-path-field > code, .data-portability-path-field > input { flex: 1; min-width: 0; color: var(--hub-text-secondary, #6e6e73); }
+.data-portability-number-fields { display: flex; flex-wrap: wrap; gap: 16px; }
+.data-portability-number-fields label { display: grid; gap: 6px; color: var(--hub-text-primary, #202124); font-size: 1em; }
+.data-portability-number-fields input { width: 100px; min-height: 34px; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--hub-control-border, #85858b); border-radius: 6px; background: var(--hub-content-surface, #fff); color: var(--hub-text-primary, #202124); font: inherit; }
+.data-portability-dependencies { display: grid; gap: 12px; list-style: none; padding: 0; margin: 8px 0; }
+.data-portability-dependencies li { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.data-portability-dependencies li > div { display: grid; min-width: 0; gap: 3px; }
+.data-portability-dependencies strong { color: var(--hub-text-primary, #202124); font-size: 1em; }
+.data-portability-dependencies small, .data-portability-dependencies code { color: var(--hub-text-secondary, #6e6e73); font-size: 1em; line-height: 1.5; }
+.data-portability-progress { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; font-size: 1em; color: var(--hub-text-primary, #202124); }
+.data-portability-progress > progress { width: 100%; grid-column: 1 / -1; accent-color: var(--hub-accent, #0a84ff); }
+.data-portability-progress > small { grid-column: 1 / -1; overflow-wrap: anywhere; font-size: 1em; }
+.data-portability-result > p, .data-portability-result > code, .data-portability-result > details, .data-portability-result > ul { display: block; margin: 8px 0; }
+.data-portability :is(button, input, summary):focus-visible { outline: 2px solid var(--hub-accent, #0a84ff); outline-offset: 3px; }

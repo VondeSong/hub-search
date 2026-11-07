@@ -1,0 +1,14 @@
+.collection-sort-wrap { position:relative; display:flex; }
+.collection-sort-popover { position:absolute; right:0; top:calc(100% + 8px); z-index:40; width:360px; max-width:calc(100vw - 40px); max-height:70vh; overflow:auto; box-sizing:border-box; padding:12px; border:1px solid var(--hub-line,#e6e8ed); border-radius:10px; background:var(--hub-content-surface,#fff); color:var(--hub-text-primary,#20242a); box-shadow:0 10px 35px #0002; }
+.collection-sort-popover header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.collection-sort-popover strong { font-size:13px; font-weight:550; }
+.collection-sort-rules { display:flex;flex-direction:column;gap:8px; }
+.collection-sort-rule { display:grid; align-items:center;grid-template-columns:20px minmax(0,1fr) 84px 22px;gap:6px; }
+.collection-sort-rule select { width:100%; min-width:0; box-sizing:border-box; border:1px solid var(--hub-line,#e6e8ed); border-radius:6px; background:var(--hub-content-surface,#fff); color:var(--hub-text-primary,#20242a); padding:6px; font:inherit; font-size:12px; }
+.collection-sort-rule select:focus-visible { outline:2px solid var(--hub-accent,#2363c9); outline-offset:1px; }
+html .collections-workspace .collection-sort-rule button { width:20px;height:28px;padding:0; }
+.collection-sort-drag { cursor:grab!important; }
+.collection-sort-popover footer { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px; padding-top:8px; border-top:1px solid var(--hub-line,#e6e8ed); }
+.collection-sort-popover small,.collection-sort-empty { font-size:11px; color:var(--hub-text-secondary,#68707a); }
+html .collections-workspace .collection-sort-popover footer button,html .collections-workspace .collection-sort-add { width:auto; height:28px; padding:0 8px; font-size:12px; }
+.collection-sort-add { margin-top:8px; }

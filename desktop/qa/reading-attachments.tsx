@@ -1,0 +1,21 @@
+import React, { useState } from "react";
+import { createRoot } from "react-dom/client";
+import "../src/App.css";
+import "../src/CollectionsWorkspace.css";
+import "../src/WorkspaceRefresh.css";
+import "../src/InterfaceSelection.css";
+import "../src/LiquidWorkspace.css";
+import "../src/DisplayPreferences.css";
+import "../src/MobileExperience.css";
+import "../src/MobileDesign.css";
+import "../src/MobileGlass.css";
+import "../src/MobileNavigationDesign.css";
+import "../src/CloudSyncSettingsSection.css";
+import { CollectionSyncPanel, type CollectionSyncSource } from "../src/CollectionSyncPanel";
+import { ReadingSourceCleanupSettings } from "../src/ReadingSourceRecovery";
+const fixture={calls:[] as {command:string;args:unknown}[],events:[] as string[],async invoke(command:string,args:unknown={}){fixture.calls.push({command,args});if(command==="get_reading_source_cleanup")return false;throw new Error("Unexpected mocked IPC: "+command);}};
+Object.assign(window,{__ATTACHMENT_FIXTURE__:fixture,__TAURI_INTERNALS__:{invoke:fixture.invoke,convertFileSrc:(path:string)=>path,transformCallback:()=>0,unregisterCallback:()=>{}}});
+const source:CollectionSyncSource={id:"dida",count:40,connected:true,canResume:false,status:"滴答稍后读：0 项迁移核验完成；32 项来源保留，等待重试",lastCheckedAt:1791524400,didaCleanup:{mode:"cloud-preserve",cloudReading:true,cleanupEnabled:false,pending:32,verified:28,deleted:8,authRequired:false,reasons:[{message:"阅读云同步已启用：来源清理未开启，滴答原项已保留",kind:"cleanup-disabled",count:28},{message:"滴答来源的附件清单未知，来源保留",kind:"attachment-list-unavailable",count:4}],lastRun:{attempted:32,completed:0,deferred:32,blocked:0,authenticationRequired:false}}};
+const noop=()=>{};
+function Fixture(){const[show,setShow]=useState(true),[settings,setSettings]=useState(false);window.addEventListener("hub:open-cloud-sync-settings",()=>{fixture.events.push("open-cleanup-settings");setSettings(true);},{once:true});return <div className="collections-workspace">{show&&<CollectionSyncPanel sources={[source]} operations={[]} itemTitles={{}} autoSyncMinutes={30} storageLabel="保存到本机" storageStatus="" pendingCancellations={0} jobRunning={false} jobVisible={false} sourceBusy={()=>false} sourceActive={()=>false} onClose={()=>setShow(false)} onSettings={noop} onSync={noop} onPause={noop} onStore={noop} onConnect={noop} onOpenUrl={noop} onDidaLogin={noop} onReview={noop} onRetry={noop} onContinueCopy={noop}>{null}</CollectionSyncPanel>}{settings&&<div className="settings-category cloud cloud-sync-center"><ReadingSourceCleanupSettings blocked={false}/></div>}</div>;}
+document.body.style.margin="0";createRoot(document.getElementById("root")!).render(<Fixture/>);

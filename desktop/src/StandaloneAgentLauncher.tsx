@@ -1,0 +1,80 @@
+import { createContext, lazy, Suspense, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { Layers,MessageSquare } from "lucide-react";
+import "./StandaloneAgentLauncher.css";
+import { runtimeCapabilities } from "./RuntimePlatform";
+import type { SearchResult } from "./SearchTypes";
+import { AgentCitationPreview, type CitationLocation } from "./AgentCitationPreview";
+export const AgentCitationContext=createContext<{value:CitationLocation|null;show:(value:CitationLocation|null)=>void}|null>(null);
+export function AgentCitationBody(){
+ const citation=useContext(AgentCitationContext);
+ return citation?.value ? <div className="agent-body-citation"><AgentCitationPreview value={citation.value}/></div> : null;
+}
+const Source = lazy(() => import("./AgentInvestigation").then(m => ({ default:m.PersistentSourceInvestigation })));
+const Standalone = lazy(() => import("./AgentInvestigation").then(m => ({ default:m.StandaloneInvestigation })));
+const Reading = lazy(() => import("./AgentInvestigation").then(m => ({ default:m.PersistentReadingInvestigation })));
+export type Entry = { result:SearchResult } | { itemKey:string; title?:string } | null;
+export type TextMaterial={kind:"text"|"flashcard";title:string;text:string;file?:boolean};
+export const AgentTextMaterialContext=createContext<{selection:TextMaterial|null;clearSelection:()=>void;pending:TextMaterial|null;setPending:(value:TextMaterial|null)=>void}|null>(null);
+export const AgentPanelContext = createContext<((entry:Entry)=>void)|null>(null);
+export const AgentAccountVisibleContext = createContext(true);
+export const AgentBrowsingContext = createContext<{entry:Entry;setEntry:React.Dispatch<React.SetStateAction<Entry>>}|null>(null);
+export function AgentPanelProvider({children}:{children:ReactNode}) {
+ const [browsing,setBrowsing]=useState<Entry>(null);
+ const [citation,setCitation]=useState<CitationLocation|null>(null);
+ const [owner,setOwner]=useState("initial");
+ const [entries,setEntries]=useState<Record<string,Entry|undefined>>({});
+ const routes=useRef(new Map<string,string>());
+ const freshOwners=useRef(new Set<string>());
+ const entry=entries[owner];
+ const [request,setRequest]=useState(0);
+ const [selection,setSelection]=useState<TextMaterial|null>(null),[pending,setPending]=useState<TextMaterial|null>(null);
+ useEffect(()=>{setSelection(null);},[browsing]);
+ useEffect(()=>{
+  const capture=()=>{
+   const value=window.getSelection();if(!value || value.isCollapsed)return;
+   const node=value.anchorNode?.parentElement,root=node?.closest('.preview-card,.flashcards-card-modal,.flashcards-review-card');
+   if(!root || !value.focusNode || !root.contains(value.focusNode) || node?.closest('input,textarea,[contenteditable=true]'))return;
+   const text=value.toString().trim();if(text)setSelection({kind:"text",text,title:root.querySelector('.preview-title,h1,h2')?.textContent?.trim()||"当前页面"});
+  };
+  document.addEventListener('selectionchange',capture);return()=>document.removeEventListener('selectionchange',capture);
+ },[]);
+ useEffect(()=>{
+  const change=(event:Event)=>{
+   const detail=(event as CustomEvent<{scopeId?:string;fromScopeId?:string;selected?:string;fromSelected?:string;newConversation:boolean}>).detail;
+   if(!detail)return;
+   const scope=detail.scopeId||detail.selected;
+   if(!scope || !/^[a-zA-Z0-9_-]{1,80}$/.test(scope))return;
+   const route=(detail.selected||"desktop")+":"+scope;
+   if(detail.fromScopeId)routes.current.set((detail.fromSelected||"desktop")+":"+detail.fromScopeId,owner);
+   if(!detail.newConversation){routes.current.set(route,owner);return;}
+   const next=routes.current.get(route)||`account:${route}`;
+   routes.current.set(route,next);
+   if(next!=="initial")freshOwners.current.add(next);
+   setEntries(current=>entry!==undefined && current[next]===undefined?{...current,[next]:null}:current);
+   setOwner(next);setCitation(null);setSelection(null);setPending(null);
+  };
+  window.addEventListener("hub:agent-account-changed",change);
+  return()=>window.removeEventListener("hub:agent-account-changed",change);
+ },[owner,entry]);
+ const open=(next:Entry)=>{setEntries(values=>{const current=values[owner];return {...values,[owner]:current===undefined?next:current&&next&&'result' in current&&'result' in next?next:current};});setRequest(n=>n+1);};
+ useEffect(()=>{if(request)window.dispatchEvent(new Event('hub:show-agent'));},[request,owner]);
+ return <AgentCitationContext.Provider value={{value:citation,show:setCitation}}><AgentTextMaterialContext.Provider value={{selection,clearSelection:()=>setSelection(null),pending,setPending}}><AgentBrowsingContext.Provider value={{entry:browsing,setEntry:setBrowsing}}><AgentPanelContext.Provider value={open}>
+  {children}
+  {runtimeCapabilities.desktop && entry===undefined && createPortal(<button type="button" className="agent-floating-launcher" aria-label="打开助手" aria-expanded={false} title="打开 Hub 助手" onClick={()=>open(null)}><span className="agent-launcher-orb" aria-hidden="true"/>助手</button>,document.body)}
+  {runtimeCapabilities.desktop && Object.entries(entries).map(([key,value])=>value===undefined?null:<AgentAccountVisibleContext.Provider key={key} value={key===owner}><div hidden={key!==owner} className="agent-global-owner"><Suspense fallback={<p role="status">正在打开助手…</p>}>
+   {value&&'result' in value?<Source result={value.result} initiallyOpen startFresh={freshOwners.current.has(key)}/>:value&&'itemKey' in value?<Reading itemKey={value.itemKey} initiallyOpen startFresh={freshOwners.current.has(key)}/>:<Standalone initiallyOpen startFresh={freshOwners.current.has(key)}/>}
+  </Suspense></div></AgentAccountVisibleContext.Provider>)}
+ </AgentPanelContext.Provider></AgentBrowsingContext.Provider></AgentTextMaterialContext.Provider></AgentCitationContext.Provider>;
+}
+export function AgentFlashcardMaterial({title,text}:{title:string;text:string}){
+ const context=useContext(AgentTextMaterialContext),open=useContext(AgentPanelContext);
+ if(!runtimeCapabilities.desktop || !context || !open)return null;
+ const material:TextMaterial={kind:"flashcard",title,text};
+ return <button type="button" title="添加闪卡到助手（文字快照）" aria-label="添加闪卡到助手" disabled={!!context.pending} draggable onPointerDown={event=>event.stopPropagation()} onDragStart={event=>{event.stopPropagation();event.dataTransfer.effectAllowed="copy";event.dataTransfer.setData('application/x-hub-agent-source',JSON.stringify(material));}} onClick={()=>{context.setPending(material);open(null);}}><Layers size={16}/></button>;
+}
+export function StandaloneAgentLauncher() {
+ const open=useContext(AgentPanelContext);
+ if(!runtimeCapabilities.desktop)return null;
+ return <button type="button" className="icon-button agent-launcher" aria-label="Hub 助手" title="打开 Hub 助手" onClick={()=>open?.(null)}><MessageSquare size={17}/></button>;
+}

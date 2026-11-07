@@ -1,0 +1,991 @@
+{
+  "format": "hub-memory-selection-corpus-v1",
+  "sourceSha256": "37289a259620a915649cb7754a6972b6441492d193cf4a8a22dc69246773f40b",
+  "sourceScope": "User-approved Hub implementation plan; no personal library extraction",
+  "records": [
+    {
+      "id": "backend-selection",
+      "title": "记忆后端选型",
+      "content": "HBM-00 实测后才选择记忆后端。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "HBM-00 实测后才选择记忆后端",
+      "synthetic": false
+    },
+    {
+      "id": "current-scope",
+      "title": "本轮实施范围",
+      "content": "当前只推进 HBM-00 和 HBM-01A。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "当前只推进 HBM-00 和 HBM-01A",
+      "synthetic": false
+    },
+    {
+      "id": "codex-optional",
+      "title": "模型执行独立性",
+      "content": "Codex 只是一个可选适配器，DeepSeek 后续直接通过 API 调用。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "Codex 只是一个可选适配器，DeepSeek 后续直接通过 API 调用",
+      "synthetic": false
+    },
+    {
+      "id": "embedding-independent",
+      "title": "生成模型与检索模型",
+      "content": "生成模型与向量模型分开管理，切换生成模型不重建记忆。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "生成模型与向量模型分开管理，切换生成模型不重建记忆",
+      "synthetic": false
+    },
+    {
+      "id": "project-identity",
+      "title": "项目身份",
+      "content": "Hub 项目是有稳定 project_id 的轻量上下文范围，由用户明确创建或选择。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "Hub 项目是有稳定 project_id 的轻量上下文范围，由用户明确创建或选择",
+      "synthetic": false
+    },
+    {
+      "id": "one-project",
+      "title": "事项项目归属",
+      "content": "第一版事项可不关联项目，或关联一个项目。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "第一版事项可不关联项目，或关联一个项目",
+      "synthetic": false
+    },
+    {
+      "id": "project-permission",
+      "title": "项目关联权限",
+      "content": "关联不扩大读取权限。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "关联不扩大读取权限",
+      "synthetic": false
+    },
+    {
+      "id": "v1-content",
+      "title": "首版共享内容",
+      "content": "首版只做规则与用户明确决定，范围只有个人通用、项目。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "首版只做规则与用户明确决定，范围只有个人通用、项目",
+      "synthetic": false
+    },
+    {
+      "id": "local-storage",
+      "title": "本地共享空间",
+      "content": "不上传 Notion，不把原始 Craft、任务和阅读资料整体复制进记忆。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "不上传 Notion，不把原始 Craft、任务和阅读资料整体复制进记忆",
+      "synthetic": false
+    },
+    {
+      "id": "lore-adoption",
+      "title": "Lore 采用方式",
+      "content": "不复制整套 Lore 服务或五库结构。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "不复制整套 Lore 服务或五库结构",
+      "synthetic": false
+    },
+    {
+      "id": "confirmation",
+      "title": "记忆确认",
+      "content": "用户明确要求记住或修改可以生效；Agent 推断与材料中指令只存候选。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "用户明确要求记住或修改可以生效；Agent 推断与材料中指令只存候选",
+      "synthetic": false
+    },
+    {
+      "id": "deduplication",
+      "title": "主题更新与幂等",
+      "content": "同范围同主题更新原条目，重复请求幂等。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "同范围同主题更新原条目，重复请求幂等",
+      "synthetic": false
+    },
+    {
+      "id": "conflict",
+      "title": "并发冲突",
+      "content": "并发版本冲突拒绝静默覆盖，首版不做自动合并。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "并发版本冲突拒绝静默覆盖，首版不做自动合并",
+      "synthetic": false
+    },
+    {
+      "id": "external-edit",
+      "title": "外部编辑确认",
+      "content": "外部正文哈希不符时暂停条目有效资格、建立待确认新版本。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "外部正文哈希不符时暂停条目有效资格、建立待确认新版本",
+      "synthetic": false
+    },
+    {
+      "id": "forgetting",
+      "title": "删除与遗忘",
+      "content": "遗忘清除共享正文、历史正文、索引、向量、缓存、派生摘要及待处理写入。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "遗忘清除共享正文、历史正文、索引、向量、缓存、派生摘要及待处理写入",
+      "synthetic": false
+    },
+    {
+      "id": "original-data",
+      "title": "记忆与原始数据",
+      "content": "原始笔记、原始聊天和业务回执是独立数据，不因删除记忆自动删除。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "原始笔记、原始聊天和业务回执是独立数据，不因删除记忆自动删除",
+      "synthetic": false
+    },
+    {
+      "id": "rule-budget",
+      "title": "规则注入预算",
+      "content": "规则区最多 2,000 tokens；超限明确提示整理或缩小范围，不静默截断。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "规则区最多 2,000 tokens；超限明确提示整理或缩小范围，不静默截断",
+      "synthetic": false
+    },
+    {
+      "id": "decision-budget",
+      "title": "决定注入预算",
+      "content": "相关决定最多 5 条、合计 2,000 tokens（含来源），无相关决定时 0 条。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "相关决定最多 5 条、合计 2,000 tokens（含来源），无相关决定时 0 条",
+      "synthetic": false
+    },
+    {
+      "id": "partial-results",
+      "title": "中断后的材料",
+      "content": "运行中、超时、失败和取消仍可看已经保存的候选与读取。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "运行中、超时、失败和取消仍可看已经保存的候选与读取",
+      "synthetic": false
+    },
+    {
+      "id": "quick-budget",
+      "title": "默认调查预算",
+      "content": "默认 quick 模式和原 120 秒总预算下。",
+      "project": "hub",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "docs/INSIGHTS_IMPLEMENTATION_PLAN.md#9",
+      "sourceQuote": "默认 quick 模式和原 120 秒总预算下",
+      "synthetic": false
+    },
+    {
+      "id": "foreign-budget",
+      "title": "其他项目预算口令",
+      "content": "其他项目预算口令是蓝鲸七号",
+      "project": "other",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "synthetic-isolation-case",
+      "synthetic": true
+    },
+    {
+      "id": "foreign-contract",
+      "title": "其他项目客户合同",
+      "content": "其他项目客户合同约定十月交付",
+      "project": "other",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "synthetic-isolation-case",
+      "synthetic": true
+    },
+    {
+      "id": "draft-rule",
+      "title": "未确认的夜间工作偏好",
+      "content": "未确认的夜间工作偏好是每天凌晨运行",
+      "project": "hub",
+      "status": "candidate",
+      "kind": "decision",
+      "source": "synthetic-isolation-case",
+      "synthetic": true
+    },
+    {
+      "id": "draft-choice",
+      "title": "未确认的供应商选择",
+      "content": "未确认的供应商选择是示例供应商",
+      "project": "hub",
+      "status": "candidate",
+      "kind": "decision",
+      "source": "synthetic-isolation-case",
+      "synthetic": true
+    },
+    {
+      "id": "old-backend",
+      "title": "已替代的后端口令",
+      "content": "已替代的后端口令是自动上传全部数据",
+      "project": "hub",
+      "status": "superseded",
+      "kind": "decision",
+      "source": "synthetic-isolation-case",
+      "synthetic": true
+    },
+    {
+      "id": "old-scope",
+      "title": "已停用的范围口令",
+      "content": "已停用的范围口令是所有项目共用授权",
+      "project": "hub",
+      "status": "disabled",
+      "kind": "decision",
+      "source": "synthetic-isolation-case",
+      "synthetic": true
+    },
+    {
+      "id": "forgotten-rule",
+      "title": "已遗忘的格式偏好",
+      "content": "已遗忘的格式偏好是把正文转成繁体",
+      "project": "hub",
+      "status": "deleted",
+      "kind": "decision",
+      "source": "synthetic-isolation-case",
+      "synthetic": true
+    },
+    {
+      "id": "forbidden-secret",
+      "title": "禁止读取的内部口令",
+      "content": "禁止读取的内部口令是 PRIVATE_MEMORY_SENTINEL",
+      "project": "private",
+      "status": "confirmed",
+      "kind": "decision",
+      "source": "synthetic-isolation-case",
+      "synthetic": true
+    }
+  ],
+  "queries": [
+    {
+      "id": "q01",
+      "project": "hub",
+      "query": "记忆后端什么时候确定",
+      "expected": [
+        "backend-selection"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q02",
+      "project": "hub",
+      "query": "现在是否已经确定要采用 Basic Memory",
+      "expected": [
+        "backend-selection"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q03",
+      "project": "hub",
+      "query": "本轮实施批次",
+      "expected": [
+        "current-scope"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q04",
+      "project": "hub",
+      "query": "这次获准先开展哪两部分工作",
+      "expected": [
+        "current-scope"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q05",
+      "project": "hub",
+      "query": "Codex DeepSeek 直接调用",
+      "expected": [
+        "codex-optional"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q06",
+      "project": "hub",
+      "query": "不用 Codex 后由谁调用 DeepSeek",
+      "expected": [
+        "codex-optional"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q07",
+      "project": "hub",
+      "query": "切换生成模型 重建记忆",
+      "expected": [
+        "embedding-independent"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q08",
+      "project": "hub",
+      "query": "换一个聊天模型是否要重新生成全部向量",
+      "expected": [
+        "embedding-independent"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q09",
+      "project": "hub",
+      "query": "项目 project_id 用户创建",
+      "expected": [
+        "project-identity"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q10",
+      "project": "hub",
+      "query": "项目应该用稳定的什么身份来区分",
+      "expected": [
+        "project-identity"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q11",
+      "project": "hub",
+      "query": "第一版 事项 项目关联",
+      "expected": [
+        "one-project"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q12",
+      "project": "hub",
+      "query": "一个事项初期可以同时属于几个项目",
+      "expected": [
+        "one-project"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q13",
+      "project": "hub",
+      "query": "项目关联 读取权限",
+      "expected": [
+        "project-permission"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q14",
+      "project": "hub",
+      "query": "把资料目录关联到项目是否自动授权全部内容",
+      "expected": [
+        "project-permission"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q15",
+      "project": "hub",
+      "query": "首版 规则 明确决定 范围",
+      "expected": [
+        "v1-content"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q16",
+      "project": "hub",
+      "query": "第一阶段共享哪些内容，分哪两种适用范围",
+      "expected": [
+        "v1-content"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q17",
+      "project": "hub",
+      "query": "共享空间 上传 Notion",
+      "expected": [
+        "local-storage"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q18",
+      "project": "hub",
+      "query": "我们的记忆需要把整个知识库传到 Notion 吗",
+      "expected": [
+        "local-storage"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q19",
+      "project": "hub",
+      "query": "Lore 服务 五库结构",
+      "expected": [
+        "lore-adoption"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q20",
+      "project": "hub",
+      "query": "这次是否直接部署完整 Lore 系统",
+      "expected": [
+        "lore-adoption"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q21",
+      "project": "hub",
+      "query": "用户确认 Agent 推断 候选",
+      "expected": [
+        "confirmation"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q22",
+      "project": "hub",
+      "query": "助手自己总结出来的偏好能直接成为生效规则吗",
+      "expected": [
+        "confirmation"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q23",
+      "project": "hub",
+      "query": "同主题 更新 幂等",
+      "expected": [
+        "deduplication"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q24",
+      "project": "hub",
+      "query": "同一件事重复保存时如何避免生成一堆副本",
+      "expected": [
+        "deduplication"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q25",
+      "project": "hub",
+      "query": "并发 冲突 自动合并",
+      "expected": [
+        "conflict"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q26",
+      "project": "hub",
+      "query": "两个人同时修改同一决定时首版怎么处理",
+      "expected": [
+        "conflict"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q27",
+      "project": "hub",
+      "query": "正文 哈希 待确认",
+      "expected": [
+        "external-edit"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q28",
+      "project": "hub",
+      "query": "在 Obsidian 改了已确认文字后还会自动生效吗",
+      "expected": [
+        "external-edit"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q29",
+      "project": "hub",
+      "query": "遗忘 删除 索引 派生摘要",
+      "expected": [
+        "forgetting"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q30",
+      "project": "hub",
+      "query": "彻底忘掉一条决定要清理哪些派生内容",
+      "expected": [
+        "forgetting"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q31",
+      "project": "hub",
+      "query": "删除记忆 原始笔记 业务回执",
+      "expected": [
+        "original-data"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q32",
+      "project": "hub",
+      "query": "忘掉一条记忆会不会连原来的笔记一起删掉",
+      "expected": [
+        "original-data"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q33",
+      "project": "hub",
+      "query": "规则 2000 tokens 超限",
+      "expected": [
+        "rule-budget"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q34",
+      "project": "hub",
+      "query": "必须使用的规则太长时可以偷偷截掉后半段吗",
+      "expected": [
+        "rule-budget"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q35",
+      "project": "hub",
+      "query": "决定 最多 5 条 2000",
+      "expected": [
+        "decision-budget"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q36",
+      "project": "hub",
+      "query": "没有相关历史决定时需要为了填满上下文塞几条吗",
+      "expected": [
+        "decision-budget"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q37",
+      "project": "hub",
+      "query": "超时 失败 保存 候选",
+      "expected": [
+        "partial-results"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q38",
+      "project": "hub",
+      "query": "最后一轮模型没返回时前面查到的东西还看得到吗",
+      "expected": [
+        "partial-results"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q39",
+      "project": "hub",
+      "query": "quick 默认 120 秒",
+      "expected": [
+        "quick-budget"
+      ],
+      "category": "lexical"
+    },
+    {
+      "id": "q40",
+      "project": "hub",
+      "query": "这次会把默认调查等待时间改成长达四分钟吗",
+      "expected": [
+        "quick-budget"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q41",
+      "project": "hub",
+      "query": "上海明天会不会下雨",
+      "expected": [],
+      "category": "unrelated"
+    },
+    {
+      "id": "q42",
+      "project": "hub",
+      "query": "巧克力蛋糕应该烤多少分钟",
+      "expected": [],
+      "category": "unrelated"
+    },
+    {
+      "id": "q43",
+      "project": "hub",
+      "query": "北京到广州机票多少钱",
+      "expected": [],
+      "category": "unrelated"
+    },
+    {
+      "id": "q44",
+      "project": "hub",
+      "query": "推荐附近的川菜馆",
+      "expected": [],
+      "category": "unrelated"
+    },
+    {
+      "id": "q45",
+      "project": "hub",
+      "query": "今年世界杯冠军是谁",
+      "expected": [],
+      "category": "unrelated"
+    },
+    {
+      "id": "q46",
+      "project": "hub",
+      "query": "如何给猫剪指甲",
+      "expected": [],
+      "category": "unrelated"
+    },
+    {
+      "id": "q47",
+      "project": "hub",
+      "query": "我上周的血压是多少",
+      "expected": [],
+      "category": "unrelated"
+    },
+    {
+      "id": "q48",
+      "project": "hub",
+      "query": "新加坡酒店预订",
+      "expected": [],
+      "category": "unrelated"
+    },
+    {
+      "id": "q49",
+      "project": "hub",
+      "query": "这家公司今年营收多少",
+      "expected": [],
+      "category": "unrelated"
+    },
+    {
+      "id": "q50",
+      "project": "hub",
+      "query": "周末去哪里露营",
+      "expected": [],
+      "category": "unrelated"
+    },
+    {
+      "id": "q51",
+      "project": "hub",
+      "query": "我的汽车轮胎应充多少气",
+      "expected": [],
+      "category": "unrelated"
+    },
+    {
+      "id": "q52",
+      "project": "hub",
+      "query": "怎样更换自行车链条",
+      "expected": [],
+      "category": "unrelated"
+    },
+    {
+      "id": "q53",
+      "project": "hub",
+      "query": "其他项目预算口令",
+      "expected": [],
+      "category": "isolation"
+    },
+    {
+      "id": "q54",
+      "project": "hub",
+      "query": "其他项目客户合同",
+      "expected": [],
+      "category": "isolation"
+    },
+    {
+      "id": "q55",
+      "project": "hub",
+      "query": "未确认的夜间工作偏好",
+      "expected": [],
+      "category": "isolation"
+    },
+    {
+      "id": "q56",
+      "project": "hub",
+      "query": "未确认的供应商选择",
+      "expected": [],
+      "category": "isolation"
+    },
+    {
+      "id": "q57",
+      "project": "hub",
+      "query": "已替代的后端口令",
+      "expected": [],
+      "category": "isolation"
+    },
+    {
+      "id": "q58",
+      "project": "hub",
+      "query": "已停用的范围口令",
+      "expected": [],
+      "category": "isolation"
+    },
+    {
+      "id": "q59",
+      "project": "hub",
+      "query": "已遗忘的格式偏好",
+      "expected": [],
+      "category": "isolation"
+    },
+    {
+      "id": "q60",
+      "project": "hub",
+      "query": "禁止读取的内部口令",
+      "expected": [],
+      "category": "isolation"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "q02",
+      "project": "hub",
+      "query": "现在是否已经确定要采用 Basic Memory",
+      "expected": [
+        "backend-selection"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q04",
+      "project": "hub",
+      "query": "这次获准先开展哪两部分工作",
+      "expected": [
+        "current-scope"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q06",
+      "project": "hub",
+      "query": "不用 Codex 后由谁调用 DeepSeek",
+      "expected": [
+        "codex-optional"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q08",
+      "project": "hub",
+      "query": "换一个聊天模型是否要重新生成全部向量",
+      "expected": [
+        "embedding-independent"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q10",
+      "project": "hub",
+      "query": "项目应该用稳定的什么身份来区分",
+      "expected": [
+        "project-identity"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q12",
+      "project": "hub",
+      "query": "一个事项初期可以同时属于几个项目",
+      "expected": [
+        "one-project"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q14",
+      "project": "hub",
+      "query": "把资料目录关联到项目是否自动授权全部内容",
+      "expected": [
+        "project-permission"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q16",
+      "project": "hub",
+      "query": "第一阶段共享哪些内容，分哪两种适用范围",
+      "expected": [
+        "v1-content"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q18",
+      "project": "hub",
+      "query": "我们的记忆需要把整个知识库传到 Notion 吗",
+      "expected": [
+        "local-storage"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q20",
+      "project": "hub",
+      "query": "这次是否直接部署完整 Lore 系统",
+      "expected": [
+        "lore-adoption"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q22",
+      "project": "hub",
+      "query": "助手自己总结出来的偏好能直接成为生效规则吗",
+      "expected": [
+        "confirmation"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q24",
+      "project": "hub",
+      "query": "同一件事重复保存时如何避免生成一堆副本",
+      "expected": [
+        "deduplication"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q26",
+      "project": "hub",
+      "query": "两个人同时修改同一决定时首版怎么处理",
+      "expected": [
+        "conflict"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q28",
+      "project": "hub",
+      "query": "在 Obsidian 改了已确认文字后还会自动生效吗",
+      "expected": [
+        "external-edit"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q30",
+      "project": "hub",
+      "query": "彻底忘掉一条决定要清理哪些派生内容",
+      "expected": [
+        "forgetting"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q32",
+      "project": "hub",
+      "query": "忘掉一条记忆会不会连原来的笔记一起删掉",
+      "expected": [
+        "original-data"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q34",
+      "project": "hub",
+      "query": "必须使用的规则太长时可以偷偷截掉后半段吗",
+      "expected": [
+        "rule-budget"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q36",
+      "project": "hub",
+      "query": "没有相关历史决定时需要为了填满上下文塞几条吗",
+      "expected": [
+        "decision-budget"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q38",
+      "project": "hub",
+      "query": "最后一轮模型没返回时前面查到的东西还看得到吗",
+      "expected": [
+        "partial-results"
+      ],
+      "category": "paraphrase"
+    },
+    {
+      "id": "q40",
+      "project": "hub",
+      "query": "这次会把默认调查等待时间改成长达四分钟吗",
+      "expected": [
+        "quick-budget"
+      ],
+      "category": "paraphrase"
+    }
+  ]
+}

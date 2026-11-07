@@ -1,0 +1,42 @@
+/* Cross-platform glass approximation: material belongs to navigation,
+   opaque surfaces to reading. */
+html:not([data-runtime-platform="android"]) .desktop-app-shell {
+  background: linear-gradient(145deg, #f0f4f8, #f9f8f6 60%, #eef2f7);
+  border-color: rgba(255,255,255,.85); box-shadow: 0 12px 36px #18243418;
+}
+html:not([data-runtime-platform="android"]) .desktop-sidebar {
+  background: linear-gradient(150deg, #ffffffb8, #f5f7f9b3);
+  backdrop-filter: blur(28px) saturate(1.25);
+  border-right: 1px solid #38475c0c; box-shadow: inset 1px 1px 0 #ffffffb3;
+  padding: 16px 12px;
+}
+html:not([data-runtime-platform="android"]) .sidebar-primary-nav button { border-radius: var(--hub-row-selection-radius, 8px); min-height: 38px; }
+html:not([data-runtime-platform="android"]) .sidebar-primary-nav button.active {
+  background: var(--hub-row-selection-bg, #edf1f4);
+  color: var(--hub-row-selection-text, #20242a);
+  box-shadow: var(--hub-row-selection-shadow, inset 2px 0 var(--hub-accent));
+  font-weight: 500;
+}
+.desktop-app-shell .search-header { background: #ffffffb8; backdrop-filter: blur(24px) saturate(1.2); border-bottom: 1px solid #38475c0c; padding-block: 12px; }
+.desktop-app-shell .search-box { background: #ffffffe0; border: 1px solid #75859c30; border-radius: 14px; box-shadow: 0 2px 6px #28364b06, inset 0 1px #fff; }
+.desktop-app-shell .search-box:focus-within { border-color: #3288ff80; box-shadow: 0 0 0 2px #3288ff18; }
+.desktop-app-shell .search-header .icon-button { border-radius: 10px; }
+.desktop-app-shell .workspace { background: #fff; }
+.desktop-app-shell .workspace-scope { border-bottom: 0; margin-bottom: 8px; color: #656c76; }
+.desktop-app-shell .pane-resizer { background: #fff; }
+.desktop-app-shell .pane-resizer::before { background: #35465c18; }
+.desktop-app-shell .pane-resizer:hover::before { background: #3288ff; }
+.desktop-app-shell :is(.desktop-workspace, .task-workspace, .collections-workspace) .preview-actions { margin: 0; padding: 2px; border-radius: 8px; border: 1px solid #dfe2e5; background: rgba(255,255,255,.95); backdrop-filter: blur(18px); box-shadow: 0 1px 5px #23344d12; }
+.desktop-app-shell .preview-actions button { border-radius: 7px; color: #626974; }
+.desktop-app-shell .preview-heading { background: #fff; border-bottom-color: #35465c0c; }
+.desktop-app-shell .preview-path { color: #717783; }
+.desktop-app-shell .preview-properties { background: #f7f8fa; border: 1px solid #35465c0c; border-radius: 12px; color: #555e6b; }
+.desktop-app-shell .preview-content { color: #30343a; }
+.desktop-app-shell button:focus-visible { outline: 2px solid #2679dc; outline-offset: 2px; }
+@media (prefers-reduced-transparency: reduce) {
+  html:not([data-runtime-platform="android"]) .desktop-sidebar, .desktop-app-shell .search-header, .desktop-app-shell :is(.desktop-workspace, .task-workspace, .collections-workspace) .preview-actions { background: #f5f6f8; backdrop-filter: none; }
+}
+@media (forced-colors: active) {
+  .desktop-app-shell .search-box, .desktop-app-shell .preview-actions { border: 1px solid ButtonText; }
+  .desktop-app-shell .sidebar-primary-nav button.active { outline: 2px solid Highlight; }
+}

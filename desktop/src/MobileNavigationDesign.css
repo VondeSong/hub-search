@@ -1,0 +1,105 @@
+/* One control layer for the library and flashcards; content stays readable. */
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell > .mobile-navigation-footer, .flashcards-workspace.flashcards-android > .flashcards-mobile-nav) {
+  position: absolute; inset-inline: 16px; bottom: calc(10px + env(safe-area-inset-bottom,0px));
+  width: auto; height: 60px; min-height: 60px; flex: none; box-sizing: border-box;
+  margin: 0; padding: 4px; border: 1px solid rgba(255,255,255,.88); border-radius: 30px;
+  background: rgba(245,248,253,.78); backdrop-filter: blur(24px) saturate(1.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 5px 20px rgba(39,61,105,.11);
+}
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.flashcards-workspace.flashcards-android) .mobile-tab-bar {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0,1fr); grid-template-columns: none;
+  height: 50px; min-height: 50px; gap: 3px; align-items: stretch;
+}
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android > .mobile-tab-bar { height: 60px; min-height: 60px; }
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.flashcards-workspace.flashcards-android) .mobile-tab-bar button {
+  position: relative; min-width: 0; min-height: 50px; padding: 4px 3px; gap: 2px;
+  border: 0; border-radius: 25px; background: transparent; color: #626a77;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font: inherit; font-size: 10px; font-weight: 500; line-height: 1.1;
+  transition: background-color 140ms ease-out, color 140ms ease-out;
+}
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.flashcards-workspace.flashcards-android) .mobile-tab-bar button::before { display: none; }
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.flashcards-workspace.flashcards-android) .mobile-tab-bar button[aria-current="page"] {
+  color: #0867cb; font-weight: 600; background: rgba(255,255,255,.76);
+  box-shadow: inset 0 1px 0 #fff, 0 1px 5px rgba(40,60,100,.07);
+}
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.flashcards-workspace.flashcards-android) .mobile-tab-bar .mobile-primary-icon {
+  position: relative; display: grid; place-items: center; min-width: 28px; min-height: 24px;
+  background: transparent; box-shadow: none; border-radius: 0;
+}
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.flashcards-workspace.flashcards-android) .mobile-tab-bar button[aria-current="page"] .mobile-primary-icon { background: transparent; box-shadow: none; }
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.flashcards-workspace.flashcards-android) .mobile-tab-bar svg { width: 21px; height: 21px; stroke-width: 1.8; }
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.flashcards-workspace.flashcards-android) .mobile-tab-bar .mobile-primary-icon small {
+  position: absolute; top: -3px; right: -13px; left: auto; min-width: 15px; height: 15px;
+  display: grid; place-items: center; padding: 0 3px; border: 1px solid #f7f9fc; border-radius: 8px;
+  color: #fff; background: #6b7b91; font-size: 8px; line-height: 1; box-sizing: border-box;
+}
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.flashcards-workspace.flashcards-android) .mobile-tab-bar button:active { background: rgba(214,223,237,.7); transition-duration: 0ms; }
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.flashcards-workspace.flashcards-android) .mobile-tab-bar button:active svg { transform: scale(.94); }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android { position: relative; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android:not(.is-reviewing) :is(.flashcards-main,.flashcards-decks) { padding-bottom: calc(92px + env(safe-area-inset-bottom,0px)); }
+
+/* Search is a reachable bottom control; scope remains above the content. */
+.mobile-search-controls { display: contents; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-search-controls { display: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-search-expanded .mobile-search-controls {
+  position: absolute; inset-inline: 16px; bottom: calc(10px + env(safe-area-inset-bottom,0px));
+  z-index: 32; display: flex; align-items: center; gap: 8px; min-height: 60px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.mobile-search-expanded) > .mobile-navigation-footer { display: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-search-controls .search-box {
+  position: relative; inset: auto; flex: 1; min-width: 0; height: 48px; min-height: 48px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-search-cancel {
+  min-width: 48px; min-height: 48px; padding: 0 4px; border: 0; border-radius: 20px;
+  background: transparent; color: #0867cb; font: inherit; font-size: 14px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-search-cancel:active { background: rgba(214,223,237,.7); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .search-header {
+  position: static; grid-template-rows: 44px; gap: 0; min-height: calc(58px + env(safe-area-inset-top,0px));
+  padding-block: calc(6px + env(safe-area-inset-top,0px)) 8px;
+  backdrop-filter: none; transform: none; filter: none;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell,
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell.filters-open { --mobile-search-header-height: calc(58px + env(safe-area-inset-top,0px)); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .search-box {
+  position: absolute; inset-inline: 20px; bottom: calc(80px + env(safe-area-inset-bottom,0px));
+  top: auto; grid-column: auto; grid-row: auto; margin: 0;
+  width: auto; height: 44px; min-height: 44px; z-index: 31; border-radius: 22px;
+  padding-inline: 14px; background: rgba(246,249,253,.86); backdrop-filter: blur(24px) saturate(1.4);
+  box-shadow: inset 0 1px 0 #fff, 0 3px 16px rgba(39,61,105,.09);
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .search-box > svg { width: 19px; height: 19px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .search-header input { font-size: 14px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .search-suggestions {
+  position: absolute; inset-inline: 0; top: auto; bottom: calc(100% + 9px); width: auto;
+  max-height: min(54dvh,360px); overflow-y: auto; border-radius: 18px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .search-header .mobile-active-filters { grid-row: 2; margin-top: 6px; min-height: 30px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-pane { padding-top: 0; padding-bottom: calc(90px + env(safe-area-inset-bottom,0px)); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell.mobile-keyboard-open .search-box { bottom: 10px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell.mobile-keyboard-open .mobile-search-controls { bottom: 4px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell.mobile-keyboard-open .mobile-search-controls .search-box { bottom: auto; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell.mobile-keyboard-open .results-pane { padding-bottom: 66px; }
+
+/* Compact scanning rows: one title, one context line, with larger text still wrapping. */
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-row {
+  min-height: 54px; padding-block: 7px; column-gap: 10px; grid-template-columns: 28px minmax(0,1fr);
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-row > .library-icon { width: 28px; height: 28px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-copy { gap: 2px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-group { gap: 0; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-group-label {
+  min-height: 28px; margin: 8px 8px 2px; padding: 4px 0; background: transparent;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .section-label { min-height: 28px; padding-block: 6px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .result-favorite-toggle.recent { width: 44px; height: 44px; top: 50%; transform: translateY(-50%); }
+@media (prefers-reduced-motion: reduce) {
+  html[data-runtime-platform="android"] .mobile-tab-bar button { transition: none !important; }
+  html[data-runtime-platform="android"] .mobile-tab-bar button:active svg { transform: none !important; }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell > .mobile-navigation-footer,.flashcards-workspace.flashcards-android > .flashcards-mobile-nav) { background: #f5f7fa; backdrop-filter: none; border-color: #858e9c; }
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell .search-box { background: #f8faff; backdrop-filter: none; border-color: #858e9c; }
+  html[data-runtime-platform="android"] .mobile-tab-bar button[aria-current="page"] { outline: 2px solid #0867cb; outline-offset: -3px; }
+}

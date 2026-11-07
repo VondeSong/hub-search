@@ -1,0 +1,110 @@
+{
+  "pngs": [
+    {
+      "file": "hub-A-1024.png",
+      "size": 1024,
+      "alpha": true
+    },
+    {
+      "file": "hub-A-128.png",
+      "size": 128,
+      "alpha": true
+    },
+    {
+      "file": "hub-A-16.png",
+      "size": 16,
+      "alpha": true
+    },
+    {
+      "file": "hub-A-256.png",
+      "size": 256,
+      "alpha": true
+    },
+    {
+      "file": "hub-A-32.png",
+      "size": 32,
+      "alpha": true
+    },
+    {
+      "file": "hub-A-512.png",
+      "size": 512,
+      "alpha": true
+    },
+    {
+      "file": "hub-A-64.png",
+      "size": 64,
+      "alpha": true
+    },
+    {
+      "file": "hub-B-1024.png",
+      "size": 1024,
+      "alpha": true
+    },
+    {
+      "file": "hub-B-128.png",
+      "size": 128,
+      "alpha": true
+    },
+    {
+      "file": "hub-B-16.png",
+      "size": 16,
+      "alpha": true
+    },
+    {
+      "file": "hub-B-256.png",
+      "size": 256,
+      "alpha": true
+    },
+    {
+      "file": "hub-B-32.png",
+      "size": 32,
+      "alpha": true
+    },
+    {
+      "file": "hub-B-512.png",
+      "size": 512,
+      "alpha": true
+    },
+    {
+      "file": "hub-B-64.png",
+      "size": 64,
+      "alpha": true
+    },
+    {
+      "file": "hub-C-1024.png",
+      "size": 1024,
+      "alpha": true
+    },
+    {
+      "file": "hub-C-128.png",
+      "size": 128,
+      "alpha": true
+    },
+    {
+      "file": "hub-C-16.png",
+      "size": 16,
+      "alpha": true
+    },
+    {
+      "file": "hub-C-256.png",
+      "size": 256,
+      "alpha": true
+    },
+    {
+      "file": "hub-C-32.png",
+      "size": 32,
+      "alpha": true
+    },
+    {
+      "file": "hub-C-512.png",
+      "size": 512,
+      "alpha": true
+    },
+    {
+      "file": "hub-C-64.png",
+      "size": 64,
+      "alpha": true
+    }
+  ],
+  "visualReview": "Compared color, 64px monochrome structure, 16/32/64px icons and light/dark backgrounds; B center separated after first review."
+}

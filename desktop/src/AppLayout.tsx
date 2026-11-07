@@ -1,0 +1,138 @@
+import { AgentCitationBody } from "./StandaloneAgentLauncher";
+import type { ComponentProps, ComponentType, CSSProperties, ReactNode } from "react";
+import type { AppEntryProps } from "./AppEntryTypes";
+import { DesktopAppEntry } from "./DesktopAppEntry";
+import { DesktopSidebar } from "./DesktopSidebar";
+import { FilterBar, SearchFilterSummary } from "./FilterBar";
+import { FooterStatus } from "./FooterStatus";
+import { MobileAppEntry } from "./MobileAppEntry";
+import { SearchHeader } from "./SearchHeader";
+import { DesktopWorkspace, MobileWorkspace, type WorkspaceProps } from "./Workspace";
+import { WorkspaceRail } from "./WorkspaceRail";
+import { WorkspaceChrome, WorkspaceHeaderContext, WorkspaceModeControl, workspaceLabels } from "./WorkspaceChrome";
+import { useSidebarLayout } from "./useSidebarLayout";
+import { PanelRight } from "lucide-react";
+import "./SearchToolbar.css";
+import { SearchFilterReveal } from "./SearchFilterReveal";
+import { MobileFilterSheet } from "./MobileFilterSheet";
+
+export type AppLayoutProps = {
+  filtersOpen: boolean;
+  mobilePreviewOpen: boolean;
+  style: CSSProperties;
+  startWindowDrag: ComponentProps<typeof SearchHeader>["startWindowDrag"];
+  headerProps: ComponentProps<typeof SearchHeader>;
+  filterBarProps: ComponentProps<typeof FilterBar>;
+  workspaceProps: WorkspaceProps;
+  footerStatusProps: ComponentProps<typeof FooterStatus>;
+  settingsDialog: ReactNode;
+  mainContent?: ReactNode;
+  desktopSidebarProps?: ComponentProps<typeof DesktopSidebar>;
+};
+
+type AppLayoutContentProps = AppLayoutProps & {
+  AppEntry: ComponentType<AppEntryProps>;
+  Workspace: ComponentType<WorkspaceProps>;
+  mobile?: boolean;
+};
+
+function AppLayoutContent({
+  filtersOpen,
+  mobilePreviewOpen,
+  style,
+  startWindowDrag,
+  headerProps,
+  filterBarProps,
+  workspaceProps,
+  footerStatusProps,
+  settingsDialog,
+  mainContent,
+  AppEntry,
+  Workspace,
+  mobile = false,
+}: AppLayoutContentProps) {
+  return (
+    <AppEntry filtersOpen={filtersOpen} previewOpen={mobilePreviewOpen} style={style}>
+      <div className="drag-strip" onMouseDown={startWindowDrag} />
+      {mainContent ? <><div className="main-content-override">{mainContent}</div><FooterStatus {...footerStatusProps} /></> : <>
+        <SearchHeader {...headerProps} />
+        {mobile ? <MobileFilterSheet open={filtersOpen} onClose={() => headerProps.setFiltersOpen(false)}><FilterBar {...filterBarProps} visible={filtersOpen} mobile /></MobileFilterSheet> : filtersOpen && <FilterBar {...filterBarProps} />}
+        <Workspace {...workspaceProps} />
+        <FooterStatus {...footerStatusProps} />
+      </>}
+      {settingsDialog}
+    </AppEntry>
+  );
+}
+
+export function DesktopAppLayout(props: AppLayoutProps) {
+  const {
+    mode: sidebarMode, changeMode, drawerOpen, togglePanel, panelExpanded, collapsePanel,
+    sidebarWidth, sidebarWidthMin, sidebarWidthMax, resizeSidebar, resizeSidebarWithKeyboard, resetSidebarWidth,
+  } = useSidebarLayout(props.desktopSidebarProps?.activeView);
+  if (props.desktopSidebarProps) {
+    const {
+      filtersOpen, mobilePreviewOpen, style, startWindowDrag, headerProps,
+      filterBarProps, workspaceProps, footerStatusProps, settingsDialog, mainContent, desktopSidebarProps,
+    } = props;
+    const integratedHeader = Boolean(mainContent) && desktopSidebarProps.activeView === "collections";
+    return (
+      <DesktopAppEntry filtersOpen={filtersOpen} previewOpen={mobilePreviewOpen} style={{ ...style, "--context-sidebar-width": `${sidebarWidth}px` } as CSSProperties} sidebarEnabled sidebarMode={sidebarMode} workspaceView={desktopSidebarProps.activeView} sidebarDrawerOpen={drawerOpen}>
+        <div className="drag-strip" onMouseDown={startWindowDrag} />
+        <WorkspaceRail
+          onTogglePanel={togglePanel}
+          panelExpanded={panelExpanded}
+          activeView={desktopSidebarProps.activeView}
+          spaces={desktopSidebarProps.spaces}
+          selectedLibraryIds={desktopSidebarProps.selectedLibraryIds}
+          renderLibraryIcon={desktopSidebarProps.renderLibraryIcon}
+          favoriteCount={desktopSidebarProps.favoriteCount}
+          taskOpenCount={desktopSidebarProps.taskOpenCount}
+          journalCount={desktopSidebarProps.journalCount}
+          historyCount={desktopSidebarProps.historyCount}
+          tagCount={desktopSidebarProps.tags.length}
+          flashcardDueCount={desktopSidebarProps.flashcardDueCount}
+          onSelectView={desktopSidebarProps.onSelectView}
+          onSelectAllLibraries={desktopSidebarProps.onSelectAllLibrariesOnly ?? desktopSidebarProps.onToggleAllLibraries}
+          onSelectLibrary={desktopSidebarProps.onSelectLibraryOnly ?? desktopSidebarProps.onToggleLibrary}
+          onToggleLibrary={desktopSidebarProps.onToggleLibrary}
+          onManageLibraries={() => footerStatusProps.setShowConnection(true)}
+        />
+        <DesktopSidebar {...desktopSidebarProps} contextualTitle={sidebarMode === "standard" ? undefined : workspaceLabels[desktopSidebarProps.activeView]} onCollapse={collapsePanel} />
+        <div
+          className="context-sidebar-resizer"
+          role="separator"
+          aria-label="调整中间栏宽度"
+          aria-orientation="vertical"
+          aria-valuemin={sidebarWidthMin}
+          aria-valuemax={sidebarWidthMax}
+          aria-valuenow={sidebarWidth}
+          tabIndex={0}
+          title="拖动调整中间栏宽度；双击恢复默认"
+          onPointerDown={resizeSidebar}
+          onDoubleClick={resetSidebarWidth}
+          onKeyDown={resizeSidebarWithKeyboard}
+        />
+        <div className={`desktop-main-layout ${filtersOpen ? "filters-open" : ""}`}>
+          <AgentCitationBody/>
+          {!integratedHeader && <WorkspaceChrome search={!mainContent && <SearchHeader {...headerProps} hideLibrarySwitcher hidePreviewToggle />} actions={!mainContent && <button className={`workspace-preview-toggle ${headerProps.showPreviewPane ? "active" : ""}`} aria-label="显示预览窗格" title="显示预览窗格" aria-pressed={headerProps.showPreviewPane} onClick={() => headerProps.setPreviewOpen(value => !value)}><PanelRight size={17} /></button>} mode={sidebarMode} onModeChange={changeMode} onTogglePanel={togglePanel} panelExpanded={panelExpanded} view={desktopSidebarProps.activeView} spaces={desktopSidebarProps.spaces} selectedLibraryIds={desktopSidebarProps.selectedLibraryIds} onToggleLibrary={desktopSidebarProps.onToggleLibrary} onSelectAll={desktopSidebarProps.onSelectAllLibrariesOnly ?? desktopSidebarProps.onToggleAllLibraries} onManage={desktopSidebarProps.onManageLibraries} />}
+          {mainContent ? <><div className="main-content-override"><WorkspaceHeaderContext.Provider value={integratedHeader ? {
+            actions: <WorkspaceModeControl mode={sidebarMode} onModeChange={changeMode} />,
+            onMouseDown: startWindowDrag,
+          } : null}>{mainContent}</WorkspaceHeaderContext.Provider></div><FooterStatus {...footerStatusProps} /></> : <>
+            <SearchFilterReveal open={filtersOpen}><FilterBar {...filterBarProps} visible={filtersOpen} /></SearchFilterReveal>
+            {(desktopSidebarProps.activeView === "home" || headerProps.query.trim()) && <SearchFilterSummary {...filterBarProps} />}
+            <DesktopWorkspace {...workspaceProps} />
+            <FooterStatus {...footerStatusProps} />
+          </>}
+        </div>
+        {settingsDialog}
+      </DesktopAppEntry>
+    );
+  }
+  return <AppLayoutContent {...props} AppEntry={DesktopAppEntry} Workspace={DesktopWorkspace} />;
+}
+
+export function MobileAppLayout(props: AppLayoutProps) {
+  return <AppLayoutContent {...props} AppEntry={MobileAppEntry} Workspace={MobileWorkspace} mobile />;
+}

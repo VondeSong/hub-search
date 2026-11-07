@@ -1,0 +1,7 @@
+# Android NDK r27 and earlier need both flags for 16 KiB ELF load segments.
+# Keep these link options scoped to the shipped Android ARM64 target.
+[target.aarch64-linux-android]
+rustflags = [
+    "-C", "link-arg=-Wl,-z,max-page-size=16384",
+    "-C", "link-arg=-Wl,-z,common-page-size=16384",
+]

@@ -1,0 +1,34 @@
+.preview-heading .preview-title { min-width: 0; }
+.preview-heading .preview-title-row { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
+.preview-heading .preview-title-row > h1 { flex: 0 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.preview-heading .preview-title-row > .preview-title-copy {
+  flex: 0 0 28px; display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; min-width: 28px; height: 28px; min-height: 28px;
+  margin: 3px 0 0; padding: 0; border: 0; border-radius: 6px;
+  color: var(--hub-text-secondary, #69717d); background: transparent; box-shadow: none;
+  opacity: 0; pointer-events: none; cursor: pointer;
+}
+.preview-heading .preview-title-row:hover > .preview-title-copy,
+.preview-heading .preview-title-row:focus-within > .preview-title-copy,
+.preview-heading .preview-title:is([data-copy-state="copied"], [data-copy-state="error"]) .preview-title-copy {
+  opacity: 1; pointer-events: auto;
+}
+.preview-heading .preview-title-copy:hover { background: var(--hub-accent-soft, #eef4fc); color: var(--hub-accent, #2363c9); }
+.preview-heading .preview-title-copy:focus-visible { outline: 2px solid var(--hub-accent, #2363c9); outline-offset: 2px; }
+.preview-heading .preview-title-copy:disabled { cursor: default; }
+.preview-heading [data-copy-state="copied"] .preview-title-copy { color: var(--hub-accent, #2363c9); }
+.preview-title-feedback { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.preview-title[data-copy-state="error"] > .preview-title-feedback {
+  position: static; display: block; width: auto; height: auto; clip-path: none;
+  white-space: normal; margin-top: 4px; color: var(--hub-text-secondary, #69717d); font-size: 12px;
+}
+@media (hover: none), (pointer: coarse) {
+  .preview-heading .preview-title-row > .preview-title-copy {
+    opacity: 1; pointer-events: auto; flex-basis: 44px; width: 44px; min-width: 44px;
+    height: 44px; min-height: 44px; margin-top: 0;
+  }
+}
+html[data-runtime-platform="android"] .preview-heading .preview-title-row > .preview-title-copy {
+  opacity: 1; pointer-events: auto; flex-basis: 44px; width: 44px; min-width: 44px;
+  height: 44px; min-height: 44px; margin-top: 0;
+}

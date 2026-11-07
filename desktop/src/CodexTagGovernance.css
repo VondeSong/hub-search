@@ -1,0 +1,10 @@
+.tag-governance-codex { padding: 16px; border-bottom: 1px solid var(--hub-border, #e8e8eb); color: var(--hub-text-primary, #202124); }
+.tag-governance-codex-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.tag-governance-codex-toolbar > button { padding: 8px 12px; border: 1px solid var(--hub-border, #e1e1e5); border-radius: 9px; background: var(--hub-bg-primary, #fff); color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
+.tag-governance-codex button:disabled { opacity: .5; cursor: default; }
+.tag-governance-codex-toolbar > .codex-governance-run { color: var(--hub-accent, #087de0); border-color: color-mix(in srgb, var(--hub-accent, #087de0) 25%, transparent); background: color-mix(in srgb, var(--hub-accent, #087de0) 7%, var(--hub-content-surface, #fff)); font-weight: 500; }
+.tag-governance-codex-toolbar > .codex-governance-run:hover:not(:disabled) { background: color-mix(in srgb, var(--hub-accent, #087de0) 12%, var(--hub-content-surface, #fff)); }
+.tag-governance-codex p, .tag-governance-codex-progress { margin: 10px 0 0; font-size: 12px; line-height: 1.65; color: var(--hub-text-secondary, #707078); }
+.tag-governance-codex-result { margin-top: 12px; padding: 12px; border-radius: 10px; background: color-mix(in srgb, var(--hub-text-primary, #202124) 4%, transparent); font-size: 13px; }
+.tag-governance-codex-result small { display: block; margin-top: 8px; font-size: 11px; line-height: 1.6; color: var(--hub-text-secondary, #707078); }
+.tag-governance-codex .tag-governance-codex-error { color: #b34335; }
