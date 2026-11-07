@@ -185,9 +185,7 @@ pub(super) fn investigate(
     let previous = store::records(root, &work.id, "nativeSession", 1)?
         .into_iter()
         .next();
-    let latest_provider_run: Option<String> = crate::source_evidence::open_read_database(root)?
-        .query_row("SELECT run_id FROM agent_records WHERE work_id=?1 AND kind='nativeRuntime' AND run_id IS NOT NULL ORDER BY rowid DESC LIMIT 1", [&work.id], |r| r.get(0))
-        .optional().map_err(|e| e.to_string())?;
+    let latest_provider_run = compatibility::latest_provider_run(root, &work.id)?;
     let recovering: bool = crate::source_evidence::open_read_database(root)?.query_row(
         "SELECT EXISTS(SELECT 1 FROM agent_records WHERE run_id=?1 AND kind='lifecycleRecovery')",
         [run], |r| r.get(0)).map_err(|e| e.to_string())?;

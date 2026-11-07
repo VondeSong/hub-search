@@ -2,6 +2,16 @@
 //! external actions. A fresh provider session never authorizes replaying a write.
 use super::*;
 
+#[cfg(test)]
+mod provider_switch_tests;
+
+pub(super) fn latest_provider_run(root: &Path, work_id: &str) -> Result<Option<String>, String> {
+    // Direct-provider replies are absent from a previously saved native thread.
+    crate::source_evidence::open_read_database(root)?
+        .query_row("SELECT run_id FROM agent_records WHERE work_id=?1 AND kind IN ('nativeRuntime','modelExecution') AND run_id IS NOT NULL ORDER BY rowid DESC LIMIT 1", [work_id], |r| r.get(0))
+        .optional().map_err(|e| e.to_string())
+}
+
 pub(super) fn provider_turn_completed(session: &Value, latest_provider_run: Option<&str>) -> bool {
     session["providerTurnCompleted"] == true
         && latest_provider_run
