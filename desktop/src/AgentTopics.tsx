@@ -14,7 +14,7 @@ const call=<T,>(args:Record<string,unknown>)=>invoke<T>("agent_investigation",{a
 const month=()=>{const now=new Date();return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;};
 
 export function AgentTopics({anchor,work,disabled,onOpenWork}:{anchor:Anchor;work?:{id:string;revision?:number;report:unknown;state:string};disabled:boolean;onOpenWork:(id:string,source?:TopicWorkSource,draft?:string)=>Promise<void>}) {
- const popover=useAgentPopover(),alive=useRef(true),sequence=useRef(0),inflight=useRef(false);
+ const popover=useAgentPopover({deferEscapeSelector:".agent-topic-work .agent-source-preview"}),alive=useRef(true),sequence=useRef(0),inflight=useRef(false);
  const previewReturn=useRef<HTMLButtonElement|null>(null);
  const [disclosureOpen,setDisclosureOpen]=useState(false),[previewWork,setPreviewWork]=useState<string|null>(null);
  const pending=useRef<{payload:string;args:Record<string,unknown>}|null>(null);

@@ -108,8 +108,15 @@ it("closes only the citation on Escape before the native Topic dismiss listener"
  await render();await open();await click("材料复核 · 2026-10");
  const cite=host.querySelector<HTMLButtonElement>(".agent-inline-citation")!;await act(async()=>{cite.focus();cite.click();});
  const source=host.querySelector<HTMLElement>('[aria-label="专题引用原文"]')!;expect(source).not.toBeNull();expect(document.activeElement).toBe(source);
+ const callsBeforeEscape=invoke.mock.calls.length;
+ await act(async()=>source.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",isComposing:true,bubbles:true,cancelable:true})));
+ expect(host.querySelector<HTMLDetailsElement>(".agent-topics")!.open).toBe(true);expect(host.querySelector('[aria-label="专题引用原文"]')).toBe(source);expect(document.activeElement).toBe(source);
  await act(async()=>source.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true,cancelable:true})));
  expect(host.querySelector<HTMLDetailsElement>(".agent-topics")!.open).toBe(true);expect(host.querySelector('[aria-label="专题引用原文"]')).toBeNull();expect(document.activeElement).toBe(cite);
+ await act(async()=>cite.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true,cancelable:true})));
+ const topics=host.querySelector<HTMLDetailsElement>(".agent-topics")!;
+ expect(topics.open).toBe(false);expect(document.activeElement).toBe(topics.querySelector('summary'));
+ expect(invoke.mock.calls).toHaveLength(callsBeforeEscape);expect(openWork).not.toHaveBeenCalled();
 });
 it("keeps the Topic anchor separate from its new month's actual Work and uses verified navigation",async()=>{
  const nextAnchor={...anchor,documentId:"november-note"};

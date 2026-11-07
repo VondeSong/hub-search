@@ -19,6 +19,7 @@ pub(super) mod tasks;
 pub(super) mod tool_results;
 pub(super) mod trace_budget;
 pub(super) mod working_state;
+mod history;
 
 pub(crate) fn migrate(c: &Connection) -> Result<(), String> {
     let result = (|| {
@@ -160,77 +161,36 @@ pub(super) fn list(
     root: &Path,
     anchor: Option<&EvidenceLocator>,
     before: Option<&Value>,
+    query: Option<&Value>,
+    archived: Option<&Value>,
 ) -> Result<Value, String> {
-    let scope = serde_json::to_value(anchor).map_err(|e| e.to_string())?;
-    let cursor = before
-        .filter(|value| !value.is_null())
-        .map(|value| {
-            let time = value["updatedAt"]
-                .as_i64()
-                .filter(|time| *time >= 0)
-                .ok_or("历史对话游标无效")?;
-            let id = value["id"]
-                .as_str()
-                .filter(|id| !id.is_empty() && id.len() <= 150)
-                .ok_or("历史对话游标无效")?;
-            if value.get("anchor") != Some(&scope) {
-                return Err("历史对话范围已变化，请重新打开历史".to_string());
-            }
-            let pinned = value
-                .get("pinned")
-                .map(|v| v.as_bool().ok_or("历史对话游标无效"))
-                .transpose()?
-                .unwrap_or(false);
-            Ok((time, id, pinned))
-        })
-        .transpose()?;
     let c = read(root)?;
-    let mut q=c.prepare("WITH history AS (SELECT agent_works.*,COALESCE((SELECT body_json FROM agent_records p WHERE p.work_id=agent_works.id AND p.kind='historyPreference' ORDER BY rowid DESC LIMIT 1),'{}') AS preference FROM agent_works), visible AS (SELECT *,COALESCE(json_extract(preference,'$.pinned'),0) AS pinned FROM history WHERE COALESCE(json_extract(preference,'$.deleted'),0)=0) SELECT id,goal,state,updated_at,1+(SELECT COUNT(*) FROM agent_records r WHERE r.work_id=visible.id AND r.kind IN ('userMessage','userDecision','steering','delivery')),pinned FROM visible WHERE (?1='null' OR anchor_json=?1) AND (?2 IS NULL OR pinned<?4 OR (pinned=?4 AND (updated_at<?2 OR (updated_at=?2 AND id>?3)))) ORDER BY pinned DESC,updated_at DESC,id LIMIT 21").map_err(|e|e.to_string())?;
-    let mut rows=q.query_map(params![encode(&anchor)?,cursor.map(|c|c.0),cursor.map(|c|c.1),cursor.map(|c|c.2)],|r|Ok(json!({"id":r.get::<_,String>(0)?,"goal":r.get::<_,String>(1)?,"state":r.get::<_,String>(2)?,"updatedAt":r.get::<_,i64>(3)?,"messageCount":r.get::<_,i64>(4)?,"pinned":r.get::<_,bool>(5)?}))).map_err(|e|e.to_string())?.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())?;
-    let more = rows.len() > 20;
-    rows.truncate(20);
-    let next = if more {
-        rows.last()
-            .map(|row| json!({"updatedAt":row["updatedAt"],"id":row["id"],"pinned":row["pinned"],"anchor":scope}))
-    } else {
-        None
-    };
-    Ok(json!({"works":rows,"nextCursor":next}))
+    let anchor = encode(&anchor)?;
+    history::list_on(&c, &anchor, before, query, archived)
 }
 pub(super) fn history_preference(root: &Path, args: &Value) -> Result<Value, String> {
     let id = super::text(args, "id", 150)?;
-    let pinned = args
-        .get("pinned")
-        .map(|v| v.as_bool().ok_or("置顶状态无效"))
-        .transpose()?;
-    let deleted = args
-        .get("deleted")
-        .map(|v| v.as_bool().ok_or("删除状态无效"))
-        .transpose()?;
-    if pinned.is_none() && deleted.is_none() {
-        return Err("缺少历史操作".into());
-    }
+    let change = history::change(args)?;
     write(root, |c| {
         let work = load(c, &id)?;
-        let old:Option<String>=c.query_row("SELECT body_json FROM agent_records WHERE work_id=?1 AND kind='historyPreference' ORDER BY rowid DESC LIMIT 1",[&id],|r|r.get(0)).optional().map_err(|e|e.to_string())?;
-        let old: Value = old
-            .map(|v| serde_json::from_str(&v).map_err(|_| "历史偏好损坏"))
-            .transpose()?
-            .unwrap_or(json!({"pinned":false,"deleted":false}));
-        let next = json!({"pinned":pinned.unwrap_or(old["pinned"]==true),"deleted":deleted.unwrap_or(old["deleted"]==true)});
-        if next == old {
-            return Ok(next);
-        }
-        if deleted == Some(true) {
-            let unresolved:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM agent_actions WHERE work_id=?1 AND state IN ('preparing','executing','unknown','reconciliation_required'))",[&id],|r|r.get(0)).map_err(|e|e.to_string())?;
-            if work.active_run.is_some() || unresolved {
-                return Err("请先结束运行并核对操作结果，再删除对话".into());
+        history::preference_on(c, &id, &change, |next| {
+            if change.deleted == Some(true) || change.archived == Some(true) {
+                let unresolved:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM agent_actions WHERE work_id=?1 AND state IN ('preparing','executing','unknown','reconciliation_required'))",[&id],|r|r.get(0)).map_err(|e|e.to_string())?;
+                if work.active_run.is_some() || unresolved {
+                    return Err(if change.deleted == Some(true) {
+                        "请先结束运行并核对操作结果，再删除对话"
+                    } else {
+                        "请先结束运行并核对操作结果，再归档对话"
+                    }.into());
+                }
             }
-            super::watch::pause_on(c, &id, "对话已从历史删除")?;
-        }
-        // History deletion keeps execution receipts and cumulative quotas intact.
-        insert(c, &id, None, "historyPreference", &next)?;
-        Ok(next)
+            if change.deleted == Some(true) {
+                super::watch::pause_on(c, &id, "对话已从历史删除")?;
+            }
+            // Archive changes only history organization. Source grants,
+            // execution receipts and cumulative quotas remain owned by Work.
+            insert(c, &id, None, "historyPreference", next)
+        })
     })
 }
 pub(super) fn reconcile(root: &Path, id: &str, live: Option<&str>) -> Result<(), String> {

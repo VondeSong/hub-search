@@ -290,7 +290,7 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
                         .and_then(|c| crate::source_evidence::resolve_note_page(root, &c, anchor))
                 })
                 .transpose()?;
-            store::list(root, anchor.as_ref(), args.get("before"))
+            store::list(root, anchor.as_ref(), args.get("before"), args.get("query"), args.get("archived"))
         }
         "status" => status(root, &text(args, "id", 150)?),
         "setHistoryPreference" => store::history_preference(root, args),

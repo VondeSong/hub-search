@@ -1,0 +1,12 @@
+[package]
+name = "hub-assistant-history-check"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+rusqlite = { version = "0.37", features = ["bundled"] }
+serde_json = "1"
+
+[lib]
+path = "history-check.rs"

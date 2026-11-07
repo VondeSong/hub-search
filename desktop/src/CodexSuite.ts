@@ -103,7 +103,11 @@ export function modelProviderLabel(provider?: ModelProvider) { return provider =
 export function codexModelLabel(settings: CodexSettings) { return settings.model || (settings.provider === "deepseek" ? "请选择模型" : "CLI 默认模型"); }
 export const CODEX_EFFORT_LABELS: Record<string, string> = { none: "无推理", minimal: "最低", low: "轻度", medium: "中等", high: "高", xhigh: "极高", max: "最大", ultra: "Ultra" };
 export function codexSelectionLabel(settings: CodexSettings) {
-  return `${codexModelLabel(settings)} · ${CODEX_EFFORT_LABELS[settings.reasoningEffort] ?? (settings.reasoningEffort || "默认推理")} · ${settings.fast ? "Fast" : "标准速度"}${settings.provider === "deepseek" ? " · DeepSeek" : ""}`;
+  const effort = CODEX_EFFORT_LABELS[settings.reasoningEffort] ?? (settings.reasoningEffort || "默认推理");
+  // A saved Fast request is meaningful without reinterpreting historical jobs through today's catalog.
+  // fast:false alone does not establish that this model has a selectable speed tier.
+  const speed = settings.provider !== "deepseek" && settings.fast ? " · Fast" : "";
+  return `${codexModelLabel(settings)} · ${effort}${speed}${settings.provider === "deepseek" ? " · DeepSeek" : ""}`;
 }
 export async function cancelModelJob(id: string) {
   await invoke("model_runtime", { args: { action: "cancel", id } });
