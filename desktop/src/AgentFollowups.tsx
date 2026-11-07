@@ -8,7 +8,7 @@ export function AgentFollowups({items,busy,active,canSteer,onAction,onResume}:{i
  const pending=items.filter(m=>!["cancelled","received","saved"].includes(m.state));
  const recent=items.filter(m=>["received","saved"].includes(m.state)).slice(-2);
  if(!pending.length&&!recent.length)return null;
- return <section className="agent-followups" aria-label="补充消息"><ul>{[...pending,...recent].map(item=><FollowupRow key={item.clientMessageId} item={item} disabled={busy} canSend={!active||canSteer} onAction={onAction}/>)}</ul>{active&&!canSteer&&pending.some(m=>["held","queued","failed"].includes(m.state))&&<p role="status">当前运行不支持即时追加，待发消息将在本轮结束后发送。</p>}{!active&&pending.some(m=>["held","queued"].includes(m.state))&&<button type="button" disabled={busy} onClick={onResume}>继续发送队列</button>}</section>;
+ return <section className="agent-followups" aria-label="补充消息"><ul>{[...pending,...recent].map(item=><FollowupRow key={item.clientMessageId} item={item} disabled={busy} canSend={!active||canSteer} onAction={onAction}/>)}</ul>{active&&!canSteer&&pending.some(m=>["held","queued","failed"].includes(m.state))&&<p role="status">当前运行不支持即时追加，请保留队列，等待本轮结束。</p>}{!active&&pending.some(m=>["held","queued"].includes(m.state))&&<button type="button" disabled={busy} onClick={onResume}>继续发送队列</button>}</section>;
 }
 function FollowupRow({item,disabled,canSend,onAction}:{item:Followup;disabled:boolean;canSend:boolean;onAction:(item:Followup,operation:string,payload?:Record<string,unknown>)=>Promise<void>}){
  const [edit,setEdit]=useState(false),[text,setText]=useState(""),[images,setImages]=useState<ImageGrant[]>([]),[notes,setNotes]=useState<Record<string,unknown>[]>([]),[sources,setSources]=useState<Record<string,unknown>[]>([]),[error,setError]=useState("");
