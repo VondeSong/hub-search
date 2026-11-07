@@ -44,6 +44,7 @@ it("CN04 native web activity remains visible without claiming full-text reading"
  expect(host.textContent).toContain("搜索网页 · 未完成");
  const explanation=host.querySelectorAll(".agent-web-provenance");
  expect(explanation).toHaveLength(1);expect(explanation[0].closest("details")).toBeNull();expect(explanation[0].textContent).toContain("返回结果数不是已读全文数");expect(explanation[0].textContent).toContain("不代表已完整读取");
+ expect(host.textContent).toContain("这条记录未提供逐项返回结果");
  expect(host.querySelector('a[href="https://example.org/a"]')).not.toBeNull();
 });
 
@@ -116,6 +117,18 @@ it.each(["failed","interrupted"])("keeps %s web diagnostics visible without impl
  expect(host.querySelectorAll('.agent-process-failure')).toHaveLength(1);
  expect(host.textContent).not.toContain("已获取");
  expect(host.textContent).not.toContain("已完整读取");
+});
+
+it.each([true,false])("keeps partial web errors visible after later reasoning while collapsed (running=%s)",async(running)=>{
+ const value:ActivityRun={runId:"live",revision:1,state:running?"investigating":"completed",running,startedAt:1,steps:0,events:[{id:"web",kind:"webSearch",state:"completed",label:"访问网页",action:"openPage",resultCount:5,errorCount:1,createdAt:1},{id:"later",kind:"reasoning",state:"completed",label:"继续整理可用来源",createdAt:2}]};
+ await act(async()=>root.render(<AgentActivity value={value}/>));
+ const toggle=host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!;
+ if(running) await act(async()=>toggle.click());
+ expect(toggle.getAttribute('aria-expanded')).toBe('false');
+ expect(host.querySelector('.agent-web-warning')?.textContent).toBe('访问网页 · 1 项未获取');
+ expect(host.querySelector('.agent-web-warning .lucide-triangle-alert')).not.toBeNull();
+ await act(async()=>toggle.click());
+ expect(host.querySelector('.agent-web-activity > summary')?.textContent).toBe('访问网页 · 1 项未获取');
 });
 
 it("distinguishes affected batches from failed pages and retains safe reasons without inventing missing details",async()=>{

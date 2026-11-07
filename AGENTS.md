@@ -26,13 +26,13 @@
 
 - 沿用私有的 [Hub 开发总看板](https://github.com/users/VondeSong/projects/2/views/1)，所属账号 `VondeSong`，Project 编号 `2`、ID `PVT_kwHOAzsX5M4BqkPh`，关联 `VondeSong/hub-search`；不新建或替换已有看板。
 - 状态字段为 `Status`，ID `PVTSSF_lAHOAzsX5M4BqkPhzho62Q8`，保留“待处理、处理中、待验证、已完成”及其现有选项身份。进度与验收按下方“开发进度与完成记录”执行，保留已有自动化配置，不擅自重置规则或事项状态。
-- “模块”为单选字段，ID `PVTSSF_lAHOAzsX5M4BqkPhzho62eM`。保留搜索、闪卡、DeepSeek、同步、界面五类及其原有选项；在原有“移动端”视图基础上补齐移动端选项和筛选。以下均为现有 Board 视图，总看板不设模块过滤，各模块以 `模块:模块名` 筛选：
+- “模块”为单选字段，ID `PVTSSF_lAHOAzsX5M4BqkPhzho62eM`，包含搜索、闪卡、Agents、同步、界面、移动端六类。Agents 由原 DeepSeek 选项原位更名，选项 ID 保持 `74a16a9d`，沿用已有事项归属和进度，不另建同名选项。以下均为现有 Board 视图，总看板不设模块过滤，各模块以 `模块:模块名` 筛选：
 
 | 模块与视图 | 适用范围 |
 | --- | --- |
 | [搜索](https://github.com/users/VondeSong/projects/2/views/2) | 本地索引、检索、结果列表与内容预览相关需求 |
 | [闪卡](https://github.com/users/VondeSong/projects/2/views/3) | 闪卡生成、质量、牌组、学习与复习相关需求 |
-| [DeepSeek](https://github.com/users/VondeSong/projects/2/views/4) | DeepSeek 提供方相关需求，保留现有分类名称和事项归属 |
+| [Agents](https://github.com/users/VondeSong/projects/2/views/4) | Hub Agents、共享记忆及模型提供方相关需求；视图筛选为 `模块:Agents` |
 | [同步](https://github.com/users/VondeSong/projects/2/views/5) | Craft、滴答、Obsidian 接入及云同步等相关需求，沿用已有归类 |
 | [界面](https://github.com/users/VondeSong/projects/2/views/6) | 导航、布局、交互与界面呈现相关需求 |
 | [移动端](https://github.com/users/VondeSong/projects/2/views/7) | 现有 Android 工程、移动布局与手机端功能适配 |

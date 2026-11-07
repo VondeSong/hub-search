@@ -8,7 +8,10 @@ pub(super) fn requires_structured_delivery(tool: &Tool) -> bool {
     if let Tool::Capability { name, .. } = tool {
         if matches!(
             name.as_str(),
-            "hub_read_note" | "hub_search_notes" | "hub_read_analysis_snapshot"
+            "hub_read_note"
+                | "hub_search_notes"
+                | "hub_list_note_sources"
+                | "hub_read_analysis_snapshot"
         ) {
             return false;
         }
@@ -166,6 +169,7 @@ mod tests {
         for name in [
             "hub_read_note",
             "hub_search_notes",
+            "hub_list_note_sources",
             "hub_read_analysis_snapshot",
         ] {
             assert!(!requires_structured_delivery(&Tool::Capability {
