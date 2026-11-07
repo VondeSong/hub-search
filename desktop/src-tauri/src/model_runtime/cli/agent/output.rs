@@ -3,9 +3,22 @@ use super::*;
 pub(super) const PUBLIC_BYTES: usize = 32_768;
 const NOTICE: &str = "\n\n（过程消息超过显示上限，后续内容未展示。）";
 
-pub(super) fn message_delta(items: &mut HashMap<String, PublicItem>, finals: &HashSet<String>, value: &Value) -> Result<(), String> {
+pub(super) fn message_delta(
+    items: &mut HashMap<String, PublicItem>,
+    finals: &HashSet<String>,
+    value: &Value,
+) -> Result<(), String> {
     let id = value["itemId"].as_str().ok_or("Agent 消息身份缺失")?;
-    append(items, id, if finals.contains(id) { "answer" } else { "message" }, value["delta"].as_str().unwrap_or_default())
+    append(
+        items,
+        id,
+        if finals.contains(id) {
+            "answer"
+        } else {
+            "message"
+        },
+        value["delta"].as_str().unwrap_or_default(),
+    )
 }
 
 pub(super) fn is_final_message(item: &Value) -> bool {
@@ -33,17 +46,37 @@ mod tests {
     fn native_answer_deltas_stay_distinct_from_progress_and_do_not_commit_a_report() {
         let mut items = HashMap::new();
         let finals = HashSet::from(["answer".to_string()]);
-        message_delta(&mut items, &finals, &json!({"itemId":"progress","delta":"正在读取"})).unwrap();
-        message_delta(&mut items, &finals, &json!({"itemId":"answer","delta":"结论🙂"})).unwrap();
-        message_delta(&mut items, &finals, &json!({"itemId":"answer","delta":"[1]"})).unwrap();
+        message_delta(
+            &mut items,
+            &finals,
+            &json!({"itemId":"progress","delta":"正在读取"}),
+        )
+        .unwrap();
+        message_delta(
+            &mut items,
+            &finals,
+            &json!({"itemId":"answer","delta":"结论🙂"}),
+        )
+        .unwrap();
+        message_delta(
+            &mut items,
+            &finals,
+            &json!({"itemId":"answer","delta":"[1]"}),
+        )
+        .unwrap();
         let mut events = Vec::new();
         flush(&mut items, &mut |kind, value| {
             assert_eq!(kind, "event");
             events.push(value.clone());
             Ok(Value::Null)
-        }).unwrap();
-        assert!(events.iter().any(|e| e["kind"] == "answer" && e["text"] == "结论🙂[1]" && e["state"] == "running"));
-        assert!(events.iter().any(|e| e["kind"] == "message" && e["text"] == "正在读取"));
+        })
+        .unwrap();
+        assert!(events
+            .iter()
+            .any(|e| e["kind"] == "answer" && e["text"] == "结论🙂[1]" && e["state"] == "running"));
+        assert!(events
+            .iter()
+            .any(|e| e["kind"] == "message" && e["text"] == "正在读取"));
         assert!(message_delta(&mut items, &finals, &json!({"delta":"no identity"})).is_err());
     }
     #[test]

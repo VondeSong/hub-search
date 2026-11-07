@@ -109,7 +109,11 @@ impl Events {
                     if result["title"] == "Internal Error" {
                         errors += 1;
                         if failures.len() < 64 {
-                            if let Some(id) = result["ref_id"].as_str().filter(|s| !s.is_empty() && s.len() <= 128 && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')) {
+                            if let Some(id) = result["ref_id"].as_str().filter(|s| {
+                                !s.is_empty()
+                                    && s.len() <= 128
+                                    && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+                            }) {
                                 failures.push(json!({"refId":id}));
                             }
                         }

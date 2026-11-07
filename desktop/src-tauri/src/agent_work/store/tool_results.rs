@@ -371,7 +371,9 @@ pub(in crate::agent_work) fn read_for_work(
             "title":value["skill"]["title"], "content":content.chars().take(4000).collect::<String>(),
             "totalChars":content.chars().count(), "truncated":content.chars().count()>4000
         }))
-    } else { None };
+    } else {
+        None
+    };
     let text = value.to_string();
     let total = text.chars().count();
     if start > total {

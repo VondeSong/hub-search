@@ -41,16 +41,19 @@ fn replace_file_atomically(staged: &Path, target: &Path) -> std::io::Result<()> 
     extern "system" {
         fn MoveFileExW(existing: *const u16, replacement: *const u16, flags: u32) -> i32;
     }
-    let staged = staged
-        .as_os_str()
-        .encode_wide()
-        .chain(Some(0))
-        .collect::<Vec<_>>();
-    let target = target
-        .as_os_str()
-        .encode_wide()
-        .chain(Some(0))
-        .collect::<Vec<_>>();
+    let wide_path = |path: &Path| -> std::io::Result<Vec<u16>> {
+        let parent = path.parent().ok_or(std::io::ErrorKind::InvalidInput)?;
+        let name = path.file_name().ok_or(std::io::ErrorKind::InvalidInput)?;
+        // Verbatim parents support long paths without resolving a final symlink being replaced.
+        Ok(fs::canonicalize(parent)?
+            .join(name)
+            .as_os_str()
+            .encode_wide()
+            .chain(Some(0))
+            .collect())
+    };
+    let staged = wide_path(staged)?;
+    let target = wide_path(target)?;
     // Both paths are local BlobStore paths. Replacement is atomic on the same
     // filesystem and never exposes a deleted or partially rewritten object.
     if unsafe { MoveFileExW(staged.as_ptr(), target.as_ptr(), 0x1 | 0x8) } == 0 {
@@ -282,6 +285,36 @@ impl BlobStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    fn long_paths_publish_stream_and_repair_blobs() {
+        use std::os::windows::ffi::OsStrExt;
+        let root = std::env::temp_dir().join(format!(
+            "craft-search-blob-long-path-test-{}",
+            rand::thread_rng().next_u64()
+        ));
+        let mut directory = root.clone();
+        while directory.as_os_str().encode_wide().count() < 280 {
+            directory.push("long-attachment-path");
+        }
+        fs::create_dir_all(directory.join("nested")).unwrap();
+        let store = BlobStore::open(&directory.join("nested/../blobs-v1")).unwrap();
+        let bytes = b"verified long-path attachment";
+        let first = store.put(bytes).unwrap();
+        assert_eq!(store.read(&first.hash).unwrap(), bytes);
+        fs::write(store.path_for(&first.hash).unwrap(), b"corrupt").unwrap();
+        assert_eq!(store.put(bytes).unwrap().hash, first.hash);
+        assert_eq!(store.read(&first.hash).unwrap(), bytes);
+        let source = root.join("source.txt");
+        fs::write(&source, b"streamed long-path attachment").unwrap();
+        let streamed = store.put_file(&source, 1024).unwrap();
+        assert_eq!(
+            store.read(&streamed.hash).unwrap(),
+            fs::read(source).unwrap()
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn identical_content_is_stored_once_and_can_be_read() {

@@ -22,7 +22,8 @@ fn reliability_rejected_trace_read_returns_the_actual_page_limit() {
     assert_eq!(feedback["retryPerformed"], false);
     let recovery = &feedback["recoveryOptions"][0];
     let schema = input::tool_schema(&specs, recovery["tool"].as_str().unwrap()).unwrap();
-    crate::model_runtime::validate_agent_tool(&recovery["arguments"], &schema["inputSchema"]).unwrap();
+    crate::model_runtime::validate_agent_tool(&recovery["arguments"], &schema["inputSchema"])
+        .unwrap();
     assert_eq!(recovery["arguments"]["name"], "hub_traceResult");
     assert_eq!(
         store::records(&f.root, &id, "toolRejected", 10)

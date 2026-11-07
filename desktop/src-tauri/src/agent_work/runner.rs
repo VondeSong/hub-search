@@ -4,10 +4,10 @@ pub(in crate::agent_work) const ANSWER_CHARS: usize = 32_000;
 pub(super) const TOOL_ENVELOPE: &str = "每轮必须同时包含 rationale、requests、report 三个字段，不能省略。仅调用工具时 requests 非空，也必须明确写 report:null；交付报告时 requests:[]，report 为报告对象。不能在同一轮执行工具并交付报告，其它字段严格遵循 schema。";
 use crate::source_evidence::EvidenceVersion;
 use std::collections::HashSet;
+mod failure_progress;
 mod measurement;
 mod native;
 mod read_progress;
-mod failure_progress;
 mod selected_materials;
 pub(crate) use native::external::WorkSession as ExternalWork;
 #[path = "../agent_acceptance/projection.rs"]
@@ -308,11 +308,14 @@ impl Context {
         Ok(())
     }
     fn remember(&mut self, excerpt: EvidenceExcerpt) -> Result<Value, String> {
-        let rules = if crate::source_evidence::local_text::is_local(&excerpt.locator) {None} else {self
-            .skills
-            .as_mut()
-            .map(|s| s.note_rules(&excerpt.locator))
-            .transpose()?};
+        let rules = if crate::source_evidence::local_text::is_local(&excerpt.locator) {
+            None
+        } else {
+            self.skills
+                .as_mut()
+                .map(|s| s.note_rules(&excerpt.locator))
+                .transpose()?
+        };
         let key = serde_json::to_string(&excerpt.locator).map_err(|e| e.to_string())?;
         if !self.entities.contains(&key) && self.entities.len() >= self.budget.entities {
             return Err("取证实体预算已用尽".into());

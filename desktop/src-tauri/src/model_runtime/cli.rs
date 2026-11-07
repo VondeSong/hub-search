@@ -9,8 +9,8 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::{mpsc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
-pub(super) mod agent;
 pub(super) mod accounts;
+pub(super) mod agent;
 #[cfg(test)]
 #[path = "process_probe.rs"]
 mod process_probe;
@@ -328,7 +328,10 @@ impl CatalogProcess {
         #[cfg(windows)]
         let group = match agent::ProcessGroup::attach(child.id()) {
             Ok(group) => Some(group),
-            Err(error) => { stop_child(&mut child); return Err(error); }
+            Err(error) => {
+                stop_child(&mut child);
+                return Err(error);
+            }
         };
         let Some(mut stdin) = child.stdin.take() else {
             stop_child(&mut child);
@@ -418,7 +421,9 @@ impl CatalogProcess {
         let mut notifications = 0;
         while notifications < 1024 {
             self.control.check()?;
-            let remaining = deadline.min(self.deadline).saturating_duration_since(Instant::now());
+            let remaining = deadline
+                .min(self.deadline)
+                .saturating_duration_since(Instant::now());
             if remaining.is_zero() {
                 return Err("读取 Codex 模型超时，请刷新后重试。".into());
             }

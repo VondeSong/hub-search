@@ -93,7 +93,10 @@ fn identity(args: &Value) -> Result<String, String> {
 fn payload(args: &Value, kind: &str) -> Value {
     let mut body = json!({"kind":kind,"expectedControlRevision":args["expectedControlRevision"],
         "expectedWorkRevision":args["expectedWorkRevision"],"expectedRunId":args["expectedRunId"],"mode":args["mode"]});
-    if args["resumeQueue"]==true {body["resumeQueue"]=json!(true);body["selectedMessageId"]=args["selectedMessageId"].clone();}
+    if args["resumeQueue"] == true {
+        body["resumeQueue"] = json!(true);
+        body["selectedMessageId"] = args["selectedMessageId"].clone();
+    }
     if let Some(report) = args.get("reportContinuation") {
         body["reportContinuation"] = report.clone();
     }
@@ -218,8 +221,10 @@ fn resume_impl(
         if state["canResume"] != true {
             return Err(state["reason"].as_str().unwrap_or("不能恢复").into());
         }
-        if args["resumeQueue"]==true {super::followups::resume_on(root,c,id,args["selectedMessageId"].as_str())?;}
-        let w=load(c,id)?;
+        if args["resumeQueue"] == true {
+            super::followups::resume_on(root, c, id, args["selectedMessageId"].as_str())?;
+        }
+        let w = load(c, id)?;
         if let Some(anchor) = &w.anchor {
             w.grant.reader(root)?.read(anchor, 0, 1, None)?;
         }

@@ -39,12 +39,30 @@ fn initial_user_message_retains_its_recorded_send_time_and_legacy_time_is_unknow
     let f = Fixture::new();
     let id = create(&f);
     let saved = store::view(&f.root, &id).unwrap();
-    let sent = saved["conversation"]["messages"][0]["createdAt"].as_i64().unwrap();
+    let sent = saved["conversation"]["messages"][0]["createdAt"]
+        .as_i64()
+        .unwrap();
     assert!(sent > 0);
-    f.c().execute("UPDATE agent_works SET updated_at=updated_at+60000 WHERE id=?1", [&id]).unwrap();
-    assert_eq!(store::view(&f.root, &id).unwrap()["conversation"]["messages"][0]["createdAt"], sent);
-    f.c().execute("DELETE FROM agent_records WHERE work_id=?1 AND kind='conversationCreated'", [&id]).unwrap();
-    assert_eq!(store::view(&f.root, &id).unwrap()["conversation"]["messages"][0]["createdAt"], 0);
+    f.c()
+        .execute(
+            "UPDATE agent_works SET updated_at=updated_at+60000 WHERE id=?1",
+            [&id],
+        )
+        .unwrap();
+    assert_eq!(
+        store::view(&f.root, &id).unwrap()["conversation"]["messages"][0]["createdAt"],
+        sent
+    );
+    f.c()
+        .execute(
+            "DELETE FROM agent_records WHERE work_id=?1 AND kind='conversationCreated'",
+            [&id],
+        )
+        .unwrap();
+    assert_eq!(
+        store::view(&f.root, &id).unwrap()["conversation"]["messages"][0]["createdAt"],
+        0
+    );
 }
 fn note() -> EvidenceLocator {
     EvidenceLocator::Note {

@@ -142,13 +142,13 @@ fn unwrap(result: Value) -> Result<Value, String> {
 }
 
 impl Session {
-    pub(crate) fn update_read_scope(&mut self, scope: EvidenceScope) -> Result<(),String> {
+    pub(crate) fn update_read_scope(&mut self, scope: EvidenceScope) -> Result<(), String> {
         self.verify()?;
-        let allowed=EvidenceReader::new(&self.root,scope.clone()).catalog()?;
-        let rules=Rules::new(&self.root,allowed,true)?;
+        let allowed = EvidenceReader::new(&self.root, scope.clone()).catalog()?;
+        let rules = Rules::new(&self.root, allowed, true)?;
         rules.verify()?;
-        self.scope=Some(scope);
-        self.rules=rules;
+        self.scope = Some(scope);
+        self.rules = rules;
         Ok(())
     }
     pub(crate) fn mcp(root: &Path) -> Result<Self, String> {

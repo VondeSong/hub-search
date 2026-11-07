@@ -8,13 +8,22 @@ fn compaction_queue_survives_interruption_and_reopen_without_false_acceptance() 
     let id = crate::agent_work::tests::create(&f, false);
     let (work, run) = crate::agent_work::tests::claim(&f, &id);
     store::record(&f.root, &run, "nativeRuntime", &json!({"protocol":1})).unwrap();
-    store::record(&f.root, &run, "nativeContextLifecycle", &json!({"state":"started","threadId":"same-thread"})).unwrap();
-    let message = json!({"runId":run,"clientMessageId":"during-compact","text":"只保留有出处的结论"});
+    store::record(
+        &f.root,
+        &run,
+        "nativeContextLifecycle",
+        &json!({"state":"started","threadId":"same-thread"}),
+    )
+    .unwrap();
+    let message =
+        json!({"runId":run,"clientMessageId":"during-compact","text":"只保留有出处的结论"});
     store::conversation::steer(&f.root, &id, &message).unwrap();
     store::conversation::steer(&f.root, &id, &message).unwrap();
     let queued = pending(&f.root, &work, &run, &HashSet::new()).unwrap();
     assert_eq!(queued.len(), 1);
-    assert!(store::records(&f.root, &id, "steeringAccepted", 32).unwrap().is_empty());
+    assert!(store::records(&f.root, &id, "steeringAccepted", 32)
+        .unwrap()
+        .is_empty());
     store::fail(&f.root, &work, &run, "压缩期间中断").unwrap();
     assert!(pending(&f.root, &work, &run, &HashSet::new()).is_err());
     let c = f.c();
@@ -22,8 +31,13 @@ fn compaction_queue_survives_interruption_and_reopen_without_false_acceptance() 
     assert_eq!(reopened.state, "interrupted");
     let history = store::conversation::read_on(&f.root, &c, &reopened).unwrap();
     assert!(history.to_string().contains("只保留有出处的结论"));
-    assert_eq!(store::records(&f.root, &id, "steering", 32).unwrap(), queued);
-    assert!(store::records(&f.root, &id, "steeringAccepted", 32).unwrap().is_empty());
+    assert_eq!(
+        store::records(&f.root, &id, "steering", 32).unwrap(),
+        queued
+    );
+    assert!(store::records(&f.root, &id, "steeringAccepted", 32)
+        .unwrap()
+        .is_empty());
 }
 
 #[test]

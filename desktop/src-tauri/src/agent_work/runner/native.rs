@@ -5,6 +5,8 @@ use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 mod accepted_delivery;
 mod arguments;
+#[cfg(test)]
+mod autonomy_acceptance;
 mod bytes;
 #[cfg(test)]
 mod closeout;
@@ -15,11 +17,9 @@ mod database;
 #[cfg(test)]
 mod delivery;
 mod direct_answer;
+pub(crate) mod external;
 #[cfg(test)]
 mod flow_acceptance;
-#[cfg(test)]
-mod autonomy_acceptance;
-pub(crate) mod external;
 mod guidance;
 mod input;
 mod late_steering;
@@ -149,7 +149,12 @@ pub(super) fn investigate(
         format!("{INSTRUCTIONS}\n本对话另行授权了 hub_mcp 的只读文档服务，与 webSearch 搜索开关独立。可按所选服务/工具查询公开文档或读取已明确选择的资源 URI；read_resource 不授权其他 URI、模板或链接；实际读取的资源 URI 可作为外部来源；先读取 catalog 格式再调用，查询宜从少量结果开始，长页面优先指定章节。不能借此访问任意网页、发送私人材料或扩展权限。MCP 结果不是 Hub 原文引文；成功调用后的来源格式与允许范围以 hub_mcp 工具说明为准，并经过宿主来源校验。自定义工具只能引用实际服务入口，不伪造文章已读证据；静态资源只能引用实际读取的 URI。自定义服务的只读声明不等于远端写入隔离。目录变化或失败后停止本轮该服务，说明限制并保留已获得结果。")
     };
     let mut tool_specs = tools(context.skills.as_ref())?;
-    if options.external_mcp { tool_specs.as_array_mut().unwrap().retain(|tool|tool["name"]!="hub_citations"); }
+    if options.external_mcp {
+        tool_specs
+            .as_array_mut()
+            .unwrap()
+            .retain(|tool| tool["name"] != "hub_citations");
+    }
     services::extend_tools(&mut tool_specs, &options.mcp_services)?;
     let wire_tools = input::wire_tools(
         &tool_specs,
@@ -186,7 +191,8 @@ pub(super) fn investigate(
     let recovering: bool = crate::source_evidence::open_read_database(root)?.query_row(
         "SELECT EXISTS(SELECT 1 FROM agent_records WHERE run_id=?1 AND kind='lifecycleRecovery')",
         [run], |r| r.get(0)).map_err(|e| e.to_string())?;
-    let (authentication_identity, account_scope) = crate::model_runtime::agent_authentication(root, operation.codex_account_selection())?;
+    let (authentication_identity, account_scope) =
+        crate::model_runtime::agent_authentication(root, operation.codex_account_selection())?;
     super::super::account_binding::check(root, &work.id, run, &account_scope, previous.is_some())?;
     let execution_manifest =
         compatibility::manifest(root, work, run, &tool_specs, &authentication_identity)?;
@@ -415,10 +421,10 @@ pub(super) fn investigate(
     let mut recovery_messages: Vec<Value> = Vec::new();
     let mut late_recovery_used = false;
     let mut compact_before_turn = compaction_plan.is_some();
-    let mut runtime_work=work.clone();
-    let mut runtime_catalog=catalog.clone();
-    let mut prepared_followups=std::collections::HashMap::<String,Value>::new();
-    let mut next_images=image_input.clone();
+    let mut runtime_work = work.clone();
+    let mut runtime_catalog = catalog.clone();
+    let mut prepared_followups = std::collections::HashMap::<String, Value>::new();
+    let mut next_images = image_input.clone();
     let result = loop {
         let compact_this_turn = std::mem::take(&mut compact_before_turn);
         let provider_started = std::time::Instant::now();
@@ -706,8 +712,8 @@ pub(super) fn investigate(
             break result;
         }
         let continuation = (|| {
-            let work=&runtime_work;
-            let catalog=&runtime_catalog;
+            let work = &runtime_work;
+            let catalog = &runtime_catalog;
             control.check()?;
             let Some(messages) =
                 late_steering::next(root, work, run, &delivered, &mut late_recovery_used)?
@@ -728,8 +734,13 @@ pub(super) fn investigate(
             }
             let input = format!("用户在最终发布前追加了以下真实要求，请处理这些要求，重新交付；普通只读答复可绑定当前引用后直接回答，业务成果仍需 hub_finish。旧报告不能直接发布。\n{}\n本轮已读材料：{}\n本轮有效引用：{}",json!({"messages":messages}),json!(context.observations),json!(quotes::catalog(&context.excerpts)));
             material_bytes.text(&input);
-            let (resend_images,_,resend_raw)=images::prepare(root,&work.grant.images)?;
-            material_bytes.images(resend_raw,serde_json::to_vec(&resend_images).map_err(|e|e.to_string())?.len());
+            let (resend_images, _, resend_raw) = images::prepare(root, &work.grant.images)?;
+            material_bytes.images(
+                resend_raw,
+                serde_json::to_vec(&resend_images)
+                    .map_err(|e| e.to_string())?
+                    .len(),
+            );
             context.usage.request_bytes = material_bytes.total();
             store::record(
                 root,
@@ -751,7 +762,7 @@ pub(super) fn investigate(
         })();
         match continuation {
             Ok(Some((messages, input, thread))) => {
-                next_images=images::prepare(root,&runtime_work.grant.images)?.0;
+                next_images = images::prepare(root, &runtime_work.grant.images)?.0;
                 accepted = None;
                 accepted_after = None;
                 native_citations = json!([]);
@@ -763,8 +774,16 @@ pub(super) fn investigate(
             Err(error) => break Err(error),
         }
     };
-    let work=&runtime_work;
-    let session=&assistant::Session{root,work,run,control,operation:session.operation,selection:session.selection.clone(),app:session.app};
+    let work = &runtime_work;
+    let session = &assistant::Session {
+        root,
+        work,
+        run,
+        control,
+        operation: session.operation,
+        selection: session.selection.clone(),
+        app: session.app,
+    };
     let result = result.and_then(|value| {
         let delta = measurement::token_delta(
             &token_usage,
@@ -871,9 +890,13 @@ pub(super) fn investigate(
         )?;
     }
     if accepted.is_none() && provider_completed {
-        if let Some(report) =
-            direct_answer.prepare_cited(structured_tools, finish_attempts, &web_accessed, &native_citations, &context.excerpts)?
-        {
+        if let Some(report) = direct_answer.prepare_cited(
+            structured_tools,
+            finish_attempts,
+            &web_accessed,
+            &native_citations,
+            &context.excerpts,
+        )? {
             store::goal::accept_report(
                 root,
                 work,

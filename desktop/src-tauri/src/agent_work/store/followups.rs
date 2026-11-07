@@ -344,18 +344,25 @@ pub(in crate::agent_work) fn resume_on(
 pub(in crate::agent_work) fn take_next(root: &Path, id: &str) -> Result<bool, String> {
     write(root, |c| take_on(root, c, id, false, None))
 }
-pub(in crate::agent_work) fn take_explicit(root: &Path, id: &str, args: &Value) -> Result<bool, String> {
+pub(in crate::agent_work) fn take_explicit(
+    root: &Path,
+    id: &str,
+    args: &Value,
+) -> Result<bool, String> {
     write(root, |c| {
         let work = load(c, id)?;
         if args.get("expectedRunId").is_none() || args["expectedRunId"] != json!(work.active_run) {
             return Err("这一轮已结束或改变，请刷新后发送".into());
         }
-        if work.active_run.is_some() || matches!(work.state.as_str(), "revoked" | "paused" | "cancelled") {
+        if work.active_run.is_some()
+            || matches!(work.state.as_str(), "revoked" | "paused" | "cancelled")
+        {
             return Err("当前对话不能恢复队列，请刷新".into());
         }
         let selected = args["selectedMessageId"].as_str();
         for mut item in rows(c, id)? {
-            if item["state"] == "held" && selected.is_none_or(|key| item["clientMessageId"] == key) {
+            if item["state"] == "held" && selected.is_none_or(|key| item["clientMessageId"] == key)
+            {
                 item["state"] = json!("queued");
                 put(c, id, &item)?;
             }
@@ -363,7 +370,13 @@ pub(in crate::agent_work) fn take_explicit(root: &Path, id: &str, args: &Value) 
         take_on(root, c, id, true, selected)
     })
 }
-fn take_on(root: &Path, c: &Connection, id: &str, explicit: bool, selected: Option<&str>) -> Result<bool, String> {
+fn take_on(
+    root: &Path,
+    c: &Connection,
+    id: &str,
+    explicit: bool,
+    selected: Option<&str>,
+) -> Result<bool, String> {
     let work = load(c, id)?;
     if work.active_run.is_some()
         || work.state == "revoked"
@@ -375,7 +388,10 @@ fn take_on(root: &Path, c: &Connection, id: &str, explicit: bool, selected: Opti
     {
         return Ok(false);
     }
-    let Some(mut item) = rows(c, id)?.into_iter().find(|m| m["state"] == "queued" && selected.is_none_or(|key| m["clientMessageId"] == key)) else {
+    let Some(mut item) = rows(c, id)?
+        .into_iter()
+        .find(|m| m["state"] == "queued" && selected.is_none_or(|key| m["clientMessageId"] == key))
+    else {
         return Ok(false);
     };
     if item["authorizationVersion"].as_i64() != Some(work.authorization_version) {

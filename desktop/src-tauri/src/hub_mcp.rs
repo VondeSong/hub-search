@@ -5020,9 +5020,19 @@ mod tests {
                 .collect::<std::collections::BTreeSet<_>>()
         );
         let tool = |name: &str| tools.iter().find(|t| t["name"] == name).unwrap();
-        assert_eq!(tool("hub_get_flashcard_quality_context")["inputSchema"]["required"], json!(["learningGoal"]));
-        assert_eq!(tool("hub_get_flashcard_quality_context")["inputSchema"]["properties"]["learningGoal"]["minLength"], 1);
-        assert_eq!(tool("hub_list_flashcard_feedback")["inputSchema"]["required"], json!([]));
+        assert_eq!(
+            tool("hub_get_flashcard_quality_context")["inputSchema"]["required"],
+            json!(["learningGoal"])
+        );
+        assert_eq!(
+            tool("hub_get_flashcard_quality_context")["inputSchema"]["properties"]["learningGoal"]
+                ["minLength"],
+            1
+        );
+        assert_eq!(
+            tool("hub_list_flashcard_feedback")["inputSchema"]["required"],
+            json!([])
+        );
         for name in read_only {
             assert_eq!(tool(name)["annotations"]["readOnlyHint"], true, "{name}");
             assert_eq!(
@@ -5173,15 +5183,15 @@ mod tests {
     fn capability_summary_is_derived_from_the_tool_catalog() {
         let summary = hub_mcp_capability_summary();
         assert_eq!(summary["schemaVersion"], json!("hub.mcp-capabilities.v1"));
-        assert_eq!(summary["toolCount"], json!(44));
-        assert_eq!(summary["readOnlyToolCount"], json!(31));
+        assert_eq!(summary["toolCount"], json!(48));
+        assert_eq!(summary["readOnlyToolCount"], json!(35));
         assert_eq!(summary["writeToolCount"], json!(13));
         assert_eq!(summary["destructiveToolCount"], json!(2));
         assert_eq!(summary["groups"]["content"], json!(3));
         assert_eq!(summary["groups"]["tagEvidence"], json!(7));
         assert_eq!(summary["groups"]["tagWorkflow"], json!(19));
         assert_eq!(summary["groups"]["flashcardMedia"], json!(8));
-        assert_eq!(summary["groups"]["other"], json!(7));
+        assert_eq!(summary["groups"]["other"], json!(11));
         assert_eq!(
             summary["groups"]
                 .as_object()

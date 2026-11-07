@@ -249,7 +249,7 @@ pub(crate) struct EvidenceCandidate {
     pub(crate) version: EvidenceVersion,
     pub(crate) title: String,
     pub(crate) snippet: String,
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) match_start_char: Option<usize>,
 }
 
@@ -762,8 +762,10 @@ impl EvidenceReader {
         locator: &EvidenceLocator,
     ) -> Result<Snapshot, String> {
         if local_text::is_local(locator) {
-            if !self.scope.notes.contains(locator) {return Err("文本附件未获明确授权".into());}
-            return local_text::snapshot(&self.root,locator);
+            if !self.scope.notes.contains(locator) {
+                return Err("文本附件未获明确授权".into());
+            }
+            return local_text::snapshot(&self.root, locator);
         }
         let library = match locator {
             EvidenceLocator::Note { library_id, .. }

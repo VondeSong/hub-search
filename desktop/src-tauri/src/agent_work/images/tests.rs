@@ -3,40 +3,61 @@ use crate::source_evidence::tests::Fixture;
 const PNG: &[u8] = include_bytes!("fixture.png");
 #[test]
 fn local_image_staging_does_not_grant_and_exact_bytes_survive_message_binding() {
-    let f=Fixture::new();
-    let args=json!({"action":"stageImage","title":"本地截图.png","mime":"image/png","base64":base64::engine::general_purpose::STANDARD.encode(PNG)});
-    let staged=ui(&f.root,&args).unwrap();
-    let g:ImageGrant=serde_json::from_value(staged["grant"].clone()).unwrap();
-    let id=create(&f);
-    assert!(store::load(&f.c(),&id).unwrap().grant.images.is_empty());
-    let preview=ui(&f.root,&json!({"action":"imagePreview","grant":g})).unwrap();
-    assert_eq!(preview["title"],"本地截图.png");
-    assert!(preview["url"].as_str().unwrap().starts_with("data:image/png;base64,"));
-    ui(&f.root,&message(&f,&id,&g,false,1)).unwrap();
-    assert_eq!(prepare(&f.root,&[g.clone()]).unwrap().2,PNG.len());
-    let mut forged=g.clone();forged.source_item_id="../secret".into();
-    assert!(bytes(&f.root,&f.c(),&forged).is_err());
-    let mut wrong=args.clone();wrong["mime"]=json!("image/jpeg");assert!(ui(&f.root,&wrong).is_err());
-    assert!(bytes(&f.root,&f.c(),&g).is_ok());
-    std::fs::write(f.root.join("collection-files/agent-images").join(format!("{}.image",g.source_item_id)),b"tampered").unwrap();
-    assert!(prepare(&f.root,&[g]).is_err());
+    let f = Fixture::new();
+    let args = json!({"action":"stageImage","title":"本地截图.png","mime":"image/png","base64":base64::engine::general_purpose::STANDARD.encode(PNG)});
+    let staged = ui(&f.root, &args).unwrap();
+    let g: ImageGrant = serde_json::from_value(staged["grant"].clone()).unwrap();
+    let id = create(&f);
+    assert!(store::load(&f.c(), &id).unwrap().grant.images.is_empty());
+    let preview = ui(&f.root, &json!({"action":"imagePreview","grant":g})).unwrap();
+    assert_eq!(preview["title"], "本地截图.png");
+    assert!(preview["url"]
+        .as_str()
+        .unwrap()
+        .starts_with("data:image/png;base64,"));
+    ui(&f.root, &message(&f, &id, &g, false, 1)).unwrap();
+    assert_eq!(prepare(&f.root, &[g.clone()]).unwrap().2, PNG.len());
+    let mut forged = g.clone();
+    forged.source_item_id = "../secret".into();
+    assert!(bytes(&f.root, &f.c(), &forged).is_err());
+    let mut wrong = args.clone();
+    wrong["mime"] = json!("image/jpeg");
+    assert!(ui(&f.root, &wrong).is_err());
+    assert!(bytes(&f.root, &f.c(), &g).is_ok());
+    std::fs::write(
+        f.root
+            .join("collection-files/agent-images")
+            .join(format!("{}.image", g.source_item_id)),
+        b"tampered",
+    )
+    .unwrap();
+    assert!(prepare(&f.root, &[g]).is_err());
 }
 
 #[test]
 fn local_image_rejects_invalid_and_oversized_inputs_before_staging() {
-    let f=Fixture::new();
-    for (mime,data) in [("text/plain","a".to_string()),("image/png","!".into()),("image/png","A".repeat(400_000))] {
-        assert!(ui(&f.root,&json!({"action":"stageImage","title":"invalid","mime":mime,"base64":data})).is_err());
+    let f = Fixture::new();
+    for (mime, data) in [
+        ("text/plain", "a".to_string()),
+        ("image/png", "!".into()),
+        ("image/png", "A".repeat(400_000)),
+    ] {
+        assert!(ui(
+            &f.root,
+            &json!({"action":"stageImage","title":"invalid","mime":mime,"base64":data})
+        )
+        .is_err());
     }
     assert!(!f.root.join("collection-files/agent-images").exists());
 }
 #[test]
 fn local_image_upload_is_not_limited_by_normal_message_envelope() {
-    let f=Fixture::new();
-    let mut data=PNG.to_vec();data.resize(80_000,0);
+    let f = Fixture::new();
+    let mut data = PNG.to_vec();
+    data.resize(80_000, 0);
     let staged=ui(&f.root,&json!({"action":"stageImage","title":"large.png","mime":"image/png","base64":base64::engine::general_purpose::STANDARD.encode(&data)})).unwrap();
-    let g:ImageGrant=serde_json::from_value(staged["grant"].clone()).unwrap();
-    assert_eq!(bytes(&f.root,&f.c(),&g).unwrap().0,data);
+    let g: ImageGrant = serde_json::from_value(staged["grant"].clone()).unwrap();
+    assert_eq!(bytes(&f.root, &f.c(), &g).unwrap().0, data);
 }
 fn seed(f: &Fixture) -> ImageGrant {
     crate::attachment_evidence::tests::seed(f, "image", "synthetic");

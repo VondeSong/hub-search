@@ -391,8 +391,8 @@ mod tests {
         let request = super::super::Request {
             directory: std::path::Path::new("isolated"),
             authentication_identity: "unused",
-                auth_root: None,
-                auth_selection: None,
+            auth_root: None,
+            auth_selection: None,
             thread: None,
             instructions: "Hub rules",
             image_input: &[],

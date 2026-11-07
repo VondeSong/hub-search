@@ -5,23 +5,46 @@ fn library_scope_changes_are_explicit_versioned_and_idempotent() {
     let f = Fixture::new();
     f.note("notes", "current", "current");
     let id = create(&f, false);
-    let req=json!({"action":"message","id":id,"text":"按库查找","clientMessageId":"libraries","expectedRevision":1,"setLibraryIds":["notes","craft"]});
-    let mut unversioned=req.clone();unversioned.as_object_mut().unwrap().remove("expectedRevision");
-    assert!(ui(&f.root,&unversioned).is_err());
-    let first=ui(&f.root,&req).unwrap();
-    assert_eq!(first["work"]["grant"]["libraryIds"],json!(["craft","notes"]));
-    assert_eq!(first["work"]["grant"]["attachmentLibraryIds"],json!(["craft","notes"]));
-    assert_eq!(ui(&f.root,&req).unwrap()["work"]["revision"],first["work"]["revision"]);
-    let mut changed=req.clone();changed["setLibraryIds"]=json!(["notes"]);
-    assert!(ui(&f.root,&changed).is_err());
-    changed["clientMessageId"]=json!("invalid");changed["expectedRevision"]=json!(2);changed["setLibraryIds"]=json!(["missing"]);
-    assert!(ui(&f.root,&changed).is_err());
-    assert_eq!(store::load(&f.c(),&id).unwrap().revision,2);
-    changed["setLibraryIds"]=json!([]);
-    let cleared=ui(&f.root,&changed).unwrap();
-    assert_eq!(cleared["work"]["grant"]["libraryIds"],json!([]));
-    assert!(store::load(&f.c(),&id).unwrap().grant.attachment_library_ids.is_empty());
-    assert!(store::load(&f.c(),&id).unwrap().grant.contains(&serde_json::from_value(locator("current")).unwrap()));
+    let req = json!({"action":"message","id":id,"text":"按库查找","clientMessageId":"libraries","expectedRevision":1,"setLibraryIds":["notes","craft"]});
+    let mut unversioned = req.clone();
+    unversioned
+        .as_object_mut()
+        .unwrap()
+        .remove("expectedRevision");
+    assert!(ui(&f.root, &unversioned).is_err());
+    let first = ui(&f.root, &req).unwrap();
+    assert_eq!(
+        first["work"]["grant"]["libraryIds"],
+        json!(["craft", "notes"])
+    );
+    assert_eq!(
+        first["work"]["grant"]["attachmentLibraryIds"],
+        json!(["craft", "notes"])
+    );
+    assert_eq!(
+        ui(&f.root, &req).unwrap()["work"]["revision"],
+        first["work"]["revision"]
+    );
+    let mut changed = req.clone();
+    changed["setLibraryIds"] = json!(["notes"]);
+    assert!(ui(&f.root, &changed).is_err());
+    changed["clientMessageId"] = json!("invalid");
+    changed["expectedRevision"] = json!(2);
+    changed["setLibraryIds"] = json!(["missing"]);
+    assert!(ui(&f.root, &changed).is_err());
+    assert_eq!(store::load(&f.c(), &id).unwrap().revision, 2);
+    changed["setLibraryIds"] = json!([]);
+    let cleared = ui(&f.root, &changed).unwrap();
+    assert_eq!(cleared["work"]["grant"]["libraryIds"], json!([]));
+    assert!(store::load(&f.c(), &id)
+        .unwrap()
+        .grant
+        .attachment_library_ids
+        .is_empty());
+    assert!(store::load(&f.c(), &id)
+        .unwrap()
+        .grant
+        .contains(&serde_json::from_value(locator("current")).unwrap()));
 }
 mod recovery;
 mod withdrawal;

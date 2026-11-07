@@ -1,11 +1,12 @@
 use super::*;
 pub(super) mod accepted_recovery;
 pub(super) mod conversation;
-pub(super) mod followups;
 mod delivery;
 mod delivery_read;
 pub(super) mod execution_budget;
+pub(super) mod followups;
 pub(super) mod goal;
+mod history;
 pub(super) mod lifecycle;
 pub(super) mod material_budget;
 pub(super) mod materials;
@@ -19,7 +20,6 @@ pub(super) mod tasks;
 pub(super) mod tool_results;
 pub(super) mod trace_budget;
 pub(super) mod working_state;
-mod history;
 
 pub(crate) fn migrate(c: &Connection) -> Result<(), String> {
     let result = (|| {
@@ -154,7 +154,13 @@ pub(super) fn create_on(
     let id = format!("work-{}", crate::random_url_safe(18));
     let created_at = stamp();
     c.execute("INSERT INTO agent_works(id,goal,success_criteria,anchor_json,grant_json,state,updated_at) VALUES(?1,?2,?3,?4,?5,'ready',?6)",params![id,goal,success,encode(&anchor)?,encode(&grant)?,created_at]).map_err(|e|e.to_string())?;
-    insert(c, &id, None, "conversationCreated", &json!({"createdAt":created_at}))?;
+    insert(
+        c,
+        &id,
+        None,
+        "conversationCreated",
+        &json!({"createdAt":created_at}),
+    )?;
     Ok(id)
 }
 pub(super) fn list(
@@ -181,7 +187,8 @@ pub(super) fn history_preference(root: &Path, args: &Value) -> Result<Value, Str
                         "请先结束运行并核对操作结果，再删除对话"
                     } else {
                         "请先结束运行并核对操作结果，再归档对话"
-                    }.into());
+                    }
+                    .into());
                 }
             }
             if change.deleted == Some(true) {

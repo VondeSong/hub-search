@@ -52,6 +52,24 @@ fn counts(f: &Fixture) -> Value {
     ])
 }
 
+fn reference_description_contract() -> Value {
+    let mut contract = json!({
+        "shared": crate::hub_capabilities::catalog(),
+        "host": crate::agent_work::assistant::schema(crate::agent_work::runner::schema())
+    });
+    let reference = contract["shared"]["tools"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|tool| tool["name"] == "hub_readSkillReference")
+        .unwrap();
+    let description = json!("读取已加载技能 references/ 内的文字参考；不执行脚本。");
+    assert_ne!(reference["description"], description);
+    reference["description"] = description.clone();
+    reference["annotations"]["title"] = description;
+    contract
+}
+
 #[test]
 fn c1_folder_import_preserves_bounded_resources_and_reads_templates_only_when_loaded() {
     let f = Fixture::new();
@@ -393,12 +411,14 @@ fn c1_registered_snapshots_cannot_be_forged_or_borrowed_from_another_source() {
 }
 
 #[test]
-fn c1_actual_353_builtin_version_is_compatible_only_with_the_declared_description_extension() {
+fn c1_builtin_version_is_compatible_only_with_the_declared_description_extension() {
     let f = Fixture::new();
     let catalog = Catalog::discover(&f.root).unwrap();
-    let path = std::env::var("HUB_SKILL_LEGACY_METHOD")
-        .expect("fixed legacy method fixture must be supplied before qualification");
-    let legacy: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    // Derive the description-only predecessor from today's contract, not an unrelated release hash.
+    let mut contract = reference_description_contract();
+    let mut legacy = catalog.fixed_version("hub-research").unwrap();
+    legacy["content"]["toolContractVersion"] = json!(hash(&contract.to_string()));
+    legacy["id"] = json!(format!("method-{}", hash(&legacy["content"].to_string())));
     assert_eq!(legacy["content"]["origin"], "builtin");
     assert!(versions::compatible_contract(
         &legacy["content"]["toolContractVersion"]
@@ -406,8 +426,12 @@ fn c1_actual_353_builtin_version_is_compatible_only_with_the_declared_descriptio
     let old = versions::restore(&catalog, &legacy).unwrap();
     assert_eq!(old.name, legacy["content"]["name"]);
     let mut changed = legacy.clone();
-    changed["content"]["toolContractVersion"] = json!("unrecognized-tool-contract");
+    contract["shared"]["tools"][0]["name"] = json!("unrecognized-tool");
+    changed["content"]["toolContractVersion"] = json!(hash(&contract.to_string()));
     changed["id"] = json!(format!("method-{}", hash(&changed["content"].to_string())));
+    assert!(!versions::compatible_contract(
+        &changed["content"]["toolContractVersion"]
+    ));
     assert!(versions::restore(&catalog, &changed).is_err());
 }
 

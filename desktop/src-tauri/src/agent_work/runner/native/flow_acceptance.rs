@@ -62,9 +62,18 @@ fn live_native_flow_acceptance() {
         .unwrap();
         result.unwrap();
         if let Some(expected) = config["expectedTools"].get(index) {
-            let actual: Vec<_> = records["toolCall"].as_array().unwrap().iter()
-                .map(|call| json!({"operation":call["operation"],"name":call["name"]})).collect();
-            assert_eq!(json!(actual), *expected, "unexpected Hub tool routing on turn {}", index + 1);
+            let actual: Vec<_> = records["toolCall"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|call| json!({"operation":call["operation"],"name":call["name"]}))
+                .collect();
+            assert_eq!(
+                json!(actual),
+                *expected,
+                "unexpected Hub tool routing on turn {}",
+                index + 1
+            );
         }
         assert!(view["work"]["report"]["prose"]["markdown"]
             .as_str()

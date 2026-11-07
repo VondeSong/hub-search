@@ -26,13 +26,19 @@ fn capability_descriptions_only_reference_an_exact_native_definition() {
     let entry = json!({"name":"hub_sample","available":true,"description":definition["description"],"inputSchema":definition["inputSchema"],"permission":"read"});
     let catalog = json!({"tools":[entry]});
     let projected = capability_context(catalog.clone(), &json!([definition]));
-    assert_eq!(projected["tools"][0]["descriptionRef"]["nativeTool"], "hub_sample");
+    assert_eq!(
+        projected["tools"][0]["descriptionRef"]["nativeTool"],
+        "hub_sample"
+    );
     assert!(projected["tools"][0].get("description").is_none());
     assert_eq!(projected["tools"][0]["permission"], "read");
     let mut changed = definition.clone();
     changed["description"] = json!("Different scope");
     let retained = capability_context(catalog, &json!([changed]));
-    assert_eq!(retained["tools"][0]["description"], definition["description"]);
+    assert_eq!(
+        retained["tools"][0]["description"],
+        definition["description"]
+    );
     assert!(retained["tools"][0].get("descriptionRef").is_none());
 }
 
