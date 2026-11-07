@@ -874,7 +874,10 @@ impl Operation {
         args
     }
     pub fn ask(&self, prompt: &str, schema: &Value, images: &[PathBuf]) -> Result<Value, String> {
-        self.ask_admitted(prompt, schema, images, None, &mut |_| Ok(()))
+        self.ask_stream(prompt, schema, images, &mut |_| Ok(()))
+    }
+    pub(crate) fn ask_stream(&self, prompt: &str, schema: &Value, images: &[PathBuf], publish: &mut dyn FnMut(&Value) -> Result<(), String>) -> Result<Value, String> {
+        self.ask_admitted(prompt, schema, images, None, &mut |_| Ok(()), publish)
     }
     pub(crate) fn ask_direct(
         &self,
@@ -882,11 +885,12 @@ impl Operation {
         schema: &Value,
         output_limit: u64,
         admit: &mut dyn FnMut(&Value) -> Result<(), String>,
+        publish: &mut dyn FnMut(&Value) -> Result<(), String>,
     ) -> Result<Value, String> {
         if self.settings.provider != "deepseek" {
             return Err("直连预算入口不支持当前提供方".into());
         }
-        self.ask_admitted(prompt, schema, &[], Some(output_limit), admit)
+        self.ask_admitted(prompt, schema, &[], Some(output_limit), admit, publish)
     }
     fn ask_admitted(
         &self,
@@ -895,6 +899,7 @@ impl Operation {
         images: &[PathBuf],
         output_limit: Option<u64>,
         admit: &mut dyn FnMut(&Value) -> Result<(), String>,
+        publish: &mut dyn FnMut(&Value) -> Result<(), String>,
     ) -> Result<Value, String> {
         if self.done.load(Ordering::SeqCst) {
             return Err("模型请求已经结束，未发起新调用。".into());
@@ -916,19 +921,7 @@ impl Operation {
         self.ask_with(|| {
             self.control.check()?;
             let result = if self.settings.provider == "deepseek" {
-                if output_limit.is_some() {
-                    deepseek::run_admitted(
-                        prompt,
-                        schema,
-                        &self.settings,
-                        images,
-                        &self.control,
-                        output_limit,
-                        admit,
-                    )
-                } else {
-                    deepseek::run(prompt, schema, &self.settings, images, &self.control)
-                }
+                deepseek::run_admitted(prompt, schema, &self.settings, images, &self.control, output_limit, admit, publish)
             } else {
                 cli::run_control(
                     prompt,

@@ -231,6 +231,18 @@ it("places live work and prepared drafts after the user message without duplicat
   expect(process.compareDocumentPosition(drafts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(host.querySelectorAll('[aria-label="本轮工作过程"]')).toHaveLength(1);
 });
+it("keeps DeepSeek streamed summaries and answer previews provisional",async()=>{
+ const current={...run,events:[{id:"reason",origin:"deepseek",kind:"reasoning" as const,state:"running",label:"核对原文的日期范围",createdAt:1200},{id:"answer",origin:"deepseek",kind:"answer" as const,state:"running",label:"第一段",createdAt:1300}]};
+ await act(async()=>root.render(<AgentActivity value={current}/>));
+ expect(host.textContent).toContain("核对原文的日期范围");
+ expect(host.querySelector('[aria-label="正在生成回答"]')?.textContent).toContain("完整接收并核验后交付");
+ await act(async()=>root.render(<AgentActivity value={{...current,events:[current.events[0],{...current.events[1],label:"第一段，第二段"}]}}/>));
+ expect(host.querySelectorAll('[aria-label="正在生成回答"]')).toHaveLength(1);
+ expect(host.textContent).toContain("第一段，第二段");
+ await act(async()=>root.render(<AgentActivity value={{...current,running:false,state:"interrupted",events:[current.events[0],{...current.events[1],kind:"unpublishedAnswer",state:"unverified"}]}}/>));
+ expect(host.querySelector('[aria-label="正在生成回答"]')).toBeNull();
+ expect(host.textContent).toContain("查看未发布的模型答复");
+});
 it("streams public summaries without presenting them as completed tool actions",async()=>{
   const current={...run,native:true,events:[{id:"summary",kind:"reasoning" as const,state:"running",label:"核对日期范围",createdAt:1200},run.events[1]]};
   await act(async()=>root.render(<AgentActivity value={current}/>));

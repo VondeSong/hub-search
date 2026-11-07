@@ -178,6 +178,14 @@ impl Session<'_> {
             );
         }
     }
+    fn preview(&self, event: &Value) -> Result<(), String> {
+        let mut event = event.clone();
+        event["id"] = json!(format!("deepseek-{}", event["kind"].as_str().unwrap_or("")));
+        event["origin"] = json!("deepseek");
+        store::stream(self.root, self.work, self.run, &event, self.control)?;
+        self.notify_at(chrono::Utc::now().timestamp_millis(), Some(&event));
+        Ok(())
+    }
     pub fn activity(&self, id: &str, state: &str, label: &str) -> Result<(), String> {
         store::record(
             self.root,
@@ -398,10 +406,10 @@ pub(super) fn investigate(
             |prompt, schema| {
                 if !operation.native_agent() && store::provider_budget::direct::enabled(root, work)?
                 {
-                    return ask_direct(root, work, run, control, budget, operation, prompt, schema);
+                    return ask_direct(root, work, run, control, budget, operation, prompt, schema, &mut |event| session.preview(event));
                 }
                 let before = control.execution_receipts().len();
-                let result = operation.ask(prompt, schema, &[]);
+                let result = operation.ask_stream(prompt, schema, &[], &mut |event| session.preview(event));
                 for receipt in control.execution_receipts().into_iter().skip(before) {
                     store::record(root, run, "modelExecution", &json!(receipt))?;
                 }
@@ -430,13 +438,14 @@ fn ask_direct(
     operation: &Operation,
     prompt: &str,
     schema: &Value,
+    publish: &mut dyn FnMut(&Value) -> Result<(), String>,
 ) -> Result<Value, String> {
     let output = store::provider_budget::direct::output_remaining(root, work, run)?;
     let call = format!("direct-{}", crate::random_url_safe(18));
     let before = control.execution_receipts().len();
     let result = operation.ask_direct(prompt, schema, output, &mut |body| {
         store::provider_budget::direct::reserve(root, work, run, &call, body, budget.request_bytes)
-    });
+    }, publish);
     for receipt in control.execution_receipts().into_iter().skip(before) {
         store::provider_budget::direct::receipt(root, work, run, &call, &json!(receipt))?;
     }
