@@ -22,6 +22,25 @@
 - 桌面便携包入口：在 `desktop/` 执行 `npm run tauri:portable`；已有发布证据脚本为 `desktop/scripts/release.py`，打包与发布时读取其实际约定，不套用其他项目的产物名称或版本号。产品版本以桌面项目的版本配置为准，不把根目录工作区包版本当作发布版本。
 - 纯文档或配置修改按实际影响核验，检查差异、内容保留情况和 `git diff --check`；暂存后核对文件范围及 `git diff --cached --check`，不强制运行无关应用测试。
 
+## 看板模块与协作入口
+
+- 沿用私有的 [Hub 开发总看板](https://github.com/users/VondeSong/projects/2/views/1)，所属账号 `VondeSong`，Project 编号 `2`、ID `PVT_kwHOAzsX5M4BqkPh`，关联 `VondeSong/hub-search`；不新建或替换已有看板。
+- 状态字段为 `Status`，ID `PVTSSF_lAHOAzsX5M4BqkPhzho62Q8`，保留“待处理、处理中、待验证、已完成”及其现有选项身份。进度与验收按下方“开发进度与完成记录”执行，保留已有自动化配置，不擅自重置规则或事项状态。
+- “模块”为单选字段，ID `PVTSSF_lAHOAzsX5M4BqkPhzho62eM`。保留搜索、闪卡、DeepSeek、同步、界面五类及其原有选项；在原有“移动端”视图基础上补齐移动端选项和筛选。以下均为现有 Board 视图，总看板不设模块过滤，各模块以 `模块:模块名` 筛选：
+
+| 模块与视图 | 适用范围 |
+| --- | --- |
+| [搜索](https://github.com/users/VondeSong/projects/2/views/2) | 本地索引、检索、结果列表与内容预览相关需求 |
+| [闪卡](https://github.com/users/VondeSong/projects/2/views/3) | 闪卡生成、质量、牌组、学习与复习相关需求 |
+| [DeepSeek](https://github.com/users/VondeSong/projects/2/views/4) | DeepSeek 提供方相关需求，保留现有分类名称和事项归属 |
+| [同步](https://github.com/users/VondeSong/projects/2/views/5) | Craft、滴答、Obsidian 接入及云同步等相关需求，沿用已有归类 |
+| [界面](https://github.com/users/VondeSong/projects/2/views/6) | 导航、布局、交互与界面呈现相关需求 |
+| [移动端](https://github.com/users/VondeSong/projects/2/views/7) | 现有 Android 工程、移动布局与手机端功能适配 |
+
+- 新收录事项按实际功能填写模块；跨模块事项选择主要模块并说明关联。既有事项不批量重分类，不为补齐视图虚构需求，不把普通 Bug 自动加入看板。
+- README 保留 Issues、开发总看板及本文件的协作导航与简短约定，原位更新并核对真实链接，不重复插入入口；产品说明仍保留在原有位置。
+- 发布时机继续由用户决定，沿用本项目已有发布授权边界；模块配置、任务完成、检查通过、Issue 关闭或里程碑完成均不自行触发标签、Release 或安装包发布。
+
 ## 路线图与 Issues
 
 - [Hub 开发总看板](https://github.com/users/VondeSong/projects/2) 作为开发路线图，主要收录新功能、重要规划和阶段目标。
