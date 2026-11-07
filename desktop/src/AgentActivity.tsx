@@ -147,6 +147,7 @@ export function AgentActivity({ value }: { value: ActivityRun }) {
   const hasActiveStep=processEvents.some(event=>["tool","skill","webSearch","reasoning","status"].includes(event.kind)&&event.state==="running");
   const stopped = !value.running && ["failed","interrupted","needsDecision"].includes(value.state);
   const failure = stopped && newest.find(event=>event.state==="failed" || event.state==="interrupted");
+  const webFailures = processEvents.filter(event=>event.kind==="webSearch" && (event.errorCount || event.state==="failed" || event.state==="interrupted"));
   const hasProcess = !!value.validity || processEvents.length>0;
   const phaseShowsStatus=processEvents.length>0&&isOperation(processEvents[processEvents.length-1]);
   return <section className="agent-activity" aria-label="本轮工作过程">
@@ -159,6 +160,7 @@ export function AgentActivity({ value }: { value: ActivityRun }) {
       {value.running && !answer && !hasActiveStep && !phaseShowsStatus && <p className="agent-live-status" role="status">正在思考</p>}
     </div>}
     {!expanded && failure && <p className="agent-process-failure" role="status"><TriangleAlert size={14} aria-hidden="true"/><span>{failure.label} · {failure.state==="failed" ? "未完成" : "已中断"}{failure.detail ? `：${failure.detail}` : ""}</span></p>}
+    {!expanded && webFailures.filter(event=>event!==failure).map(event=><p key={event.id} className="agent-process-failure" role="status"><TriangleAlert size={14} aria-hidden="true"/><span>{webSummary(event)}</span></p>)}
     {!expanded && unpublished && <ActivityEventView event={unpublished} scope={null}/>}
     {value.running && answer && <div className="agent-report agent-answer agent-native-answer" aria-label="正在生成回答" aria-busy="true">{answer.origin==="deepseek"&&<p className="agent-note">{answer.truncated?"回答预览已达显示上限，仍在接收；完整回答核验后交付":"回答预览 · 完整接收并核验后交付"}</p>}<PublicText text={answer.label}/></div>}
   </section>;

@@ -42,8 +42,7 @@ it("CN04 native web activity remains visible without claiming full-text reading"
  await act(async()=>root.render(<AgentActivity value={value}/>));await act(async()=>host.querySelector<HTMLButtonElement>("button")!.click());
  expect(host.textContent).not.toContain("调用已结束");expect(host.textContent).not.toContain("搜索网页： ·");
  expect(host.textContent).toContain("搜索网页 · 未完成");
- const explanation=Array.from(host.querySelectorAll("details")).filter(d=>d.querySelector("summary")?.textContent==="联网记录说明");
- expect(explanation).toHaveLength(1);expect(explanation[0].open).toBe(false);expect(explanation[0].textContent).toContain("返回结果数不是已读全文数");
+ expect(host.textContent).toContain("这条记录未提供逐项返回结果");
  expect(host.querySelector('a[href="https://example.org/a"]')).not.toBeNull();
 });
 
@@ -54,7 +53,7 @@ it("shows batch outcomes and separate details without turning unknown web action
   {id:"find",kind:"webSearch",state:"completed",label:"在网页内查找",action:"findInPage",pattern:"65,853,514",createdAt:4}
  ]};
  await act(async()=>root.render(<AgentActivity value={value}/>));
- expect(host.querySelector('.agent-activity-toggle')?.textContent).toBe('工作过程 · 1 秒');
+ expect(host.querySelector('.agent-activity-toggle')?.textContent).toBe('用时 1 秒');
  await act(async()=>host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!.click());
  const summaries=Array.from(host.querySelectorAll('.agent-activity-step summary')).map(s=>s.textContent);
  expect(summaries[0]).toBe('查阅网页资料 · 1 项未获取');
@@ -88,12 +87,16 @@ it("keeps old empty web records readable without claiming a search or successful
  expect(host.textContent).toContain('first query；second query');
 });
 
-it("shows partial web errors in the collapsed live status too",async()=>{
- const value:ActivityRun={runId:"live",revision:1,state:"investigating",running:true,startedAt:1,steps:0,events:[{id:"web",kind:"webSearch",state:"completed",label:"访问网页",action:"openPage",resultCount:5,errorCount:1,createdAt:1}]};
+it.each([true,false])("keeps partial web errors visible when collapsed (running=%s)",async(running)=>{
+ const value:ActivityRun={runId:"live",revision:1,state:running?"investigating":"completed",running,startedAt:1,steps:0,events:[{id:"web",kind:"webSearch",state:"completed",label:"访问网页",action:"openPage",resultCount:5,errorCount:1,createdAt:1},{id:"later",kind:"reasoning",state:"completed",label:"继续整理可用来源",createdAt:2}]};
  await act(async()=>root.render(<AgentActivity value={value}/>));
- expect(host.querySelector('.agent-live-status')?.textContent).toBe('访问网页 · 1 项未获取');
- expect(host.querySelector('.agent-live-status .lucide-triangle-alert')).not.toBeNull();
- expect(host.querySelector('.agent-live-status .agent-spinning')).toBeNull();
+ const toggle=host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!;
+ if(running) await act(async()=>toggle.click());
+ expect(toggle.getAttribute('aria-expanded')).toBe('false');
+ expect(host.querySelector('.agent-process-failure')?.textContent).toBe('访问网页 · 1 项未获取');
+ expect(host.querySelector('.agent-process-failure .lucide-triangle-alert')).not.toBeNull();
+ await act(async()=>toggle.click());
+ expect(host.querySelector('.agent-web-activity > summary')?.textContent).toBe('访问网页 · 1 项未获取');
 });
 
 it("distinguishes affected batches from failed pages and retains safe reasons without inventing missing details",async()=>{

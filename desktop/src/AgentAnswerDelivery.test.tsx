@@ -24,7 +24,8 @@ it("CN05 valid long published answers preserve their tail in restored conversati
  await act(async()=>root.render(<AgentConversation conversation={{messages:[{id:"saved",role:"assistant",runId:"run",createdAt:1,report}],hasEarlier:false}} revoked={false} onOpenCitation={vi.fn()}/>));
  expect(host.querySelector(".agent-answer")!.textContent).toBe(text);expect(host.textContent).not.toContain("未发布");
 });
-it("CN05 explicit progress clipping notice remains visible",async()=>{
+it("CN05 explicit progress clipping notice remains visible when reading the process",async()=>{
  const value=activity("");value.events=[{id:"progress",kind:"message",state:"completed",label:"已展示的过程。\n\n（过程消息超过显示上限，后续内容未展示。）",createdAt:1}];await act(async()=>root.render(<AgentActivity value={value}/>));
+ await act(async()=>host.querySelector<HTMLButtonElement>(".agent-activity-toggle")!.click());
  expect(host.textContent).toContain("后续内容未展示");expect(host.textContent).not.toContain("查看未发布");
 });

@@ -8,7 +8,10 @@ pub(super) fn requires_structured_delivery(tool: &Tool) -> bool {
     if let Tool::Capability { name, .. } = tool {
         if matches!(
             name.as_str(),
-            "hub_read_note" | "hub_search_notes" | "hub_read_analysis_snapshot"
+            "hub_read_note"
+                | "hub_search_notes"
+                | "hub_list_note_sources"
+                | "hub_read_analysis_snapshot"
         ) {
             return false;
         }
@@ -166,6 +169,7 @@ mod tests {
         for name in [
             "hub_read_note",
             "hub_search_notes",
+            "hub_list_note_sources",
             "hub_read_analysis_snapshot",
         ] {
             assert!(!requires_structured_delivery(&Tool::Capability {
@@ -455,8 +459,14 @@ fn cn05c_inherited_evidence_allows_conversation_but_source_changes_still_block_p
 #[test]
 fn native_web_diagnostics_do_not_reset_an_already_completed_answer() {
     let mut answer = Answer::default();
-    answer.observe("finalMessage", &json!({"text":"Answer with [source](https://example.org/a)"}));
-    answer.observe("webDiagnostics", &json!({"kind":"webSearch","errorCount":1}));
+    answer.observe(
+        "finalMessage",
+        &json!({"text":"Answer with [source](https://example.org/a)"}),
+    );
+    answer.observe(
+        "webDiagnostics",
+        &json!({"kind":"webSearch","errorCount":1}),
+    );
     let report = answer.prepare(0, 0, &HashSet::new()).unwrap().unwrap();
     assert!(report.completion.is_none());
     assert!(report.prose.unwrap().markdown.contains("Answer with"));
