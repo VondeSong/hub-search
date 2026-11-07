@@ -100,6 +100,18 @@ it("counts a direct validated answer as first real feedback without requiring a 
   expect(saved.uiFirstFeedbackMs).toBe(saved.uiUsefulMs);
   expect(saved.uiFirstFeedbackMs).toBe(saved.uiDoneMs);
 });
+it.each(["正文预览", ""]) ("counts only nonempty answer previews as feedback and never as delivery (%s)", async label => {
+  setup(); await render(null); api.begin("submit");
+  const running = view("new", "investigating", "answer");
+  running.activity![0].events[0].label = label;
+  api.snapshotReceived(running); await render(running); await paint();
+  const failed = view("new", "failed", "unpublishedAnswer");
+  failed.activity![0].events[0].label = "未经核验的正文";
+  api.snapshotReceived(failed); await render(failed); await paint();
+  const saved = invoke.mock.calls.find(([, x]) => x.args.action === "uiTiming")![1].args.sample;
+  expect(saved.uiFirstFeedbackMs !== null).toBe(Boolean(label));
+  expect(saved.uiUsefulMs).toBeNull(); expect(saved.uiDoneMs).toBeNull();
+});
 it("does not mark an invalidated report as feedback, useful output or final visible delivery", async () => {
   setup(); await render(null); api.begin("submit");
   const invalid = { ...view("new", "completed"), validity: "sourceChanged" };

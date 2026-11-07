@@ -35,6 +35,21 @@ fn partial_public_strings_wait_for_incomplete_escapes_and_do_not_match_nested_im
 }
 
 #[test]
+fn public_summary_preserves_the_full_validated_intent_limit() {
+    let summary = format!("{}末尾核对", "公开😀".repeat(332));
+    assert_eq!(summary.chars().count(), 1000);
+    let mut events = vec![];
+    let mut publish = |v: &Value| { events.push(v.clone()); Ok(()) };
+    let mut stream = Stream::new(&mut publish);
+    stream.content = json!({"rationale":summary,"report":{"markdown":"答复"}}).to_string();
+    stream.preview("completed", true).unwrap();
+    stream.content = json!({"rationale":"字".repeat(1001)}).to_string();
+    stream.preview("running", true).unwrap();
+    assert_eq!(events.iter().find(|e| e["kind"] == "reasoning").unwrap()["text"], summary);
+    assert_eq!(events.iter().rev().find(|e| e["kind"] == "reasoning").unwrap()["text"].as_str().unwrap().chars().count(), 1000);
+}
+
+#[test]
 fn missing_done_finish_truncation_tool_calls_and_invalid_data_never_validate() {
     for wire in [
         event(json!({"content":"{}"}),json!("stop")),

@@ -98,7 +98,7 @@ impl<'a> Stream<'a> {
     }
     pub fn preview(&mut self, state: &str, force: bool) -> Result<(), String> {
         if !force && self.last.elapsed() < Duration::from_millis(150) { return Ok(()); }
-        let summary = field(&self.content, &["rationale"]).unwrap_or_default().chars().take(600).collect::<String>();
+        let summary = field(&self.content, &["rationale"]).unwrap_or_default().chars().take(1000).collect::<String>();
         let answer = field(&self.content, &["report","markdown"])
             .or_else(|| field(&self.content, &["report","summary"]))
             .unwrap_or_default();

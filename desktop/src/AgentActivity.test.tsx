@@ -250,6 +250,22 @@ it("shows a DeepSeek public summary once when the validated intent repeats it",a
  expect(host.textContent?.split(summary.label)).toHaveLength(2);
  expect(host.querySelector('.agent-commentary')).toBeNull();
 });
+it("keeps a full 1000-character DeepSeek public intent available once after completion",async()=>{
+ const text="公开😀".repeat(332)+"末尾核对";
+ const summary={id:"r",origin:"deepseek",kind:"reasoning" as const,state:"completed",label:text,createdAt:10};
+ const intent={id:"i",kind:"message" as const,state:"completed",label:text,createdAt:11};
+ await act(async()=>root.render(<AgentActivity value={{...run,running:false,state:"completed",events:[summary,intent]}}/>));
+ await act(async()=>host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!.click());
+ expect(host.querySelectorAll('.agent-reasoning')).toHaveLength(1);
+ expect(host.querySelector('.agent-reasoning details, details.agent-reasoning div')?.textContent).toContain("末尾核对");
+ expect(host.querySelector('.agent-commentary')).toBeNull();
+});
+it("keeps a non-BMP character intact at the public summary disclosure boundary",async()=>{
+ const label="字".repeat(71)+"😀末尾";
+ await act(async()=>root.render(<AgentActivity value={{...run,events:[{id:"r",origin:"deepseek",kind:"reasoning",state:"running",label,createdAt:10}]}}/>));
+ expect(host.querySelector('details.agent-reasoning > summary span')?.textContent).toBe("字".repeat(71)+"😀…");
+ expect(host.querySelector('details.agent-reasoning > div')?.textContent).toBe(label);
+});
 it("explains a capped DeepSeek preview while receiving and after interruption",async()=>{
  const answer={id:"answer",origin:"deepseek",kind:"answer" as const,state:"running",label:"部分正文",truncated:true,createdAt:1300};
  await act(async()=>root.render(<AgentActivity value={{...run,events:[answer]}}/>));

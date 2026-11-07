@@ -67,10 +67,11 @@ function ActivityEventView({ event, scope }: { event: ActivityEvent; scope: Tool
   }
   if (event.kind === "reasoning") {
     const text=event.label.replace(/[#*\n]/g," ").trim();
+    const characters=Array.from(text);
     const icon=null;
     const prefix=event.state==="interrupted"?"已中断：":event.state==="failed"?"未完成：":"";
-    if(text.length<=72) return <div className="agent-activity-step agent-reasoning" aria-label="思考摘要">{icon}<span>{prefix}{text || "正在思考"}</span></div>;
-    return <details className="agent-reasoning"><summary>{icon}<span>{prefix}{text.slice(0,72)}…</span><ChevronDown className="agent-reasoning-chevron" size={13} aria-hidden="true"/></summary><div><PublicText text={event.label}/></div></details>;
+    if(characters.length<=72) return <div className="agent-activity-step agent-reasoning" aria-label="思考摘要">{icon}<span>{prefix}{text || "正在思考"}</span></div>;
+    return <details className="agent-reasoning"><summary>{icon}<span>{prefix}{characters.slice(0,72).join("")}…</span><ChevronDown className="agent-reasoning-chevron" size={13} aria-hidden="true"/></summary><div><PublicText text={event.label}/></div></details>;
   }
   return <div className={"agent-activity-step agent-step-" + event.state}>
     {event.state === "failed" ? <TriangleAlert size={14} aria-hidden="true" /> : event.state === "interrupted" ? <Circle size={14} aria-hidden="true" /> : event.kind === "skill" ? <BookOpen size={14} aria-hidden="true" /> : event.label.includes("搜索") ? <Search size={14} aria-hidden="true" /> : /命令|运行|执行/.test(event.label) ? <Terminal size={14} aria-hidden="true"/> : /编辑|修改|创建文件/.test(event.label) ? <Pencil size={14} aria-hidden="true"/> : /读取|原文|材料/.test(event.label) ? <FileText size={14} aria-hidden="true"/> : <Wrench size={14} aria-hidden="true"/>}
