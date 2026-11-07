@@ -774,6 +774,7 @@ dependencies = [
  "icu_collator",
  "icu_locale",
  "infer 0.22.0",
+ "jni",
  "keyring",
  "lopdf",
  "notify",

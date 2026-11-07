@@ -51,6 +51,7 @@ fn request_profile_shutdown(app: &AppHandle, restart: bool) {
     request.restart |= restart;
     let request_id = request.id.clone();
     drop(pending);
+    #[cfg(desktop)]
     show_main_window(app);
     let _ = app.emit(
         "hub:flush-user-profile-before-exit",

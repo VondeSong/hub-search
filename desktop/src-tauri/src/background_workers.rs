@@ -121,6 +121,7 @@ pub(crate) fn start(app: AppHandle) {
     x_bookmarks::local_sources::start(app.clone());
     crate::dida_task_refresh::start(app.clone());
     reading_sync::start_scheduler(app.clone());
+    crate::quick_journal::start_scheduler(app.clone());
     x_bookmarks::library::start_worker(app.clone());
     telegram::start_scheduler(app.clone());
     let condition_app = app.clone();

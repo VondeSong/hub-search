@@ -22,6 +22,7 @@ mod index_job_metadata;
 mod model_runtime;
 mod model_skills;
 mod obsidian_edit;
+mod quick_journal;
 mod shared_memory;
 #[cfg(test)]
 use database::forget_initialized_database;
@@ -35451,6 +35452,17 @@ pub fn run() {
                 journal_page,
                 journal_view,
                 create_journals,
+                quick_journal::get_quick_journal_settings,
+                quick_journal::save_quick_journal_settings,
+                quick_journal::stage_quick_journal_attachment,
+                quick_journal::get_quick_journal_draft,
+                quick_journal::save_quick_journal_draft,
+                quick_journal::capture_quick_journal,
+                quick_journal::sync_quick_journal,
+                quick_journal::list_quick_journal,
+                quick_journal::quick_journal_image,
+                quick_journal::export_quick_journal_attachment,
+                quick_journal::open_quick_journal,
                 local_document,
                 local_markdown_resource_info,
                 open_craft_attachment,

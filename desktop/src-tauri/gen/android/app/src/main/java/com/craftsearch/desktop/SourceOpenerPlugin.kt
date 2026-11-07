@@ -19,6 +19,9 @@ import java.io.Closeable
 class SourceOpenArgs { lateinit var url: String }
 
 @InvokeArg
+class QuickJournalScheduleArgs { lateinit var root: String }
+
+@InvokeArg
 class FlashcardBackupReadArgs { lateinit var uri: String; lateinit var destination: String; lateinit var operationId: String }
 
 @InvokeArg
@@ -117,6 +120,14 @@ internal object BackupCopyControl {
 
 @TauriPlugin
 class SourceOpenerPlugin(private val activity: Activity) : Plugin(activity) {
+    @Command
+    fun scheduleQuickJournal(invoke: Invoke) {
+        try {
+            val args = invoke.parseArgs(QuickJournalScheduleArgs::class.java)
+            QuickJournalWorker.schedule(activity.applicationContext, args.root)
+            invoke.resolve()
+        } catch (e: Exception) { invoke.reject("速记已保存在本机，后台任务安排失败") }
+    }
     @Command
     fun readingNetworkState(invoke: Invoke) {
         try {

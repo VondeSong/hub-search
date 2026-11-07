@@ -1,4 +1,6 @@
 # Add project specific ProGuard rules here.
+-keep class com.craftsearch.desktop.QuickJournalWorker { *; }
+-keep class com.craftsearch.desktop.QuickJournalWorker$Companion { *; }
 # You can control the set of applied configuration files using the
 # proguardFiles setting in build.gradle.
 #

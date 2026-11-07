@@ -1,7 +1,7 @@
 import { userProfileStorage } from "./UserProfileStorage";
 import { createContext, useContext, useEffect, useState } from "react";
 
-export const journalLayouts = { stream: "日历流", calendar: "月历", list: "列表", table: "表格" } as const;
+export const journalLayouts = { stream: "日历流", records: "速记卡片", calendar: "月历", list: "列表", table: "表格" } as const;
 export type JournalLayout = keyof typeof journalLayouts;
 export type JournalViewConfig = {
   layout: JournalLayout; query: string; libraries: string[] | null;

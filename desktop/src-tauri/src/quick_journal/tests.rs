@@ -1,0 +1,240 @@
+use super::*;
+use crate::reading_sync::object_store::InventoryPage;
+use futures::future::BoxFuture;
+use std::{collections::BTreeMap, sync::Mutex};
+
+#[derive(Default)]
+struct MemoryStore(Mutex<BTreeMap<String, Vec<u8>>>);
+impl Store for MemoryStore {
+    fn key(&self, r: &str) -> String {
+        format!("prefix/v2/{r}")
+    }
+    fn check_network(&self, _: &str) -> Result<(), String> {
+        Ok(())
+    }
+    fn head_size<'a>(&'a self, k: &'a str) -> BoxFuture<'a, Result<Option<u64>, String>> {
+        Box::pin(async move { Ok(self.0.lock().unwrap().get(k).map(|v| v.len() as u64)) })
+    }
+    fn get<'a>(&'a self, k: &'a str, max: usize) -> BoxFuture<'a, Result<Option<Vec<u8>>, String>> {
+        Box::pin(async move {
+            let v = self.0.lock().unwrap().get(k).cloned();
+            if v.as_ref().is_some_and(|v| v.len() > max) {
+                return Err("too large".into());
+            }
+            Ok(v)
+        })
+    }
+    fn inventory_page<'a>(
+        &'a self,
+        r: &'a str,
+        _: Option<&'a str>,
+    ) -> BoxFuture<'a, Result<InventoryPage, String>> {
+        Box::pin(async move {
+            Ok(InventoryPage {
+                keys: self
+                    .0
+                    .lock()
+                    .unwrap()
+                    .keys()
+                    .filter(|k| k.starts_with(&self.key(r)))
+                    .cloned()
+                    .collect(),
+                ..Default::default()
+            })
+        })
+    }
+    fn list<'a>(&'a self, r: &'a str) -> BoxFuture<'a, Result<Vec<String>, String>> {
+        Box::pin(async move { Ok(self.inventory_page(r, None).await?.keys) })
+    }
+    fn put_verified<'a>(&'a self, k: &'a str, b: &'a [u8]) -> BoxFuture<'a, Result<bool, String>> {
+        Box::pin(async move {
+            let mut data = self.0.lock().unwrap();
+            if let Some(old) = data.get(k) {
+                if old != b {
+                    return Err("immutable conflict".into());
+                }
+                return Ok(false);
+            }
+            data.insert(k.into(), b.to_vec());
+            Ok(true)
+        })
+    }
+    fn delete_exact<'a>(&'a self, k: &'a str) -> BoxFuture<'a, Result<(), String>> {
+        Box::pin(async move {
+            self.0.lock().unwrap().remove(k);
+            Ok(())
+        })
+    }
+}
+struct Fixture {
+    dir: PathBuf,
+    db: PathBuf,
+}
+impl Fixture {
+    fn new() -> Self {
+        let dir = std::env::temp_dir().join(format!("hub-quick-journal-{}", random_url_safe(12)));
+        fs::create_dir_all(dir.join("vault")).unwrap();
+        let db = dir.join("craft-search.sqlite3");
+        let c = Connection::open(&db).unwrap();
+        c.execute_batch("CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT);CREATE TABLE libraries(id TEXT,provider TEXT,location TEXT,enabled INTEGER);").unwrap();
+        schema(&c).unwrap();
+        c.execute(
+            "INSERT INTO libraries VALUES('os','obsidian',?1,1)",
+            [dir.join("vault").to_string_lossy()],
+        )
+        .unwrap();
+        meta(
+            &c,
+            "quick_journal_settings",
+            &serde_json::to_string(&Settings {
+                library_id: "os".into(),
+                folder: "Journals".into(),
+                sync: true,
+            })
+            .unwrap(),
+        )
+        .unwrap();
+        crate::database::register_initialized_fixture(&db);
+        Self { dir, db }
+    }
+}
+impl Drop for Fixture {
+    fn drop(&mut self) {
+        crate::database::forget_initialized_database(&self.db);
+        let _ = fs::remove_dir_all(&self.dir);
+    }
+}
+
+#[tokio::test]
+async fn cloud_replay_preserves_manual_edits_and_receipts_follow_verified_attachments() {
+    let f = Fixture::new();
+    let store = MemoryStore::default();
+    let mut r = record();
+    let bytes = b"attachment";
+    let hash = digest(bytes);
+    r.attachments.push(Attachment {
+        hash: hash.clone(),
+        name: "evidence.txt".into(),
+        size: bytes.len(),
+        image: false,
+    });
+    store
+        .put_verified(
+            &store.key(&format!("journal/records/{}.json", r.id)),
+            &serde_json::to_vec(&r).unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(transfer(&f.db, &store, "test").await.is_err());
+    assert!(!f.dir.join("vault/Journals/2026-11-07.md").exists());
+    store
+        .put_verified(&store.key(&format!("journal/assets/{hash}")), bytes)
+        .await
+        .unwrap();
+    transfer(&f.db, &store, "test").await.unwrap();
+    let path = f.dir.join("vault/Journals/2026-11-07.md");
+    let md = fs::read_to_string(&path).unwrap();
+    assert!(md.contains(&format!("{hash}.txt")));
+    assert!(store
+        .get(&store.key(&format!("journal/receipts/{}.json", r.id)), 1024)
+        .await
+        .unwrap()
+        .is_some());
+    fs::write(&path, md.replace("记录", "原文中的人工修改")).unwrap();
+    transfer(&f.db, &store, "test").await.unwrap();
+    let edited = fs::read_to_string(&path).unwrap();
+    assert!(edited.contains("人工修改"));
+    assert_eq!(format::blocks(&edited).unwrap().len(), 1);
+    // Rebuilding the local queue from the inbox does not restore the old body over an existing ID.
+    open_database(&f.db)
+        .unwrap()
+        .execute("DELETE FROM quick_journal_records", [])
+        .unwrap();
+    transfer(&f.db, &store, "test").await.unwrap();
+    assert_eq!(fs::read_to_string(&path).unwrap(), edited);
+}
+#[test]
+fn retries_keep_one_queue_entry_and_never_clear_an_unrelated_draft() {
+    let f = Fixture::new();
+    let r = record();
+    meta(
+        &open_database(&f.db).unwrap(),
+        "quick_journal_draft",
+        "unrelated",
+    )
+    .unwrap();
+    enqueue(&f.db, &r).unwrap();
+    enqueue(&f.db, &r).unwrap();
+    assert_eq!(queue(&f.db).unwrap().len(), 1);
+    let mut changed = r;
+    changed.text = "changed".into();
+    assert!(enqueue(&f.db, &changed).is_err());
+    assert_eq!(
+        metadata_string(&open_database(&f.db).unwrap(), "quick_journal_draft"),
+        "unrelated"
+    );
+}
+#[tokio::test]
+async fn another_desktop_cannot_claim_the_same_cloud_inbox() {
+    let a = Fixture::new();
+    let b = Fixture::new();
+    let store = MemoryStore::default();
+    transfer(&a.db, &store, "test").await.unwrap();
+    assert!(transfer(&b.db, &store, "test").await.is_err());
+}
+fn record() -> Record {
+    Record {
+        version: 1,
+        id: "a".repeat(32),
+        date: "2026-11-07".into(),
+        text: "记录\n\n第二段 #想法".into(),
+        attachments: vec![],
+    }
+}
+#[test]
+fn append_preserves_frontmatter_manual_edits_and_deduplicates_retries() {
+    let dir = std::env::temp_dir().join(format!("hub-journal-test-{}", random_url_safe(12)));
+    fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("2026-11-07.md");
+    let before = "---\ntags: [日记]\n---\n\n# 当天\n\n手写内容\n";
+    fs::write(&path, before).unwrap();
+    let r = record();
+    append(&path, &r).unwrap();
+    let first = fs::read_to_string(&path).unwrap();
+    assert!(first.starts_with(before));
+    fs::write(&path, first.replace("第二段", "手工修改")).unwrap();
+    append(&path, &r).unwrap();
+    let final_text = fs::read_to_string(&path).unwrap();
+    assert!(final_text.contains("手工修改"));
+    assert_eq!(format::blocks(&final_text).unwrap().len(), 1);
+    let mut second = r.clone();
+    second.id = "b".repeat(32);
+    append(&path, &second).unwrap();
+    assert_eq!(
+        format::blocks(&fs::read_to_string(&path).unwrap())
+            .unwrap()
+            .len(),
+        2
+    );
+    fs::remove_dir_all(dir).unwrap();
+}
+#[test]
+fn creates_one_daily_file_and_rejects_broken_boundaries() {
+    let dir = std::env::temp_dir().join(format!("hub-journal-test-{}", random_url_safe(12)));
+    let path = dir.join("2026-11-07.md");
+    append(&path, &record()).unwrap();
+    let before = fs::read_to_string(&path).unwrap();
+    assert!(before.starts_with("# 2026-11-07\n"));
+    let broken = before.replace("v1 end", "v7 end");
+    fs::write(&path, &broken).unwrap();
+    assert!(append(&path, &record()).is_err());
+    assert_eq!(fs::read_to_string(&path).unwrap(), broken);
+    fs::remove_dir_all(dir).unwrap();
+}
+#[test]
+fn folder_never_escapes_vault() {
+    for f in ["../a", "/abs", "C:/test", "a\\b", "a/../b", ""] {
+        assert!(!safe_folder(f));
+    }
+    assert!(safe_folder("日记/每日"));
+}
