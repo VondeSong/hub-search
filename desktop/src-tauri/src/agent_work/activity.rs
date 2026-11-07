@@ -387,7 +387,8 @@ pub(super) fn can_steer_on(c: &Connection, run: &str) -> Result<bool, String> {
          AND EXISTS(SELECT 1 FROM agent_records WHERE run_id=?1 AND kind='nativeTurn')",
         [run],
         |r| r.get(0),
-    ).map_err(|e| e.to_string())
+    )
+    .map_err(|e| e.to_string())
 }
 
 fn active_run(w: &Work, run: &str, state: &str) -> bool {
@@ -442,7 +443,10 @@ mod context_lifecycle_tests {
             read_on(&f.root, &f.c(), &stopped).unwrap()[0]["events"][0]["kind"],
             "unpublishedAnswer"
         );
-        assert_eq!(read_on(&f.root, &f.c(), &stopped).unwrap()[0]["events"][0]["truncated"], true);
+        assert_eq!(
+            read_on(&f.root, &f.c(), &stopped).unwrap()[0]["events"][0]["truncated"],
+            true
+        );
         f.c()
             .execute(
                 "UPDATE agent_runs SET state='investigating' WHERE id=?1",

@@ -29,7 +29,13 @@ fn image_and_note_followup_without_ack_is_never_replayed_after_compaction_or_end
         args["addImages"] = json!([staged_image(&f)]);
         args["addNotes"] = json!([extra()]);
         if ending == "compaction" {
-            record(&f.root, &run, "nativeContextLifecycle", &json!({"state":"started","threadId":"same-thread"})).unwrap();
+            record(
+                &f.root,
+                &run,
+                "nativeContextLifecycle",
+                &json!({"state":"started","threadId":"same-thread"}),
+            )
+            .unwrap();
         }
         save(&f.root, &args).unwrap();
         save(&f.root, &args).unwrap();
@@ -37,15 +43,31 @@ fn image_and_note_followup_without_ack_is_never_replayed_after_compaction_or_end
         assert_eq!(admitted.len(), 1);
         assert_eq!(admitted[0]["addImages"], args["addImages"]);
         assert_eq!(updated.grant.images.len(), 1);
-        assert_eq!(view_on(&read(&f.root).unwrap(), &updated).unwrap()[0]["state"], "sending");
-        if ending == "completion" { finish_turn(&f, &id, &run); }
-        else { fail(&f.root, &updated, &run, "运行中断，未收到回执").unwrap(); }
+        assert_eq!(
+            view_on(&read(&f.root).unwrap(), &updated).unwrap()[0]["state"],
+            "sending"
+        );
+        if ending == "completion" {
+            finish_turn(&f, &id, &run);
+        } else {
+            fail(&f.root, &updated, &run, "运行中断，未收到回执").unwrap();
+        }
         let reopened = load(&read(&f.root).unwrap(), &id).unwrap();
-        assert_eq!(view_on(&read(&f.root).unwrap(), &reopened).unwrap()[0]["state"], "unconfirmed");
+        assert_eq!(
+            view_on(&read(&f.root).unwrap(), &reopened).unwrap()[0]["state"],
+            "unconfirmed"
+        );
         save(&f.root, &args).unwrap();
-        assert!(!take_explicit(&f.root, &id, &json!({"expectedRunId":null,"selectedMessageId":"image-note"})).unwrap());
+        assert!(!take_explicit(
+            &f.root,
+            &id,
+            &json!({"expectedRunId":null,"selectedMessageId":"image-note"})
+        )
+        .unwrap());
         assert_eq!(records(&f.root, &id, "steering", 10).unwrap().len(), 1);
-        assert!(records(&f.root, &id, "steeringAccepted", 10).unwrap().is_empty());
+        assert!(records(&f.root, &id, "steeringAccepted", 10)
+            .unwrap()
+            .is_empty());
     }
 }
 
@@ -64,13 +86,28 @@ fn missing_image_and_revoked_authorization_block_queued_attachments() {
             write(&f.root, |c| { c.execute("UPDATE agent_works SET state='revoked',authorization_version=authorization_version+1 WHERE id=?1", [&id]).unwrap(); Ok(()) }).unwrap();
             assert!(take_explicit(&f.root, &id, &json!({"expectedRunId":null})).is_err());
         } else {
-            std::fs::remove_file(f.root.join("collection-files/agent-images").join(format!("{}.image", image["sourceItemId"].as_str().unwrap()))).unwrap();
+            std::fs::remove_file(
+                f.root
+                    .join("collection-files/agent-images")
+                    .join(format!("{}.image", image["sourceItemId"].as_str().unwrap())),
+            )
+            .unwrap();
             assert!(!take_explicit(&f.root, &id, &json!({"expectedRunId":null})).unwrap());
-            assert_eq!(rows(&read(&f.root).unwrap(), &id).unwrap()[0]["state"], "failed");
+            assert_eq!(
+                rows(&read(&f.root).unwrap(), &id).unwrap()[0]["state"],
+                "failed"
+            );
         }
-        assert!(load(&read(&f.root).unwrap(), &id).unwrap().grant.images.is_empty());
+        assert!(load(&read(&f.root).unwrap(), &id)
+            .unwrap()
+            .grant
+            .images
+            .is_empty());
         assert!(records(&f.root, &id, "steering", 10).unwrap().is_empty());
-        assert!(!records(&f.root, &id, "userMessage", 10).unwrap().iter().any(|m| m["clientMessageId"] == "attachment"));
+        assert!(!records(&f.root, &id, "userMessage", 10)
+            .unwrap()
+            .iter()
+            .any(|m| m["clientMessageId"] == "attachment"));
     }
 }
 #[test]
@@ -177,39 +214,73 @@ fn queued_messages_dispatch_in_order_only_after_turn_finishes() {
     .unwrap();
     for key in ["one", "two", "three"] {
         assert!(take_next(&f.root, &id).unwrap());
-        assert_eq!(records(&f.root, &id, "userMessage", 1).unwrap()[0]["clientMessageId"], key);
+        assert_eq!(
+            records(&f.root, &id, "userMessage", 1).unwrap()[0]["clientMessageId"],
+            key
+        );
         let (_, next_run) = claim(&f, &id);
         assert!(!take_next(&f.root, &id).unwrap());
         finish_turn(&f, &id, &next_run);
     }
     assert!(!take_next(&f.root, &id).unwrap());
-    assert_eq!(records(&f.root, &id, "userMessage", 10).unwrap().iter().filter(|m| m["clientMessageId"].is_string()).count(), 3);
+    assert_eq!(
+        records(&f.root, &id, "userMessage", 10)
+            .unwrap()
+            .iter()
+            .filter(|m| m["clientMessageId"].is_string())
+            .count(),
+        3
+    );
 }
 
 fn finish_turn(f: &Fixture, id: &str, run: &str) {
     write(&f.root, |c| {
-        c.execute("UPDATE agent_works SET active_run=NULL,state='completed' WHERE id=?1", [id]).unwrap();
-        c.execute("UPDATE agent_runs SET state='completed' WHERE id=?1", [run]).unwrap();
+        c.execute(
+            "UPDATE agent_works SET active_run=NULL,state='completed' WHERE id=?1",
+            [id],
+        )
+        .unwrap();
+        c.execute("UPDATE agent_runs SET state='completed' WHERE id=?1", [run])
+            .unwrap();
         Ok(())
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 #[test]
 fn selected_message_runs_first_then_remaining_queue_keeps_fifo() {
     let (f, id) = setup();
     let (work, run) = claim(&f, &id);
-    for key in ["one", "two", "three"] { save(&f.root, &request(&work, key, "queue")).unwrap(); }
+    for key in ["one", "two", "three"] {
+        save(&f.root, &request(&work, key, "queue")).unwrap();
+    }
     finish_turn(&f, &id, &run);
     change(&f.root, &json!({"id":id,"clientMessageId":"two","editVersion":1,"operation":"send","expectedRunId":null})).unwrap();
-    assert!(take_explicit(&f.root, &id, &json!({"expectedRunId":null,"selectedMessageId":"two"})).unwrap());
-    assert_eq!(records(&f.root, &id, "userMessage", 1).unwrap()[0]["clientMessageId"], "two");
+    assert!(take_explicit(
+        &f.root,
+        &id,
+        &json!({"expectedRunId":null,"selectedMessageId":"two"})
+    )
+    .unwrap());
+    assert_eq!(
+        records(&f.root, &id, "userMessage", 1).unwrap()[0]["clientMessageId"],
+        "two"
+    );
     // Repeated dispatch must never substitute another queued message.
-    assert!(!take_explicit(&f.root, &id, &json!({"expectedRunId":null,"selectedMessageId":"two"})).unwrap());
+    assert!(!take_explicit(
+        &f.root,
+        &id,
+        &json!({"expectedRunId":null,"selectedMessageId":"two"})
+    )
+    .unwrap());
     for key in ["one", "three"] {
         let (_, run) = claim(&f, &id);
         finish_turn(&f, &id, &run);
         assert!(take_next(&f.root, &id).unwrap());
-        assert_eq!(records(&f.root, &id, "userMessage", 1).unwrap()[0]["clientMessageId"], key);
+        assert_eq!(
+            records(&f.root, &id, "userMessage", 1).unwrap()[0]["clientMessageId"],
+            key
+        );
     }
     assert!(!take_next(&f.root, &id).unwrap());
 }
@@ -220,14 +291,21 @@ fn promotion_requires_live_native_runtime_and_bound_turn_without_mutating_queue(
         let (f, id) = setup();
         let (work, run) = claim(&f, &id);
         save(&f.root, &request(&work, "q", "queue")).unwrap();
-        for kind in facts { record(&f.root, &run, kind, &json!({})).unwrap(); }
+        for kind in facts {
+            record(&f.root, &run, kind, &json!({})).unwrap();
+        }
         let before = rows(&read(&f.root).unwrap(), &id).unwrap();
         let send = json!({"id":id,"clientMessageId":"q","editVersion":1,"operation":"send","expectedRunId":run});
-        assert!(change(&f.root, &send).unwrap_err().contains("不支持即时追加"));
+        assert!(change(&f.root, &send)
+            .unwrap_err()
+            .contains("不支持即时追加"));
         assert_eq!(rows(&read(&f.root).unwrap(), &id).unwrap(), before);
         finish_turn(&f, &id, &run);
         assert!(take_next(&f.root, &id).unwrap());
-        assert_eq!(records(&f.root, &id, "userMessage", 1).unwrap()[0]["clientMessageId"], "q");
+        assert_eq!(
+            records(&f.root, &id, "userMessage", 1).unwrap()[0]["clientMessageId"],
+            "q"
+        );
     }
     let (f, id) = setup();
     let (work, run) = claim(&f, &id);
@@ -246,13 +324,20 @@ fn promotion_requires_live_native_runtime_and_bound_turn_without_mutating_queue(
 fn selected_send_rejects_stale_run_and_does_not_release_other_held_messages() {
     let (f, id) = setup();
     let (work, run) = claim(&f, &id);
-    for key in ["one", "two"] { save(&f.root, &request(&work, key, "queue")).unwrap(); }
+    for key in ["one", "two"] {
+        save(&f.root, &request(&work, key, "queue")).unwrap();
+    }
     let mut send = json!({"id":id,"clientMessageId":"two","editVersion":1,"operation":"send"});
     for expected in [None, Some(Value::Null), Some(json!("old-run"))] {
-        if let Some(value) = expected { send["expectedRunId"] = value; }
+        if let Some(value) = expected {
+            send["expectedRunId"] = value;
+        }
         assert!(change(&f.root, &send).is_err());
     }
-    assert_eq!(rows(&read(&f.root).unwrap(), &id).unwrap()[1]["editVersion"], 1);
+    assert_eq!(
+        rows(&read(&f.root).unwrap(), &id).unwrap()[1]["editVersion"],
+        1
+    );
     finish_turn(&f, &id, &run);
     send["expectedRunId"] = json!(run);
     assert!(change(&f.root, &send).is_err());
@@ -260,10 +345,23 @@ fn selected_send_rejects_stale_run_and_does_not_release_other_held_messages() {
     send["expectedRunId"] = Value::Null;
     change(&f.root, &send).unwrap();
     let (_, new_run) = claim(&f, &id);
-    assert!(take_explicit(&f.root, &id, &json!({"expectedRunId":null,"selectedMessageId":"two"})).is_err());
+    assert!(take_explicit(
+        &f.root,
+        &id,
+        &json!({"expectedRunId":null,"selectedMessageId":"two"})
+    )
+    .is_err());
     finish_turn(&f, &id, &new_run);
-    assert!(take_explicit(&f.root, &id, &json!({"expectedRunId":null,"selectedMessageId":"two"})).unwrap());
-    assert_eq!(rows(&read(&f.root).unwrap(), &id).unwrap()[0]["state"], "held");
+    assert!(take_explicit(
+        &f.root,
+        &id,
+        &json!({"expectedRunId":null,"selectedMessageId":"two"})
+    )
+    .unwrap());
+    assert_eq!(
+        rows(&read(&f.root).unwrap(), &id).unwrap()[0]["state"],
+        "held"
+    );
     assert!(!take_next(&f.root, &id).unwrap());
 }
 #[test]
@@ -332,7 +430,13 @@ fn changed_source_is_rejected_before_scope_admission_and_edit_can_revalidate() {
     );
     change(&f.root,&json!({"id":id,"clientMessageId":"stale","editVersion":1,"operation":"edit","text":"按更新后的资料分析","addNotes":[extra()]})).unwrap();
     record(&f.root, &run, "nativeRuntime", &json!({"protocol":1})).unwrap();
-    record(&f.root, &run, "nativeTurn", &json!({"threadId":"fixture","turnId":"turn"})).unwrap();
+    record(
+        &f.root,
+        &run,
+        "nativeTurn",
+        &json!({"threadId":"fixture","turnId":"turn"}),
+    )
+    .unwrap();
     change(
         &f.root,
         &json!({"id":id,"clientMessageId":"stale","editVersion":2,"operation":"send","expectedRunId":run}),

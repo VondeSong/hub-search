@@ -12,7 +12,7 @@ it("selects explicit library ids for all libraries and allows individual selecti
  const host=document.createElement("div");document.body.append(host);const root=createRoot(host);const change=vi.fn();
  try{
  await act(async()=>root.render(<AgentLibraryScope selected={[]} disabled={false} onChange={change}/>));
- const inputs=host.querySelectorAll<HTMLInputElement>('input');
+ const inputs=host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
  await act(async()=>inputs[0].click());expect(change).toHaveBeenLastCalledWith([{id:"one",name:"库一"},{id:"two",name:"库二"}]);
  await act(async()=>inputs[2].click());expect(change).toHaveBeenLastCalledWith([{id:"two",name:"库二"}]);
  }finally{await act(async()=>root.unmount());host.remove();}

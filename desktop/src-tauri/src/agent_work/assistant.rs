@@ -406,10 +406,21 @@ pub(super) fn investigate(
             |prompt, schema| {
                 if !operation.native_agent() && store::provider_budget::direct::enabled(root, work)?
                 {
-                    return ask_direct(root, work, run, control, budget, operation, prompt, schema, &mut |event| session.preview(event));
+                    return ask_direct(
+                        root,
+                        work,
+                        run,
+                        control,
+                        budget,
+                        operation,
+                        prompt,
+                        schema,
+                        &mut |event| session.preview(event),
+                    );
                 }
                 let before = control.execution_receipts().len();
-                let result = operation.ask_stream(prompt, schema, &[], &mut |event| session.preview(event));
+                let result =
+                    operation.ask_stream(prompt, schema, &[], &mut |event| session.preview(event));
                 for receipt in control.execution_receipts().into_iter().skip(before) {
                     store::record(root, run, "modelExecution", &json!(receipt))?;
                 }
@@ -443,9 +454,22 @@ fn ask_direct(
     let output = store::provider_budget::direct::output_remaining(root, work, run)?;
     let call = format!("direct-{}", crate::random_url_safe(18));
     let before = control.execution_receipts().len();
-    let result = operation.ask_direct(prompt, schema, output, &mut |body| {
-        store::provider_budget::direct::reserve(root, work, run, &call, body, budget.request_bytes)
-    }, publish);
+    let result = operation.ask_direct(
+        prompt,
+        schema,
+        output,
+        &mut |body| {
+            store::provider_budget::direct::reserve(
+                root,
+                work,
+                run,
+                &call,
+                body,
+                budget.request_bytes,
+            )
+        },
+        publish,
+    );
     for receipt in control.execution_receipts().into_iter().skip(before) {
         store::provider_budget::direct::receipt(root, work, run, &call, &json!(receipt))?;
     }

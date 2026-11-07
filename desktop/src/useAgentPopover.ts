@@ -1,8 +1,13 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 /** Native details keeps disclosure semantics; dismissal never submits a form. */
-export function useAgentPopover() {
+export function useAgentPopover(options: { deferEscapeSelector?: string } = {}) {
   const ref = useRef<HTMLDetailsElement>(null);
+  const [element, setElement] = useState<HTMLDetailsElement | null>(null);
+  const deferredEscape = useRef(options.deferEscapeSelector);
+  deferredEscape.current = options.deferEscapeSelector;
+  // The assistant's disclosures mount after its launcher is first opened.
+  useLayoutEffect(() => { if (ref.current !== element) setElement(ref.current); });
   function close(restoreFocus = false) {
     const element = ref.current;
     if (!element?.open) return;
@@ -10,12 +15,15 @@ export function useAgentPopover() {
     if (restoreFocus) element.querySelector("summary")?.focus();
   }
   useEffect(() => {
+    if (!element) return;
     const outside = (event: Event) => {
       if (event.target instanceof Node && !ref.current?.contains(event.target)) close();
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.isComposing || event.defaultPrevented || !ref.current?.open ||
           !(event.target instanceof Node) || !ref.current.contains(event.target)) return;
+      // Let a nested search field or action menu consume its first Escape.
+      if (deferredEscape.current && event.target instanceof Element && event.target.closest(deferredEscape.current)) return;
       event.preventDefault();
       event.stopPropagation();
       close(true);
@@ -25,13 +33,18 @@ export function useAgentPopover() {
     document.addEventListener("pointerdown", outside, true);
     document.addEventListener("focusin", outside);
     document.addEventListener("keydown", escape, true);
-    const element = ref.current;
     const controls = element?.closest(".agent-composer-controls");
     const body = element?.closest(".agent-body");
+    const header = element?.closest(".agent-panel-header");
+    const panel = element?.closest(".agent-panel");
     const fit = () => {
-      if (!element?.open || !controls || !body) return;
+      if (!element?.open) return;
+      if (header && panel) {
+        const available = panel.getBoundingClientRect().bottom - header.getBoundingClientRect().bottom - 8;
+        element.style.setProperty("--agent-header-popover-room", `${Math.max(0, Math.floor(available))}px`);
+      }
+      if (!controls || !body) return;
       // The scroll clip starts below the panel header, not at the viewport edge.
-      const panel = element.closest(".agent-panel");
       if (panel) element.style.setProperty("--agent-skill-height", `${Math.floor(panel.getBoundingClientRect().height / 2)}px`);
       const available = controls.getBoundingClientRect().top - Math.max(8, body.getBoundingClientRect().top) - 8;
       element.style.setProperty("--agent-popover-room", `${Math.max(0, Math.floor(available))}px`);
@@ -44,6 +57,10 @@ export function useAgentPopover() {
       const composer = controls.closest(".agent-composer");
       if (composer) resize?.observe(composer);
     }
+    if (header && panel) {
+      resize?.observe(header);
+      resize?.observe(panel);
+    }
     fit();
     return () => {
       document.removeEventListener("pointerdown", outside, true);
@@ -54,6 +71,6 @@ export function useAgentPopover() {
       window.removeEventListener("resize", fit);
       resize?.disconnect();
     };
-  }, []);
+  }, [element]);
   return { ref, close };
 }

@@ -276,8 +276,8 @@ fn mcp_cannot_resume_an_old_thread_before_any_process_or_provider_call() {
         Request {
             directory: Path::new("does-not-exist"),
             authentication_identity: "transport-must-reject-before-authentication",
-                auth_root: None,
-                auth_selection: None,
+            auth_root: None,
+            auth_selection: None,
             thread: Some("old-thread"),
             instructions: "",
             image_input: &[],

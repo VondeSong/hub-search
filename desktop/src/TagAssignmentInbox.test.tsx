@@ -165,7 +165,9 @@ it("opens central settings and reflects saved changes without a feature selector
   expect(opened).toHaveBeenCalledOnce();
   suiteSettings = { model: "new-model", reasoningEffort: "max", fast: false, maxConcurrent: 3 };
   suiteRevision++; await act(async () => refreshCodexSuite());
-  expect(host.textContent).toContain("new-model · 最大 · 标准速度");
+  expect(host.textContent).toContain("new-model · 最大");
+  expect(host.textContent).not.toContain("标准速度");
+  expect(host.textContent).not.toContain("Fast");
   expect(host.querySelector('input[aria-label="推理强度"]')).toBeNull();
   window.removeEventListener("hub:open-codex-settings", opened);
 });

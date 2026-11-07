@@ -82,3 +82,25 @@ it("does not reposition non-composer disclosures and disconnects observers on un
   await act(async () => root.render(null));
   expect(disconnect).toHaveBeenCalledOnce();
 });
+
+it("fits header menus to the actual floating panel and follows panel height changes", async () => {
+  function HeaderMenu({ mounted = true }: { mounted?: boolean }) {
+    const popover = useAgentPopover();
+    return <aside className="agent-panel"><header className="agent-panel-header">
+      {mounted && <details ref={popover.ref}><summary>历史</summary><button>关闭</button></details>}
+    </header></aside>;
+  }
+  await act(async () => root.render(<HeaderMenu mounted={false} />));
+  await act(async () => root.render(<HeaderMenu />));
+  const panel = host.querySelector<HTMLElement>(".agent-panel")!;
+  const header = host.querySelector<HTMLElement>(".agent-panel-header")!;
+  const details = host.querySelector("details")!;
+  const panelBox = vi.spyOn(panel, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 300, 440, 380));
+  vi.spyOn(header, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 300, 440, 62));
+  await act(async () => { details.open = true; details.dispatchEvent(new Event("toggle")); });
+  expect(details.style.getPropertyValue("--agent-header-popover-room")).toBe("310px");
+  panelBox.mockReturnValue(new DOMRect(0, 300, 440, 250));
+  resized();
+  expect(details.style.getPropertyValue("--agent-header-popover-room")).toBe("180px");
+  expect(details.open).toBe(true);
+});

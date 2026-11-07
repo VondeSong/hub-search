@@ -49,7 +49,11 @@ pub(super) fn prepare(
             .budget
             .body_chars
             .saturating_sub(context.usage.body_chars)
-            .min(if crate::source_evidence::local_text::is_local(&locator) {20_000} else {6000});
+            .min(if crate::source_evidence::local_text::is_local(&locator) {
+                20_000
+            } else {
+                6000
+            });
         let result = if !work.grant.contains(&locator) {
             Err("资料已不在当前授权范围内".into())
         } else if available == 0 || context.entities.len() >= context.budget.entities {

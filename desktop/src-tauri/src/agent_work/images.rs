@@ -26,10 +26,23 @@ fn identity(
         if source.len() != 64 || !source.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err("图片标识无效".into());
         }
-        let metadata = std::fs::read(root.join("collection-files/agent-images").join(format!("{source}.json")))
-            .map_err(|_| "本地图片缓存缺失，请重新添加")?;
+        let metadata = std::fs::read(
+            root.join("collection-files/agent-images")
+                .join(format!("{source}.json")),
+        )
+        .map_err(|_| "本地图片缓存缺失，请重新添加")?;
         let value: Value = serde_json::from_slice(&metadata).map_err(|_| "图片记录损坏")?;
-        return Ok((ImageGrant { library_id: library.into(), document_id: source.into(), source_item_id: source.into(), input_version: source.into(), blob_hash: source.into() }, value["title"].as_str().unwrap_or("图片").into(), value["mime"].as_str().unwrap_or("").into()));
+        return Ok((
+            ImageGrant {
+                library_id: library.into(),
+                document_id: source.into(),
+                source_item_id: source.into(),
+                input_version: source.into(),
+                blob_hash: source.into(),
+            },
+            value["title"].as_str().unwrap_or("图片").into(),
+            value["mime"].as_str().unwrap_or("").into(),
+        ));
     }
     let (document,title,mime):(String,String,String)=c.query_row(
         "SELECT s.document_id,s.title,s.mime_type FROM source_items s JOIN libraries l ON l.id=s.space_id JOIN documents d ON d.space_id=s.space_id AND d.id=s.document_id WHERE s.id=?1 AND s.space_id=?2 AND l.enabled=1 AND s.mime_type IN ('image/png','image/jpeg','image/webp') AND s.status NOT IN ('unavailable','removed','missing')",
@@ -53,11 +66,12 @@ fn bytes(root: &Path, c: &Connection, g: &ImageGrant) -> Result<(Vec<u8>, String
         return Err("原图版本已变化，请撤回旧图片并重新选择授权".into());
     }
     let path = if g.library_id == LOCAL_LIBRARY {
-        root.join("collection-files/agent-images").join(format!("{}.image",g.source_item_id))
+        root.join("collection-files/agent-images")
+            .join(format!("{}.image", g.source_item_id))
     } else {
-    let store = crate::blob_store::BlobStore::open_existing(&root.join("blobs-v1"))?
-        .with_backup_index(root.join("craft-search.sqlite3"));
-    store.path_for(&g.blob_hash)?
+        let store = crate::blob_store::BlobStore::open_existing(&root.join("blobs-v1"))?
+            .with_backup_index(root.join("craft-search.sqlite3"));
+        store.path_for(&g.blob_hash)?
     };
     let mut data = Vec::new();
     std::fs::File::open(path)
@@ -173,33 +187,56 @@ pub(super) fn list(root: &Path, args: &Value) -> Result<Value, String> {
 
 /// Staging is local only; the message action separately binds the exact bytes to a conversation.
 pub(super) fn stage(root: &Path, args: &Value) -> Result<Value, String> {
-    let title = super::text(args,"title",200)?;
+    let title = super::text(args, "title", 200)?;
     let mime = args["mime"].as_str().unwrap_or("");
-    if !matches!(mime,"image/png"|"image/jpeg"|"image/webp") { return Err("仅支持 PNG、JPEG、WebP 图片".into()); }
+    if !matches!(mime, "image/png" | "image/jpeg" | "image/webp") {
+        return Err("仅支持 PNG、JPEG、WebP 图片".into());
+    }
     let encoded = args["base64"].as_str().ok_or("缺少图片内容")?;
-    if encoded.len() > (MAX_BYTES + 2) / 3 * 4 { return Err("图片压缩后仍超过256 KiB，请选择较小图片".into()); }
-    let data = base64::engine::general_purpose::STANDARD.decode(encoded).map_err(|_| "图片内容无效")?;
-    if data.is_empty() || data.len() > MAX_BYTES { return Err("图片大小无效".into()); }
-    let matches = match mime { "image/png" => data.starts_with(b"\x89PNG\r\n\x1a\n"), "image/jpeg" => data.starts_with(&[255,216,255]), "image/webp" => data.starts_with(b"RIFF") && data.get(8..12)==Some(b"WEBP"), _ => false };
-    if !matches { return Err("图片类型与文件内容不一致".into()); }
+    if encoded.len() > (MAX_BYTES + 2) / 3 * 4 {
+        return Err("图片压缩后仍超过256 KiB，请选择较小图片".into());
+    }
+    let data = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .map_err(|_| "图片内容无效")?;
+    if data.is_empty() || data.len() > MAX_BYTES {
+        return Err("图片大小无效".into());
+    }
+    let matches = match mime {
+        "image/png" => data.starts_with(b"\x89PNG\r\n\x1a\n"),
+        "image/jpeg" => data.starts_with(&[255, 216, 255]),
+        "image/webp" => data.starts_with(b"RIFF") && data.get(8..12) == Some(b"WEBP"),
+        _ => false,
+    };
+    if !matches {
+        return Err("图片类型与文件内容不一致".into());
+    }
     decode(&data)?;
-    let hash = format!("{:x}",Sha256::digest(&data));
+    let hash = format!("{:x}", Sha256::digest(&data));
     let directory = root.join("collection-files/agent-images");
     std::fs::create_dir_all(&directory).map_err(|_| "无法创建图片缓存")?;
-    std::fs::write(directory.join(format!("{hash}.image")),&data).map_err(|_| "无法保存图片缓存")?;
-    std::fs::write(directory.join(format!("{hash}.json")),json!({"title":title,"mime":mime}).to_string()).map_err(|_| "无法保存图片记录")?;
+    std::fs::write(directory.join(format!("{hash}.image")), &data)
+        .map_err(|_| "无法保存图片缓存")?;
+    std::fs::write(
+        directory.join(format!("{hash}.json")),
+        json!({"title":title,"mime":mime}).to_string(),
+    )
+    .map_err(|_| "无法保存图片记录")?;
     let c = crate::source_evidence::open_read_database(root)?;
-    let (grant,_,_) = identity(root,&c,LOCAL_LIBRARY,&hash)?;
-    bytes(root,&c,&grant)?;
+    let (grant, _, _) = identity(root, &c, LOCAL_LIBRARY, &hash)?;
+    bytes(root, &c, &grant)?;
     Ok(json!({"grant":grant,"title":title,"mime":mime}))
 }
 
-pub(super) fn preview(root: &Path, args: &Value) -> Result<Value,String> {
-    let grant: ImageGrant = serde_json::from_value(args["grant"].clone()).map_err(|_| "图片标识无效")?;
+pub(super) fn preview(root: &Path, args: &Value) -> Result<Value, String> {
+    let grant: ImageGrant =
+        serde_json::from_value(args["grant"].clone()).map_err(|_| "图片标识无效")?;
     let c = crate::source_evidence::open_read_database(root)?;
-    let (data,mime)=bytes(root,&c,&grant)?;
-    let (_,title,_)=identity(root,&c,&grant.library_id,&grant.source_item_id)?;
-    Ok(json!({"title":title,"url":format!("data:{mime};base64,{}",base64::engine::general_purpose::STANDARD.encode(data))}))
+    let (data, mime) = bytes(root, &c, &grant)?;
+    let (_, title, _) = identity(root, &c, &grant.library_id, &grant.source_item_id)?;
+    Ok(
+        json!({"title":title,"url":format!("data:{mime};base64,{}",base64::engine::general_purpose::STANDARD.encode(data))}),
+    )
 }
 pub(super) fn selection(value: &Value, field: &str) -> Result<Vec<ImageGrant>, String> {
     let images: Vec<ImageGrant> =

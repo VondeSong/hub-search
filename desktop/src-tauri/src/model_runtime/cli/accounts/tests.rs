@@ -43,7 +43,10 @@ fn only_masked_identity_leaves_the_native_boundary() {
         assert!(!view.contains(secret));
     }
     assert_eq!(a.login["type"], "chatgptAuthTokens");
-    assert_eq!(a.login["accessToken"], token("user-a", "workspace-a", 9999999999));
+    assert_eq!(
+        a.login["accessToken"],
+        token("user-a", "workspace-a", 9999999999)
+    );
 }
 #[test]
 fn malformed_or_signed_out_identity_is_not_an_implicit_fallback() {

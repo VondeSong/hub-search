@@ -310,18 +310,46 @@ mod tests {
     fn resumed_goal_turn_does_not_own_compaction() {
         let mut s = Requested::default();
         for turn in ["goal", "compact"] {
-            assert!(!s.event("own", "turn/started", &json!({"threadId":"own","turn":{"id":turn}})).unwrap());
+            assert!(!s
+                .event(
+                    "own",
+                    "turn/started",
+                    &json!({"threadId":"own","turn":{"id":turn}})
+                )
+                .unwrap());
         }
-        assert!(!s.event("own", "turn/completed", &json!({"threadId":"own","turn":{"id":"goal","status":"interrupted"}})).unwrap());
+        assert!(!s
+            .event(
+                "own",
+                "turn/completed",
+                &json!({"threadId":"own","turn":{"id":"goal","status":"interrupted"}})
+            )
+            .unwrap());
         s.event("own", "item/started", &event("compact")).unwrap();
         s.event("own", "item/completed", &event("compact")).unwrap();
-        assert!(s.event("own", "turn/completed", &json!({"threadId":"own","turn":{"id":"compact","status":"completed"}})).unwrap());
+        assert!(s
+            .event(
+                "own",
+                "turn/completed",
+                &json!({"threadId":"own","turn":{"id":"compact","status":"completed"}})
+            )
+            .unwrap());
     }
     #[test]
     fn completed_unrelated_turn_cannot_later_claim_compaction() {
         let mut s = Requested::default();
-        s.event("own", "turn/started", &json!({"threadId":"own","turn":{"id":"old"}})).unwrap();
-        s.event("own", "turn/completed", &json!({"threadId":"own","turn":{"id":"old","status":"completed"}})).unwrap();
+        s.event(
+            "own",
+            "turn/started",
+            &json!({"threadId":"own","turn":{"id":"old"}}),
+        )
+        .unwrap();
+        s.event(
+            "own",
+            "turn/completed",
+            &json!({"threadId":"own","turn":{"id":"old","status":"completed"}}),
+        )
+        .unwrap();
         assert!(s.event("own", "item/started", &event("old")).is_err());
     }
     #[cfg(windows)]

@@ -94,7 +94,14 @@ async fn request(
     } else {
         client.get(format!("{base}{route}"))
     };
-    req = req.bearer_auth(secret).header("Accept", if stream.is_some() { "text/event-stream" } else { "application/json" });
+    req = req.bearer_auth(secret).header(
+        "Accept",
+        if stream.is_some() {
+            "text/event-stream"
+        } else {
+            "application/json"
+        },
+    );
     if let Some(body) = body {
         req = req.json(body);
     }
@@ -106,10 +113,13 @@ async fn request(
         if !(200..300).contains(&status) {
             return Ok((status, Vec::new()));
         }
-        if response
-            .content_length()
-            .is_some_and(|n| n > if stream.is_some() { streaming::MAX_WIRE_BYTES as u64 } else { 2 * 1024 * 1024 })
-        {
+        if response.content_length().is_some_and(|n| {
+            n > if stream.is_some() {
+                streaming::MAX_WIRE_BYTES as u64
+            } else {
+                2 * 1024 * 1024
+            }
+        }) {
             return Err(TOO_LARGE.into());
         }
         let mut bytes = Vec::new();
@@ -120,11 +130,16 @@ async fn request(
             }
             if let Some(stream) = stream.as_deref_mut() {
                 stream.feed(&chunk)?;
-                if stream.is_done() { break; }
+                if stream.is_done() {
+                    break;
+                }
+            } else {
+                bytes.extend_from_slice(&chunk);
             }
-            else { bytes.extend_from_slice(&chunk); }
         }
-        if let Some(stream) = stream { bytes = stream.finish()?; }
+        if let Some(stream) = stream {
+            bytes = stream.finish()?;
+        }
         Ok((status, bytes))
     };
     tokio::pin!(pending);
@@ -331,7 +346,16 @@ pub(super) fn run_admitted(
         .is_some_and(|a| a.iter().any(|v| v == "image"));
     let body = body(prompt, schema, settings, images, image)?;
     let secret = key()?;
-    run_at_admitted(BASE, &secret, body, schema, control, output_limit, admit, publish)
+    run_at_admitted(
+        BASE,
+        &secret,
+        body,
+        schema,
+        control,
+        output_limit,
+        admit,
+        publish,
+    )
 }
 fn run_at_admitted(
     base: &str,
@@ -353,7 +377,13 @@ fn run_at_admitted(
     run_at_stream(base, secret, &body, schema, control, publish)
 }
 #[cfg(test)]
-fn run_at(base: &str, secret: &str, body: &Value, schema: &Value, control: &Control) -> Result<Value,String> {
+fn run_at(
+    base: &str,
+    secret: &str,
+    body: &Value,
+    schema: &Value,
+    control: &Control,
+) -> Result<Value, String> {
     run_at_stream(base, secret, body, schema, control, &mut |_| Ok(()))
 }
 fn run_at_stream(
@@ -403,8 +433,17 @@ fn run_at_stream(
         Ok(value)
     })();
     stream.account(&mut receipt);
-    if let Err(error) = stream.preview(if result.is_ok() { "completed" } else { "failed" }, true) {
-        if result.is_ok() { result = Err(error); }
+    if let Err(error) = stream.preview(
+        if result.is_ok() {
+            "completed"
+        } else {
+            "failed"
+        },
+        true,
+    ) {
+        if result.is_ok() {
+            result = Err(error);
+        }
     }
     receipt.stream_bytes = stream.wire_bytes as u64;
     receipt.elapsed_ms = started.elapsed().as_millis() as u64;

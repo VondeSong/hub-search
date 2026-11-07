@@ -72,7 +72,8 @@ fn v5_topic_entry_creates_ready_original_work_and_method_before_first_claim() {
     assert!(!options::load_on(&c, id).unwrap().auto_flashcard_inbox);
     preflight(&f.root, &c, &w, "codex", true).unwrap();
     assert!(preflight(&f.root, &c, &w, "deepseek", true).is_err());
-    assert_eq!(counts(&f), json!([1, 0, 2, 0]));
+    // The initial message timestamp is retained as a conversationCreated record.
+    assert_eq!(counts(&f), json!([1, 0, 3, 0]));
     let before = counts(&f);
     assert_eq!(
         crate::agent_work::ui(&f.root, &args).unwrap()["openedWorkId"],
@@ -435,7 +436,7 @@ fn v5_topic_period_legacy_empty_selection_can_rebind_its_exact_work() {
     // 349 saved an exact selection without a separate source-rule fingerprint.
     f.c().execute("UPDATE agent_topic_revisions SET config_json=json_remove(config_json,'$.sourceRule.scopeFingerprint') WHERE topic_id=?1",[t["topic"]["id"].as_str().unwrap()]).unwrap();
     crate::agent_work::ui(&f.root,&json!({"action":"topicBind","topicId":t["topic"]["id"],"expectedRevision":1,"workId":id,"expectedWorkRevision":1,"period":"2026-10","clientRequestId":"legacy-empty-exact-rebind"})).unwrap();
-    assert_eq!(counts(&f), json!([1, 0, 3, 0]));
+    assert_eq!(counts(&f), json!([1, 0, 4, 0]));
     assert!(version_on(&f.c(), &store::load(&f.c(), id).unwrap())
         .unwrap()
         .is_some());

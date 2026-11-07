@@ -24,7 +24,7 @@ fn current_schema_installs_recent_index_without_changing_saved_work() {
         serde_json::to_value(before).unwrap()
     );
     assert_eq!(
-        store::list(&f.root, None, None).unwrap()["works"][0]["id"],
+        store::list(&f.root, None, None, None, None).unwrap()["works"][0]["id"],
         id
     );
 }
@@ -39,12 +39,30 @@ fn initial_user_message_retains_its_recorded_send_time_and_legacy_time_is_unknow
     let f = Fixture::new();
     let id = create(&f);
     let saved = store::view(&f.root, &id).unwrap();
-    let sent = saved["conversation"]["messages"][0]["createdAt"].as_i64().unwrap();
+    let sent = saved["conversation"]["messages"][0]["createdAt"]
+        .as_i64()
+        .unwrap();
     assert!(sent > 0);
-    f.c().execute("UPDATE agent_works SET updated_at=updated_at+60000 WHERE id=?1", [&id]).unwrap();
-    assert_eq!(store::view(&f.root, &id).unwrap()["conversation"]["messages"][0]["createdAt"], sent);
-    f.c().execute("DELETE FROM agent_records WHERE work_id=?1 AND kind='conversationCreated'", [&id]).unwrap();
-    assert_eq!(store::view(&f.root, &id).unwrap()["conversation"]["messages"][0]["createdAt"], 0);
+    f.c()
+        .execute(
+            "UPDATE agent_works SET updated_at=updated_at+60000 WHERE id=?1",
+            [&id],
+        )
+        .unwrap();
+    assert_eq!(
+        store::view(&f.root, &id).unwrap()["conversation"]["messages"][0]["createdAt"],
+        sent
+    );
+    f.c()
+        .execute(
+            "DELETE FROM agent_records WHERE work_id=?1 AND kind='conversationCreated'",
+            [&id],
+        )
+        .unwrap();
+    assert_eq!(
+        store::view(&f.root, &id).unwrap()["conversation"]["messages"][0]["createdAt"],
+        0
+    );
 }
 fn note() -> EvidenceLocator {
     EvidenceLocator::Note {
@@ -347,10 +365,20 @@ fn history_pin_delete_and_pagination_preserve_work_receipts() {
     store::claim(&f.root, &ids[2], &run).unwrap();
     assert!(ui(
         &f.root,
+        &json!({"action":"setHistoryPreference","id":ids[2],"archived":true})
+    )
+    .is_err());
+    assert!(ui(
+        &f.root,
         &json!({"action":"setHistoryPreference","id":ids[2],"deleted":true})
     )
     .is_err());
     f.c().execute("INSERT INTO agent_actions(id,work_id,kind,base_revision,authorization_version,state,context_hash,created_at,updated_at) VALUES('history-pending',?1,'archiveCopy',1,1,'unknown','',0,0)",[&ids[3]]).unwrap();
+    assert!(ui(
+        &f.root,
+        &json!({"action":"setHistoryPreference","id":ids[3],"archived":true})
+    )
+    .is_err());
     assert!(ui(
         &f.root,
         &json!({"action":"setHistoryPreference","id":ids[3],"deleted":true})

@@ -22,19 +22,43 @@ fn answer() -> Value {
     json!({"rationale":"阅读后判断材料与问题无关，直接回答","requests":[],"report":{"status":"completed","summary":"直接回答","findings":[],"nextSteps":[],"questions":[],"limitations":[],"waitCondition":"","prose":{"markdown":"这次无需采用附件。","citations":[]}}})
 }
 #[test]
-fn long_local_text_is_pre_read_and_tail_remains_addressable_without_inline_message(){
-    let f=Fixture::new();
-    let body=format!("{}END_OF_LOCAL_FILE","长文".repeat(20_000));
-    let staged=ui(&f.root,&json!({"action":"stageTextFile","title":"长文.md","text":body})).unwrap();
-    let locator:EvidenceLocator=serde_json::from_value(staged["locator"].clone()).unwrap();
-    let id=create(&f,vec![locator.clone()]);let (work,run)=claim(&f,&id);let mut c=context(&f,&work);
-    prepare(&f.root,&work,&run,&mut c).unwrap();
-    assert_eq!(c.excerpts[0].total_chars,40_017);assert!(c.excerpts[0].truncated);assert_eq!(c.excerpts[0].start_char,0);
-    assert!(store::records(&f.root,&id,"userMessage",10).unwrap().iter().all(|m|!m.to_string().contains("END_OF_LOCAL_FILE")));
-    let tail=work.grant.reader(&f.root).unwrap().read(&locator,40_000,100,None).unwrap();assert_eq!(tail.content,"END_OF_LOCAL_FILE");
-    assert_eq!(ui(&f.root,&json!({"action":"create","goal":"x".repeat(70_000)})).unwrap_err(),"调查请求过大");
+fn long_local_text_is_pre_read_and_tail_remains_addressable_without_inline_message() {
+    let f = Fixture::new();
+    let body = format!("{}END_OF_LOCAL_FILE", "长文".repeat(20_000));
+    let staged = ui(
+        &f.root,
+        &json!({"action":"stageTextFile","title":"长文.md","text":body}),
+    )
+    .unwrap();
+    let locator: EvidenceLocator = serde_json::from_value(staged["locator"].clone()).unwrap();
+    let id = create(&f, vec![locator.clone()]);
+    let (work, run) = claim(&f, &id);
+    let mut c = context(&f, &work);
+    prepare(&f.root, &work, &run, &mut c).unwrap();
+    assert_eq!(c.excerpts[0].total_chars, 40_017);
+    assert!(c.excerpts[0].truncated);
+    assert_eq!(c.excerpts[0].start_char, 0);
+    assert!(store::records(&f.root, &id, "userMessage", 10)
+        .unwrap()
+        .iter()
+        .all(|m| !m.to_string().contains("END_OF_LOCAL_FILE")));
+    let tail = work
+        .grant
+        .reader(&f.root)
+        .unwrap()
+        .read(&locator, 40_000, 100, None)
+        .unwrap();
+    assert_eq!(tail.content, "END_OF_LOCAL_FILE");
+    assert_eq!(
+        ui(
+            &f.root,
+            &json!({"action":"create","goal":"x".repeat(70_000)})
+        )
+        .unwrap_err(),
+        "调查请求过大"
+    );
     let anchored=ui(&f.root,&json!({"action":"create","goal":"读取附件","successCriteria":"按相关性使用","anchor":locator,"grant":{"libraryIds":[],"notes":[locator],"readingItemKeys":[]}})).unwrap();
-    assert_eq!(anchored["work"]["grant"]["notes"][0],json!(locator));
+    assert_eq!(anchored["work"]["grant"]["notes"][0], json!(locator));
 }
 fn context(f: &Fixture, w: &Work) -> Context {
     Context {
@@ -152,11 +176,23 @@ fn previously_ignored_attachment_is_recovered_on_next_question() {
     let id = create(&f, vec![note("chosen")]);
     let (w, r) = claim(&f, &id);
     let report: Report = serde_json::from_value(answer()["report"].clone()).unwrap();
-    store::publish(&f.root, &w, &r, &report, &[], &[], &json!([]), &json!({}), &Control::default()).unwrap();
+    store::publish(
+        &f.root,
+        &w,
+        &r,
+        &report,
+        &[],
+        &[],
+        &json!([]),
+        &json!({}),
+        &Control::default(),
+    )
+    .unwrap();
     ui(&f.root, &json!({"action":"message","id":id,"text":"继续分析","clientMessageId":"recover","expectedRevision":w.revision})).unwrap();
     let (w, r) = claim(&f, &id);
     investigate(&f.root, &w, &r, &Control::default(), |prompt, _| {
         assert!(prompt.contains("LEGACY_UNREAD_ATTACHMENT"));
         Ok(answer())
-    }).unwrap();
+    })
+    .unwrap();
 }

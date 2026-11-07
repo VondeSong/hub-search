@@ -8,10 +8,17 @@ fn fixture(
 ) -> (String, std::thread::JoinHandle<String>) {
     fixture_parts(status, vec![(body, delay)])
 }
-fn fixture_parts(status: u16, parts: Vec<(String, Duration)>) -> (String, std::thread::JoinHandle<String>) {
+fn fixture_parts(
+    status: u16,
+    parts: Vec<(String, Duration)>,
+) -> (String, std::thread::JoinHandle<String>) {
     fixture_parts_held(status, parts, Duration::ZERO)
 }
-fn fixture_parts_held(status: u16, parts: Vec<(String, Duration)>, hold: Duration) -> (String, std::thread::JoinHandle<String>) {
+fn fixture_parts_held(
+    status: u16,
+    parts: Vec<(String, Duration)>,
+    hold: Duration,
+) -> (String, std::thread::JoinHandle<String>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
     let join = std::thread::spawn(move || {
@@ -42,12 +49,21 @@ fn fixture_parts_held(status: u16, parts: Vec<(String, Duration)>, hold: Duratio
                 }
             }
         }
-        let length = if hold.is_zero() { format!("Content-Length: {}\r\n", parts.iter().map(|(s, _)| s.len()).sum::<usize>()) } else { String::new() };
+        let length = if hold.is_zero() {
+            format!(
+                "Content-Length: {}\r\n",
+                parts.iter().map(|(s, _)| s.len()).sum::<usize>()
+            )
+        } else {
+            String::new()
+        };
         let head=format!("HTTP/1.1 {status} Test\r\nContent-Type: text/event-stream\r\n{length}Connection: close\r\n\r\n");
         let _ = stream.write_all(head.as_bytes());
         for (part, delay) in parts {
             std::thread::sleep(delay);
-            if stream.write_all(part.as_bytes()).is_err() { break; }
+            if stream.write_all(part.as_bytes()).is_err() {
+                break;
+            }
             let _ = stream.flush();
         }
         std::thread::sleep(hold);
@@ -59,14 +75,23 @@ fn json_response(content: &str, reason: &str) -> String {
     json!({"model":"deepseek-flash","choices":[{"finish_reason":reason,"message":{"content":content,"reasoning_content":"PRIVATE_REASONING"}}],"usage":{"prompt_tokens":29,"completion_tokens":8,"total_tokens":37}}).to_string()
 }
 fn response(content: &str, reason: &str) -> String {
-    let raw:Value=serde_json::from_str(&json_response(content,reason)).unwrap();
-    format!("data: {}\n\ndata: {}\n\ndata: [DONE]\n\n",
+    let raw: Value = serde_json::from_str(&json_response(content, reason)).unwrap();
+    format!(
+        "data: {}\n\ndata: {}\n\ndata: [DONE]\n\n",
         json!({"choices":[{"index":0,"delta":{"reasoning_content":"PRIVATE_REASONING","content":content},"finish_reason":null}]}),
-        json!({"model":raw["model"],"choices":[{"index":0,"delta":{},"finish_reason":reason}],"usage":raw["usage"]}))
+        json!({"model":raw["model"],"choices":[{"index":0,"delta":{},"finish_reason":reason}],"usage":raw["usage"]})
+    )
 }
 pub(super) fn framing_response() -> String {
-    let frame = format!("data: {}\n\n", json!({"id":"a".repeat(64),"object":"chat.completion.chunk","created":1718345013,"model":"deepseek-flash","system_fingerprint":"f".repeat(32),"choices":[{"index":0,"delta":{"reasoning_content":"r"},"finish_reason":null,"logprobs":null}]}));
-    format!("{}{}", frame.repeat(7000), response("{\"answer\":\"ok\"}", "stop"))
+    let frame = format!(
+        "data: {}\n\n",
+        json!({"id":"a".repeat(64),"object":"chat.completion.chunk","created":1718345013,"model":"deepseek-flash","system_fingerprint":"f".repeat(32),"choices":[{"index":0,"delta":{"reasoning_content":"r"},"finish_reason":null,"logprobs":null}]})
+    );
+    format!(
+        "{}{}",
+        frame.repeat(7000),
+        response("{\"answer\":\"ok\"}", "stop")
+    )
 }
 #[test]
 fn http_stream_accepts_framing_overhead_above_the_catalog_response_limit() {
@@ -74,7 +99,10 @@ fn http_stream_accepts_framing_overhead_above_the_catalog_response_limit() {
     assert!(wire.len() > 2 * 1024 * 1024);
     let (url, server) = fixture(200, wire, Duration::ZERO);
     let control = Control::default();
-    assert_eq!(run_at(&url, "fixture-secret", &json!({}), &schema(), &control).unwrap()["answer"], "ok");
+    assert_eq!(
+        run_at(&url, "fixture-secret", &json!({}), &schema(), &control).unwrap()["answer"],
+        "ok"
+    );
     server.join().unwrap();
     assert!(control.execution_receipts()[0].stream_bytes > 2 * 1024 * 1024);
 }
@@ -88,47 +116,109 @@ fn settings() -> Settings {
 }
 #[test]
 fn http_stream_publishes_before_completion_and_retains_final_validation() {
-    let prefix=format!("data: {}\n\n",json!({"choices":[{"index":0,"delta":{"content":"{\"rationale\":\"核对事实\",\"report\":{\"markdown\":\"实时片段"},"finish_reason":null}]}));
-    let suffix=format!("data: {}\n\ndata: [DONE]\n\n",json!({"choices":[{"index":0,"delta":{"content":"已完成\"}}"},"finish_reason":"stop"}]}));
-    let (url,server)=fixture_parts(200,vec![(prefix,Duration::from_millis(180)),(suffix,Duration::from_millis(350))]);
-    let mut early=false;
-    let start=Instant::now();
-    let mut events=vec![];
-    let schema=json!({"type":"object","required":["rationale","report"],"properties":{"rationale":{"type":"string"},"report":{"type":"object"}}});
-    let value=run_at_stream(&url,"fixture-secret",&json!({}),&schema,&Control::default(),&mut |event| {
-        if event["kind"]=="answer" && event["text"]=="实时片段" { early=start.elapsed()<Duration::from_millis(500); }
-        events.push(event.clone());Ok(())
-    }).unwrap();
+    let prefix = format!(
+        "data: {}\n\n",
+        json!({"choices":[{"index":0,"delta":{"content":"{\"rationale\":\"核对事实\",\"report\":{\"markdown\":\"实时片段"},"finish_reason":null}]})
+    );
+    let suffix = format!(
+        "data: {}\n\ndata: [DONE]\n\n",
+        json!({"choices":[{"index":0,"delta":{"content":"已完成\"}}"},"finish_reason":"stop"}]})
+    );
+    let (url, server) = fixture_parts(
+        200,
+        vec![
+            (prefix, Duration::from_millis(180)),
+            (suffix, Duration::from_millis(350)),
+        ],
+    );
+    let mut early = false;
+    let start = Instant::now();
+    let mut events = vec![];
+    let schema = json!({"type":"object","required":["rationale","report"],"properties":{"rationale":{"type":"string"},"report":{"type":"object"}}});
+    let value = run_at_stream(
+        &url,
+        "fixture-secret",
+        &json!({}),
+        &schema,
+        &Control::default(),
+        &mut |event| {
+            if event["kind"] == "answer" && event["text"] == "实时片段" {
+                early = start.elapsed() < Duration::from_millis(500);
+            }
+            events.push(event.clone());
+            Ok(())
+        },
+    )
+    .unwrap();
     server.join().unwrap();
     assert!(early);
-    assert_eq!(value["report"]["markdown"],"实时片段已完成");
-    assert!(events.iter().any(|e|e["kind"]=="reasoning" && e["text"]=="核对事实"));
+    assert_eq!(value["report"]["markdown"], "实时片段已完成");
+    assert!(events
+        .iter()
+        .any(|e| e["kind"] == "reasoning" && e["text"] == "核对事实"));
     // A preview is not a validated result: missing required answer still fails.
-    let (url,server)=fixture(200,response("{\"rationale\":\"说明\",\"report\":{\"markdown\":\"未核验\"}}","stop"),Duration::ZERO);
-    assert!(run_at_stream(&url,"fixture-secret",&json!({}),&super::tests::schema(),&Control::default(),&mut |_|Ok(())).is_err());
+    let (url, server) = fixture(
+        200,
+        response(
+            "{\"rationale\":\"说明\",\"report\":{\"markdown\":\"未核验\"}}",
+            "stop",
+        ),
+        Duration::ZERO,
+    );
+    assert!(run_at_stream(
+        &url,
+        "fixture-secret",
+        &json!({}),
+        &super::tests::schema(),
+        &Control::default(),
+        &mut |_| Ok(())
+    )
+    .is_err());
     server.join().unwrap();
 }
 #[test]
 fn streamed_preview_cancellation_never_delivers_and_missing_done_preserves_known_usage() {
-    let first=format!("data: {}\n\n",json!({"choices":[{"index":0,"delta":{"content":"{\"rationale\":\"核对资料\",\"report\":{\"markdown\":\"尚未完成"},"finish_reason":null}]}));
-    let (url,server)=fixture_parts(200,vec![(first,Duration::from_millis(170)),("data: [DONE]\n\n".into(),Duration::from_millis(350))]);
-    let control=Control::bounded(Duration::from_secs(3));
-    let mut saw_preview=false;
-    let result=run_at_stream(&url,"fixture-secret",&json!({}),&schema(),&control,&mut |event| {
-        if event["kind"]=="answer" && event["text"]=="尚未完成" {saw_preview=true;control.cancel();}
-        Ok(())
-    });
+    let first = format!(
+        "data: {}\n\n",
+        json!({"choices":[{"index":0,"delta":{"content":"{\"rationale\":\"核对资料\",\"report\":{\"markdown\":\"尚未完成"},"finish_reason":null}]})
+    );
+    let (url, server) = fixture_parts(
+        200,
+        vec![
+            (first, Duration::from_millis(170)),
+            ("data: [DONE]\n\n".into(), Duration::from_millis(350)),
+        ],
+    );
+    let control = Control::bounded(Duration::from_secs(3));
+    let mut saw_preview = false;
+    let result = run_at_stream(
+        &url,
+        "fixture-secret",
+        &json!({}),
+        &schema(),
+        &control,
+        &mut |event| {
+            if event["kind"] == "answer" && event["text"] == "尚未完成" {
+                saw_preview = true;
+                control.cancel();
+            }
+            Ok(())
+        },
+    );
     server.join().unwrap();
     assert!(saw_preview && result.is_err());
-    assert_eq!(control.execution_receipts()[0].outcome,"cancelled");
-    let broken=response("{\"answer\":\"not-final\"}","stop").replace("data: [DONE]\n\n","");
-    let (url,server)=fixture(200,broken,Duration::ZERO);
-    let control=Control::default();
-    assert_eq!(run_at(&url,"fixture-secret",&json!({}),&schema(),&control).unwrap_err(),TRUNCATED);
+    assert_eq!(control.execution_receipts()[0].outcome, "cancelled");
+    let broken = response("{\"answer\":\"not-final\"}", "stop").replace("data: [DONE]\n\n", "");
+    let (url, server) = fixture(200, broken, Duration::ZERO);
+    let control = Control::default();
+    assert_eq!(
+        run_at(&url, "fixture-secret", &json!({}), &schema(), &control).unwrap_err(),
+        TRUNCATED
+    );
     server.join().unwrap();
-    let receipt=&control.execution_receipts()[0];
-    assert_eq!(receipt.total_tokens,Some(37));
-    assert_ne!(receipt.outcome,"completedOutput");
+    let receipt = &control.execution_receipts()[0];
+    assert_eq!(receipt.total_tokens, Some(37));
+    assert_ne!(receipt.outcome, "completedOutput");
 }
 fn schema() -> Value {
     json!({"type":"object","required":["answer"],"additionalProperties":false,"properties":{"answer":{"type":"string"}}})
@@ -136,7 +226,11 @@ fn schema() -> Value {
 #[test]
 fn done_finishes_before_transport_close_without_skipping_final_validation() {
     for (content, valid) in [("{\"answer\":\"ok\"}", true), ("{}", false)] {
-        let (url, server) = fixture_parts_held(200, vec![(response(content, "stop"), Duration::ZERO)], Duration::from_millis(900));
+        let (url, server) = fixture_parts_held(
+            200,
+            vec![(response(content, "stop"), Duration::ZERO)],
+            Duration::from_millis(900),
+        );
         let control = Control::bounded(Duration::from_millis(500));
         let result = run_at(&url, "fixture-secret", &json!({}), &schema(), &control);
         server.join().unwrap();
@@ -345,7 +439,8 @@ fn generation_timeout_and_unknown_connection_outcome_are_not_silent_successes() 
 #[test]
 fn v4_direct_usage_keeps_raw_cache_counts_and_missing_is_not_zero() {
     let mut receipt = execution::Trace::new().finish("running", None);
-    let mut raw: Value = serde_json::from_str(&json_response("{\"answer\":\"ok\"}", "stop")).unwrap();
+    let mut raw: Value =
+        serde_json::from_str(&json_response("{\"answer\":\"ok\"}", "stop")).unwrap();
     parse_response(&serde_json::to_vec(&raw).unwrap(), &mut receipt).unwrap();
     assert!(
         !receipt.usage_complete

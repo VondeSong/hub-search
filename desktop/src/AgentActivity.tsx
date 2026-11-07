@@ -29,6 +29,14 @@ function webSummary(event:ActivityEvent) {
   const state=event.state==="running"?" · 进行中":event.state==="interrupted"?" · 已中断":event.state==="failed"?" · 未完成":"";
   return `${webLabel(event)}${state}${event.errorCount ? ` · ${event.errorCount} 项未获取` : ""}`;
 }
+function webFailureSummary(events:ActivityEvent[]) {
+  const issues=events.filter(event=>event.kind==="webSearch" && (event.state==="failed" || event.state==="interrupted" || (event.errorCount ?? 0)>0));
+  // Results from separate batches may refer to the same page; do not sum them
+  // into a claimed number of unique failed pages.
+  return issues.length===1 ? webSummary(issues[0]) : issues.length>1 ? `${issues.length} 批网页操作存在未完成项` : null;
+}
+// Older native progress records carry this suffix without a truncated flag.
+const progressClippingNotice="（过程消息超过显示上限，后续内容未展示。）";
 function WebActivity({event}:{event:ActivityEvent}) {
   const href=publicWebHref(event.url);
   const original=event.label.replace(/^Codex\s*/,"").replace(/[：:]\s*$/,"").trim();
@@ -99,6 +107,8 @@ function OperationPhase({events,scope,running}:{events:ActivityEvent[];scope:Too
   if(!operations.length)return <>{events.map(event=><ActivityEventView key={event.id} event={event} scope={scope}/>)}</>;
   const active=running?[...events].reverse().find(event=>event.state==="running"):undefined;
   const failed=operations.some(event=>event.state==="failed"||event.state==="interrupted"||event.errorCount);
+  const webFailure=webFailureSummary(operations);
+  const otherFailure=operations.some(event=>event.kind!=="webSearch" && (event.state==="failed" || event.state==="interrupted"));
   const labels=[...new Set(operations.map(event=>
     event.kind==="webSearch"?"查阅网页":event.kind==="context"?"读取资料":event.kind==="skill"?"使用技能":
     /命令|运行|执行/.test(event.label)?"运行命令":/编辑|修改|创建文件/.test(event.label)?"编辑文件":
@@ -109,7 +119,7 @@ function OperationPhase({events,scope,running}:{events:ActivityEvent[];scope:Too
   const currentLabel=current && (/^(读取|搜索|访问|运行|执行|检查|核对|验证|编辑|加载|查找|整理|分析|生成|保存|创建)/.test(current.label)?"正在"+current.label:current.label);
   const summary=current ? pending&&!active?"等待："+current.label:currentLabel! : running?"正在思考":overview;
   return <details className={`agent-operation-group${running?" agent-operation-active":""}`} open={open} onToggle={event=>setOpen(event.currentTarget.open)}>
-    <summary title={summary}>{current?<EventIcon event={current}/>:!running&&<EventIcon event={{...operations[0],state:"completed",errorCount:0}}/>}<span className={running?"agent-current-action":undefined}>{summary}</span>{failed&&!open&&<small className="agent-phase-warning">部分未完成</small>}<ChevronDown size={12} aria-hidden="true"/></summary>
+    <summary title={summary}>{current?<EventIcon event={current}/>:!running&&<EventIcon event={{...operations[0],state:"completed",errorCount:0}}/>}<span className={running?"agent-current-action":undefined}>{summary}</span>{failed&&!open&&<small className="agent-phase-warning" role="status"><TriangleAlert size={12} aria-hidden="true"/>{webFailure ? `${otherFailure?"部分未完成 · ":""}${webFailure}` : "部分未完成"}</small>}<ChevronDown size={12} aria-hidden="true"/></summary>
     <div>{events.map(event=><ActivityEventView key={event.id} event={event} scope={scope}/>)}</div>
   </details>;
 }
@@ -147,9 +157,12 @@ export function AgentActivity({ value }: { value: ActivityRun }) {
   const hasActiveStep=processEvents.some(event=>["tool","skill","webSearch","reasoning","status"].includes(event.kind)&&event.state==="running");
   const stopped = !value.running && ["failed","interrupted","needsDecision"].includes(value.state);
   const failure = stopped && newest.find(event=>event.state==="failed" || event.state==="interrupted");
-  const webFailures = processEvents.filter(event=>event.kind==="webSearch" && (event.errorCount || event.state==="failed" || event.state==="interrupted"));
   const hasProcess = !!value.validity || processEvents.length>0;
   const phaseShowsStatus=processEvents.length>0&&isOperation(processEvents[processEvents.length-1]);
+  const webFailure=webFailureSummary(processEvents);
+  const clippedProgress=processEvents.filter(event=>["message","reasoning","plan"].includes(event.kind));
+  const clippingInText=clippedProgress.some(event=>event.label.trimEnd().endsWith(progressClippingNotice));
+  const clipped=clippingInText || clippedProgress.some(event=>event.truncated);
   return <section className="agent-activity" aria-label="本轮工作过程">
     {hasProcess ? <button type="button" className="agent-activity-toggle" aria-expanded={expanded} aria-controls={detailsId} onClick={()=>setExpanded(current=>!current)}>
       <span>{timeLabel} {duration}</span><ChevronDown className={expanded ? "" : "agent-collapsed"} size={12} aria-hidden="true"/>
@@ -158,9 +171,11 @@ export function AgentActivity({ value }: { value: ActivityRun }) {
       {value.validity && <p className="agent-note">{value.validity}</p>}
       <ActivityTimeline running={value.running && !answer} events={processEvents} scope={value.validity ? null : scope}/>
       {value.running && !answer && !hasActiveStep && !phaseShowsStatus && <p className="agent-live-status" role="status">正在思考</p>}
+      {processEvents.some(event=>event.kind==="webSearch") && <p className="agent-note agent-web-provenance">返回结果数不是已读全文数；联网记录中的来源不代表已完整读取。</p>}
     </div>}
-    {!expanded && failure && <p className="agent-process-failure" role="status"><TriangleAlert size={14} aria-hidden="true"/><span>{failure.label} · {failure.state==="failed" ? "未完成" : "已中断"}{failure.detail ? `：${failure.detail}` : ""}</span></p>}
-    {!expanded && webFailures.filter(event=>event!==failure).map(event=><p key={event.id} className="agent-process-failure" role="status"><TriangleAlert size={14} aria-hidden="true"/><span>{webSummary(event)}</span></p>)}
+    {!expanded && failure && failure.kind!=="webSearch" && <p className="agent-process-failure" role="status"><TriangleAlert size={14} aria-hidden="true"/><span>{failure.label} · {failure.state==="failed" ? "未完成" : "已中断"}{failure.detail ? `：${failure.detail}` : ""}</span></p>}
+    {!expanded && webFailure && <p className="agent-process-failure agent-web-warning" role="status"><TriangleAlert size={14} aria-hidden="true"/><span>{webFailure}{failure && failure.kind==="webSearch" && failure.detail ? `：${failure.detail}` : ""}</span></p>}
+    {clipped && (!expanded || !clippingInText) && <p className="agent-note" role="status" aria-label="过程显示限制">过程消息超过显示上限，后续内容未展示。</p>}
     {!expanded && unpublished && <ActivityEventView event={unpublished} scope={null}/>}
     {value.running && answer && <div className="agent-report agent-answer agent-native-answer" aria-label="正在生成回答" aria-busy="true">{answer.origin==="deepseek"&&<p className="agent-note">{answer.truncated?"回答预览已达显示上限，仍在接收；完整回答核验后交付":"回答预览 · 完整接收并核验后交付"}</p>}<PublicText text={answer.label}/></div>}
   </section>;

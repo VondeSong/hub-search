@@ -8,8 +8,12 @@ import type { TimedEvent } from "./useAgentUiTiming";
 
 const { invoke, bridge, visibility } = vi.hoisted(() => ({ invoke: vi.fn(), bridge: { receive: null as null | ((event: { payload: TimedEvent }) => void) },visibility:{value:true} }));
 vi.mock("./CodexSuite",async importOriginal=>({...await importOriginal<object>(),loadCodexSuiteModels:vi.fn(async()=>[]),cachedCodexSuiteModels:()=>[],useCodexSuite:()=>({loaded:true,loading:false,settings:{model:"fixture-model",provider:"codex",reasoningEffort:"medium",fast:false,maxConcurrent:2}})}));
-vi.mock("@tauri-apps/api/core", () => ({ invoke }));
-vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async (_name, receive) => { bridge.receive=receive;return () => { bridge.receive=null; }; }) }));
+vi.mock("@tauri-apps/api/core", () => ({ invoke: (command: string, ...args: unknown[]) => command === "list_libraries" ? Promise.resolve([]) : invoke(command, ...args) }));
+vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async (name, receive) => {
+  if (name !== "agent-work-updated") return () => {};
+  bridge.receive=receive;
+  return () => { if (bridge.receive === receive) bridge.receive=null; };
+}) }));
 vi.mock("./WindowVisibility", () => ({ useDocumentVisible: () => visibility.value }));
 vi.mock("./RuntimePlatform", () => ({ runtimeCapabilities: { desktop: true, localVault: true } }));
 let host: HTMLDivElement, root: Root;

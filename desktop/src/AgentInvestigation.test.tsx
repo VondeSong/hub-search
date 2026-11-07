@@ -5,7 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { AgentInvestigation, ReadingInvestigation, StandaloneInvestigation, investigationAnchor } from "./AgentInvestigation";
 import * as fileInputs from "./AgentFileInputs";
-import type { SearchResult } from "./SearchTypes";
+import type { LibrarySummary, SearchResult } from "./SearchTypes";
 import type { AgentActions } from "./AgentTagAction";
 import type { Conversation, Progress, HistoricalDelivery } from "./AgentDelivery";
 import type { ActivityRun } from "./AgentActivity";
@@ -15,13 +15,14 @@ import { WorkspaceRail } from "./WorkspaceRail";
 import { SearchHeaderActions } from "./SearchHeaderActions";
 import { resetCodexAccountsForTests } from "./CodexAccounts";
 
-const { invoke, visibility } = vi.hoisted(() => ({ invoke: vi.fn(), visibility: {value:true} }));
-vi.mock("@tauri-apps/api/core", () => ({ invoke: (command:string,...args:unknown[]) => command === "list_libraries" ? Promise.resolve([]) : command === "model_runtime" && (args[0] as {args?:{action?:string}})?.args?.action === "codexAccounts" ? Promise.resolve({selected:"desktop",accounts:[],current:{label:"t***@example.invalid",scopeId:"a".repeat(64),kind:"chatgpt",plan:"plus"}}) : invoke(command,...args) }));
+const { invoke, visibility, libraryInventory } = vi.hoisted(() => ({ invoke: vi.fn(), visibility: {value:true}, libraryInventory: {value: [] as LibrarySummary[]} }));
+vi.mock("@tauri-apps/api/core", () => ({ invoke: (command:string,...args:unknown[]) => command === "list_libraries" ? Promise.resolve(libraryInventory.value) : command === "model_runtime" && (args[0] as {args?:{action?:string}})?.args?.action === "codexAccounts" ? Promise.resolve({selected:"desktop",accounts:[],current:{label:"t***@example.invalid",scopeId:"a".repeat(64),kind:"chatgpt",plan:"plus"}}) : invoke(command,...args) }));
 vi.mock("./WindowVisibility", () => ({ useDocumentVisible: () => visibility.value, isWindowVisible:()=>visibility.value, subscribeWindowVisibility:()=>()=>{} }));
 vi.mock("./CodexSuite",async importOriginal=>({...await importOriginal<object>(),loadCodexSuiteModels:vi.fn(async()=>[]),cachedCodexSuiteModels:()=>[],useCodexSuite:()=>({loaded:true,loading:false,settings:{model:"fixture-model",provider:"codex",reasoningEffort:"medium",fast:false,maxConcurrent:2}})}));
 vi.mock("./RuntimePlatform", () => ({ runtimeCapabilities: { desktop: true, localVault: true } }));
 let host: HTMLDivElement, root: Root;
 const result: SearchResult = { id: "hit", entityKey: "page:notes:doc", provider: "obsidian", libraryId: "notes", libraryName: "工作笔记", spaceId: "notes", spaceName: "工作笔记", documentId: "doc", contentType: "markdown", sourceType: "note", title: "安装方案", path: "安装方案.md", snippet: "", matchTerms: [], matchField: "", matchCount: 0, subMatches: [] };
+const noteLibrary: LibrarySummary = {id:"notes",provider:"obsidian",name:"工作笔记",connected:true,documentCount:1,excludedPaths:[]};
 const report = { status: "needsDecision", summary: "先验证现有接口", findings: [{ text: "历史记录要求保持 M6", citations: [{ evidenceId: "e1", quote: "保持 M6" }] }], nextSteps: [{ action: "测量孔位", reason: "缺少公差结果", citations: [] }], questions: ["是否保留现有固定架？"], limitations: ["来源为本地缓存"], waitCondition: "" };
 const makeView = (state = "completed") => ({ work: { id: "work-1", goal: "核对安装方案", state, grant: { libraryIds: [] }, report: state === "completed" ? report : null }, evidence: [{ title: "历史决定", sourcePath: "历史决定.md", content: "保持 M6", startChar: 0, endChar: 5, totalChars: 5, truncated: false }], decisions: [] as { text: string; author: string }[], run: { usage: { modelCalls: 2, entitiesRead: 2, bodyChars: 100 } }, validity: "", runActive: state === "investigating", actionActive: false, actions: undefined as AgentActions | undefined });
 
@@ -132,7 +133,7 @@ beforeEach(() => {
   localStorage.removeItem("hub.agent.panel.width.v1");
   localStorage.removeItem("hub.agent.panel.height.v1");
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-  host = document.createElement("div"); document.body.append(host); root = createRoot(host); current = makeView(); visibility.value=true;
+  host = document.createElement("div"); document.body.append(host); root = createRoot(host); current = makeView(); visibility.value=true; libraryInventory.value=[];
   invoke.mockReset().mockImplementation(async (command, { args }) => {
     expect(command).toBe("agent_investigation");
     if (args.action === "list") return { works: [] };
@@ -146,7 +147,40 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); resetCodexAccountsForTests(); host.remove(); document.body.style.direction = ""; Reflect.deleteProperty(document.body, "clientWidth"); vi.useRealTimers(); });
 const button = (text: string) => Array.from(document.body.querySelectorAll<HTMLButtonElement>("button")).find(item => (item.getAttribute("aria-label") || item.textContent)?.includes(text))!;
-const click = async (text: string) => { await act(async () => button(text).click()); };
+async function openDialogueDetails() {
+  const menu=document.body.querySelector<HTMLDetailsElement>(".agent-dialogue-details")!;
+  const sections=menu.querySelector<HTMLElement>(".agent-details-sections")!;
+  if (!menu.open || sections.hidden) await act(async()=>document.body.querySelector<HTMLButtonElement>('.agent-header-end button[aria-label="对话详情"]')!.click());
+  expect(menu.open).toBe(true);expect(sections.hidden).toBe(false);
+}
+async function openHistory() {
+  const menu=document.body.querySelector<HTMLDetailsElement>(".agent-dialogue-details")!;
+  if (menu.open && menu.querySelector<HTMLElement>(".agent-history-container")!.hidden) {
+    await act(async()=>menu.querySelector<HTMLButtonElement>('.agent-details-heading button[aria-label="关闭对话详情"]')!.click());
+  }
+  if (!menu.open) await act(async()=>menu.querySelector<HTMLElement>(":scope > summary")!.click());
+  expect(menu.open).toBe(true);expect(menu.querySelector<HTMLElement>(".agent-history-container")!.hidden).toBe(false);
+}
+async function revealButton(text:string) {
+  const target=button(text);expect(target,text).toBeDefined();
+  if (target.closest(".agent-details-sections")) {
+    await openDialogueDetails();
+    const parents:HTMLDetailsElement[]=[];
+    for(let parent=target.parentElement;parent;parent=parent.parentElement) if(parent instanceof HTMLDetailsElement) parents.unshift(parent);
+    for(const details of parents) if(!details.open) await act(async()=>details.querySelector<HTMLElement>(":scope > summary")!.click());
+    expect(target.closest("[hidden]")).toBeNull();
+  }
+  return target;
+}
+const click = async (text: string) => { const target=await revealButton(text);await act(async () => target.click()); };
+async function selectTaskMode(label:"标准"|"扩展") {
+  const menu=document.body.querySelector<HTMLDetailsElement>(".agent-task-mode")!;
+  await act(async()=>menu.querySelector<HTMLElement>(":scope > summary")!.click());
+  expect(menu.open).toBe(true);
+  const choice=[...menu.querySelectorAll<HTMLButtonElement>(".agent-mode-choice")].find(item=>item.querySelector("strong")?.textContent===label)!;
+  await act(async()=>choice.click());
+  expect(menu.open).toBe(false);expect(menu.querySelector(".agent-mode-badge")?.textContent).toBe(label);
+}
 const fill = async (name: string, value: string) => {
   const input = document.body.querySelector<HTMLTextAreaElement>(`[name="${name}"]`)!;
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); });
@@ -175,17 +209,19 @@ it("pages older global conversations without changing the selected Work or draft
   await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
   await fill("investigationGoal","尚未发送的草稿");
   const sections=document.querySelector<HTMLElement>(".agent-details-sections")!;
-  await click("更多…");
+  await openHistory();
   expect(document.querySelectorAll(".agent-history-row")).toHaveLength(20);
   expect(sections.hidden).toBe(true);
   expect(invoke.mock.calls.filter(([,v])=>v?.args?.action==="list")).toHaveLength(1);
-  await click("返回对话菜单");expect(document.querySelectorAll(".agent-history-row")).toHaveLength(4);
-  expect(document.querySelector(".agent-details-sections")).toBe(sections);expect(sections.hidden).toBe(false);
-  await click("更多…");await click("加载更早对话");
-  expect(invoke.mock.calls.filter(([,v])=>v?.args?.action==="list")[1][1].args).toEqual({action:"list",anchor:null,before:cursor});
+  await click("关闭对话历史");expect(document.querySelector<HTMLDetailsElement>(".agent-dialogue-details")!.open).toBe(false);
+  await openDialogueDetails();expect(document.querySelector(".agent-details-sections")).toBe(sections);expect(sections.hidden).toBe(false);
+  await openHistory();expect(document.querySelectorAll(".agent-history-row")).toHaveLength(20);
+  expect(invoke.mock.calls.filter(([,v])=>v?.args?.action==="list")).toHaveLength(1);
+  await click("加载更多对话");
+  expect(invoke.mock.calls.filter(([,v])=>v?.args?.action==="list")[1][1].args).toEqual({action:"list",anchor:null,query:"",archived:false,before:cursor});
   expect(document.querySelectorAll(".agent-history-row")).toHaveLength(21);
   expect(document.body.querySelector<HTMLTextAreaElement>('[name="investigationGoal"]')!.value).toBe("尚未发送的草稿");
-  expect(button("更多…")).toBeUndefined();
+  expect(document.querySelector(".agent-history-more")).toBeNull();
   await click("更早的独立对话");
   expect(invoke.mock.calls.some(([,v])=>v?.args?.action==="status"&&v.args.id==="older-work")).toBe(true);
   expect(invoke.mock.calls.some(([,v])=>["create","message","respond","resume"].includes(v?.args?.action))).toBe(false);
@@ -199,9 +235,9 @@ it("keeps the history cursor and existing choices after a page fails, then retri
     return {works:[{id:"older",goal:"较早对话",state:"completed"}],nextCursor:null};
   });
   await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
-  await click("更多…");await click("加载更早对话");expect(document.body.querySelector('[role="alert"]')?.textContent).toContain("读取暂时失败");
+  await openHistory();await click("加载更多对话");expect(document.body.querySelector('[role="alert"]')?.textContent).toContain("读取暂时失败");
   expect(document.querySelectorAll(".agent-history-row")).toHaveLength(1);
-  await click("重试加载更早对话");expect(attempts).toBe(2);expect(button("更多…")).toBeUndefined();
+  await click("重试加载更多对话");expect(attempts).toBe(2);expect(document.querySelector(".agent-history-more")).toBeNull();
   expect(invoke.mock.calls.filter(([,v])=>v?.args?.action==="list"&&v.args.before).map(([,v])=>v.args.before)).toEqual([cursor,cursor]);
 });
 it("arranges and cancels context compaction without starting a model or discarding the report",async()=>{
@@ -235,9 +271,10 @@ it("reading investigations grant only the explicit item and do not assume a note
 });
 async function openAddPage(label:string){
  if(label==="使用技能"){await click("添加技能");return;}
- if(label==="资料范围"){await click("添加资料");await act(async()=>{const details=document.body.querySelector<HTMLDetailsElement>(".agent-material-advanced")!;details.open=true;});return;}
+ if(label==="资料范围"){await click("搜索范围：");return;}
  if(label==="从笔记库添加"){await click("添加资料");return;}
- await act(async()=>{const d=document.body.querySelector<HTMLDetailsElement>(".agent-add-menu")!;d.open=true;d.dispatchEvent(new Event("toggle"));});
+ const menu=document.body.querySelector<HTMLDetailsElement>(".agent-add-menu")!;
+ if(menu.open){if(!menu.querySelector(".agent-add-choices"))await click("返回");}else await act(async()=>menu.querySelector<HTMLElement>(":scope > summary")!.click());
  await click(label);
 }
 async function open() { await act(async () => root.render(<AgentInvestigation result={result} />)); await click("调查这篇笔记"); }
@@ -301,7 +338,7 @@ it("reads a saved report with a hidden composer and returns by Escape without cl
  expect(panel.dataset.agentReading).toBe("false");expect(panel.hidden).toBe(false);
  expect(document.body.querySelector<HTMLElement>('.agent-composer')?.hidden).toBe(false);
  expect(document.body.querySelector<HTMLTextAreaElement>('[name="investigationGoal"]')?.value).toBe('保留这个追问草稿');
- expect(document.activeElement?.getAttribute('aria-label')).toBe('专注阅读报告');
+ expect(document.activeElement).toBe(document.body.querySelector('.agent-header-end button[aria-label="对话详情"]'));
  expect(invoke.mock.calls.some(([,v])=>["respond","resume","create"].includes(v?.args?.action))).toBe(false);
 });
 it("opens recovery details above a stable composer while reading a saved report",async()=>{
@@ -319,7 +356,7 @@ it("opens recovery details above a stable composer while reading a saved report"
  expect(document.activeElement).toBe(controls.querySelector('summary'));
  expect(controls.textContent).toContain('需先核对已提交的保存结果');
  expect(controls.textContent).toContain('用量');
- await click('更多…');expect(document.querySelector<HTMLElement>('.agent-details-sections')?.hidden).toBe(true);
+ await openHistory();expect(document.querySelector<HTMLElement>('.agent-details-sections')?.hidden).toBe(true);
  await click('查看任务详情');await act(async()=>{await new Promise(r=>setTimeout(r,10));});
  expect(controls.closest('[hidden]')).toBeNull();expect(document.activeElement).toBe(controls.querySelector('summary'));
  expect(invoke.mock.calls.some(([,v])=>["respond","resume","create"].includes(v?.args?.action))).toBe(false);
@@ -397,13 +434,11 @@ it("honours per-mode admission and starts only the permitted mode after a fresh 
  current={...makeView("failed"),lifecycle:quotaLifecycle(true,false)};
  invoke.mockImplementation(async(_,{args})=>args.action==="list"?{works:[{id:"work-1",goal:current.work.goal,state:current.work.state}]}:current);
  await open();
- await openAddPage("更多设置");
- const select=document.body.querySelector<HTMLSelectElement>('[name="investigationMode"]')!;
- await act(async()=>{select.value="deep";select.dispatchEvent(new Event("change",{bubbles:true}));});
+ await selectTaskMode("扩展");
  expect(button("继续调查").disabled).toBe(true);await click("继续调查");
  await fill("investigationGoal","深度额度不足时仅保存");await click("保存补充");
  expect(invoke.mock.calls.some(([,p])=>p?.args?.action==="respond")).toBe(false);
- await act(async()=>{select.value="quick";select.dispatchEvent(new Event("change",{bubbles:true}));});
+ await selectTaskMode("标准");
  expect(button("继续调查").disabled).toBe(false);
  await fill("investigationGoal","在同事项既有标准额度内处理");await click("发送追问");
  const calls=invoke.mock.calls.filter(([,p])=>p?.args?.action==="respond");expect(calls).toHaveLength(1);expect(calls[0][1].args.mode).toBe("quick");
@@ -676,12 +711,15 @@ it("opens the original-note editor without starting an investigation or a model 
   await open();
   await click("修改这篇 Obsidian 笔记");
   const actions = invoke.mock.calls.filter(([command]) => command === "agent_investigation").map(([, { args }]) => args.action);
-  expect(actions).toEqual(["list", "list", "create"]);
+  expect(actions).toEqual(["list", "list", "create", "list"]);
   const create = invoke.mock.calls.find(([, { args }]) => args.action === "create")![1].args;
   expect(create.anchor).toEqual({ kind: "note", libraryId: "notes", documentId: "doc", pageId: null });
   expect(create.grant.libraryIds).toEqual([]);
   expect(actions).not.toContain("respond");
   expect(document.body.querySelector<HTMLDetailsElement>(".agent-more-tools")?.open).toBe(true);
+  expect(document.body.querySelector<HTMLDetailsElement>(".agent-dialogue-details")?.open).toBe(true);
+  expect(document.body.querySelector<HTMLElement>(".agent-details-sections")?.hidden).toBe(false);
+  expect(document.body.querySelector(".agent-more-tools")?.closest("[hidden]")).toBeNull();
 });
 it("opens a separate assistant, fills suggestions without sending, and restores focus and draft after Escape", async () => {
   await open();
@@ -702,6 +740,7 @@ it("opens a separate assistant, fills suggestions without sending, and restores 
   expect(invoke.mock.calls.map(([, { args }]) => args.action)).toEqual(["list", "list"]);
 });
 it("keeps settings collapsed until requested and preserves the explicit library choice while reopening", async () => {
+  libraryInventory.value=[noteLibrary];
   await open();
   expect(document.body.querySelector(".agent-settings")).toBeNull();
   await openAddPage("资料范围");
@@ -709,11 +748,15 @@ it("keeps settings collapsed until requested and preserves the explicit library 
   expect(settings.closest('.agent-add-menu')).not.toBeNull();
   expect(settings.textContent).toContain('这里决定助手可以读取哪些资料');
   expect(settings.querySelector('[type="range"]')).toBeNull();
-  await act(async () => settings.querySelector<HTMLInputElement>('[type="checkbox"]')!.click());
+  const picker=document.body.querySelector<HTMLInputElement>('[aria-label="允许查找 工作笔记"]')!;
+  expect(picker.checked).toBe(false);
+  await act(async () => picker.click());
+  expect(settings.querySelector<HTMLInputElement>('[type="checkbox"]')!.checked).toBe(true);
   await click("关闭助手"); await click("调查这篇笔记");
   await openAddPage("资料范围");
   expect(document.body.querySelector<HTMLInputElement>('.agent-settings [type="checkbox"]')!.checked).toBe(true);
-  expect(document.body.querySelector(".agent-context")?.textContent).toContain("工作笔记 · 整个资料库");
+  expect(document.body.querySelector<HTMLInputElement>('[aria-label="允许查找 工作笔记"]')!.checked).toBe(true);
+  expect(document.body.querySelector(".agent-scope-trigger")?.textContent).toContain("工作笔记");
   expect(invoke.mock.calls.some(([, { args }]) => args.action === "respond")).toBe(false);
 });
 it("switching the source preserves the active conversation and draft until the user starts with the new material", async () => {
@@ -832,12 +875,14 @@ it("binds preflight memory before the first model call and stops if binding fail
 });
 
 it("does not analyze automatically and defaults to an exact note grant", async () => {
+  libraryInventory.value=[noteLibrary];
   await act(async () => root.render(<AgentInvestigation result={result} />));
   expect(invoke).not.toHaveBeenCalled();
   await click("调查这篇笔记");
   expect(invoke.mock.calls.map(([, { args }]) => args.action)).toEqual(["list", "list"]);
   await openAddPage("资料范围");
-  expect(document.body.querySelector<HTMLInputElement>('[type="checkbox"]')!.checked).toBe(false);
+  expect(document.body.querySelector<HTMLInputElement>('[aria-label="允许查找 工作笔记"]')!.checked).toBe(false);
+  expect(document.body.querySelector<HTMLInputElement>('.agent-settings [type="checkbox"]')!.checked).toBe(false);
   await fill("investigationGoal", "核对安装方案"); await click("开始调查");
   const create = invoke.mock.calls.find(([, { args }]) => args.action === "create")![1].args;
   expect(create.grant).toEqual({ libraryIds: [], notes: [{ kind: "note", libraryId: "notes", documentId: "doc", pageId: null }], readingItemKeys: [] });
@@ -846,12 +891,22 @@ it("does not analyze automatically and defaults to an exact note grant", async (
   expect(document.body.querySelector('[role="status"]')).not.toBeNull();
 });
 it("whole-library access requires the user's explicit checkbox selection", async () => {
+  libraryInventory.value=[noteLibrary];
   await open(); await fill("investigationGoal", "查找相关记录");
   await openAddPage("资料范围");
-  await act(async () => document.body.querySelector<HTMLInputElement>('[type="checkbox"]')!.click());
+  const checkbox=document.body.querySelector<HTMLInputElement>('[aria-label="允许查找 工作笔记"]')!;
+  expect(checkbox.checked).toBe(false);
+  expect(invoke.mock.calls.some(([, { args }]) => ["create","message","respond"].includes(args.action))).toBe(false);
+  await act(async () => checkbox.click());
+  expect(document.body.querySelector<HTMLInputElement>('.agent-settings [type="checkbox"]')!.checked).toBe(true);
   await click("开始调查");
-  expect(invoke.mock.calls.find(([, { args }]) => args.action === "create")![1].args.grant.libraryIds).toEqual(["notes"]);
-  expect(invoke.mock.calls.find(([, { args }]) => args.action === "create")![1].args.grant.attachmentLibraryIds).toEqual(["notes"]);
+  const calls=invoke.mock.calls.map(([, { args }])=>args);
+  expect(calls.find(args=>args.action==="create").grant).toEqual({libraryIds:[],notes:[investigationAnchor(result)],readingItemKeys:[]});
+  const bindings=calls.filter(args=>args.action==="message"&&args.setLibraryIds);
+  expect(bindings).toHaveLength(1);expect(bindings[0].setLibraryIds).toEqual(["notes"]);
+  // The host's setLibraryIds operation binds note/task and attachment scopes
+  // together; this must finish before the first model response is requested.
+  expect(calls.indexOf(bindings[0])).toBeLessThan(calls.findIndex(args=>args.action==="respond"));
 });
 it("loads an existing interrupted work without starting a model", async () => {
   current = makeView("interrupted");
@@ -1009,7 +1064,11 @@ it("restores keyboard focus to the announced receipt even when the work state st
     if (args.action === "submitTagProposal") current = { ...current, actions: { tagOptions: ["验证"], items: [{ id: "a-1", state: "verified", payload, receipt: { goalCompleted: false, result: { proposal: { proposalId: "p-1", tag: "验证", status: "pending" } } }, currentProposal: { proposalId: "p-1", tag: "验证", status: "pending" } }] } };
     return current;
   });
-  await open(); button("提交「验证」").focus(); await click("提交「验证」");
+  await open();
+  const submit=await revealButton("提交「验证」");
+  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,0));});
+  submit.focus();expect(document.activeElement).toBe(submit);
+  await click("提交「验证」");
   expect(document.activeElement).toBe(document.body.querySelector('[role="status"]'));
   expect(document.activeElement?.textContent).toContain("补标提交结果已核验");
 });
@@ -1651,8 +1710,9 @@ it.each([false,true])("keeps history open when deleting the displayed global cha
  });
  await act(async()=>root.render(<AgentPanelProvider><StandaloneAgentLauncher/></AgentPanelProvider>));
  await click('Hub 助手');if(reading)await click('专注阅读报告');
- await act(async()=>document.querySelector<HTMLElement>('.agent-dialogue-details > summary')!.click());
+ await openHistory();
  expect(document.querySelector<HTMLDetailsElement>('.agent-dialogue-details')?.open).toBe(true);
+ await click(`更多对话操作 ${saved.goal}`);
  await click(`删除对话 ${saved.goal}`);
  expect(deleted).toBe(true);expect(document.body.textContent).not.toContain('确认删除');expect(document.querySelector('.agent-history-undo')).not.toBeNull();
  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,10));});expect(document.querySelector('.agent-history-undo')?.closest('.agent-dialogue-details')).toBe(document.querySelector('.agent-dialogue-details'));
@@ -1740,7 +1800,7 @@ it("takes Escape before a focused page input can clear its own query",async()=>{
 
 it("switches floating and sidebar presentation without losing draft and resets the new chat title",async()=>{
  await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
- const title=()=>document.querySelector('.agent-panel-header > strong')?.textContent;
+ const title=()=>document.querySelector('.agent-task-mode .agent-mode-title')?.textContent;
  expect(title()).toBe("新聊天");
  await fill("investigationGoal","总结正文，提取待办事项");
  expect(title()).toBe("总结正文，提取待办事项");
@@ -1758,7 +1818,7 @@ it("keeps the saved conversation title while composing a follow-up",async()=>{
  invoke.mockImplementation(async(_,{args})=>args.action==="list"?{works:[{id:current.work.id,goal:current.work.goal,state:current.work.state}]}:current);
  await act(async()=>root.render(<AgentInvestigation result={result}/>));await click("调查这篇笔记");
  await fill("investigationGoal","继续分析另一个问题");
- expect(document.querySelector('.agent-panel-header > strong')?.textContent).toBe(current.work.goal);
+ expect(document.querySelector('.agent-task-mode .agent-mode-title')?.textContent).toBe(current.work.goal);
 });
 
 
@@ -1782,11 +1842,14 @@ it("drops mixed explicit sources into a new conversation without granting a libr
  expect(create.grant.readingItemKeys).toEqual(["reading-1"]);
 });
 it("merges library drops anywhere in the assistant and grants them before the first response",async()=>{
+ libraryInventory.value=[noteLibrary,{id:"craft",provider:"craft",name:"Craft",connected:true,documentCount:2,excludedPaths:[]}];
  await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
  for(const [target,items] of [[".agent-panel-header",[{id:"notes",name:"笔记库"}]],[".agent-body",[{id:"notes",name:"笔记库"},{id:"craft",name:"Craft"}]]] as const){
   await act(async()=>{const event=new Event("drop",{bubbles:true,cancelable:true});Object.defineProperty(event,"dataTransfer",{value:{types:["application/x-hub-agent-libraries"],getData:()=>JSON.stringify(items)}});document.querySelector(target)!.dispatchEvent(event);});
  }
- expect(document.querySelectorAll('[data-material-kind="library"]')).toHaveLength(2);
+ expect(document.querySelector('.agent-scope-trigger')?.textContent).toContain('全部资料库 · 2');
+ await openAddPage('资料范围');
+ expect([...document.querySelectorAll<HTMLInputElement>('.agent-library-choice input:checked')].map(input=>input.getAttribute('aria-label'))).toEqual(['允许查找 工作笔记','允许查找 Craft']);
  expect(invoke.mock.calls.some(([,p])=>p?.args?.action==="message")).toBe(false);
  await fill("investigationGoal","从这些库中查找相关资料");
  await act(async()=>document.querySelector<HTMLFormElement>(".agent-composer form")!.requestSubmit());
@@ -1930,11 +1993,14 @@ it("captures preview selection as text and queues a flashcard snapshot through t
 it("keeps global history in a fresh page chat without resuming an unrelated work",async()=>{
  invoke.mockImplementation(async(_,{args})=>args.action==='list'?{works:args.anchor?[]:[{id:'other-work',goal:'另一篇资料的历史对话',state:'completed'}]}:current);
  await open();
+ await openHistory();
  expect(document.querySelector('.agent-conversations')?.textContent).toContain('另一篇资料的历史对话');
- expect(document.querySelector('.agent-panel-header > strong')?.textContent).toBe('新聊天');
+ expect(document.querySelector('.agent-task-mode .agent-mode-title')?.textContent).toBe('新聊天');
  expect(invoke.mock.calls.some(([,p])=>p?.args?.action==='status')).toBe(false);
  await click('新对话');
+ await openHistory();
  expect(document.querySelector('.agent-conversations')?.textContent).toContain('另一篇资料的历史对话');
+ await openDialogueDetails();
  expect(document.querySelector('.agent-dialogue-details')?.textContent).toContain('尚未开始任务');
  expect(document.querySelector('.agent-dialogue-details')?.textContent).toContain('资料范围');
  expect(document.querySelector('.agent-dialogue-details')?.textContent).toContain('记忆与后续操作');

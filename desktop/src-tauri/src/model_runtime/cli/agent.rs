@@ -32,10 +32,21 @@ pub(crate) struct Request<'a> {
 pub(crate) fn authentication_identity() -> Result<String, String> {
     Ok(authentication::current()?.identity)
 }
-pub(crate) fn authentication_for(root: &Path, selected: Option<&str>) -> Result<(String, String), String> {
+pub(crate) fn authentication_for(
+    root: &Path,
+    selected: Option<&str>,
+) -> Result<(String, String), String> {
     let prepared = authentication::current_for(Some(root), selected)?;
     let value: Value = serde_json::from_slice(&prepared.bytes).map_err(|_| "账号授权格式无效")?;
-    let scope = value["scopeId"].as_str().map(str::to_owned).or_else(|| value["OPENAI_API_KEY"].as_str().map(|key| format!("{:x}",sha2::Sha256::digest(key.as_bytes())))).ok_or("无法绑定 Codex 账号身份")?;
+    let scope = value["scopeId"]
+        .as_str()
+        .map(str::to_owned)
+        .or_else(|| {
+            value["OPENAI_API_KEY"]
+                .as_str()
+                .map(|key| format!("{:x}", sha2::Sha256::digest(key.as_bytes())))
+        })
+        .ok_or("无法绑定 Codex 账号身份")?;
     Ok((prepared.identity, scope))
 }
 
@@ -194,8 +205,17 @@ fn spawn(
         .map_err(|_| "无法建立 Agent 会话目录")?;
     // Keep user config, plugins and unrelated workspaces out of this runtime.
     let auth = home.join("auth.json");
-    let login = serde_json::from_slice::<Value>(&prepared.bytes).ok().and_then(|v| v.get("hubExternalLogin").cloned());
-    let auth_file = authentication::snapshot(&auth, if login.is_some() { b"{}" } else { &prepared.bytes })?;
+    let login = serde_json::from_slice::<Value>(&prepared.bytes)
+        .ok()
+        .and_then(|v| v.get("hubExternalLogin").cloned());
+    let auth_file = authentication::snapshot(
+        &auth,
+        if login.is_some() {
+            b"{}"
+        } else {
+            &prepared.bytes
+        },
+    )?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -620,8 +640,11 @@ pub(crate) fn run(
                     continue;
                 }
                 let id = format!("steer-{key}");
-                let input=message.get("input").cloned().unwrap_or_else(||json!([{"type":"text","text":message["text"]}]));
-                host("steerAdmission",message)?;
+                let input = message
+                    .get("input")
+                    .cloned()
+                    .unwrap_or_else(|| json!([{"type":"text","text":message["text"]}]));
+                host("steerAdmission", message)?;
                 process.send(json!({"id":id,"method":"turn/steer","params":{"threadId":thread_id,"expectedTurnId":turn_id,
                     "input":input}}))?;
                 steering.insert(id, message.clone());
@@ -803,7 +826,12 @@ pub(crate) fn run(
                     if !steering.is_empty() {
                         return Err("追加要求已保存，本轮尚未确认接收，请继续执行".into());
                     }
-                    for diagnostic in web_events.diagnostics(request.directory, thread["thread"]["path"].as_str(), &thread_id, &turn_id) {
+                    for diagnostic in web_events.diagnostics(
+                        request.directory,
+                        thread["thread"]["path"].as_str(),
+                        &thread_id,
+                        &turn_id,
+                    ) {
                         host("webDiagnostics", &diagnostic)?;
                     }
                     host(
@@ -986,8 +1014,8 @@ mod tests {
                 let request = Request {
                     directory: Path::new("isolated-agent"),
                     authentication_identity: "unused",
-                auth_root: None,
-                auth_selection: None,
+                    auth_root: None,
+                    auth_selection: None,
                     thread,
                     instructions: "完整Hub规则：只能引用已授权原文；保存需要真实回执。",
                     image_input: &[],

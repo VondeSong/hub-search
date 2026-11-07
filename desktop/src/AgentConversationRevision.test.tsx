@@ -3,13 +3,13 @@ import {act} from "react";
 import {createRoot,type Root} from "react-dom/client";
 import {afterEach,beforeEach,expect,it,vi} from "vitest";
 import {AgentConversation,type Conversation} from "./AgentDelivery";
-import fixture from "../artifacts/agent-live-dialogue-20261104/conversation-fixture.json";
+import fixture from "./AgentConversationRevision.fixture";
 vi.mock("@tauri-apps/api/core",()=>({invoke:vi.fn()}));
 let host:HTMLDivElement,root:Root;
 beforeEach(()=>{Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});host=document.createElement('div');document.body.append(host);root=createRoot(host);});
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();Reflect.deleteProperty(navigator,'clipboard');});
 async function render(conversation:Conversation){await act(async()=>root.render(<AgentConversation conversation={conversation} revoked={false} onOpenCitation={()=>{}}/>));}
-it('keeps all three real native answers readable after follow-up changes',async()=>{
+it('keeps all three synthetic plain-text answers readable after follow-up changes',async()=>{
  await render(fixture as Conversation);
  expect(host.querySelectorAll('.agent-answer')).toHaveLength(3);
  expect(host.querySelector('details.agent-history')).toBeNull();

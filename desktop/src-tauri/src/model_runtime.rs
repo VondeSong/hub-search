@@ -8,7 +8,10 @@ pub(crate) use cli::agent::interaction as agent_interaction;
 pub(crate) use cli::agent::services as mcp_services;
 pub(crate) use cli::agent::web as agent_web;
 pub(crate) use cli::agent::Request as AgentRequest;
-pub(crate) fn agent_authentication(root: &Path, selected: Option<&str>) -> Result<(String, String), String> {
+pub(crate) fn agent_authentication(
+    root: &Path,
+    selected: Option<&str>,
+) -> Result<(String, String), String> {
     cli::agent::authentication_for(root, selected)
 }
 pub(crate) fn codex_account(root: &Path) -> Result<Value, String> {
@@ -440,7 +443,9 @@ fn runtime(root: &Path) -> Result<Arc<Runtime>, String> {
         return Ok(found.clone());
     }
     let mut value = new_runtime(read_settings(root)?);
-    if let Some(runtime) = Arc::get_mut(&mut value) { runtime.root = Some(root.to_path_buf()); }
+    if let Some(runtime) = Arc::get_mut(&mut value) {
+        runtime.root = Some(root.to_path_buf());
+    }
     all.insert(root.to_path_buf(), value.clone());
     Ok(value)
 }
@@ -504,7 +509,8 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
         return Err("模型设置请求过大。".into());
     }
     match args["action"].as_str().unwrap_or("get") {
-        "codexAccounts" | "startCodexLogin" | "cancelCodexLogin" | "selectCodexAccount" | "removeCodexAccount" => cli::accounts::ui(root, args),
+        "codexAccounts" | "startCodexLogin" | "cancelCodexLogin" | "selectCodexAccount"
+        | "removeCodexAccount" => cli::accounts::ui(root, args),
         "models" => {
             let provider = if let Some(provider) = args["provider"].as_str() {
                 provider.to_string()
@@ -626,7 +632,9 @@ pub(crate) struct Operation {
     call_gate: Mutex<()>,
 }
 impl Operation {
-    pub(crate) fn codex_account_selection(&self) -> Option<&str> { self.codex_account.as_deref() }
+    pub(crate) fn codex_account_selection(&self) -> Option<&str> {
+        self.codex_account.as_deref()
+    }
     pub(crate) fn record_agent_completion(&self, usage: &Value) -> Value {
         let mut receipt = execution::Trace::new().finish("completedOutput", None);
         receipt.phase = "agentTurn";
@@ -794,7 +802,15 @@ impl Operation {
         let id = format!("model-{}-{}", time_ms(), state.next_id);
         let mut settings = selection.unwrap_or_else(|| state.settings.clone());
         settings.max_concurrent = state.settings.max_concurrent;
-        let codex_account = if native_agent_provider(&settings.provider) { runtime.root.as_deref().map(cli::accounts::selected).transpose()? } else { None };
+        let codex_account = if native_agent_provider(&settings.provider) {
+            runtime
+                .root
+                .as_deref()
+                .map(cli::accounts::selected)
+                .transpose()?
+        } else {
+            None
+        };
         state.jobs.push_back(Job {
             id: id.clone(),
             workflow: workflow.into(),
@@ -876,7 +892,13 @@ impl Operation {
     pub fn ask(&self, prompt: &str, schema: &Value, images: &[PathBuf]) -> Result<Value, String> {
         self.ask_stream(prompt, schema, images, &mut |_| Ok(()))
     }
-    pub(crate) fn ask_stream(&self, prompt: &str, schema: &Value, images: &[PathBuf], publish: &mut dyn FnMut(&Value) -> Result<(), String>) -> Result<Value, String> {
+    pub(crate) fn ask_stream(
+        &self,
+        prompt: &str,
+        schema: &Value,
+        images: &[PathBuf],
+        publish: &mut dyn FnMut(&Value) -> Result<(), String>,
+    ) -> Result<Value, String> {
         self.ask_admitted(prompt, schema, images, None, &mut |_| Ok(()), publish)
     }
     pub(crate) fn ask_direct(
@@ -921,7 +943,16 @@ impl Operation {
         self.ask_with(|| {
             self.control.check()?;
             let result = if self.settings.provider == "deepseek" {
-                deepseek::run_admitted(prompt, schema, &self.settings, images, &self.control, output_limit, admit, publish)
+                deepseek::run_admitted(
+                    prompt,
+                    schema,
+                    &self.settings,
+                    images,
+                    &self.control,
+                    output_limit,
+                    admit,
+                    publish,
+                )
             } else {
                 cli::run_control(
                     prompt,

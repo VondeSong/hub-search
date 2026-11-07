@@ -24,8 +24,24 @@ it("CN05 valid long published answers preserve their tail in restored conversati
  await act(async()=>root.render(<AgentConversation conversation={{messages:[{id:"saved",role:"assistant",runId:"run",createdAt:1,report}],hasEarlier:false}} revoked={false} onOpenCitation={vi.fn()}/>));
  expect(host.querySelector(".agent-answer")!.textContent).toBe(text);expect(host.textContent).not.toContain("未发布");
 });
-it("CN05 explicit progress clipping notice remains visible when reading the process",async()=>{
- const value=activity("");value.events=[{id:"progress",kind:"message",state:"completed",label:"已展示的过程。\n\n（过程消息超过显示上限，后续内容未展示。）",createdAt:1}];await act(async()=>root.render(<AgentActivity value={value}/>));
- await act(async()=>host.querySelector<HTMLButtonElement>(".agent-activity-toggle")!.click());
- expect(host.textContent).toContain("后续内容未展示");expect(host.textContent).not.toContain("查看未发布");
+it.each(["legacy","metadata"])("CN05 %s progress clipping remains visible while collapsed without duplicating the expanded notice",async format=>{
+ const value=activity("");value.events=[{id:"progress",kind:"message",state:"completed",label:format==="legacy"?"已展示的过程。\n\n（过程消息超过显示上限，后续内容未展示。）":"已展示的过程。",truncated:format==="metadata"?true:undefined,createdAt:1}];await act(async()=>root.render(<AgentActivity value={value}/>));
+ const toggle=host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!;
+ expect(toggle.getAttribute('aria-expanded')).toBe('false');
+ expect(host.querySelector('[aria-label="过程显示限制"][role="status"]')?.textContent).toContain("后续内容未展示");
+ expect(host.textContent).not.toContain("已展示的过程");expect(host.textContent).not.toContain("查看未发布");
+ await act(async()=>toggle.click());
+ expect(host.textContent).toContain("已展示的过程");
+ expect(host.textContent?.match(/后续内容未展示/g)).toHaveLength(1);
+ await act(async()=>toggle.click());
+ expect(host.textContent?.match(/后续内容未展示/g)).toHaveLength(1);
+ expect(host.querySelector('.agent-activity-events')).toBeNull();
+});
+it("CN05 does not infer clipped progress from a normal message or a clipped answer",async()=>{
+ const value=activity("");value.events=[{id:"progress",kind:"message",state:"completed",label:"过程完整展示。",createdAt:1},{id:"answer",kind:"unpublishedAnswer",state:"unverified",truncated:true,label:"只保留的答复预览",createdAt:2}];
+ await act(async()=>root.render(<AgentActivity value={value}/>));
+ expect(host.querySelector('[aria-label="过程显示限制"]')).toBeNull();
+ expect(host.textContent).not.toContain("后续内容未展示");
+ expect(host.textContent).toContain("查看未发布的模型答复");
+ await expand();expect(host.textContent).toContain("仅保留了部分回答预览");
 });

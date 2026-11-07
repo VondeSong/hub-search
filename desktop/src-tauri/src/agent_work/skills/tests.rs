@@ -6,10 +6,22 @@ fn research_skill_distinguishes_local_web_and_mixed_sources_without_forcing_load
     let f = Fixture::new();
     let mut catalog = Catalog::discover(&f.root).unwrap();
     let metadata = catalog.metadata();
-    let research = metadata["skills"].as_array().unwrap().iter().find(|s| s["name"] == "hub-research").unwrap();
-    assert!(research["description"].as_str().unwrap().contains("纯公开网页调研"));
+    let research = metadata["skills"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["name"] == "hub-research")
+        .unwrap();
+    assert!(research["description"]
+        .as_str()
+        .unwrap()
+        .contains("纯公开网页调研"));
     assert!(catalog.loaded.is_empty());
-    for request in ["分析 Hub 已授权的笔记", "结合 Hub 笔记和公开网页比较", "请使用 $hub-research 分析公开网页"] {
+    for request in [
+        "分析 Hub 已授权的笔记",
+        "结合 Hub 笔记和公开网页比较",
+        "请使用 $hub-research 分析公开网页",
+    ] {
         let loaded = catalog.load("hub-research", request).unwrap();
         let body = loaded["instructions"].as_str().unwrap();
         assert!(body.contains("引用 Hub 原文时"));

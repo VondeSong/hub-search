@@ -302,7 +302,7 @@ fn c2_same_bytes_changed_tool_contract_requires_an_explicit_new_pin() {
     let mut old =
         crate::agent_work::topics::method_on(&c, saved["methodVersion"].as_str().unwrap()).unwrap();
     old["content"]["toolContractVersion"] =
-        json!("74023346faeb0ff1657dadb1b22fb883a1db10f75a46624642ff3714e719c1ea");
+        json!(hash(&reference_description_contract().to_string()));
     old["id"] = json!(format!("method-{}", hash(&old["content"].to_string())));
     assert!(versions::compatible_contract(
         &old["content"]["toolContractVersion"]

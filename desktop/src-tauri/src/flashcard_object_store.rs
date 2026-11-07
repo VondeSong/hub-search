@@ -326,6 +326,13 @@ impl OssStore {
     #[cfg(test)]
     pub(crate) fn with_test_endpoint(mut self, base: Url) -> Self {
         assert_eq!(base.host_str(), Some("127.0.0.1"));
+        // Loopback fixtures must not depend on the workstation's external proxy.
+        self.client = Client::builder()
+            .no_proxy()
+            .redirect(reqwest::redirect::Policy::none())
+            .timeout(std::time::Duration::from_secs(180))
+            .build()
+            .expect("local OSS test client");
         self.base = base;
         self
     }

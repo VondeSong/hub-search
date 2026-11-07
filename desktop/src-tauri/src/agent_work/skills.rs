@@ -626,13 +626,19 @@ pub(super) fn source_file(root: &Path, name: &str, reveal: bool) -> Result<Value
     let path = if let Some(directory) = &skill.directory {
         checked_path(directory, Path::new("SKILL.md"))?
     } else if skill.package.is_none() {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/agent_work/skills").join(&skill.name).join("SKILL.md")
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("src/agent_work/skills")
+            .join(&skill.name)
+            .join("SKILL.md")
     } else {
         return Err("请从方法包管理查看维护来源".into());
     };
-    if !path.is_file() { return Err("当前安装未包含技能源文件，请在 Hub 项目中查看".into()); }
+    if !path.is_file() {
+        return Err("当前安装未包含技能源文件，请在 Hub 项目中查看".into());
+    }
     if reveal {
-        tauri_plugin_opener::reveal_item_in_dir(&path).map_err(|_| "无法在资源管理器定位技能文件")?;
+        tauri_plugin_opener::reveal_item_in_dir(&path)
+            .map_err(|_| "无法在资源管理器定位技能文件")?;
     }
     Ok(json!({"path":path.to_string_lossy()}))
 }

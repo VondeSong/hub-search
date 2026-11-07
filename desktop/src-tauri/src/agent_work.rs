@@ -22,11 +22,11 @@ mod runner;
 mod source_scope;
 pub(crate) use runner::projection_acceptance::run_cli as run_projection_acceptance;
 pub(crate) use runner::ExternalWork;
+mod account_binding;
 pub(crate) mod skills;
 #[cfg(test)]
 mod standalone_tests;
 mod store;
-mod account_binding;
 #[cfg(test)]
 mod tests;
 mod topics;
@@ -221,9 +221,11 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
     if args.to_string().len() > request_limit {
         return Err("调查请求过大".into());
     }
-    if matches!(args["action"].as_str(),Some("respond"|"resume")) { account_binding::pin(root,args)?; }
+    if matches!(args["action"].as_str(), Some("respond" | "resume")) {
+        account_binding::pin(root, args)?;
+    }
     match args["action"].as_str().unwrap_or("status") {
-        "authorizeCodexConversation" => account_binding::authorize(root,args),
+        "authorizeCodexConversation" => account_binding::authorize(root, args),
         action if action.starts_with("topic") => topics::ui(root, args),
         "previewSourceScope" => source_scope::preview(root, args),
         "createWithSourceScope" => source_scope::create(root, args),
@@ -239,7 +241,11 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
         }
         "create" => {
             let goal = text(args, "goal", 2000)?;
-            let criteria = if args["successCriteria"].as_str() == Some("") { String::new() } else { text(args, "successCriteria", 2000)? };
+            let criteria = if args["successCriteria"].as_str() == Some("") {
+                String::new()
+            } else {
+                text(args, "successCriteria", 2000)?
+            };
             let anchor: Option<EvidenceLocator> =
                 serde_json::from_value(args["anchor"].clone()).map_err(|_| "对话来源无效")?;
             let mut grant: Grant =
@@ -290,7 +296,13 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
                         .and_then(|c| crate::source_evidence::resolve_note_page(root, &c, anchor))
                 })
                 .transpose()?;
-            store::list(root, anchor.as_ref(), args.get("before"))
+            store::list(
+                root,
+                anchor.as_ref(),
+                args.get("before"),
+                args.get("query"),
+                args.get("archived"),
+            )
         }
         "status" => status(root, &text(args, "id", 150)?),
         "setHistoryPreference" => store::history_preference(root, args),
@@ -351,20 +363,49 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
         }
         "followup" | "changeFollowup" => {
             let id = text(args, "id", 150)?;
-            if args["action"] == "followup" { store::followups::save(root,args)?; }
-            else { store::followups::change(root,args)?; }
-            status(root,&id)
+            if args["action"] == "followup" {
+                store::followups::save(root, args)?;
+            } else {
+                store::followups::change(root, args)?;
+            }
+            status(root, &id)
         }
         "resumeQueue" => {
-            let id=text(args,"id",150)?;
-            let current=store::load(&crate::source_evidence::open_read_database(root)?,&id)?;
-            if matches!(current.state.as_str(),"paused"|"cancelled") {
-                let mut resume=args.clone();resume["action"]=json!("resume");resume["resumeQueue"]=json!(true);
-                return run_mode_app(root,&id,assistant::budget_for_work(root,&id,args["mode"].as_str().unwrap_or("quick"))?,true,None,Some(&resume));
+            let id = text(args, "id", 150)?;
+            let current = store::load(&crate::source_evidence::open_read_database(root)?, &id)?;
+            if matches!(current.state.as_str(), "paused" | "cancelled") {
+                let mut resume = args.clone();
+                resume["action"] = json!("resume");
+                resume["resumeQueue"] = json!(true);
+                return run_mode_app(
+                    root,
+                    &id,
+                    assistant::budget_for_work(
+                        root,
+                        &id,
+                        args["mode"].as_str().unwrap_or("quick"),
+                    )?,
+                    true,
+                    None,
+                    Some(&resume),
+                );
             }
-            if store::followups::take_explicit(root,&id,args)? {
-                run_mode_app(root,&id,assistant::budget_for_work(root,&id,args["mode"].as_str().unwrap_or("quick"))?,true,None,Some(args))
-            } else {status(root,&id)}
+            if store::followups::take_explicit(root, &id, args)? {
+                run_mode_app(
+                    root,
+                    &id,
+                    assistant::budget_for_work(
+                        root,
+                        &id,
+                        args["mode"].as_str().unwrap_or("quick"),
+                    )?,
+                    true,
+                    None,
+                    Some(args),
+                )
+            } else {
+                status(root, &id)
+            }
         }
         "answerNativeInput" => {
             let start_new_turn = store::native_input::respond(root, args)?;
@@ -390,7 +431,9 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
             )
         }
         "skills" => skills::view(root),
-        "skillSourceFile" => skills::source_file(root, &text(args,"name",100)?, args["reveal"] == true),
+        "skillSourceFile" => {
+            skills::source_file(root, &text(args, "name", 100)?, args["reveal"] == true)
+        }
         "skillPackages"
         | "skillPackageDetails"
         | "skillPackageFile"
@@ -407,10 +450,11 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
         // explicitly submitted locators become the model's host-issued grant.
         "imageMaterials" => images::list(root, args),
         "stageImage" => images::stage(root, args),
-        "stageTextFile" => crate::source_evidence::local_text::stage(root,args),
+        "stageTextFile" => crate::source_evidence::local_text::stage(root, args),
         "textFileMetadata" => {
-            let locator=serde_json::from_value(args["locator"].clone()).map_err(|_|"文本附件身份无效")?;
-            crate::source_evidence::local_text::metadata(root,&locator)
+            let locator =
+                serde_json::from_value(args["locator"].clone()).map_err(|_| "文本附件身份无效")?;
+            crate::source_evidence::local_text::metadata(root, &locator)
         }
         "imagePreview" => images::preview(root, args),
         "materials" => {
@@ -460,7 +504,7 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
             let id = text(args, "id", 150)?;
             let map = active().lock().map_err(|_| "调查运行状态不可用")?;
             let changed = store::lifecycle::stop(root, &id, args, args["action"] == "cancelGoal")?;
-            store::followups::hold(root,&id)?;
+            store::followups::hold(root, &id)?;
             if changed {
                 if let Some(run) = map.get(&(root_key(root), id.clone())) {
                     run.control.cancel();
@@ -534,7 +578,7 @@ pub(crate) async fn ui_app(app: tauri::AppHandle, args: Value) -> Result<Value, 
         let root = crate::active_data_root(&app)?;
         return tokio::task::spawn_blocking(move || {
             let id = text(&args, "id", 150)?;
-            account_binding::pin(&root,&args)?;
+            account_binding::pin(&root, &args)?;
             let budget =
                 assistant::budget_for_work(&root, &id, args["mode"].as_str().unwrap_or("quick"))?;
             run_mode_app(&root, &id, budget, true, Some(&app), Some(&args))
@@ -571,7 +615,10 @@ fn status(root: &Path, id: &str) -> Result<Value, String> {
     actions::reconcile(root, id, action.as_deref())?;
     drop(map);
     let mut view = store::view(root, id)?;
-    view["codexAccountBinding"] = store::records(root,id,"codexAccountBinding",1)?.into_iter().next().unwrap_or(Value::Null);
+    view["codexAccountBinding"] = store::records(root, id, "codexAccountBinding", 1)?
+        .into_iter()
+        .next()
+        .unwrap_or(Value::Null);
     let run_active = live.is_some() || view["work"]["activeRun"].is_string();
     view["runActive"] = json!(run_active);
     if run_active && live.is_none() {
@@ -594,16 +641,25 @@ fn run_mode(root: &Path, id: &str, budget: Budget, prepare_drafts: bool) -> Resu
     run_mode_app(root, id, budget, prepare_drafts, None, None)
 }
 fn run_mode_app(
-    root: &Path, id: &str, budget: Budget, prepare_drafts: bool,
-    app: Option<&tauri::AppHandle>, args: Option<&Value>,
-) -> Result<Value,String> {
-    let mut result=run_once_app(root,id,budget,prepare_drafts,app,args);
+    root: &Path,
+    id: &str,
+    budget: Budget,
+    prepare_drafts: bool,
+    app: Option<&tauri::AppHandle>,
+    args: Option<&Value>,
+) -> Result<Value, String> {
+    let mut result = run_once_app(root, id, budget, prepare_drafts, app, args);
     for _ in 0..32 {
-        if result.is_err() { store::followups::hold(root,id)?; break; }
-        if !store::followups::take_next(root,id)? {break;}
-        result=run_once_app(root,id,budget,prepare_drafts,app,None);
+        if result.is_err() {
+            store::followups::hold(root, id)?;
+            break;
+        }
+        if !store::followups::take_next(root, id)? {
+            break;
+        }
+        result = run_once_app(root, id, budget, prepare_drafts, app, None);
     }
-    result.and_then(|_|status(root,id))
+    result.and_then(|_| status(root, id))
 }
 fn run_once_app(
     root: &Path,
@@ -731,7 +787,7 @@ fn run_once_app(
         }
     })();
     if let Err(error) = result {
-        let current=store::load(&crate::source_evidence::open_read_database(root)?,id)?;
+        let current = store::load(&crate::source_evidence::open_read_database(root)?, id)?;
         store::fail(root, &current, &run_id, &error)?;
         if prepare_drafts {
             return Err(error);

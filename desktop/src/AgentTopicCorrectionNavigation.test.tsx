@@ -6,7 +6,7 @@ import { AgentInvestigation } from "./AgentInvestigation";
 import type { SearchResult } from "./SearchTypes";
 const { invoke, choice } = vi.hoisted(() => ({ invoke: vi.fn(), choice: { documentId: "other" } }));
 vi.mock("./CodexSuite",async importOriginal=>({...await importOriginal<object>(),loadCodexSuiteModels:vi.fn(async()=>[]),cachedCodexSuiteModels:()=>[],useCodexSuite:()=>({loaded:true,loading:false,settings:{model:"fixture-model",provider:"codex",reasoningEffort:"medium",fast:false,maxConcurrent:2}})}));
-vi.mock("@tauri-apps/api/core", () => ({ invoke }));
+vi.mock("@tauri-apps/api/core", () => ({ invoke: (command: string, ...args: unknown[]) => command === "list_libraries" ? Promise.resolve([]) : invoke(command, ...args) }));
 vi.mock("./WindowVisibility", () => ({ useDocumentVisible: () => true }));
 vi.mock("./RuntimePlatform", () => ({ runtimeCapabilities: { desktop: true, localVault: true } }));
 vi.mock("./AgentTopics", () => ({ AgentTopics: ({ onOpenWork }: { onOpenWork: (id: string, source: unknown, draft?: string) => Promise<void> }) => <button type="button" onClick={() => void onOpenWork("saved-work", { anchor: { kind: "note", libraryId: "notes", documentId: choice.documentId, pageId: null }, title: "实际笔记", path: "daily/note.md", libraryName: "隔离" }, "请核对保存数据第2版 row-one。我的纠正：")}>进入原工作填写纠正</button> }));

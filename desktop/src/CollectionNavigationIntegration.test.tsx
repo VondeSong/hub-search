@@ -79,6 +79,10 @@ async function changeField(label: string, value: string) {
 }
 const latestQuery = () => { const calls = invoke.mock.calls.filter(([command]) => command === "list_collection_items"); return calls[calls.length - 1]?.[1]; };
 const localCommands = new Set(["list_collection_items", "get_collection_storage", "list_libraries", "collection_library_operations"]);
+// The existing model footer may read local settings/status. Generation and
+// remote-content commands remain outside this allowlist.
+const localCallsOnly = () => invoke.mock.calls.every(([command, payload]) => localCommands.has(command)
+  || (command === "model_runtime" && (payload?.args?.action === "get" || payload?.args?.action === "status")));
 
 it("uses source-scoped full counts and local queries for reading navigation independently of the visible page", async () => {
   invoke.mockImplementation(async (command: string, args?: { source?: string }) => command === "list_collection_items" ? { ...page, navigationCounts: args?.source === "telegram" ? { ...counts, all: 4, unread: 3, inProgress: 0, read: 1, savedCopies: [] } : counts } : command === "get_collection_storage" ? storage : command === "list_libraries" ? libraries : []);
@@ -97,7 +101,7 @@ it("uses source-scoped full counts and local queries for reading navigation inde
   await clickNavigation("归档");
   expect(latestQuery()).toMatchObject({ source: "telegram", status: "archived" });
   expect(container.querySelector('.task-view-switch button[aria-pressed="true"]')?.textContent).toBe("表格");
-  expect(invoke.mock.calls.every(([command]) => localCommands.has(command))).toBe(true);
+  expect(localCallsOnly()).toBe(true);
 });
 
 it("passes a saved-copy library filter while preserving source and revealing its active condition", async () => {
@@ -110,7 +114,7 @@ it("passes a saved-copy library filter while preserving source and revealing its
   await act(async () => vi.advanceTimersByTimeAsync(160));
   expect(latestQuery()).toMatchObject({ source: "likes", status: "all", filters: { libraryId: "craft-main" } });
   expect(container.querySelector('[aria-label="当前筛选条件"]')?.textContent).toContain("已保存副本：Main");
-  expect(invoke.mock.calls.every(([command]) => localCommands.has(command))).toBe(true);
+  expect(localCallsOnly()).toBe(true);
 });
 
 it("saves explicit query conditions and later layout changes in the named view without writing content", async () => {
@@ -128,7 +132,7 @@ it("saves explicit query conditions and later layout changes in the named view w
   expect(latestQuery()).toMatchObject({ source: "all", status: "unread", media: "video", filters: { tags: ["AI"], collectedWithinDays: 7 } });
   expect(container.querySelector('.task-view-switch button[aria-pressed="true"]')?.textContent).toBe("画廊");
   expect(container.querySelector(".collection-view-modified")).toBeNull();
-  expect(invoke.mock.calls.every(([command]) => localCommands.has(command))).toBe(true);
+  expect(localCallsOnly()).toBe(true);
 });
 
 it.each(["列表", "表格", "看板", "画廊"])("offers target-specific recovery in %s without reopening a successful target", async layout => {
@@ -147,7 +151,7 @@ it.each(["列表", "表格", "看板", "画廊"])("offers target-specific recove
   expect(actions.querySelectorAll("button")).toHaveLength(2);
   await act(async () => [...actions.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("滴答清单"))!.click());
   expect(container.querySelector("dialog[open]")?.textContent).toContain("实际创建的页面或任务 ID");
-  expect(invoke.mock.calls.every(([command]) => localCommands.has(command))).toBe(true);
+  expect(localCallsOnly()).toBe(true);
 });
 
 it("renders the production collection sidebar separately from search smart collections under their shared provider", async () => {
@@ -197,7 +201,7 @@ it("retains the selected local preview and scroll position after the workspace u
   expect(container.querySelector<HTMLDivElement>(".collection-database")?.scrollTop).toBe(360);
   expect(container.querySelector('[aria-label="阅读详情"]')?.textContent).toContain("正文仍在本地");
   expect(container.querySelector(".collection-row.selected")).toBeTruthy();
-  expect(invoke.mock.calls.every(([command]) => localCommands.has(command))).toBe(true);
+  expect(localCallsOnly()).toBe(true);
 });
 
 it.each(["partial", "unknown", "needs_review"])("keeps a parked %s plan isolated from another active target and resumes only its library", async phase => {

@@ -55,7 +55,14 @@ fn trace_skill_preview_is_historical_bounded_and_preserves_original_json() {
     let original = json!({"kind":"skillInstructions","skill":{"title":"研究方法"},"instructions":"说明🙂".repeat(1600)});
     let reference = capture(&f.root, &w.id, &r, &request, &original).unwrap();
     let page = reload(&f, &w, &reference, 0, 4000).unwrap();
-    assert_eq!(page["methodPreview"]["content"].as_str().unwrap().chars().count(), 4000);
+    assert_eq!(
+        page["methodPreview"]["content"]
+            .as_str()
+            .unwrap()
+            .chars()
+            .count(),
+        4000
+    );
     assert_eq!(page["methodPreview"]["truncated"], true);
     assert!(page["sourcePreview"].is_null());
     assert_eq!(page["currentEvidence"], false);

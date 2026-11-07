@@ -84,7 +84,7 @@ export function AgentTopicWork({workId,anchor,page,disabled,onBack,onOpenWork,on
     {page==="历史"&&(conversation?<AgentConversation workId={workId} recordVersion={view.recordVersion} conversation={conversation} revoked={false} onOpenCitation={(...args)=>void openSource(...args)} onLoadEarlier={()=>void earlier()} earlierLoading={olderLoading}/>:<AgentDelivery workId={workId} recordVersion={view.recordVersion} report={null} evidence={[]} history={view.history} running={false} revoked={false} onOpenCitation={(...args)=>void openSource(...args)}/>)}
    </>}
   </>}
-  {(source||sourceLoading||sourceError)&&!revoked&&<section ref={sourcePanel} tabIndex={-1} className="agent-source-preview" aria-label="专题引用原文" onKeyDownCapture={event=>{if(event.key==="Escape"){event.preventDefault();event.stopPropagation();closeSource();}}}>
+  {(source||sourceLoading||sourceError)&&!revoked&&<section ref={sourcePanel} tabIndex={-1} className="agent-source-preview" aria-label="专题引用原文" onKeyDownCapture={event=>{if(event.key==="Escape" && !event.nativeEvent.isComposing && !event.defaultPrevented){event.preventDefault();event.stopPropagation();closeSource();}}}>
    <header><strong>{source?.excerpt.title||"引用原文"}</strong><button type="button" onClick={closeSource}>关闭引用并返回</button></header>
    {sourceLoading?<p role="status">正在按当前授权核对原文…</p>:sourceError?<p role="alert">{sourceError}。可重新核对状态后打开。</p>:source&&<><p className="agent-note">{source.excerpt.sourcePath} · 第{source.excerpt.startChar+1}–{source.excerpt.endChar}字符{source.excerpt.truncated?"（节选）":""}</p><blockquote>{source.excerpt.content}</blockquote></>}
   </section>}

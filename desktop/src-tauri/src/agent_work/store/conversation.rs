@@ -61,10 +61,14 @@ pub(super) fn message_on(
     let client_id = super::super::text(value, "clientMessageId", 100)?;
     let additions = super::materials::additions(value)?;
     let removals = super::materials::removals(value)?;
-    let library_ids = value.get("setLibraryIds").map(|v| {
-        let ids: Vec<String> = serde_json::from_value(v.clone()).map_err(|_| "资料库范围必须是列表")?;
-        EvidenceScope::new(ids, vec![]).map(|scope| scope.whole_libraries().to_vec())
-    }).transpose()?;
+    let library_ids = value
+        .get("setLibraryIds")
+        .map(|v| {
+            let ids: Vec<String> =
+                serde_json::from_value(v.clone()).map_err(|_| "资料库范围必须是列表")?;
+            EvidenceScope::new(ids, vec![]).map(|scope| scope.whole_libraries().to_vec())
+        })
+        .transpose()?;
     let add_images = images::selection(value, "addImages")?;
     let remove_images = images::selection(value, "removeImages")?;
     let work = load(c, id)?;
@@ -79,7 +83,11 @@ pub(super) fn message_on(
             && previous.get("removeNotes").cloned().unwrap_or(json!([])) == json!(removals)
             && previous.get("addImages").cloned().unwrap_or(json!([])) == json!(add_images)
             && previous.get("removeImages").cloned().unwrap_or(json!([])) == json!(remove_images)
-            && previous.get("setLibraryIds").cloned().unwrap_or(Value::Null) == json!(library_ids)
+            && previous
+                .get("setLibraryIds")
+                .cloned()
+                .unwrap_or(Value::Null)
+                == json!(library_ids)
         {
             Ok(())
         } else {
@@ -115,8 +123,11 @@ pub(super) fn message_on(
         return Err("当前要求已达核对容量；未追加新要求，已有成果和预算保留".into());
     }
     let mut body = json!({"text":content,"author":"user","revision":work.revision+1,"clientMessageId":client_id,"addNotes":additions,"removeNotes":removals,"addImages":add_images,"removeImages":remove_images});
-    if let Some(ids) = &library_ids { body["setLibraryIds"] = json!(ids); }
-    if library_ids.is_some() || !additions.is_empty()
+    if let Some(ids) = &library_ids {
+        body["setLibraryIds"] = json!(ids);
+    }
+    if library_ids.is_some()
+        || !additions.is_empty()
         || !removals.is_empty()
         || !add_images.is_empty()
         || !remove_images.is_empty()
@@ -127,10 +138,20 @@ pub(super) fn message_on(
         let mut grant = super::materials::extend(root, c, &work, &additions, &removals)?;
 
         if let Some(ids) = &library_ids {
-            if grant.manifest.is_some() { return Err("固定清单不能改为整库授权".into()); }
+            if grant.manifest.is_some() {
+                return Err("固定清单不能改为整库授权".into());
+            }
             for library in ids {
-                let exists: bool = c.query_row("SELECT EXISTS(SELECT 1 FROM libraries WHERE id=?1)", [library], |r| r.get(0)).map_err(|e| e.to_string())?;
-                if !exists { return Err("资料库已不存在，请刷新范围".into()); }
+                let exists: bool = c
+                    .query_row(
+                        "SELECT EXISTS(SELECT 1 FROM libraries WHERE id=?1)",
+                        [library],
+                        |r| r.get(0),
+                    )
+                    .map_err(|e| e.to_string())?;
+                if !exists {
+                    return Err("资料库已不存在，请刷新范围".into());
+                }
             }
             grant.library_ids = ids.clone();
             grant.attachment_library_ids = ids.clone();

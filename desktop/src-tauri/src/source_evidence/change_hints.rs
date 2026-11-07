@@ -19,8 +19,12 @@ impl EvidenceReader {
         for locator in locators {
             self.checkpoint()?;
             if local_text::is_local(locator) {
-                if !self.scope.notes.contains(locator){return Err("文本附件未获明确授权".into());}
-                let version=local_text::snapshot(&self.root,locator).ok().map(|s|s.version);
+                if !self.scope.notes.contains(locator) {
+                    return Err("文本附件未获明确授权".into());
+                }
+                let version = local_text::snapshot(&self.root, locator)
+                    .ok()
+                    .map(|s| s.version);
                 hints.push(json!({"locator":locator,"available":version.is_some(),"fingerprint":fingerprint(&json!(version))}));
                 continue;
             }

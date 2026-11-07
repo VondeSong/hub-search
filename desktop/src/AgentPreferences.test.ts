@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { beforeEach, expect, it } from "vitest";
-import { loadAgentPreferences, rememberAgentPreferences } from "./AgentPreferences";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { loadAgentModelPreference, loadAgentPreferences, rememberAgentModelPreference, rememberAgentPreferences } from "./AgentPreferences";
 beforeEach(()=>localStorage.clear());
+afterEach(()=>vi.restoreAllMocks());
 it("starts new chats with live search and no inherited grants",()=>{
  expect(loadAgentPreferences()).toEqual({model:null,autoFlashcardInbox:false,webSearch:"live"});
 });
@@ -17,4 +18,17 @@ it("ignores malformed saved preferences",()=>{
  expect(loadAgentPreferences()).toEqual({model:null,autoFlashcardInbox:false,webSearch:"live"});
  localStorage.setItem("hub.agent.preferences.v1","broken");
  expect(loadAgentPreferences().model).toBeNull();
+});
+it("keeps effort preferences separate by provider and never gives DeepSeek Fast",()=>{
+ rememberAgentModelPreference({provider:"codex",model:"same-id",reasoningEffort:"high",fast:true,maxConcurrent:2});
+ rememberAgentModelPreference({provider:"deepseek",model:"same-id",reasoningEffort:"none",fast:true,maxConcurrent:2});
+ expect(loadAgentModelPreference("codex","same-id")).toEqual({reasoningEffort:"high",fast:true});
+ expect(loadAgentModelPreference("deepseek","same-id")).toEqual({reasoningEffort:"none",fast:false});
+ expect(loadAgentPreferences()).toEqual({model:null,autoFlashcardInbox:false,webSearch:"live"});
+});
+it("ignores malformed per-model preferences and tolerates unavailable storage",()=>{
+ localStorage.setItem("hub.agent.model-preferences.v1",JSON.stringify([{provider:"other",model:"a",reasoningEffort:"high",fast:true},{provider:"codex",model:"a",reasoningEffort:{value:"high"},fast:false}]));
+ expect(loadAgentModelPreference("codex","a")).toBeNull();
+ vi.spyOn(Storage.prototype,"setItem").mockImplementation(()=>{throw new Error("QuotaExceededError");});
+ expect(()=>rememberAgentPreferences({model:{provider:"codex",model:"a",reasoningEffort:"high",fast:true,maxConcurrent:2},autoFlashcardInbox:false})).not.toThrow();
 });

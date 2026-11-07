@@ -2,7 +2,10 @@ import {AgentFollowups,type Followup} from "./AgentFollowups";
 import { loadAgentPreferences, rememberAgentPreferences } from "./AgentPreferences";
 import { AgentCitationContext, AgentBrowsingContext, AgentPanelContext,AgentAccountVisibleContext,AgentTextMaterialContext,type TextMaterial } from "./StandaloneAgentLauncher";
 import {AgentMaterialCard} from "./AgentMaterialCard";
-import {AgentConversationHistory,type WorkSummary} from "./AgentConversationHistory";
+import {AgentConversationHistory,type WorkSummary,type HistoryChange} from "./AgentConversationHistory";
+import { AgentTaskMode } from "./AgentTaskMode";
+import { AgentScopeTrigger } from "./AgentScopeTrigger";
+import { useAgentLibraryRegistry, resolveAgentLibraries } from "./useAgentLibraryRegistry";
 import type { CitationLocation } from "./AgentCitationPreview";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -25,7 +28,7 @@ import { AgentSourceScope, type SourceSelection } from "./AgentSourceScope";
 import { AgentScopeCoverage } from "./AgentScopeCoverage";
 import { useContext, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronRight, WandSparkles, FileText, ListChecks, Maximize2, MessageSquare, Minimize2, MoreHorizontal, Quote, Plus, Search, SlidersHorizontal, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronRight, WandSparkles, FileText, ListChecks, Maximize2, Menu, MessageSquare, Minimize2, MoreHorizontal, Quote, Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import type { SearchResult } from "./SearchTypes";
 import { isTaskPreviewResult } from "./TaskResultIdentity";
 import { runtimeCapabilities } from "./RuntimePlatform";
@@ -42,6 +45,7 @@ import { AgentCharts, type AnalysisChart } from "./AgentCharts";
 import { AgentSleepDatasets, type SleepDatasetItem } from "./AgentSleepDatasets";
 import { AgentConversation, AgentDelivery, prependConversation, type Conversation, type Evidence, type Report, type Progress, type HistoricalDelivery } from "./AgentDelivery";
 import "./AgentInvestigation.css";
+import "./AgentAssistantRefinement.css";
 
 import { AgentGoalAssessment, type GoalAssessment } from "./AgentGoalAssessment";
 import { AgentTaskTree, type TaskTree } from "./AgentTaskTree";
@@ -68,7 +72,7 @@ function historyViewScope(view: View | null) {
 function sameNoteAnchor(a:InvestigationLocator|null|undefined,b:InvestigationLocator|null|undefined){
   return a?.kind==="note"&&b?.kind==="note"&&a.libraryId===b.libraryId&&a.documentId===b.documentId&&a.pageId===b.pageId;
 }
-type WorkListCursor = { updatedAt: number; id: string; pinned?:boolean; anchor: InvestigationLocator | null };
+type WorkListCursor = { updatedAt: number; id: string; pinned?:boolean; anchor: InvestigationLocator | null; query?:string; archived?:boolean };
 type WorkListPage = { works: WorkSummary[]; nextCursor?: WorkListCursor | null };
 const states: Record<string, string> = { paused: "本轮已停止", cancelled: "目标已取消", ready: "可以开始", investigating: "正在处理", completed: "本轮已完成", needsDecision: "需要你的决定", waiting: "等待条件满足", insufficientEvidence: "证据不足", interrupted: "已中断，可继续", failed: "本次调查失败", expired: "需要重新核对来源", revoked: "授权已撤回" };
 const call = <T,>(args: Record<string, unknown>) => invoke<T>("agent_investigation", { args });
@@ -143,9 +147,10 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const [requestedOpen, setOpen] = useState(initialOpen);
   const open = requestedOpen && accountVisible;
   useEffect(()=>{const show=()=>{if(accountVisible)setOpen(true);};window.addEventListener('hub:show-agent',show);return()=>window.removeEventListener('hub:show-agent',show);},[accountVisible]);
-  const detailsPopover=useAgentPopover();
+  const detailsPopover=useAgentPopover({deferEscapeSelector:".agent-history-search input, .agent-history-action-menu, .agent-details-sections .agent-popover[open]"});
   const detailsMenu=detailsPopover.ref;
-  const [historyExpanded,setHistoryExpanded]=useState(false);
+  const detailsReturn=useRef<HTMLElement|null>(null);
+  const [historyExpanded,setHistoryExpanded]=useState(true);
   const workControls=useRef<HTMLDetailsElement>(null);
   const materialPopover=useAgentPopover();
   const [addMenuOpen,setAddMenuOpen]=useState(false);
@@ -167,7 +172,12 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const [works, setWorks] = useState<WorkSummary[]>([]);
   const [worksCursor, setWorksCursor] = useState<WorkListCursor | null>(null);
   const [worksLoading, setWorksLoading] = useState(initialOpen);
-  const worksJob = useRef(false);
+  const worksJob = useRef(0);
+  const worksRequest = useRef(0);
+  const [historyQuery,setHistoryQuery] = useState("");
+  const [historyArchived,setHistoryArchived] = useState(false);
+  const historyFilter = useRef({query:"",archived:false});
+  const libraryRegistry = useAgentLibraryRegistry(open);
   const [worksError, setWorksError] = useState("");
   const [goal, setGoal] = useState(initialDraft||"");
   const skillPrefix = goal.match(/^(?:\$[a-z0-9]+(?:-[a-z0-9]+)*\s+)+/)?.[0] || "";
@@ -175,11 +185,9 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const questionText = goal.slice(skillPrefix.length);
   const [wholeLibrary, setWholeLibrary] = useState(false);
   const [libraryDraft,setLibraryDraft]=useState<AgentLibrary[]|null>(null);
-  const [libraryNames,setLibraryNames]=useState<Record<string,string>>({});
-  const selectedLibraries:AgentLibrary[]=libraryDraft ?? (view?.work.grant.libraryIds||[]).map(id=>({id,name:libraryNames[id]||id}));
+  const selectedLibraries = resolveAgentLibraries(libraryDraft ?? (view?.work.grant.libraryIds||[]).map(id=>({id,name:""})),libraryRegistry);
   const changeLibraries=(items:AgentLibrary[])=>{
     setLibraryDraft(items);setWholeLibrary(false);
-    setLibraryNames(current=>({...current,...Object.fromEntries(items.map(l=>[l.id,l.name]))}));
   };
   const [materials, setMaterials] = useState<AgentMaterial[]>([]);
   const [pageAttached,setPageAttached]=useState(!!pageAnchor);
@@ -188,6 +196,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const primaryMaterial=materials.find(item=>sameNoteAnchor(item.locator,anchor)) || (sameNoteAnchor(boundMaterial.current?.locator,anchor) ? boundMaterial.current : null);
   const sourceTitle=primaryMaterial?.title || (view?.work.anchor && pageAnchor?.kind==="note" && !sameNoteAnchor(view.work.anchor,pageAnchor) ? view.evidence[0]?.title || "对话资料" : pageTitle);
   const libraryName=primaryMaterial?.libraryName || pageLibraryName;
+  const composerLibraries = !view && wholeLibrary && anchor?.kind==="note" ? resolveAgentLibraries([{id:anchor.libraryId,name:libraryName}],libraryRegistry) : selectedLibraries;
   const canEditNote=pageCanEditNote && sameNoteAnchor(anchor,pageAnchor) && (pageAttached || !!view);
   const hasDraftSources=selectedLibraries.length>0 || pageAttached || materials.length>0 || dropped.length>0 || snippets.length>0;
   const [removals, setRemovals] = useState<NoteLocator[]>([]);
@@ -407,15 +416,22 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     if (open && visible && view) void revalidate(view.work.id).catch(reason => { if (alive.current) setError(String(reason)); });
   }, [open, visible]);
   const reloadWorks = async ():Promise<WorkListPage|null> => {
-    setWorksLoading(true);setWorksError("");
+    const ticket=++worksRequest.current;
+    worksJob.current=0;setWorksLoading(true);setWorksError("");
     try {
-      const value = await call<WorkListPage>({action:"list",anchor:null});
-      if(!alive.current)return null;
+      const value = await call<WorkListPage>({action:"list",anchor:null,...historyFilter.current});
+      if(!alive.current || ticket!==worksRequest.current)return null;
       setWorks(value.works);
       setWorksCursor(value.nextCursor??null);
       return value;
-    }catch(reason){if(alive.current)setWorksError(String(reason));return null;}
-    finally{if(alive.current)setWorksLoading(false);}
+    }catch(reason){if(alive.current && ticket===worksRequest.current)setWorksError(String(reason));return null;}
+    finally{if(alive.current && ticket===worksRequest.current)setWorksLoading(false);}
+  };
+  const filterHistory = (query:string,archived:boolean) => {
+    const next={query:query.slice(0,200),archived};
+    historyFilter.current=next;setHistoryQuery(next.query);setHistoryArchived(archived);
+    setWorks([]);setWorksCursor(null);
+    void reloadWorks();
   };
   const load = async () => {
     setError(""); setBusy(true);
@@ -432,17 +448,18 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   };
   useEffect(() => { if (initialOpen) void load(); }, []);
   const loadEarlierWorks = async () => {
-    if (!worksCursor || worksJob.current || busy || active) return;
-    worksJob.current=true; setWorksLoading(true); setWorksError("");
+    if (!worksCursor || worksJob.current || worksLoading || busy || active) return;
+    const ticket=++worksRequest.current;
+    worksJob.current=ticket;setWorksLoading(true);setWorksError("");
     try {
-      const value=await call<WorkListPage>({action:"list",anchor:null,before:worksCursor});
-      if (!alive.current) return;
+      const value=await call<WorkListPage>({action:"list",anchor:null,...historyFilter.current,before:worksCursor});
+      if (!alive.current || ticket!==worksRequest.current) return;
       setWorks(current=>[...current,...value.works.filter(work=>!current.some(existing=>existing.id===work.id))]);
       setWorksCursor(value.nextCursor ?? null);
-    } catch(reason) { if(alive.current) setWorksError(String(reason)); }
-    finally { worksJob.current=false; if(alive.current) setWorksLoading(false); }
+    } catch(reason) { if(alive.current && ticket===worksRequest.current) setWorksError(String(reason)); }
+    finally { if(worksJob.current===ticket)worksJob.current=0;if(alive.current && ticket===worksRequest.current)setWorksLoading(false); }
   };
-  const changeHistory=async(work:WorkSummary,change:{pinned?:boolean;deleted?:boolean})=>{
+  const changeHistory=async(work:WorkSummary,change:HistoryChange)=>{
     if(busy || active)throw new Error("请等待当前操作结束后再修改对话历史");setBusy(true);setWorksError("");
     try{
       await call({action:"setHistoryPreference",id:work.id,...change});
@@ -653,7 +670,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       if (!alive.current) return;
       setPublicUrl("");
       boundMaterial.current=primaryMaterial || null;
-      setView(value); setWorks(current => [{ id: value.work.id, goal: value.work.goal, state: value.work.state }, ...current]);
+      setView(value); void reloadWorks();
       if(anchor){setMaterials([]);setDropped([]);} setRemovals([]);
       // Bind the user's preflight selection before the first model call. A
       // failed binding leaves a visible ready work and never starts a model.
@@ -678,7 +695,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     try {
       const value=await call<View>({action:"createWithSourceScope",selection,expectedManifest,anchor,goal:goal.trim(),successCriteria:"依据固定范围回答问题，说明覆盖、出处和局限；未读取或未抽取的材料不能算作已处理。"});
       if(!alive.current)return;
-      setView(value);setWorks(current=>[{id:value.work.id,goal:value.work.goal,state:value.work.state},...current]);setGoal("");setMaterials([]);setDropped([]);setRemovals([]);
+      setView(value);void reloadWorks();setGoal("");setMaterials([]);setDropped([]);setRemovals([]);
       if(assistantOptions.model || assistantOptions.autoFlashcardInbox || assistantOptions.externalMcp || assistantOptions.webSearch || assistantOptions.mcpServices?.length) await call<View>({action:"configureAssistant",id:value.work.id,options:assistantOptions,confirmedAutoInbox:assistantOptions.autoFlashcardInbox});
       if(memorySelection.enabled) await invoke("shared_memory",{args:{action:"selectScope",workId:value.work.id,...memorySelection}});
     } catch(reason) {if(alive.current)setError(String(reason));throw reason;}
@@ -697,9 +714,9 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     if (busy || active || anchor?.kind !== "note") return;
     setBusy(true); setError("");
     try {
-      const grant = { libraryIds: wholeLibrary ? [anchor.libraryId] : [], notes: [anchor], readingItemKeys: [] };
+      const grant = { libraryIds: composerLibraries.map(library=>library.id), notes: [anchor], readingItemKeys: [] };
       const value = await call<View>({ action: "create", goal: "修改当前 Obsidian 笔记", successCriteria: "查看具体修改，明确确认后保存；发现外部变化时保留草稿并停止覆盖。", anchor, grant });
-      if (alive.current) { setView(value); setWorks(current => [{ id: value.work.id, goal: value.work.goal, state: value.work.state }, ...current]);  if(detailsMenu.current) detailsMenu.current.open=true; }
+      if (alive.current) { setView(value); void reloadWorks(); setHistoryExpanded(false); if(detailsMenu.current) detailsMenu.current.open=true; }
     } catch (reason) { if (alive.current) setError(String(reason)); }
     finally { if (alive.current) setBusy(false); }
   };
@@ -875,20 +892,27 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         if(libraryData){
           event.preventDefault();event.stopPropagation();
           if(busy||active||businessCheck||confirmMessage||view?.work.grant.manifest||view?.work.state==="revoked"||publicUrl){setError("请在普通对话空闲时调整库范围；固定清单请从范围入口调整。");return;}
-          try {const items=readLibraryDrop(libraryData);changeLibraries([...new Map([...selectedLibraries,...items].map(l=>[l.id,l])).values()]);setReportReading(false);setError("");}catch(reason){setError(String(reason));}
+          try {const items=readLibraryDrop(libraryData);changeLibraries([...new Map([...composerLibraries,...items].map(l=>[l.id,l])).values()]);setReportReading(false);setError("");}catch(reason){setError(String(reason));}
           return;
         }
         if(event.dataTransfer.files?.length){event.preventDefault();event.stopPropagation();setReportReading(false);void addFiles(Array.from(event.dataTransfer.files));return;}const data=event.dataTransfer.getData("application/x-hub-agent-source");if(!data)return;event.preventDefault();event.stopPropagation();setReportReading(false);try{if(data.length>65536)throw new Error();addExternalMaterial(JSON.parse(data));}catch{setError("无法识别拖入的资料，请重新拖入。");}}} onKeyDown={event => {
-      if (event.key === "Escape" && !event.nativeEvent.isComposing && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); const menu=(!reportReading && event.currentTarget.querySelector<HTMLDetailsElement>(".agent-composer details[open]")) || (detailsMenu.current?.open ? detailsMenu.current : null); if(menu){menu.open=false;menu.querySelector("summary")?.focus();}else if(citationOpen){returnFromCitation();}else if(reportReading){setReportReading(false);event.currentTarget.querySelector<HTMLButtonElement>(".agent-reading-toggle")?.focus();}else closePanel(); }
+      if (event.key === "Escape" && !event.nativeEvent.isComposing && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); const menu=(!reportReading && event.currentTarget.querySelector<HTMLDetailsElement>(".agent-composer details[open]")) || (detailsMenu.current?.open ? detailsMenu.current : null); if(menu){menu.open=false;menu.querySelector("summary")?.focus();}else if(citationOpen){returnFromCitation();}else if(reportReading){setReportReading(false);event.currentTarget.querySelector<HTMLButtonElement>('.agent-header-end button[aria-label="对话详情"]')?.focus();}else closePanel(); }
     }}>
       <header className="agent-panel-header">
-        <MessageSquare size={18} aria-hidden="true" /><strong title={chatTitle}>{chatTitle}</strong>
-        <button type="button" className="agent-source-toggle" onClick={() => {if(sourceVisible)returnFromCitation();else{clearSourcePreview();setReportReading(false);setSourceVisible(true);}}}>{sourceVisible ? "返回对话" : "查看正文"}</button>
-        {report && view?.work.state!=="revoked" && <button type="button" className="agent-reading-toggle" aria-label={reportReading?"返回对话布局":"专注阅读报告"} title={reportReading?"返回对话布局（Esc）":"专注阅读报告"} aria-pressed={reportReading} disabled={!!active} onClick={()=>{clearSourcePreview();setReportReading(current=>!current);}}>{reportReading?<Minimize2 size={17}/>:<Maximize2 size={17}/>}</button>}
-        <details ref={detailsMenu} className="agent-dialogue-details" onClickCapture={event=>{const menu=event.currentTarget;if(!menu.open&&(event.target as Element).closest("summary")===menu.firstElementChild)setHistoryExpanded(false);}}><summary aria-label="对话详情" title="对话详情"><MoreHorizontal size={18} aria-hidden="true"/></summary><div className="agent-details-content">
-      <AgentConversationHistory expanded={historyExpanded} onExpand={()=>setHistoryExpanded(true)} onBack={()=>setHistoryExpanded(false)} works={works} currentId={view?.work.id} disabled={busy||!!active||worksLoading} more={!!worksCursor} loading={worksLoading} error={worksError} states={states} onRetry={()=>void reloadWorks()} onClose={()=>{if(detailsMenu.current)detailsMenu.current.open=false;}} onMore={()=>void loadEarlierWorks()} onChange={changeHistory} onOpen={work=>{setLibraryDraft(null);setError("");setGoal("");setMaterials([]);setDropped([]);setSnippets([]);setImageDraft(null);setRemovals([]);clearSourcePreview();void refresh(work.id).then(()=>{if(detailsMenu.current)detailsMenu.current.open=false;}).catch(reason=>setError(String(reason)));}}/>
+        <div className="agent-header-start">
+        <details ref={detailsMenu} className="agent-dialogue-details" onClickCapture={event=>{const menu=event.currentTarget;if(!menu.open&&(event.target as Element).closest("summary")===menu.firstElementChild){detailsReturn.current=menu.firstElementChild as HTMLElement;setHistoryExpanded(true);}}} onToggle={event=>{if(event.target!==event.currentTarget)return;const menu=event.currentTarget;if(!menu.open&&detailsReturn.current?.isConnected&&(menu.contains(document.activeElement)||document.activeElement===document.body))detailsReturn.current.focus();}}><summary aria-label="对话历史" title="对话历史"><Menu size={18} aria-hidden="true"/></summary><div className="agent-details-content">
+          <div hidden={!historyExpanded} className="agent-history-container">
+      <AgentConversationHistory query={historyQuery} archived={historyArchived} onQueryChange={query=>filterHistory(query,historyFilter.current.archived)} onArchivedChange={archived=>filterHistory(historyFilter.current.query,archived)} works={works} currentId={view?.work.id} disabled={busy||!!active} more={!!worksCursor} loading={worksLoading} error={worksError} states={states} onRetry={()=>void reloadWorks()} onClose={()=>{if(detailsMenu.current)detailsMenu.current.open=false;}} onMore={()=>void loadEarlierWorks()} onChange={changeHistory} onOpen={work=>{setLibraryDraft(null);setError("");setGoal("");setMaterials([]);setDropped([]);setSnippets([]);setImageDraft(null);setRemovals([]);clearSourcePreview();void refresh(work.id).then(()=>{if(detailsMenu.current)detailsMenu.current.open=false;}).catch(reason=>setError(String(reason)));}}/>
+          </div>
           <div className="agent-details-sections" hidden={historyExpanded}>
-          {anchor?.kind==="note"&&canEditNote&&<AgentTopics key={`topics-${view?.work.id||draftRevision}`} anchor={anchor} work={view?.work} disabled={businessDisabled||!!active} onOpenWork={async (id,source,draft)=>{if(source&&!sameNoteAnchor(source.anchor,anchor)){if(!onOpenTopicWork)throw new Error("此入口尚不支持跨笔记继续，请从本期笔记打开原工作");onOpenTopicWork(id,source,view?.work.id,draft);return;}setLibraryDraft(null);setError("");setGoal("");setMaterials([]);setDropped([]);setRemovals([]);setSourcePreview(null);sourceSequence.current++;const opened=await refresh(id);if(alive.current){setWorks(current=>current.some(w=>w.id===id)?current:[{id,goal:opened.work.goal,state:opened.work.state},...current]);if(draft){setGoal(draft);goalInput.current?.focus();}}}}/>}
+          <div className="agent-details-heading"><strong>对话详情</strong><button type="button" aria-label="关闭对话详情" onClick={()=>detailsPopover.close(true)}><X size={16}/></button></div>
+          <div className="agent-display-controls">
+            <button type="button" onClick={() => {if(sourceVisible)returnFromCitation();else{clearSourcePreview();setReportReading(false);setSourceVisible(true);}detailsPopover.close();}}><FileText size={16}/>{sourceVisible ? "返回对话" : "查看正文"}</button>
+            {report && view?.work.state!=="revoked" && <button type="button" className="agent-reading-toggle" aria-pressed={reportReading} disabled={!!active} onClick={()=>{clearSourcePreview();setReportReading(current=>!current);detailsPopover.close();}}>{reportReading?<Minimize2 size={16}/>:<Maximize2 size={16}/>} {reportReading?"返回对话布局":"专注阅读报告"}</button>}
+            <button type="button" aria-pressed={docked} onClick={() => {setDocked(value => !value);detailsPopover.close();}}>{docked ? <Minimize2 size={16}/> : <Maximize2 size={16}/>} {docked ? "切换为浮窗" : "展开为侧边栏"}</button>
+            {onTopicBack&&<button type="button" disabled={busy||!!active} onClick={onTopicBack}><ArrowLeft size={16}/>返回专题所在工作</button>}
+          </div>
+          {anchor?.kind==="note"&&canEditNote&&<AgentTopics key={`topics-${view?.work.id||draftRevision}`} anchor={anchor} work={view?.work} disabled={businessDisabled||!!active} onOpenWork={async (id,source,draft)=>{if(source&&!sameNoteAnchor(source.anchor,anchor)){if(!onOpenTopicWork)throw new Error("此入口尚不支持跨笔记继续，请从本期笔记打开原工作");onOpenTopicWork(id,source,view?.work.id,draft);return;}setLibraryDraft(null);setError("");setGoal("");setMaterials([]);setDropped([]);setRemovals([]);setSourcePreview(null);sourceSequence.current++;await refresh(id);if(alive.current){void reloadWorks();if(draft){setGoal(draft);goalInput.current?.focus();}}}}/>}
           <SharedMemory key={'details-memory-'+(view?.work.id || draftRevision)} compact workId={view?.work.id} disabled={busy || !!active} onSelectionChange={setMemorySelection} usage={view?.memoryUse}/>
           {conversationDetails}
         <details ref={workControls} className="agent-work-controls"><summary>用量与任务{controlsNeedAttention ? " · 需要处理" : ""}</summary>
@@ -908,10 +932,13 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         </details>
         </div>
         </div></details>
-        {onTopicBack&&<button type="button" disabled={busy||!!active} onClick={onTopicBack}>返回专题所在工作</button>}
-        <button type="button" title="新对话" aria-label="新对话" disabled={busy || !!active} onClick={()=>newInvestigation()}><Plus size={18} /></button>
-        <button type="button" title={docked ? "切换为浮窗" : "展开为侧边栏"} aria-label={docked ? "切换为浮窗" : "展开为侧边栏"} aria-pressed={docked} onClick={() => setDocked(value => !value)}>{docked ? <Minimize2 size={18}/> : <Maximize2 size={18}/>}</button>
-        <button type="button" title="关闭助手（Esc）" aria-label="关闭助手" onClick={closePanel}><X size={18} /></button>
+          <button type="button" title="新对话" aria-label="新对话" disabled={busy || !!active} onClick={()=>newInvestigation()}><Plus size={19} /></button>
+        </div>
+        <AgentTaskMode title={chatTitle} value={mode} disabled={busy || !!active} onChange={setMode}/>
+        <div className="agent-header-end">
+          <button type="button" title="对话详情" aria-label="对话详情" onClick={event=>{detailsReturn.current=event.currentTarget;setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-sections .agent-details-heading button")?.focus();},0);}}><MoreHorizontal size={18}/></button>
+          <button type="button" title="关闭助手（Esc）" aria-label="关闭助手" onClick={closePanel}><X size={19} /></button>
+        </div>
       </header>
       <div className="agent-body">
       <div className="agent-conversation-wrap">
@@ -990,7 +1017,6 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         <input ref={fileInput} type="file" aria-label="选择图片或文本文件" accept={agentFileAccept} multiple hidden onChange={event=>{const files=Array.from(event.currentTarget.files||[]);event.currentTarget.value="";void addFiles(files);}}/>
         {open && globalPanel && (assistantOptions.model?.provider ?? runtime.settings.provider ?? "codex") === "codex" && <CodexAccountBadge boundScopeId={view?.codexAccountBinding?.scopeId} workId={view?.work.id} disabled={!!active||pendingRun} needsAuthorization={[error,view?.run?.error].some(value=>value?.includes("请确认账号后继续"))} onAuthorized={()=>{setError("");void refresh(view!.work.id);}}/>}
         <div className="agent-composer-materials">
-        {!!selectedLibraries.length&&<div className="agent-pending-materials" aria-label="资料库范围">{selectedLibraries.map(l=><AgentMaterialCard key={l.id} kind="library" title={l.name} subtitle={libraryDraft!==null?"库范围 · 随下一条问题生效":"库范围 · 已授权"} disabled={businessDisabled||!!active} onRemove={()=>changeLibraries(selectedLibraries.filter(s=>s.id!==l.id))}/>)}</div>}
         {libraryDraft!==null&&!selectedLibraries.length&&!!view?.work.grant.libraryIds.length&&<p className="agent-note">下一条问题将清除整库范围，单独添加的页面保留。<button type="button" onClick={()=>setLibraryDraft(null)}>撤销</button></p>}
         {(dropped.length>0||snippets.length>0)&&<div className="agent-pending-materials" aria-label="待添加资料">{dropped.map((item,index)=><AgentMaterialCard key={JSON.stringify(item.locator)} kind={item.locator.kind==="reading"?"reading":item.locator.kind==="task"?"task":"page"} title={item.title} disabled={busy} onRemove={()=>{setDropped(current=>current.filter((_,i)=>i!==index));goalInput.current?.focus();}}/>)}{snippets.map((item,index)=><AgentMaterialCard key={`text-${index}`} kind={item.kind} title={item.kind==="text"&&!item.file?item.text:item.title} subtitle={`${item.file?"文本附件 · 全文":item.kind==="text"?"所选文字":"闪卡文字快照"} · ${item.text.length}字 · ${item.title}`} disabled={busy} onRemove={()=>{setSnippets(current=>current.filter((_,i)=>i!==index));goalInput.current?.focus();}}/>)}</div>}
         {view?.work.grant.notes?.filter(n=>isTextAttachment(n)&&!removals.some(r=>materialKey(r)===materialKey(n))).map(locator=><AgentTextFileCard key={materialKey(locator)} locator={locator} disabled={businessDisabled||!!active} onRemove={()=>{setRemovals(current=>[...current,locator]);setAddPage("materials");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}/>)}
@@ -1012,6 +1038,9 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
               <div className={`agent-add-content${(addPage==="materials" || addPage==="scope")?" agent-add-materials":addPage==="skills"?" agent-add-skills":""}`}>
                 <div className="agent-popover-header">{addPage==="home"?<strong>添加到本次对话</strong>:<button type="button" className="agent-menu-back" ref={addBack} onClick={()=>setAddPage("home")}><ArrowLeft size={16} aria-hidden="true"/>返回</button>}<button type="button" aria-label="关闭添加菜单" onClick={()=>materialPopover.close(true)}><X size={16} aria-hidden="true"/></button></div>
                 {addPage==="home" && <div className="agent-add-choices">
+                  <button type="button" className="agent-menu-choice" disabled={busy||filePreparing||!!businessCheck} onClick={()=>setAddPage("materials")}><FileText size={18}/><span><strong>资料库与页面</strong><small>选择材料与允许查找的范围</small></span><ChevronRight size={15}/></button>
+                  <button type="button" className="agent-menu-choice" disabled={busy||!!active&&!steerable} onClick={()=>setAddPage("skills")}><WandSparkles size={18}/><span><strong>技能</strong><small>选择本次使用的处理方法</small></span><ChevronRight size={15}/></button>
+                  {textMaterials?.selection && <button type="button" className="agent-menu-choice" disabled={busy||filePreparing||!!view?.work.grant.manifest} onClick={()=>{addTextMaterial(textMaterials.selection!);textMaterials.clearSelection();materialPopover.close(false);goalInput.current?.focus();}}><Quote size={18}/><span><strong>添加当前所选文字</strong><small>将选中的文字作为本次对话资料</small></span><ChevronRight size={15}/></button>}
                   <button type="button" className="agent-menu-choice" disabled={busy||filePreparing||!!businessCheck||!!view?.work.grant.manifest||!!publicUrl} onClick={()=>fileInput.current?.click()}><FileText size={18}/><span><strong>添加图片或文件</strong><small>文本每份最多 2 MiB、50 万字符；也可拖入文件或粘贴截图</small></span><ChevronRight size={15}/></button>
                   <button type="button" className="agent-menu-choice" disabled={!!view?.work.grant.manifest || !!publicUrl} onClick={()=>setAddPage("images")}><FileText size={18}/><span><strong>从资料库添加图片</strong><small>选择已有图片，随问题一起发送</small></span><ChevronRight size={15}/></button>
                   {!view && !pageAttached && !materials.length && <button type="button" className="agent-menu-choice" onClick={()=>setAddPage("web")}><FileText size={18}/><span><strong>读取公共链接</strong><small>发送问题时保存网页快照</small></span><ChevronRight size={15}/></button>}
@@ -1023,28 +1052,29 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
                 {addMenuOpen && (addPage==="materials" || addPage==="scope") && <div className="agent-add-section"><strong>资料</strong>
             
             {(browsing?.entry || (!view && pageAnchor)) && <button type="button" className="agent-menu-choice" disabled={busy || filePreparing || !!businessCheck || !!view?.work.grant.manifest || (!browsing?.entry && pageAttached)} onClick={()=>{if(browsing?.entry)addExternalMaterial(browsing.entry);else if(pageAnchor){setPageAttached(true);setMaterials(current=>current.filter(item=>!sameNoteAnchor(item.locator,pageAnchor)));}}}><FileText size={18}/><span><strong>{!browsing?.entry && pageAttached?"当前页面已加入":"添加当前页面"}</strong><small>{(browsing?.entry && ("result" in browsing.entry ? browsing.entry.result.title : browsing.entry.title)) || pageTitle || currentObjectLabel}</small></span></button>}
-            {!view?.work.grant.manifest && <AgentLibraryScope selected={selectedLibraries} disabled={businessDisabled||!!active||confirmMessage||view?.work.state==="revoked"} onChange={changeLibraries}/>}
+            {!view?.work.grant.manifest && <AgentLibraryScope registry={libraryRegistry} selected={composerLibraries} disabled={businessDisabled||!!active||confirmMessage||view?.work.state==="revoked"} onChange={changeLibraries}/>}
             {!view?.work.grant.manifest && <AgentMaterials embedded onDone={()=>{materialPopover.close(false);goalInput.current?.focus();}} key={view?.work.id || draftRevision} anchor={anchor?.kind==="note" ? anchor : undefined} anchorIncluded={!!anchor && (!!view || pageAttached)} selected={materials} retained={view ? view.work.grant.notes || (anchor?.kind==="note" ? [anchor] : []) : undefined} libraryIds={view?.work.grant.libraryIds} disabled={busy || filePreparing || !!businessCheck || confirmMessage} onChange={setMaterials} removed={removals} onRemove={view&&!active ? setRemovals : undefined} onWithdraw={view&&!active ? ()=>void withdrawMaterials() : undefined}/>}
-            <details className="agent-material-advanced" key={addPage} open={addPage==="scope" || undefined}><summary>高级范围</summary><p className="agent-note">{selectedLibraries.length ? `当前库范围：${selectedLibraries.map(l=>l.name).join("、")}` : (!view && !hasDraftSources || !!view && !anchor && !view.work.grant.notes?.length) ? "未添加资料，可直接对话；可在这里添加资料" : view?.work.state==="revoked" ? "来源授权已撤回" : view?.work.grant.manifest ? `已固定授权 ${view.work.grant.manifest.members.length} 份资料` : (view ? !!view.work.grant.libraryIds.length : wholeLibrary) ? `当前范围：${view?.work.grant.libraryIds.length || 1} 个资料库` : !anchor && view ? `当前范围：${view.work.grant.notes?.length || 0} 份明确选中的文档/页面` : `当前范围：${sourceTitle || currentObjectLabel}，另有 ${view ? Math.max(0,(view.work.grant.notes?.length || 1)-1) : Math.max(0,materials.length+dropped.length-(pageAttached?0:1))} 份资料`}。添加和撤回单篇笔记请使用输入框下方的“添加资料”；原始记录与累计预算保留。</p>
+            <details className="agent-material-advanced" key={addPage} open={addPage==="scope" || undefined}><summary>高级范围</summary><p className="agent-note">{selectedLibraries.length ? `当前库范围：${selectedLibraries.map(l=>l.name).join("、")}` : (!view && !hasDraftSources || !!view && !anchor && !view.work.grant.notes?.length) ? "未添加资料，可直接对话；可在这里添加资料" : view?.work.state==="revoked" ? "来源授权已撤回" : view?.work.grant.manifest ? `已固定授权 ${view.work.grant.manifest.members.length} 份资料` : (view ? !!view.work.grant.libraryIds.length : wholeLibrary) ? `当前范围：${view?.work.grant.libraryIds.length || 1} 个资料库` : !anchor && view ? `当前范围：${view.work.grant.notes?.length || 0} 份明确选中的文档/页面` : `当前范围：${sourceTitle || currentObjectLabel}，另有 ${view ? Math.max(0,(view.work.grant.notes?.length || 1)-1) : Math.max(0,materials.length+dropped.length-(pageAttached?0:1))} 份资料`}。添加和撤回单篇笔记请使用“+”菜单中的“资料库与页面”；原始记录与累计预算保留。</p>
             {!view && canEditNote && anchor?.kind==="note" && <AgentSourceScope key={`source-scope-${draftRevision}`} libraryId={anchor.libraryId} disabled={busy || wholeLibrary || !!selectedLibraries.length || !!materials.length} canConfirm={!!goal.trim()} onConfirm={createSourceScope}/>}
             {view?.work.grant.manifest && view.work.revision!==undefined && view.work.authorizationVersion!==undefined && <AgentScopeCoverage key={`scope-coverage-${view.work.id}-${view.work.revision}-${view.work.authorizationVersion}-${view.recordVersion}`} workId={view.work.id} revision={view.work.revision} authorizationVersion={view.work.authorizationVersion} disabled={businessDisabled || !!active}/> }
             {view?.work.grant.manifest?.selection && anchor?.kind==="note" && <AgentSourceScope key={`scope-refresh-${view.work.id}-${view.work.revision}`} libraryId={anchor.libraryId} initialSelection={view.work.grant.manifest.selection} disabled={businessDisabled || !!active || confirmMessage} canConfirm={view.work.revision!==undefined} confirmationLabel="确认新范围，保留本对话（不启动分析）" onConfirm={replaceSourceScope}/>}
             {view?.work.grant.manifest && <p className="agent-note">已固定授权 {view.work.grant.manifest.members.length} 份材料。成员或版本变化后可重新确认范围，原累计预算保留；也可停止整个事项的来源授权。</p>}
             {<div className="agent-settings">
               <p className="agent-note">这里决定助手可以读取哪些资料。浏览其他页面不会自动授权；输入框中的资料会随问题一起发送给当前模型。</p>
-              {!view && anchor?.kind==="note" && <label className="agent-grant"><input type="checkbox" disabled={busy} checked={wholeLibrary} onChange={event=>setWholeLibrary(event.target.checked)}/>允许查找「{libraryName}」整个资料库的相关资料</label>}
+              {!view && anchor?.kind==="note" && <label className="agent-grant"><input type="checkbox" disabled={busy} checked={composerLibraries.some(library=>library.id===anchor.libraryId)} onChange={event=>changeLibraries(event.target.checked?[...composerLibraries.filter(library=>library.id!==anchor.libraryId),{id:anchor.libraryId,name:libraryName}]:composerLibraries.filter(library=>library.id!==anchor.libraryId))}/>允许查找「{libraryName}」整个资料库的相关资料</label>}
               {!view && anchor?.kind!=="note" && <p className="agent-note">可在上方选择资料库范围，或单独添加页面。</p>}
             </div>}
             </details></div>}
-                {addMenuOpen && addPage==="settings" && <div className="agent-add-section"><strong>更多设置</strong><label className="agent-mode"><span>任务执行额度</span><select name="investigationMode" value={mode} disabled={busy || !!active} onChange={event => setMode(event.target.value)}><option value="quick">标准</option><option value="deep">扩展</option></select></label><p className="agent-note">控制工具步骤、资料量和运行时限；不是模型推理强度，扩展额度不保证回答更好。</p><label>助手宽度<input type="range" min={panelResize.minimum} max={panelResize.maximum} step="1" value={panelWidth} onChange={event=>setPanelWidth(Number(event.target.value))}/></label>{view && <label className="agent-confirm-message"><input type="checkbox" checked={confirmMessage} disabled={busy || !!active} onChange={event=>setConfirmMessage(event.target.checked)}/>这条内容是我确认的决定</label>}
+                {addMenuOpen && addPage==="settings" && <div className="agent-add-section"><strong>更多设置</strong><p className="agent-note">任务额度：{mode==="deep"?"扩展":"标准"}。可通过顶部中间的任务模式调整。</p><label>助手宽度<input type="range" min={panelResize.minimum} max={panelResize.maximum} step="1" value={panelWidth} onChange={event=>setPanelWidth(Number(event.target.value))}/></label>{view && <label className="agent-confirm-message"><input type="checkbox" checked={confirmMessage} disabled={busy || !!active} onChange={event=>setConfirmMessage(event.target.checked)}/>这条内容是我确认的决定</label>}
                   <details className="agent-menu-advanced"><summary>联网搜索与工具连接</summary><AgentAssistantOptions section="connection" value={(view ? view.assistantOptions || defaultAssistantOptions : assistantOptions)} disabled={busy || !!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/></details>
                 </div>}
               </div>
             </details>
             <AgentAssistantOptions section="permissions" value={(view ? view.assistantOptions || defaultAssistantOptions : assistantOptions)} disabled={busy || !!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
-          <button type="button" className="agent-current-page" aria-label="添加资料" title="资料：添加、移除与授权范围" disabled={busy || filePreparing || !!publicUrl} onClick={()=>{setAddPage("materials");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}><FileText size={18}/></button>
-          <button type="button" className="agent-current-page" aria-label="添加技能" title="技能：选择本次使用的处理方法" disabled={busy || (!!active && !steerable)} onClick={()=>{setAddPage("skills");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}><WandSparkles size={18} aria-hidden="true"/></button>
-          {textMaterials?.selection&&<button type="button" className="agent-current-page" aria-label="添加所选文字" title="添加所选文字（文字快照，不是区块）" disabled={busy||filePreparing||!!view?.work.grant.manifest} onMouseDown={event=>event.preventDefault()} onClick={()=>{addTextMaterial(textMaterials.selection!);textMaterials.clearSelection();}}><Quote size={18}/></button>}
+            <AgentScopeTrigger selected={composerLibraries} registry={libraryRegistry} fallbackLabel={view?.work.grant.manifest ? `固定 ${view.work.grant.manifest.members.length} 份资料` : (materials.length || dropped.length || snippets.length || (view?.work.grant.notes?.length || 0)>1) ? "已添加资料" : (pageAttached || !!anchor) ? "当前页面" : "添加资料范围"} pending={libraryDraft!==null} disabled={busy || filePreparing || !!publicUrl} onClick={()=>{setAddPage("scope");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}/>
+          <button type="button" className="agent-current-page agent-secondary-tool" aria-label="添加资料" title="资料：添加、移除与授权范围" disabled={busy || filePreparing || !!publicUrl} onClick={()=>{setAddPage("materials");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}><FileText size={18}/></button>
+          <button type="button" className="agent-current-page agent-secondary-tool" aria-label="添加技能" title="技能：选择本次使用的处理方法" disabled={busy || (!!active && !steerable)} onClick={()=>{setAddPage("skills");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}><WandSparkles size={18} aria-hidden="true"/></button>
+          {textMaterials?.selection&&<button type="button" className="agent-current-page agent-selection-tool" aria-label="添加所选文字" title="添加所选文字（文字快照，不是区块）" disabled={busy||filePreparing||!!view?.work.grant.manifest} onMouseDown={event=>event.preventDefault()} onClick={()=>{addTextMaterial(textMaterials.selection!);textMaterials.clearSelection();}}><Quote size={18}/></button>}
             <AgentAssistantOptions value={(view ? view.assistantOptions || defaultAssistantOptions : assistantOptions)} disabled={busy || !!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
             {active && <button className="agent-send" type="button" aria-label="停止本轮" title="停止本轮" disabled={busy || stopping} onClick={()=>void mutate("cancel")}><Square size={13} fill="currentColor" aria-hidden="true" /></button>}
             {(!active || !!goal.trim() || !!materials.length || !!dropped.length || !!snippets.length || !!imageChanges.addImages.length) && <button className="agent-send" type="submit" aria-label={active?(followupMode==="queue"||!steerable?"排队发送":"追加要求"):saveOnly?"保存补充":view?"发送追问":"开始调查"} aria-keyshortcuts="Control+Enter Meta+Enter" title="发送" disabled={busy || filePreparing || stopping || !!removals.length || (!goal.trim()&&!materials.length&&!dropped.length&&!snippets.length&&!imageChanges.addImages.length)}><ArrowUp size={19} /></button>}

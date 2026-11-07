@@ -17,8 +17,14 @@ fn native_compaction_actual_once() {
         .ok()
         .as_deref()
         == Some("0.166");
-    let batch = std::env::var("HUB_NATIVE_COMPACTION_THREE_BATCHES").ok().as_deref() == Some("1");
-    let closeout = std::env::var("HUB_NATIVE_COMPACTION_CLOSEOUT").ok().as_deref() == Some("1");
+    let batch = std::env::var("HUB_NATIVE_COMPACTION_THREE_BATCHES")
+        .ok()
+        .as_deref()
+        == Some("1");
+    let closeout = std::env::var("HUB_NATIVE_COMPACTION_CLOSEOUT")
+        .ok()
+        .as_deref()
+        == Some("1");
     let out = base.join(if closeout {
         "artifacts/agent-autonomy-closeout-20261105/compaction"
     } else if batch {
@@ -132,8 +138,11 @@ fn native_compaction_actual_once() {
             assert_eq!(lifecycle["hostRequested"], true);
             assert_eq!(lifecycle["completionProven"], true);
             if closeout {
-                let reads = records.iter().filter(|r| r.2 == "toolCall")
-                    .filter(|r| serde_json::from_str::<Value>(&r.3).unwrap()["operation"] == "read").count();
+                let reads = records
+                    .iter()
+                    .filter(|r| r.2 == "toolCall")
+                    .filter(|r| serde_json::from_str::<Value>(&r.3).unwrap()["operation"] == "read")
+                    .count();
                 assert!(reads >= 2, "both turns must obtain current source evidence");
             }
         }
