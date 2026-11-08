@@ -52,6 +52,11 @@ impl<'a> DeliveryRead<'a> {
                     return Err("历史回答授权身份不匹配".into());
                 }
             }
+            if !crate::shared_memory::historical_use_valid(self.root, self.c, &work.id, run)? {
+                return Err(
+                    "这条历史回答使用的共享记忆已被修订、停用或遗忘，请按当前记忆重新核对".into(),
+                );
+            }
             let excerpts: Vec<EvidenceExcerpt> =
                 serde_json::from_value(body["evidence"].clone()).map_err(|_| "调查取证记录损坏")?;
             let candidates: Vec<(EvidenceLocator, crate::source_evidence::EvidenceVersion)> =

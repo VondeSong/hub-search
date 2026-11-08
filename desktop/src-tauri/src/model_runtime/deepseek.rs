@@ -386,7 +386,7 @@ fn run_at(
 ) -> Result<Value, String> {
     run_at_stream(base, secret, body, schema, control, &mut |_| Ok(()))
 }
-// DeepSeek may add empty placeholders or a redundant, verifiable item count.
+// DeepSeek may add null/empty-string placeholders or a redundant, verifiable item count.
 fn canonicalize_completion_placeholders(value: &mut Value, schema: &Value) {
     let Some(contract) = schema.pointer("/properties/report/anyOf/0/properties/completion/anyOf/0")
     else {
@@ -406,8 +406,11 @@ fn canonicalize_completion_placeholders(value: &mut Value, schema: &Value) {
     else {
         return;
     };
-    completion
-        .retain(|field, value| field == "goalBinding" || field == "items" || !value.is_null());
+    completion.retain(|field, value| {
+        field == "goalBinding"
+            || field == "items"
+            || !(value.is_null() || value.as_str() == Some(""))
+    });
     if completion
         .get("itemCount")
         .and_then(Value::as_u64)

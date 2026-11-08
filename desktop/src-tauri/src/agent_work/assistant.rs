@@ -108,6 +108,8 @@ pub(super) fn schema(mut base: Value) -> Value {
     ));
     requests.push(object(json!({"operation":{"type":"string","enum":["goalRevision"]},"request":store::goal::revisions::schema()})));
     requests.push(object(json!({"operation":{"type":"string","enum":["workingState"]},"request":store::working_state::schema()})));
+    requests.push(object(json!({"operation":{"type":"string","enum":["proposeMemory"]},"request":crate::shared_memory::proposals::schema()})));
+    requests.push(object(json!({"operation":{"type":"string","enum":["conversationHistory"]},"before":{"type":["string","null"]},"recordId":{"type":["string","null"]},"startChar":{"type":"integer","minimum":0},"maxChars":{"type":"integer","minimum":1,"maximum":6000}})));
     base["properties"]["report"] = json!({"anyOf":[object(json!({
         "status":{"type":"string","enum":["completed","needsDecision","waiting","insufficientEvidence"]},
         "completion":store::goal::completion::schema(),"markdown":{"type":"string","minLength":1,"maxLength":runner::ANSWER_CHARS},"citations":{"type":"array","items":object(json!({"quoteId":string}))},
@@ -247,6 +249,26 @@ impl Session<'_> {
         }
         let working_state = matches!(&tool, runner::Tool::WorkingState { .. });
         let result = match tool {
+            runner::Tool::ProposeMemory { request } => crate::shared_memory::proposals::propose(
+                self.root,
+                &self.work.id,
+                self.run,
+                &request,
+                self.selection["provider"].as_str().unwrap_or("unknown"),
+            ),
+            runner::Tool::ConversationHistory {
+                before,
+                record_id,
+                start_char,
+                max_chars,
+            } => store::conversation::history(
+                self.root,
+                self.work,
+                before.as_deref(),
+                record_id.as_deref(),
+                start_char,
+                max_chars,
+            ),
             runner::Tool::WorkingState { request } => store::working_state::execute(
                 self.root,
                 self.work,

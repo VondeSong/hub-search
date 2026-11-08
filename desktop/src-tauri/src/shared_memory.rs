@@ -1,6 +1,7 @@
 //! Hub owns confirmation, scope and version eligibility. Basic Memory owns
 //! Markdown materialization and retrieval; its results never grant authority.
 mod backend;
+pub(crate) mod proposals;
 mod runtime;
 #[cfg(test)]
 mod tests;
@@ -57,6 +58,8 @@ pub(crate) fn migrate(c: &Connection) -> Result<(), String> {
             id TEXT PRIMARY KEY,memory_id TEXT NOT NULL REFERENCES memory_entries(id),version INTEGER NOT NULL,
             body_hash TEXT NOT NULL,state TEXT NOT NULL,request_key TEXT NOT NULL UNIQUE,
             request_hash TEXT NOT NULL,confirmation TEXT NOT NULL,UNIQUE(memory_id,version));
+        CREATE TABLE IF NOT EXISTS memory_proposals(id TEXT PRIMARY KEY,memory_id TEXT NOT NULL,project_id TEXT NOT NULL,expected_version INTEGER NOT NULL,body_json TEXT NOT NULL,source_json TEXT NOT NULL,state TEXT NOT NULL,created_at INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS memory_sources(revision_id TEXT PRIMARY KEY,source_json TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS memory_epoch(id INTEGER PRIMARY KEY CHECK(id=1),value INTEGER NOT NULL);
         INSERT OR IGNORE INTO memory_epoch VALUES(1,0);").map_err(|e| e.to_string())
 }
@@ -165,6 +168,13 @@ fn status(root: &Path, work: Option<&str>) -> Result<Value, String> {
     for id in ids {
         let item = load(&c, &id)?;
         let mut value = json!(item);
+        value["updatedAt"] = json!(c
+            .query_row(
+                "SELECT updated_at FROM memory_entries WHERE id=?1",
+                [&item.id],
+                |r| r.get::<_, i64>(0)
+            )
+            .map_err(|e| e.to_string())?);
         match body(root, &item) {
             Ok(content) => value["body"] = json!(content),
             Err(reason) => {
@@ -172,6 +182,20 @@ fn status(root: &Path, work: Option<&str>) -> Result<Value, String> {
                 value["detail"] = json!(reason);
             }
         }
+        let source: Option<String> = c
+            .query_row(
+                "SELECT source_json FROM memory_sources WHERE revision_id=?1",
+                [&item.revision_id],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| e.to_string())?;
+        value["source"] = source
+            .map(|raw| serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null))
+            .unwrap_or(json!({"origin":"legacyUserConfirmed"}));
+        let mut revisions=c.prepare("SELECT v.version,s.source_json FROM memory_versions v LEFT JOIN memory_sources s ON s.revision_id=v.id WHERE v.memory_id=?1 ORDER BY v.version DESC").map_err(|e|e.to_string())?;
+        let history=revisions.query_map([&item.id],|r|Ok((r.get::<_,i64>(0)?,r.get::<_,Option<String>>(1)?))).map_err(|e|e.to_string())?.map(|r|{let(version,source)=r.map_err(|e|e.to_string())?;Ok(json!({"version":version,"source":source.and_then(|raw|serde_json::from_str::<Value>(&raw).ok())}))}).collect::<Result<Vec<Value>,String>>()?;
+        value["history"] = json!(history);
         entries.push(value);
     }
     let mut stmt = c
@@ -198,7 +222,7 @@ fn status(root: &Path, work: Option<&str>) -> Result<Value, String> {
         .flatten();
     let runtime = backend::config(root);
     Ok(
-        json!({"backend":"basicMemory","configured":runtime.is_ok(),"runtimeDetail":runtime.err(),"entries":entries,"projects":projects,
+        json!({"backend":"basicMemory","configured":runtime.is_ok(),"runtimeDetail":runtime.err(),"entries":entries,"proposals":proposals::list(&c,selected.as_ref().and_then(|s|s["projectId"].as_str()).unwrap_or(""))?,"projects":projects,
         "selection":selected.unwrap_or(json!({"projectId":"","enabled":false}))}),
     )
 }
@@ -247,6 +271,7 @@ fn stage(root: &Path, args: &Value) -> Result<Item, String> {
         }
         return load(&c, &old_id);
     }
+    let source = proposals::source(&c, args, &id, expected)?;
     let old = load(&c, &id).ok();
     if old.as_ref().map(|v| v.version).unwrap_or(0) != expected {
         return Err("记忆版本已变化，请刷新后再确认".into());
@@ -299,6 +324,7 @@ fn stage(root: &Path, args: &Value) -> Result<Item, String> {
             ],
         )
         .map_err(|e| e.to_string())?;
+        proposals::accept(c, args, &revision, &source)?;
         bump(c)?;
         load(c, &id)
     })
@@ -470,6 +496,13 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
             let mut service = BasicMemory::start(root, &backend::config(root)?)?;
             publish(root, &item, &mut service)?;
         }
+        "dismissProposal" => {
+            let id = text(args, "proposalId", 100)?;
+            write(root, |c| {
+                c.execute("UPDATE memory_proposals SET state='dismissed' WHERE id=?1 AND state='awaitingConfirmation'",[id]).map_err(|e|e.to_string())?;
+                Ok(())
+            })?;
+        }
         "deactivate" => {
             let id = text(args, "id", 100)?;
             write(root, |c| {
@@ -490,6 +523,9 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
                     [&id],
                 )
                 .map_err(|e| e.to_string())?;
+                c.execute("DELETE FROM memory_proposals WHERE memory_id=?1", [&id])
+                    .map_err(|e| e.to_string())?;
+                c.execute("DELETE FROM memory_sources WHERE revision_id IN (SELECT id FROM memory_versions WHERE memory_id=?1)",[&id]).map_err(|e|e.to_string())?;
                 bump(c)
             })?;
             let mut service = BasicMemory::start(root, &backend::config(root)?)?;
@@ -515,7 +551,15 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
         }
         _ => return Err("未知记忆操作".into()),
     }
-    status(root, work)
+    let mut current = status(root, work)?;
+    if work.is_none() {
+        if let Some(project) = args["projectId"].as_str() {
+            let c = database(root)?;
+            scope(&c, project)?;
+            current["proposals"] = json!(proposals::list(&c, project)?);
+        }
+    }
+    Ok(current)
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -526,6 +570,7 @@ pub(crate) struct Context {
     rules: Vec<Value>,
     decisions: Vec<Value>,
     pub(crate) notice: Option<String>,
+    omissions: Value,
     #[serde(skip)]
     items: Vec<Item>,
 }
@@ -533,7 +578,7 @@ impl Context {
     pub(crate) fn audit(&self) -> Value {
         json!({"epoch":self.epoch,"projectId":self.project_id,
             "items":self.items.iter().map(|i|json!({"id":i.id,"version":i.version,"kind":i.kind,"reason":if i.kind=="rule"{"confirmedRule"}else{"basicMemoryCandidate"}})).collect::<Vec<_>>(),
-            "notice":self.notice,"budgetMethod":"UTF-8 bytes upper bound; each section <=2000 including JSON"})
+            "notice":self.notice,"omissions":self.omissions,"budgetMethod":"UTF-8 bytes upper bound; each section <=2000 including JSON"})
     }
 }
 #[cfg(test)]
@@ -590,6 +635,7 @@ fn select(
         rules: vec![],
         decisions: vec![],
         notice: None,
+        omissions: json!({"notRetrieved":0,"budget":0}),
         items: vec![],
     };
     let mut stmt=c.prepare("SELECT id FROM memory_entries WHERE state='active' AND (project_id='' OR project_id=?1) ORDER BY id").map_err(|e|e.to_string())?;
@@ -614,7 +660,8 @@ fn select(
         }
     }
     if !allowed.is_empty() {
-        let candidates = backend.search(query)?;
+        let allowed_ids: Vec<_> = allowed.keys().cloned().collect();
+        let candidates = backend.search(query, &allowed_ids)?;
         // Retrieval is candidate selection, never a claim that the memory
         // answers the question. The model must check its actual applicability.
         for revision in candidates {
@@ -622,22 +669,67 @@ fn select(
                 continue;
             };
             if result.decisions.len() == 5 {
-                break;
+                result.omissions["budget"] =
+                    json!(result.omissions["budget"].as_u64().unwrap() + 1);
+                continue;
             }
             result.decisions.push(value);
             if serde_json::to_vec(&result.decisions).unwrap().len() > 2000 {
                 result.decisions.pop();
+                result.omissions["budget"] =
+                    json!(result.omissions["budget"].as_u64().unwrap() + 1);
                 continue;
             }
             result.items.push(item);
         }
     }
+    result.omissions["notRetrieved"] = json!(allowed.len());
     if serde_json::to_vec(&result).unwrap().len() > 4000 {
         return Err("共享上下文超过总预算，请缩小范围或精简记忆".into());
     }
     verify(root, &result)?;
     Ok(result)
 }
+/// Historical memory-derived prose cannot reintroduce replaced/withdrawn decisions.
+pub(crate) fn historical_use_valid(
+    root: &Path,
+    c: &Connection,
+    work: &str,
+    run: &str,
+) -> Result<bool, String> {
+    let raw:Option<String>=c.query_row("SELECT body_json FROM agent_records WHERE work_id=?1 AND run_id=?2 AND kind='sharedMemoryUse' ORDER BY rowid DESC LIMIT 1",params![work,run],|r|r.get(0)).optional().map_err(|e|e.to_string())?;
+    let Some(raw) = raw else { return Ok(true) };
+    let audit: Value = serde_json::from_str(&raw).map_err(|_| "历史记忆使用记录损坏")?;
+    let items = audit["items"].as_array().ok_or("历史记忆使用记录缺失")?;
+    if items.is_empty() {
+        return Ok(true);
+    }
+    let selected: Option<String> = c
+        .query_row(
+            "SELECT project_id FROM memory_work_scopes WHERE work_id=?1 AND enabled=1",
+            [work],
+            |r| r.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+    if selected.as_deref() != audit["projectId"].as_str() {
+        return Ok(false);
+    }
+    for used in items {
+        let Some(id) = used["id"].as_str() else {
+            return Ok(false);
+        };
+        let item = load(c, id)?;
+        if item.state != "active"
+            || Some(item.version) != used["version"].as_i64()
+            || body(root, &item).is_err()
+        {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 pub(crate) fn verify(root: &Path, context: &Context) -> Result<(), String> {
     let c = database(root)?;
     let epoch: i64 = c

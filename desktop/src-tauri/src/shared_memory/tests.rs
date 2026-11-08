@@ -1,4 +1,8 @@
 use super::*;
+#[path = "tests/live_continuity.rs"]
+mod live_continuity;
+#[path = "tests/proposals.rs"]
+mod proposal_tests;
 use crate::source_evidence::tests::Fixture;
 
 struct Local {
@@ -26,7 +30,7 @@ impl Backend for Local {
     fn ready(&mut self, id: &str) -> Result<bool, String> {
         Ok(self.visible && path(&self.root, id, false)?.exists())
     }
-    fn search(&mut self, _: &str) -> Result<Vec<String>, String> {
+    fn search(&mut self, _: &str, _: &[String]) -> Result<Vec<String>, String> {
         let p = self.root.join("shared-memory/notes");
         if !p.exists() {
             return Ok(vec![]);

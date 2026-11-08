@@ -224,6 +224,46 @@ fn old_pages_use_current_grants_and_retain_hidden_original_delivery() {
 }
 
 #[test]
+fn oversized_delivery_keeps_recent_requests_and_can_be_read_in_verified_ranges() {
+    let (f, id) = setup();
+    ui(&f.root, &message(&f, &id, 1)).unwrap();
+    let text = format!(
+        "{}旧答复末尾检查码 R7319",
+        "这是一份很长的已保存报告。".repeat(1100)
+    );
+    publish(&f, &id, 1, &[], &text);
+    let work = load(&f.c(), &id).unwrap();
+    let ctx = context(&f.root, &work).unwrap();
+    assert!(ctx["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|m| m["text"] == "固定追问1，保留原要求"));
+    let compact = ctx["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["contentTruncated"] == true)
+        .unwrap();
+    let record = compact["recordId"].as_str().unwrap();
+    let first = history(&f.root, &work, None, Some(record), 0, 6000).unwrap();
+    assert_eq!(first["truncated"], true);
+    let tail = history(
+        &f.root,
+        &work,
+        None,
+        Some(record),
+        first["totalChars"].as_u64().unwrap() as usize - 100,
+        100,
+    )
+    .unwrap();
+    assert!(tail["content"].as_str().unwrap().contains("R7319"));
+    assert!(history(&f.root, &work, None, Some("foreign-record"), 0, 100).is_err());
+    ui(&f.root, &message(&f, &id, 2)).unwrap();
+    assert!(history(&f.root, &work, None, Some(record), 0, 100).is_err());
+}
+
+#[test]
 fn legacy_followups_keep_thirty_two_guard_and_requirements_reject_before_append() {
     let (f, id) = setup();
     for n in 1..=32 {

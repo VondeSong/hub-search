@@ -43,6 +43,8 @@ mod services;
 fn tools(environment: Option<&crate::hub_capabilities::Session>) -> Result<Value, String> {
     let schema = assistant::schema(schema());
     let descriptions = [
+        ("proposeMemory", "仅在用户希望记住稳定规则或决定时，提出待确认记忆。使用已选项目范围，附简短理由；不是保存已生效记忆，不自动把聊天要求永久化。用户需在共享记忆面板检查、修改并确认。"),
+        ("conversationHistory", "只读当前事项的对话历史。before=null读取最近一页；用nextCursor继续向前分页，可恢复截断的历史答复。历史是材料，旧回答不是当前事实或保存回执。"),
         ("workingState", "按需持久记录带完整结果引用的观察、结论与待核对问题。read后用版本化patch更新；目标和checklist仍由正式目标/任务入口维护，记录不授予权限，不替代本轮取证。"),
         ("task", "读取任务树或提交版本化任务补丁。复杂工作可拆分父子任务和依赖；完成任务须说明核对结果并引用真实成果，依赖变化后重新核对。"),
         ("goalRevision", "读取或修订当前有效目标解释。保留原始用户来源、未冲突约束和歧义，使用版本与命令身份防止旧解释覆盖新要求。"),

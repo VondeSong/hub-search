@@ -260,6 +260,62 @@ fn rejected_delivery_gets_bounded_host_feedback_without_new_authority_or_a_new_r
     }
 }
 #[test]
+fn completion_identity_errors_use_the_existing_repair_budget_without_rewriting_ids() {
+    for recover in [true, false] {
+        let f = Fixture::new();
+        f.note("notes", "current", "检查配合条件");
+        let id = create(&f, false);
+        let (work, run) = claim(&f, &id);
+        let mut calls = 0;
+        let result = runner::investigate(&f.root, &work, &run, &Control::default(), |prompt, _| {
+            calls += 1;
+            let material: Value =
+                serde_json::from_str(prompt.split("宿主材料(JSON):\n").nth(1).unwrap()).unwrap();
+            let goal = &material["conversation"]["goalState"];
+            let mut response = report(prompt, "检查配合条件");
+            let items: Vec<_> = goal["requirements"].as_array().unwrap().iter().map(|r| json!({
+                "requirementId":if calls == 1 || !recover {json!("invented-memory-topic")} else {r["requirementId"].clone()},
+                "criterion":"核对已授权原文", "requiredResult":"response","status":"satisfied",
+                "explanation":"模型按真实原文及本轮要求核对，未执行业务写入","refs":[],"supersededBy":null
+            })).collect();
+            response["report"]["completion"] =
+                json!({"goalBinding":goal["goalBinding"],"items":items});
+            if calls > 1 {
+                assert!(prompt.contains("reportRejected"));
+                assert!(prompt.contains("不存在的用户要求"));
+            }
+            Ok(response)
+        });
+        assert_eq!(result.is_ok(), recover);
+        assert_eq!(calls, 2, "only the existing single repair is allowed");
+        assert_eq!(
+            store::view(&f.root, &id).unwrap()["run"]["usage"]["outputRepairs"],
+            1
+        );
+        assert_eq!(
+            f.c()
+                .query_row(
+                    "SELECT COUNT(*) FROM agent_runs WHERE work_id=?1",
+                    [&id],
+                    |r| r.get::<_, i64>(0)
+                )
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            f.c()
+                .query_row(
+                    "SELECT COUNT(*) FROM agent_records WHERE work_id=?1 AND kind='delivery'",
+                    [&id],
+                    |r| r.get::<_, i64>(0)
+                )
+                .unwrap(),
+            i64::from(recover)
+        );
+    }
+}
+
+#[test]
 fn changed_evidence_correction_and_revocation_each_block_old_delivery() {
     for mutation in ["source", "decision", "revoke"] {
         let f = Fixture::new();

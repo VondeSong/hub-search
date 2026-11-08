@@ -122,7 +122,8 @@ pub(in crate::agent_work) fn allow_tool(
         | Tool::ReadSkillReference { .. }
         | Tool::TraceResult { .. }
         | Tool::ToolSchema { .. }
-        | Tool::GoalState {} => true,
+        | Tool::GoalState {}
+        | Tool::ConversationHistory { .. } => true,
         Tool::Chart { request } => {
             matches!(request["action"].as_str(), Some("read" | "validate"))
                 && request["artifactId"] == bound["request"]["artifactId"]

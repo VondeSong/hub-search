@@ -86,7 +86,8 @@ fn empty_completion_placeholders_are_removed_before_strict_stream_validation() {
     let schema = completion_schema();
     let expected = json!({"report":{"completion":{"goalBinding":{"workRevision":3},"items":[{"refs":["actual-proof"],"status":"satisfied"}]}}});
     let mut padded = expected.clone();
-    padded["report"]["completion"]["note"] = Value::Null;
+    padded["report"]["completion"]["note"] = json!("");
+    padded["report"]["completion"]["emptyProviderHint"] = json!("");
     padded["report"]["completion"]["completion"] = Value::Null;
     padded["report"]["completion"]["goalBindingAdditional"] = Value::Null;
     padded["report"]["completion"]["providerPadding"] = Value::Null;
@@ -114,6 +115,7 @@ fn completion_placeholder_compatibility_preserves_all_other_rejections_and_contr
     let valid = json!({"report":{"completion":{"goalBinding":{},"items":[]}}});
     for (field, value) in [
         ("note", json!("not empty")),
+        ("note", json!(" ")),
         ("completion", json!({})),
         ("unknown", json!(false)),
         ("itemCount", json!(1)),
@@ -146,6 +148,15 @@ fn completion_placeholder_compatibility_preserves_all_other_rejections_and_contr
         "never rewrite an unrelated or expanded contract"
     );
     super::super::schema::validate(&candidate, &other).unwrap();
+    let mut strict = schema.clone();
+    strict["properties"]["report"]["anyOf"][0]["properties"]["limitations"] =
+        json!({"type":"array"});
+    strict["properties"]["report"]["anyOf"][0]["required"] = json!(["limitations"]);
+    let mut missing = valid.clone();
+    missing["report"]["completion"]["note"] = json!("");
+    canonicalize_completion_placeholders(&mut missing, &strict);
+    assert!(missing["report"].get("limitations").is_none());
+    assert!(super::super::schema::validate(&missing, &strict).is_err());
     let mut candidate = valid;
     candidate["report"]["note"] = Value::Null;
     canonicalize_completion_placeholders(&mut candidate, &schema);

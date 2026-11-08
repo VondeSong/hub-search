@@ -25,6 +25,7 @@ pub(super) fn requires_structured_delivery(tool: &Tool) -> bool {
             | Tool::TraceResult { .. }
             | Tool::ToolSchema { .. }
             | Tool::GoalState { .. }
+            | Tool::ConversationHistory { .. }
     )
 }
 

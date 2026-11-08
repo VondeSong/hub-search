@@ -284,10 +284,10 @@ fn page_on_cached(
                 projection["references"].clone(),
                 projection["state"].clone(),
             ),
-            Err(_) => (
+            Err(reason) => (
                 Value::Null,
                 Vec::new(),
-                "来源、授权或图表版本证据不可用，历史正文已隐藏".into(),
+                format!("{reason}；历史正文已隐藏"),
                 json!([]),
                 json!("unavailable"),
             ),
@@ -295,6 +295,69 @@ fn page_on_cached(
         messages.push(json!({"id":id,"role":"assistant","runId":run_id,"createdAt":created_at,"revision":revision,"report":report,"evidence":evidence,"validity":validity,"artifactRefs":artifact_refs,"artifactState":artifact_state}));
     }
     Ok(json!({"messages":messages,"hasEarlier":has_earlier,"nextCursor":next_cursor}))
+}
+
+/// Bounded, current-authorization history access, including exact old delivery text.
+pub(in crate::agent_work) fn history(
+    root: &Path,
+    work: &Work,
+    before: Option<&str>,
+    record_id: Option<&str>,
+    start: usize,
+    max: usize,
+) -> Result<Value, String> {
+    if max == 0 || max > 6000 {
+        return Err("历史读取范围须为1至6000字符".into());
+    }
+    let permit = crate::library_runtime::cached_read_permit(root)?;
+    let c = read(root)?;
+    c.execute_batch("BEGIN DEFERRED")
+        .map_err(|e| e.to_string())?;
+    let current = load(&c, &work.id)?;
+    if current.state == "revoked"
+        || current.revision != work.revision
+        || current.authorization_version != work.authorization_version
+    {
+        return Err("事项或来源授权已变化，请刷新".into());
+    }
+    let mut reads = super::delivery_read::DeliveryRead::new(root, &c, &current);
+    let following = if let Some(id) = record_id.filter(|id| *id != format!("{}-goal", work.id)) {
+        let row:i64=c.query_row("SELECT rowid FROM agent_records WHERE work_id=?1 AND id=?2 AND kind IN ('userMessage','userDecision','steering','delivery')",params![work.id,id],|r|r.get(0)).map_err(|_|"历史记录不属于当前事项")?;
+        c.query_row("SELECT id FROM agent_records WHERE work_id=?1 AND rowid>?2 AND kind IN ('userMessage','userDecision','steering','delivery') ORDER BY rowid LIMIT 1",params![work.id,row],|r|r.get::<_,String>(0)).optional().map_err(|e|e.to_string())?
+    } else {
+        None
+    };
+    let page = page_on_cached(
+        &c,
+        &current,
+        &mut reads,
+        if record_id.is_some() {
+            following.as_deref()
+        } else {
+            before
+        },
+    )?;
+    let value = if let Some(id) = record_id {
+        page["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|v| v["id"] == id)
+            .cloned()
+            .ok_or("该历史消息当前不可见")?
+    } else {
+        page.clone()
+    };
+    let text = serde_json::to_string(&value).map_err(|e| e.to_string())?;
+    let total = text.chars().count();
+    if start > total {
+        return Err("历史字符起点超出范围".into());
+    }
+    c.execute_batch("COMMIT").map_err(|e| e.to_string())?;
+    permit.checkpoint()?;
+    Ok(
+        json!({"content":text.chars().skip(start).take(max).collect::<String>(),"startChar":start,"endChar":(start+max).min(total),"totalChars":total,"truncated":start+max<total,"nextCursor":page["nextCursor"],"hasEarlier":page["hasEarlier"],"sourceKind":"conversationHistory","policy":"这是历史材料；旧答复不能证明当前来源有效或业务操作完成。"}),
+    )
 }
 
 #[cfg(test)]
@@ -344,6 +407,15 @@ pub(in crate::agent_work) fn context(root: &Path, work: &Work) -> Result<Value, 
                 item.as_object_mut().unwrap().remove("summary");
             }
         }
+        item["recordId"] = message["id"].clone();
+        if item.to_string().len() > 5000 {
+            let content = item["text"]
+                .as_str()
+                .or_else(|| item["summary"].as_str())
+                .unwrap_or("");
+            item = json!({"role":item["role"],"kind":item["kind"],"recordId":message["id"],"text":content.chars().take(1000).collect::<String>(),"contentTruncated":true,"notice":"历史片段已缩短；需要完整内容时调用 conversationHistory，以 recordId 和字符范围读取。"});
+            omitted = true;
+        }
         let size = item.to_string().len();
         if bytes + size > 16000 {
             omitted = true;
@@ -361,7 +433,7 @@ pub(in crate::agent_work) fn context(root: &Path, work: &Work) -> Result<Value, 
         .find(|m| m["role"] == "user")
         .and_then(|m| m["text"].as_str())
         .unwrap_or(&work.goal);
-    let mut context = json!({"currentRequest":request,"goalState":super::goal::completion::context_on(root,&c,&current)?,"goalBinding":super::goal::binding_on(&c, &current)?,"messages":messages,"earlierMessagesOmitted":omitted,"policy":"普通用户消息是本轮要求，不自动成为确认事实或长期记忆；助手历史回答本身不是事实证据。Hub 笔记的精确编号引用只能选择本轮 quoteCatalog，并核验当前授权和版本，不能沿用历史编号。公开网页来源可复用同一原生会话中已实际读取且仍适用的内容，以具名 HTTPS 链接引用；总结、解释和启示类追问材料足够时直接回答，不为重复引用而联网。新增事实、时效变化、证据冲突、上下文缺失或用户要求复核时再查证。普通延伸追问不等于否定此前事实。"});
+    let mut context = json!({"currentRequest":request,"goalState":super::goal::completion::context_on(root,&c,&current)?,"goalBinding":super::goal::binding_on(&c, &current)?,"messages":messages,"earlierMessagesOmitted":omitted,"historyCursor":conversation["nextCursor"],"handoffPolicy":"当前目标和最新修订以goalState为准；进度与问题见capabilities.workingState，保存以businessActionRecords为准。历史不完整时可调用conversationHistory按页或recordId补读；不得把摘要、助手旧回答或准备中的草稿当作完成事实。","policy":"普通用户消息是本轮要求，不自动成为确认事实或长期记忆；助手历史回答本身不是事实证据。Hub 笔记的精确编号引用只能选择本轮 quoteCatalog，并核验当前授权和版本，不能沿用历史编号。公开网页来源可复用同一原生会话中已实际读取且仍适用的内容，以具名 HTTPS 链接引用；总结、解释和启示类追问材料足够时直接回答，不为重复引用而联网。新增事实、时效变化、证据冲突、上下文缺失或用户要求复核时再查证。普通延伸追问不等于否定此前事实。"});
     super::report_continuation::context_on(root, &c, &current, &mut context)?;
     Ok(context)
 }

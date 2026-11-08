@@ -15,7 +15,7 @@ pub(super) struct RuntimeConfig {
 pub(super) trait Backend {
     fn write(&mut self, revision: &str, body: &str) -> Result<(), String>;
     fn ready(&mut self, revision: &str) -> Result<bool, String>;
-    fn search(&mut self, query: &str) -> Result<Vec<String>, String>;
+    fn search(&mut self, query: &str, allowed: &[String]) -> Result<Vec<String>, String>;
     fn delete(&mut self, revision: &str) -> Result<(), String>;
 }
 
@@ -296,12 +296,19 @@ impl BasicMemory {
         Ok(serde_json::from_str(text).unwrap_or_else(|_| json!({"text":text})))
     }
     fn find(&mut self, query: &str, kind: &str) -> Result<Vec<String>, String> {
-        let result = self.call(
-            "search_notes",
-            json!({"project":"hub","search_all_projects":false,
-            "query":query,"search_type":kind,"entity_types":["entity"],"page_size":100,
-            "min_similarity":0.0,"output_format":"json"}),
-        )?;
+        self.find_scoped(query, kind, None)
+    }
+    fn find_scoped(
+        &mut self,
+        query: &str,
+        kind: &str,
+        allowed: Option<&[String]>,
+    ) -> Result<Vec<String>, String> {
+        let mut args = json!({"project":"hub","search_all_projects":false,"query":query,"search_type":kind,"entity_types":["entity"],"page_size":100,"min_similarity":0.0,"output_format":"json"});
+        if let Some(ids) = allowed {
+            args["metadata_filters"] = json!({"permalink":{"$in":ids}});
+        }
+        let result = self.call("search_notes", args)?;
         let result = result.get("result").unwrap_or(&result);
         let rows = result["results"]
             .as_array()
@@ -332,8 +339,8 @@ impl Backend for BasicMemory {
         }
         Ok(self.find(revision, "vector")?.iter().any(|s| s == revision))
     }
-    fn search(&mut self, query: &str) -> Result<Vec<String>, String> {
-        self.find(query, "vector")
+    fn search(&mut self, query: &str, allowed: &[String]) -> Result<Vec<String>, String> {
+        self.find_scoped(query, "vector", Some(allowed))
     }
     fn delete(&mut self, revision: &str) -> Result<(), String> {
         self.call("delete_note",json!({"identifier":revision,"project":"hub","is_directory":false,"output_format":"json"}))?;
