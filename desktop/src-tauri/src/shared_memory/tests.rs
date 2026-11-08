@@ -65,6 +65,42 @@ fn save(f: &Fixture, b: &mut impl Backend, request: &Value) -> Item {
     load(&f.c(), &item.id).unwrap()
 }
 #[test]
+fn schema_83_upgrade_installs_memory_management_and_preserves_confirmed_entries() {
+    let f = Fixture::new();
+    let mut b = Local::new(&f);
+    let item = save(&f, &mut b, &request("legacy", 0, "保留已确认决定。"));
+    f.c()
+        .execute_batch(
+            "DROP TABLE memory_sources; DROP TABLE memory_proposals;
+        UPDATE metadata SET value='83' WHERE key='schema_version';",
+        )
+        .unwrap();
+    let path = f.root.join("craft-search.sqlite3");
+    for _ in 0..2 {
+        crate::database::forget_initialized_database(&path);
+        let c = crate::database::open_database(&path).unwrap();
+        assert_eq!(
+            c.query_row(
+                "SELECT value FROM metadata WHERE key='schema_version'",
+                [],
+                |r| r.get::<_, String>(0)
+            )
+            .unwrap(),
+            crate::database::DATABASE_SCHEMA_VERSION.to_string()
+        );
+        drop(c);
+        let view = status(&f.root, None).unwrap();
+        assert_eq!(view["entries"][0]["id"], item.id);
+        assert_eq!(view["entries"][0]["body"], "保留已确认决定。");
+        assert_eq!(view["entries"][0]["version"], 1);
+        assert_eq!(
+            view["entries"][0]["source"]["origin"],
+            "legacyUserConfirmed"
+        );
+        assert_eq!(view["proposals"], json!([]));
+    }
+}
+#[test]
 fn immutable_versions_and_idempotent_replay_never_overwrite_accepted_markdown() {
     let f = Fixture::new();
     let mut b = Local::new(&f);

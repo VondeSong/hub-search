@@ -18,7 +18,8 @@ use std::{
 // recovery policies they do not understand. Existing records are not rewritten.
 // Epoch 81 adds fixed method/topic bindings. Older writers must not silently
 // ignore them when continuing work; existing data and budget roots are retained.
-pub(crate) const DATABASE_SCHEMA_VERSION: i64 = 83;
+// Epoch 84 installs memory proposals and provenance for existing epoch 83 databases.
+pub(crate) const DATABASE_SCHEMA_VERSION: i64 = 84;
 #[cfg(test)]
 mod recovery_version_tests;
 static DATABASE_INITIALIZATION_LOCK: Mutex<()> = Mutex::new(());
