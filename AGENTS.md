@@ -17,6 +17,8 @@
 
 ## 项目检查与构建入口
 
+- 界面交互迭代先更新现有 [Hub 站点原型](https://hub-workspace-von11.song02211368537057.chatgpt.site)，供用户体验比较，再按用户明确指令修改本地桌面交互；更新原型不自动启动桌面实现。对齐现有页面时以当前本地实现为依据，示例数据与真实同步能力分别说明。
+
 - 根目录 `package.json` 提供 `npm test`，串联桌面前端测试与 Rust 库测试；`npm run probe:mcp`、`npm run probe:hub-mcp` 为按需使用的本机探针，不视为每次提交的固定检查。
 - `desktop/package.json` 提供完整检查入口：在 `desktop/` 执行 `npm run check`，包含前端测试、Rust 测试、Rust 格式检查及前端构建；按改动影响选择必要检查，不把未运行项写成通过。
 - 桌面便携包入口：在 `desktop/` 执行 `npm run tauri:portable`；已有发布证据脚本为 `desktop/scripts/release.py`，打包与发布时读取其实际约定，不套用其他项目的产物名称或版本号。产品版本以桌面项目的版本配置为准，不把根目录工作区包版本当作发布版本。
