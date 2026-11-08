@@ -3,6 +3,22 @@ import type { CodexSettings, ModelProvider } from "./CodexSuite";
 
 const key = "hub.agent.preferences.v1";
 const modelsKey = "hub.agent.model-preferences.v1";
+const memoryKey = "hub.agent.memory-preferences.v1";
+export type MemorySelection = { projectId: string; enabled: boolean };
+
+export function loadMemoryPreference(): MemorySelection {
+  try {
+    const saved = JSON.parse(localStorage.getItem(memoryKey) || "null");
+    if (saved && typeof saved.projectId === "string" && saved.projectId.length <= 100 && typeof saved.enabled === "boolean") {
+      return { projectId: saved.projectId, enabled: saved.enabled };
+    }
+  } catch { /* Missing or invalid preferences never opt a new chat into memory. */ }
+  return { projectId: "", enabled: false };
+}
+export function rememberMemoryPreference(selection: MemorySelection) {
+  try { localStorage.setItem(memoryKey, JSON.stringify(selection)); }
+  catch { /* The current conversation can still use its explicit selection. */ }
+}
 type ModelPreference = { provider: ModelProvider; model: string; reasoningEffort: string; fast: boolean };
 
 function readModelPreferences(): ModelPreference[] {

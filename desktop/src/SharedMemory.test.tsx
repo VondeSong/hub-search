@@ -3,6 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SharedMemory } from "./SharedMemory";
+import { loadMemoryPreference, rememberMemoryPreference } from "./AgentPreferences";
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
@@ -12,8 +13,55 @@ beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   invoke.mockReset().mockResolvedValue(empty);
+  localStorage.clear();
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
+it("restores draft defaults after remount and remembers manual scope and off changes", async () => {
+  rememberMemoryPreference({projectId:"p1",enabled:true});
+  const view = {...empty, projects:[...empty.projects,{id:"p2",name:"第二项目"}]};
+  invoke.mockResolvedValue(view);
+  async function draft() {
+    await act(async () => root.render(<SharedMemory disabled={false} />));
+    await act(async () => { const details=host.querySelector('details')!; details.open=true; details.dispatchEvent(new Event('toggle')); });
+  }
+  await draft();
+  expect(host.querySelector('select')!.value).toBe('p1');
+  expect(host.querySelector<HTMLInputElement>('[type="checkbox"]')!.checked).toBe(true);
+  await act(async () => { const select=host.querySelector('select')!; select.value='p2'; select.dispatchEvent(new Event('change',{bubbles:true})); });
+  await act(async () => host.querySelector<HTMLInputElement>('[type="checkbox"]')!.click());
+  expect(loadMemoryPreference()).toEqual({projectId:'p2',enabled:false});
+  await act(async () => root.unmount()); root=createRoot(host);
+  await draft();
+  expect(host.querySelector('select')!.value).toBe('p2');
+  expect(host.querySelector<HTMLInputElement>('[type="checkbox"]')!.checked).toBe(false);
+  expect(invoke.mock.calls.every(([,{args}])=>args.action==='status')).toBe(true);
+});
+it("reads an old work without changing defaults and remembers only a successful manual choice", async () => {
+  rememberMemoryPreference({projectId:'p2',enabled:true});
+  invoke.mockImplementation(async (_,{args}) => ({...empty,selection:args.action==='selectScope'?{projectId:args.projectId,enabled:args.enabled}:{projectId:'p1',enabled:false}}));
+  await open();
+  expect(host.querySelector('select')!.value).toBe('p1');
+  expect(loadMemoryPreference()).toEqual({projectId:'p2',enabled:true});
+  await act(async () => host.querySelector<HTMLInputElement>('[type="checkbox"]')!.click());
+  expect(loadMemoryPreference()).toEqual({projectId:'p1',enabled:true});
+  invoke.mockImplementation(async (_,{args}) => {if(args.action==='selectScope') throw new Error('运行中不能修改'); return {...empty,selection:{projectId:'p1',enabled:true}};});
+  await act(async () => host.querySelector<HTMLInputElement>('[type="checkbox"]')!.click());
+  expect(loadMemoryPreference()).toEqual({projectId:'p1',enabled:true});
+  expect(host.textContent).toContain('运行中不能修改');
+});
+it("disables a deleted remembered project and shows a warning without enabling another scope", async () => {
+  rememberMemoryPreference({projectId:'deleted',enabled:true});
+  invoke.mockImplementation(async (_,{args}) => {if(args.projectId==='deleted') throw new Error('请选择已创建的记忆项目'); return empty;});
+  const onSelectionChange=vi.fn();
+  await act(async () => root.render(<SharedMemory disabled={false} onSelectionChange={onSelectionChange} />));
+  await act(async () => {const d=host.querySelector('details')!;d.open=true;d.dispatchEvent(new Event('toggle'));});
+  expect(host.textContent).toContain('上次选择的记忆项目已不可用');
+  expect(host.querySelector('select')!.value).toBe('');
+  expect(host.querySelector<HTMLInputElement>('[type="checkbox"]')!.checked).toBe(false);
+  expect(loadMemoryPreference()).toEqual({projectId:'',enabled:false});
+  expect(onSelectionChange).toHaveBeenLastCalledWith({projectId:'',enabled:false});
+  expect(invoke.mock.calls.every(([,{args}])=>args.action==='status')).toBe(true);
+});
 async function open() {
   await act(async () => root.render(<SharedMemory workId="work-1" disabled={false} />));
   await act(async () => {

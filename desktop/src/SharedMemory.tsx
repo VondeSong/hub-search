@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
+import { loadMemoryPreference, rememberMemoryPreference, type MemorySelection } from "./AgentPreferences";
+export type { MemorySelection } from "./AgentPreferences";
 
 type MemorySource = { origin: string; workId?: string; runId?: string; sourceRecordId?: string; proposedBy?: string; confirmedAt?: number; changeReason?: string };
 type Proposal = { id: string; projectId: string; expectedVersion: number; candidate: { title: string; topicKey: string; kind: "rule" | "decision"; body: string; reason: string }; source: MemorySource };
@@ -12,18 +14,18 @@ type View = {
   configured: boolean; runtimeDetail?: string | null; entries: Entry[]; proposals?: Proposal[]; projects: { id: string; name: string }[];
   selection: { projectId: string; enabled: boolean };
 };
-export type MemorySelection = { projectId: string; enabled: boolean };
 export type MemoryUse = { projectId: string; omissions?: {notRetrieved: number; budget: number}; notice?: string | null; items: { id: string; version: number; kind: string; reason: string }[] };
 const call = (args: Record<string, unknown>) => invoke<View>("shared_memory", { args });
 const states: Record<string, string> = {
   pending: "等待索引核验", active: "已生效", inactive: "已停用", deleting: "已停止使用，正在清除", review: "恢复的历史记忆，需要重新确认",
 };
 
-export function SharedMemory({ workId, disabled, onSelectionChange, usage, compact = false }: { compact?: boolean; workId?: string; disabled: boolean; onSelectionChange?: (selection: MemorySelection) => void; usage?: MemoryUse | null }) {
+export function SharedMemory({ workId, disabled, onSelectionChange, initialSelection, usage, compact = false }: { compact?: boolean; workId?: string; disabled: boolean; initialSelection?: MemorySelection; onSelectionChange?: (selection: MemorySelection) => void; usage?: MemoryUse | null }) {
   const [expanded, setExpanded] = useState(false);
   const [view, setView] = useState<View | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [selectionNotice, setSelectionNotice] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [kind, setKind] = useState<"rule" | "decision">("decision");
@@ -34,25 +36,38 @@ export function SharedMemory({ workId, disabled, onSelectionChange, usage, compa
   const alive = useRef(true);
   const currentWork = useRef(workId); currentWork.current = workId;
   useEffect(() => { setView(null); setEdit(null); setProposal(null); setTitle(""); setBody(""); setChangeReason(""); request.current = null; if (expanded) void perform({ action: "status" }); }, [workId]);
-  const draftSelection = useRef<MemorySelection>({ projectId: "", enabled: false });
+  const draftSelection = useRef<MemorySelection>(initialSelection ?? loadMemoryPreference());
+  if (!workId && initialSelection) draftSelection.current = initialSelection;
+  useEffect(() => {
+    if (!workId && initialSelection) setView(current => current ? { ...current, selection: initialSelection } : current);
+  }, [workId, initialSelection?.projectId, initialSelection?.enabled]);
   // Retain the identity after an interrupted submission. Changed content gets a
   // new request identity; exact retry reconciles the accepted version.
   const request = useRef<{ payload: string; key: string } | null>(null);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  async function perform(args: Record<string, unknown>) {
+  async function perform(args: Record<string, unknown>, rememberSelection = false) {
     setBusy(true); setError("");
     try {
       let next = await call({ ...(!workId ? { projectId: draftSelection.current.projectId } : {}), ...args, workId });
       if (!workId && typeof args.projectId === "string" && args.projectId !== draftSelection.current.projectId) {
         next = await call({ action: "status", projectId: draftSelection.current.projectId });
       }
-      if (alive.current && currentWork.current === workId) {setView(workId ? next : { ...next, selection: draftSelection.current }); if(workId) onSelectionChange?.(next.selection);}
+      if (alive.current && currentWork.current === workId) {setView(workId ? next : { ...next, selection: draftSelection.current }); if(workId) onSelectionChange?.(next.selection); if(rememberSelection) rememberMemoryPreference(next.selection);}
       return true;
     } catch (reason) {
       if (alive.current && currentWork.current === workId) {
         setError(String(reason));
         try {
-          const next = await call({ action: "status", workId, ...(!workId ? { projectId: draftSelection.current.projectId } : {}) });
+          let next = await call({ action: "status", workId });
+          if (!workId && draftSelection.current.projectId && !next.projects.some(project => project.id === draftSelection.current.projectId)) {
+            if (alive.current && currentWork.current === workId) {
+              draftSelection.current = { projectId: "", enabled: false };
+              rememberMemoryPreference(draftSelection.current); onSelectionChange?.(draftSelection.current);
+              setError(""); setSelectionNotice("上次选择的记忆项目已不可用，已关闭记忆。请重新选择范围。");
+            }
+          } else if (!workId && draftSelection.current.projectId) {
+            next = await call({ action: "status", projectId: draftSelection.current.projectId });
+          }
           if (alive.current && currentWork.current === workId) {setView(workId ? next : { ...next, selection: draftSelection.current }); if(workId) onSelectionChange?.(next.selection);}
         } catch { /* Preserve the original failure. */ }
       }
@@ -60,9 +75,11 @@ export function SharedMemory({ workId, disabled, onSelectionChange, usage, compa
     } finally { if (alive.current && currentWork.current === workId) setBusy(false); }
   }
   function select(selection: MemorySelection) {
+    setSelectionNotice("");
     setProposal(null); setEdit(null); setTitle(""); setBody(""); setChangeReason(""); request.current = null;
-    if (workId) { void perform({ action: "selectScope", ...selection }); return; }
+    if (workId) { void perform({ action: "selectScope", ...selection }, true); return; }
     draftSelection.current = selection;
+    rememberMemoryPreference(selection);
     setView(current => current ? { ...current, selection } : current);
     onSelectionChange?.(selection);
     void perform({ action: "status", projectId: selection.projectId });
@@ -89,6 +106,8 @@ export function SharedMemory({ workId, disabled, onSelectionChange, usage, compa
     <summary>{compact && view ? `记忆 · ${view.selection.enabled ? "已启用" : "未启用"}` : "共享记忆"}{view?.proposals?.length ? ` · ${view.proposals.length} 条待确认` : ""}</summary>
     {expanded && <>
       <p className="agent-note">保存你确认的规则与决定，供其他调查复用。个人通用记忆适用于所有启用记忆的事项，项目记忆只在所选项目内使用。</p>
+      <p className="agent-note">新聊天会沿用你最后选择的记忆范围和开关；记忆内容仍需确认保存。</p>
+      {selectionNotice && <p role="status">{selectionNotice}</p>}
       {!view && busy && <p role="status">正在准备本地记忆，首次使用可能需要一点时间…</p>}
       {view && <>
         <button type="button" disabled={blocked} onClick={() => void perform({ action: "status" })}>刷新记忆</button>

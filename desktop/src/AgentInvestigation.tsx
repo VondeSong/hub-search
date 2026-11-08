@@ -1,5 +1,5 @@
 import {AgentFollowups,type Followup} from "./AgentFollowups";
-import { loadAgentPreferences, rememberAgentPreferences } from "./AgentPreferences";
+import { loadAgentPreferences, rememberAgentPreferences, loadMemoryPreference, rememberMemoryPreference } from "./AgentPreferences";
 import { AgentCitationContext, AgentBrowsingContext, AgentPanelContext,AgentAccountVisibleContext,AgentTextMaterialContext,type TextMaterial } from "./StandaloneAgentLauncher";
 import {AgentMaterialCard} from "./AgentMaterialCard";
 import {AgentConversationHistory,type WorkSummary,type HistoryChange} from "./AgentConversationHistory";
@@ -200,7 +200,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const canEditNote=pageCanEditNote && sameNoteAnchor(anchor,pageAnchor) && (pageAttached || !!view);
   const hasDraftSources=selectedLibraries.length>0 || pageAttached || materials.length>0 || dropped.length>0 || snippets.length>0;
   const [removals, setRemovals] = useState<NoteLocator[]>([]);
-  const [memorySelection, setMemorySelection] = useState<MemorySelection>({ projectId: "", enabled: false });
+  const [memorySelection, setMemorySelection] = useState<MemorySelection>(loadMemoryPreference);
   const [mode, setMode] = useState("quick");
   const [draftOptions,setAssistantOptions]=useState<AssistantOptions>(loadAgentPreferences);
   const runtime = useCodexSuite();
@@ -665,6 +665,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     }
     setBusy(true); setError("");
     try {
+      await checkDraftMemory();
       const grant=buildDraftGrant();
       let value = publicUrl.trim() ? await call<View>({action:"createFromPublicUrl",url:publicUrl.trim(),goal:goal.trim(),confirmedPublicRead:true}) : await call<View>({ action: "create", goal: messageText, successCriteria: "", anchor, grant });
       if (!alive.current) return;
@@ -675,7 +676,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       // Bind the user's preflight selection before the first model call. A
       // failed binding leaves a visible ready work and never starts a model.
       if (assistantOptions.model || assistantOptions.autoFlashcardInbox || assistantOptions.externalMcp || assistantOptions.webSearch || assistantOptions.mcpServices?.length) await call<View>({action:"configureAssistant",id:value.work.id,options:assistantOptions,confirmedAutoInbox:assistantOptions.autoFlashcardInbox});
-      if (memorySelection.enabled) await invoke("shared_memory", { args: { action: "selectScope", workId: value.work.id, ...memorySelection } });
+      if (memorySelection.enabled || memorySelection.projectId) await invoke("shared_memory", { args: { action: "selectScope", workId: value.work.id, ...memorySelection } });
       const addNotes=!anchor?materials.map(m=>m.locator):[];
       const addSources=!anchor?dropped.map(m=>m.locator):[];
       if(snapshots||imagesChanged||addNotes.length||addSources.length||libraryDraft!==null){
@@ -689,15 +690,26 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     } catch (reason) { if (alive.current) setError(String(reason)); }
     finally { if (alive.current) setBusy(false); }
   };
+  async function checkDraftMemory() {
+    if (!memorySelection.enabled && !memorySelection.projectId) return;
+    const status = await invoke<{configured: boolean; runtimeDetail?: string; projects: {id: string}[]}>("shared_memory", { args: { action: "status" } });
+    if (memorySelection.projectId && !status.projects.some(project => project.id === memorySelection.projectId)) {
+      const fallback = { projectId: "", enabled: false };
+      setMemorySelection(fallback); rememberMemoryPreference(fallback);
+      throw new Error("上次选择的记忆项目已不可用，已关闭记忆。请确认范围后重新发送。");
+    }
+    if (memorySelection.enabled && !status.configured) throw new Error(status.runtimeDetail || "本地记忆尚未就绪，请打开记忆面板检查后重试。");
+  }
   const createSourceScope = async (selection:SourceSelection, expectedManifest:string) => {
     if (busy || view || !goal.trim()) return;
     setBusy(true); setError("");
     try {
+      await checkDraftMemory();
       const value=await call<View>({action:"createWithSourceScope",selection,expectedManifest,anchor,goal:goal.trim(),successCriteria:"依据固定范围回答问题，说明覆盖、出处和局限；未读取或未抽取的材料不能算作已处理。"});
       if(!alive.current)return;
       setView(value);void reloadWorks();setGoal("");setMaterials([]);setDropped([]);setRemovals([]);
       if(assistantOptions.model || assistantOptions.autoFlashcardInbox || assistantOptions.externalMcp || assistantOptions.webSearch || assistantOptions.mcpServices?.length) await call<View>({action:"configureAssistant",id:value.work.id,options:assistantOptions,confirmedAutoInbox:assistantOptions.autoFlashcardInbox});
-      if(memorySelection.enabled) await invoke("shared_memory",{args:{action:"selectScope",workId:value.work.id,...memorySelection}});
+      if(memorySelection.enabled || memorySelection.projectId) await invoke("shared_memory",{args:{action:"selectScope",workId:value.work.id,...memorySelection}});
     } catch(reason) {if(alive.current)setError(String(reason));throw reason;}
     finally {if(alive.current)setBusy(false);}
   };
@@ -835,7 +847,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   };
   const newInvestigation = (preserveHistory=false) => {
     sequence.current++; setLibraryDraft(null); setView(null); setPublicUrl(""); setAssistantOptions(loadAgentPreferences()); setGoal(""); setWholeLibrary(false); setMaterials([]);setDropped([]);setSnippets([]);setImageDraft(null); setRemovals([]);
-    setMemorySelection({ projectId: "", enabled: false }); setConfirmMessage(false); setError("");  setSourcePreview(null); setSourceError(""); setSourceLoading(false); sourceSequence.current++; messageIdentity.current=null;
+    setMemorySelection(loadMemoryPreference()); setConfirmMessage(false); setError("");  setSourcePreview(null); setSourceError(""); setSourceLoading(false); sourceSequence.current++; messageIdentity.current=null;
     setDraftRevision(value => value + 1);
     setPageAttached(!!pageAnchor);boundMaterial.current=null;clearSourcePreview();
     // Deleting the displayed chat keeps the history menu mounted so undo remains available.
@@ -913,7 +925,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
             {onTopicBack&&<button type="button" disabled={busy||!!active} onClick={onTopicBack}><ArrowLeft size={16}/>返回专题所在工作</button>}
           </div>
           {anchor?.kind==="note"&&canEditNote&&<AgentTopics key={`topics-${view?.work.id||draftRevision}`} anchor={anchor} work={view?.work} disabled={businessDisabled||!!active} onOpenWork={async (id,source,draft)=>{if(source&&!sameNoteAnchor(source.anchor,anchor)){if(!onOpenTopicWork)throw new Error("此入口尚不支持跨笔记继续，请从本期笔记打开原工作");onOpenTopicWork(id,source,view?.work.id,draft);return;}setLibraryDraft(null);setError("");setGoal("");setMaterials([]);setDropped([]);setRemovals([]);setSourcePreview(null);sourceSequence.current++;await refresh(id);if(alive.current){void reloadWorks();if(draft){setGoal(draft);goalInput.current?.focus();}}}}/>}
-          <SharedMemory key={'details-memory-'+(view?.work.id || draftRevision)} compact workId={view?.work.id} disabled={busy || !!active} onSelectionChange={setMemorySelection} usage={view?.memoryUse}/>
+          <SharedMemory key={'details-memory-'+(view?.work.id || draftRevision)} compact workId={view?.work.id} initialSelection={memorySelection} disabled={busy || !!active} onSelectionChange={setMemorySelection} usage={view?.memoryUse}/>
           {conversationDetails}
         <details ref={workControls} className="agent-work-controls"><summary>用量与任务{controlsNeedAttention ? " · 需要处理" : ""}</summary>
         {view && view.work.state!=="revoked" ? <>

@@ -1,7 +1,26 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { loadAgentModelPreference, loadAgentPreferences, rememberAgentModelPreference, rememberAgentPreferences } from "./AgentPreferences";
+import { loadAgentModelPreference, loadAgentPreferences, rememberAgentModelPreference, rememberAgentPreferences, loadMemoryPreference, rememberMemoryPreference } from "./AgentPreferences";
 beforeEach(()=>localStorage.clear());
+it("remembers memory scope and both toggle states without model-specific storage", () => {
+ expect(loadMemoryPreference()).toEqual({projectId:"",enabled:false});
+ rememberMemoryPreference({projectId:"p1",enabled:true});
+ expect(loadMemoryPreference()).toEqual({projectId:"p1",enabled:true});
+ rememberMemoryPreference({projectId:"p2",enabled:false});
+ expect(loadMemoryPreference()).toEqual({projectId:"p2",enabled:false});
+ rememberMemoryPreference({projectId:"",enabled:true});
+ expect(loadMemoryPreference()).toEqual({projectId:"",enabled:true});
+});
+it.each(['broken','{"projectId":"p1","enabled":"true"}','{"enabled":true}','null'])("does not opt into memory from invalid preferences (%s)", saved => {
+ localStorage.setItem("hub.agent.memory-preferences.v1",saved);
+ expect(loadMemoryPreference()).toEqual({projectId:"",enabled:false});
+});
+it("keeps new chats opted out when preference storage is unavailable", () => {
+ vi.spyOn(Storage.prototype,"getItem").mockImplementation(()=>{throw new Error("Unavailable");});
+ vi.spyOn(Storage.prototype,"setItem").mockImplementation(()=>{throw new Error("Unavailable");});
+ expect(loadMemoryPreference()).toEqual({projectId:"",enabled:false});
+ expect(()=>rememberMemoryPreference({projectId:"p1",enabled:true})).not.toThrow();
+});
 afterEach(()=>vi.restoreAllMocks());
 it("starts new chats with live search and no inherited grants",()=>{
  expect(loadAgentPreferences()).toEqual({model:null,autoFlashcardInbox:false,webSearch:"live"});

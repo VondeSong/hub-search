@@ -130,6 +130,7 @@ beforeEach(() => {
   resetCodexAccountsForTests();
   sessionStorage.clear();
   localStorage.removeItem("hub.agent.preferences.v1");
+  localStorage.removeItem("hub.agent.memory-preferences.v1");
   localStorage.removeItem("hub.agent.panel.width.v1");
   localStorage.removeItem("hub.agent.panel.height.v1");
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -851,6 +852,7 @@ it("mounts the assistant independently and toggles the sidebar without replacing
 });
 it("binds preflight memory before the first model call and stops if binding fails", async () => {
   for (const reject of [false, true]) {
+    localStorage.removeItem('hub.agent.memory-preferences.v1');
     await act(async () => root.unmount()); root = createRoot(host);
     invoke.mockReset().mockImplementation(async (command, { args }) => {
       if (command === 'shared_memory') {
@@ -2036,6 +2038,56 @@ it("keeps history and menu sections visible when there are no saved conversation
 });
 
 
+it.each(["codex","deepseek"])("binds inherited memory before the first model call without opening its panel (%s)",async provider=>{
+ const memory={projectId:'p1',enabled:true};
+ localStorage.setItem('hub.agent.memory-preferences.v1',JSON.stringify(memory));
+ localStorage.setItem('hub.agent.preferences.v1',JSON.stringify({model:{provider,model:'fixture-model',reasoningEffort:'medium',fast:false,maxConcurrent:2}}));
+ const original=invoke.getMockImplementation()!;
+ invoke.mockImplementation(async(command,p)=>command==='shared_memory'?{configured:true,projects:[{id:'p1'}],selection:memory}:original(command,p));
+ await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
+ await fill('investigationGoal','使用已确认项目记忆');await click('开始调查');
+ const calls=invoke.mock.calls;
+ const preflight=calls.findIndex(([c,p])=>c==='shared_memory'&&p.args.action==='status');
+ const create=calls.findIndex(([,p])=>p.args.action==='create');
+ const bind=calls.findIndex(([c,p])=>c==='shared_memory'&&p.args.action==='selectScope');
+ const respond=calls.findIndex(([,p])=>p.args.action==='respond');
+ expect(preflight).toBeGreaterThanOrEqual(0);expect(create).toBeGreaterThan(preflight);expect(bind).toBeGreaterThan(create);expect(respond).toBeGreaterThan(bind);
+ expect(calls[bind][1].args).toMatchObject({...memory,workId:'work-1'});
+ expect(localStorage.getItem('hub.agent.memory-preferences.v1')).toBe(JSON.stringify(memory));
+});
+it("new-chat reset reloads defaults and keeps the remembered off state",async()=>{
+ localStorage.setItem('hub.agent.memory-preferences.v1',JSON.stringify({projectId:'p1',enabled:false}));
+ const original=invoke.getMockImplementation()!;
+ invoke.mockImplementation(async(command,p)=>command==='shared_memory'?{configured:true,projects:[{id:'p1'}]}:original(command,p));
+ await open();await click('新对话');
+ await fill('investigationGoal','不开启记忆的新问题');await click('开始调查');
+ expect(invoke.mock.calls.some(([,p])=>p.args.action==='respond')).toBe(true);
+ expect(invoke.mock.calls.find(([c,p])=>c==='shared_memory'&&p.args.action==='selectScope')?.[1].args).toMatchObject({projectId:'p1',enabled:false});
+});
+it.each(['deleted','unavailable'])("blocks a new model call when remembered memory is %s",async condition=>{
+ localStorage.setItem('hub.agent.memory-preferences.v1',JSON.stringify({projectId:'p1',enabled:true}));
+ const original=invoke.getMockImplementation()!;
+ invoke.mockImplementation(async(command,p)=>command==='shared_memory'?{configured:condition!=='unavailable',projects:condition==='deleted'?[]:[{id:'p1'}]}:original(command,p));
+ await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
+ await fill('investigationGoal','检查默认记忆');await click('开始调查');
+ expect(invoke.mock.calls.some(([,p])=>['create','respond','selectScope'].includes(p.args.action))).toBe(false);
+ expect(document.body.textContent).toContain(condition==='deleted'?'上次选择的记忆项目已不可用':'本地记忆尚未就绪');
+ if(condition==='deleted')expect(JSON.parse(localStorage.getItem('hub.agent.memory-preferences.v1')!)).toEqual({projectId:'',enabled:false});
+});
+it("does not start a model if inherited memory binding fails after preflight",async()=>{
+ localStorage.setItem('hub.agent.memory-preferences.v1',JSON.stringify({projectId:'p1',enabled:true}));
+ const original=invoke.getMockImplementation()!;
+ invoke.mockImplementation(async(command,p)=>{
+   if(command!=='shared_memory')return original(command,p);
+   if(p.args.action==='selectScope')throw new Error('记忆范围绑定失败');
+   return {configured:true,projects:[{id:'p1'}]};
+ });
+ await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
+ await fill('investigationGoal','绑定失败测试');await click('开始调查');
+ expect(invoke.mock.calls.some(([,p])=>p.args.action==='create')).toBe(true);
+ expect(invoke.mock.calls.some(([,p])=>p.args.action==='respond')).toBe(false);
+ expect(document.body.textContent).toContain('记忆范围绑定失败');
+});
 it.each(["codex","deepseek"])("new chats apply remembered model preferences and supported search (%s)",async provider=>{
  const model={provider,model:"remembered-model",reasoningEffort:"high",fast:true,maxConcurrent:2};
  localStorage.setItem("hub.agent.preferences.v1",JSON.stringify({model,webSearch:"live",autoFlashcardInbox:true,externalMcp:true}));
