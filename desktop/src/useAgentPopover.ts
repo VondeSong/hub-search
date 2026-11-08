@@ -16,6 +16,8 @@ export function useAgentPopover(options: { deferEscapeSelector?: string } = {}) 
   }
   useEffect(() => {
     if (!element) return;
+    // Padding clicks keep a focus owner inside the disclosure for Escape.
+    if (!element.hasAttribute("tabindex")) element.tabIndex = -1;
     const outside = (event: Event) => {
       if (event.target instanceof Node && !ref.current?.contains(event.target)) close();
     };

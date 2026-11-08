@@ -1875,6 +1875,16 @@ it("shows history as selectable rows instead of an overflowing native select",as
  expect(document.querySelector(".agent-conversations select")).toBeNull();
  expect(document.querySelectorAll(".agent-history-row")).toHaveLength(1);
 });
+it("keeps Escape inside a focused disclosure surface without closing the assistant",async()=>{
+ await open();const menu=document.querySelector<HTMLDetailsElement>('.agent-dialogue-details')!,panel=document.querySelector<HTMLElement>('.agent-panel')!;
+ await act(async()=>{menu.querySelector('summary')!.focus();menu.open=true;menu.dispatchEvent(new Event('toggle'));});
+ // Model the browser focus owner after clicking non-interactive menu padding.
+ await act(async()=>menu.focus());
+ expect(document.activeElement).toBe(menu);
+ await act(async()=>document.activeElement!.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})));
+ expect(menu.open).toBe(false);expect(panel.hidden).toBe(false);
+ expect(document.activeElement).toBe(menu.querySelector('summary'));
+});
 it("dismisses header details after outside interaction or losing window focus without closing the assistant",async()=>{
  await open();const menu=document.querySelector<HTMLDetailsElement>('.agent-dialogue-details')!,panel=document.querySelector<HTMLElement>('.agent-panel')!;
  const show=()=>act(async()=>{menu.querySelector('summary')!.focus();menu.open=true;menu.dispatchEvent(new Event('toggle'));});
