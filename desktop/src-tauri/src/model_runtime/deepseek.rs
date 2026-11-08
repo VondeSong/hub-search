@@ -386,6 +386,42 @@ fn run_at(
 ) -> Result<Value, String> {
     run_at_stream(base, secret, body, schema, control, &mut |_| Ok(()))
 }
+// DeepSeek may add empty placeholders or a redundant, verifiable item count.
+fn canonicalize_completion_placeholders(value: &mut Value, schema: &Value) {
+    let Some(contract) = schema.pointer("/properties/report/anyOf/0/properties/completion/anyOf/0")
+    else {
+        return;
+    };
+    if contract["type"] != "object"
+        || contract["additionalProperties"] != false
+        || !contract["properties"].as_object().is_some_and(|p| {
+            p.len() == 2 && p.contains_key("goalBinding") && p.contains_key("items")
+        })
+    {
+        return;
+    }
+    let Some(completion) = value
+        .pointer_mut("/report/completion")
+        .and_then(Value::as_object_mut)
+    else {
+        return;
+    };
+    completion
+        .retain(|field, value| field == "goalBinding" || field == "items" || !value.is_null());
+    if completion
+        .get("itemCount")
+        .and_then(Value::as_u64)
+        .is_some_and(|count| {
+            completion
+                .get("items")
+                .and_then(Value::as_array)
+                .is_some_and(|items| count == items.len() as u64)
+        })
+    {
+        completion.remove("itemCount");
+    }
+}
+
 fn run_at_stream(
     base: &str,
     secret: &str,
@@ -427,7 +463,8 @@ fn run_at_stream(
         if status != 200 {
             return Err(http_error(status).into());
         }
-        let value = parse_response(&bytes, &mut receipt)?;
+        let mut value = parse_response(&bytes, &mut receipt)?;
+        canonicalize_completion_placeholders(&mut value, schema);
         super::schema::validate(&value, schema)?;
         control.check()?;
         Ok(value)

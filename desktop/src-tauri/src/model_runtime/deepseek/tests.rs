@@ -71,6 +71,87 @@ fn fixture_parts_held(
     });
     (url, join)
 }
+fn completion_schema() -> Value {
+    json!({"type":"object","additionalProperties":false,"properties":{"report":{"anyOf":[
+        {"type":"object","additionalProperties":false,"properties":{"completion":{"anyOf":[
+            {"type":"object","additionalProperties":false,"required":["goalBinding","items"],
+             "properties":{"goalBinding":{"type":"object"},"items":{"type":"array"}}},
+            {"type":"null"}
+        ]}}},{"type":"null"}
+    ]}}})
+}
+
+#[test]
+fn empty_completion_placeholders_are_removed_before_strict_stream_validation() {
+    let schema = completion_schema();
+    let expected = json!({"report":{"completion":{"goalBinding":{"workRevision":3},"items":[{"refs":["actual-proof"],"status":"satisfied"}]}}});
+    let mut padded = expected.clone();
+    padded["report"]["completion"]["note"] = Value::Null;
+    padded["report"]["completion"]["completion"] = Value::Null;
+    padded["report"]["completion"]["goalBindingAdditional"] = Value::Null;
+    padded["report"]["completion"]["providerPadding"] = Value::Null;
+    padded["report"]["completion"]["itemCount"] = json!(1);
+    assert!(super::super::schema::validate(&padded, &schema).is_err());
+    let (url, server) = fixture(200, response(&padded.to_string(), "stop"), Duration::ZERO);
+    let result = run_at(
+        &url,
+        "fixture-secret",
+        &json!({}),
+        &schema,
+        &Control::default(),
+    )
+    .unwrap();
+    server.join().unwrap();
+    assert_eq!(
+        result, expected,
+        "binding, requirements and proof references must remain exact"
+    );
+}
+
+#[test]
+fn completion_placeholder_compatibility_preserves_all_other_rejections_and_contracts() {
+    let schema = completion_schema();
+    let valid = json!({"report":{"completion":{"goalBinding":{},"items":[]}}});
+    for (field, value) in [
+        ("note", json!("not empty")),
+        ("completion", json!({})),
+        ("unknown", json!(false)),
+        ("itemCount", json!(1)),
+        ("itemCount", json!("0")),
+        ("itemCount", json!(-1)),
+    ] {
+        let mut candidate = valid.clone();
+        candidate["report"]["completion"][field] = value;
+        let original = candidate.clone();
+        canonicalize_completion_placeholders(&mut candidate, &schema);
+        assert_eq!(candidate, original);
+        assert!(super::super::schema::validate(&candidate, &schema).is_err());
+    }
+    let mut wrong_binding = valid.clone();
+    wrong_binding["report"]["completion"]["goalBinding"] = Value::Null;
+    wrong_binding["report"]["completion"]["note"] = Value::Null;
+    canonicalize_completion_placeholders(&mut wrong_binding, &schema);
+    assert!(wrong_binding["report"]["completion"]["goalBinding"].is_null());
+    assert!(super::super::schema::validate(&wrong_binding, &schema).is_err());
+    let mut other = schema.clone();
+    other
+        .pointer_mut("/properties/report/anyOf/0/properties/completion/anyOf/0/properties")
+        .unwrap()["note"] = json!({"type":"null"});
+    let mut candidate = valid.clone();
+    candidate["report"]["completion"]["note"] = Value::Null;
+    let original = candidate.clone();
+    canonicalize_completion_placeholders(&mut candidate, &other);
+    assert_eq!(
+        candidate, original,
+        "never rewrite an unrelated or expanded contract"
+    );
+    super::super::schema::validate(&candidate, &other).unwrap();
+    let mut candidate = valid;
+    candidate["report"]["note"] = Value::Null;
+    canonicalize_completion_placeholders(&mut candidate, &schema);
+    assert!(super::super::schema::validate(&candidate, &schema).is_err());
+}
+
 fn json_response(content: &str, reason: &str) -> String {
     json!({"model":"deepseek-flash","choices":[{"finish_reason":reason,"message":{"content":content,"reasoning_content":"PRIVATE_REASONING"}}],"usage":{"prompt_tokens":29,"completion_tokens":8,"total_tokens":37}}).to_string()
 }
