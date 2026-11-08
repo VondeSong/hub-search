@@ -8,11 +8,14 @@ import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { localJournalDate, type JournalViewConfig } from "./JournalViews";
 import type { LibrarySummary } from "./SearchTypes";
 import "./QuickJournal.css";
+import { openCloudSyncSettings } from "./CloudSyncEvents";
 
 type Attachment = { hash: string; name: string; size: number; image: boolean };
 type Record = { version: 1; id: string; date: string; text: string; attachments: Attachment[] };
 type Item = { record: Record; body: string; uploaded: boolean; applied: boolean; libraryId: string; path: string; namespace: string; sourceError?: string };
-type Settings = { libraryId: string; folder: string; sync: boolean };
+type Settings = { libraryId: string; folder: string; sync: boolean; dateFolders: boolean };
+type SyncReport = { pendingUpload: number; awaitingOs: number; written: number };
+type SettingsResult = { settings: Settings; mobile: boolean; error: string; cloudEnabled?: boolean; autoSync?: boolean };
 const blank = (): Record => ({ version: 1, id: crypto.randomUUID().replace(/-/g, ""), date: localJournalDate(), text: "", attachments: [] });
 const message = (e: unknown) => String(e);
 function Image({ hash, name }: { hash: string; name: string }) {
@@ -50,7 +53,10 @@ function Card({ item, mobile }: { item: Item; mobile: boolean }) {
 export function QuickJournal({ libraries, scope, view, dataVersion }: { libraries: LibrarySummary[]; scope: string[] | null; view: JournalViewConfig; dataVersion: string }) {
   const [draft, setDraft] = useState<Record>(blank), [ready, setReady] = useState(false), [saving, setSaving] = useState(false), [uploading, setUploading] = useState(false);
   const [items, setItems] = useState<Item[]>([]), [error, setError] = useState(""), [notice, setNotice] = useState(""), [busy, setBusy] = useState(false);
-  const [mobile, setMobile] = useState(false), [settings, setSettings] = useState<Settings>({ libraryId: "", folder: "Journals", sync: false }), [settingsReady, setSettingsReady] = useState(false);
+  const [mobile, setMobile] = useState(false), [settings, setSettings] = useState<Settings>({ libraryId: "", folder: "Journals", sync: false, dateFolders: true }), [settingsReady, setSettingsReady] = useState(false);
+  const [savedSettings, setSavedSettings] = useState<Settings | null>(null), [settingsOpen, setSettingsOpen] = useState(false);
+  const [cloud, setCloud] = useState<{ enabled?: boolean; auto?: boolean }>({});
+  const settingsDirty = savedSettings !== null && (settings.libraryId !== savedSettings.libraryId || settings.folder !== savedSettings.folder || settings.sync !== savedSettings.sync || settings.dateFolders !== savedSettings.dateFolders);
   const [limit, setLimit] = useState(50), [tag, setTag] = useState("");
   const draftWrites = useRef(Promise.resolve()), draftLatest = useRef(draft), fileInput = useRef<HTMLInputElement>(null), mounted = useRef(true);
   const persist = (value: Record) => {
@@ -65,15 +71,39 @@ export function QuickJournal({ libraries, scope, view, dataVersion }: { librarie
   useEffect(() => {
     mounted.current = true;
     void invoke<string>("get_quick_journal_draft").then(raw => { if (!mounted.current) return; if (raw) { const saved = JSON.parse(raw) as Record; if (saved.version !== 1 || !Array.isArray(saved.attachments)) throw new Error("草稿格式无法识别"); setDraft(saved); draftLatest.current = saved; } setReady(true); }).catch(e => setError(message(e)));
-    void invoke<{ settings: Settings; mobile: boolean; error: string }>("get_quick_journal_settings").then(v => { if (mounted.current) { setSettings(v.settings); setMobile(v.mobile); setSettingsReady(true); } }).catch(e => setError(message(e)));
+    void invoke<SettingsResult>("get_quick_journal_settings").then(v => { if (mounted.current) {
+      const value = { ...v.settings, dateFolders: v.settings.dateFolders ?? false };
+      setSettings(value); setSavedSettings(value); setMobile(v.mobile); setSettingsReady(true);
+      setCloud({ enabled: v.cloudEnabled, auto: v.autoSync });
+      if (!value.sync || (!v.mobile && !value.libraryId)) setSettingsOpen(true);
+    } }).catch(e => setError(message(e)));
     return () => { mounted.current = false; };
   }, []);
   useEffect(() => { void refresh().catch(e => setError(message(e))); const timer = setInterval(() => { void refresh().catch(e => setError(message(e))); }, 15000); return () => clearInterval(timer); }, [dataVersion]);
   useEffect(() => { setLimit(50); }, [view.query, view.period, view.day, view.month, tag, scope, view.libraries]);
-  async function sync() {
+  async function sync(manual = true) {
+    if (busy || !settingsReady) return;
+    if (!manual && (!savedSettings?.sync || settingsDirty)) return;
+    if (settingsDirty) { setError("速记设置有未保存的修改，请先点击“保存设置”"); setSettingsOpen(true); return; }
     setBusy(true); setError("");
-    try { await invoke("sync_quick_journal"); await refresh(); }
-    catch (e) { setError(message(e)); } finally { setBusy(false); }
+    if (manual) setNotice("");
+    try {
+      const report = await invoke<SyncReport | null>("sync_quick_journal");
+      if (manual) setNotice(report ? `本轮同步已结束。本机队列：待上传 ${report.pendingUpload} 条，等待电脑写入 ${report.awaitingOs} 条，已确认写入 OS ${report.written} 条。` : "同步请求已结束，请查看卡片状态。");
+    } catch (e) { setError(message(e)); setSettingsOpen(true); }
+    finally {
+      await refresh().catch(e => setError(message(e)));
+      await invoke<SettingsResult>("get_quick_journal_settings").then(v => setCloud({ enabled: v.cloudEnabled, auto: v.autoSync })).catch(() => {});
+      setBusy(false);
+    }
+  }
+  async function saveSettings() {
+    setBusy(true); setError(""); setNotice("");
+    const value = { ...settings };
+    try {
+      const result = await invoke<{ warning?: string } | null>("save_quick_journal_settings", { value });
+      setSavedSettings(value); setNotice(result?.warning ? `设置已保存，后台任务安排失败：${result.warning}。可先手动同步。` : "设置已保存。可以点击“同步 / 重试”检查结果。");
+    } catch (e) { setError(message(e)); } finally { setBusy(false); }
   }
   async function save() {
     if (saving || uploading || !ready) return;
@@ -85,7 +115,7 @@ export function QuickJournal({ libraries, scope, view, dataVersion }: { librarie
       setNotice(result.warning || `已保存到本机，可以锁屏。${settings.sync ? "" : "云同步尚未开启。"}`);
       await refresh();
       // Persisted WorkManager handles Android; this also makes desktop captures immediately visible in OS.
-      void sync();
+      void sync(false);
     } catch (e) { setError(message(e)); } finally { setSaving(false); }
   }
   async function attach(files: FileList | null) {
@@ -118,12 +148,19 @@ export function QuickJournal({ libraries, scope, view, dataVersion }: { librarie
   }).sort((a, b) => view.ascending ? a.record.date.localeCompare(b.record.date) : b.record.date.localeCompare(a.record.date)), [items, view, scope, settings.libraryId, tag]);
   const tags = [...new Set(items.flatMap(i => tagsFor(i.body)))].sort();
   return <section className="quick-journal" aria-label="速记卡片流">
-    <details className="quick-journal-settings"><summary>速记保存与同步设置</summary>
+    <details className="quick-journal-settings" open={settingsOpen} onToggle={e => setSettingsOpen(e.currentTarget.open)}><summary>速记保存与同步设置</summary>
       <p>记录按所选日期写入日记。电脑作为唯一写入端；手机保留本机副本。云同步复用设置中的 OSS 连接及总开关。</p>
-      {!mobile && <label>OS 资料库<select aria-label="速记 OS 资料库" value={settings.libraryId} disabled={!settingsReady} onChange={e => setSettings({ ...settings, libraryId: e.target.value })}><option value="">请选择</option>{libraries.filter(l => l.provider === "obsidian").map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>}
-      {!mobile && <label>库内日记目录<input value={settings.folder} onChange={e => setSettings({ ...settings, folder: e.target.value })} placeholder="Journals" /></label>}
-      <label><input type="checkbox" checked={settings.sync} onChange={e => setSettings({ ...settings, sync: e.target.checked })} />开启本设备速记云同步</label>
-      <button disabled={!settingsReady || busy} onClick={async () => { setBusy(true); setError(""); try { await invoke("save_quick_journal_settings", { value: settings }); setNotice("设置已保存"); } catch (e) { setError(message(e)); } finally { setBusy(false); } }}>保存设置</button>
+      <p role="status">已保存的速记同步：{savedSettings?.sync ? "开启" : "关闭"}；云同步总开关：{cloud.enabled === undefined ? "待检查" : cloud.enabled ? "开启" : "关闭"}；自动同步：{cloud.auto === undefined ? "待检查" : cloud.auto ? "开启" : "关闭"}</p>
+      <button onClick={openCloudSyncSettings}>打开云同步设置</button>
+      {!mobile && <label>OS 资料库<select aria-label="速记 OS 资料库" value={settings.libraryId} disabled={!settingsReady || busy} onChange={e => setSettings({ ...settings, libraryId: e.target.value })}><option value="">请选择</option>{libraries.filter(l => l.provider === "obsidian").map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>}
+      {!mobile && <><label>{settings.dateFolders ? "日记根目录" : "日记固定目录"}<input aria-label="速记日记目录" disabled={!settingsReady || busy} value={settings.folder} onChange={e => setSettings({ ...settings, folder: e.target.value })} placeholder="Journals" /></label>
+        <label><input type="checkbox" disabled={!settingsReady || busy} checked={settings.dateFolders} onChange={e => setSettings({ ...settings, dateFolders: e.target.checked })} />按记录日期分年/月目录</label>
+        <p>{settings.dateFolders ? "填写根目录，例如 Journals，年月会按每条记录的日期自动补齐。" : "当前使用固定目录，跨月时不会自动切换。可改填 Journals 并开启年/月目录。"}</p>
+        <p>保存后，{draft.date || "所选日期"}的目标：{settings.folder}/{settings.dateFolders && draft.date ? `${draft.date.slice(0, 4)}/${draft.date.slice(5, 7)}/` : ""}{draft.date || "日期"}.md</p>
+      </>}
+      <label><input type="checkbox" disabled={!settingsReady || busy} checked={settings.sync} onChange={e => setSettings({ ...settings, sync: e.target.checked })} />开启本设备速记云同步</label>
+      {settingsDirty && <p role="status">设置尚未保存，当前同步仍使用已保存的配置。</p>}
+      <button disabled={!settingsReady || busy} onClick={() => { void saveSettings(); }}>保存设置</button>
     </details>
     <form className="quick-journal-compose" onSubmit={e => { e.preventDefault(); void save(); }}>
       <label className="sr-only" htmlFor="quick-journal-text">此刻的想法</label>
@@ -137,7 +174,7 @@ export function QuickJournal({ libraries, scope, view, dataVersion }: { librarie
     </form>
     {notice && <p className="quick-journal-notice" role="status">{notice}</p>}
     {error && <div className="quick-journal-error" role="alert">{error}<button onClick={() => { setError(""); void refresh().catch(e => setError(message(e))); }}>重新读取</button></div>}
-    <div className="quick-journal-controls"><span>{filtered.length} 条记录</span><button disabled={busy} onClick={() => { void sync(); }}><RefreshCw size={15} />{busy ? "同步中…" : "同步 / 重试"}</button>{!!tags.length && <label>标签<select aria-label="速记标签" value={tag} onChange={e => setTag(e.target.value)}><option value="">全部</option>{tags.map(t => <option key={t} value={t}>#{t}</option>)}</select></label>}</div>
+    <div className="quick-journal-controls"><span>{filtered.length} 条记录</span><button disabled={busy || !settingsReady} onClick={() => { void sync(); }}><RefreshCw size={15} />{busy ? "处理中…" : "同步 / 重试"}</button>{!!tags.length && <label>标签<select aria-label="速记标签" value={tag} onChange={e => setTag(e.target.value)}><option value="">全部</option>{tags.map(t => <option key={t} value={t}>#{t}</option>)}</select></label>}</div>
     {filtered.slice(0, limit).map(i => <Card key={i.record.id} item={i} mobile={mobile} />)}
     {!filtered.length && <p className="quick-journal-empty">还没有符合筛选的记录。写下一个想法，或调整日期和资料库。</p>}
     {filtered.length > limit && <button onClick={() => setLimit(limit + 50)}>加载更多记录</button>}

@@ -7,7 +7,8 @@ const records=["今天的一个想法：把记录的动作变得足够轻，才�
 let items=records.map((text,i)=>({record:{version:1,id:String(i).repeat(32),date:today,text,attachments:[]},body:text,applied:i!==1,uploaded:i!==1,libraryId:"os",path:"",namespace:"demo"}));
 (window as any).__TAURI_INTERNALS__={invoke:async(cmd:string,args:any)=>{
  if(cmd==="get_quick_journal_draft")return "";
- if(cmd==="get_quick_journal_settings")return {settings:{libraryId:"os",folder:"Journals",sync:false},mobile:innerWidth<500};
+ if(cmd==="get_quick_journal_settings")return {settings:{libraryId:"os",folder:"Journals",sync:false,dateFolders:true},mobile:innerWidth<500,cloudEnabled:true,autoSync:true};
+ if(cmd==="sync_quick_journal")return {pendingUpload:1,awaitingOs:0,written:2};
  if(cmd==="list_quick_journal")return {items,error:""};
  if(cmd==="capture_quick_journal"){items=[{record:args.record,body:args.record.text,applied:false,uploaded:false,libraryId:"os",path:"",namespace:""},...items];return {warning:null};}
  return null;

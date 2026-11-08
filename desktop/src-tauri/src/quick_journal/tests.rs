@@ -90,6 +90,7 @@ impl Fixture {
                 library_id: "os".into(),
                 folder: "Journals".into(),
                 sync: true,
+                date_folders: false,
             })
             .unwrap(),
         )
@@ -103,6 +104,139 @@ impl Drop for Fixture {
         crate::database::forget_initialized_database(&self.db);
         let _ = fs::remove_dir_all(&self.dir);
     }
+}
+
+fn save_settings(f: &Fixture, s: &Settings) {
+    meta(
+        &open_database(&f.db).unwrap(),
+        "quick_journal_settings",
+        &serde_json::to_string(s).unwrap(),
+    )
+    .unwrap();
+}
+#[test]
+fn new_settings_use_date_folders_while_legacy_settings_keep_their_destination() {
+    let f = Fixture::new();
+    let c = open_database(&f.db).unwrap();
+    assert!(!settings(&c).unwrap().date_folders);
+    meta(
+        &c,
+        "quick_journal_settings",
+        r#"{"libraryId":"os","folder":"Journals/2026/11","sync":true}"#,
+    )
+    .unwrap();
+    let old = settings(&c).unwrap();
+    assert!(!old.date_folders);
+    assert!(target(&c, &old, "2026-09-30")
+        .unwrap()
+        .ends_with("Journals/2026/11"));
+    c.execute(
+        "DELETE FROM metadata WHERE key='quick_journal_settings'",
+        [],
+    )
+    .unwrap();
+    assert!(settings(&c).unwrap().date_folders);
+}
+#[test]
+fn dates_route_to_original_month_and_keep_existing_diaries_and_applied_records() {
+    let f = Fixture::new();
+    let mut r = record();
+    enqueue(&f.db, &r).unwrap();
+    apply_local(&f.db).unwrap();
+    let legacy = f.dir.join("vault/Journals/2026-11-07.md");
+    let old = fs::read_to_string(&legacy).unwrap();
+    save_settings(
+        &f,
+        &Settings {
+            library_id: "os".into(),
+            folder: "Journals".into(),
+            sync: true,
+            date_folders: true,
+        },
+    );
+    for (id, date) in [
+        ("b", "2026-12-31"),
+        ("c", "2027-01-01"),
+        ("d", "2024-02-29"),
+    ] {
+        r.id = id.repeat(32);
+        r.date = date.into();
+        let path = f.dir.join(format!(
+            "vault/Journals/{}/{}/{}.md",
+            &date[..4],
+            &date[5..7],
+            date
+        ));
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, "# 人工日记\n\n已有内容\n").unwrap();
+        enqueue(&f.db, &r).unwrap();
+        apply_local(&f.db).unwrap();
+        apply_local(&f.db).unwrap();
+        let md = fs::read_to_string(&path).unwrap();
+        assert!(md.starts_with("# 人工日记\n\n已有内容\n"));
+        assert_eq!(format::blocks(&md).unwrap().len(), 1);
+    }
+    assert_eq!(fs::read_to_string(legacy).unwrap(), old);
+    assert!(!f.dir.join("vault/Journals/2026/11/2026-11-07.md").exists());
+}
+#[test]
+fn manual_sync_explains_each_disabled_gate_and_mobile_does_not_require_a_vault() {
+    let f = Fixture::new();
+    let c = open_database(&f.db).unwrap();
+    meta(&c, "cloud_sync_enabled", "0").unwrap();
+    meta(
+        &c,
+        "quick_journal_settings",
+        r#"{"libraryId":"","folder":"Journals","sync":false}"#,
+    )
+    .unwrap();
+    assert!(sync_configuration(&c, false, true)
+        .unwrap_err()
+        .contains("速记云同步未开启"));
+    assert!(sync_configuration(&c, true, true).unwrap().is_none());
+    meta(
+        &c,
+        "quick_journal_settings",
+        r#"{"libraryId":"","folder":"Journals","sync":true}"#,
+    )
+    .unwrap();
+    assert!(sync_configuration(&c, false, true)
+        .unwrap_err()
+        .contains("总开关"));
+    meta(&c, "cloud_sync_enabled", "1").unwrap();
+    meta(&c, "cloud_sync_auto", "0").unwrap();
+    meta(&c, "flashcard_cloud_provider", "oss").unwrap();
+    meta(
+        &c,
+        "flashcard_oss_config",
+        r#"{"bucket":"hub-test","region":"cn-shanghai","prefix":"test","accessKeyId":"test"}"#,
+    )
+    .unwrap();
+    assert!(sync_configuration(&c, false, false)
+        .unwrap_err()
+        .contains("OS 资料库"));
+    assert!(sync_configuration(&c, false, true).unwrap().is_some());
+    assert!(sync_configuration(&c, true, true).unwrap().is_none());
+}
+#[test]
+fn sync_report_does_not_call_pending_records_uploaded_or_written() {
+    let f = Fixture::new();
+    let r = record();
+    enqueue(&f.db, &r).unwrap();
+    assert_eq!(sync_report(&f.db).unwrap().pending_upload, 1);
+    update(
+        &f.db,
+        "UPDATE quick_journal_records SET uploaded=1,namespace=?2 WHERE id=?1",
+        &r.id,
+        "test",
+    )
+    .unwrap();
+    let report = sync_report(&f.db).unwrap();
+    assert_eq!(report.pending_upload, 0);
+    assert_eq!(report.awaiting_os, 1);
+    assert_eq!(report.written, 0);
+    apply_local(&f.db).unwrap();
+    assert_eq!(sync_report(&f.db).unwrap().written, 1);
 }
 
 #[tokio::test]

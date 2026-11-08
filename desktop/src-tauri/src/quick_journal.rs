@@ -17,6 +17,8 @@ pub(crate) struct Settings {
     pub library_id: String,
     pub folder: String,
     pub sync: bool,
+    #[serde(default)]
+    pub date_folders: bool,
 }
 fn schema(c: &Connection) -> Result<(), String> {
     c.execute_batch("CREATE TABLE IF NOT EXISTS quick_journal_records (
@@ -30,6 +32,7 @@ fn settings(c: &Connection) -> Result<Settings, String> {
     if raw.is_empty() {
         return Ok(Settings {
             folder: "Journals".into(),
+            date_folders: true,
             ..Default::default()
         });
     }
@@ -65,7 +68,7 @@ fn safe_folder(folder: &str) -> bool {
                 && !p.chars().any(|c| c.is_control() || "<>:\"|?*".contains(c))
         })
 }
-fn target(c: &Connection, s: &Settings) -> Result<PathBuf, String> {
+fn target(c: &Connection, s: &Settings, date: &str) -> Result<PathBuf, String> {
     if !safe_folder(&s.folder) {
         return Err("请填写库内日记目录，例如 Journals".into());
     }
@@ -77,8 +80,16 @@ fn target(c: &Connection, s: &Settings) -> Result<PathBuf, String> {
         )
         .map_err(|_| "请先选择已接入的 OS Obsidian 库")?;
     let vault = fs::canonicalize(location).map_err(|_| "OS 库暂时不可用")?;
+    if !format::valid_date(date) {
+        return Err("日记日期无效".into());
+    }
+    let folder = if s.date_folders {
+        format!("{}/{}/{}", s.folder, &date[..4], &date[5..7])
+    } else {
+        s.folder.clone()
+    };
     let mut path = vault.clone();
-    for part in s.folder.split('/') {
+    for part in folder.split('/') {
         path.push(part);
         if path.exists()
             && !fs::canonicalize(&path)
@@ -101,14 +112,14 @@ pub(crate) fn get_quick_journal_settings(app: AppHandle) -> Result<Value, String
     let (c, _guard) = open_write_database(&database_path(&app)?)?;
     schema(&c)?;
     Ok(
-        json!({"settings":settings(&c)?,"error":metadata_string(&c,"quick_journal_error"),"mobile":cfg!(mobile)}),
+        json!({"settings":settings(&c)?,"error":metadata_string(&c,"quick_journal_error"),"mobile":cfg!(mobile),"cloudEnabled":cloud_sync::policy(&c).enabled,"autoSync":cloud_sync::policy(&c).auto_sync}),
     )
 }
 #[tauri::command]
 pub(crate) async fn save_quick_journal_settings(
     app: AppHandle,
     value: Settings,
-) -> Result<(), String> {
+) -> Result<Value, String> {
     let _lock = LOCK.lock().await;
     {
         let (c, _guard) = open_write_database(&database_path(&app)?)?;
@@ -116,8 +127,17 @@ pub(crate) async fn save_quick_journal_settings(
         if !safe_folder(&value.folder) {
             return Err("日记目录无效".into());
         }
-        if !cfg!(mobile) && !value.library_id.is_empty() {
-            target(&c, &value)?;
+        if !cfg!(mobile) {
+            if value.sync && value.library_id.is_empty() {
+                return Err("请先选择速记要写入的 OS 资料库".into());
+            }
+            if !value.library_id.is_empty() {
+                target(
+                    &c,
+                    &value,
+                    &chrono::Local::now().format("%Y-%m-%d").to_string(),
+                )?;
+            }
         }
         if value.sync {
             config(&c)?;
@@ -128,8 +148,7 @@ pub(crate) async fn save_quick_journal_settings(
             &serde_json::to_string(&value).map_err(|e| e.to_string())?,
         )?;
     }
-    schedule_mobile(&app)?;
-    Ok(())
+    Ok(json!({"warning":schedule_mobile(&app).err()}))
 }
 #[tauri::command]
 pub(crate) fn stage_quick_journal_attachment(
@@ -352,7 +371,6 @@ fn apply_local(db: &PathBuf) -> Result<(), String> {
     if s.library_id.is_empty() {
         return Ok(());
     }
-    let dir = target(&c, &s)?;
     let rows = c
         .prepare("SELECT payload FROM quick_journal_records WHERE applied=0 ORDER BY seq")
         .map_err(|e| e.to_string())?
@@ -363,6 +381,7 @@ fn apply_local(db: &PathBuf) -> Result<(), String> {
     for payload in rows {
         let r: Record = serde_json::from_str(&payload).map_err(|e| e.to_string())?;
         r.validate()?;
+        let dir = target(&c, &s, &r.date)?;
         for a in &r.attachments {
             let bytes = fs::read(asset(db, &a.hash)?).map_err(|_| "附件仍在等待下载")?;
             if bytes.len() != a.size || digest(&bytes) != a.hash {
@@ -581,19 +600,60 @@ async fn transfer(db: &PathBuf, store: &dyn Store, namespace: &str) -> Result<()
     }
     Ok(())
 }
-async fn run(app: &AppHandle, automatic: bool) -> Result<(), String> {
+fn sync_configuration(
+    c: &Connection,
+    automatic: bool,
+    mobile: bool,
+) -> Result<Option<OssConfig>, String> {
+    let s = settings(c)?;
+    let p = cloud_sync::policy(c);
+    if automatic && (!s.sync || !p.enabled || !p.auto_sync) {
+        return Ok(None);
+    }
+    if !s.sync {
+        return Err("本设备速记云同步未开启，请展开“速记保存与同步设置”，勾选后保存设置".into());
+    }
+    if !p.enabled {
+        return Err("云同步总开关未开启，请到“设置 → 云同步”开启；本机记录已保留".into());
+    }
+    if !mobile && s.library_id.is_empty() {
+        return Err("尚未选择 OS 资料库，请在“速记保存与同步设置”中选择并保存".into());
+    }
+    config(c).map(Some)
+}
+#[derive(Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SyncReport {
+    pending_upload: usize,
+    awaiting_os: usize,
+    written: usize,
+}
+fn sync_report(db: &PathBuf) -> Result<SyncReport, String> {
+    let mut report = SyncReport::default();
+    for (_, _, uploaded, applied) in queue(db)? {
+        if !uploaded {
+            report.pending_upload += 1;
+        }
+        if uploaded && !applied {
+            report.awaiting_os += 1;
+        }
+        if applied {
+            report.written += 1;
+        }
+    }
+    Ok(report)
+}
+async fn run(app: &AppHandle, automatic: bool) -> Result<SyncReport, String> {
     let _lock = LOCK.lock().await;
     let db = database_path(app)?;
     let result = async {
         apply_local(&db)?;
         let configuration = {
             let c = open_database(&db)?;
-            let s = settings(&c)?;
-            let p = cloud_sync::policy(&c);
-            if !s.sync || !p.enabled || (automatic && !p.auto_sync) {
-                return Ok(());
-            }
-            config(&c)?
+            let Some(configuration) = sync_configuration(&c, automatic, cfg!(mobile))? else {
+                return sync_report(&db);
+            };
+            configuration
         };
         let namespace = configuration.namespace();
         let store = guarded_store(
@@ -602,7 +662,8 @@ async fn run(app: &AppHandle, automatic: bool) -> Result<(), String> {
             stored_secret_get(app, "hub-flashcard-oss-secret-v1")?.unwrap_or_default(),
             automatic,
         )?;
-        transfer(&db, &store, &namespace).await
+        transfer(&db, &store, &namespace).await?;
+        sync_report(&db)
     }
     .await;
     {
@@ -641,7 +702,7 @@ fn guarded_store(
     ))
 }
 #[tauri::command]
-pub(crate) async fn sync_quick_journal(app: AppHandle) -> Result<(), String> {
+pub(crate) async fn sync_quick_journal(app: AppHandle) -> Result<SyncReport, String> {
     run(&app, false).await
 }
 fn schedule_mobile(app: &AppHandle) -> Result<(), String> {

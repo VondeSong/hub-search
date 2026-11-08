@@ -34,12 +34,10 @@ pub extern "system" fn Java_com_craftsearch_desktop_QuickJournalWorker_syncNativ
                 let configuration = {
                     let c = open_database(&db)?;
                     schema(&c)?;
-                    let s = settings(&c)?;
-                    let p = cloud_sync::policy(&c);
-                    if !s.sync || !p.enabled || !p.auto_sync {
+                    let Some(configuration) = sync_configuration(&c, true, true)? else {
                         return Ok(());
-                    }
-                    config(&c)?
+                    };
+                    configuration
                 };
                 let namespace = configuration.namespace();
                 let secret = mobile_secrets::get(
