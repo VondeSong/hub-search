@@ -20,8 +20,8 @@ beforeEach(() => {
     if (cmd === "capture_quick_journal") return { warning: null };
   });
 });
-afterEach(async () => { await act(async () => root.unmount()); node.remove(); });
-const render = async () => { await act(async () => root.render(<QuickJournal libraries={[]} scope={null} dataVersion="1" view={{ ...defaultJournalView(), period: "all", layout: "records" }} />)); };
+afterEach(async () => { await act(async () => root.unmount()); node.remove(); vi.useRealTimers(); });
+const render = async (dataVersion = "1") => { await act(async () => root.render(<QuickJournal libraries={[]} scope={null} dataVersion={dataVersion} view={{ ...defaultJournalView(), period: "all", layout: "records" }} />)); };
 it("restores a draft and displays each record's current Markdown without clock times", async () => {
   await render(); expect(node.querySelector("textarea")?.value).toBe(record.text);
   expect(node.querySelector("article")?.textContent).toContain("OS 中手动修改后的正文");
@@ -81,4 +81,29 @@ it("previews the record date in year/month mode and preserves a legacy fixed dir
   await act(async () => toggle.click());
   expect(node.textContent).toContain("Journals/2026-11-07.md");
   expect(node.textContent).toContain("固定目录，跨月时不会自动切换");
+});
+it("keeps loaded Markdown images mounted through expansion, parent updates and polling while showing OS edits", async () => {
+  vi.useFakeTimers();
+  const hash = "b".repeat(64), linkedHash = "c".repeat(64);
+  let body = `${"正文".repeat(180)}\n\n![照片](_hub-assets/${hash}.jpg)\n\n[![链接图片](_hub-assets/${linkedHash}.jpg)](https://example.com)`;
+  const original = invoke.getMockImplementation()!;
+  invoke.mockImplementation((cmd: string, args: any) => {
+    if (cmd === "quick_journal_image") return Promise.resolve(`data:image/jpeg;base64,${args.hash}`);
+    if (cmd === "list_quick_journal") return Promise.resolve({ items: [{ record: { ...record }, body, applied: true, uploaded: true, path: "daily", libraryId: "os" }], error: "" });
+    return original(cmd, args);
+  });
+  await render();
+  const images = [...node.querySelectorAll("article img")];
+  expect(images).toHaveLength(2);
+  const reads = invoke.mock.calls.filter(c => c[0] === "quick_journal_image").length;
+  await act(async () => button("展开全文").click());
+  await render("2");
+  body = body.replace("正文", "OS 中的新修改");
+  await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
+  await act(async () => button("同步 / 重试").click());
+  expect(node.querySelectorAll("article img")[0]).toBe(images[0]);
+  expect(node.querySelectorAll("article img")[1]).toBe(images[1]);
+  expect(invoke.mock.calls.filter(c => c[0] === "quick_journal_image")).toHaveLength(reads);
+  expect(node.querySelector("article")?.textContent).toContain("OS 中的新修改");
+  expect(button("收起").getAttribute("aria-expanded")).toBe("true");
 });

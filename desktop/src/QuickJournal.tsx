@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, Paperclip, RefreshCw, Send, X } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
@@ -25,6 +25,11 @@ function Image({ hash, name }: { hash: string; name: string }) {
 }
 function Card({ item, mobile }: { item: Item; mobile: boolean }) {
   const [expanded, setExpanded] = useState(false), [error, setError] = useState("");
+  // Refreshes must preserve the renderer identities and loaded image state.
+  const markdownComponents = useMemo<Components>(() => ({
+    img: ({ src, alt }) => { const hash = src?.match(/(?:^|\/)\_hub-assets\/([a-f0-9]{64})(?:\.[a-z0-9]{1,12})?$/)?.[1]; return hash ? <Image hash={hash} name={alt || "照片"} /> : <span>{alt || "图片"}</span>; },
+    a: ({ href, children }) => /^https?:\/\//i.test(href || "") ? <a href={href} onClick={e => { e.preventDefault(); void openUrl(href!).catch(e => setError(message(e))); }}>{children}</a> : <span>{children}</span>,
+  }), []);
   const collapsible = item.body.length > 350 || item.body.split("\n").length > 8 || item.record.attachments.length > 1;
   async function exportAttachment(a: Attachment) {
     try {
@@ -38,10 +43,7 @@ function Card({ item, mobile }: { item: Item; mobile: boolean }) {
       {item.applied && !mobile && <button aria-label={`打开 ${item.record.date} 的 OS 日记`} onClick={() => { void invoke("open_quick_journal", { id: item.record.id }).catch(e => setError(message(e))); }}><ExternalLink size={16} /></button>}
     </header>
     <div className={`quick-journal-prose ${collapsible && !expanded ? "is-collapsed" : ""}`}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={{
-        img: ({ src, alt }) => { const hash = src?.match(/(?:^|\/)\_hub-assets\/([a-f0-9]{64})(?:\.[a-z0-9]{1,12})?$/)?.[1]; return hash ? <Image hash={hash} name={alt || "照片"} /> : <span>{alt || "图片"}</span>; },
-        a: ({ href, children }) => /^https?:\/\//i.test(href || "") ? <a href={href} onClick={e => { e.preventDefault(); void openUrl(href!).catch(e => setError(message(e))); }}>{children}</a> : <span>{children}</span>,
-      }}>{item.body}</ReactMarkdown>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={markdownComponents}>{item.body}</ReactMarkdown>
       {(!item.path || item.sourceError) && item.record.attachments.map(a => a.image ? <Image key={a.hash} hash={a.hash} name={a.name} /> : <p key={a.hash}><Paperclip size={14} /> {a.name}</p>)}
     </div>
     {!!item.record.attachments.length && <div className="quick-journal-attachments">{item.record.attachments.map((a, i) => <button key={`${a.hash}-${i}`} onClick={() => { void exportAttachment(a); }}><Paperclip size={14} />保存 {a.name}</button>)}</div>}
