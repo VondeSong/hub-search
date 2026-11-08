@@ -148,6 +148,9 @@ fn selected_material_completion_repair_keeps_citations_and_proof_validation() {
             return Err(error);
         }
         assert_eq!(calls, 2, "repair must keep the existing bounded budget");
+        let repair = material["observations"].as_array().unwrap().iter().find(|o| o["completionRepair"].is_object()).unwrap();
+        assert_eq!(repair["completionRepair"]["contract"], store::goal::completion::GUIDE);
+        assert!(repair["completionRepair"]["instruction"].as_str().unwrap().contains("不要重新创建已存在的草稿"));
         assert!(material["observations"].as_array().unwrap().iter().any(|o| o["outputRejected"].as_str().is_some_and(|e| e.contains("additionalProperties") && e.contains("allowed fields: [\"goalBinding\",\"items\"]"))));
         crate::model_runtime::validate_agent_tool(&response, schema).unwrap();
         Ok(response)

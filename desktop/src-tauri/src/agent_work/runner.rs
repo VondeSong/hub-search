@@ -301,8 +301,14 @@ impl Context {
         Ok(())
     }
     fn reject(&mut self, root: &Path, run: &str, kind: &str, error: &str) -> Result<(), String> {
-        let feedback = json!({"origin":"host",(kind):error,
+        let mut feedback = json!({"origin":"host",(kind):error,
             "meaning":"No report facts were accepted. Correct the indicated field within this same run and remaining budget. Every citation must select an existing quoteCatalog quoteId. The host fills in the original words. Search summaries are not citation evidence; read the source first. Unknown facts must stay unknown. Do not use waiting for a read you can request yourself."});
+        if kind == "outputRejected" && error.contains("$.report.completion") {
+            feedback["completionRepair"] = json!({
+                "contract": store::goal::completion::GUIDE,
+                "instruction": "重新构造 report.completion，不要复用含多余字段的对象：对象顶层仅复制当前 goalBinding 和 items；即使其他字段值为 null 也必须删除。正文、status、summary、citations 放在 report，不放在 completion。已生成待确认草稿时使用真实 draft 凭证，不能声称已写入；实际保存后才使用 action 回执。不要重新创建已存在的草稿或执行动作。",
+            });
+        }
         store::record(root, run, kind, &feedback)?;
         self.observations.push(feedback);
         Ok(())
