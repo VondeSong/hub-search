@@ -3,6 +3,17 @@
 use super::*;
 use std::collections::HashSet;
 
+pub(in crate::agent_work) const GUIDE: &str = "完成核对合同：report.completion 只能为 null 或仅含 goalBinding、items 的对象，不得添加 note、goalBindingNote 或其他字段。goalBinding 原样复制 conversation.goalState.goalBinding；items 的每项只含 requirementId、criterion、requiredResult、status、explanation、refs、supersededBy，逐字使用当前 requirements 的 requirementId 并覆盖全部有效要求。纯阅读、摘要、正文交付和只读约束使用 requiredResult=response，refs=[]；report.citations 中的 quoteId（eN:qN）是来源引文，不是完成凭证，不能放入 refs。chart/draft/action 的 refs 只能选择 conversation.goalState.proofs 中对应类型的真实 proofId，不能编造或以来源引文替代。未完成则如实标记 unfulfilled/blocked；notApplicable 仅用于较新用户命令明确替代的要求并填写 supersededBy。null 表示未评估，不代表已完成。";
+
+pub(in crate::agent_work) fn example(goal: &Value) -> Value {
+    json!({"goalBinding":goal["goalBinding"],"items":[{
+        "requirementId":goal["requirements"][0]["requirementId"],
+        "criterion":"本项需要交付的文字要求或只读约束", "requiredResult":"response",
+        "status":"unfulfilled", "explanation":"根据实际交付说明满足情况，不能照抄示例结论",
+        "refs":[],"supersededBy":null,
+    }]})
+}
+
 pub(in crate::agent_work) const RESPONSE_DELIVERY_POLICY: &str = "hub_finish 的 accepted=true 表示已核验、等待最终发布。Hub 在所有最终发布检查通过后，以同一事务保存报告正文、引用、目标绑定和来源依赖到当前事项及交付历史，可重新打开。若在生成上限内已核验报告，随后仅提供方结束回合超时，可在原宿主总时限内继续最终发布检查；取消、过期、来源或预算失效均不得恢复发布。提供方超时和未知用量单独保留，发布成功不等于提供方正常完成或费用已结算。仅要求在当前事项留存回答并后续修订时，完成类型为 response，无需另建独立报告或外部保存动作；后续要求、来源或版本改变仍须重新核对。外部保存、修改源笔记、导入、独立制品及永久保存仍须相应能力和真实证据，本交付约定不能证明这些操作。";
 
 /// Describes the existing publication owner; acceptance itself is not a write

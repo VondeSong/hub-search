@@ -8,21 +8,38 @@ pub(super) fn is_rejection(error: &str) -> bool {
 struct Violation {
     path: String,
     rule: &'static str,
+    allowed_fields: Option<Vec<String>>,
 }
 fn violation(path: &str, rule: &'static str) -> Violation {
     Violation {
         path: path.into(),
         rule,
+        allowed_fields: None,
+    }
+}
+impl Violation {
+    fn diagnostic(&self) -> String {
+        let fields = self
+            .allowed_fields
+            .as_ref()
+            .map(|fields| {
+                format!(
+                    "; allowed fields: {}",
+                    serde_json::to_string(fields).unwrap()
+                )
+            })
+            .unwrap_or_default();
+        format!("{}: {}{fields}", self.path, self.rule)
     }
 }
 pub(super) fn validate_arguments(value: &Value, schema: &Value) -> Result<(), String> {
-    check(value, schema, 0, "$").map_err(|e| format!("工具参数不符合要求 [{}: {}]", e.path, e.rule))
+    check(value, schema, 0, "$").map_err(|e| format!("工具参数不符合要求 [{}]", e.diagnostic()))
 }
 pub(super) fn validate(value: &Value, schema: &Value) -> Result<(), String> {
     if value.to_string().len() > super::MAX_OUTPUT_BYTES {
         return Err("模型返回内容过长，未提交结果。".into());
     }
-    check(value, schema, 0, "$").map_err(|e| format!("{INVALID} [{}: {}]", e.path, e.rule))
+    check(value, schema, 0, "$").map_err(|e| format!("{INVALID} [{}]", e.diagnostic()))
 }
 fn check(v: &Value, s: &Value, depth: usize, path: &str) -> Result<(), Violation> {
     if depth > 48 {
@@ -46,12 +63,12 @@ fn check(v: &Value, s: &Value, depth: usize, path: &str) -> Result<(), Violation
                 .collect();
             let matches = results.iter().filter(|r| r.is_ok()).count();
             if matches == 0 || (exact && matches != 1) {
-                // Only schema-owned paths and rule names leave this gate. A
+                // Only schema-owned paths, field names and rules leave this gate. A
                 // nullable branch must not hide a useful nested field failure.
                 return Err(results
                     .into_iter()
                     .filter_map(Result::err)
-                    .max_by_key(|e| e.path.len())
+                    .max_by_key(|e| (e.path.len(), e.rule != "type"))
                     .unwrap_or_else(|| violation(path, name)));
             }
         }
@@ -90,7 +107,11 @@ fn check(v: &Value, s: &Value, depth: usize, path: &str) -> Result<(), Violation
             if let Some(property) = s["properties"].get(key) {
                 check(value, property, depth + 1, &format!("{path}.{key}"))?;
             } else if s["additionalProperties"] == false {
-                return Err(violation(path, "additionalProperties"));
+                let mut error = violation(path, "additionalProperties");
+                error.allowed_fields = s["properties"]
+                    .as_object()
+                    .map(|p| p.keys().cloned().collect());
+                return Err(error);
             }
         }
     }
@@ -143,8 +164,26 @@ fn output_diagnostics_identify_schema_fields_without_echoing_values_or_unknown_k
     .unwrap_err();
     assert!(error.contains("$: additionalProperties"));
     assert!(!error.contains("PRIVATE_"));
+    assert!(error.contains("allowed fields: [\"report\"]"), "{error}");
     assert!(validate(&json!({"report":null}), &schema).is_ok());
     assert!(validate(&json!({"report":{"questions":[]}}), &schema).is_ok());
+
+    // Prefer the object's structural error over its nullable branch's type error.
+    let completion = json!({"anyOf":[{"type":"object","required":["items"],"additionalProperties":false,"properties":{"items":{"type":"array"}}},{"type":"null"}]});
+    let schema = json!({"type":"object","properties":{"completion":completion}});
+    let error = validate(
+        &json!({"completion":{"items":[],"PRIVATE_KEY":"PRIVATE_VALUE"}}),
+        &schema,
+    )
+    .unwrap_err();
+    assert!(
+        error.contains("$.completion: additionalProperties"),
+        "{error}"
+    );
+    assert!(error.contains("allowed fields: [\"items\"]"), "{error}");
+    assert!(!error.contains("PRIVATE_"));
+    assert!(validate(&json!({"completion":{"items":[]}}), &schema).is_ok());
+    assert!(validate(&json!({"completion":null}), &schema).is_ok());
 }
 #[test]
 fn shared_gate_rejects_wrong_types_unknown_fields_missing_and_invalid_enum() {

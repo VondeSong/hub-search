@@ -912,6 +912,16 @@ fn investigate_loop(
             } else {
                 format!("本轮首先回答 conversation.currentRequest；结合 messages 理解前文指代。普通追问不能冒充 confirmedUserDecisions，历史回答不能替代当前原文依据。用户补充要求可以改变回答形式；除非确实需要，不强制增加下一步或待决定问题。\n{guide}{prompt}")
             };
+            let mut example_report = if session.is_some() {
+                json!({"status":"insufficientEvidence","markdown":"根据实际材料回答，并用 [1] 对应 citations 的第一项；证据不足时说明未知。","citations":[],"questions":[],"limitations":[],"waitCondition":""})
+            } else {
+                json!({"status":"insufficientEvidence","summary":"根据实际材料回答；证据不足时说明未知。","findings":[],"nextSteps":[],"questions":[],"limitations":[],"waitCondition":""})
+            };
+            example_report["completion"] =
+                store::goal::completion::example(&conversation["goalState"]);
+            let output_example =
+                json!({"rationale":"本轮公开工作意图","requests":[],"report":example_report});
+            let prompt = format!("{}\n以下是完整 JSON 输出结构示例，仅演示字段和层级，不是本轮结论。completion 示例只含第一项，实际须覆盖全部有效要求并按事实填写类型、状态、说明和凭证。正文、citations、status 等是 report 的字段，与 completion 并列，不能放进 completion。校验反馈含 additionalProperties 时，对象只保留 allowed fields 中的字段；说明写入 explanation 或正文，不添加字段。只输出一个根对象，不追加第二段 JSON 或额外字段。\n完整输出示例(JSON):\n{output_example}\n{prompt}", store::goal::completion::GUIDE);
             let bytes = prompt.len() + turn_schema.to_string().len() + 256;
             if bytes > if session.is_some() { 196_608 } else { 65_536 }
                 || context.usage.request_bytes + bytes + archive_reserved_bytes

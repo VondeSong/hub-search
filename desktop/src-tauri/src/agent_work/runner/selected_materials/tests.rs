@@ -100,6 +100,79 @@ fn selected_body_reaches_model_but_citation_is_optional() {
 }
 
 #[test]
+fn selected_material_completion_repair_keeps_citations_and_proof_validation() {
+    let f = Fixture::new();
+    f.note(
+        "notes",
+        "chosen",
+        "收藏用于组件选型。收藏不表示已完成采用评估。",
+    );
+    let id = create(&f, vec![note("chosen")]);
+    let (w, run) = claim(&f, &id);
+    let control = Control::bounded(Duration::from_secs(30));
+    let session = assistant::Session {
+        root: &f.root,
+        work: &w,
+        run: &run,
+        control: &control,
+        operation: None,
+        selection: json!({"provider":"deepseek"}),
+        app: None,
+    };
+    let mut calls = 0;
+    investigate_assistant(&f.root, &w, &run, &control, assistant::budget("quick").unwrap(), &session, |prompt, schema| {
+        assert!(prompt.contains(store::goal::completion::GUIDE));
+        let material: Value = serde_json::from_str(prompt.split("宿主材料(JSON):\n").last().unwrap()).unwrap();
+        let goal = &material["conversation"]["goalState"];
+        let example: Value = serde_json::from_str(prompt.split("完整输出示例(JSON):\n").nth(1).unwrap().lines().next().unwrap()).unwrap();
+        crate::model_runtime::validate_agent_tool(&example, schema).unwrap();
+        assert_eq!(example["report"]["completion"]["goalBinding"], goal["goalBinding"]);
+        assert_eq!(example["report"]["completion"]["items"][0]["requirementId"], goal["requirements"][0]["requirementId"]);
+        let items = goal["requirements"].as_array().unwrap().iter().map(|requirement| json!({
+            "requirementId":requirement["requirementId"],"criterion":requirement["text"],
+            "requiredResult":"response","status":"satisfied","explanation":"只读概括所选原文并标注引用。",
+            "refs":[],"supersededBy":null,
+        })).collect::<Vec<_>>();
+        let mut response = json!({"rationale":"仅概括所选原文。","requests":[],"report":{
+            "status":"completed","completion":{"goalBinding":goal["goalBinding"],"items":items},
+            "markdown":"收藏用于组件选型，但不表示已完成采用评估。[1]",
+            "citations":[{"quoteId":material["quoteCatalog"][0]["quoteId"]}],
+            "questions":[],"limitations":[],"waitCondition":"",
+        }});
+        calls += 1;
+        if calls == 1 {
+            response["report"]["completion"]["note"] = Value::Null;
+            let error = crate::model_runtime::validate_agent_tool(&response, schema).unwrap_err();
+            assert!(error.contains("$.report.completion: additionalProperties"), "{error}");
+            assert!(error.contains("allowed fields: [\"goalBinding\",\"items\"]"), "{error}");
+            return Err(error);
+        }
+        assert_eq!(calls, 2, "repair must keep the existing bounded budget");
+        assert!(material["observations"].as_array().unwrap().iter().any(|o| o["outputRejected"].as_str().is_some_and(|e| e.contains("additionalProperties") && e.contains("allowed fields: [\"goalBinding\",\"items\"]"))));
+        crate::model_runtime::validate_agent_tool(&response, schema).unwrap();
+        Ok(response)
+    }).unwrap();
+    assert_eq!(calls, 2);
+    let saved = store::load(&f.c(), &id).unwrap();
+    assert_eq!(saved.state, "completed");
+    assert!(!saved.report.unwrap().prose.unwrap().citations.is_empty());
+    assert_eq!(
+        f.c()
+            .query_row("SELECT count(*) FROM agent_actions", [], |r| r
+                .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    let error =
+        store::goal::completion::resolve_proofs(&json!([]), &["e1:q1".into()], "response", false)
+            .unwrap_err();
+    assert!(
+        error.contains("完成证据不存在"),
+        "source quotes are never completion proofs"
+    );
+}
+
+#[test]
 fn followup_addition_is_read_without_title_in_question() {
     let f = Fixture::new();
     f.note("notes", "chosen", "FOLLOWUP_ATTACHMENT_SENTINEL");
