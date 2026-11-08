@@ -18,6 +18,7 @@ mod collection_models;
 mod content;
 mod database;
 mod database_maintenance_entry;
+mod file_lock;
 mod index_job_metadata;
 mod model_runtime;
 mod model_skills;

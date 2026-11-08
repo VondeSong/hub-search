@@ -1,6 +1,7 @@
 package com.craftsearch.desktop
 
 import android.os.Bundle
+import java.io.File
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
@@ -8,6 +9,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 
 class MainActivity : TauriActivity() {
+  // Android's /data/user/0 alias must be resolved before native data-safety checks.
+  override fun getDataDir(): File = super.getDataDir().canonicalFile
+
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)

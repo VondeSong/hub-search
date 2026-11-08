@@ -55,8 +55,7 @@ fn config_lock(root: &Path) -> Result<fs::File, String> {
         .open(&path)
         .map_err(|e| format!("自动备份正在处理，请稍后重试：{e}"))?;
     #[cfg(not(windows))]
-    file.try_lock()
-        .map_err(|e| format!("自动备份正在处理：{e}"))?;
+    crate::file_lock::try_lock(&file, false).map_err(|e| format!("自动备份正在处理：{e}"))?;
     Ok(file)
 }
 

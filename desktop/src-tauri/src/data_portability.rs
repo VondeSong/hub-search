@@ -55,14 +55,13 @@ fn lock_file(root: &Path, name: &str, shared: bool) -> Result<File, String> {
         .truncate(false)
         .open(path)
         .map_err(|e| format!("无法锁定数据目录：{e}"))?;
-    let result = if shared {
-        file.try_lock_shared()
-    } else {
-        file.try_lock()
-    };
-    result.map_err(|_| {
-        "数据仍在使用或正在备份，请等待操作结束；迁移前请退出使用此目录的其他 Hub / MCP 进程。"
-            .to_string()
+    crate::file_lock::try_lock(&file, shared).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::WouldBlock {
+            "数据仍在使用或正在备份，请等待操作结束；迁移前请退出使用此目录的其他 Hub / MCP 进程。"
+                .to_string()
+        } else {
+            format!("无法锁定数据目录：{error}")
+        }
     })?;
     Ok(file)
 }
