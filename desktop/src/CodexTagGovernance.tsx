@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { CodexDefinitionModel } from "./CodexDefinitionModel";
 import { publishCodexNotice, useCodexSuite } from "./CodexSuite";
 import "./CodexTagGovernance.css";
+import { TagTaskActivity } from "./ModelJobActivity";
 
 type Audit = { status: string; stale: boolean; catalogReviewed: number; catalogTotal: number; tagsAnalyzed: number; pairsAnalyzed: number; candidatePending: number };
 type Report = { analyzed: number; submitted: { proposalId: string; tags: string[]; previewError?: string; preview?: { stale?: boolean; reviewBlocked?: boolean; reviewBlockers?: { message?: string }[] } }[]; errors: string[]; coverage: string; audit?: Audit };
@@ -62,6 +63,7 @@ export function CodexTagGovernance({ tagId, onCompleted }: { tagId?: string; onC
       </button>
     </div>
     <p>{tagId ? "比较当前标签与相关标签的原文证据，生成待审核的关系建议。" : "分批筛选全部标签，每次深入核对最多 2 个候选；进度自动保存。"} 建议由你审核后生效。</p>
+    <TagTaskActivity tag={tagId || ""} workflows={["tag-governance"]}/>
     {audit && <div className="tag-governance-codex-progress">{audit.stale ? "旧检查依据已过期，记录仍保留。点击上方按钮，按最新数据建立新一轮检查。" : <>目录已筛选 {audit.catalogReviewed} / {audit.catalogTotal} 个 · 深入核对 {audit.tagsAnalyzed} 个标签、{audit.pairsAnalyzed} 对关系 · 待继续 {audit.candidatePending} 项</>}</div>}
     {report && <div aria-live="polite" className="tag-governance-codex-result">
       <strong>本次已保存 {report.submitted.length} 项分析记录</strong>

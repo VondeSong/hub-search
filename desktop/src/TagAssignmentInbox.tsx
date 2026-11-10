@@ -15,6 +15,7 @@ import { publishCodexNotice, useCodexSuite } from "./CodexSuite";
 
 import { CodexContentScan } from "./CodexContentScan";
 import { TagContentScanPanel } from "./TagContentScanPanel";
+import { TagTaskActivity } from "./ModelJobActivity";
 import { DefinitionEditor } from "./DefinitionEditor";
 
 type Definition = { description: string; include: string; exclude: string; libraryIds: string[] };
@@ -246,6 +247,7 @@ export function TagAssignmentInbox({ tagId, userDescription = "", onOpenEvidence
   return <section className="tag-assignment-inbox" aria-label="内容补标">
     <header><strong>内容补标</strong><button type="button" disabled={loading || !!busy} onClick={() => void load()}>刷新建议</button></header>
     <p className="tag-assignment-hint">查看建议并批准到 Hub，再按需确认写回 Craft / Obsidian 原笔记。</p>
+    {tagId && <TagTaskActivity tag={tagId} workflows={["tag-definition", "tag-assignment-discovery"]}/>}
     {tagId && <div className="tag-definition-toolbar"><CodexDefinitionModel /></div>}
     {tagId && <details className="tag-assignment-definition" open={version === 0 ? true : undefined}><summary>定义与范围 · {version ? `已确认 · 版本 ${version} · ${definition.libraryIds.length} 个资料库` : "请先确认"}</summary>
       <div className="tag-definition-toolbar">

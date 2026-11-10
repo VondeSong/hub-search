@@ -73,6 +73,12 @@ struct SavedSettings {
 }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct Progress {
+    at: u64,
+    message: String,
+}
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Job {
     id: String,
     workflow: String,
@@ -88,6 +94,8 @@ struct Job {
     finished_at: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
+    context: Option<String>,
+    progress: Vec<Progress>,
     executions: Vec<execution::Receipt>,
     usage: Usage,
 }
@@ -823,6 +831,8 @@ impl Operation {
             started_at: None,
             finished_at: None,
             error: None,
+            context: None,
+            progress: Vec::new(),
             executions: Vec::new(),
             usage: Usage::default(),
         });
@@ -881,6 +891,31 @@ impl Operation {
         }))
     }
     /// A caller's old per-feature settings can never override this operation snapshot.
+    pub(crate) fn context(&self, value: &str) {
+        let mut state = self.runtime.state.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(job) = state.jobs.iter_mut().find(|job| job.id == self.id) {
+            job.context = Some(value.chars().take(200).collect());
+            state.revision += 1;
+        }
+    }
+    // Only application-authored checkpoints; never store prompts or model scratchpads.
+    pub(crate) fn progress(&self, message: &str) {
+        let mut state = self.runtime.state.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(job) = state
+            .jobs
+            .iter_mut()
+            .find(|job| job.id == self.id && job.state == "running")
+        {
+            if job.progress.len() >= 96 {
+                job.progress.remove(0);
+            }
+            job.progress.push(Progress {
+                at: time_ms(),
+                message: message.chars().take(240).collect(),
+            });
+            state.revision += 1;
+        }
+    }
     pub fn arguments(&self, args: &Value) -> Value {
         let mut args = args.clone();
         args["model"] = json!(self.settings.model);
@@ -1079,6 +1114,26 @@ impl Drop for Operation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn progress_is_isolated_bounded_and_stops_after_finish() {
+        let runtime = new_runtime(Settings::default());
+        let operation = Operation::start_on(runtime.clone(), "tag-definition", "生成定义").unwrap();
+        operation.context("方法");
+        for _ in 0..100 {
+            operation.progress("正在核对选定资料");
+        }
+        let view = snapshot(&runtime);
+        assert_eq!(view["jobs"][0]["context"], "方法");
+        assert_eq!(view["jobs"][0]["progress"].as_array().unwrap().len(), 96);
+        let other = Operation::start_on(runtime.clone(), "other", "其他任务").unwrap();
+        assert_eq!(snapshot(&runtime)["jobs"][1]["progress"], json!([]));
+        other.finish(&Ok::<_, String>(()));
+        operation.finish(&Err::<(), _>("核验未通过".to_string()));
+        operation.progress("不能追加");
+        let view = snapshot(&runtime);
+        assert_eq!(view["jobs"][0]["state"], "failed");
+        assert_eq!(view["jobs"][0]["progress"].as_array().unwrap().len(), 96);
+    }
     #[test]
     fn conversation_selection_changes_only_its_own_snapshot_and_keeps_global_admission() {
         let global = Settings {

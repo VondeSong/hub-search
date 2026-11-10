@@ -7,7 +7,7 @@ export type ModelProvider = "codex" | "deepseek";
 export type CodexSettings = { provider?: ModelProvider; model: string; reasoningEffort: string; fast: boolean; maxConcurrent: number };
 export type CodexModel = { id: string; name: string; reasoningLevels?: string[]; defaultReasoning?: string | null; fastDescription?: string };
 export type ModelExecution = { provider: string; outcome: string; elapsedMs: number; inputTokens?: number | null; outputTokens?: number | null; totalTokens?: number | null };
-export type CodexJob = { id: string; workflow: string; label: string; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; provider?: ModelProvider; model: string; reasoningEffort: string; fast: boolean; startedAt?: number; finishedAt?: number; error?: string; executions?: ModelExecution[]; usage?: { calls: number; callsWithTokens: number; totalTokens: number } };
+export type CodexJob = { id: string; workflow: string; label: string; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; provider?: ModelProvider; model: string; reasoningEffort: string; fast: boolean; startedAt?: number; finishedAt?: number; error?: string; context?: string | null; progress?: { at: number; message: string }[]; executions?: ModelExecution[]; usage?: { calls: number; callsWithTokens: number; totalTokens: number } };
 export type CodexSnapshot = { settings: CodexSettings; jobs: CodexJob[]; revision: number };
 type Store = CodexSnapshot & { loaded: boolean; loading: boolean; error: string };
 const initial = (): Store => ({ settings: { model: "", reasoningEffort: "", fast: false, maxConcurrent: 2 }, jobs: [], revision: 0, loaded: false, loading: false, error: "" });

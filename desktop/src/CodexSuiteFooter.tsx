@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Clock3, LoaderCircle, Settings2, X } from "lucide-react";
 import { cancelModelJob, codexSelectionLabel, openCodexSuiteSettings, publishCodexNotice, useCodexSuite, type CodexJob } from "./CodexSuite";
 import "./CodexSuiteFooter.css";
+import { ModelJobActivity } from "./ModelJobActivity";
 
 const labels: Record<CodexJob["state"], string> = { queued: "等待运行", running: "正在生成", succeeded: "生成完成", failed: "生成失败", cancelled: "已停止，可继续" };
 export function CodexSuiteFooter() {
@@ -43,6 +44,7 @@ export function CodexSuiteFooter() {
         <small>{codexSelectionLabel({ provider: job.provider, model: job.model, reasoningEffort: job.reasoningEffort, fast: job.fast, maxConcurrent: suite.settings.maxConcurrent })}</small>
         {!!job.usage?.calls && <small>{job.usage.calls} 次调用 · {job.usage.callsWithTokens ? `${job.usage.totalTokens.toLocaleString()} tokens${job.usage.callsWithTokens < job.usage.calls ? `（${job.usage.callsWithTokens} 次已返回用量）` : ""}` : "提供方未返回用量"}</small>}
         {(job.state === "running" || job.state === "queued") && <button type="button" onClick={() => void cancelModelJob(job.id).catch(reason => publishCodexNotice(String(reason), "error"))}>停止此请求</button>}
+        <ModelJobActivity job={job}/>
         {job.error && <p className="codex-suite-job-error">{job.error}</p>}
       </article>)}</div>
     </section>}
