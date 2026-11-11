@@ -1,14 +1,22 @@
 package com.craftsearch.desktop
 
 import android.os.Bundle
+import android.webkit.WebView
 import java.io.File
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.graphics.Insets
 
 class MainActivity : TauriActivity() {
+  private var hubWebView: WebView? = null
+
+  override fun onWebViewCreate(webView: WebView) {
+    super.onWebViewCreate(webView)
+    hubWebView = webView
+  }
   // Android's /data/user/0 alias must be resolved before native data-safety checks.
   override fun getDataDir(): File = super.getDataDir().canonicalFile
 
@@ -17,6 +25,15 @@ class MainActivity : TauriActivity() {
     super.onCreate(savedInstanceState)
 
     val content = findViewById<android.view.View>(android.R.id.content)
+    val bottomPadding = content.paddingBottom
+    ViewCompat.setOnApplyWindowInsetsListener(content) { view, insets ->
+      // Edge-to-edge WebViews can keep a full-height viewport above the IME.
+      val ime = WindowInsetsCompat.Type.ime()
+      view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight,
+        bottomPadding + insets.getInsets(ime).bottom)
+      WindowInsetsCompat.Builder(insets).setInsets(ime, Insets.NONE).build()
+    }
+    ViewCompat.requestApplyInsets(content)
     val keyboardBack = object : OnBackPressedCallback(false) {
       override fun handleOnBackPressed() {
         WindowInsetsControllerCompat(window, content).hide(WindowInsetsCompat.Type.ime())
@@ -38,8 +55,15 @@ class MainActivity : TauriActivity() {
 
   @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
   override fun onBackPressed() {
-    // Tauri invokes this fallback after the WebView history is exhausted.
-    // Keep the root task available for resume instead of tearing down the Rust runtime.
-    moveTaskToBack(true)
+    // Legacy Back reaches this override before AndroidX's history callback.
+    val content = findViewById<android.view.View>(android.R.id.content)
+    if (content != null && ViewCompat.getRootWindowInsets(content)
+        ?.isVisible(WindowInsetsCompat.Type.ime()) == true) {
+      WindowInsetsControllerCompat(window, content).hide(WindowInsetsCompat.Type.ime())
+      return
+    }
+    val webView = hubWebView
+    if (webView?.canGoBack() == true) webView.goBack()
+    else moveTaskToBack(true)
   }
 }

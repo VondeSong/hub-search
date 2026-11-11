@@ -150,3 +150,6 @@ html[data-runtime-platform="android"] .cloud-agents :is(.cloud-agents-header,.cl
 html[data-runtime-platform="android"] .cloud-agents .cloud-agents-list { background:var(--mobile-fill); }
 html[data-runtime-platform="android"] .cloud-agents :is(.cloud-agents-user,.cloud-agents-list button[aria-current]) { background:var(--mobile-selected); }
 html[data-runtime-platform="android"] .cloud-agents .cloud-agents-answer { font-size:17px; line-height:1.75; }
+
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.journal-mobile) .mobile-top-area .search-header { display:none; }
+html[data-runtime-platform="android"] .journal-mobile .journal-db-body { padding:0 0 calc(84px + env(safe-area-inset-bottom,0px)); }
