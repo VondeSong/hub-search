@@ -6,9 +6,11 @@ import { useAgentPopover } from "./useAgentPopover";
 import type { AssistantOptions } from "./AgentAssistantOptions";
 import "./AgentModelMenu.css";
 
-const effortName=(value:string)=>CODEX_EFFORT_LABELS[value]||value||"默认";
+const effortLabels:Record<string,string>={none:"关闭思考",low:"低",medium:"中",xhigh:"超高"};
+const effortName=(value:string)=>effortLabels[value]||CODEX_EFFORT_LABELS[value]||value||"默认";
 const supportsFast=(provider:ModelProvider,model?:CodexModel)=>provider==="codex"&&!!model?.fastDescription?.trim();
 const descriptions:Record<string,string>={none:"直接回答，不启用推理模式",low:"较少推理投入，适合简单问题",medium:"适合日常讨论与资料整理",high:"增加推理投入，适合复杂问题",xhigh:"更充分地推理与检查，等待可能更久",max:"使用该模型最高的推理投入",ultra:"使用该模型支持的更高推理投入"};
+const modelLabel=(name:string)=>name.replace(/^(GPT-\d+(?:\.\d+)?)-(Sol|Terra|Astra|Luna)$/i,"$1 $2");
 const providers:ModelProvider[]=["deepseek","codex"];
 export function AgentModelMenu({value,disabled,onSave}:{value:AssistantOptions;disabled:boolean;onSave:(value:AssistantOptions)=>Promise<void>}){
   const runtime=useCodexSuite(),effective=value.model??(runtime.loaded?runtime.settings:null),activeProvider=effective?.provider??"codex";
@@ -25,7 +27,7 @@ export function AgentModelMenu({value,disabled,onSave}:{value:AssistantOptions;d
     setError(failures.join("；"));setLoading(false);
   }
   useEffect(()=>{if(runtime.loaded||value.model)void load();},[runtime.loaded]);
-  const selected=catalogs[activeProvider].find(model=>model.id===effective?.model),modelName=selected?.name||effective?.model||"选择模型";
+  const selected=catalogs[activeProvider].find(model=>model.id===effective?.model),modelName=modelLabel(selected?.name||effective?.model||"选择模型");
   const levels=[...new Set(selected?.reasoningLevels||[])],currentEffort=effective?.reasoningEffort||"",resolvedEffort=currentEffort||selected?.defaultReasoning||"",currentIndex=levels.indexOf(resolvedEffort);
   const fastAvailable=supportsFast(activeProvider,selected),fastActive=activeProvider==="codex"&&!!effective?.fast,blocked=disabled||saving;
   const barCount=resolvedEffort==="none"||currentIndex<0?0:Math.max(1,Math.round((currentIndex+1)/levels.length*5));
@@ -59,7 +61,7 @@ export function AgentModelMenu({value,disabled,onSave}:{value:AssistantOptions;d
       </summary>
       <div className="agent-assistant-settings agent-model-menu" aria-label="模型与速度">
         <div className="agent-popover-header"><span>模型与速度</span><button type="button" aria-label="关闭模型选择" onClick={()=>modelMenu.close(true)}><X size={16}/></button></div>
-        <div className="agent-model-list">{providers.map(provider=><section key={provider} aria-label={provider==="codex"?"OpenAI 模型":"DeepSeek 模型"}><span className="agent-model-heading">{provider==="codex"?"OpenAI":"DeepSeek"}</span>{catalogs[provider].map(model=><button type="button" className="agent-menu-choice" key={model.id} title={model.id} disabled={blocked} aria-pressed={effective?.model===model.id&&activeProvider===provider} onClick={()=>chooseModel(provider,model)}><img className="agent-provider-icon" src={`/brands/${provider==="codex"?"openai":"deepseek"}.ico`} alt={provider==="codex"?"OpenAI":"DeepSeek"}/><span>{model.name}</span>{effective?.model===model.id&&activeProvider===provider&&<Check size={16}/>}</button>)}</section>)}</div>
+        <div className="agent-model-list">{providers.map(provider=><section key={provider} aria-label={provider==="codex"?"OpenAI 模型":"DeepSeek 模型"}><span className="agent-model-heading">{provider==="codex"?"OpenAI":"DeepSeek"}</span>{catalogs[provider].map(model=><button type="button" className="agent-menu-choice" key={model.id} title={model.id} disabled={blocked} aria-pressed={effective?.model===model.id&&activeProvider===provider} onClick={()=>chooseModel(provider,model)}><img className="agent-provider-icon" src={`/brands/${provider==="codex"?"openai":"deepseek"}.ico`} alt={provider==="codex"?"OpenAI":"DeepSeek"}/><span>{/^DeepSeek[- ]V/i.test(model.name)?<>DeepSeek<small>{model.name.replace(/^DeepSeek[- ]/i,"").replace(/[- ](Flash|Pro)$/i," $1")}</small></>:modelLabel(model.name)}</span>{effective?.model===model.id&&activeProvider===provider&&<Check size={16}/>}</button>)}</section>)}</div>
         {loading&&!catalogs.codex.length&&!catalogs.deepseek.length&&<p role="status">正在读取可用模型…</p>}
         {!loading&&!catalogs.codex.length&&!catalogs.deepseek.length&&!error&&<p className="agent-note">没有可用模型，请刷新或检查提供方设置。</p>}
         {fastAvailable&&<section className="agent-speed-setting" aria-label="响应速度"><strong>响应速度</strong><div className="agent-speed-segments">{[false,true].map(fast=><button type="button" key={String(fast)} disabled={blocked||!effective} aria-label={fast?"快速模式":"标准速度"} aria-pressed={fastActive===fast} onClick={()=>{if(effective)void save({...value,model:{...effective,fast}});}}>{fast?<Zap size={18}/>:<Circle size={18}/>}<span>{fast?"加速":"标准"}</span>{fastActive===fast&&<Check size={16}/>}</button>)}</div><p>加速增加用量消耗，不改变思考强度。</p></section>}

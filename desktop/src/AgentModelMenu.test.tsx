@@ -70,7 +70,7 @@ it("uses DeepSeek's actual effort levels and never exposes speed, even with a ma
   expect(host.textContent).not.toContain("标准速度");
   await setRange(0, "assistive");
   expect(save).toHaveBeenCalledExactlyOnceWith(options("deepseek-flash", "deepseek", "none"));
-  expect(summary("effort").getAttribute("aria-label")).toContain("无推理");
+  expect(summary("effort").getAttribute("aria-label")).toContain("关闭思考");
 });
 
 it("hides speed for Codex models that do not advertise Fast", async () => {

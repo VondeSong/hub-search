@@ -317,6 +317,17 @@ describe("assistant refinement integration", () => {
 
 
 describe("site v71 assistant controls",()=>{
+  it("opens task status as its own panel and restores the mode trigger on Escape",async()=>{
+    await render(<StandaloneInvestigation initiallyOpen startFresh/>);
+    const trigger=select<HTMLElement>('.agent-task-mode>summary');await activate(trigger);
+    await activate([...document.querySelectorAll<HTMLButtonElement>('.agent-mode-menu button')].find(b=>b.textContent==="查看任务状态")!);
+    await act(async()=>{await new Promise(resolve=>setTimeout(resolve,10));});
+    expect(select<HTMLElement>('.agent-detail-materials').hidden).toBe(true);
+    const close=select<HTMLButtonElement>('button[aria-label="关闭任务状态"]');expect(document.activeElement).toBe(close);
+    await act(async()=>close.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})));
+    expect(select<HTMLDetailsElement>('.agent-dialogue-details').open).toBe(false);expect(document.activeElement).toBe(trigger);
+    expect(calls('create')).toHaveLength(0);expect(calls('respond')).toHaveLength(0);
+  });
   it("creates an empty new chat and explicitly applies its topic scope before the first model request",async()=>{
     const topic={id:"new-topic",revision:1,title:"首次专题",pinned:false,grant:{libraryIds:[],notes:[{kind:"note",libraryId:"library-a",documentId:"note-a",pageId:null}],readingItemKeys:[]},policy:"materials-only",skills:[],versions:[]};
     invoke.mockImplementation(async(command,payload)=>{
@@ -334,6 +345,8 @@ describe("site v71 assistant controls",()=>{
     await activate(select<HTMLElement>('.agent-task-mode>summary'));
     await activate([...document.querySelectorAll<HTMLButtonElement>('.agent-mode-menu button')].find(b=>b.textContent?.includes("全部专题"))!);
     await activate([...document.querySelectorAll<HTMLButtonElement>('.agent-topic-list button')].find(b=>b.textContent?.includes(topic.title))!);
+    expect(calls("create")).toHaveLength(0);
+    await activate([...document.querySelectorAll<HTMLButtonElement>('.agent-research-topics button')].find(b=>b.textContent==="应用到当前对话")!);
     await submit("从这个专题开始核对");
     expect(calls("create")).toHaveLength(1);expect(calls("create")[0].grant).toEqual({libraryIds:[],notes:[],readingItemKeys:[]});
     expect(calls("replaceResearchScope")).toHaveLength(1);expect(calls("replaceResearchScope")[0].grant).toEqual({...topic.grant,sources:[]});
@@ -361,6 +374,7 @@ describe("site v71 assistant controls",()=>{
     await activate(select<HTMLElement>('.agent-task-mode>summary'));
     await activate([...document.querySelectorAll<HTMLButtonElement>('.agent-mode-menu button')].find(b=>b.textContent?.includes("全部专题"))!);
     await activate([...document.querySelectorAll<HTMLButtonElement>('.agent-topic-list button')].find(b=>b.textContent?.includes(topic.title))!);
+    await activate([...document.querySelectorAll<HTMLButtonElement>('.agent-research-topics button')].find(b=>b.textContent==="应用到当前对话")!);
     changed=true;
     await submit("保留这个问题，先核对更新");
     expect(calls("create")).toHaveLength(0);expect(calls("respond")).toHaveLength(0);

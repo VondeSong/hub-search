@@ -19,6 +19,7 @@ type Catalog = { skills: AgentSkill[]; diagnostics: { name: string; message: str
 const builtinTitles: Record<string,string> = {"hub-research":"资料分析与核对","hub-statistics":"材料统计与覆盖核对","hub-flashcards":"有来源的闪卡","hub-note-edit":"笔记整理与修改","hub-archive":"阅读材料归档","hub-tool-guide":"Hub 工具使用方法"};
 export const skillTitle = (name:string) => builtinTitles[name] || name;
 const purposes: Record<string,string> = {"hub-research":"比较材料中的观点，核对原文与矛盾","hub-statistics":"统计材料中的数量、日期与覆盖范围","hub-flashcards":"根据笔记制作或检查学习卡片","hub-note-edit":"整理、改写当前可编辑的 Obsidian 笔记","hub-archive":"为阅读材料准备归档方案","hub-tool-guide":"查看标签、媒体和闪卡工具的使用约定"};
+export const skillPurpose=(name:string)=>purposes[name]||"";
 
 export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], onReset, pinned=[], onPin }: { disabled: boolean; onSelect: (name: string) => void; embedded?: boolean; selected?:string[]; onReset?:()=>void; pinned?:string[]; onPin?:(name:string)=>void }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);

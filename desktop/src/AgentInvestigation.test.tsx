@@ -274,7 +274,7 @@ async function openAddPage(label:string){
  if(label==="资料范围"){await click("搜索范围：");return;}
  if(label==="资料库与页面"){await click("搜索范围：");await click("核心材料");return;}
  if(label==="从笔记库添加"){await click("搜索范围：");await click("核心材料");return;}
- if(label==="更多设置"){await openDialogueDetails();const connection=[...document.body.querySelectorAll<HTMLDetailsElement>(".agent-details-sections details")].find(d=>d.querySelector("summary")?.textContent==="联网与工具")!;connection.open=true;connection.classList.add("agent-menu-advanced");return;}
+ if(label==="更多设置"){await openDialogueDetails();const connection=[...document.body.querySelectorAll<HTMLDetailsElement>(".agent-details-sections details")].find(d=>d.querySelector(".agent-detail-title")?.textContent==="联网与工具")!;connection.open=true;connection.classList.add("agent-menu-advanced");return;}
  if(label==="从资料库添加图片"){await click("搜索范围：");await click("选择资料库图片");return;}
  if(label==="读取公共链接"){await click("搜索范围：");await click("读取公共链接");return;}
  const menu=document.body.querySelector<HTMLDetailsElement>(".agent-add-menu")!;
@@ -431,7 +431,7 @@ it("keeps an unsaved supplement after commit failure without reporting saved or 
  expect(invoke.mock.calls.some(([,p])=>p?.args?.action==="respond")).toBe(false);
 });
 it("uses permitted standard execution automatically without a manual mode picker",async()=>{
- current={...makeView("failed"),lifecycle:quotaLifecycle(true,false)};invoke.mockImplementation(async(_,{args})=>args.action==="list"?{works:[{id:"work-1",goal:current.work.goal,state:current.work.state}]}:current);await open();expect(button("继续调查").disabled).toBe(false);await fill("investigationGoal","在既有额度内处理");await click("发送");const calls=invoke.mock.calls.filter(([,p])=>p?.args?.action==="respond");expect(calls).toHaveLength(1);expect(calls[0][1].args.mode).toBe("quick");expect(document.body.querySelector('.agent-mode-badge')).toBeNull();
+ current={...makeView("failed"),lifecycle:quotaLifecycle(true,false)};invoke.mockImplementation(async(_,{args})=>args.action==="list"?{works:[{id:"work-1",goal:current.work.goal,state:current.work.state}]}:current);await open();expect(button("继续调查").disabled).toBe(false);await fill("investigationGoal","在既有额度内处理");await click("发送");const calls=invoke.mock.calls.filter(([,p])=>p?.args?.action==="respond");expect(calls).toHaveLength(1);expect(calls[0][1].args.mode).toBe("quick");expect(document.body.querySelector('.agent-mode-badge')?.textContent).toBe('标准');expect(document.body.querySelector('.agent-mode-menu select')).toBeNull();
 });
 
 function historyFixture():typeof current {
@@ -951,7 +951,7 @@ it("shows persisted material before run controls after the final model call fail
   expect(document.body.textContent).toContain("尚未形成完整结论");
   expect(document.body.textContent).not.toContain("查明的情况");
   expect(document.body.querySelector(".agent-conversation")?.textContent).toContain("功放安装示例");
-  expect(document.body.querySelector(".agent-dialogue-details")?.textContent).toContain("来源范围与本轮用量");
+  expect(document.body.querySelector(".agent-dialogue-details")?.textContent).toContain("资料范围");
   expect(invoke.mock.calls.some(([, { args }]) => args.action === "respond")).toBe(false);
 });
 it("keeps prior delivered evidence in a labeled history while a new run is pending", async () => {
@@ -2017,7 +2017,7 @@ it("keeps global history in a fresh page chat without resuming an unrelated work
  await openDialogueDetails();
  expect(document.querySelector('.agent-dialogue-details')?.textContent).toContain('尚未开始任务');
  expect(document.querySelector('.agent-dialogue-details')?.textContent).toContain('资料范围');
- expect(document.querySelector('.agent-dialogue-details')?.textContent).toContain('记忆与后续操作');
+ expect(document.querySelector('.agent-dialogue-details')?.textContent).toContain('成果与保存');
  expect(invoke.mock.calls.some(([,p])=>['create','respond','resume','message'].includes(p?.args?.action))).toBe(false);
 });
 it("shows history read errors and retries only the history without replacing the draft",async()=>{
@@ -2035,7 +2035,7 @@ it("keeps history and menu sections visible when there are no saved conversation
  invoke.mockImplementation(async(_,{args})=>args.action==='list'?{works:[]}:current);
  await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
  const menu=document.querySelector('.agent-details-content')!;
- expect(menu.textContent).toContain('还没有历史对话');expect(menu.textContent).toContain('资料范围');expect(menu.textContent).toContain('记忆与后续操作');expect(menu.textContent).toContain('任务状态');
+ expect(menu.textContent).toContain('还没有历史对话');expect(menu.textContent).toContain('资料范围');expect(menu.textContent).toContain('成果与保存');expect(menu.textContent).toContain('任务状态');
  expect(menu.querySelector('.agent-provider-budget')).toBeNull();expect(button('停止此任务')).toBeUndefined();
 });
 

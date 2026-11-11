@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach,beforeEach,expect,it,vi } from "vitest";
-import { AgentResearchTopics,researchGrant,type ResearchGrant,type ResearchTopic } from "./AgentResearch";
+import { AgentActiveTopic,AgentResearchTopics,researchGrant,type ResearchGrant,type ResearchTopic } from "./AgentResearch";
 const {invoke}=vi.hoisted(()=>({invoke:vi.fn()}));
 vi.mock("@tauri-apps/api/core",()=>({invoke}));
 let host:HTMLDivElement,root:Root;
@@ -28,4 +28,24 @@ it("requires confirmation after a topic loses a source and cannot apply an entir
  expect([...host.querySelectorAll("button")].find(b=>b.textContent?.includes("确认仅使用剩余资料"))!.disabled).toBe(true);
  expect(host.textContent).toContain("用当前选择的资料修复专题");
  expect(close).not.toHaveBeenCalled();
+});
+it("reviews an available topic and applies only after explicit confirmation",async()=>{
+ const apply=vi.fn(async()=>{}),close=vi.fn();
+ invoke.mockImplementation(async(_,{args})=>args?.action==="researchTopics"?{topics:[topic]}:{grant:topic.grant,unavailable:[],changed:[],versions:[]});
+ await act(async()=>root.render(<AgentResearchTopics open saveMode={false} config={{grant:manual,policy:"material-first",skills:[]}} disabled={false} onApply={apply} onClose={close}/>));
+ await act(async()=>host.querySelector<HTMLButtonElement>('.agent-topic-list button')!.click());
+ expect(apply).not.toHaveBeenCalled();expect(close).not.toHaveBeenCalled();
+ await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==="应用到当前对话")!.click());
+ expect(apply).toHaveBeenCalledWith(expect.objectContaining({id:topic.id,grant:topic.grant}));expect(close).toHaveBeenCalledOnce();
+});
+it("removes a topic source or skill locally without overwriting the saved topic or manual materials",async()=>{
+ const original=structuredClone(topic),originalManual=structuredClone(manual),change=vi.fn();
+ invoke.mockResolvedValue([]);
+ await act(async()=>root.render(<AgentActiveTopic topic={topic} disabled={false} onChange={change} onCancel={()=>{}}/>));
+ await act(async()=>host.querySelector<HTMLButtonElement>('button[aria-label^="从当前专题移除材料"]')!.click());
+ expect(change.mock.calls[0][0].grant.notes).toEqual([]);
+ await act(async()=>host.querySelector<HTMLButtonElement>('button[aria-label^="从当前专题移除技能"]')!.click());
+ expect(change.mock.calls[1][0].skills).toEqual([]);
+ expect(topic).toEqual(original);expect(manual).toEqual(originalManual);
+ expect(invoke.mock.calls.some(([,p])=>p?.args?.action==='saveResearchTopic')).toBe(false);
 });

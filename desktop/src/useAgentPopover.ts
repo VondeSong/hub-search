@@ -1,10 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 /** Native details keeps disclosure semantics; dismissal never submits a form. */
-export function useAgentPopover(options: { deferEscapeSelector?: string } = {}) {
+export function useAgentPopover(options: { deferEscapeSelector?: string; triggerRef?: RefObject<HTMLElement | null>; returnFocusRef?: RefObject<HTMLElement | null> } = {}) {
   const ref = useRef<HTMLDetailsElement>(null);
   const [element, setElement] = useState<HTMLDetailsElement | null>(null);
   const deferredEscape = useRef(options.deferEscapeSelector);
+  const trigger = options.triggerRef;
+  const returnFocus = options.returnFocusRef;
   deferredEscape.current = options.deferEscapeSelector;
   // The assistant's disclosures mount after its launcher is first opened.
   useLayoutEffect(() => { if (ref.current !== element) setElement(ref.current); });
@@ -12,14 +14,14 @@ export function useAgentPopover(options: { deferEscapeSelector?: string } = {}) 
     const element = ref.current;
     if (!element?.open) return;
     element.open = false;
-    if (restoreFocus) element.querySelector("summary")?.focus();
+    if (restoreFocus) (returnFocus ? returnFocus.current ?? element.querySelector("summary") : trigger?.current ?? element.querySelector("summary"))?.focus();
   }
   useEffect(() => {
     if (!element) return;
     // Padding clicks keep a focus owner inside the disclosure for Escape.
     if (!element.hasAttribute("tabindex")) element.tabIndex = -1;
     const outside = (event: Event) => {
-      if (event.target instanceof Node && !ref.current?.contains(event.target)) close();
+      if (event.target instanceof Node && !ref.current?.contains(event.target) && !trigger?.current?.contains(event.target)) close();
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.isComposing || event.defaultPrevented || !ref.current?.open ||
@@ -73,6 +75,6 @@ export function useAgentPopover(options: { deferEscapeSelector?: string } = {}) 
       window.removeEventListener("resize", fit);
       resize?.disconnect();
     };
-  }, [element]);
+  }, [element, trigger, returnFocus]);
   return { ref, close };
 }

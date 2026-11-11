@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { loadMemoryPreference, rememberMemoryPreference, type MemorySelection } from "./AgentPreferences";
 export type { MemorySelection } from "./AgentPreferences";
 
@@ -20,7 +20,7 @@ const states: Record<string, string> = {
   pending: "等待索引核验", active: "已生效", inactive: "已停用", deleting: "已停止使用，正在清除", review: "恢复的历史记忆，需要重新确认",
 };
 
-export function SharedMemory({ workId, disabled, onSelectionChange, initialSelection, usage, compact = false }: { compact?: boolean; workId?: string; disabled: boolean; initialSelection?: MemorySelection; onSelectionChange?: (selection: MemorySelection) => void; usage?: MemoryUse | null }) {
+export function SharedMemory({ workId, disabled, onSelectionChange, initialSelection, usage, compact = false, summary }: { summary?: (selection: MemorySelection | undefined) => ReactNode; compact?: boolean; workId?: string; disabled: boolean; initialSelection?: MemorySelection; onSelectionChange?: (selection: MemorySelection) => void; usage?: MemoryUse | null }) {
   const [expanded, setExpanded] = useState(false);
   const [view, setView] = useState<View | null>(null);
   const [busy, setBusy] = useState(false);
@@ -98,12 +98,12 @@ export function SharedMemory({ workId, disabled, onSelectionChange, initialSelec
     }
   }
   const blocked = disabled || busy;
-  return <details className="agent-run-details" onToggle={event => {
+  return <details className={`agent-run-details${summary?" agent-detail-row":""}`} onToggle={event => {
     const next = event.currentTarget.open;
     setExpanded(next);
     if (next && !busy) void perform({ action: "status" });
   }}>
-    <summary>{compact && view ? `记忆 · ${view.selection.enabled ? "已启用" : "未启用"}` : "共享记忆"}{view?.proposals?.length ? ` · ${view.proposals.length} 条待确认` : ""}</summary>
+    <summary>{summary ? summary(view?.selection ?? (workId?undefined:initialSelection)) : compact && view ? `记忆 · ${view.selection.enabled ? "已启用" : "未启用"}` : "共享记忆"}{view?.proposals?.length ? ` · ${view.proposals.length} 条待确认` : ""}</summary>
     {expanded && <>
       <p className="agent-note">保存你确认的规则与决定，供其他调查复用。个人通用记忆适用于所有启用记忆的事项，项目记忆只在所选项目内使用。</p>
       <p className="agent-note">新聊天会沿用你最后选择的记忆范围和开关；记忆内容仍需确认保存。</p>

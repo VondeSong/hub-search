@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, useRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useAgentPopover } from "./useAgentPopover";
@@ -12,6 +12,20 @@ function Menu({ composer = true }: { composer?: boolean }) {
   const menu = <details ref={popover.ref}><summary>菜单</summary><button>返回</button></details>;
   return composer ? <div className="agent-body"><div className="agent-composer"><div className="agent-composer-controls">{menu}</div></div></div> : menu;
 }
+function ExternalTriggerMenu() {
+  const trigger=useRef<HTMLButtonElement>(null);
+  const popover=useAgentPopover({triggerRef:trigger});
+  return <><button ref={trigger} onClick={()=>{if(popover.ref.current)popover.ref.current.open=!popover.ref.current.open;}}>更多</button><details ref={popover.ref}><summary>历史</summary><button>内容</button></details></>;
+}
+it("does not dismiss an external toggle before its click and therefore reopen it",async()=>{
+  await act(async()=>root.render(<ExternalTriggerMenu/>));
+  const trigger=host.querySelector('button')!,menu=host.querySelector('details')!;
+  await act(async()=>trigger.click());expect(menu.open).toBe(true);
+  await act(async()=>{trigger.dispatchEvent(new Event('pointerdown',{bubbles:true}));trigger.focus();trigger.click();});
+  expect(menu.open).toBe(false);
+  await act(async()=>trigger.click());expect(menu.open).toBe(true);
+  await act(async()=>document.body.dispatchEvent(new Event('pointerdown',{bubbles:true})));expect(menu.open).toBe(false);
+});
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   disconnect.mockReset();

@@ -117,3 +117,14 @@
 .agent-model-controls .agent-speed-segments>button { display:flex; flex:1; justify-content:center; align-items:center; gap:7px; min-height:34px; border:0; background:transparent; color:var(--hub-text-secondary); }
 .agent-model-controls .agent-speed-segments>button[aria-pressed=true] { color:var(--hub-text-primary); background:var(--hub-content-surface); box-shadow:0 1px 4px color-mix(in srgb,var(--hub-text-primary) 8%,transparent); }
 .agent-model-controls .agent-model-footer { flex-wrap:wrap; justify-content:space-between; font-size:10px; }
+.agent-panel .agent-model-controls .agent-model-menu .agent-menu-choice,
+.agent-panel .agent-model-controls .agent-effort-levels .agent-menu-choice { font-size:12px; line-height:1.5; border-radius:11px; padding:8px 10px; }
+.agent-panel .agent-model-controls .agent-effort-levels .agent-menu-choice { min-height:52px; }
+.agent-panel .agent-model-controls .agent-effort-levels strong { font-size:12px; }
+.agent-panel .agent-model-controls .agent-model-list .agent-menu-choice { min-height:36px; }
+.agent-model-list .agent-menu-choice small { display:block; margin-top:3px; color:var(--hub-text-secondary); font-size:11px; }
+.agent-panel .agent-model-controls .agent-model-heading { font-size:11px; padding:6px 8px; margin:0; line-height:1.5; }
+.agent-panel .agent-model-controls .agent-provider-icon { width:18px; height:18px; }
+.agent-panel .agent-model-controls .agent-speed-setting > strong { font-size:12px; font-weight:500; }
+.agent-panel .agent-model-controls .agent-speed-segments > button { font-size:12px; min-height:32px; border-radius:9px; }
+.agent-model-controls .agent-assistant-settings > * { flex-shrink:0; }
