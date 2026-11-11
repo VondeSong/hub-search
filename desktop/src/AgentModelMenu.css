@@ -128,3 +128,6 @@
 .agent-panel .agent-model-controls .agent-speed-setting > strong { font-size:12px; font-weight:500; }
 .agent-panel .agent-model-controls .agent-speed-segments > button { font-size:12px; min-height:32px; border-radius:9px; }
 .agent-model-controls .agent-assistant-settings > * { flex-shrink:0; }
+.agent-panel .agent-model-controls>.agent-option-model>summary{padding:0 1px 0 5px;font-size:12px;color:var(--hub-text-primary)}
+.agent-panel .agent-model-controls>.agent-option-effort>summary{width:auto;padding:0 4px 0 1px;gap:5px;font-size:12px;white-space:nowrap}
+.agent-model-controls>.agent-option-effort>summary>svg{flex:none}

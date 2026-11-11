@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { AgentSkills } from "./AgentSkills";
@@ -43,7 +43,7 @@ it("offers retry after discovery failure and opens the owned directory only on a
   expect(host.querySelector('[role="alert"]')).toBeNull();
   expect(invoke.mock.calls.some(([, args]) => args.args.action === "openSkillDirectory")).toBe(false);
   invoke.mockImplementation(async(_,{args})=>args.action==="skillPackages"?{sources:[]}:catalog);
-  await act(async () => [...host.querySelectorAll("button")].find(button => button.textContent === "管理技能")!.click());
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="管理技能"]')!.click());
   await act(async () => [...host.querySelectorAll("button")].find(button => button.textContent === "打开用户技能文件夹")!.click());
   expect(invoke).toHaveBeenLastCalledWith("agent_investigation", { args: { action: "openSkillDirectory" } });
   expect(host.textContent).toContain(catalog.directory);
@@ -53,7 +53,7 @@ it("offers retry after discovery failure and opens the owned directory only on a
 
 it("explains the purpose before origin and does not require a skill for ordinary questions",async()=>{
   await render(); await open();
-  expect(host.textContent).toContain("普通提问可直接发送");
+  expect(host.textContent).toContain("按需自动选用");
   const choice=host.querySelector('.agent-skill-choice > button')!;
   expect(choice.querySelector('.agent-skill-icon svg')).not.toBeNull();
   expect(choice.querySelector('.agent-skill-copy strong')?.textContent).toBe("有来源的闪卡");
@@ -66,22 +66,40 @@ it("keeps empty discovery distinct from loading failure without choosing a fallb
   invoke.mockResolvedValue({...catalog,skills:[]});
   await render(); await open();
   expect(host.textContent).toContain("还没有可用技能");
-  expect(host.textContent).toContain("仍可直接提问");
+  expect(host.textContent).toContain("可直接提问");
   expect(host.querySelector('.agent-skill-choice')).toBeNull();
   expect(select).not.toHaveBeenCalled();
 });
 
-it("keeps the internal guide and long scope descriptions folded while allowing automatic selection",async()=>{
+it("keeps the internal guide searchable alongside other skills while allowing automatic selection",async()=>{
   invoke.mockResolvedValue({...catalog,skills:[...catalog.skills,{...catalog.skills[0],name:"hub-tool-guide",title:"Hub 工具使用方法"}]});
   const reset=vi.fn();
   await act(async()=>root.render(<AgentSkills disabled={false} onSelect={select} selected={["hub-flashcards"]} onReset={reset}/>));
   await open();
   expect(host.querySelector('button[aria-pressed="true"]')?.textContent).toContain('有来源的闪卡');
   expect(host.querySelector(".agent-skill-description")).toBeNull();
-  const guide=[...host.querySelectorAll('details')].find(d=>d.querySelector(':scope > summary')?.textContent==='高级工具指南')!;
-  expect(guide.open).toBe(false);
-  expect(guide.textContent).toContain('Hub 工具使用方法');
+  const guide=host.querySelector('[aria-label="查看技能 Hub 工具使用方法"]')!;
+  expect(guide).not.toBeNull();
+  expect(guide.closest('section')?.getAttribute('aria-label')).toBe('全部技能');
   await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='恢复自动选择')!.click());
   expect(reset).toHaveBeenCalledOnce();
+  expect(select).not.toHaveBeenCalled();
+});
+
+it("searches title, identifier and purpose, and keeps focus when pinning moves a skill",async()=>{
+  function PinnedSkills(){const [pinned,setPinned]=useState<string[]>([]);return <AgentSkills embedded disabled={false} onSelect={select} pinned={pinned} onPin={name=>setPinned(current=>current.includes(name)?current.filter(item=>item!==name):[...current,name])}/>;}
+  await act(async()=>root.render(<PinnedSkills/>));
+  const pin=host.querySelector<HTMLButtonElement>('[aria-label="置顶技能 学习审核"]')!;
+  await act(async()=>{pin.focus();pin.click();});
+  expect(host.querySelector('.agent-skill-group')?.getAttribute('aria-label')).toBe('置顶');
+  expect(document.activeElement?.getAttribute('aria-label')).toBe('取消置顶技能 学习审核');
+  const search=host.querySelector<HTMLInputElement>('[aria-label="搜索技能"]')!;
+  async function query(value:string){await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(search,value);search.dispatchEvent(new Event('input',{bubbles:true}));});}
+  for(const keyword of ['学习审核','custom-audit','个人方法']){await query(keyword);expect(host.querySelectorAll('.agent-skill-choice')).toHaveLength(1);expect(host.querySelector('.agent-skill-choice')?.textContent).toContain('学习审核');}
+  await query('不存在的技能');expect(host.textContent).toContain('没有找到匹配的技能');
+  await query('');
+  await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="查看技能 学习审核"]')!.click());
+  await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="取消置顶技能 学习审核"]')!.click());
+  expect(document.activeElement?.getAttribute('aria-label')).toBe('置顶技能 学习审核');
   expect(select).not.toHaveBeenCalled();
 });

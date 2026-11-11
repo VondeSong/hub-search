@@ -88,10 +88,10 @@ it("does not resubmit a stale Fast flag after the model loses that capability", 
   expect(host.querySelector(".agent-model-fast-active")).toBeNull();
 });
 
-it.each([["fixed-fast", "high"], ["fast-no-effort", ""]])("keeps real Fast accessible for %s without an adjustable reasoning slider", async (model, effort) => {
+it.each([["fixed-fast", "high"], ["fast-no-effort", ""]])("keeps real Fast in model settings for %s without inventing reasoning levels", async (model, effort) => {
   const initial = options(model, "codex", effort);
-  await render(initial); await open("effort");
-  expect(details("effort").hidden).toBe(false);
+  await render(initial); await open("model");
+  expect(details("effort").hidden).toBe(model==="fast-no-effort");
   expect(host.querySelectorAll(".agent-effort-levels button").length).toBeLessThanOrEqual(1);
   await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="快速模式"]')!.click());
   expect(save).toHaveBeenCalledExactlyOnceWith({ ...initial, model: { ...initial.model!, fast: true } });
@@ -99,6 +99,21 @@ it.each([["fixed-fast", "high"], ["fast-no-effort", ""]])("keeps real Fast acces
   expect(host.querySelector(".agent-model-fast-active")).not.toBeNull();
   expect(runtime.settings.fast).toBe(false);
   expect(invoke.mock.calls.every(([, value]) => value.args.action === "models")).toBe(true);
+});
+
+it("shows the model before textual reasoning depth, with only the depth carrying an arrow", async()=>{
+  await render();
+  expect([...host.querySelector('.agent-model-controls')!.children].map(e=>e.classList.contains('agent-option-model'))).toEqual([true,false]);
+  expect(summary('model').querySelector('svg')).toBeNull();
+  expect(summary('effort').textContent).toBe('高');
+  expect(summary('effort').querySelector('.agent-reasoning-bars')).toBeNull();
+  expect(summary('effort').querySelector('svg')).not.toBeNull();
+  await open('model'); await choose('plain');
+  expect(details('model').open).toBe(true);
+  await open('effort');
+  expect(details('model').open).toBe(false);
+  expect(details('effort').open).toBe(true);
+  expect(summary('effort').textContent).toBe('低');
 });
 
 it("restores each provider/model preference when switching back, without changing other options", async () => {

@@ -7,7 +7,7 @@ export type AgentMaterial = { locator: NoteLocator; title: string; path: string;
 type Page = { notes: AgentMaterial[]; total: number; nextOffset: number | null; snapshot: string };
 export const materialKey = (note: NoteLocator) => JSON.stringify([note.libraryId, note.documentId, note.pageId]);
 
-export function AgentMaterials({ anchor, anchorIncluded=true, selected, disabled, onChange, retained, libraryIds = [], removed = [], onRemove, onWithdraw, embedded=false, onDone }: { onDone?:()=>void; embedded?: boolean; anchor?: NoteLocator; anchorIncluded?:boolean; selected: AgentMaterial[]; disabled: boolean; onChange: (notes: AgentMaterial[]) => void; retained?: NoteLocator[]; libraryIds?: string[]; removed?: NoteLocator[]; onRemove?: (notes: NoteLocator[]) => void; onWithdraw?: () => void }) {
+export function AgentMaterials({ anchor, anchorIncluded=true, selected, disabled, onChange, retained, libraryIds = [], removed = [], onRemove, onWithdraw, embedded=false, hideFooter=false, onDone }: { hideFooter?:boolean; onDone?:()=>void; embedded?: boolean; anchor?: NoteLocator; anchorIncluded?:boolean; selected: AgentMaterial[]; disabled: boolean; onChange: (notes: AgentMaterial[]) => void; retained?: NoteLocator[]; libraryIds?: string[]; removed?: NoteLocator[]; onRemove?: (notes: NoteLocator[]) => void; onWithdraw?: () => void }) {
   const popover = useAgentPopover();
   const [query, setQuery] = useState("");
   const [page, setPage] = useState<Page | null>(null);
@@ -59,7 +59,7 @@ export function AgentMaterials({ anchor, anchorIncluded=true, selected, disabled
       })}
       {page?.nextOffset != null && <button type="button" disabled={disabled || loading} onClick={() => void load(page.nextOffset!)}>下一页</button>}
       </div>
-      <footer className="agent-material-footer"><span aria-live="polite">已选 {selected.length} 份<small>随下一条消息发送</small></span><button type="button" disabled={disabled || !!removed.length} onClick={()=>onDone ? onDone() : popover.close(true)}>完成选择</button></footer>
+      {!hideFooter&&<footer className="agent-material-footer"><span aria-live="polite">已选 {selected.length} 份<small>随下一条消息发送</small></span><button type="button" disabled={disabled || !!removed.length} onClick={()=>onDone ? onDone() : popover.close(true)}>完成选择</button></footer>}
     </div>;
   return embedded ? <div className="agent-menu-embedded">{content}</div> : <details ref={popover.ref} className="agent-materials agent-popover" name="hub-agent-preference" onToggle={event=>{if(event.target===event.currentTarget && event.currentTarget.open && !page && !loading)void load();}}><summary>{retained?"材料范围":"材料"}{selected.length ? `（${retained?"待追加 "+selected.length:selected.length+1}）` : ""}{removed.length ? `（待撤回 ${removed.length}）` : ""}</summary>{content}</details>;
 }

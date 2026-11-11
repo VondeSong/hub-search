@@ -275,10 +275,11 @@ async function openAddPage(label:string){
  if(label==="资料库与页面"){await click("搜索范围：");await click("核心材料");return;}
  if(label==="从笔记库添加"){await click("搜索范围：");await click("核心材料");return;}
  if(label==="更多设置"){await openDialogueDetails();const connection=[...document.body.querySelectorAll<HTMLDetailsElement>(".agent-details-sections details")].find(d=>d.querySelector(".agent-detail-title")?.textContent==="联网与工具")!;connection.open=true;connection.classList.add("agent-menu-advanced");return;}
- if(label==="从资料库添加图片"){await click("搜索范围：");await click("选择资料库图片");return;}
- if(label==="读取公共链接"){await click("搜索范围：");await click("读取公共链接");return;}
+ if(label==="从资料库添加图片"){await click("搜索范围：");await click("核心材料");await click("选择资料库图片");return;}
+ if(label==="读取公共链接"){await click("搜索范围：");await click("核心材料");await click("读取公共链接");return;}
  const menu=document.body.querySelector<HTMLDetailsElement>(".agent-add-menu")!;
- if(menu.open){if(!menu.querySelector(".agent-add-choices"))await click("返回");}else await act(async()=>menu.querySelector<HTMLElement>(":scope > summary")!.click());
+ if(menu.open&&!menu.querySelector(".agent-add-choices"))await click("关闭添加菜单");
+ if(!menu.open)await act(async()=>menu.querySelector<HTMLElement>(":scope > summary")!.click());
  await click(label);
 }
 async function open() { await act(async () => root.render(<AgentInvestigation result={result} />)); await click("调查这篇笔记"); }
@@ -783,7 +784,7 @@ it("draft scope shows no material after removal and restores the explicit page",
  const summary=()=>document.body.querySelector('.agent-material-advanced > .agent-note')!.textContent;
  expect(summary()).toContain("未添加资料，可直接对话");expect(summary()).not.toContain("安装方案");
  expect(button("开始调查").disabled).toBe(false);
- await click("返回");await click("添加资料");await click("添加当前页面");await openAddPage("资料范围");
+ await click("关闭添加菜单");await click("添加资料");await click("添加当前页面");await openAddPage("资料范围");
  expect(summary()).toContain("当前范围：安装方案，另有 0 份资料");expect(button("开始调查").disabled).toBe(false);
  expect(document.body.querySelector<HTMLTextAreaElement>('[name="investigationGoal"]')!.value).toBe("保留问题");
  expect(invoke.mock.calls.some(([,p])=>["create","respond","revoke","source"].includes(p?.args?.action))).toBe(false);
@@ -794,12 +795,12 @@ it("draft scope counts the replacement primary only once and follows remaining s
  invoke.mockImplementation(async(command,payload)=>payload.args.action==="materials"?{notes,total:2,nextOffset:null,snapshot:"replacement"}:base(command,payload));
  await open();await click("移除当前页面");await openAddPage("从笔记库添加");
  await act(async()=>document.body.querySelector<HTMLInputElement>('.agent-material-choice input')!.click());
- await click("返回");await openAddPage("资料范围");
+ await click("返回资料范围");await openAddPage("资料范围");
  const summary=()=>document.body.querySelector('.agent-material-advanced > .agent-note')!.textContent;
  expect(summary()).toContain("当前范围：替换资料，另有 0 份资料");expect(summary()).not.toContain("安装方案");
- await click("返回");await click("添加资料");
+ await click("关闭添加菜单");await click("添加资料");
  await act(async()=>document.body.querySelectorAll<HTMLInputElement>('.agent-material-choice input')[1].click());
- await click("返回");await openAddPage("资料范围");expect(summary()).toContain("当前范围：替换资料，另有 1 份资料");
+ await click("返回资料范围");await openAddPage("资料范围");expect(summary()).toContain("当前范围：替换资料，另有 1 份资料");
  await click("移除材料 替换资料");await openAddPage("资料范围");expect(summary()).toContain("当前范围：第二份资料，另有 0 份资料");
  await click("移除材料 第二份资料");await openAddPage("资料范围");expect(summary()).toContain("未添加资料");
  expect(invoke.mock.calls.some(([,p])=>["create","respond","revoke","source"].includes(p?.args?.action))).toBe(false);
@@ -1294,6 +1295,7 @@ it("keeps a follow-up unsent until selected withdrawal is confirmed separately",
  await open();
  await openAddPage("从笔记库添加");
  await click("撤回授权 附加材料");await fill("investigationGoal","新的分析要求");
+ expect(document.body.querySelector<HTMLButtonElement>(".agent-scope-done")!.disabled).toBe(true);
  expect(button("发送追问").disabled).toBe(true);
  await act(async()=>document.body.querySelector('.agent-composer form')!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
  expect(invoke.mock.calls.some(([,p])=>p?.args?.action==="message"||p?.args?.action==="respond")).toBe(false);
@@ -1450,7 +1452,7 @@ it("public URL is fetched only on explicit send, with no inherited library grant
   invoke.mockImplementation(async(_,{args})=>args.action==="list"?{works:[]}:current);
   await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
   await act(async()=>{const menu=document.body.querySelector<HTMLDetailsElement>(".agent-add-menu")!;menu.open=true;menu.dispatchEvent(new Event("toggle"));});
-  await click("搜索范围：");await click("读取公共链接");
+  await click("搜索范围：");await click("核心材料");await click("读取公共链接");
   const input=document.body.querySelector<HTMLInputElement>('[aria-label="公共网页地址"]')!;
   await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(input,"https://example.org/a");input.dispatchEvent(new Event("input",{bubbles:true}));});
   expect(invoke.mock.calls.some(([,v])=>v?.args?.action==="createFromPublicUrl")).toBe(false);

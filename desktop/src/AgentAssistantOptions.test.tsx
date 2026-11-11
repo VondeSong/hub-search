@@ -55,7 +55,10 @@ it("dismisses without changing settings and restores focus",async()=>{
 it("keeps the menu and current model on failed save",async()=>{
  await render();await open();save.mockRejectedValueOnce(new Error("保存失败"));await click("实际模型");
  expect(modelDetails().open).toBe(true);expect(host.textContent).toContain("保存失败");expect(modelSummary().textContent).toContain("actual-global");
- await click("实际模型");expect(modelDetails().open).toBe(false);
+ await click("实际模型");expect(modelDetails().open).toBe(true);
+ expect(host.querySelector('[role="alert"]')).toBeNull();
+ await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="关闭模型选择"]')!.click());
+ expect(modelDetails().open).toBe(false);expect(document.activeElement).toBe(modelSummary());
 });
 it("groups providers without applying disabled choices",async()=>{
  await render("model",true,defaultAssistantOptions,true);await open();expect(host.querySelector('[aria-label="OpenAI 模型"]')).not.toBeNull();expect(host.querySelector('[aria-label="DeepSeek 模型"]')).not.toBeNull();await click("实际模型");expect(save).not.toHaveBeenCalled();

@@ -1,6 +1,6 @@
 import ReactMarkdown from "react-markdown";
-import { useEffect, useRef, useState } from "react";
-import { WandSparkles, Check, Pin, PinOff } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { WandSparkles, Check, Pin, PinOff, Search, Settings2, RefreshCw } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAgentPopover } from "./useAgentPopover";
 import {AgentSkillPackages} from "./AgentSkillPackages";
@@ -23,6 +23,8 @@ export const skillPurpose=(name:string)=>purposes[name]||"";
 
 export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], onReset, pinned=[], onPin }: { disabled: boolean; onSelect: (name: string) => void; embedded?: boolean; selected?:string[]; onReset?:()=>void; pinned?:string[]; onPin?:(name:string)=>void }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [query,setQuery]=useState("");
+  const returnPin=useRef<string|null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const popover = useAgentPopover();
@@ -65,26 +67,33 @@ export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], o
     const title = listReturn.current?.textContent;
     requestAnimationFrame(() => Array.from(menuElement.current?.querySelectorAll("button") || []).find(button => label ? button.getAttribute("aria-label") === label : button.textContent === title)?.focus());
   }
-  const choice = (skill: AgentSkill) => <div className="agent-skill-choice" key={skill.name}>
+  useLayoutEffect(()=>{
+    if(!returnPin.current)return;
+    const row=Array.from(menuElement.current?.querySelectorAll<HTMLElement>('[data-skill-name]')||[]).find(item=>item.dataset.skillName===returnPin.current);
+    row?.querySelector<HTMLButtonElement>('.agent-skill-pin')?.focus();returnPin.current=null;
+  },[pinned]);
+  const matches=(catalog?.skills||[]).filter(skill=>`${skill.title} ${skill.name} ${skill.description}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
+  const groups=[{title:"置顶",items:matches.filter(skill=>pinned.includes(skill.name))},{title:pinned.length?"其他技能":"全部技能",items:matches.filter(skill=>!pinned.includes(skill.name))}];
+  const choice = (skill: AgentSkill) => <div className="agent-skill-choice" data-skill-name={skill.name} data-selected={selected.includes(skill.name)||undefined} key={skill.name}>
     <button type="button" aria-label={`查看技能 ${skill.title}`} aria-pressed={selected.includes(skill.name)}
       onClick={event => { listReturn.current = event.currentTarget; setDetail(skill); }}>
       <span className="agent-skill-icon" aria-hidden="true"><WandSparkles size={17} strokeWidth={1.4}/></span>
       <span className="agent-skill-copy"><strong>{skill.title}</strong><span>{purposes[skill.name] || skill.description.split(/[。；]/)[0] || "未提供用途说明"}</span></span>
       {selected.includes(skill.name) && <Check size={16} className="agent-skill-check" aria-hidden="true"/>}
     </button>
-    {onPin && <button type="button" className="agent-skill-pin" aria-label={(pinned.includes(skill.name)?"取消置顶技能 ":"置顶技能 ")+skill.title} aria-pressed={pinned.includes(skill.name)} onClick={()=>onPin(skill.name)}>{pinned.includes(skill.name)?<PinOff size={15}/>:<Pin size={15}/>}</button>}
+    {onPin && <button type="button" className="agent-skill-pin" aria-label={(pinned.includes(skill.name)?"取消置顶技能 ":"置顶技能 ")+skill.title} aria-pressed={pinned.includes(skill.name)} onClick={()=>{returnPin.current=skill.name;onPin(skill.name);}}>{pinned.includes(skill.name)?<PinOff size={15}/>:<Pin size={15}/>}</button>}
   </div>;
   const content = <div className="agent-skill-menu" ref={menuElement} aria-label="可用技能">
     {!embedded && <div className="agent-popover-header"><strong>使用技能</strong><button type="button" aria-label="关闭技能菜单" onClick={() => popover.close(true)}>关闭</button></div>}
-    {error && <p role="alert">{error}</p>}
-    {detail ? <section className="agent-skill-detail" aria-label="技能详情">
+    {error && <p role="alert">{error}{!detail&&!managing&&<button type="button" disabled={loading} onClick={()=>void load()}>刷新技能</button>}</p>}
+    {detail ? <section className="agent-skill-detail" aria-label="技能详情" data-skill-name={detail.name}>
       <button type="button" className="agent-menu-back" onClick={back}>← 技能库</button>
-      <h3 ref={detailHeading} tabIndex={-1}>{detail.title}</h3>
+      <div className="agent-skill-detail-title"><span className="agent-skill-icon" aria-hidden="true"><WandSparkles size={20}/></span><h3 ref={detailHeading} tabIndex={-1}>{detail.title}</h3>{onPin&&<button type="button" className="agent-skill-pin" aria-label={(pinned.includes(detail.name)?"取消置顶技能 ":"置顶技能 ")+detail.title} aria-pressed={pinned.includes(detail.name)} onClick={()=>{returnPin.current=detail.name;onPin(detail.name);}}>{pinned.includes(detail.name)?<PinOff size={15}/>:<Pin size={15}/>}</button>}</div>
       <p className="agent-note">{detail.origin === "builtin" ? "Hub 内置" : detail.origin === "registered" ? "已登记方法包" : "用户技能"} · {detail.allowImplicitInvocation ? "助手可按需使用" : "仅手动指定"}</p>
       <h4>适用范围</h4><p>{detail.description || "未提供用途说明"}</p>
       {!detail.available && <p role="status">暂不可用：{detail.unavailableReasons.join("；")}</p>}
       <div className="agent-skill-actions">
-        <button type="button" disabled={disabled || !detail.available} onClick={() => { onSelect(detail.name); if (details.current) details.current.open = false; }}>{selected.includes(detail.name) ? "已添加到本次对话" : "添加到本次对话"}</button>
+        <button type="button" disabled={disabled || !detail.available || selected.includes(detail.name)} onClick={() => { onSelect(detail.name); if (details.current) details.current.open = false; }}>{selected.includes(detail.name) ? "已添加到本次对话" : "添加到本次对话"}</button>
         {detail.origin === "user" && <button type="button" onClick={() => void load("openSkillDirectory")}>打开文件夹编辑</button>}
         {detail.origin === "registered" && <button type="button" onClick={() => {setDetail(null);setManaging(true);}}>查看与管理方法包</button>}
       </div>
@@ -95,6 +104,7 @@ export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], o
     </section> : managing ? <section className="agent-skill-detail" aria-label="技能管理">
       <button type="button" className="agent-menu-back" onClick={back}>← 技能库</button>
       <h3 ref={detailHeading} tabIndex={-1}>管理技能</h3>
+      <button type="button" disabled={loading} onClick={()=>void load()}><RefreshCw size={14}/>刷新技能</button>
       <AgentSkillPackages initiallyExpanded onChanged={() => void load()}/>
       <div className="agent-skill-actions"><button type="button" disabled={loading} onClick={() => void load("openSkillDirectory")}>打开用户技能文件夹</button></div>
       <details className="agent-menu-advanced"><summary>文件夹与使用说明</summary>
@@ -102,13 +112,14 @@ export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], o
         <p className="agent-skill-directory">{catalog?.directory}</p>
       </details>
     </section> : <>
-      <div className="agent-skill-toolbar"><strong>技能库</strong><button type="button" onClick={event => {listReturn.current=event.currentTarget;setManaging(true);}}>管理技能</button><button type="button" disabled={loading} onClick={() => void load()}>刷新技能</button></div>
-      <p className="agent-note">{selected.length ? `已指定 ${selected.length} 项技能，随下一条消息生效。` : "普通提问可直接发送，助手会自动按需选择。"}</p>
-      {!!selected.length && onReset && <button type="button" disabled={disabled} onClick={onReset}>恢复自动选择</button>}
-      {loading && <p role="status">正在读取技能…</p>}
-      {catalog && !loading && !error && catalog.skills.length === 0 && <p className="agent-note">还没有可用技能。你仍可直接提问，或从管理技能添加。</p>}
-      {catalog?.skills.filter(skill => skill.name !== "hub-tool-guide").map(choice)}
-      {catalog?.skills.some(skill => skill.name === "hub-tool-guide") && <details className="agent-menu-advanced"><summary>高级工具指南</summary>{catalog.skills.filter(skill => skill.name === "hub-tool-guide").map(choice)}</details>}
+      <div className="agent-skill-toolbar"><label className="agent-skill-search"><Search size={15}/><input type="search" aria-label="搜索技能" value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索技能"/></label><button type="button" aria-label="管理技能" title="管理技能" onClick={event=>{listReturn.current=event.currentTarget;setManaging(true);}}><Settings2 size={17}/></button></div>
+      <div className="agent-skill-intro"><p className="agent-note">{selected.length ? `已选 ${selected.length} 项，随下一条消息使用。` : "按需自动选用，也可指定本次使用的技能。"}</p>{!!selected.length&&onReset&&<button type="button" onClick={onReset} disabled={disabled}>恢复自动选择</button>}</div>
+      <div className="agent-skill-scroll">
+      {loading&&<p role="status">正在读取技能…</p>}
+      {!loading&&!error&&catalog&&!catalog.skills.length&&<p className="agent-note">还没有可用技能，可直接提问或从管理技能添加。</p>}
+      {!loading&&!error&&catalog&&!!catalog.skills.length&&!matches.length&&<p className="agent-note">没有找到匹配的技能。</p>}
+      {groups.filter(group=>group.items.length).map(group=><section className="agent-skill-group" aria-label={group.title} key={group.title}><h3>{group.title}<span>{group.items.length}</span></h3>{group.items.map(choice)}</section>)}
+      </div>
       {!!catalog?.diagnostics.length && <details><summary>有技能未能加载</summary>{catalog.diagnostics.map((item, index) => <p className="agent-note" key={index}>{item.name}：{item.message}</p>)}</details>}
     </>}
   </div>;

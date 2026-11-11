@@ -108,6 +108,34 @@ it.each(["live", "cached", "disabled"] as const)("restores Codex search after a 
   expect(configured.model.provider).toBe("codex");
 });
 
+it("keeps pinned skills only in the bottom skill library and the scope overview to three entries",async()=>{
+  await render(<StandaloneInvestigation initiallyOpen/>);
+  await activate(select<HTMLButtonElement>('.agent-skill-shortcut'));
+  await activate(select<HTMLButtonElement>('[aria-label="置顶技能 资料分析与核对"]'));
+  expect(select<HTMLElement>('.agent-skill-group').getAttribute('aria-label')).toBe('置顶');
+  await activate(select<HTMLButtonElement>('[aria-label="关闭添加菜单"]'));
+  await activate(select<HTMLElement>('.agent-task-mode>summary'));
+  expect(select<HTMLElement>('.agent-mode-menu').textContent).not.toContain('置顶技能');
+  await activate(select<HTMLButtonElement>('[aria-label="关闭任务模式"]'));
+  await activate(select<HTMLButtonElement>('.agent-scope-trigger'));
+  const panel=select<HTMLElement>('.agent-add-materials');
+  expect([...panel.querySelectorAll('.agent-scope-overview>button strong,.agent-scope-overview>details>summary strong')].map(e=>e.textContent)).toEqual(['资料策略','核心材料','可检索的资料库']);
+  expect(panel.querySelector('.agent-popover-header')?.textContent).toBe('资料范围');
+  expect(panel.querySelector('[aria-label="返回资料范围"]')).toBeNull();
+  expect(panel.querySelector('.agent-scope-extra')).toBeNull();
+  expect(panel.querySelector('.agent-scope-footer')?.textContent).toContain('保存为专题');
+  expect(panel.querySelector('.agent-scope-done')?.textContent).toBe('完成');
+  await activate([...panel.querySelectorAll<HTMLButtonElement>('.agent-scope-overview>button')][0]);
+  expect(panel.querySelector('[aria-label="返回资料范围"]')).not.toBeNull();
+  expect(panel.querySelector('.agent-material-footer')).toBeNull();
+  expect(panel.querySelector('.agent-scope-done')?.textContent).toBe('完成选择');
+  await activate(select<HTMLButtonElement>('.agent-scope-done'));
+  expect(panel.querySelector('.agent-popover-header')?.textContent).toBe('资料范围');
+  await activate(select<HTMLButtonElement>('.agent-scope-done'));
+  expect(document.activeElement).toBe(select<HTMLTextAreaElement>('[name="investigationGoal"]'));
+  expect(calls('create')).toHaveLength(0);
+});
+
 const select = <T extends Element>(selector: string, within: ParentNode = document): T => {
   const element = within.querySelector<T>(selector);
   expect(element, `Missing production control: ${selector}`).not.toBeNull();
