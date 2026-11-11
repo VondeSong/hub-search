@@ -76,6 +76,7 @@ const LazySettingsDialog = lazy(() => import("./SettingsDialog").then((module) =
 const LazySettingsContent = lazy(() => import("./SettingsContent").then((module) => ({ default: module.SettingsContent })));
 const LazyTaskWorkspace = lazy(() => import("./TaskWorkspace").then((module) => ({ default: module.TaskWorkspace })));
 const LazyCollectionsWorkspace = lazy(() => import("./CollectionsWorkspace").then((module) => ({ default: module.CollectionsWorkspace })));
+const LazyCloudAgents = lazy(() => import("./CloudAgents"));
 const LazyFlashcardsWorkspace = lazy(() => import("./FlashcardsWorkspace").then((module) => ({ default: module.FlashcardsWorkspace })));
 
 function indexJobTypeLabel(jobType: string): string {
@@ -148,6 +149,7 @@ function AppContent() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [desktopSidebarView, setDesktopSidebarView] = useState<DesktopSidebarView>("home");
   const [mobileBrowseOpen, setMobileBrowseOpen] = useState(false);
+  const [mobileAgentsOpen, setMobileAgentsOpen] = useState(false);
   const [flashcardsStandaloneOpen, setFlashcardsStandaloneOpen] = useState(false);
   const [tagOverviewMode, setTagOverviewMode] = useState<"all" | "cleanup">("all");
   const [selectedJournalDate, setSelectedJournalDate] = useState("");
@@ -851,6 +853,7 @@ useEffect(() => {
     setFiltersOpen(false);
     setSpaceMenuOpen(false);
     setMobileBrowseOpen(route === "browse");
+    setMobileAgentsOpen(route === "agents");
     if (route === "search" || route === "browse") selectDesktopSidebarView("home");
     else if (route === "tasks" || route === "favorites" || route === "history" || route === "journals" || route === "tags" || route === "collections") {
       selectDesktopSidebarView(route);
@@ -1208,7 +1211,7 @@ useEffect(() => {
     mobilePreviewOpen,
     style: shellStyle,
     startWindowDrag,
-    mainContent: isMobileLayout && mobileBrowseOpen && !flashcardsActive ? <MobileBrowse
+    mainContent: isMobileLayout && mobileAgentsOpen && !flashcardsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开 Agents…</div>}><LazyCloudAgents /></Suspense> : isMobileLayout && mobileBrowseOpen && !flashcardsActive ? <MobileBrowse
       favoriteCount={favoriteResults.length}
       historyCount={viewHistory.length}
       journalCount={journalDates.length}
@@ -1340,7 +1343,7 @@ useEffect(() => {
       versionLabel: "v85",
       flashcardsActive,
       mobileNavigation: isMobileLayout ? <MobileNavigation
-        active={mobileBrowseOpen || (["favorites", "history", "journals", "tags", "collections"] as DesktopSidebarView[]).includes(desktopSidebarView) ? "browse" : tasksActive ? "tasks" : "search"}
+        active={mobileAgentsOpen ? "agents" : mobileBrowseOpen || (["favorites", "history", "journals", "tags", "collections"] as DesktopSidebarView[]).includes(desktopSidebarView) ? "browse" : tasksActive ? "tasks" : "search"}
         onSelect={navigateMobile}
         dueCount={flashcardDueCount}
       /> : undefined,

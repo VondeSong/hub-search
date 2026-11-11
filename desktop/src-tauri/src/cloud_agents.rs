@@ -1,0 +1,254 @@
+use base64::{engine::general_purpose::STANDARD, Engine};
+use reqwest::{Client, Method, Url};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+use std::{sync::OnceLock, time::Duration};
+use tauri::AppHandle;
+
+const CREDENTIAL: &str = "hub-cloud-agents-v1";
+const MAX_RESPONSE: usize = 28 * 1024 * 1024;
+
+#[derive(Deserialize, Serialize)]
+struct Config {
+    endpoint: String,
+    token: String,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "op", rename_all = "camelCase")]
+pub(crate) enum Action {
+    Config,
+    Connect {
+        endpoint: String,
+        token: String,
+    },
+    List,
+    Read {
+        thread: String,
+        before: Option<u64>,
+    },
+    Send {
+        thread: String,
+        turn: String,
+        message: Value,
+    },
+    Stop {
+        thread: String,
+        turn: String,
+    },
+    Attachment {
+        id: String,
+    },
+}
+
+fn endpoint(value: &str) -> Result<Url, String> {
+    let url = Url::parse(value.trim()).map_err(|_| "VPS 地址格式无效。")?;
+    let loopback = match url.host() {
+        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+        _ => false,
+    };
+    if !(url.scheme() == "https" || (url.scheme() == "http" && loopback))
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.host().is_none()
+        || url.query().is_some()
+        || url.fragment().is_some()
+        || url.path() != "/"
+    {
+        return Err("请输入 HTTPS 服务地址，例如 https://agents.example.com。".into());
+    }
+    Ok(url)
+}
+
+fn id(value: &str) -> Result<&str, String> {
+    if value.len() == 36
+        && value.bytes().enumerate().all(|(index, byte)| {
+            if matches!(index, 8 | 13 | 18 | 23) {
+                byte == b'-'
+            } else {
+                byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+            }
+        })
+    {
+        Ok(value)
+    } else {
+        Err("云端会话或消息编号无效。".into())
+    }
+}
+
+fn config_view(config: &Config) -> Value {
+    let binding = Sha256::digest(format!("{}\n{}", config.endpoint, config.token).as_bytes());
+    json!({"endpoint":config.endpoint,"binding":format!("{binding:x}")})
+}
+
+async fn request(
+    config: &Config,
+    method: Method,
+    path: &str,
+    body: Option<Value>,
+    image: bool,
+) -> Result<Value, String> {
+    static CLIENT: OnceLock<Result<Client, String>> = OnceLock::new();
+    let client = CLIENT
+        .get_or_init(|| {
+            Client::builder()
+                .no_proxy()
+                .redirect(reqwest::redirect::Policy::none())
+                .connect_timeout(Duration::from_secs(6))
+                .timeout(Duration::from_secs(45))
+                .build()
+                .map_err(|_| "无法启动云端 Agents 网络连接。".into())
+        })
+        .as_ref()
+        .map_err(Clone::clone)?;
+    let url = endpoint(&config.endpoint)?
+        .join(path)
+        .map_err(|_| "云端请求地址无效。")?;
+    let mut call = client.request(method, url).bearer_auth(&config.token);
+    if let Some(body) = body {
+        call = call.json(&body);
+    }
+    let mut response = call
+        .send()
+        .await
+        .map_err(|_| "无法连接 VPS。检查网络后可安全重试。")?;
+    let status = response.status();
+    let mime = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("")
+        .to_owned();
+    let limit = if image { 4 * 1024 * 1024 } else { MAX_RESPONSE };
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|_| "连接中断，请重试。")? {
+        if bytes.len() + chunk.len() > limit {
+            return Err("VPS 返回内容超出限制。".into());
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    if !status.is_success() {
+        let fallback = format!("VPS 请求失败（HTTP {}）。", status.as_u16());
+        let error = serde_json::from_slice::<Value>(&bytes)
+            .ok()
+            .and_then(|value| {
+                value["error"]
+                    .as_str()
+                    .map(|message| message.chars().take(240).collect::<String>())
+            });
+        return Err(error.unwrap_or(fallback));
+    }
+    if image {
+        if !matches!(mime.as_str(), "image/jpeg" | "image/png" | "image/webp") {
+            return Err("VPS 返回了无法预览的附件类型。".into());
+        }
+        return Ok(json!({"url":format!("data:{mime};base64,{}",STANDARD.encode(bytes))}));
+    }
+    serde_json::from_slice(&bytes).map_err(|_| "VPS 返回格式无效，请检查服务地址。".into())
+}
+
+#[tauri::command]
+pub(crate) async fn cloud_agents(app: AppHandle, action: Action) -> Result<Value, String> {
+    let current = || -> Result<Option<Config>, String> {
+        crate::stored_secret_get(&app, CREDENTIAL)?
+            .map(|value| {
+                serde_json::from_str(&value).map_err(|_| "保存的 VPS 连接无效，请重新连接。".into())
+            })
+            .transpose()
+    };
+    match action {
+        Action::Config => Ok(current()?.as_ref().map(config_view).unwrap_or(Value::Null)),
+        Action::Connect {
+            endpoint: raw,
+            token,
+        } => {
+            let token = token.trim();
+            if token.len() != 43
+                || !token
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+            {
+                return Err("设备密钥格式无效。".into());
+            }
+            let config = Config {
+                endpoint: endpoint(&raw)?.to_string(),
+                token: token.to_owned(),
+            };
+            let check = request(&config, Method::GET, "/v1/threads", None, false).await?;
+            if !check["threads"].is_array() || !check["account"].is_object() {
+                return Err("此地址没有返回 Hub Agents 服务信息。".into());
+            }
+            crate::stored_secret_set(
+                &app,
+                CREDENTIAL,
+                &serde_json::to_string(&config).map_err(|e| e.to_string())?,
+            )?;
+            Ok(config_view(&config))
+        }
+        action => {
+            let config = current()?.ok_or("请先连接 VPS。")?;
+            let (method, path, body, image) = match action {
+                Action::List => (Method::GET, "/v1/threads".into(), None, false),
+                Action::Read { thread, before } => (
+                    Method::GET,
+                    format!(
+                        "/v1/threads/{}{}",
+                        id(&thread)?,
+                        before
+                            .map(|value| format!("?before={value}"))
+                            .unwrap_or_default()
+                    ),
+                    None,
+                    false,
+                ),
+                Action::Send {
+                    thread,
+                    turn,
+                    message,
+                } => (
+                    Method::POST,
+                    format!("/v1/threads/{}/turns/{}", id(&thread)?, id(&turn)?),
+                    Some(message),
+                    false,
+                ),
+                Action::Stop { thread, turn } => (
+                    Method::POST,
+                    format!("/v1/threads/{}/turns/{}/stop", id(&thread)?, id(&turn)?),
+                    None,
+                    false,
+                ),
+                Action::Attachment { id: value } => (
+                    Method::GET,
+                    format!("/v1/attachments/{}", id(&value)?),
+                    None,
+                    true,
+                ),
+                _ => unreachable!(),
+            };
+            request(&config, method, &path, body, image).await
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn endpoint_protects_device_tokens() {
+        assert!(endpoint("https://agents.example.com:9443").is_ok());
+        assert!(endpoint("http://127.0.0.1:8787").is_ok());
+        for invalid in [
+            "http://agents.example.com",
+            "https://user@agents.example.com",
+            "https://agents.example.com/foo",
+            "https://agents.example.com/?token=x",
+            "file:///tmp",
+        ] {
+            assert!(endpoint(invalid).is_err(), "{invalid}");
+        }
+        assert!(id("../attachments").is_err());
+    }
+}

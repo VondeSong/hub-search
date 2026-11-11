@@ -1,6 +1,7 @@
 import {libraryDragType} from "./AgentLibraryScope";
 import { LibraryStatusIcon } from "./LibraryStatusIcon";
 import { StandaloneAgentLauncher } from "./StandaloneAgentLauncher";
+import { CloudAgentsLauncher } from "./CloudAgentsLauncher";
 import { providerUnavailableHint } from "./ProviderLabels";
 import {
   BookOpenCheck,
@@ -95,6 +96,7 @@ export function WorkspaceRail({
 
       <div className="workspace-rail-navigation" aria-label="浏览视图">
         <StandaloneAgentLauncher />
+        <CloudAgentsLauncher />
         {navigation.map((item) => (
           <button
             key={item.view}

@@ -9,6 +9,7 @@ pub fn run_m1_projection_acceptance_cli() -> Result<(), String> {
 mod attachments;
 mod background_workers;
 mod blob_store;
+mod cloud_agents;
 mod cloud_inventory;
 mod cloud_maintenance;
 mod cloud_network;
@@ -35247,6 +35248,7 @@ pub fn run() {
                 tag_assignment,
                 model_runtime,
                 agent_investigation,
+                cloud_agents::cloud_agents,
                 connect_mcp,
                 set_craft_api_connection,
                 connect_dida365,

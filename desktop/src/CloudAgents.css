@@ -1,0 +1,85 @@
+.cloud-agents {
+  --cloud-text: #182138;
+  --cloud-muted: #56627b;
+  --cloud-line: #dce4f1;
+  --cloud-accent: #2859b1;
+  --cloud-control: #fff;
+  display: flex; flex-direction: column; min-height: 0; height: 100%;
+  background: linear-gradient(155deg,#edf3ff,#f8faff 43%,#f5f7fc);
+  color: var(--cloud-text); overflow: hidden;
+}
+.cloud-agents * { box-sizing: border-box; }
+.cloud-agents button, .cloud-agents-tools label {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 44px; min-width: 44px; padding: 7px 11px; font: inherit;
+  border: 1px solid var(--cloud-line); border-radius: 13px;
+  background: var(--cloud-control); color: var(--cloud-text); cursor: pointer;
+}
+.cloud-agents button:disabled, .cloud-agents-tools label:has(input:disabled) { opacity: .54; cursor: default; }
+.cloud-agents :focus-visible { outline: 2px solid var(--cloud-accent); outline-offset: 2px; }
+.cloud-agents-header {
+  flex: none; display: flex; align-items: center; gap: 7px; padding: 11px 15px;
+  border-bottom: 1px solid var(--cloud-line); background: rgba(250,252,255,.82); backdrop-filter: blur(20px);
+}
+.cloud-agents-header > div { flex: 1; min-width: 0; }
+.cloud-agents-header h1 { margin: 0; font-size: 1.25rem; line-height: 1.2; letter-spacing: -.025em; }
+.cloud-agents-header span { display: block; margin-top: 3px; font-size: .75rem; color: var(--cloud-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cloud-agents-connect { align-self: center; width: min(100%, 420px); padding: 22px 18px; overflow: auto; }
+.cloud-agents-connect h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 18px; font-size: 1.1rem; }
+.cloud-agents-connect label { display: grid; gap: 6px; margin-bottom: 13px; font-size: .9rem; }
+.cloud-agents-connect input, .cloud-agents-compose textarea {
+  width: 100%; min-width: 0; padding: 10px 11px; border: 1px solid var(--cloud-line);
+  border-radius: 12px; color: var(--cloud-text); background: var(--cloud-control); font: inherit;
+}
+.cloud-agents-connect input { min-height: 46px; font-size: 1rem; }
+.cloud-agents button.cloud-agents-primary { background: var(--cloud-accent); color: #fff; border-color: transparent; }
+.cloud-agents-body { flex: 1; display: flex; min-height: 0; position: relative; }
+.cloud-agents-list {
+  flex: 0 0 205px; min-width: 0; padding: 10px; overflow: auto;
+  background: #f0f4fb; border-right: 1px solid var(--cloud-line);
+}
+.cloud-agents-list button { display: flex; justify-content: start; text-align: start; width: 100%; margin-bottom: 6px; overflow-wrap: anywhere; }
+.cloud-agents-list button[aria-current] { background: #e3edff; border-color: #c7d8f8; }
+.cloud-agents-chat { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cloud-agents-messages { flex: 1; overflow: auto; padding: 15px clamp(14px,3vw,32px); overscroll-behavior: contain; }
+.cloud-agents-empty { display: grid; place-items: center; min-height: 40%; color: var(--cloud-muted); }
+.cloud-agents-empty h2 { font-size: 1rem; font-weight: 500; }
+.cloud-agents-turn { display: grid; gap: 12px; margin: 0 0 21px; }
+.cloud-agents-user { justify-self: end; max-width: 90%; min-width: 0; border-radius: 17px; background: #e1ebfc; padding: 10px 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cloud-agents-answer { font-size: .96rem; line-height: 1.6; overflow-wrap: anywhere; }
+.cloud-agents-answer p:first-child { margin-top: 0; }
+.cloud-agents-answer pre { overflow: auto; max-width: 100%; background: var(--cloud-control); border-radius: 12px; padding: 10px; }
+.cloud-agents-answer small, .cloud-agents-compose small { color: var(--cloud-muted); }
+.cloud-agent-attachment { margin-top: 5px; }
+.cloud-agent-attachment button { justify-content: start; text-align: start; max-width: 100%; overflow-wrap: anywhere; }
+.cloud-agent-attachment img { display: block; margin-top: 5px; max-width: 100%; max-height: 340px; object-fit: contain; border-radius: 10px; }
+.cloud-agents-compose {
+  display: grid; gap: 6px; flex: none; padding: 9px 14px 11px;
+  background: rgba(249,252,255,.87); backdrop-filter: blur(20px); border-top: 1px solid var(--cloud-line);
+}
+.cloud-agents-compose textarea { resize: vertical; min-height: 53px; max-height: 23vh; font-size: 1rem; }
+.cloud-agents-tools, .cloud-agents-files, .cloud-agents-pending { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cloud-agents-tools label { position: relative; }
+.cloud-agents-tools label:focus-within { outline: 2px solid var(--cloud-accent); }
+.cloud-agents-tools input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
+.cloud-agents-tools .cloud-agents-primary { margin-inline-start: auto; }
+.cloud-agents-files { overflow: auto; max-height: 84px; }
+.cloud-agents-files button { min-height: 35px; font-size: .8rem; }
+.cloud-agents-notice { margin: 0; font-size: .82rem; color: #86451d; }
+.cloud-agents-notice button, .cloud-agents-pending button { min-height: 36px; font-size: .8rem; }
+.cloud-agents-pending { font-size: .82rem; }
+.cloud-agents-dialog {
+  position: fixed; inset: 0; width: min(820px,calc(100vw - 36px)); height: min(800px,calc(100dvh - 36px));
+  max-width: none; max-height: none; border: 1px solid #dce4f1; border-radius: 23px; padding: 0;
+  background: #f5f7fc; box-shadow: 0 25px 90px #253a5840;
+}
+.cloud-agents-dialog::backdrop { background: #1c2e4f45; }
+.mobile-app-shell .main-content-override:has(.cloud-agents) { padding-bottom: calc(87px + env(safe-area-inset-bottom,0px)); }
+.mobile-app-shell.mobile-keyboard-open .main-content-override:has(.cloud-agents) { padding-bottom: 0; }
+@media (max-width: 620px) {
+  .cloud-agents-list { position: absolute; z-index: 1; inset: 0 auto 0 0; width: min(78%,280px); box-shadow: 14px 0 28px #27477425; }
+  .cloud-agents-header { padding-inline: 10px; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .cloud-agents-header, .cloud-agents-compose { backdrop-filter: none; background: #f9fbff; }
+}

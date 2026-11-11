@@ -1,8 +1,8 @@
-import { BookOpenCheck, Bookmark, CalendarDays, ChevronRight, Clock3, FolderOpen, ListTodo, Search, Star, Tags } from "lucide-react";
+import { BookOpenCheck, Bookmark, CalendarDays, ChevronRight, Clock3, Cloud, FolderOpen, ListTodo, Search, Star, Tags } from "lucide-react";
 import type { DesktopSidebarView } from "./DesktopSidebar";
 import { MobileTabBar } from "./MobileTabBar";
 
-export type MobileDestination = "search" | "browse" | "tasks" | "review";
+export type MobileDestination = "search" | "browse" | "tasks" | "review" | "agents";
 export type MobileBrowseView = Extract<DesktopSidebarView, "favorites" | "history" | "journals" | "tags" | "collections">;
 
 type MobileNavigationProps = {
@@ -16,6 +16,7 @@ export function MobileNavigation({ active, onSelect, dueCount }: MobileNavigatio
     { key: "search", label: "搜索", icon: Search },
     { key: "browse", label: "浏览", icon: FolderOpen },
     { key: "tasks", label: "任务", icon: ListTodo },
+    { key: "agents", label: "Agents", icon: Cloud },
     { key: "review", label: "复习", icon: BookOpenCheck, count: dueCount, countLabel: "今天待复习" },
   ] as const;
   return <MobileTabBar items={destinations} active={active} onSelect={(key) => onSelect(key as MobileDestination)} label="主要导航" />;

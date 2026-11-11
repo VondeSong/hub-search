@@ -1,0 +1,27 @@
+[Unit]
+Description=Hub Agents private gateway
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=hub-agents
+Group=hub-agents
+StateDirectory=hub-agents
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/hub-agents
+Environment=HOME=/var/lib/hub-agents
+Environment=CODEX_HOME=/var/lib/hub-agents/codex
+ExecStart=/usr/bin/python3 /opt/hub-agents/server.py --state /var/lib/hub-agents/gateway --codex /usr/local/bin/codex serve
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target
