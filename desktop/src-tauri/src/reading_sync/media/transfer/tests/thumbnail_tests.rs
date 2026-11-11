@@ -390,11 +390,11 @@ async fn reading_thumbnail_rejects_non_images_oversize_manual_and_untrusted_remo
     oversized.resize((2 * MB + 1) as usize, 0);
     let mut policy_oversized = png();
     policy_oversized.resize((MB + 1) as usize, 0);
-    for (bytes, image_mb) in [
-        (mp4(), 10),
-        (b"PK\x03\x04archive fixture".to_vec(), 10),
-        (oversized, 10),
-        (policy_oversized, 1),
+    for (bytes, image_mb, manual_allowed) in [
+        (mp4(), 10, false),
+        (b"PK\x03\x04archive fixture".to_vec(), 10, false),
+        (oversized, 10, false),
+        (policy_oversized, 1, true),
     ] {
         let server = server().await;
         let remote = store(&server);
@@ -418,14 +418,20 @@ async fn reading_thumbnail_rejects_non_images_oversize_manual_and_untrusted_remo
         upload_pending(&a.db, &remote, &ns, &p, Some((KEY, COVER)))
             .await
             .unwrap();
-        assert_eq!(manifest(&a, &ns, KEY, COVER).state, "skipped");
-        assert!(!server
-            .state
-            .lock()
-            .unwrap()
-            .files
-            .keys()
-            .any(|key| key.contains("/blobs/")));
+        assert_eq!(
+            manifest(&a, &ns, KEY, COVER).state,
+            if manual_allowed { "ready" } else { "skipped" }
+        );
+        assert_eq!(
+            server
+                .state
+                .lock()
+                .unwrap()
+                .files
+                .keys()
+                .any(|key| key.contains("/blobs/")),
+            manual_allowed
+        );
     }
 
     let server = server().await;

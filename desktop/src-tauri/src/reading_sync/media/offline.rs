@@ -114,7 +114,7 @@ fn inspect(c: &Connection, db: &Path, ns: &str, key: &str, extras: bool) -> Resu
                     actionable += 1;
                     e.reason = "本机已校验，待离线保留".into();
                 }
-            } else if !allowed(&p, &m.mime, m.size, extras) {
+            } else if !allowed_explicit(&m.mime, m.size, extras) {
                 e.state = "excluded".into();
                 e.reason = "未包含音视频/ZIP，或超过当前大小限制".into();
             } else {
@@ -197,9 +197,6 @@ pub(super) async fn execute(
         let p = policy(&c)?;
         if before.items.iter().any(|e| e.state == "download") {
             cloud_sync::require_reading(&c, false)?;
-            if !p.enabled {
-                return Err("请先开启阅读附件同步；已有本机文件仍可离线使用".into());
-            }
             if remote.is_none() {
                 return Err("离线下载需要有效的云连接".into());
             }
@@ -228,7 +225,7 @@ pub(super) async fn execute(
                         key,
                         &entry.url,
                         &p,
-                        extras,
+                        true,
                         &mut budget,
                     )
                     .await?;

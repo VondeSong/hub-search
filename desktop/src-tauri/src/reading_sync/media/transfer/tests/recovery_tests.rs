@@ -333,7 +333,7 @@ async fn reading_recovery_partial_missing_oversize_and_explicit_extras_never_cou
     receive(&b, &remote, &ns).await;
     assert_eq!(manifest(&b, &ns, MISSING).state, "missing");
     assert_eq!(manifest(&b, &ns, ZIP).state, "ready");
-    for (extras, verified) in [(false, 1), (true, 2)] {
+    for (extras, verified) in [(false, 2), (true, 3)] {
         let out = execute(&b, &remote, &ns, extras, &plan(&b, &ns, extras))
             .await
             .unwrap();

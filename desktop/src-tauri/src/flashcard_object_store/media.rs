@@ -216,6 +216,16 @@ impl OssStore {
         hash: &str,
         blobs: &BlobStore,
     ) -> Result<Option<u64>, String> {
+        self.get_media_blob_limited(key, hash, blobs, crate::FLASHCARD_SYNC_MAX_MEDIA_BYTES)
+            .await
+    }
+    pub(crate) async fn get_media_blob_limited(
+        &self,
+        key: &str,
+        hash: &str,
+        blobs: &BlobStore,
+        limit: u64,
+    ) -> Result<Option<u64>, String> {
         crate::cloud_transfer_meter::mark();
         let mut response = self
             .request(Method::GET, key, &[], false)?
@@ -228,10 +238,7 @@ impl OssStore {
         if !response.status().is_success() {
             return Err(format!("OSS 下载失败：HTTP {}", response.status()));
         }
-        if response
-            .content_length()
-            .is_some_and(|n| n > crate::FLASHCARD_SYNC_MAX_MEDIA_BYTES)
-        {
+        if response.content_length().is_some_and(|n| n > limit) {
             return Err("附件超过 250 MB 单文件限制".into());
         }
         let staged = blobs.staging_path()?;
@@ -252,7 +259,7 @@ impl OssStore {
                 crate::cloud_transfer_meter::downloaded(chunk.len());
                 self.downloaded_bytes
                     .fetch_add(chunk.len() as u64, std::sync::atomic::Ordering::Relaxed);
-                if total > crate::FLASHCARD_SYNC_MAX_MEDIA_BYTES {
+                if total > limit {
                     return Err("附件超过 250 MB 单文件限制".into());
                 }
                 digest.update(&chunk);

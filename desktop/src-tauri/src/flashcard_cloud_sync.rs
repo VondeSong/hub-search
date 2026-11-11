@@ -90,6 +90,7 @@ pub(super) async fn save_flashcard_oss_config(
 ) -> Result<CloudSettings, String> {
     let _guard = FLASHCARD_SYNC_LOCK.lock().await;
     let _reading_guard = reading_sync::LOCK.lock().await;
+    let _quick_guard = quick_journal::LOCK.lock().await;
     let oss = oss.normalized()?;
     if !matches!(media_policy.as_str(), "all" | "onDemand") {
         return Err("附件下载策略无效".into());
@@ -544,6 +545,7 @@ pub(super) async fn activate_flashcard_cloud_sync(
     let _guard = FLASHCARD_SYNC_LOCK.lock().await;
     let database = database_path(&app)?;
     let _reading_guard = reading_sync::LOCK.lock().await;
+    let _quick_guard = quick_journal::LOCK.lock().await;
     let (current, target_config) = {
         let c = open_database(&database)?;
         if !cloud_sync::policy(&c).enabled {

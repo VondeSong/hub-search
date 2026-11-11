@@ -11316,6 +11316,7 @@ async fn update_flashcard_sync_settings(
 ) -> Result<FlashcardSyncSettings, String> {
     let _sync_guard = FLASHCARD_SYNC_LOCK.lock().await;
     let _reading_guard = reading_sync::LOCK.lock().await;
+    let _quick_guard = quick_journal::LOCK.lock().await;
     let url = normalize_flashcard_webdav_url(&url)?;
     let username = username.trim().chars().take(240).collect::<String>();
     let database = database_path(&app)?;
@@ -11475,6 +11476,10 @@ async fn sync_flashcard_media(
     remote_hashes: &HashSet<String>,
     merged_hashes: &HashSet<String>,
     legacy_encryption_key: &str,
+    rules: Option<(
+        &cloud_sync::attachments::Directions,
+        HashMap<String, String>,
+    )>,
 ) -> Result<(usize, usize), String> {
     let media_root = base_url
         .join("media/")
@@ -11507,6 +11512,39 @@ async fn sync_flashcard_media(
         let url = media_root
             .join(hash)
             .map_err(|error| format!("无法构造媒体下载地址：{error}"))?;
+        if let Some((rules, types)) = &rules {
+            if !rules.download.any() {
+                continue;
+            }
+            let head = webdav_request(
+                client,
+                reqwest::Method::HEAD,
+                url.clone(),
+                &settings.username,
+                password,
+            )
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+            let size = head
+                .headers()
+                .get(CONTENT_LENGTH)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(u64::MAX);
+            let mime = types
+                .get(hash)
+                .map(String::as_str)
+                .or_else(|| {
+                    head.headers()
+                        .get(CONTENT_TYPE)
+                        .and_then(|v| v.to_str().ok())
+                })
+                .unwrap_or("");
+            if !rules.download.allows(mime, "", size) {
+                continue;
+            }
+        }
         let mut response = webdav_request(
             client,
             reqwest::Method::GET,
@@ -11539,16 +11577,26 @@ async fn sync_flashcard_media(
         if !response.status().is_success() {
             return Err(format!("无法下载闪卡媒体：HTTP {}", response.status()));
         }
+        let download_limit = rules
+            .as_ref()
+            .map(|(r, _)| r.download.max_mb * 1024 * 1024)
+            .unwrap_or(FLASHCARD_SYNC_MAX_MEDIA_BYTES);
         if response
             .content_length()
-            .is_some_and(|size| size > FLASHCARD_SYNC_MAX_MEDIA_BYTES + 64)
+            .is_some_and(|size| size > download_limit + 64)
         {
-            return Err("远端闪卡媒体超过 250 MB 安全限制".to_string());
+            return Err("远端闪卡媒体超过本机下载大小上限".to_string());
         }
-        let bytes = http_body::bytes(response, (FLASHCARD_SYNC_MAX_MEDIA_BYTES + 64) as usize)
+        let bytes = http_body::bytes(response, (download_limit + 64) as usize)
             .await
-            .map_err(|error| format!("无法读取闪卡媒体（250 MB 上限）：{error}"))?;
+            .map_err(|error| format!("无法读取闪卡媒体：{error}"))?;
         let plaintext = decrypt_flashcard_media(&bytes, legacy_encryption_key)?;
+        if rules
+            .as_ref()
+            .is_some_and(|(r, _)| plaintext.len() as u64 > r.download.max_mb * 1024 * 1024)
+        {
+            return Err("闪卡附件超过下载大小上限，原内容保留".into());
+        }
         let stored = blob_store.put(&plaintext)?;
         if stored.hash != *hash {
             return Err("远端闪卡媒体哈希校验失败".to_string());
@@ -11567,6 +11615,13 @@ async fn sync_flashcard_media(
         let url = media_root
             .join(hash)
             .map_err(|error| format!("无法构造媒体上传地址：{error}"))?;
+        if let Some((rules, _)) = &rules {
+            let bytes = fs::read(&local_path).map_err(|e| e.to_string())?;
+            let mime = infer::get(&bytes).map(|v| v.mime_type()).unwrap_or("");
+            if !rules.upload.allows(mime, "", metadata.len()) {
+                continue;
+            }
+        }
         let exists = webdav_request(
             client,
             reqwest::Method::HEAD,
@@ -11706,6 +11761,8 @@ async fn sync_flashcards_webdav_transfer(
             local_flashcard_snapshot(&connection)?
         };
         let merged_hashes = flashcard_snapshot_media_hashes(&snapshot);
+        let attachment_rules =
+            cloud_sync::attachments::policy(&open_database(&database)?, "flashcards")?;
         let media = sync_flashcard_media(
             &client,
             &base_url,
@@ -11715,6 +11772,12 @@ async fn sync_flashcards_webdav_transfer(
             &remote_hashes,
             &merged_hashes,
             &legacy_encryption_key,
+            Some((
+                &attachment_rules,
+                cloud_sync::attachments::media_types(
+                    &serde_json::to_value(&snapshot).map_err(|e| e.to_string())?,
+                ),
+            )),
         )
         .await?;
         uploaded_media += media.0;
@@ -35362,6 +35425,8 @@ pub fn run() {
                 flashcard_authoring::duplicate_flashcard,
                 get_flashcard_sync_settings,
                 cloud_sync::get_cloud_sync_policy,
+                cloud_sync::attachments::get_cloud_attachment_policies,
+                cloud_sync::attachments::update_cloud_attachment_policy,
                 isolated_runtime::get_isolated_runtime_status,
                 background_workers::background_worker_status,
                 database_maintenance_entry::get_local_database_maintenance,
@@ -40102,6 +40167,7 @@ mod tests {
             &HashSet::new(),
             &hashes,
             encryption_key,
+            None,
         )
         .await
         .unwrap();
@@ -40115,6 +40181,7 @@ mod tests {
             &hashes,
             &hashes,
             encryption_key,
+            None,
         )
         .await
         .unwrap();

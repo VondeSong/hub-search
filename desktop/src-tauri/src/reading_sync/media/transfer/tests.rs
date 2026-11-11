@@ -561,7 +561,7 @@ async fn reading_media_policy_blocks_oversize_and_requires_manual_archive_transf
     .unwrap();
     a.round(&remote, "a").await;
     assert_eq!(a.manifest().state, "skipped");
-    assert!(!allowed(&p, "image/png", MB + 1, true));
+    assert!(allowed(&p, "image/png", MB + 1, true));
     assert!(!allowed(&p, "application/x-executable", 10, true));
 }
 
@@ -574,7 +574,8 @@ async fn reading_media_daily_and_cache_limits_and_body_changes_prevent_download(
     a.seed(&png());
     a.round(&remote, "a").await;
     b.round(&remote, "b").await;
-    let p = policy(&b.c()).unwrap();
+    let mut p = policy(&b.c()).unwrap();
+    p.unlimited = false;
     meta(
         &b.c(),
         "reading_media_reserved",
@@ -693,7 +694,8 @@ async fn reading_quota_small_object_settles_existing_readback_actual_bytes() {
 #[tokio::test]
 async fn reading_quota_partial_failure_and_cancellation_release_only_unused_bytes() {
     let d = Device::new();
-    let p = policy(&d.c()).unwrap();
+    let mut p = policy(&d.c()).unwrap();
+    p.unlimited = false; // Historical batch accounting compatibility only.
     let budget = Budget::new(&p);
     let r = budget
         .reserve(&d.db, &p, 1000, "reading/media-v1/blobs/test")
@@ -724,7 +726,8 @@ async fn reading_quota_small_read_fits_remaining_allowance_not_max_manifest() {
     let s = server().await;
     let remote = store(&s);
     let d = Device::new();
-    let p = policy(&d.c()).unwrap();
+    let mut p = policy(&d.c()).unwrap();
+    p.unlimited = false; // Historical accounting compatibility only.
     let budget = Budget::new(&p);
     let key = remote.key("reading/small.json");
     remote.put_verified(&key, b"{}").await.unwrap();
@@ -888,4 +891,65 @@ fn reading_quota_previous_day_reservations_expire_without_becoming_usage() {
     drop(r);
     assert_eq!(metadata_u64(&d.c(), "reading_media_reserved", 0), 0);
     assert_eq!(metadata_u64(&d.c(), "reading_transfer_legacy", 0), 0);
+}
+
+#[tokio::test]
+async fn runtime_ignores_retired_budgets_and_keeps_upload_download_filters_independent() {
+    let server = server().await;
+    let remote = store(&server);
+    let a = Device::new();
+    let b = Device::new();
+    a.seed(&png());
+    let none = crate::cloud_sync::attachments::Selection {
+        image: false,
+        video: false,
+        pdf: false,
+        other: false,
+        max_mb: 1,
+    };
+    let mut directions = crate::cloud_sync::attachments::Directions {
+        upload: none.clone(),
+        download: none,
+    };
+    meta(
+        &a.c(),
+        "cloud_attachments_reading_v1",
+        &serde_json::to_string(&directions).unwrap(),
+    )
+    .unwrap();
+    a.round(&remote, "a").await;
+    assert!(!server
+        .state
+        .lock()
+        .unwrap()
+        .files
+        .keys()
+        .any(|k| k.contains("/blobs/")));
+    directions.upload.image = true;
+    meta(
+        &a.c(),
+        "cloud_attachments_reading_v1",
+        &serde_json::to_string(&directions).unwrap(),
+    )
+    .unwrap();
+    meta(
+        &a.c(),
+        "reading_media_reserved",
+        &(u64::MAX / 2).to_string(),
+    )
+    .unwrap();
+    a.round(&remote, "a").await;
+    b.round(&remote, "b").await;
+    let p = policy(&b.c()).unwrap();
+    assert!(p.unlimited);
+    meta(
+        &b.c(),
+        "reading_media_reserved",
+        &(u64::MAX / 2).to_string(),
+    )
+    .unwrap();
+    download(&b.db, &remote, NS, KEY, URL, &p, true)
+        .await
+        .unwrap();
+    assert!(local_available(&b.c(), &b.db, NS, KEY, URL).unwrap());
 }

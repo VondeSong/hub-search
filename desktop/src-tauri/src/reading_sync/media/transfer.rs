@@ -93,7 +93,11 @@ impl Drop for Reservation {
 impl Budget {
     pub(crate) fn new(p: &Policy) -> Self {
         Self {
-            left: Arc::new(std::sync::Mutex::new(p.batch_mb * MB)),
+            left: Arc::new(std::sync::Mutex::new(if p.unlimited {
+                u64::MAX
+            } else {
+                p.batch_mb.saturating_mul(MB)
+            })),
         }
     }
     fn reserve(
@@ -104,7 +108,7 @@ impl Budget {
         key: &str,
     ) -> Result<Reservation, String> {
         let mut left = self.left.lock().map_err(|_| "传输额度锁不可用")?;
-        if bytes > *left {
+        if !p.unlimited && bytes > *left {
             return Err(retry::wait(
                 retry::Admission::Quota,
                 "本轮云端传输额度不足，原内容保留",
@@ -119,7 +123,7 @@ impl Budget {
         } else {
             metadata_u64(&c, "reading_media_reserved", 0)
         };
-        if used.saturating_add(bytes) > p.daily_mb * MB {
+        if !p.unlimited && used.saturating_add(bytes) > p.daily_mb * MB {
             return Err(retry::wait(
                 retry::Admission::Quota,
                 "今日云端传输额度不足，原内容保留；可在云同步设置查看实际传输与旧版预留",
@@ -150,7 +154,7 @@ impl Budget {
         let pending = metadata_u64(&tx, "reading_transfer_pending", 0).saturating_add(bytes);
         meta(&tx, "reading_transfer_pending", &pending.to_string())?;
         tx.commit().map_err(|e| e.to_string())?;
-        *left -= bytes;
+        *left = left.saturating_sub(bytes);
         Ok(Reservation {
             db: db.clone(),
             day: effective_day,
@@ -323,14 +327,14 @@ async fn upload_one(
     // Re-check today's policy even for an outbox staged before a settings change.
     check_network(remote, &remote.key(MANIFESTS))?;
     if m.state == "ready" {
-        if !allowed_resource(
+        if !allowed_upload_resource(
             &open_database(db)?,
             &m.key,
             &m.url,
             p,
             &m.mime,
             m.size,
-            true,
+            force,
         )? {
             return Err(retry::wait(
                 retry::Admission::Type,
@@ -427,6 +431,22 @@ async fn uploads(
     };
     let mut result = Summary::default();
     for (id, body, path, cursor) in pending {
+        if only.is_none() {
+            let m: Manifest = serde_json::from_slice(&body).map_err(|_| "附件清单损坏")?;
+            if m.state == "ready"
+                && !allowed_upload_resource(
+                    &open_database(db)?,
+                    &m.key,
+                    &m.url,
+                    p,
+                    &m.mime,
+                    m.size,
+                    false,
+                )?
+            {
+                continue;
+            }
+        }
         if only.is_none() {
             let (c, _writer) = open_write_database(db)?;
             meta(&c, &cursor_key, &cursor.to_string())?;
@@ -782,6 +802,9 @@ pub(crate) async fn ensure(app: &AppHandle, key: &str, url: &str) -> Result<(), 
             return Err("附件尚未下载，请开启阅读附件同步或在原设备下载".into());
         }
         require_automatic_preview(&c, &ns, key, url)?;
+        if p.transfer_rules.is_none() && p.download != "all" {
+            return Err("附件仅手动下载，请在附件云副本中下载".into());
+        }
         (object_store::store(app, &c)?, ns, p)
     };
     download(&db, &remote, &ns, key, url, &p, false).await
@@ -981,13 +1004,21 @@ pub(crate) async fn sync(
     }
     {
         let c = open_database(db)?;
-        result.pending += c
-            .query_row(
-                "SELECT count(*) FROM reading_media_outbox WHERE namespace=?1",
-                [ns],
-                |r| r.get::<_, usize>(0),
-            )
+        let mut q = c
+            .prepare("SELECT body FROM reading_media_outbox WHERE namespace=?1")
             .map_err(|e| e.to_string())?;
+        for raw in q
+            .query_map([ns], |r| r.get::<_, Vec<u8>>(0))
+            .map_err(|e| e.to_string())?
+        {
+            let m: Manifest = serde_json::from_slice(&raw.map_err(|e| e.to_string())?)
+                .map_err(|_| "附件清单损坏")?;
+            if m.state != "ready"
+                || allowed_upload_resource(&c, &m.key, &m.url, &p, &m.mime, m.size, false)?
+            {
+                result.pending += 1;
+            }
+        }
     }
     Ok(result)
 }

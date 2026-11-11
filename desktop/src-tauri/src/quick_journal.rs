@@ -9,7 +9,7 @@ use format::{Attachment, Record, MAX_ATTACHMENT};
 mod android;
 #[cfg(test)]
 mod tests;
-static LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+pub(crate) static LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -21,7 +21,8 @@ pub(crate) struct Settings {
     pub date_folders: bool,
 }
 fn schema(c: &Connection) -> Result<(), String> {
-    c.execute_batch("CREATE TABLE IF NOT EXISTS quick_journal_records (
+    c.execute_batch("CREATE TABLE IF NOT EXISTS quick_journal_asset_receipts(namespace TEXT NOT NULL,hash TEXT NOT NULL,PRIMARY KEY(namespace,hash));
+    CREATE TABLE IF NOT EXISTS quick_journal_records (
         seq INTEGER PRIMARY KEY AUTOINCREMENT,id TEXT UNIQUE NOT NULL,payload TEXT NOT NULL,
         namespace TEXT NOT NULL DEFAULT '',uploaded INTEGER NOT NULL DEFAULT 0,
         applied INTEGER NOT NULL DEFAULT 0,receipted INTEGER NOT NULL DEFAULT 0,library_id TEXT NOT NULL DEFAULT '',path TEXT NOT NULL DEFAULT '');")
@@ -111,8 +112,14 @@ fn config(c: &Connection) -> Result<OssConfig, String> {
 pub(crate) fn get_quick_journal_settings(app: AppHandle) -> Result<Value, String> {
     let (c, _guard) = open_write_database(&database_path(&app)?)?;
     schema(&c)?;
+    let value = settings(&c)?;
+    let error = metadata_string(&c, "quick_journal_error");
+    let supported = flashcard_cloud_sync::provider(&c) == "oss";
+    let p = cloud_sync::policy(&c);
+    drop(c);
+    drop(_guard);
     Ok(
-        json!({"settings":settings(&c)?,"error":metadata_string(&c,"quick_journal_error"),"mobile":cfg!(mobile),"cloudEnabled":cloud_sync::policy(&c).enabled,"autoSync":cloud_sync::policy(&c).auto_sync}),
+        json!({"report":sync_report(&database_path(&app)?)?,"supported":supported,"settings":value,"error":error,"mobile":cfg!(mobile),"cloudEnabled":p.enabled,"autoSync":p.auto_sync}),
     )
 }
 #[tauri::command]
@@ -211,6 +218,11 @@ fn enqueue(db: &PathBuf, r: &Record) -> Result<(), String> {
             return Err("本机附件校验失败".into());
         }
     }
+    insert_record(db, r)
+}
+// The remote manifest is durable before optional attachment bytes arrive.
+fn insert_record(db: &PathBuf, r: &Record) -> Result<(), String> {
+    r.validate()?;
     let (mut c, _guard) = open_write_database(db)?;
     c.execute_batch("PRAGMA synchronous=FULL;")
         .map_err(|e| e.to_string())?;
@@ -265,8 +277,24 @@ fn append(path: &Path, r: &Record) -> Result<(), String> {
         Err(e) => return Err(e.to_string()),
     };
     let original = before.as_deref().unwrap_or("");
-    if format::blocks(original)?.iter().any(|(id, _)| id == &r.id) {
-        return Ok(());
+    let exists = format::blocks(original)?.iter().any(|(id, _)| id == &r.id);
+    let mut patched = original.to_string();
+    if exists {
+        for a in &r.attachments {
+            let placeholder = pending_attachment(&r.id, a);
+            let mut single = r.clone();
+            single.text = String::new();
+            single.attachments = vec![a.clone()];
+            let link = format::blocks(&single.markdown("_hub-assets"))?
+                .into_iter()
+                .next()
+                .ok_or("附件区块无效")?
+                .1;
+            patched = patched.replacen(&placeholder, &link, 1);
+        }
+        if patched == original {
+            return Ok(());
+        }
     }
     let prefix = if before.is_none() {
         format!("# {}\n\n", r.date)
@@ -280,7 +308,11 @@ fn append(path: &Path, r: &Record) -> Result<(), String> {
             }
         )
     };
-    let after = format!("{prefix}{}", r.markdown("_hub-assets"));
+    let after = if exists {
+        patched
+    } else {
+        format!("{prefix}{}", r.markdown("_hub-assets"))
+    };
     if !format::blocks(&after)?.iter().any(|(id, _)| id == &r.id) {
         return Err("当天日记含未闭合的 Markdown 区块，请在 OS 中修正后重试；原文未修改".into());
     }
@@ -361,6 +393,13 @@ fn append(path: &Path, r: &Record) -> Result<(), String> {
     }
     Ok(())
 }
+fn pending_attachment(id: &str, a: &Attachment) -> String {
+    format!(
+        "<!-- hub-attachment:{id}:{} -->\n附件未下载：{}（可在 Hub 速记中下载）",
+        a.hash,
+        a.name.replace(['[', ']', '<', '>'], "")
+    )
+}
 fn apply_local(db: &PathBuf) -> Result<(), String> {
     if cfg!(mobile) {
         return Ok(());
@@ -372,7 +411,7 @@ fn apply_local(db: &PathBuf) -> Result<(), String> {
         return Ok(());
     }
     let rows = c
-        .prepare("SELECT payload FROM quick_journal_records WHERE applied=0 ORDER BY seq")
+        .prepare("SELECT payload FROM quick_journal_records ORDER BY seq")
         .map_err(|e| e.to_string())?
         .query_map([], |r| r.get::<_, String>(0))
         .map_err(|e| e.to_string())?
@@ -381,9 +420,57 @@ fn apply_local(db: &PathBuf) -> Result<(), String> {
     for payload in rows {
         let r: Record = serde_json::from_str(&payload).map_err(|e| e.to_string())?;
         r.validate()?;
-        let dir = target(&c, &s, &r.date)?;
+        let (already, previous, previous_library): (bool, String, String) = c
+            .query_row(
+                "SELECT applied,path,library_id FROM quick_journal_records WHERE id=?1",
+                [&r.id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .map_err(|e| e.to_string())?;
+        let library = if already {
+            &previous_library
+        } else {
+            &s.library_id
+        };
+        let path = if already && !previous.is_empty() {
+            let path = PathBuf::from(previous);
+            let location: String = c.query_row(
+                "SELECT location FROM libraries WHERE id=?1 AND provider='obsidian' AND enabled=1",
+                [library], |r| r.get(0),
+            ).map_err(|_| "原日记资料库暂不可用")?;
+            if !fs::canonicalize(path.parent().ok_or("日记路径无效")?)
+                .map_err(|e| e.to_string())?
+                .starts_with(fs::canonicalize(location).map_err(|e| e.to_string())?)
+            {
+                return Err("原日记目录不能指向资料库外".into());
+            }
+            path
+        } else {
+            target(&c, &s, &r.date)?.join(format!("{}.md", r.date))
+        };
+        let dir = path.parent().ok_or("日记目录无效")?.to_path_buf();
+        let mut rendered = r.clone();
+        rendered.attachments.clear();
+        if already
+            && !fs::read_to_string(&path)
+                .ok()
+                .and_then(|v| format::blocks(&v).ok())
+                .is_some_and(|blocks| blocks.iter().any(|(id, _)| id == &r.id))
+        {
+            continue;
+        }
         for a in &r.attachments {
-            let bytes = fs::read(asset(db, &a.hash)?).map_err(|_| "附件仍在等待下载")?;
+            let bytes = match fs::read(asset(db, &a.hash)?) {
+                Ok(v) => v,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    rendered
+                        .text
+                        .push_str(&format!("\n\n{}", pending_attachment(&r.id, a)));
+                    continue;
+                }
+                Err(e) => return Err(e.to_string()),
+            };
+            rendered.attachments.push(a.clone());
             if bytes.len() != a.size || digest(&bytes) != a.hash {
                 return Err("附件校验失败，日记未写入".into());
             }
@@ -397,11 +484,10 @@ fn apply_local(db: &PathBuf) -> Result<(), String> {
             }
             data_portability::atomic_write(&asset_dir.join(a.filename()), &bytes)?;
         }
-        let path = dir.join(format!("{}.md", r.date));
-        append(&path, &r)?;
+        append(&path, &rendered)?;
         c.execute(
             "UPDATE quick_journal_records SET applied=1,library_id=?2,path=?3 WHERE id=?1",
-            params![r.id, s.library_id, path.to_string_lossy()],
+            params![r.id, library, path.to_string_lossy()],
         )
         .map_err(|e| e.to_string())?;
     }
@@ -455,15 +541,6 @@ async fn transfer(db: &PathBuf, store: &dyn Store, namespace: &str) -> Result<()
                 &r.id,
                 namespace,
             )?;
-            for a in &r.attachments {
-                let bytes = fs::read(asset(db, &a.hash)?).map_err(|_| "本机附件缺失")?;
-                if digest(&bytes) != a.hash || bytes.len() != a.size {
-                    return Err("本机附件校验失败".into());
-                }
-                store
-                    .put_verified(&store.key(&format!("journal/assets/{}", a.hash)), &bytes)
-                    .await?;
-            }
             store
                 .put_verified(
                     &store.key(&format!("journal/records/{}.json", r.id)),
@@ -476,6 +553,43 @@ async fn transfer(db: &PathBuf, store: &dyn Store, namespace: &str) -> Result<()
                 &r.id,
                 namespace,
             )?;
+        }
+        let rules = {
+            let c = open_database(db)?;
+            crate::cloud_sync::attachments::policy(&c, "quick")?
+        };
+        for a in &r.attachments {
+            if !rules.upload.allows(
+                if a.image { "image/unknown" } else { "" },
+                &a.name,
+                a.size as u64,
+            ) {
+                continue;
+            }
+            let sent = {
+                let c = open_database(db)?;
+                c.query_row("SELECT EXISTS(SELECT 1 FROM quick_journal_asset_receipts WHERE namespace=?1 AND hash=?2)",params![namespace,a.hash],|r|r.get::<_,bool>(0)).map_err(|e|e.to_string())?
+            };
+            if sent {
+                continue;
+            }
+            let bytes = match fs::read(asset(db, &a.hash)?) {
+                Ok(v) => v,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound && uploaded => continue,
+                Err(_) => return Err("本机附件缺失".into()),
+            };
+            if digest(&bytes) != a.hash || bytes.len() != a.size {
+                return Err("本机附件校验失败".into());
+            }
+            store
+                .put_verified(&store.key(&format!("journal/assets/{}", a.hash)), &bytes)
+                .await?;
+            let (c, _guard) = open_write_database(db)?;
+            c.execute(
+                "INSERT OR IGNORE INTO quick_journal_asset_receipts VALUES(?1,?2)",
+                params![namespace, a.hash],
+            )
+            .map_err(|e| e.to_string())?;
         }
     }
     if !cfg!(mobile) {
@@ -529,20 +643,7 @@ async fn transfer(db: &PathBuf, store: &dyn Store, namespace: &str) -> Result<()
                 if r.id != id {
                     return Err("云端速记 ID 不匹配".into());
                 }
-                for a in &r.attachments {
-                    let bytes = store
-                        .get(
-                            &store.key(&format!("journal/assets/{}", a.hash)),
-                            MAX_ATTACHMENT,
-                        )
-                        .await?
-                        .ok_or("附件仍在等待上传")?;
-                    if digest(&bytes) != a.hash || bytes.len() != a.size {
-                        return Err("云端附件校验失败".into());
-                    }
-                    data_portability::atomic_write(&asset(db, &a.hash)?, &bytes)?;
-                }
-                enqueue(db, &r)?;
+                insert_record(db, &r)?;
                 update(
                     db,
                     "UPDATE quick_journal_records SET uploaded=1,namespace=?2 WHERE id=?1",
@@ -557,6 +658,37 @@ async fn transfer(db: &PathBuf, store: &dyn Store, namespace: &str) -> Result<()
                 return Err("云端分页游标重复".into());
             }
             continuation = page.next;
+        }
+        apply_local(db)?;
+        for (r, bound, _, _) in queue(db)? {
+            if bound != namespace {
+                continue;
+            }
+            let rules = {
+                let c = open_database(db)?;
+                crate::cloud_sync::attachments::policy(&c, "quick")?
+            };
+            for a in &r.attachments {
+                if asset(db, &a.hash)?.is_file()
+                    || !rules.download.allows(
+                        if a.image { "image/unknown" } else { "" },
+                        &a.name,
+                        a.size as u64,
+                    )
+                {
+                    continue;
+                }
+                let Some(bytes) = store
+                    .get(&store.key(&format!("journal/assets/{}", a.hash)), a.size)
+                    .await?
+                else {
+                    continue;
+                };
+                if bytes.len() != a.size || digest(&bytes) != a.hash {
+                    return Err("速记附件校验失败，正文已保留".into());
+                }
+                data_portability::atomic_write(&asset(db, &a.hash)?, &bytes)?;
+            }
         }
         apply_local(db)?;
     }
@@ -787,7 +919,7 @@ pub(crate) fn quick_journal_image(app: AppHandle, hash: String) -> Result<String
     ))
 }
 #[tauri::command]
-pub(crate) fn export_quick_journal_attachment(
+pub(crate) async fn export_quick_journal_attachment(
     app: AppHandle,
     id: String,
     hash: String,
@@ -807,6 +939,39 @@ pub(crate) fn export_quick_journal_attachment(
         .iter()
         .find(|a| a.hash == hash)
         .ok_or("附件不属于此记录")?;
+    if !asset(&db, &hash)?.is_file() {
+        let _lock = LOCK.lock().await;
+        let configuration = {
+            let c = open_database(&db)?;
+            sync_configuration(&c, false, cfg!(mobile))?.ok_or("速记云同步未开启")?
+        };
+        let ns = configuration.namespace();
+        let bound: String = open_database(&db)?
+            .query_row(
+                "SELECT namespace FROM quick_journal_records WHERE id=?1",
+                [&r.id],
+                |r| r.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        if bound != ns {
+            return Err("速记属于其他云空间，原记录保留".into());
+        }
+        let store = guarded_store(
+            &db,
+            configuration,
+            stored_secret_get(&app, "hub-flashcard-oss-secret-v1")?.unwrap_or_default(),
+            false,
+        )?;
+        let bytes = store
+            .get(&store.key(&format!("journal/assets/{hash}")), a.size)
+            .await?
+            .ok_or("此附件尚未上传，请在原设备放宽上传规则后同步")?;
+        if digest(&bytes) != hash || bytes.len() != a.size {
+            return Err("附件校验失败".into());
+        }
+        data_portability::atomic_write(&asset(&db, &hash)?, &bytes)?;
+        apply_local(&db)?;
+    }
     let bytes = fs::read(asset(&db, &hash)?).map_err(|_| "附件不在本机")?;
     if digest(&bytes) != hash {
         return Err("附件校验失败".into());

@@ -7,7 +7,7 @@ type CloudSettings = { provider: "webdav" | "oss"; oss?: OssConfig; hasSecret: b
 type Report = { uploadedBytes: number; downloadedBytes: number; pendingMedia: number; uploadedChanges: number; downloadedChanges: number; completedAt: number };
 const empty: OssConfig = { bucket: "", region: "cn-hangzhou", prefix: "HubFlashcards", accessKeyId: "" };
 
-export function CloudConnectionOptions({ syncing, onChanged, onProviderChange, webdavSettings, webdavReady = false, webdavDirty = false, transfersAllowed = true, onBusyChange }: { syncing: boolean; onChanged: () => Promise<void>; onProviderChange?: (provider: CloudSettings["provider"]) => void; webdavSettings?: ReactNode; webdavReady?: boolean; webdavDirty?: boolean; transfersAllowed?: boolean; onBusyChange?: (busy: boolean) => void }) {
+export function CloudConnectionOptions({ syncing, onChanged, onProviderChange, webdavSettings, webdavReady = false, webdavDirty = false, transfersAllowed = true, onBusyChange, showDownloadPolicy = true }: { syncing: boolean; onChanged: () => Promise<void>; onProviderChange?: (provider: CloudSettings["provider"]) => void; webdavSettings?: ReactNode; webdavReady?: boolean; webdavDirty?: boolean; transfersAllowed?: boolean; onBusyChange?: (busy: boolean) => void; showDownloadPolicy?: boolean }) {
   const [settings, setSettings] = useState<CloudSettings | null>(null);
   const [selected, setSelected] = useState<CloudSettings["provider"] | null>(null);
   const [oss, setOss] = useState(empty);
@@ -69,7 +69,7 @@ export function CloudConnectionOptions({ syncing, onChanged, onProviderChange, w
     <div className="cloud-provider-picker" role="group" aria-label="选择要配置的云服务">
       {(["oss", "webdav"] as const).map(provider => <button key={provider} type="button" aria-pressed={selected === provider} disabled={disabled} onClick={() => { setSelected(provider); setReady(false); setError(""); setMessage(""); }}>
         <span><strong>{names[provider]}</strong>{settings?.provider === provider && <small>当前使用</small>}</span>
-        <span>{provider === "oss" ? "阿里云对象存储" : "支持坚果云等 WebDAV 服务"}</span>
+        <span>{provider === "oss" ? "阿里云对象存储" : "旧 WebDAV 连接兼容"}</span>
       </button>)}
     </div>
     {switching && <p className="cloud-connection-switch-note" role="status">正在配置 {names[selected]}，尚未启用。同步仍使用 {names[settings.provider]}。</p>}
@@ -82,7 +82,7 @@ export function CloudConnectionOptions({ syncing, onChanged, onProviderChange, w
         <label><span>同步目录</span><input value={oss.prefix} onChange={e => update("prefix", e.target.value)} spellCheck={false} /></label>
         <label><span>AccessKey ID</span><input value={oss.accessKeyId} onChange={e => update("accessKeyId", e.target.value)} autoComplete="off" spellCheck={false} /></label>
         <label><span>AccessKey Secret</span><input type="password" value={secret} onChange={e => setSecret(e.target.value)} placeholder={settings?.hasSecret ? "已安全保存；留空保持" : "专用密钥，不要发到聊天里"} autoComplete="new-password" /></label>
-        <label><span>闪卡附件下载</span><select value={policy} onChange={e => setPolicy(e.target.value as typeof policy)}><option value="all">全部下载，供离线使用</option><option value="onDemand">打开时下载，减少占用</option></select></label>
+        {showDownloadPolicy && <label><span>闪卡附件下载</span><select value={policy} onChange={e => setPolicy(e.target.value as typeof policy)}><option value="all">全部下载，供离线使用</option><option value="onDemand">打开时下载，减少占用</option></select></label>}
         {movingActiveOss && <><p>更改正在使用的云位置会迁移全部模块。分批传输未结束前继续使用原位置，再次保存可继续；原云数据保留。</p><label className="cloud-auto-sync"><input type="checkbox" checked={ready} onChange={e => setReady(e.target.checked)} /><span>其它设备已同步并暂停编辑和自动同步</span></label></>}
         <div className="cloud-sync-actions"><button disabled={!dirty || (movingActiveOss && (!ready || !transfersAllowed))} onClick={() => void run("save")}>{busy === "save" ? "保存中…" : movingActiveOss ? "迁移并保存 OSS 配置" : "保存 OSS 配置"}</button><button disabled={!settings?.oss || dirty} onClick={() => void run("test")}>{busy === "test" ? "校验中…" : "测试 OSS 连接"}</button></div>
       </fieldset>

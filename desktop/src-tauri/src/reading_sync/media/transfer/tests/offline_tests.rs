@@ -159,7 +159,7 @@ async fn reading_offline_explicit_extras_and_missing_body_never_claim_complete()
     assert_eq!(result["plan"]["warnings"].as_array().unwrap().len(), 1);
 }
 #[tokio::test]
-async fn reading_offline_shared_batch_budget_retains_success_and_retry_drains_remaining() {
+async fn reading_offline_retired_budgets_do_not_split_explicit_downloads() {
     let s = server().await;
     let remote = store(&s);
     let a = Device::new();
@@ -177,6 +177,8 @@ async fn reading_offline_shared_batch_budget_retains_success_and_retry_drains_re
     a.round(&remote, "a").await;
     b.round(&remote, "b").await;
     let p = Policy {
+        enabled: false,
+        image_mb: 1,
         batch_mb: 4,
         daily_mb: 4,
         ..policy(&b.c()).unwrap()
@@ -190,18 +192,15 @@ async fn reading_offline_shared_batch_budget_retains_success_and_retry_drains_re
     let result = run(&b, Some(&remote), false, &preview(&b, false))
         .await
         .unwrap();
-    assert_eq!(result["succeeded"], 1);
-    assert_eq!(result["failures"].as_array().unwrap().len(), 1);
-    assert_eq!(result["plan"]["complete"], false);
-    assert!(metadata_u64(&b.c(), "reading_media_reserved", 0) < 4 * MB);
-    // A new allowance simulates the next permitted user retry; already pinned bytes are not charged again.
-    meta(&b.c(), "reading_media_reserved", "0").unwrap();
-    let result = run(&b, Some(&remote), false, &preview(&b, false))
-        .await
-        .unwrap();
-    assert_eq!(result["succeeded"], 1);
+    assert_eq!(result["succeeded"], 2);
+    assert!(result["failures"].as_array().unwrap().is_empty());
     assert_eq!(result["plan"]["complete"], true);
+    assert!(metadata_u64(&b.c(), "reading_media_reserved", 0) > 4 * MB);
+    let transferred = remote.transferred();
+    assert_eq!(preview(&b, false)["complete"], true);
+    assert_eq!(remote.transferred(), transferred);
 }
+
 #[tokio::test]
 async fn reading_offline_rejects_stale_preview_and_paused_download_then_repairs_corruption() {
     let s = server().await;

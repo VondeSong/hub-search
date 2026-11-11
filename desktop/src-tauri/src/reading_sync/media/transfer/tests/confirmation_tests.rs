@@ -7,6 +7,7 @@ async fn attachment_traffic_existing_object_uses_one_read_budget_and_missing_req
     let remote = store(&server);
     let a = Device::new();
     let mut p = policy(&a.c()).unwrap();
+    p.unlimited = false; // Historical accounting compatibility only.
     p.batch_mb = 4;
     p.daily_mb = 4;
     let bytes = vec![42; (3 * MB) as usize];
@@ -60,7 +61,8 @@ async fn attachment_traffic_admission_wait_preserves_retries_and_next_day_resume
     let remote = store(&server);
     let a = Device::new();
     a.seed(&png());
-    let p = policy(&a.c()).unwrap();
+    let mut p = policy(&a.c()).unwrap();
+    p.unlimited = false;
     stage(&a.c(), NS, "a", &p, None).unwrap();
     meta(
         &a.c(),

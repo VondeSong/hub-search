@@ -76,6 +76,54 @@ fn another_store(server: &Server) -> (OssStore, String) {
 }
 
 #[tokio::test]
+async fn attachment_directions_preserve_skipped_bytes_and_resume_after_relaxing_choices() {
+    let server = server().await;
+    let remote = store(&server);
+    let ns = "direction-preferences";
+    let (db, blobs, hash) = fixture("direction-upload", true);
+    let none = crate::cloud_sync::attachments::Selection {
+        image: false,
+        video: false,
+        pdf: false,
+        other: false,
+        max_mb: 1,
+    };
+    let mut rules = crate::cloud_sync::attachments::Directions {
+        upload: none.clone(),
+        download: none.clone(),
+    };
+    let save = |db: &PathBuf, rules: &crate::cloud_sync::attachments::Directions| {
+        open_database(db).unwrap().execute(
+            "INSERT OR REPLACE INTO metadata(key,value) VALUES('cloud_attachments_flashcards_v1',?1)",
+            [serde_json::to_string(rules).unwrap()],
+        ).unwrap();
+    };
+    save(&db, &rules);
+    run(&remote, &db, &blobs, ns, true, false).await.unwrap();
+    let key = remote.key(&format!("media/{hash}"));
+    assert!(!server.state.lock().unwrap().files.contains_key(&key));
+    assert!(blobs.path_for(&hash).unwrap().is_file());
+    rules.upload.other = true;
+    save(&db, &rules);
+    run(&remote, &db, &blobs, ns, true, false).await.unwrap();
+    assert!(server.state.lock().unwrap().files.contains_key(&key));
+    let (receiver, local, _) = fixture("direction-download", false);
+    rules.upload = none;
+    save(&receiver, &rules);
+    run(&remote, &receiver, &local, ns, true, false)
+        .await
+        .unwrap();
+    assert!(!local.path_for(&hash).unwrap().is_file());
+    rules.download.other = true;
+    save(&receiver, &rules);
+    run(&remote, &receiver, &local, ns, false, false)
+        .await
+        .unwrap();
+    assert_eq!(fs::read(local.path_for(&hash).unwrap()).unwrap(), BYTES);
+    assert!(server.state.lock().unwrap().files.contains_key(&key));
+}
+
+#[tokio::test]
 async fn media_delivery_real_sync_reopen_skips_stable_local_bytes_but_rechecks_remote_presence() {
     let server = server().await;
     let remote = store(&server);

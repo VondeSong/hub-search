@@ -1,5 +1,6 @@
 //! Device-local policy shared by cloud modules. Provider keys/remote paths remain compatible.
 use super::*;
+pub(crate) mod attachments;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -94,6 +95,7 @@ pub(super) async fn update_cloud_sync_policy(
     // A successful pause means an active transfer has finished, and no queued transfer can start.
     let _guard = FLASHCARD_SYNC_LOCK.lock().await;
     let _reading_guard = reading_sync::LOCK.lock().await;
+    let _quick_guard = quick_journal::LOCK.lock().await;
     let (mut c, _writer) = open_write_database(&database_path(&app)?)?;
     save(&mut c, &settings)?;
     Ok(policy(&c))
