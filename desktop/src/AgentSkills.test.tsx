@@ -44,7 +44,7 @@ it("offers retry after discovery failure and opens the owned directory only on a
   expect(invoke.mock.calls.some(([, args]) => args.args.action === "openSkillDirectory")).toBe(false);
   invoke.mockImplementation(async(_,{args})=>args.action==="skillPackages"?{sources:[]}:catalog);
   await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="管理技能"]')!.click());
-  await act(async () => [...host.querySelectorAll("button")].find(button => button.textContent === "打开用户技能文件夹")!.click());
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="打开用户技能文件夹"]')!.click());
   expect(invoke).toHaveBeenLastCalledWith("agent_investigation", { args: { action: "openSkillDirectory" } });
   expect(host.textContent).toContain(catalog.directory);
   expect(host.textContent).toContain("与 Codex 的用户技能独立");

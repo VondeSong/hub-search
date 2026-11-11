@@ -131,3 +131,8 @@
 .agent-panel .agent-model-controls>.agent-option-model>summary{padding:0 1px 0 5px;font-size:12px;color:var(--hub-text-primary)}
 .agent-panel .agent-model-controls>.agent-option-effort>summary{width:auto;padding:0 4px 0 1px;gap:5px;font-size:12px;white-space:nowrap}
 .agent-model-controls>.agent-option-effort>summary>svg{flex:none}
+.agent-panel .agent-model-controls .agent-effort-levels>.agent-menu-choice{display:grid;grid-template-columns:24px minmax(0,1fr) 18px;align-items:center;gap:10px;min-height:58px;padding:9px 10px;border-radius:10px;text-align:start}
+.agent-model-controls .agent-effort-levels>.agent-menu-choice>.agent-reasoning-bars{flex:none;width:24px;justify-content:flex-start}
+.agent-panel .agent-model-controls .agent-effort-levels>.agent-menu-choice>span:not(.agent-reasoning-bars){margin:0;min-width:0;text-align:start}
+.agent-panel .agent-model-controls .agent-effort-levels strong{font-size:13px;font-weight:500;line-height:1.5}
+.agent-panel .agent-model-controls .agent-effort-levels small{font-size:12px;line-height:1.55;font-weight:400}

@@ -33,6 +33,7 @@ function AgentSaveOptions({value,disabled,canAuto,onSave,section}:Props) {
   }
   const title=section==="permissions"?"保存权限":"工具连接";
   const changed=JSON.stringify(draft)!==JSON.stringify(value);
+  const webStatus=effective?.provider==="deepseek"?"当前模型不支持网页搜索。":draft.researchPolicy==="materials-only"?"仅使用所选材料，不搜索网页。":!draft.webSearch||draft.webSearch==="disabled"?"已关闭，本轮不搜索网页。":draft.webSearch==="cached"?"使用缓存搜索，结果可能不是最新。":draft.researchPolicy==="open"?"可按问题查询公开来源。":"优先使用材料，有需要再补充网页。";
   const contents=<>
     {section==="permissions" && <>
       <p className="agent-note">控制成果如何保存，不改变助手可读取的资料范围。</p>
@@ -41,11 +42,12 @@ function AgentSaveOptions({value,disabled,canAuto,onSave,section}:Props) {
       <p className="agent-note">笔记修改与远端归档仍需预览确认。读取授权资料与分析不需要逐次确认。</p>
     </>}
     {section==="connection" && <>
+      <dl className="agent-connection-facts"><div><dt>网页补充</dt><dd>{webStatus}</dd></div><div><dt>内置工具</dt><dd>使用本轮资料范围和保存权限。</dd></div></dl>
       <label>工具连接<select value={draft.externalMcp?"mcp":"native"} disabled={disabled||saving||effective?.provider==="deepseek"} onChange={event=>setDraft(current=>{const next={...current};if(event.target.value==="mcp")next.externalMcp=true;else delete next.externalMcp;return next;})}><option value="native">Hub 内置连接</option><option value="mcp">Codex MCP 通道（验证中）</option></select></label>
       <label>联网搜索<select value={draft.researchPolicy==="materials-only"?"disabled":draft.webSearch??"disabled"} disabled={disabled||saving||draft.researchPolicy==="materials-only"} onChange={event=>setDraft(current=>{const next={...current};if(event.target.value==="disabled")delete next.webSearch;else next.webSearch=event.target.value as "cached"|"live";return next;})}><option value="disabled">关闭</option><option value="cached" disabled={effective?.provider==="deepseek"}>缓存搜索</option><option value="live" disabled={effective?.provider==="deepseek"}>实时搜索</option></select></label>
-      <p className="agent-note">新聊天默认实时搜索；此处可关闭，选择会用于后续新聊天。已有对话保留各自设置。仅支持 Codex。开启后，检索词会发送给联网搜索服务；不会因此开放其他本地资料。缓存搜索可能不是最新信息，实时搜索可获取更新内容。搜索记录和链接随对话保存，网页全文需另行读取。提供方内部检索材料不计入 Hub 的材料字节统计。</p>
+      <details className="agent-connection-explanation"><summary>联网与工具说明</summary><p className="agent-note">新聊天默认实时搜索；此处可关闭，选择会用于后续新聊天。已有对话保留各自设置。仅支持 Codex。开启后，检索词会发送给联网搜索服务；不会因此开放其他本地资料。缓存搜索可能不是最新信息，实时搜索可获取更新内容。搜索记录和链接随对话保存，网页全文需另行读取。提供方内部检索材料不计入 Hub 的材料字节统计。</p></details>
       {draft.externalMcp && <p className="agent-note">沿用当前事项的资料授权、累计预算和交付校验。每次从新上下文恢复已有记录，不复用或压缩旧线程；不会自动配置其他聊天。双端完整任务尚未验收。</p>}
-      <AgentMcpServices value={draft.mcpServices??[]} disabled={disabled||saving||effective?.provider==="deepseek"||draft.researchPolicy==="materials-only"} onChange={services=>setDraft(current=>{const next={...current};if(services.length)next.mcpServices=services;else delete next.mcpServices;return next;})}/>
+      <details className="agent-mcp-settings"><summary>外部工具（MCP）<small>{draft.mcpServices?.length?`已选 ${draft.mcpServices.length} 项`:"未选择"}</small></summary><AgentMcpServices value={draft.mcpServices??[]} disabled={disabled||saving||effective?.provider==="deepseek"||draft.researchPolicy==="materials-only"} onChange={services=>setDraft(current=>{const next={...current};if(services.length)next.mcpServices=services;else delete next.mcpServices;return next;})}/></details>
     </>}
     {changed && <button type="button" disabled={disabled||saving} onClick={()=>void save(draft)}>{saving?"正在应用…":draft.autoFlashcardInbox&&!value.autoFlashcardInbox?"确认本对话的自动导入授权":"应用到本对话"}</button>}
     {error && <p role="alert">{error}</p>}

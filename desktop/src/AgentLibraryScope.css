@@ -46,6 +46,10 @@
 .agent-library-copy > small { display: flex; flex-wrap: wrap; column-gap: 5px; font-size: 11px; line-height: 1.6; color: var(--hub-text-secondary); }
 .agent-library-copy > small > span + span::before { content: "·"; margin-inline-end: 5px; }
 .agent-library-picker .agent-library-empty { padding: 12px 8px; margin: 0; color: var(--hub-text-secondary); text-align: center; font-size: 12px; }
+.agent-scope-overview .agent-library-picker>.agent-library-list{max-height:none;overflow:visible}
+.agent-library-picker .agent-library-choice>.agent-library-copy{flex:1;min-width:0;margin:0;text-align:start}
+.agent-library-picker .agent-library-copy>small{display:flex;justify-content:flex-start;column-gap:5px;row-gap:0;text-align:start}
+.agent-library-picker .agent-library-copy>small>span{flex:0 0 auto;margin:0;text-align:start}
 .agent-library-picker > .agent-library-error { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; font-size: 12px; }
 .agent-library-error > span { flex: 1 1 160px; overflow-wrap: anywhere; }
 .agent-library-picker :is(.agent-library-error, .agent-library-picker-footer) > button { width: auto; min-height: 28px; padding: 3px 4px; border: 0; border-radius: 6px; background: transparent; color: var(--hub-text-secondary); font: inherit; font-size: 12px; text-align: start; cursor: pointer; }

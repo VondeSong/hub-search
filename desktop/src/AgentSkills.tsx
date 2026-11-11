@@ -1,6 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { WandSparkles, Check, Pin, PinOff, Search, Settings2, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, FolderOpen, WandSparkles, Check, Pin, PinOff, Search, Settings2, RefreshCw } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAgentPopover } from "./useAgentPopover";
 import {AgentSkillPackages} from "./AgentSkillPackages";
@@ -101,13 +101,12 @@ export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], o
 
       {detail.origin === "builtin" && <details className="agent-skill-document"><summary>完整技能说明</summary><div className="agent-skill-prose"><ReactMarkdown>{(builtinDocuments[detail.name] || "正文暂不可用").replace(/^---[\s\S]*?\n---\s*\n/, "")}</ReactMarkdown></div></details>}
 
-    </section> : managing ? <section className="agent-skill-detail" aria-label="技能管理">
-      <button type="button" className="agent-menu-back" onClick={back}>← 技能库</button>
-      <h3 ref={detailHeading} tabIndex={-1}>管理技能</h3>
-      <button type="button" disabled={loading} onClick={()=>void load()}><RefreshCw size={14}/>刷新技能</button>
-      <AgentSkillPackages initiallyExpanded onChanged={() => void load()}/>
-      <div className="agent-skill-actions"><button type="button" disabled={loading} onClick={() => void load("openSkillDirectory")}>打开用户技能文件夹</button></div>
-      <details className="agent-menu-advanced"><summary>文件夹与使用说明</summary>
+    </section> : managing ? <section className="agent-skill-detail agent-skill-management" aria-label="技能管理">
+      <button type="button" className="agent-menu-back" onClick={back}><ChevronLeft size={15}/>返回技能</button>
+      <div className="agent-skill-management-heading"><div><h3 ref={detailHeading} tabIndex={-1}>管理技能</h3><p>管理本机技能与固定方法包。</p></div><button type="button" className="agent-skill-refresh" aria-label="刷新技能" title="刷新技能" disabled={loading} onClick={()=>void load()}><RefreshCw size={16}/></button></div>
+      <div className="agent-skill-management-group"><button type="button" className="agent-skill-management-row" aria-label="打开用户技能文件夹" disabled={loading} onClick={() => void load("openSkillDirectory")}><FolderOpen size={18}/><span><strong>用户技能文件夹</strong><small>添加或编辑自己的 SKILL.md</small></span><ChevronRight size={15}/></button></div>
+      <div className="agent-skill-management-group"><h4>方法包</h4><AgentSkillPackages initiallyExpanded onChanged={() => void load()}/></div>
+      <details className="agent-menu-advanced agent-skill-management-help"><summary>文件夹与使用说明</summary>
         <p className="agent-note">用户技能与 Codex 的用户技能独立。每个技能放在独立文件夹中，包含 SKILL.md；修改后刷新。已登记方法包通过检查并发布新版本更新。外部 Codex 可通过 Hub MCP 读取 Hub 技能。</p>
         <p className="agent-skill-directory">{catalog?.directory}</p>
       </details>

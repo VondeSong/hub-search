@@ -1,4 +1,4 @@
-import { BookOpen, Sparkles } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import { AgentWebSources, type WebSource } from "./AgentWebSources";
 import { AgentAnswerActions } from "./AgentAnswerActions";
 import { AgentArtifactRevision } from "./AgentArtifactRevision";
@@ -51,7 +51,7 @@ function SourceExcerpt({ value }: { value: Evidence }) {
   return <details className="agent-citation"><summary>{value.title}</summary><blockquote>{value.content}</blockquote><small>{value.sourcePath} · 第 {value.startChar + 1}–{value.endChar} 字符{value.truncated ? "（节选）" : ""}</small></details>;
 }
 
-function ReportContent({ value, evidence, runId, onOpenCitation }: { value: Report; evidence: Evidence[]; runId?: string; onOpenCitation?: CitationOpening }) {
+function ReportContent({ value, evidence, runId, onOpenCitation, actions }: { value: Report; evidence: Evidence[]; runId?: string; onOpenCitation?: CitationOpening; actions?:ReactNode }) {
   if (value.prose) {
     const prose=value.prose;
     const markdown=prose.markdown.replace(/\[(\d+)\](?!\()/g,(all,index:string)=>Number(index)>0 && Number(index)<=prose.citations.length ? "[" + index + "](#hub-citation-" + index + ")" : all);
@@ -63,7 +63,7 @@ function ReportContent({ value, evidence, runId, onOpenCitation }: { value: Repo
       <ReportCitationContext.Provider value={{ citations: prose.citations, evidence, runId, onOpenCitation }}><ReportMarkdown markdown={markdown} /></ReportCitationContext.Provider>
       <AgentWebSources sources={prose.webSources??[]}/>
       {!!value.limitations.length && <p className="agent-note">{value.limitations.join("；")}</p>}
-      <AgentAnswerActions text={[prose.markdown,...value.limitations,copySources.length ? "来源：\n"+copySources.join("\n") : ""].filter(Boolean).join("\n\n")}/>
+      <div className="agent-answer-toolbar"><AgentAnswerActions text={[prose.markdown,...value.limitations,copySources.length ? "来源：\n"+copySources.join("\n") : ""].filter(Boolean).join("\n\n")}/>{actions}</div>
     </div>;
   }
   const citations = (items: Citation[]) => items.map((citation, index) => {
@@ -78,15 +78,16 @@ function ReportContent({ value, evidence, runId, onOpenCitation }: { value: Repo
     {!!value.questions.length && <><h3>需要你决定</h3><ul>{value.questions.map((question, index) => <li key={index}>{question}</li>)}</ul></>}
     {value.waitCondition && <p>等待条件：{value.waitCondition}。可手动继续，或在下方明确设置可核对的复查条件。</p>}
     {!!value.limitations.length && <details><summary>证据范围与局限</summary><ul>{value.limitations.map((limit, index) => <li key={index}>{limit}</li>)}</ul></details>}
+    {actions&&<div className="agent-answer-toolbar">{actions}</div>}
   </div>;
 }
 
-function BoundReport({ value, report, evidence, runId, onOpenCitation, workId, recordVersion, keepHistoricalTextVisible=false }: Reopening & {
+function BoundReport({ value, report, evidence, runId, onOpenCitation, workId, recordVersion, keepHistoricalTextVisible=false, actions }: Reopening & {
   value: ArtifactBinding; report: Report; evidence: Evidence[]; runId?: string; onOpenCitation?: CitationOpening;
-  keepHistoricalTextVisible?: boolean;
+  keepHistoricalTextVisible?: boolean; actions?:ReactNode;
 }) {
   if (value.artifactState === "unavailable") return null;
-  const body = <ReportContent value={report} evidence={evidence} runId={runId} onOpenCitation={onOpenCitation} />;
+  const body = <ReportContent value={report} evidence={evidence} runId={runId} onOpenCitation={onOpenCitation} actions={actions}/>;
   const references = !!value.artifactRefs?.length && <p className="agent-note" aria-label="回答使用的图表版本">
     {value.artifactRefs.map((ref, index) => <span key={ref.artifactId}>{index > 0 ? "；" : ""}图表 {index + 1} · 第 {ref.revision} 版{ref.currentRevision !== ref.revision ? `（当前第 ${ref.currentRevision} 版）` : ""}</span>)}
   </p>;
@@ -116,7 +117,7 @@ export function AgentDelivery({ report, evidence, progress, history = [], runnin
   </>;
 }
 
-export function AgentConversation({ conversation, revoked, onOpenCitation, renderAfter, activity=[], workId, recordVersion, onLoadEarlier, earlierLoading=false, earlierError="" }: Reopening & { conversation: Conversation; revoked: boolean; onOpenCitation: CitationOpening; onLoadEarlier?: () => void; earlierLoading?: boolean; earlierError?: string; renderAfter?: (message: ConversationMessage) => ReactNode; activity?:ActivityRun[] }) {
+export function AgentConversation({ conversation, revoked, onOpenCitation, renderAfter, renderActions, activity=[], workId, recordVersion, onLoadEarlier, earlierLoading=false, earlierError="" }: Reopening & { conversation: Conversation; revoked: boolean; onOpenCitation: CitationOpening; onLoadEarlier?: () => void; earlierLoading?: boolean; earlierError?: string; renderAfter?: (message: ConversationMessage) => ReactNode; renderActions?: (message:ConversationMessage)=>ReactNode; activity?:ActivityRun[] }) {
   if (revoked) return null;
   return <div className="agent-messages" aria-label="对话记录">
     {conversation.hasEarlier && (onLoadEarlier && conversation.nextCursor ? <button type="button" disabled={earlierLoading} onClick={onLoadEarlier}>{earlierLoading ? "正在读取更早记录…" : "查看更早记录"}</button> : <p className="agent-note">这里只显示最近的对话，较早记录仍已保存。</p>)}
@@ -138,9 +139,8 @@ export function AgentConversation({ conversation, revoked, onOpenCitation, rende
         {Number.isFinite(message.createdAt)&&message.createdAt>0&&!Number.isNaN(new Date(message.createdAt).getTime())&&<time dateTime={new Date(message.createdAt).toISOString()} title={new Date(message.createdAt).toLocaleString("zh-CN",{hour12:false})}>{new Date(message.createdAt).toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit",hour12:false})}</time>}
         <AgentAnswerActions text={message.text || ""} label="消息"/>
       </div></> : <>
-        <div className="agent-message-author"><Sparkles size={14} aria-hidden="true"/><span>Hub 助手</span></div>
         {message.validity && <p className="agent-note">{revisedText ? "此前回答" : message.validity}</p>}
-        {message.report && <BoundReport workId={workId} recordVersion={recordVersion} value={message} report={message.report} evidence={message.evidence || []} runId={message.runId} onOpenCitation={onOpenCitation} keepHistoricalTextVisible={revisedText} />}
+        {message.report && <BoundReport workId={workId} recordVersion={recordVersion} value={message} report={message.report} evidence={message.evidence || []} runId={message.runId} onOpenCitation={onOpenCitation} keepHistoricalTextVisible={revisedText} actions={renderActions?.(message)}/>}
       </>}
       {message.role === "assistant" && renderAfter?.(message)}
     </section>;

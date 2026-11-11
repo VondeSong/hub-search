@@ -6,7 +6,7 @@ import { useAgentPopover } from "./useAgentPopover";
 import type { AssistantOptions } from "./AgentAssistantOptions";
 import "./AgentModelMenu.css";
 
-const effortLabels:Record<string,string>={none:"关闭思考",low:"低",medium:"中",xhigh:"极高"};
+const effortLabels:Record<string,string>={none:"关闭思考",low:"低",medium:"中",xhigh:"极高",ultra:"极限"};
 const effortName=(value:string)=>effortLabels[value]||CODEX_EFFORT_LABELS[value]||value||"默认";
 const supportsFast=(provider:ModelProvider,model?:CodexModel)=>provider==="codex"&&!!model?.fastDescription?.trim();
 const descriptions:Record<string,string>={none:"直接回答，不启用推理模式",low:"较少推理投入，适合简单问题",medium:"适合日常讨论与资料整理",high:"增加推理投入，适合复杂问题",xhigh:"更充分地推理与检查，等待可能更久",max:"使用该模型最高的推理投入",ultra:"使用该模型支持的更高推理投入"};

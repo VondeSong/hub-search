@@ -9,6 +9,16 @@ let host:HTMLDivElement,root:Root;
 beforeEach(()=>{Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});host=document.createElement("div");document.body.append(host);root=createRoot(host);});
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();});
 const activity=(text:string):ActivityRun=>({runId:"failed",revision:1,state:"failed",running:false,startedAt:1,finishedAt:2000,steps:0,events:[{id:"answer",kind:"unpublishedAnswer",state:"unverified",label:text,createdAt:2}]});
+it("keeps answer actions beside copy, bound to each historical answer without an author banner",async()=>{
+ const chosen=vi.fn();
+ const messages=['first','second'].map(id=>({id,role:'assistant' as const,runId:id,createdAt:1,report:{status:'completed',summary:id,findings:[],nextSteps:[],questions:[],limitations:[],waitCondition:'',prose:{markdown:id,citations:[]}}}));
+ await act(async()=>root.render(<AgentConversation conversation={{messages,hasEarlier:false}} revoked={false} onOpenCitation={vi.fn()} renderActions={message=><div className="agent-answer-destinations"><button onClick={()=>chosen(message.runId)}>插入页面</button></div>}/>));
+ expect(host.querySelector('.agent-message-author')).toBeNull();
+ const toolbars=host.querySelectorAll('.agent-answer-toolbar');expect(toolbars).toHaveLength(2);
+ expect(toolbars[1].querySelector('[aria-label="复制回答"]')).not.toBeNull();
+ await act(async()=>toolbars[1].querySelector<HTMLButtonElement>('.agent-answer-destinations button')!.click());
+ expect(chosen).toHaveBeenCalledExactlyOnceWith('second');
+});
 async function expand(){const details=host.querySelector<HTMLDetailsElement>("details.agent-tool-result")!;await act(async()=>{details.open=true;details.dispatchEvent(new Event("toggle"));});}
 it("CN05 unverified final is findable while process is collapsed and renders only on demand",async()=>{
  const text="中🙂".repeat(17000)+"完整尾句";await act(async()=>root.render(<AgentActivity value={activity(text)}/>));

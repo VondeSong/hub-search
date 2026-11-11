@@ -8,6 +8,14 @@ vi.mock("@tauri-apps/api/core",()=>({invoke}));
 let host:HTMLDivElement,root:Root;
 const changed=vi.fn();
 const preview:AnswerSave={saveId:"save",runId:"historical-run",title:"edited title",text:"edited body",mode:"note",targetName:"笔记库",state:"prepared",confirmationToken:"bound-token"};
+it("returns focus to the actual save action that opened the dialog",async()=>{
+ await act(async()=>root.render(<AgentAnswerSave workId="work" runId="historical-run" disabled={false} records={[]} onChanged={changed}/>));
+ const opener=[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='新建笔记')!;
+ await act(async()=>{opener.focus();opener.click();});
+ await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label="关闭保存回答"]')!.click());
+ expect(document.activeElement).toBe(opener);
+ expect(invoke.mock.calls.some(([,p])=>p?.args?.action==='submitAnswerSave')).toBe(false);
+});
 beforeEach(()=>{Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});host=document.createElement("div");document.body.append(host);root=createRoot(host);invoke.mockReset();changed.mockReset();invoke.mockImplementation(async(_,{args})=>args.action==="answerSaveSource"?{title:"original title",text:"original answer",sourceHash:"verified-hash"}:args.action==="answerDestinations"?{libraries:[{id:"notes",name:"笔记库",provider:"obsidian"}]}:args.action==="prepareAnswerSave"?preview:{...preview,state:"verified",receipt:{verified:true,path:"vault/note.md"}});});
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();});
 const button=(text:string)=>[...document.body.querySelectorAll("button")].find(b=>b.textContent===text)!;

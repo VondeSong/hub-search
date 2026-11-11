@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { ChevronLeft, FolderBookmark, Pin, X } from "lucide-react";
+import { Check, ChevronLeft, FolderBookmark, Pin, X } from "lucide-react";
 import type { ImageGrant } from "./AgentImages";
 import type { NoteLocator } from "./AgentMaterials";
 import type { InvestigationLocator } from "./AgentInvestigation";
@@ -37,7 +37,7 @@ export function useResearchSelection(key:string){
   return [state.key===key?state.value:null,(value:ResearchSelection|null)=>{setState({key,value});try{if(value)userProfileStorage.setItem("hub.agent.research."+key,JSON.stringify(value));else userProfileStorage.removeItem("hub.agent.research."+key);}catch{}}] as const;
 }
 export function AgentResearchPolicy({value,disabled,onChange}:{value:ResearchPolicy;disabled:boolean;onChange:(v:ResearchPolicy)=>void}){
-  return <div className="agent-research-policies">{(Object.keys(policyNames) as ResearchPolicy[]).map(policy=><button type="button" key={policy} disabled={disabled} className="agent-menu-choice" aria-pressed={value===policy} onClick={()=>onChange(policy)}><span><strong>{policyNames[policy]}</strong><small>{policy==="material-first"?"先读核心材料，必要时联网补充":policy==="materials-only"?"只使用所选材料，缺少依据时说明":"围绕问题研究，保持本地资料范围"}</small></span>{value===policy&&"✓"}</button>)}</div>;
+  return <div className="agent-research-policies">{(Object.keys(policyNames) as ResearchPolicy[]).map(policy=><button type="button" key={policy} disabled={disabled} className="agent-menu-choice" aria-pressed={value===policy} onClick={()=>onChange(policy)}><span><strong>{policyNames[policy]}</strong><small>{policy==="material-first"?"先读核心材料，必要时联网补充":policy==="materials-only"?"只使用所选材料，缺少依据时说明":"围绕问题研究，保持本地资料范围"}</small></span>{value===policy&&<Check size={16} aria-hidden="true"/>}</button>)}</div>;
 }
 export function AgentResearchTopics({open,saveMode,config,active,disabled,onApply,onClose,initialId,onBack,onMetadata}:{onBack?:()=>void;onMetadata?:(topic:ResearchTopic)=>void;initialId?:string;open:boolean;saveMode:boolean;config:Omit<ResearchTopic,"id"|"revision"|"title"|"pinned">;active?:ResearchTopic;disabled:boolean;onApply:(t:ResearchTopic)=>Promise<void>;onClose:()=>void}){
   const [topics,setTopics]=useState<ResearchTopic[]>([]),[query,setQuery]=useState(""),[title,setTitle]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(false),[saveSkills,setSaveSkills]=useState(true);
