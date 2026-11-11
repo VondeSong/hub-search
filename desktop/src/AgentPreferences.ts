@@ -60,13 +60,29 @@ export function loadAgentPreferences(): AssistantOptions {
     if (model && [undefined, "codex", "deepseek"].includes(model.provider) && typeof model.model === "string" && model.model.length <= 200 && typeof model.reasoningEffort === "string" && model.reasoningEffort.length <= 40 && typeof model.fast === "boolean" && Number.isInteger(model.maxConcurrent) && model.maxConcurrent >= 1 && model.maxConcurrent <= 32) {
       defaults.model = { provider: model.provider, model: model.model, reasoningEffort: model.reasoningEffort, fast: model.fast, maxConcurrent: model.maxConcurrent };
     }
-    if (["disabled", "cached", "live"].includes(saved.webSearch)) defaults.webSearch = saved.webSearch;
+    defaults.webSearch = defaults.model?.provider === "deepseek" ? "disabled" : loadCodexWebSearchPreference();
   } catch { /* Invalid or unavailable storage falls back to new-chat defaults. */ }
   return defaults;
 }
-export function rememberAgentPreferences(value: AssistantOptions) {
+export function loadCodexWebSearchPreference(): NonNullable<AssistantOptions["webSearch"]> {
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) || "null");
+    if (["disabled", "cached", "live"].includes(saved?.codexWebSearch)) return saved.codexWebSearch;
+    const value = saved?.model?.provider !== "deepseek" ? saved?.webSearch : undefined;
+    if (["disabled", "cached", "live"].includes(value)) return value;
+  } catch { /* Missing or invalid preferences use the normal new-chat default. */ }
+  return "live";
+}
+
+export function rememberAgentPreferences(value: AssistantOptions, previous?: AssistantOptions, inheritedProvider: ModelProvider = "codex") {
   // Only preferences carry forward; material grants, MCP and saving permissions never do.
-  try { localStorage.setItem(key, JSON.stringify({ model: value.model, webSearch: value.webSearch ?? "disabled" })); }
+  const provider = value.model ? value.model.provider ?? "codex" : inheritedProvider;
+  const previousProvider = previous?.model ? previous.model.provider ?? "codex" : inheritedProvider;
+  // DeepSeek's capability restriction must not become the user's Codex preference.
+  const codexWebSearch = provider === "codex" ? value.webSearch ?? "disabled"
+    : previous && previousProvider === "codex" ? previous.webSearch ?? "disabled"
+    : loadCodexWebSearchPreference();
+  try { localStorage.setItem(key, JSON.stringify({ model: value.model, webSearch: provider === "deepseek" ? "disabled" : codexWebSearch, codexWebSearch })); }
   catch { /* Saving the actual conversation does not depend on browser preference storage. */ }
   rememberAgentModelPreference(value.model);
 }

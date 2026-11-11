@@ -6,6 +6,7 @@ import { PersistentSourceInvestigation, StandaloneInvestigation } from "./AgentI
 import { resetCodexAccountsForTests } from "./CodexAccounts";
 import type { LibrarySummary, SearchResult } from "./SearchTypes";
 import type { WorkSummary } from "./AgentConversationHistory";
+import { loadCodexSuiteModels, type ModelProvider } from "./CodexSuite";
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
@@ -82,7 +83,30 @@ beforeEach(() => {
 });
 afterEach(async () => {
   await act(async () => root.unmount());
+  vi.mocked(loadCodexSuiteModels).mockResolvedValue([]);
   resetCodexAccountsForTests(); host.remove();
+});
+
+it.each(["live", "cached", "disabled"] as const)("restores Codex search after a DeepSeek round trip (%s)", async webSearch => {
+  const model = { provider: "codex", model: "codex-search-test", reasoningEffort: "medium", fast: false, maxConcurrent: 2 };
+  localStorage.setItem("hub.agent.preferences.v1", JSON.stringify({ model, webSearch }));
+  vi.mocked(loadCodexSuiteModels).mockImplementation(async (provider = "codex") => [{ id: provider + "-search-test", name: provider, reasoningLevels: ["medium"], defaultReasoning: "medium" }]);
+  await render(<StandaloneInvestigation initiallyOpen/>);
+  async function choose(provider: ModelProvider) {
+    await activate(select<HTMLElement>(".agent-option-model > summary"));
+    await activate([...document.querySelectorAll<HTMLButtonElement>(".agent-model-providers button")].find(button => button.textContent === (provider === "codex" ? "Codex" : "DeepSeek"))!);
+    await activate(select<HTMLButtonElement>(`.agent-model-list button[title="${provider}-search-test"]`));
+  }
+  await choose("deepseek");
+  const deepseekSaved = JSON.parse(localStorage.getItem("hub.agent.preferences.v1")!);
+  expect(deepseekSaved.webSearch).toBe("disabled");
+  await act(async () => root.unmount()); root = createRoot(host);
+  await render(<StandaloneInvestigation initiallyOpen/>);
+  await choose("codex");
+  await submit("联网偏好切换回归");
+  const configured = invoke.mock.calls.find(([command, payload]) => command === "agent_investigation" && payload?.args?.action === "configureAssistant")![1].args.options;
+  expect(configured.webSearch).toBe(webSearch);
+  expect(configured.model.provider).toBe("codex");
 });
 
 const select = <T extends Element>(selector: string, within: ParentNode = document): T => {

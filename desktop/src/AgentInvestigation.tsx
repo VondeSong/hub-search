@@ -1,5 +1,5 @@
 import {AgentFollowups,type Followup} from "./AgentFollowups";
-import { loadAgentPreferences, rememberAgentPreferences, loadMemoryPreference, rememberMemoryPreference } from "./AgentPreferences";
+import { loadAgentPreferences, rememberAgentPreferences, loadCodexWebSearchPreference, loadMemoryPreference, rememberMemoryPreference } from "./AgentPreferences";
 import { AgentCitationContext, AgentBrowsingContext, AgentPanelContext,AgentAccountVisibleContext,AgentTextMaterialContext,type TextMaterial } from "./StandaloneAgentLauncher";
 import {AgentMaterialCard} from "./AgentMaterialCard";
 import {AgentConversationHistory,type WorkSummary,type HistoryChange} from "./AgentConversationHistory";
@@ -807,13 +807,16 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     finally { if (alive.current) setBusy(false); }
   };
   const saveAssistantOptions=async (options:AssistantOptions)=>{
-    if((options.model ?? runtime.settings)?.provider === "deepseek") options={...options,webSearch:"disabled"};
+    const previous=(view ? view.assistantOptions || defaultAssistantOptions : assistantOptions);
+    const provider=(options.model ?? runtime.settings)?.provider ?? "codex";
+    const previousProvider=(previous.model ?? runtime.settings)?.provider ?? "codex";
+    if(provider === "deepseek") options={...options,webSearch:"disabled"};
+    else if(previousProvider === "deepseek") options={...options,webSearch:loadCodexWebSearchPreference()};
     if(view) {
       const next=await call<View>({action:"configureAssistant",id:view.work.id,options,confirmedAutoInbox:options.autoFlashcardInbox});
       if(alive.current) setView(next);
     } else setAssistantOptions(options);
-    const previous=(view ? view.assistantOptions || defaultAssistantOptions : assistantOptions);
-    if(JSON.stringify(previous.model)!==JSON.stringify(options.model) || previous.webSearch!==options.webSearch) rememberAgentPreferences(options);
+    if(JSON.stringify(previous.model)!==JSON.stringify(options.model) || previous.webSearch!==options.webSearch) rememberAgentPreferences(options,previous,runtime.settings?.provider);
   };
   const outcomes=(items:NonNullable<AgentActions>["items"])=>items.length ? <div className="agent-outcomes" aria-label="对话成果">{items.map(item=>item.kind==="flashcardDrafts" ? <FlashcardRecord key={item.id} item={item as FlashcardAction} disabled={businessDisabled} revoked={view?.work.state==="revoked"} onAction={businessAction}/> : item.kind==="archiveCopy" ? <ArchiveRecord key={item.id} item={item as ArchiveAction} disabled={businessDisabled} revoked={view?.work.state==="revoked"} onAction={businessAction}/> : item.kind==="obsidianEdit" ? <AgentObsidianEdit key={item.id} actions={{tagOptions:[],items:[item]}} recordsOnly verificationPending={!!businessCheck?.uncertain && businessCheck.actionId===item.id} disabled={businessDisabled} revoked={view?.work.state==="revoked"} onAction={businessAction}/> : null)}</div> : null;
   const inlineOutcomes=(message:ConversationMessage)=>{
