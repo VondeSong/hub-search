@@ -750,7 +750,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     setBusy(true); setError("");
     try {
       await checkDraftMemory();
-      const grant=research?effectiveGrant:buildDraftGrant();
+      const grant=research?{libraryIds:[],notes:[],readingItemKeys:[]}:buildDraftGrant();
       let value = publicUrl.trim() ? await call<View>({action:"createFromPublicUrl",url:publicUrl.trim(),goal:goal.trim(),confirmedPublicRead:true,researchPolicy:assistantOptions.researchPolicy}) : await call<View>({ action: "create", goal: messageText, successCriteria: "", anchor:research?null:anchor, grant });
       if (!alive.current) return;
       setPublicUrl("");
@@ -758,6 +758,11 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       if(tagMode||tagPreparation.references.length)tagPending.current=tagPreparation;
       setView(value); if(research)researchPending.current={...research,manual,includeManual:false}; void reloadWorks();
       if(anchor){setMaterials([]);setDropped([]);} setRemovals([]);
+      if(research){
+        value=await call<View>({action:"replaceResearchScope",id:value.work.id,grant:effectiveGrant,expectedRevision:value.work.revision,expectedAuthorizationVersion:value.work.authorizationVersion});
+        if(!alive.current)return;
+        setView(value);
+      }
       // Bind the user's preflight selection before the first model call. A
       // failed binding leaves a visible ready work and never starts a model.
       if (assistantOptions.researchPolicy || assistantOptions.model || assistantOptions.autoFlashcardInbox || assistantOptions.externalMcp || assistantOptions.webSearch || assistantOptions.mcpServices?.length) value=await call<View>({action:"configureAssistant",id:value.work.id,options:assistantOptions,confirmedAutoInbox:assistantOptions.autoFlashcardInbox});

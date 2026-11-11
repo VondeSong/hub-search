@@ -208,10 +208,15 @@ pub(super) async fn ui(app: tauri::AppHandle, args: Value) -> Result<Value, Stri
             if library_id != target {
                 return Err("目标页面和资料库不匹配".into());
             }
-            let valid:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM documents WHERE space_id=?1 AND id=?2 AND provider=?3)",params![target,document_id,provider],|r|r.get(0)).map_err(|e|e.to_string())?;
-            if !valid {
-                return Err("目标页面已不可用".into());
-            }
+            let target_title: String = c
+                .query_row(
+                    "SELECT title FROM documents WHERE space_id=?1 AND id=?2 AND provider=?3",
+                    params![target, document_id, provider],
+                    |r| r.get(0),
+                )
+                .map_err(|_| "目标页面已不可用")?;
+            plan["target"] = args["target"].clone();
+            plan["targetTitle"] = json!(target_title);
             if provider == "obsidian" {
                 if page_id.is_some() {
                     return Err("Obsidian 保存目标必须为整篇笔记".into());
@@ -254,6 +259,13 @@ pub(super) async fn ui(app: tauri::AppHandle, args: Value) -> Result<Value, Stri
                     return Err("请选择当前连接中的滴答清单".into());
                 }
                 plan["projectId"] = json!(project);
+                plan["projectName"] = remote["projects"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|p| p["id"] == project)
+                    .unwrap()["name"]
+                    .clone();
             }
             plan["remote"] = remote;
         }

@@ -3,6 +3,8 @@
 mod action_target;
 mod actions;
 mod activity;
+#[cfg(test)]
+mod alignment_acceptance;
 mod answer_save;
 mod artifacts;
 mod assistant;

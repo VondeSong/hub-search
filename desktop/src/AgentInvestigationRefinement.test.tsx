@@ -317,6 +317,29 @@ describe("assistant refinement integration", () => {
 
 
 describe("site v71 assistant controls",()=>{
+  it("creates an empty new chat and explicitly applies its topic scope before the first model request",async()=>{
+    const topic={id:"new-topic",revision:1,title:"首次专题",pinned:false,grant:{libraryIds:[],notes:[{kind:"note",libraryId:"library-a",documentId:"note-a",pageId:null}],readingItemKeys:[]},policy:"materials-only",skills:[],versions:[]};
+    invoke.mockImplementation(async(command,payload)=>{
+      const args=payload?.args;
+      if(args?.action==="researchTopics")return {topics:[topic]};
+      if(args?.action==="checkResearchTopic")return {grant:topic.grant,unavailable:[],changed:[],versions:[]};
+      if(args?.action==="create"&&args.anchor==null&&args.grant.notes.length)throw Error("无来源对话须从空资料授权开始");
+      if(args?.action==="replaceResearchScope"){
+        current={...current,work:{...current.work,grant:args.grant,revision:current.work.revision+1,authorizationVersion:current.work.authorizationVersion+1}};
+        return current;
+      }
+      return native(command,payload);
+    });
+    await render(<StandaloneInvestigation initiallyOpen startFresh/>);
+    await activate(select<HTMLElement>('.agent-task-mode>summary'));
+    await activate([...document.querySelectorAll<HTMLButtonElement>('.agent-mode-menu button')].find(b=>b.textContent?.includes("全部专题"))!);
+    await activate([...document.querySelectorAll<HTMLButtonElement>('.agent-topic-list button')].find(b=>b.textContent?.includes(topic.title))!);
+    await submit("从这个专题开始核对");
+    expect(calls("create")).toHaveLength(1);expect(calls("create")[0].grant).toEqual({libraryIds:[],notes:[],readingItemKeys:[]});
+    expect(calls("replaceResearchScope")).toHaveLength(1);expect(calls("replaceResearchScope")[0].grant).toEqual({...topic.grant,sources:[]});
+    expect(calls("respond")).toHaveLength(1);
+    const order=invoke.mock.calls.map(([,p])=>p?.args?.action);expect(order.indexOf("replaceResearchScope")).toBeLessThan(order.indexOf("respond"));
+  });
   it("offers a tag task preparation without sending the typed request or discarding it",async()=>{
     await render(<StandaloneInvestigation initiallyOpen startFresh/>);
     await type(select<HTMLTextAreaElement>('[name="investigationGoal"]'),"帮我起草标签定义，保留补充要求");
