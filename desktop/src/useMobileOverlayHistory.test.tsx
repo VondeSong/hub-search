@@ -4,8 +4,8 @@ import { createRoot,type Root } from "react-dom/client";
 import { it,expect,vi,beforeEach,afterEach } from "vitest";
 import { useMobileOverlayHistory } from "./useMobileOverlayHistory";
 let host:HTMLDivElement,root:Root,owner:ReturnType<typeof useMobileOverlayHistory>;
-const setters={setFiltersOpen:vi.fn(),setSettingsOpen:vi.fn(),setPreviewOpen:vi.fn(),setFlashcardsOpen:vi.fn(),setSelectedTag:vi.fn(),consumeSearchBack:vi.fn(()=>false)};
-function Harness({enabled=true,filtersOpen=false,settingsOpen=false}:{enabled?:boolean;filtersOpen?:boolean;settingsOpen?:boolean}){owner=useMobileOverlayHistory({enabled,filtersOpen,settingsOpen,...setters});return null;}
+const setters={setCaptureOpen:vi.fn(),setFiltersOpen:vi.fn(),setSettingsOpen:vi.fn(),setPreviewOpen:vi.fn(),setFlashcardsOpen:vi.fn(),setSelectedTag:vi.fn(),consumeSearchBack:vi.fn(()=>false)};
+function Harness({enabled=true,filtersOpen=false,settingsOpen=false,captureOpen=false}:{enabled?:boolean;filtersOpen?:boolean;settingsOpen?:boolean;captureOpen?:boolean}){owner=useMobileOverlayHistory({enabled,filtersOpen,settingsOpen,captureOpen,...setters});return null;}
 beforeEach(()=>{(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;vi.clearAllMocks();window.history.replaceState({},"");host=document.createElement("div");document.body.append(host);root=createRoot(host);});
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.restoreAllMocks();delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;});
 it("uses one preview history entry and closes it before applying the base route",async()=>{
@@ -26,4 +26,27 @@ it("keeps native back handling ahead of route navigation and removes its listene
 it("does not modify desktop history when opening or closing an overlay",async()=>{
   const push=vi.spyOn(window.history,"pushState"),back=vi.spyOn(window.history,"back");await act(async()=>root.render(<Harness enabled={false}/>));
   await act(async()=>{owner.openFlashcards();owner.closeFlashcards();});expect(push).not.toHaveBeenCalled();expect(back).not.toHaveBeenCalled();expect(setters.setFlashcardsOpen).toHaveBeenLastCalledWith(false);
+});
+
+it("closes capture on Android back without navigating the underlying page", async()=>{
+  const route=vi.fn(); await act(async()=>root.render(<Harness captureOpen/>)); owner.bindRoute(route);
+  expect(window.history.state.hubQuickCapture).toBe(true);
+  window.history.replaceState({hubMobileRoute:"browse"},"");
+  await act(async()=>window.dispatchEvent(new PopStateEvent("popstate",{state:window.history.state})));
+  expect(setters.setCaptureOpen).toHaveBeenLastCalledWith(false); expect(route).not.toHaveBeenCalled();
+});
+it("does not pop the destination when saving replaces the capture entry", async()=>{
+  const back=vi.spyOn(window.history,"back"); await act(async()=>root.render(<Harness captureOpen/>));
+  window.history.replaceState({hubMobileRoute:"journals"},"");
+  await act(async()=>root.render(<Harness/>)); expect(back).not.toHaveBeenCalled();
+});
+it("hands capture to sync settings without creating another entry", async()=>{
+  const push=vi.spyOn(window.history,"pushState"),back=vi.spyOn(window.history,"back");
+  await act(async()=>root.render(<Harness captureOpen/>));
+  window.history.replaceState({hubMobileRoute:"browse",hubSettings:true},"");
+  await act(async()=>root.render(<Harness settingsOpen/>));
+  expect(push).toHaveBeenCalledTimes(1); expect(back).not.toHaveBeenCalled();
+  window.history.replaceState({hubMobileRoute:"browse"},"");
+  await act(async()=>window.dispatchEvent(new PopStateEvent("popstate",{state:window.history.state})));
+  expect(setters.setSettingsOpen).toHaveBeenLastCalledWith(false);
 });

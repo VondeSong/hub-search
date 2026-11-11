@@ -180,7 +180,7 @@ export function SearchHeader({
       {isMobileLayout && <button className="mobile-search-cancel" type="button" onClick={onCancelMobileSearch}>取消</button>}
       </div>
       <SearchHeaderActions
-        showAgent={!hideLibrarySwitcher}
+        showAgent={!isMobileLayout && !hideLibrarySwitcher}
         hidePreviewToggle={hidePreviewToggle}
         activeFilterCount={activeFilterCount}
         filtersOpen={filtersOpen}

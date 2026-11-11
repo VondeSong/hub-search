@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { QuickJournal } from "./QuickJournal";
-import { defaultJournalView } from "./JournalViews";
+import { defaultJournalView, localJournalDate, type JournalViewConfig } from "./JournalViews";
 const invoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...args: unknown[]) => invoke(...args) }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
@@ -106,4 +106,90 @@ it("keeps loaded Markdown images mounted through expansion, parent updates and p
   expect(invoke.mock.calls.filter(c => c[0] === "quick_journal_image")).toHaveLength(reads);
   expect(node.querySelector("article")?.textContent).toContain("OS 中的新修改");
   expect(button("收起").getAttribute("aria-expanded")).toBe("true");
+});
+
+const mobileSettings = () => {
+  const original = invoke.getMockImplementation()!;
+  invoke.mockImplementation((cmd:string,args:unknown)=>cmd === "get_quick_journal_settings" ? Promise.resolve({settings:{libraryId:"",folder:"Journals",sync:true},mobile:true,cloudEnabled:true,autoSync:true}) : original(cmd,args));
+};
+const renderComposer=async(onSaved=vi.fn())=>{await act(async()=>root.render(<QuickJournal libraries={[]} scope={null} view={defaultJournalView()} dataVersion="mobile" mode="compose" onSaved={onSaved}/>));return onSaved;};
+it("focuses restored mobile input and navigates only after native capture and draft clearing",async()=>{
+  mobileSettings(); let complete!:(value:unknown)=>void;
+  const original=invoke.getMockImplementation()!;
+  invoke.mockImplementation((cmd:string,args:unknown)=>cmd==="capture_quick_journal"?new Promise(resolve=>{complete=resolve;}):original(cmd,args));
+  const saved=await renderComposer(); expect(document.activeElement).toBe(node.querySelector("textarea"));
+  expect(node.textContent).not.toContain("任务");expect(node.textContent).not.toContain("链接");
+  await act(async()=>node.querySelector("form")!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
+  expect(saved).not.toHaveBeenCalled();expect(node.querySelector("textarea")!.value).toBe(record.text);
+  await act(async()=>complete({warning:null}));
+  expect(saved).toHaveBeenCalledWith(expect.objectContaining({id:record.id,date:record.date}));
+  expect(invoke).not.toHaveBeenCalledWith("sync_quick_journal");
+  const writes=invoke.mock.calls.filter(c=>c[0]==="save_quick_journal_draft");const last=writes[writes.length-1];
+  expect(JSON.parse(last[1].draft).text).toBe("");
+});
+it("retains an edited native draft after closing and reopening the mobile composer",async()=>{
+  mobileSettings();let stored=JSON.stringify(record);const original=invoke.getMockImplementation()!;
+  invoke.mockImplementation((cmd:string,args:any)=>{if(cmd==="get_quick_journal_draft")return Promise.resolve(stored);if(cmd==="save_quick_journal_draft"){stored=args.draft;return Promise.resolve();}return original(cmd,args);});
+  await renderComposer();const input=node.querySelector("textarea")!;
+  await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value")!.set!.call(input,"关闭后继续写 #草稿");input.dispatchEvent(new Event("input",{bubbles:true}));});
+  await act(async()=>root.render(null));await renderComposer();
+  expect(node.querySelector("textarea")!.value).toBe("关闭后继续写 #草稿");
+});
+it("recovers a draft-read failure without replacing the saved draft",async()=>{
+  mobileSettings();const original=invoke.getMockImplementation()!;let fail=true;
+  invoke.mockImplementation((cmd:string,args:unknown)=>cmd==="get_quick_journal_draft"&&fail?Promise.reject("读取失败"):original(cmd,args));
+  await renderComposer();expect(node.querySelector("textarea")!.disabled).toBe(true);fail=false;
+  await act(async()=>button("重新读取").click());expect(node.querySelector("textarea")!.value).toBe(record.text);expect(node.querySelector("textarea")!.disabled).toBe(false);
+});
+it("rejects oversized attachments before staging any bytes",async()=>{
+  mobileSettings();await renderComposer();const file=new File(["x"],"big.pdf");Object.defineProperty(file,"size",{value:20*1024*1024+1});
+  const picker=node.querySelector<HTMLInputElement>('input[type="file"]')!;Object.defineProperty(picker,"files",{value:[file],configurable:true});
+  await act(async()=>picker.dispatchEvent(new Event("change",{bubbles:true})));
+  expect(node.textContent).toContain("超过 20 MB");expect(invoke.mock.calls.some(c=>c[0]==="stage_quick_journal_attachment")).toBe(false);expect(node.querySelector("textarea")!.value).toBe(record.text);
+});
+it("stages a file in native storage and allows an attachment-only mobile record",async()=>{
+  mobileSettings();const original=invoke.getMockImplementation()!;const attachment={hash:"e".repeat(64),name:"记录.pdf",size:1,image:false};
+  invoke.mockImplementation((cmd:string,args:unknown)=>cmd==="get_quick_journal_draft"?Promise.resolve(JSON.stringify({...record,text:""})):cmd==="stage_quick_journal_attachment"?Promise.resolve(attachment):original(cmd,args));
+  await renderComposer();const picker=node.querySelector<HTMLInputElement>('input[type="file"]')!;Object.defineProperty(picker,"files",{value:[new File(["x"],attachment.name)],configurable:true});
+  await act(async()=>{picker.dispatchEvent(new Event("change",{bubbles:true}));await new Promise(resolve=>setTimeout(resolve,25));});
+  expect(node.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(false);
+  await act(async()=>node.querySelector("form")!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
+  expect(invoke).toHaveBeenCalledWith("capture_quick_journal",{record:expect.objectContaining({text:"",attachments:[attachment]})});
+});
+it("searches local unfiled mobile records by date and filename, with pending and tag filters",async()=>{
+  mobileSettings();const original=invoke.getMockImplementation()!;
+  invoke.mockImplementation((cmd:string,args:unknown)=>cmd==="list_quick_journal"?Promise.resolve({items:[{record:{...record,attachments:[{hash:"e".repeat(64),name:"现场.pdf",size:1,image:false}]},body:record.text,applied:false,uploaded:false,libraryId:"",path:""},{record:{...record,id:"b".repeat(32)},body:"已完成 #生活",applied:true,uploaded:true,libraryId:"os",path:"day"}],error:""}):original(cmd,args));
+  function Feed(){const[view,setView]=useState<JournalViewConfig>({...defaultJournalView(),period:"all",layout:"records"});return <QuickJournal libraries={[]} scope={["os"]} view={view} dataVersion="1" mode="feed" onViewChange={change=>setView(v=>({...v,...change}))}/>;}
+  await act(async()=>root.render(<Feed/>));expect(node.querySelectorAll("article")).toHaveLength(2);
+  const search=node.querySelector<HTMLInputElement>('input[type="search"]')!;
+  async function query(value:string){await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(search,value);search.dispatchEvent(new Event("input",{bubbles:true}));});}
+  await query("现场.pdf");expect(node.querySelectorAll("article")).toHaveLength(1);await query("2026-11-07");expect(node.querySelectorAll("article")).toHaveLength(2);
+  await query("");await act(async()=>button("待同步").click());expect(node.querySelectorAll("article")).toHaveLength(1);
+  expect(node.querySelector("textarea")).toBeNull();expect(invoke.mock.calls.some(c=>c[0]==="get_quick_journal_draft")).toBe(false);
+});
+
+it("starts an empty restored mobile draft on today while preserving a dated nonempty draft",async()=>{
+ mobileSettings();const original=invoke.getMockImplementation()!;
+ invoke.mockImplementation((cmd:string,args:unknown)=>cmd==="get_quick_journal_draft"?Promise.resolve(JSON.stringify({...record,text:""})):original(cmd,args));
+ await renderComposer();await act(async()=>node.querySelector<HTMLButtonElement>('[aria-label="更多记录选项"]')!.click());
+ expect(node.querySelector<HTMLInputElement>('input[type="date"]')!.value).toBe(localJournalDate());
+});
+
+it("retries a failed native draft write when saving again without requiring another edit",async()=>{
+ mobileSettings();let fail=true;const original=invoke.getMockImplementation()!;
+ invoke.mockImplementation((cmd:string,args:unknown)=>cmd==="save_quick_journal_draft"&&fail?Promise.reject("暂时无法保存草稿"):original(cmd,args));
+ await renderComposer();const input=node.querySelector("textarea")!;
+ await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value")!.set!.call(input,"可重试的草稿");input.dispatchEvent(new Event("input",{bubbles:true}));});
+ await act(async()=>node.querySelector("form")!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
+ expect(node.querySelector("textarea")!.value).toBe("可重试的草稿");expect(invoke.mock.calls.some(c=>c[0]==="capture_quick_journal")).toBe(false);
+ fail=false;await act(async()=>node.querySelector("form")!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
+ expect(invoke).toHaveBeenCalledWith("capture_quick_journal",{record:expect.objectContaining({id:record.id,text:"可重试的草稿"})});
+});
+it("waits for in-flight attachment staging when reopening the composer",async()=>{
+ mobileSettings();let stored=JSON.stringify(record),finish!:(value:unknown)=>void;const original=invoke.getMockImplementation()!,attachment={hash:"e".repeat(64),name:"排查.txt",size:1,image:false};
+ invoke.mockImplementation((cmd:string,args:any)=>{if(cmd==="get_quick_journal_draft")return Promise.resolve(stored);if(cmd==="save_quick_journal_draft"){stored=args.draft;return Promise.resolve();}if(cmd==="stage_quick_journal_attachment")return new Promise(resolve=>{finish=resolve;});return original(cmd,args);});
+ await renderComposer();const picker=node.querySelector<HTMLInputElement>('input[type="file"]')!;Object.defineProperty(picker,"files",{value:[new File(["x"],attachment.name)]});
+ await act(async()=>{picker.dispatchEvent(new Event("change",{bubbles:true}));await new Promise(resolve=>setTimeout(resolve,25));});
+ await act(async()=>root.render(null));await renderComposer();expect(node.querySelector("textarea")!.disabled).toBe(true);
+ await act(async()=>finish(attachment));expect(node.querySelector("textarea")!.disabled).toBe(false);expect(node.textContent).toContain(attachment.name);
 });

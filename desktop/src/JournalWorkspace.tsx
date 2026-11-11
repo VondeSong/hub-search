@@ -1,3 +1,4 @@
+import { runtimeCapabilities } from "./RuntimePlatform";
 import { CalendarDays, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, List, ListFilter, Plus, Search, Settings2, Star, Table2, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { journalEntryTitle } from "./JournalPresentation";
@@ -28,7 +29,7 @@ export function JournalWorkspace(props:JournalWorkspaceProps){
   return <JournalDatabase {...props} store={store}/>;
 }
 function JournalDatabase({libraries,scope,dataVersion,selectedDate,selectedKey,onNavigateDate,onPreview,onOpen,onCreate,renderIcon,favoriteIds,onFavorite,store}:JournalWorkspaceProps&{store:NonNullable<ReturnType<typeof useJournalViews>>}){
-  const {view}=store;const today=localJournalDate();
+  const view=runtimeCapabilities.mobile?{...store.view,layout:"records" as const,period:store.view.period==="month"?"all" as const:store.view.period,ascending:false}:store.view;const today=localJournalDate();
   const page=useJournalPage(view,scope,dataVersion,view.layout!=="stream"&&view.layout!=="records");
   const root=useRef<HTMLDivElement>(null),body=useRef<HTMLDivElement>(null),menu=useRef<HTMLDetailsElement>(null),saveInput=useRef<HTMLInputElement>(null);
   const [filters,setFilters]=useState(false),[saveMode,setSaveMode]=useState<"save"|"rename"|null>(null),[name,setName]=useState("");
@@ -105,7 +106,7 @@ function JournalDatabase({libraries,scope,dataVersion,selectedDate,selectedKey,o
     {filtered&&<div className="journal-db-filter-summary" aria-label="当前日志筛选条件">{view.query&&<span>搜索：{view.query}</span>}{view.libraries!==null&&<span>资料库：{view.libraries.map(id=>libraries.find(l=>l.id===id)?.name||"未连接资料库").join("、")||"未选择"}</span>}{view.period==="day"&&<span>日期：{view.day}</span>}<button onClick={()=>{store.update({query:"",libraries:null,period:"month",day:""});setQuery("");}}>清除筛选</button></div>}
     {view.layout!=="stream"&&view.layout!=="records"&&page.error&&<div className="journal-db-status" role="alert">{page.error}<button onClick={page.retry}>重试</button></div>}
     <div ref={body} className="journal-db-body" aria-busy={view.layout!=="stream"&&view.layout!=="records"&&page.loading} onScroll={event=>sessionPosition.current.set(sessionKey,event.currentTarget.scrollTop)}>
-      {view.layout==="records"?<QuickJournal libraries={libraries} scope={scope} view={view} dataVersion={dataVersion}/>:view.layout==="stream"?<JournalDailyStream store={store} today={today} scope={scope} dataVersion={dataVersion} selectedKey={selected} canCreate={canCreate} onChoose={choose} onPreview={result=>{setPickedKey(result.entityKey);onPreview(result);}} onCreate={onCreate}/>:!page.error&&(view.layout==="calendar"?calendar():view.layout==="list"?list():table())}
+      {view.layout==="records"?<QuickJournal mode={runtimeCapabilities.mobile ? "feed" : "all"} onViewChange={store.update} libraries={libraries} scope={scope} view={view} dataVersion={dataVersion}/>:view.layout==="stream"?<JournalDailyStream store={store} today={today} scope={scope} dataVersion={dataVersion} selectedKey={selected} canCreate={canCreate} onChoose={choose} onPreview={result=>{setPickedKey(result.entityKey);onPreview(result);}} onCreate={onCreate}/>:!page.error&&(view.layout==="calendar"?calendar():view.layout==="list"?list():table())}
       {!page.loading&&!page.error&&page.total===0&&view.layout!=="stream"&&view.layout!=="records"&&view.layout!=="calendar"&&<div className="journal-db-status"><CalendarDays size={24}/><strong>{filtered?"没有符合筛选的日志":"当前范围暂无日志"}</strong><p>可以调整日期范围或资料库。</p></div>}
       {view.layout!=="stream"&&view.layout!=="records"&&!page.loading&&page.items.length<page.total&&<div className="journal-db-status"><button onClick={page.loadMore}>继续加载（已显示 {page.items.length} / {page.total} 篇）</button></div>}
     </div>

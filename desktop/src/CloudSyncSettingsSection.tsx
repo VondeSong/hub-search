@@ -1,3 +1,5 @@
+import { QuickJournal } from "./QuickJournal";
+import { defaultJournalView } from "./JournalViews";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Cloud, LoaderCircle } from "lucide-react";
@@ -118,6 +120,7 @@ export function CloudSyncSettingsSection({ active = true }: { active?: boolean }
   const movingActiveWebdav = provider === "webdav" && Boolean(connection?.url) && (url !== connection?.url || username !== connection?.username);
   return <section ref={sectionRef} className="settings-category cloud cloud-sync-center" aria-label="云同步设置">
     <header><Cloud size={22} /><div><h2>云同步</h2><p>管理本设备的云连接与同步范围。</p></div></header>
+    {runtimeCapabilities.mobile && <QuickJournal libraries={[]} scope={null} view={defaultJournalView()} dataVersion="cloud-settings" mode="settings" />}
     <div className="cloud-sync-notice" aria-live="polite">
       {busy && <p role="status"><LoaderCircle size={15} className="spin" />{busy}</p>}
       {error && <p role="alert">{error}</p>}

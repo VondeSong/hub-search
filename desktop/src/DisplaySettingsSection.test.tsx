@@ -14,7 +14,9 @@ it("shows effective Android font sizes and saves the larger reading preference",
     await act(async () => root.render(<DisplaySettingsSection mobile appSettings={DEFAULT_APP_SETTINGS}
       saveSettings={saveSettings} changeRecentGroupingSetting={vi.fn()} desktopSidebarEnabled
       changeDesktopSidebarSetting={vi.fn()} />));
-    const selects = [...container.querySelectorAll("select")];
+    const allSelects = [...container.querySelectorAll("select")];
+    expect(allSelects.slice(0, 2).map(select => select.getAttribute("aria-label"))).toEqual(["手机主题", "手机强调色"]);
+    const selects = allSelects.slice(2);
     expect(selects.map((select) => select.value)).toEqual(["filled", "14", "16", "19", "30", "10"]);
     expect([...selects[1].options].map(option => option.value)).toContain("15");
     expect(selects.map((select) => select.getAttribute("aria-label"))).toEqual(["任务状态样式", "列表文字大小", "预览正文", "预览页面标题", "首页最近页面数量", "首页最近任务数量"]);
