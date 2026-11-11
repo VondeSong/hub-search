@@ -300,6 +300,20 @@ impl Device {
         let db = root.join("hub.sqlite3");
         let c = checked(open_database(&db), "建立本轮隔离数据库");
         checked(x_bookmarks::storage::schema(&c), "初始化隔离阅读库");
+        // X originals belong to an external Obsidian vault, including on a cloud consumer.
+        let vault = root.with_extension("vault");
+        checked(fs::create_dir(&vault), "建立本轮独立 Obsidian 保存库");
+        checked(
+            meta(
+                &c,
+                "collection_storage_v1",
+                &json!({
+                    "mode":"obsidian", "vaultPath":vault, "downloadMedia":true
+                })
+                .to_string(),
+            ),
+            "设置隔离 X 原件保存位置",
+        );
         checked(
             meta(
                 &c,
@@ -382,6 +396,14 @@ impl Drop for Device {
                         .is_some_and(|name| name.to_string_lossy().starts_with("real-oss-"))
                 {
                     let _ = fs::remove_dir_all(&target);
+                    let vault = target.with_extension("vault");
+                    if ordinary_directory(&vault) {
+                        if let Ok(resolved) = fs::canonicalize(&vault) {
+                            if resolved == vault && resolved.parent() == Some(owner.as_path()) {
+                                let _ = fs::remove_dir_all(&resolved);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -416,8 +438,8 @@ impl BoundedOss {
     }
     fn begin(&self, key: &str) -> Result<(), String> {
         self.check(key)?;
-        if self.requests.fetch_add(1, AtomicOrdering::Relaxed) >= 100 {
-            return Err("联调传输调用超过 100 次安全上限".into());
+        if self.requests.fetch_add(1, AtomicOrdering::Relaxed) >= 300 {
+            return Err("联调传输调用超过 300 次安全上限".into());
         }
         let (up, down) = self.inner.transferred();
         if up + down > 128 * 1024 {
@@ -526,6 +548,20 @@ impl Store for BoundedOss {
 #[tokio::test]
 #[ignore = "explicit real OSS integration only; requires read-only config DB path and existing Windows credential"]
 async fn real_oss_reading_roundtrip_from_producer_to_query_and_files() {
+    let (configuration, inner, run) = isolated_oss("reading");
+    let suffix_hash = hash(run.as_bytes());
+    let prefix = inner.key("");
+    let remote = BoundedOss {
+        inner,
+        prefix,
+        objects: Mutex::new(BTreeSet::new()),
+        requests: AtomicUsize::new(0),
+    };
+    reading_roundtrip(configuration, remote, run, suffix_hash).await;
+}
+
+/// Opt-in only. Reads configuration without migrating or writing the personal database.
+pub(crate) fn isolated_oss(module: &str) -> (OssConfig, OssStore, String) {
     let path=std::env::var_os("HUB_OSS_INTEGRATION_CONFIG_DB")
         .map(PathBuf::from).expect("真实 OSS 联调要求 HUB_OSS_INTEGRATION_CONFIG_DB 非秘密绝对路径；环境缺失不会被当作通过");
     assert!(
@@ -548,8 +584,8 @@ async fn real_oss_reading_roundtrip_from_producer_to_query_and_files() {
         "读取并规范既有 OSS 连接配置",
     );
     drop(personal); // No domain schema migration or personal database writer is ever invoked.
-    let run = format!("20261007-{}", random_url_safe(10));
-    let suffix_hash = hash(run.as_bytes());
+    assert!(matches!(module, "reading" | "flashcards" | "quick"));
+    let run = format!("20261112-{module}-{}", random_url_safe(10));
     let mut configuration = base.clone();
     configuration.prefix = format!("{}/_integration/{run}", base.prefix);
     let configuration = checked(configuration.normalized(), "建立本轮独立测试云目录");
@@ -571,18 +607,79 @@ async fn real_oss_reading_roundtrip_from_producer_to_query_and_files() {
         !prefix.starts_with(&format!("{}/v2/", base.prefix)),
         "测试对象目录必须与个人正式 v2 子树分离"
     );
-    let remote = BoundedOss {
-        inner,
-        prefix,
-        objects: Mutex::new(BTreeSet::new()),
-        requests: AtomicUsize::new(0),
-    };
+    (configuration, inner, run)
+}
+
+async fn reading_roundtrip(
+    configuration: OssConfig,
+    remote: BoundedOss,
+    run: String,
+    suffix_hash: String,
+) {
     let ns = configuration.namespace();
     let a = Device::new(&run, "producer", &configuration);
     let b = Device::new(&run, "consumer", &configuration);
     let png=checked(base64::engine::general_purpose::STANDARD.decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aE+0AAAAASUVORK5CYII="),"解码合成 PNG 原件");
     a.seed(&png);
+    let none = crate::cloud_sync::attachments::Selection {
+        image: false,
+        video: false,
+        pdf: false,
+        other: false,
+        max_mb: 1,
+    };
+    let mut rules = crate::cloud_sync::attachments::Directions {
+        upload: none.clone(),
+        download: none,
+    };
+    let save = |device: &Device, rules: &crate::cloud_sync::attachments::Directions| {
+        checked(
+            meta(
+                &device.c(),
+                "cloud_attachments_reading_v1",
+                &serde_json::to_string(rules).unwrap(),
+            ),
+            "保存双向隔离附件策略",
+        );
+    };
+    save(&a, &rules);
+    save(&b, &rules);
     a.round(&remote, &ns, "real-cloud-producer").await;
+    b.round(&remote, &ns, "real-cloud-consumer").await;
+    let body_only = x_bookmarks::reading_sync_test_items(&b.c(), "in_progress");
+    assert_eq!(body_only[0]["post"]["text"], BODY);
+    assert_eq!(body_only[0]["savedMedia"], json!([]));
+    assert!(
+        !checked(remote.list("reading/").await, "核对未选附件没有上传")
+            .iter()
+            .any(|k| k.contains("/blobs/"))
+    );
+    rules.upload.image = true;
+    save(&a, &rules);
+    checked(
+        meta(
+            &a.c(),
+            "reading_media_reserved",
+            &(u64::MAX / 2).to_string(),
+        ),
+        "设置旧额度已满场景",
+    );
+    a.round(&remote, &ns, "real-cloud-producer").await;
+    b.round(&remote, &ns, "real-cloud-consumer").await;
+    assert_eq!(
+        x_bookmarks::reading_sync_test_items(&b.c(), "in_progress")[0]["savedMedia"],
+        json!([])
+    );
+    rules.download.image = true;
+    save(&b, &rules);
+    checked(
+        meta(
+            &b.c(),
+            "reading_media_reserved",
+            &(u64::MAX / 2).to_string(),
+        ),
+        "设置消费端旧额度已满场景",
+    );
     b.round(&remote, &ns, "real-cloud-consumer").await;
     let items = x_bookmarks::reading_sync_test_items(&b.c(), "in_progress");
     assert_eq!(items.len(), 1, "正式阅读列表应接收到一个条目");
@@ -606,11 +703,22 @@ async fn real_oss_reading_roundtrip_from_producer_to_query_and_files() {
         "正式文件消费接口核验 PNG",
     );
     assert!(
-        checked(fs::canonicalize(&path), "解析消费端文件")
-            .starts_with(checked(fs::canonicalize(&b.root), "解析消费端隔离目录")),
-        "下载文件必须由消费端隔离目录持有"
+        checked(fs::canonicalize(&path), "解析消费端文件").starts_with(checked(
+            fs::canonicalize(b.root.with_extension("vault")),
+            "解析消费端隔离保存库"
+        )),
+        "X 下载原件必须由消费端独立 Obsidian 保存库持有"
     );
     assert_eq!(checked(fs::read(&path), "读回消费端实际图片"), png);
+    checked(
+        x_bookmarks::properties::save_local(&mut b.c(), KEY, "read", &["反向更新".into()]),
+        "正式消费端反向修改阅读状态",
+    );
+    b.round(&remote, &ns, "real-cloud-consumer").await;
+    a.round(&remote, &ns, "real-cloud-producer").await;
+    let reverse = x_bookmarks::reading_sync_test_items(&a.c(), "read");
+    assert_eq!(reverse.len(), 1);
+    assert_eq!(reverse[0]["tags"], json!(["反向更新"]));
     for table in [
         "collection_library_jobs",
         "collection_x_outbox",
@@ -633,6 +741,6 @@ async fn real_oss_reading_roundtrip_from_producer_to_query_and_files() {
     );
     println!(
         "{}",
-        json!({"status":"success","namespaceSuffixHash":suffix_hash,"objects":keys.len(),"uploadedBytes":uploaded,"downloadedBytes":downloaded,"producerAndQueryVerified":true,"consumerFileVerified":true,"remoteObjectsRetained":true})
+        json!({"status":"success","namespaceSuffixHash":suffix_hash,"objects":keys.len(),"uploadedBytes":uploaded,"downloadedBytes":downloaded,"producerAndQueryVerified":true,"consumerFileVerified":true,"independentDirectionsAndDeferredUploadVerified":true,"retiredBudgetDoesNotBlock":true,"reverseUpdateVerified":true,"remoteObjectsRetained":true})
     );
 }

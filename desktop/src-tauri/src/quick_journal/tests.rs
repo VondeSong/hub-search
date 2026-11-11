@@ -414,19 +414,39 @@ fn deferred_attachments_patch_only_generated_markers_without_replaying_body() {
 
 #[tokio::test]
 async fn direction_choices_defer_assets_and_later_patch_the_original_edited_diary() {
+    direction_roundtrip(&MemoryStore::default(), "test").await;
+}
+
+#[cfg(windows)]
+#[tokio::test]
+#[ignore = "explicit real OSS integration; requires HUB_OSS_INTEGRATION_CONFIG_DB and existing Windows credential"]
+async fn real_oss_quick_journal_defers_assets_and_preserves_edited_diary() {
+    let (config, store, run) = crate::reading_sync::real_cloud_tests::isolated_oss("quick");
+    direction_roundtrip(&store, &config.namespace()).await;
+    let (uploaded, downloaded) = store.transferred();
+    assert!(uploaded + downloaded < 4 * 1024 * 1024);
+    println!(
+        "{}",
+        json!({"status":"success", "module":"quick", "namespaceSuffixHash":digest(run.as_bytes()),
+        "uploadedBytes":uploaded,"downloadedBytes":downloaded,"bodyBeforeAssets":true,
+        "independentDirections":true,"deferredUploadAndDownload":true,"uploadAndDownloadSizeLimits":true,"editedDiaryPreserved":true,"remoteObjectsRetained":true})
+    );
+}
+
+async fn direction_roundtrip(store: &dyn Store, namespace: &str) {
     let sender = Fixture::new();
     let receiver = Fixture::new();
-    let store = MemoryStore::default();
-    let bytes = b"deferred PDF attachment";
+    let mut bytes = b"%PDF-1.4\n".to_vec();
+    bytes.resize(1024 * 1024 + 1, b' ');
     let a = Attachment {
-        hash: digest(bytes),
+        hash: digest(&bytes),
         name: "proof.pdf".into(),
         size: bytes.len(),
         image: false,
     };
     let mut r = record();
     r.attachments.push(a.clone());
-    data_portability::atomic_write(&asset(&sender.db, &a.hash).unwrap(), bytes).unwrap();
+    data_portability::atomic_write(&asset(&sender.db, &a.hash).unwrap(), &bytes).unwrap();
     enqueue(&sender.db, &r).unwrap();
     let c = open_database(&sender.db).unwrap();
     let mut s = settings(&c).unwrap();
@@ -458,25 +478,41 @@ async fn direction_choices_defer_assets_and_later_patch_the_original_edited_diar
     };
     save(&sender.db, &rules);
     save(&receiver.db, &rules);
-    transfer(&sender.db, &store, "test").await.unwrap();
-    transfer(&receiver.db, &store, "test").await.unwrap();
+    transfer(&sender.db, store, namespace).await.unwrap();
+    transfer(&receiver.db, store, namespace).await.unwrap();
     let path = receiver.dir.join("vault/Journals/2026-11-07.md");
     let initial = fs::read_to_string(&path).unwrap();
     assert!(initial.contains("附件未下载"));
     fs::write(&path, initial.replace("第二段", "人工修改")).unwrap();
-    assert!(!store
-        .0
-        .lock()
+    assert!(store
+        .head_size(&store.key(&format!("journal/assets/{}", a.hash)))
+        .await
         .unwrap()
-        .contains_key(&store.key(&format!("journal/assets/{}", a.hash))));
+        .is_none());
     rules.upload.pdf = true;
     save(&sender.db, &rules);
-    transfer(&sender.db, &store, "test").await.unwrap();
-    transfer(&receiver.db, &store, "test").await.unwrap();
+    transfer(&sender.db, store, namespace).await.unwrap();
+    assert!(store
+        .head_size(&store.key(&format!("journal/assets/{}", a.hash)))
+        .await
+        .unwrap()
+        .is_none());
+    rules.upload.max_mb = 2;
+    save(&sender.db, &rules);
+    transfer(&sender.db, store, namespace).await.unwrap();
+    transfer(&receiver.db, store, namespace).await.unwrap();
     assert!(!asset(&receiver.db, &a.hash).unwrap().exists());
     rules.download.pdf = true;
     save(&receiver.db, &rules);
-    transfer(&receiver.db, &store, "test").await.unwrap();
+    transfer(&receiver.db, store, namespace).await.unwrap();
+    assert!(!asset(&receiver.db, &a.hash).unwrap().exists());
+    rules.download.max_mb = 2;
+    save(&receiver.db, &rules);
+    transfer(&receiver.db, store, namespace).await.unwrap();
+    assert_eq!(
+        fs::read(asset(&receiver.db, &a.hash).unwrap()).unwrap(),
+        bytes
+    );
     let final_text = fs::read_to_string(&path).unwrap();
     assert!(final_text.contains("人工修改"));
     assert!(!final_text.contains("附件未下载"));

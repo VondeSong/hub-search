@@ -688,6 +688,8 @@ async fn verify_webdav_migration(
     Ok(())
 }
 
+#[cfg(all(test, windows))]
+mod real_cloud_tests;
 #[cfg(test)]
 #[path = "flashcard_cloud_sync_tests.rs"]
 pub(crate) mod tests;

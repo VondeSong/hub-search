@@ -893,4 +893,4 @@ pub(crate) fn migration_body_ready(c: &Connection, ns: &str) -> Result<bool, Str
 }
 
 #[cfg(all(test, windows))]
-mod real_cloud_tests;
+pub(crate) mod real_cloud_tests;
