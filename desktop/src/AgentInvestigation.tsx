@@ -751,7 +751,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     try {
       await checkDraftMemory();
       const grant=research?{libraryIds:[],notes:[],readingItemKeys:[]}:buildDraftGrant();
-      let value = publicUrl.trim() ? await call<View>({action:"createFromPublicUrl",url:publicUrl.trim(),goal:goal.trim(),confirmedPublicRead:true,researchPolicy:assistantOptions.researchPolicy}) : await call<View>({ action: "create", goal: messageText, successCriteria: "", anchor:research?null:anchor, grant });
+      let value = publicUrl.trim() ? await call<View>({action:"createFromPublicUrl",url:publicUrl.trim(),goal:goal.trim(),confirmedPublicRead:true,researchPolicy:assistantOptions.researchPolicy}) : await call<View>({ action: "create", goal: snapshots?(submittedText.trim()||"请分析提供的文字资料。"):messageText, successCriteria: "", anchor:research?null:anchor, grant });
       if (!alive.current) return;
       setPublicUrl("");
       boundMaterial.current=primaryMaterial || null;

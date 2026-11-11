@@ -1985,6 +1985,25 @@ it("captures preview selection as text and queues a flashcard snapshot through t
  expect(invoke.mock.calls.some(([,p])=>['message','create','respond'].includes(p?.args?.action))).toBe(false);
 });
 
+it("sends an allowed long snapshot as message material instead of overflowing the new chat goal",async()=>{
+ const original=invoke.getMockImplementation()!;
+ const snapshot="合成资料".repeat(550);
+ invoke.mockImplementation(async(command,payload)=>{
+  if(payload?.args?.action==="create"&&payload.args.goal.length>2000)throw Error("目标超过2000字");
+  return original(command,payload);
+ });
+ await act(async()=>root.render(<AgentPanelProvider><StandaloneAgentLauncher/><AgentFlashcardMaterial title="长文字样本" text={snapshot}/></AgentPanelProvider>));
+ await click("添加闪卡到助手");
+ await vi.waitFor(()=>expect(document.querySelector('[data-material-kind="flashcard"]')).not.toBeNull());
+ await fill("investigationGoal","总结这份文字资料");
+ await act(async()=>document.querySelector<HTMLButtonElement>(".agent-send")!.click());
+ const create=invoke.mock.calls.find(([,p])=>p?.args?.action==="create")![1].args;
+ expect(create.goal).toBe("总结这份文字资料");
+ const message=invoke.mock.calls.find(([,p])=>p?.args?.action==="message")![1].args;
+ expect(message.text).toContain(snapshot);expect(message.text.split(snapshot)).toHaveLength(2);
+ expect(invoke.mock.calls.some(([,p])=>p?.args?.action==="respond")).toBe(true);
+});
+
 it("keeps global history in a fresh page chat without resuming an unrelated work",async()=>{
  invoke.mockImplementation(async(_,{args})=>args.action==='list'?{works:args.anchor?[]:[{id:'other-work',goal:'另一篇资料的历史对话',state:'completed'}]}:current);
  await open();
