@@ -3,6 +3,7 @@
 mod action_target;
 mod actions;
 mod activity;
+mod answer_save;
 mod artifacts;
 mod assistant;
 #[cfg(test)]
@@ -17,9 +18,11 @@ mod memory_selection_tests;
 mod options;
 #[cfg(test)]
 mod repair_tests;
+mod research;
 mod response;
 mod runner;
 mod source_scope;
+mod tag_tasks;
 pub(crate) use runner::projection_acceptance::run_cli as run_projection_acceptance;
 pub(crate) use runner::ExternalWork;
 mod account_binding;
@@ -328,6 +331,13 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
         "requestContextCompaction" => store::native_compaction::request(root, args),
         "cancelContextCompaction" => store::native_compaction::cancel(root, args),
         "configureAssistant" => options::configure(root, args),
+        "agentTags" => crate::hub_mcp::agent_tags::catalog(root, args),
+        "configureTagTask" => tag_tasks::configure(root, args),
+        "relatedTagMaterials"
+        | "researchTopics"
+        | "saveResearchTopic"
+        | "checkResearchTopic"
+        | "replaceResearchScope" => research::ui(root, args),
         "discoverMcpService" => crate::model_runtime::mcp_services::discover(
             &text(args, "server", 2048)?,
             &Control::bounded(std::time::Duration::from_secs(60)),
@@ -546,7 +556,21 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
 }
 
 pub(crate) async fn ui_app(app: tauri::AppHandle, args: Value) -> Result<Value, String> {
+    if matches!(
+        args["action"].as_str(),
+        Some(
+            "answerDestinations"
+                | "answerSaveSource"
+                | "answerSaveTarget"
+                | "prepareAnswerSave"
+                | "submitAnswerSave"
+                | "inspectAnswerSave"
+        )
+    ) {
+        return answer_save::ui(app, args).await;
+    }
     if args["action"] == "createFromPublicUrl" {
+        research::check_public_read(&args)?;
         let goal = text(&args, "goal", 4000)?;
         if args["confirmedPublicRead"] != true {
             return Err("请明确确认读取公共链接".into());
@@ -621,6 +645,13 @@ fn status(root: &Path, id: &str) -> Result<Value, String> {
         .unwrap_or(Value::Null);
     let run_active = live.is_some() || view["work"]["activeRun"].is_string();
     view["runActive"] = json!(run_active);
+    view["answerSaves"] = answer_save::records(root, id)?;
+    if view["work"]["state"] != "revoked" {
+        view["tagTasks"] = json!(store::records(root, id, "tagTaskResult", 32)?
+            .into_iter()
+            .filter(|r| r["authorizationVersion"] == view["work"]["authorizationVersion"])
+            .collect::<Vec<_>>());
+    }
     if run_active && live.is_none() {
         view["runOwner"] = json!("externalMcp");
     }

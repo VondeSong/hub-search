@@ -337,7 +337,7 @@ pub(in crate::agent_work) fn history(
             before
         },
     )?;
-    let value = if let Some(id) = record_id {
+    let mut value = if let Some(id) = record_id {
         page["messages"]
             .as_array()
             .unwrap()
@@ -348,6 +348,15 @@ pub(in crate::agent_work) fn history(
     } else {
         page.clone()
     };
+    if super::super::options::load_on(&c, &work.id)?.materials_only() {
+        if let Some(messages) = value["messages"].as_array_mut() {
+            for message in messages {
+                restrict_model_history(message);
+            }
+        } else {
+            restrict_model_history(&mut value);
+        }
+    }
     let text = serde_json::to_string(&value).map_err(|e| e.to_string())?;
     let total = text.chars().count();
     if start > total {
@@ -363,6 +372,12 @@ pub(in crate::agent_work) fn history(
 #[cfg(test)]
 mod paging_tests;
 
+fn restrict_model_history(message: &mut Value) {
+    if message["role"] == "assistant" {
+        *message = json!({"id":message["id"],"role":"assistant","kind":message["kind"],"notice":"仅依据材料：历史回答只保留身份，不提供旧事实；请读取当前授权原文。"});
+    }
+}
+
 pub(in crate::agent_work) fn context(root: &Path, work: &Work) -> Result<Value, String> {
     super::tasks::refresh(root, &work.id)?;
     let c = read(root)?;
@@ -375,6 +390,7 @@ pub(in crate::agent_work) fn context(root: &Path, work: &Work) -> Result<Value, 
         return Err("对话或来源授权已改变".into());
     }
     let conversation = read_on(root, &c, work)?;
+    let materials_only = super::super::options::load_on(&c, &work.id)?.materials_only();
     let mut messages = Vec::new();
     let mut bytes = 0;
     let mut omitted = conversation["hasEarlier"] == true;
@@ -384,6 +400,9 @@ pub(in crate::agent_work) fn context(root: &Path, work: &Work) -> Result<Value, 
         .flatten()
         .rev()
     {
+        if materials_only && message["role"] != "user" {
+            continue;
+        }
         let mut item = if message["role"] == "user" {
             json!({"role":"user","kind":message["kind"],"text":message["text"]})
         } else if message["report"].is_object()

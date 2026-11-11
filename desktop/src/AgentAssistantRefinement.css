@@ -1,4 +1,29 @@
 /* Assistant chrome uses the same theme surfaces as the rest of Hub. */
+.agent-research-topics { position:absolute; z-index:15; inset:70px 12px auto; max-height:calc(100% - 100px); overflow:auto; padding:14px; border:1px solid var(--hub-separator); border-radius:15px; background:var(--hub-content-surface); color:var(--hub-text-primary); font-size:13px; box-shadow:0 8px 30px color-mix(in srgb,var(--hub-text-primary) 10%,transparent); }
+.agent-topic-list > div { display:flex; gap:6px; align-items:center; }
+.agent-topic-list > div > button:first-child { flex:1; text-align:start; min-width:0; }
+.agent-topic-list small { display:block; margin-top:4px; color:var(--hub-text-secondary); font-size:11px; }
+.agent-topic-selection,.agent-tag-token { display:inline-flex; align-items:center; gap:4px; border-radius:9px; background:var(--hub-control-fill); color:var(--hub-text-secondary); font-size:12px; }
+.agent-topic-selection { display:flex; flex-wrap:wrap; padding:5px 8px; margin-bottom:6px; }
+.agent-topic-selection > details { flex:1; min-width:0; }
+.agent-topic-selection > label { flex-basis:100%; font-size:11px; }
+.agent-topic-selection summary { cursor:pointer; }
+.agent-panel .agent-topic-selection > button,.agent-panel .agent-tag-token > button { border:0; background:transparent; min-height:28px; padding:4px 6px; }
+.agent-topic-selection > button,.agent-tag-token > button:last-child:not(:first-child) { opacity:0; }
+.agent-topic-selection:is(:hover,:focus-within) > button,.agent-tag-token:is(:hover,:focus-within) > button { opacity:1; }
+.agent-tag-references { position:relative; display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+.agent-tag-definition { flex-basis:100%; padding:8px; border:1px solid var(--hub-separator); border-radius:9px; font-size:12px; }
+.agent-tag-picker { width:100%; box-sizing:border-box; }
+.agent-tag-picker header,.agent-tag-picker > div > div { display:flex; align-items:center; gap:6px; }
+.agent-tag-picker header > label,.agent-tag-picker > div > div > button:first-child { flex:1; min-width:0; }
+.agent-tag-result { margin:10px 0; font-size:12px; }
+.agent-answer-save { position:fixed; z-index:60; top:50%; left:50%; transform:translate(-50%,-50%); width:min(620px,calc(100vw - 32px)); max-height:calc(100dvh - 48px); overflow:auto; padding:18px; box-sizing:border-box; background:var(--hub-content-surface); border:1px solid var(--hub-separator); border-radius:18px; color:var(--hub-text-primary); box-shadow:0 12px 48px color-mix(in srgb,var(--hub-text-primary) 18%,transparent); font-size:13px; }
+.agent-answer-save label { display:grid; gap:6px; margin:12px 0; }
+.agent-answer-save :is(input,select,textarea) { width:100%; box-sizing:border-box; font:inherit; color:inherit; background:var(--hub-content-surface); border:1px solid var(--hub-separator); border-radius:8px; padding:8px 10px; }
+.agent-answer-save textarea { min-height:180px; resize:vertical; line-height:1.7; }
+.agent-answer-save pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:45vh; overflow:auto; font:inherit; line-height:1.7; }
+.agent-answer-save-receipt { flex-basis:100%; margin:6px 0; padding:8px 10px; border:1px solid var(--hub-separator); border-radius:9px; font-size:11px; overflow-wrap:anywhere; }
+@media (hover:none) { .agent-topic-selection > button,.agent-tag-token > button:last-child:not(:first-child) { opacity:1; } }
 .agent-panel {
   border-radius: 20px;
   box-shadow: 0 12px 48px color-mix(in srgb, var(--hub-text-primary) 8%, transparent), 0 2px 8px color-mix(in srgb, var(--hub-text-primary) 4%, transparent);
@@ -192,8 +217,13 @@
 .agent-message-author>svg { color:var(--hub-accent); }
 .agent-panel .agent-panel-header .agent-dialogue-details[data-history=true] .agent-details-content { inset-inline:12px auto; }
 .agent-selected-skills>span { position:relative; }
-.agent-panel .agent-answer-destinations { display:flex; gap:7px; margin-top:12px; }
+.agent-panel .agent-answer-destinations { display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; }
 .agent-panel .agent-answer-destinations>button { padding:6px 8px; font-size:11px; border-radius:6px; }
 @media (hover:hover) and (pointer:fine) {
  .agent-selected-skills>span:not(:hover):not(:focus-within)>button { opacity:0; pointer-events:none; }
 }
+
+.agent-answer-save button { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:32px; margin:3px; padding:6px 10px; border:1px solid var(--hub-separator); border-radius:8px; background:var(--hub-content-surface); color:var(--hub-text-primary); font:inherit; cursor:pointer; }
+.agent-answer-save button:hover:not(:disabled) { background:var(--hub-control-fill); }
+.agent-answer-save button:disabled { opacity:.5; cursor:default; }
+.agent-answer-save :focus-visible { outline:2px solid var(--hub-accent); outline-offset:2px; }

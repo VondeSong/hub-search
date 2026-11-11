@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 mod archive;
 pub(super) mod assistant;
 mod flashcards;
-mod obsidian;
+pub(super) mod obsidian;
 pub(super) fn obsidian_ui(root: &Path, args: &Value) -> Result<Value, String> {
     match args["action"].as_str().unwrap_or_default() {
         "prepareObsidianEdit" => obsidian::prepare(root, args),

@@ -317,6 +317,33 @@ describe("assistant refinement integration", () => {
 
 
 describe("site v71 assistant controls",()=>{
+  it("offers a tag task preparation without sending the typed request or discarding it",async()=>{
+    await render(<StandaloneInvestigation initiallyOpen startFresh/>);
+    await type(select<HTMLTextAreaElement>('[name="investigationGoal"]'),"帮我起草标签定义，保留补充要求");
+    await activate([...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="准备标签任务 · 起草定义")!);
+    expect(select<HTMLTextAreaElement>('[name="investigationGoal"]').value).toBe("帮我起草标签定义，保留补充要求");
+    expect(select('.agent-tag-workspace').textContent).toContain("起草标签定义");
+    expect(calls("create")).toHaveLength(0);expect(calls("respond")).toHaveLength(0);
+  });
+  it("rechecks an active topic before sending and retains the draft when a core source changes",async()=>{
+    const topic={id:"live-topic",revision:1,title:"已核对的专题",pinned:true,grant:{libraryIds:[],notes:[{kind:"note",libraryId:"library-a",documentId:"note-a",pageId:null}],readingItemKeys:[]},policy:"material-first",skills:[],versions:[]};
+    let changed=false;
+    invoke.mockImplementation(async(command,payload)=>{
+      const action=payload?.args?.action;
+      if(action==="researchTopics")return {topics:[topic]};
+      if(action==="checkResearchTopic")return {grant:topic.grant,unavailable:[],changed:changed?[{reason:"核心材料已更新"}]:[],versions:[]};
+      return native(command,payload);
+    });
+    await render(<StandaloneInvestigation initiallyOpen startFresh/>);
+    await activate(select<HTMLElement>('.agent-task-mode>summary'));
+    await activate([...document.querySelectorAll<HTMLButtonElement>('.agent-mode-menu button')].find(b=>b.textContent?.includes("全部专题"))!);
+    await activate([...document.querySelectorAll<HTMLButtonElement>('.agent-topic-list button')].find(b=>b.textContent?.includes(topic.title))!);
+    changed=true;
+    await submit("保留这个问题，先核对更新");
+    expect(calls("create")).toHaveLength(0);expect(calls("respond")).toHaveLength(0);
+    expect(select<HTMLTextAreaElement>('[name="investigationGoal"]').value).toBe("保留这个问题，先核对更新");
+    expect(document.body.textContent).toContain("确认使用更新后的资料");
+  });
   it("switches task modes without clearing the current input or dispatching a model",async()=>{
     await render(<StandaloneInvestigation initiallyOpen startFresh/>);
     const input=select<HTMLTextAreaElement>('[name="investigationGoal"]');await type(input,"保留这段手写草稿");
@@ -324,7 +351,7 @@ describe("site v71 assistant controls",()=>{
     const choice=(name:string)=>[...document.querySelectorAll<HTMLButtonElement>('.agent-mode-menu button')].find(button=>button.querySelector('strong')?.textContent===name)!;
     await activate(choice("标签助手"));expect(input.value).toBe("保留这段手写草稿");expect(select('.agent-tag-workspace')).not.toBeNull();
     await activate(select<HTMLElement>('.agent-task-mode>summary'));await activate(choice("通用助手"));
-    expect(input.value).toBe("保留这段手写草稿");expect(select<HTMLElement>('.agent-tag-workspace').parentElement?.hidden).toBe(true);
+    expect(input.value).toBe("保留这段手写草稿");expect(document.querySelector('.agent-tag-workspace')).toBeNull();
     expect(calls("create")).toHaveLength(0);expect(calls("respond")).toHaveLength(0);
   });
   it("toggles the layout directly and keeps layout choices out of conversation details",async()=>{

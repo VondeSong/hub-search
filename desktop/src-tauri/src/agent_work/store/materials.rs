@@ -88,7 +88,9 @@ pub(super) fn extend(
         if removed.contains(&note) {
             return Err("同一材料不能同时追加和撤回授权".into());
         }
-        if grant.contains(&note) {
+        if grant.notes.contains(&note)
+            || (!matches!(&note, EvidenceLocator::Note { .. }) && grant.contains(&note))
+        {
             return Err("所选材料已在授权范围内，请刷新材料清单".into());
         }
         match &note {

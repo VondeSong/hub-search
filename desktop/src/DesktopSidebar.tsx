@@ -335,6 +335,7 @@ export const DesktopSidebar = memo(function DesktopSidebar({
     return (
       <div
         className={`sidebar-tag-row ${selectedTag === tag.normalizedName ? "selected" : ""}`}
+        draggable onDragStart={event=>{event.dataTransfer.setData("application/x-hub-tag",JSON.stringify({tagId:tag.normalizedName,label:tag.name}));event.dataTransfer.effectAllowed="copy";}}
         key={instanceKey}
         style={{ "--tag-color": color } as CSSProperties}
       >

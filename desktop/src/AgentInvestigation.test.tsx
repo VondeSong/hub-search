@@ -150,8 +150,9 @@ afterEach(async () => { await act(async () => root.unmount()); resetCodexAccount
 const button = (label: string) => {
  if(label==="添加资料")return document.body.querySelector<HTMLButtonElement>(".agent-scope-trigger")!;
  if(["开始调查","发送追问","追加要求","排队发送","发送"].includes(label))return document.body.querySelector<HTMLButtonElement>('.agent-send[type="submit"]')!;
- const text=label==="专注阅读报告"?"只看最新回答":label==="预览追加当前报告"?"插入当前页面":label;
- return Array.from(document.body.querySelectorAll<HTMLButtonElement>("button")).find(item=>(item.getAttribute("aria-label")||item.textContent)?.includes(text))!;
+ const text=label==="专注阅读报告"?"只看最新回答":label;
+ const buttons=Array.from(document.body.querySelectorAll<HTMLButtonElement>("button"));
+ return (buttons.find(item=>item.getAttribute("aria-label")===text||item.textContent?.trim()===text||item.querySelector("strong")?.textContent===text)||buttons.find(item=>(item.getAttribute("aria-label")||item.textContent)?.includes(text)))!;
 };
 async function openDialogueDetails() {
   const menu=document.body.querySelector<HTMLDetailsElement>(".agent-dialogue-details")!;
@@ -1457,7 +1458,7 @@ it("public URL is fetched only on explicit send, with no inherited library grant
   await act(async()=>document.body.querySelector<HTMLFormElement>(".agent-composer form")!.requestSubmit());
   const calls=invoke.mock.calls.filter(([,v])=>v?.args?.action==="createFromPublicUrl");
   expect(calls).toHaveLength(1);
-  expect(calls[0][1].args).toEqual({action:"createFromPublicUrl",url:"https://example.org/a",goal:"总结网页并说明出处",confirmedPublicRead:true});
+  expect(calls[0][1].args).toEqual({action:"createFromPublicUrl",url:"https://example.org/a",goal:"总结网页并说明出处",confirmedPublicRead:true,researchPolicy:"material-first"});
 });
 
 it("starts a standalone conversation with empty authorization and optional materials",async()=>{
@@ -2076,7 +2077,7 @@ it.each(["codex","deepseek"])("new chats apply remembered model preferences and 
  await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
  await fill("investigationGoal","测试记忆设置");await click("开始调查");
  const configured=invoke.mock.calls.find(([,p])=>p?.args?.action==="configureAssistant")?.[1].args.options;
- expect(configured).toEqual({model,webSearch:provider==="codex"?"live":"disabled",autoFlashcardInbox:false});
+ expect(configured).toEqual({researchPolicy:"material-first",model,webSearch:provider==="codex"?"live":"disabled",autoFlashcardInbox:false});
 });
 it("new chat enables live search while restoring an old chat does not change its settings",async()=>{
  await open();await fill("investigationGoal","新问题");await click("开始调查");

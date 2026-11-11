@@ -247,6 +247,11 @@ impl Session<'_> {
                 return Err(reason.into());
             }
         }
+        if matches!(&tool, runner::Tool::ProposeMemory { .. })
+            && options::load(self.root, &self.work.id)?.materials_only()
+        {
+            return Err("仅依据材料时不使用或修改共享记忆，请先切换资料策略".into());
+        }
         let working_state = matches!(&tool, runner::Tool::WorkingState { .. });
         let result = match tool {
             runner::Tool::ProposeMemory { request } => crate::shared_memory::proposals::propose(
@@ -426,6 +431,10 @@ pub(super) fn investigate(
             budget,
             &session,
             |prompt, schema| {
+                let prompt = format!(
+                    "{}\n{prompt}",
+                    options::load(root, &work.id)?.research_guide()
+                );
                 if !operation.native_agent() && store::provider_budget::direct::enabled(root, work)?
                 {
                     return ask_direct(
@@ -435,14 +444,14 @@ pub(super) fn investigate(
                         control,
                         budget,
                         operation,
-                        prompt,
+                        &prompt,
                         schema,
                         &mut |event| session.preview(event),
                     );
                 }
                 let before = control.execution_receipts().len();
                 let result =
-                    operation.ask_stream(prompt, schema, &[], &mut |event| session.preview(event));
+                    operation.ask_stream(&prompt, schema, &[], &mut |event| session.preview(event));
                 for receipt in control.execution_receipts().into_iter().skip(before) {
                     store::record(root, run, "modelExecution", &json!(receipt))?;
                 }

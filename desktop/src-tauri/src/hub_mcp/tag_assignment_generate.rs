@@ -39,18 +39,38 @@ pub(super) fn generate(root: &Path, args: &Value) -> Result<Value, String> {
     result
 }
 
+pub(in crate::hub_mcp) fn generate_with(
+    root: &Path,
+    args: &Value,
+    ask: &mut dyn FnMut(&str, &Value) -> Result<Value, String>,
+) -> Result<Value, String> {
+    generate_using(root, args, &mut |_: &str| {}, ask)
+}
 fn generate_inner(
     root: &Path,
     args: &Value,
     operation: &crate::model_runtime::Operation,
+) -> Result<Value, String> {
+    generate_using(
+        root,
+        args,
+        &mut |message| operation.progress(message),
+        &mut |prompt, schema| operation.ask(prompt, schema, &[]),
+    )
+}
+fn generate_using(
+    root: &Path,
+    args: &Value,
+    progress: &mut dyn FnMut(&str),
+    ask: &mut dyn FnMut(&str, &Value) -> Result<Value, String>,
 ) -> Result<Value, String> {
     if RUNNING.swap(true, Ordering::SeqCst) {
         return Err("已有定义正在生成，请稍候。".into());
     }
     let _guard = RunGuard;
     let tag = normalized_tag_argument(args, "tag")?;
-    operation.context(&tag);
-    operation.progress("核对标签定义版本及分析资料库");
+
+    progress("核对标签定义版本及分析资料库");
     let current = definition(root, &json!({"tag":tag}))?;
     let version = current["definition"]["version"].as_i64().unwrap_or(0);
     if args["expectedVersion"].as_i64() != Some(version) {
@@ -58,17 +78,17 @@ fn generate_inner(
     }
     let library_ids = definition_library_ids(args, &current)?;
     let input = json!({"description":text_field(&args["currentInput"],"description",0,2000)?,"include":text_field(&args["currentInput"],"include",0,2000)?,"exclude":text_field(&args["currentInput"],"exclude",0,2000)?});
-    operation.progress("读取选定资料库中的标签样本和使用边界");
+    progress("读取选定资料库中的标签样本和使用边界");
     let profile = hub_tag_profile(root, &json!({"tag":tag,"evidenceLimit":5,"relatedLimit":0,"libraryIds":library_ids})).or_else(|error| {
         if error == format!("找不到标签 #{tag}") { Ok(json!({"entityCount":0,"evidence":[],"limitation":"所选资料库暂无此标签样本，仅可起草保守定义，不推断实际用法。"})) } else { Err(error) }
     })?;
-    let context = json!({"tag":tag,"currentInput":input,"confirmedDefinition":current["definition"],"libraryIds":library_ids,
+    let context = json!({"tag":tag,"instructions":args["instruction"],"currentInput":input,"confirmedDefinition":current["definition"],"libraryIds":library_ids,
         "profile":profile,
         "taxonomy":hub_tag_taxonomy(root,&json!({"tag":tag,"limit":20,"libraryIds":library_ids}))?});
     let (prompt, schema) = definition_request(&context);
-    operation.progress("根据标签用法生成定义草稿");
-    let generated = operation.ask(&prompt, &schema, &[])?;
-    operation.progress("模型已返回，核验定义字段与版本");
+    progress("根据标签用法生成定义草稿");
+    let generated = ask(&prompt, &schema)?;
+    progress("模型已返回，核验定义字段与版本");
     for field in ["description", "include", "exclude"] {
         text_field(
             &generated,
@@ -81,7 +101,7 @@ fn generate_inner(
         root,
         &json!({"tag":tag,"expectedVersion":version,"definition":generated,"idempotencyKey":format!("desktop-definition-{}",random_url_safe(18))}),
     )?;
-    operation.progress("草稿已保存待确认，现有标签定义未变更");
+    progress("草稿已保存待确认，现有标签定义未变更");
     definition(root, &json!({"tag":tag}))
 }
 

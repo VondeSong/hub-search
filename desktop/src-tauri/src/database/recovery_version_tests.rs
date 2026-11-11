@@ -40,6 +40,49 @@ fn fixture() -> (crate::source_evidence::tests::Fixture, String) {
 }
 
 #[test]
+fn assistant_epoch_84_upgrade_installs_tables_without_resetting_existing_work() {
+    let (f, _) = fixture();
+    let path = f.root.join("craft-search.sqlite3");
+    let before = facts(&f.c());
+    f.c().execute_batch("DROP TABLE agent_research_topics;DROP TABLE agent_answer_saves;UPDATE metadata SET value='84' WHERE key='schema_version';").unwrap();
+    forget_initialized_database(&path);
+    let c = open_database(&path).unwrap();
+    assert_eq!(facts(&c), before);
+    for table in ["agent_research_topics", "agent_answer_saves"] {
+        assert_eq!(
+            c.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+    }
+    assert_eq!(
+        c.query_row(
+            "SELECT value FROM metadata WHERE key='schema_version'",
+            [],
+            |r| r.get::<_, String>(0)
+        )
+        .unwrap(),
+        DATABASE_SCHEMA_VERSION.to_string()
+    );
+    c.execute_batch("DROP TABLE agent_research_topics;CREATE TABLE agent_research_topics(id TEXT PRIMARY KEY);UPDATE metadata SET value='84' WHERE key='schema_version';").unwrap();
+    drop(c);
+    forget_initialized_database(&path);
+    assert!(open_database(&path).is_err());
+    let c = Connection::open(&path).unwrap();
+    assert_eq!(
+        c.query_row(
+            "SELECT value FROM metadata WHERE key='schema_version'",
+            [],
+            |r| r.get::<_, String>(0)
+        )
+        .unwrap(),
+        "84"
+    );
+    assert_eq!(facts(&c), before);
+}
+
+#[test]
 fn recovery_epoch_upgrade_keeps_work_quota_unknown_receipt_and_is_idempotent() {
     let (f, id) = fixture();
     let path = f.root.join("craft-search.sqlite3");

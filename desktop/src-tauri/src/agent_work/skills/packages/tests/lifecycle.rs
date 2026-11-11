@@ -350,7 +350,7 @@ fn c2_schema_82_upgrade_retains_rows_and_invalid_operation_table_rolls_back() {
             |r| r.get::<_, String>(0)
         )
         .unwrap(),
-        "83"
+        crate::database::DATABASE_SCHEMA_VERSION.to_string()
     );
     c.execute_batch("DROP TABLE agent_skill_package_operations;CREATE TABLE agent_skill_package_operations(id TEXT);UPDATE metadata SET value='82' WHERE key='schema_version'").unwrap();
     drop(c);

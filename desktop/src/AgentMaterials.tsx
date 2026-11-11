@@ -50,7 +50,7 @@ export function AgentMaterials({ anchor, anchorIncluded=true, selected, disabled
       {page && <p className="agent-note">{query.trim()?`找到 ${page.total} 份笔记`:`浏览笔记 · 共 ${page.total} 份`} · 本页 {page.notes.length} 份</p>}
       {page?.total===0 && <p className="agent-note">没有找到笔记，试试更短的标题或路径关键词。</p>}
       {page?.notes.map(note => {
-        const primary = (anchor && anchorIncluded && materialKey(note.locator) === materialKey(anchor)) || libraryIds.includes(note.locator.libraryId) || retained?.some(n => n.libraryId===note.locator.libraryId && n.documentId===note.locator.documentId && (n.pageId===null || n.pageId===note.locator.pageId));
+        const primary = (anchor && anchorIncluded && materialKey(note.locator) === materialKey(anchor)) || retained?.some(n => n.libraryId===note.locator.libraryId && n.documentId===note.locator.documentId && (n.pageId===null || n.pageId===note.locator.pageId));
         const pendingRemoval = removed.some(n => materialKey(n)===materialKey(note.locator));
         const coversAnchor = anchor && anchorIncluded && note.locator.libraryId===anchor.libraryId && note.locator.documentId===anchor.documentId && (note.locator.pageId===null || note.locator.pageId===anchor.pageId);
         const canRemove = onRemove && !libraryIds.includes(note.locator.libraryId) && !coversAnchor && retained?.some(n=>materialKey(n)===materialKey(note.locator));

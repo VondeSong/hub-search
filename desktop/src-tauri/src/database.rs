@@ -19,7 +19,8 @@ use std::{
 // Epoch 81 adds fixed method/topic bindings. Older writers must not silently
 // ignore them when continuing work; existing data and budget roots are retained.
 // Epoch 84 installs memory proposals and provenance for existing epoch 83 databases.
-pub(crate) const DATABASE_SCHEMA_VERSION: i64 = 84;
+// Epoch 85 installs reusable research scopes and idempotent answer save receipts.
+pub(crate) const DATABASE_SCHEMA_VERSION: i64 = 85;
 #[cfg(test)]
 mod recovery_version_tests;
 static DATABASE_INITIALIZATION_LOCK: Mutex<()> = Mutex::new(());
@@ -2337,7 +2338,7 @@ pub(crate) fn initialize_database(path: &PathBuf) -> Result<Connection, String> 
     )?;
     crate::task_dates::install_schema(&connection)?;
     crate::user_profile::ensure_schema(&connection)?;
-    if schema_version < 83 {
+    if schema_version < DATABASE_SCHEMA_VERSION {
         crate::agent_work::migrate(&connection)?;
     }
     connection

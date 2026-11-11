@@ -203,15 +203,15 @@ pub(super) fn schema() -> Value {
 
 #[derive(Default, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Usage {
-    model_calls: usize,
+pub(super) struct Usage {
+    pub(super) model_calls: usize,
     #[serde(skip_serializing_if = "is_zero")]
     agent_sessions: usize,
     model_retries: usize,
     output_repairs: usize,
-    request_bytes: usize,
-    body_chars: usize,
-    entities_read: usize,
+    pub(super) request_bytes: usize,
+    pub(super) body_chars: usize,
+    pub(super) entities_read: usize,
     #[serde(skip_serializing_if = "is_zero")]
     local_scan_documents: usize,
     #[serde(skip_serializing_if = "is_zero")]
@@ -721,12 +721,17 @@ fn investigate_loop(
         let current_request = conversation["currentRequest"]
             .as_str()
             .unwrap_or(&work.goal);
-        let shared_memory = crate::shared_memory::context_controlled(
-            root,
-            &work.id,
-            current_request,
-            Some(control),
-        )?;
+        let research_options = options::load(root, &work.id)?;
+        let shared_memory = if research_options.materials_only() {
+            None
+        } else {
+            crate::shared_memory::context_controlled(
+                root,
+                &work.id,
+                current_request,
+                Some(control),
+            )?
+        };
         if let Some(memory) = &shared_memory {
             control.check()?;
             store::record(root, run, "sharedMemoryUse", &memory.audit())?;
@@ -743,6 +748,18 @@ fn investigate_loop(
                 .push(json!({"origin":"host","anchor":seed}));
         }
         selected_materials::prepare(root, work, run, &mut context)?;
+        if let Some(result) = super::tag_tasks::prepare(
+            root,
+            work,
+            run,
+            control,
+            budget,
+            session.map(|s| &s.selection),
+            &mut context.usage,
+            &mut ask,
+        )? {
+            context.observations.push(result);
+        }
         context.named_sources(root, run, current_request)?;
         let continuation = store::review_trigger(root, run)?;
         if continuation.is_some() {
@@ -859,7 +876,7 @@ fn investigate_loop(
         let mut pending_retry = false;
         let mut repair_used = false;
         let mut pending_repair = false;
-        let mut normal_calls = 0;
+        let mut normal_calls = context.usage.model_calls;
         // The domain archive planner has its own audited 128 KiB / two-call
         // ceiling. Reserve that ceiling before entering it, while retaining
         // actual request bytes and execution receipts as separate facts.

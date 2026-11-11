@@ -23,7 +23,7 @@ it("keeps new chats opted out when preference storage is unavailable", () => {
 });
 afterEach(()=>vi.restoreAllMocks());
 it("starts new chats with live search and no inherited grants",()=>{
- expect(loadAgentPreferences()).toEqual({model:null,autoFlashcardInbox:false,webSearch:"live"});
+ expect(loadAgentPreferences()).toEqual({researchPolicy:"material-first",model:null,autoFlashcardInbox:false,webSearch:"live"});
 });
 it.each(["live","cached","disabled"] as const)("retains Codex search through DeepSeek saves and new chats (%s)",webSearch=>{
  const codex={model:{provider:"codex" as const,model:"codex-test",reasoningEffort:"medium",fast:false,maxConcurrent:2},autoFlashcardInbox:false,webSearch};
@@ -31,7 +31,7 @@ it.each(["live","cached","disabled"] as const)("retains Codex search through Dee
  rememberAgentPreferences(codex);
  rememberAgentPreferences(deepseek,codex);
  rememberAgentPreferences({...deepseek,autoFlashcardInbox:true,externalMcp:true},deepseek);
- expect(loadAgentPreferences()).toEqual({...deepseek,autoFlashcardInbox:false});
+ expect(loadAgentPreferences()).toEqual({...deepseek,researchPolicy:"material-first",autoFlashcardInbox:false});
  expect(loadCodexWebSearchPreference()).toBe(webSearch);
 });
 it("keeps Codex search when the effective DeepSeek model is inherited",()=>{
@@ -54,13 +54,13 @@ it("migrates old DeepSeek restrictions without changing legacy Codex opt-outs",(
 it("remembers model effort and fast mode but never carries saving or tool grants",()=>{
  const model={provider:"codex" as const,model:"model-a",reasoningEffort:"high",fast:true,maxConcurrent:2};
  rememberAgentPreferences({model,webSearch:"disabled",autoFlashcardInbox:true,externalMcp:true});
- expect(loadAgentPreferences()).toEqual({model,webSearch:"disabled",autoFlashcardInbox:false});
+ expect(loadAgentPreferences()).toEqual({researchPolicy:"material-first",model,webSearch:"disabled",autoFlashcardInbox:false});
  rememberAgentPreferences({model:null,webSearch:"cached",autoFlashcardInbox:false});
- expect(loadAgentPreferences()).toEqual({model:null,webSearch:"cached",autoFlashcardInbox:false});
+ expect(loadAgentPreferences()).toEqual({researchPolicy:"material-first",model:null,webSearch:"cached",autoFlashcardInbox:false});
 });
 it("ignores malformed saved preferences",()=>{
  localStorage.setItem("hub.agent.preferences.v1",'{"model":{"provider":"other"},"webSearch":"other"}');
- expect(loadAgentPreferences()).toEqual({model:null,autoFlashcardInbox:false,webSearch:"live"});
+ expect(loadAgentPreferences()).toEqual({researchPolicy:"material-first",model:null,autoFlashcardInbox:false,webSearch:"live"});
  localStorage.setItem("hub.agent.preferences.v1","broken");
  expect(loadAgentPreferences().model).toBeNull();
 });
@@ -69,7 +69,7 @@ it("keeps effort preferences separate by provider and never gives DeepSeek Fast"
  rememberAgentModelPreference({provider:"deepseek",model:"same-id",reasoningEffort:"none",fast:true,maxConcurrent:2});
  expect(loadAgentModelPreference("codex","same-id")).toEqual({reasoningEffort:"high",fast:true});
  expect(loadAgentModelPreference("deepseek","same-id")).toEqual({reasoningEffort:"none",fast:false});
- expect(loadAgentPreferences()).toEqual({model:null,autoFlashcardInbox:false,webSearch:"live"});
+ expect(loadAgentPreferences()).toEqual({researchPolicy:"material-first",model:null,autoFlashcardInbox:false,webSearch:"live"});
 });
 it("ignores malformed per-model preferences and tolerates unavailable storage",()=>{
  localStorage.setItem("hub.agent.model-preferences.v1",JSON.stringify([{provider:"other",model:"a",reasoningEffort:"high",fast:true},{provider:"codex",model:"a",reasoningEffort:{value:"high"},fast:false}]));

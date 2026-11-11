@@ -2,7 +2,7 @@
 use super::*;
 use crate::obsidian_edit::{self as files, Snapshot};
 use std::collections::HashSet;
-mod report;
+pub(in crate::agent_work) mod report;
 mod report_undo;
 
 pub(super) fn prepare_report(root: &Path, args: &Value) -> Result<Value, String> {

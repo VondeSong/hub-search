@@ -4729,6 +4729,7 @@ fn list_tag_governance_proposals(
     status: Option<String>,
     limit: Option<usize>,
     cursor: Option<String>,
+    proposal_ids: Option<Vec<String>>,
 ) -> Result<Value, String> {
     let data_root = active_data_root(&app)?;
     hub_mcp::hub_list_tag_governance_proposals(
@@ -4737,6 +4738,7 @@ fn list_tag_governance_proposals(
             "tag": tag.unwrap_or_default(),
             "status": status.unwrap_or_else(|| "pending".to_string()),
             "cursor": cursor,
+            "proposalIds":proposal_ids,
             "limit": limit.unwrap_or(50),
         }),
     )

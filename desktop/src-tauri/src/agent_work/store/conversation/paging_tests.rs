@@ -7,6 +7,24 @@ fn setup() -> (Fixture, String) {
     let id = create(&f, false);
     (f, id)
 }
+#[test]
+fn materials_only_filters_old_answers_from_model_context_and_history_not_the_ui() {
+    let (f, id) = setup();
+    publish(&f, &id, 1, &[], "OLD_WEB_FACT_SENTINEL");
+    ui(&f.root, &message(&f, &id, 2)).unwrap();
+    ui(&f.root, &json!({"action":"configureAssistant","id":id,"options":{"model":null,"researchPolicy":"materials-only"}})).unwrap();
+    let work = load(&f.c(), &id).unwrap();
+    let model = context(&f.root, &work).unwrap().to_string();
+    assert!(!model.contains("OLD_WEB_FACT_SENTINEL"));
+    assert!(model.contains("固定追问2"));
+    let history = history(&f.root, &work, None, None, 0, 6000).unwrap();
+    assert!(!history.to_string().contains("OLD_WEB_FACT_SENTINEL"));
+    assert!(history.to_string().contains("固定追问2"));
+    assert!(read_on(&f.root, &f.c(), &work)
+        .unwrap()
+        .to_string()
+        .contains("OLD_WEB_FACT_SENTINEL"));
+}
 fn note(id: &str) -> EvidenceLocator {
     serde_json::from_value(json!({"kind":"note","libraryId":"notes","documentId":id,"pageId":null}))
         .unwrap()

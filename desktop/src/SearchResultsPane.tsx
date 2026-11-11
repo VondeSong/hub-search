@@ -1,3 +1,5 @@
+import { useContext } from "react";
+import { AgentPanelContext, AgentTagRequestContext } from "./StandaloneAgentLauncher";
 import { userProfileStorage } from "./UserProfileStorage";
 import { CalendarDays, Grid2X2, List, Plus, Search, Tags, TriangleAlert } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
@@ -111,6 +113,7 @@ export function SearchResultsPane({
   const journalViews = useJournalViews();
   const resultMemory = useResultContextMemory(navigationContext, results, selectedIndex, contextReady && !searching, onRestoreSelection, selectionManagedByData);
   const [tagView, setTagView] = useState<{ tag: string; tab: "content" | "assignment" | "relations" }>({ tag: "", tab: "content" });
+  const assistantPanel=useContext(AgentPanelContext),tagAssistant=useContext(AgentTagRequestContext);
   const tab = isMobileLayout ? "content" : tagView.tag === selectedCollectionTag?.normalizedName ? tagView.tab : "content";
   const tagPage = collectionView === "tags" && !!selectedCollectionTag && !query.trim();
   const showContent = !tagPage || tab === "content";
@@ -189,6 +192,7 @@ export function SearchResultsPane({
           onSelectRelatedTag={(tag) => onSelectCollectionTag?.(tag)}
         />
         {!isMobileLayout && <nav className="tag-workspace-tabs" aria-label="标签工作区">
+          {assistantPanel&&tagAssistant&&<button type="button" onClick={()=>{tagAssistant.setPending({tagId:selectedCollectionTag.normalizedName,label:selectedCollectionTag.name,task:tab==="relations"?"relations":tab==="assignment"?"missing":"definition"});assistantPanel(null);}}>交给标签助手</button>}
           {([['content', '内容'], ['assignment', '内容补标'], ['relations', '标签关系']] as const).map(([value, label]) => <button key={value} aria-current={tab === value ? 'page' : undefined} onClick={() => { setTagView({ tag: selectedCollectionTag.normalizedName, tab: value }); onTagTabChange?.(value !== "content"); }}>{label}</button>)}
         </nav>}
         {!isMobileLayout && <div hidden={tab !== "relations"}><TagGovernanceInbox tagId={selectedCollectionTag.normalizedName} onOpenEvidence={onPreviewEvidence ?? onOpenResult} onTaxonomyChanged={onSelectedTagTaxonomyChanged} /></div>}
@@ -248,6 +252,7 @@ export function SearchResultsPane({
               {sortedCollectionTags.map((tag) => (
                   <button
                     key={tag.normalizedName}
+                    draggable onDragStart={event=>{event.dataTransfer.setData("application/x-hub-tag",JSON.stringify({tagId:tag.normalizedName,label:tag.name}));event.dataTransfer.effectAllowed="copy";}}
                     onClick={() => onSelectCollectionTag?.(tag)}
                     style={{ "--tag-color": collectionTagColors[tag.normalizedName] ?? "#4C8FD4" } as CSSProperties}
                   >

@@ -49,10 +49,14 @@ pub(crate) fn migrate(c: &Connection) -> Result<(), String> {
         // IF NOT EXISTS silently accept a partial or unrelated table shape.
         super::topics::migrate(c)?;
         super::skills::migrate(c)?;
+        super::research::migrate(c)?;
+        super::answer_save::migrate(c)?;
         for (table,columns) in [
         ("agent_works","id,goal,success_criteria,anchor_json,grant_json,revision,authorization_version,state,active_run,report_json,updated_at"),
         ("agent_runs","id,work_id,base_revision,authorization_version,state,started_at,finished_at,error,usage_json"),
         ("agent_records","id,work_id,run_id,kind,body_json,created_at"),
+        ("agent_research_topics","id,revision,body_json,updated_at"),
+        ("agent_answer_saves","id,work_id,run_id,state,body_json,updated_at"),
     ] {
         c.prepare(&format!("SELECT {columns} FROM {table} LIMIT 0"))?;
         let pk:String=c.query_row("SELECT COALESCE(group_concat(name,','),'') FROM pragma_table_info(?1) WHERE pk>0",[table],|r|r.get(0))?;
@@ -608,6 +612,25 @@ pub(super) fn report_save_context_on(
         return Err("报告依据、成果或操作回执已变化，请重新核对后保存".into());
     }
     Ok(json!({"runId":run,"report":report,"evidence":body["evidence"]}))
+}
+
+pub(super) fn answer_save_context(
+    root: &Path,
+    c: &Connection,
+    w: &Work,
+    run: &str,
+) -> Result<Value, String> {
+    if w.state == "revoked" || w.active_run.is_some() {
+        return Err("请在本轮结束并核对来源后保存回答".into());
+    }
+    let (raw,authorization):(String,i64)=c.query_row("SELECT r.body_json,u.authorization_version FROM agent_records r JOIN agent_runs u ON u.id=r.run_id WHERE r.work_id=?1 AND r.run_id=?2 AND r.kind='delivery' ORDER BY r.rowid DESC LIMIT 1",params![w.id,run],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|_|"所选回答不属于当前对话或尚未正式交付")?;
+    let body: Value = serde_json::from_str(&raw).map_err(|_| "回答交付记录损坏")?;
+    let (_, projection) =
+        delivery_read::DeliveryRead::new(root, c, w).verify(w, run, &body, authorization)?;
+    if projection["state"] == "stale" {
+        return Err("回答引用的图表版本已变化，请先核对后保存".into());
+    }
+    Ok(json!({"runId":run,"report":body["report"],"evidence":body["evidence"]}))
 }
 
 pub(super) fn view(root: &Path, id: &str) -> Result<Value, String> {

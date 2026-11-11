@@ -51,7 +51,7 @@ function rememberLibraries(tag: string, ids: string[]) {
   } catch { /* Storage can be unavailable. */ }
 }
 
-export function TagAssignmentInbox({ tagId, userDescription = "", onOpenEvidence, onChanged, onDescriptionSaved }: {
+export function TagAssignmentInbox({ tagId, userDescription = "", onOpenEvidence, onChanged, onDescriptionSaved, assistantOnly=false, proposalIds,initialLibraryIds }: { initialLibraryIds?:string[];assistantOnly?:boolean;proposalIds?:string[];
   tagId?: string; userDescription?: string; onOpenEvidence?: (r: SearchResult) => void;
   onChanged?: () => void; onDescriptionSaved?: (description: string) => void;
 }) {
@@ -98,13 +98,13 @@ export function TagAssignmentInbox({ tagId, userDescription = "", onOpenEvidence
     setLoading(true); setError(""); setPreviews({}); setExpanded("");
     if (!after) setItems([]);
     try {
-      const result = await call<{ proposals: Proposal[]; nextCursor: string | null }>({ action: "list", tag: tagId ?? "", status, limit: 20, cursor: after ?? "" });
+      const result = await call<{ proposals: Proposal[]; nextCursor: string | null }>({ action: "list", tag: tagId ?? "", status, limit: 20, cursor: after ?? "",...(proposalIds?{proposalIds}:{}) });
       if (request !== generation.current) return;
       setItems(current => after ? [...current, ...result.proposals.filter(p => !current.some(old => old.proposalId === p.proposalId))] : result.proposals);
       setCursor(result.nextCursor);
     } catch (e) { if (request === generation.current) setError(String(e)); }
     finally { if (request === generation.current) setLoading(false); }
-  }, [tagId, status]);
+  }, [tagId, status, JSON.stringify(proposalIds)]);
 
   useEffect(() => { void load(); return () => { generation.current++; }; }, [load]);
   useEffect(() => { const refresh = () => { void load(); }; window.addEventListener("hub-tag-scan-updated", refresh); return () => window.removeEventListener("hub-tag-scan-updated", refresh); }, [load]);
@@ -132,7 +132,7 @@ export function TagAssignmentInbox({ tagId, userDescription = "", onOpenEvidence
       const savedVersion = result.definition?.version ?? 0;
       if (first) {
         setVersion(savedVersion);
-        setDefinition(d => ({ ...(result.definition?.definition ?? d), libraryIds: initialLibraries(tagId, availableLibraries.map(l => l.libraryId), result.definition?.definition.libraryIds) }));
+        setDefinition(d => ({ ...(result.definition?.definition ?? d), libraryIds: assistantOnly&&!result.definition?availableLibraries.filter(l=>initialLibraryIds?.includes(l.libraryId)).map(l=>l.libraryId):initialLibraries(tagId, availableLibraries.map(l => l.libraryId), result.definition?.definition.libraryIds) }));
         first = false;
       }
       const incoming = result.draft;
@@ -236,7 +236,8 @@ export function TagAssignmentInbox({ tagId, userDescription = "", onOpenEvidence
     } catch (e) { if (alive.current) { setPreviews({}); setExpanded(""); setError(String(e)); } }
     finally { if (alive.current) setBusy(""); }
   };
-  const visibleItems = status === "pending" && !showAnalysis ? items.filter(item => item.proposal.decision === "recommend_add") : items;
+  const scopedItems=proposalIds?items.filter(item=>proposalIds.includes(item.proposalId)):items;
+  const visibleItems = status === "pending" && !showAnalysis ? scopedItems.filter(item => item.proposal.decision === "recommend_add") : scopedItems;
   const tally = (decision: string) => discovery?.submitted.filter(item => item.decision === decision).length ?? 0;
   const remaining = discovery?.remainingCount ?? 0;
   const goToReview = (next: Status) => {
@@ -248,9 +249,9 @@ export function TagAssignmentInbox({ tagId, userDescription = "", onOpenEvidence
     <header><strong>内容补标</strong><button type="button" disabled={loading || !!busy} onClick={() => void load()}>刷新建议</button></header>
     <p className="tag-assignment-hint">查看建议并批准到 Hub，再按需确认写回 Craft / Obsidian 原笔记。</p>
     {tagId && <TagTaskActivity tag={tagId} workflows={["tag-definition", "tag-assignment-discovery"]}/>}
-    {tagId && <div className="tag-definition-toolbar"><CodexDefinitionModel /></div>}
-    {tagId && <details className="tag-assignment-definition" open={version === 0 ? true : undefined}><summary>定义与范围 · {version ? `已确认 · 版本 ${version} · ${definition.libraryIds.length} 个资料库` : "请先确认"}</summary>
-      <div className="tag-definition-toolbar">
+    {!assistantOnly&&tagId && <div className="tag-definition-toolbar"><CodexDefinitionModel /></div>}
+    {tagId && <details className="tag-assignment-definition" open={assistantOnly||version === 0 ? true : undefined}><summary>定义与范围 · {version ? `已确认 · 版本 ${version} · ${definition.libraryIds.length} 个资料库` : "请先确认"}</summary>
+      <div className="tag-definition-toolbar" hidden={assistantOnly}>
       <button type="button" disabled={version === null || saving || generating || finding || scanBusy || !modelAvailable} onClick={() => void generateDefinition()}>{generating ? "模型正在生成…" : version ? "用模型 优化定义" : "用模型 生成定义"}</button></div>
       <p className="tag-assignment-hint">生成后可点击正文修改，确认保存后用于内容补标。</p>
       {draft && <div role="status"><p>模型新草稿已到达，当前输入已保留。</p>
@@ -267,9 +268,9 @@ export function TagAssignmentInbox({ tagId, userDescription = "", onOpenEvidence
         <button type="button" disabled={saving || generating || !definition.description.trim() || !definition.include.trim() || !definition.libraryIds.length} onClick={() => void save()}>{saving ? "保存中…" : "确认并保存定义"}</button>
       </fieldset>
     </details>}
-    {tagId && <nav className="tag-check-modes" aria-label="检查方式"><button disabled={scanBusy || finding || generating} aria-pressed={checkMode === "quick"} onClick={() => setCheckMode("quick")}>查找可能漏标</button><button disabled={scanBusy || finding || generating} aria-pressed={checkMode === "full"} onClick={() => setCheckMode("full")}>逐篇检查</button></nav>}
-    {tagId && <div hidden={checkMode !== "full"}><p className="tag-assignment-hint">按已保存的定义逐篇核对正文，达到预算后暂停，进度可续跑。</p>{(!version || dirty.current) && <p role="status">请先在上方确认并保存定义与范围，再开始逐篇检查。</p>}<CodexContentScan tagId={tagId} disabled={!version || dirty.current || generating || saving || finding} onRunningChange={setScanBusy} /><TagContentScanPanel tagId={tagId} /></div>}
-    {tagId && <div hidden={checkMode !== "quick"} className="tag-assignment-discover">
+    {!assistantOnly&&tagId && <nav className="tag-check-modes" aria-label="检查方式"><button disabled={scanBusy || finding || generating} aria-pressed={checkMode === "quick"} onClick={() => setCheckMode("quick")}>查找可能漏标</button><button disabled={scanBusy || finding || generating} aria-pressed={checkMode === "full"} onClick={() => setCheckMode("full")}>逐篇检查</button></nav>}
+    {!assistantOnly&&tagId && <div hidden={checkMode !== "full"}><p className="tag-assignment-hint">按已保存的定义逐篇核对正文，达到预算后暂停，进度可续跑。</p>{(!version || dirty.current) && <p role="status">请先在上方确认并保存定义与范围，再开始逐篇检查。</p>}<CodexContentScan tagId={tagId} disabled={!version || dirty.current || generating || saving || finding} onRunningChange={setScanBusy} /><TagContentScanPanel tagId={tagId} /></div>}
+    {!assistantOnly&&tagId && <div hidden={checkMode !== "quick"} className="tag-assignment-discover">
       <button type="button" disabled={finding || generating || saving || version === null || !modelAvailable} onClick={() => void findAssignments(remaining > 0 && !discovery?.stale)}>{finding ? "模型正在检查…" : remaining > 0 && !discovery?.stale ? `继续检查剩余 ${remaining} 项` : "用模型 查找补标建议"}</button>
       <p className="tag-assignment-hint">使用已保存的定义与范围，每批最多检查 5 项，进度自动保存。只有批准后才添加标签。</p>
     </div>}

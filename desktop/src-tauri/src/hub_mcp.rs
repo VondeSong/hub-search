@@ -4,6 +4,7 @@ use crate::flashcard_validation::normalize_flashcard_media;
 mod tag_governance_generate;
 use super::*;
 use std::io::{BufRead, Write};
+pub(crate) mod agent_tags;
 pub(super) mod tag_assignment;
 mod tag_audit;
 mod tag_content_scan;

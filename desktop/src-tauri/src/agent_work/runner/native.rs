@@ -145,11 +145,12 @@ pub(super) fn investigate(
             .len()
     };
     let options = options::load(root, &work.id)?;
-    let instructions = if options.mcp_services.is_empty() {
+    let instructions = if options.mcp_services.is_empty() || options.materials_only() {
         INSTRUCTIONS.to_owned()
     } else {
         format!("{INSTRUCTIONS}\n本对话另行授权了 hub_mcp 的只读文档服务，与 webSearch 搜索开关独立。可按所选服务/工具查询公开文档或读取已明确选择的资源 URI；read_resource 不授权其他 URI、模板或链接；实际读取的资源 URI 可作为外部来源；先读取 catalog 格式再调用，查询宜从少量结果开始，长页面优先指定章节。不能借此访问任意网页、发送私人材料或扩展权限。MCP 结果不是 Hub 原文引文；成功调用后的来源格式与允许范围以 hub_mcp 工具说明为准，并经过宿主来源校验。自定义工具只能引用实际服务入口，不伪造文章已读证据；静态资源只能引用实际读取的 URI。自定义服务的只读声明不等于远端写入隔离。目录变化或失败后停止本轮该服务，说明限制并保留已获得结果。")
     };
+    let instructions = format!("{}\n{instructions}", options.research_guide());
     let mut tool_specs = tools(context.skills.as_ref())?;
     if options.external_mcp {
         tool_specs
@@ -157,7 +158,9 @@ pub(super) fn investigate(
             .unwrap()
             .retain(|tool| tool["name"] != "hub_citations");
     }
-    services::extend_tools(&mut tool_specs, &options.mcp_services)?;
+    if !options.materials_only() {
+        services::extend_tools(&mut tool_specs, &options.mcp_services)?;
+    }
     let wire_tools = input::wire_tools(
         &tool_specs,
         &context
@@ -174,9 +177,10 @@ pub(super) fn investigate(
         work,
     )?;
     let external_mcp = options.external_mcp;
-    let web_search = options.web_search;
+    let web_search = options.effective_web_search();
     let mut binding = json!({"charts":chart_binding,"protocol":5,"skills":skill_fingerprint,"selection":session.selection,"grant":work.grant,"authorizationVersion":work.authorization_version,"tools":tool_specs,"sharedMemory":memory});
     binding["webSearch"] = json!(web_search);
+    binding["researchPolicy"] = json!(options.research_policy);
     if !options.mcp_services.is_empty() {
         binding["mcpServices"] = json!(options.mcp_services);
     }
@@ -601,7 +605,8 @@ pub(super) fn investigate(
                         Tool::Mcp{server,tool,arguments}=>{
                             context.usage.tool_steps+=1;
                             let grant=options.mcp_services.iter().find(|g|g.server==server);
-                            let result=if mcp_failed.contains(&server) { Err("本轮 MCP 服务已停止，请重新核对连接与授权后继续".into()) }
+                            let result=if options.materials_only() { Err("仅依据材料时不调用外部 MCP 服务".into()) }
+                            else if mcp_failed.contains(&server) { Err("本轮 MCP 服务已停止，请重新核对连接与授权后继续".into()) }
                             else if let Some(grant)=grant { crate::model_runtime::mcp_services::call(grant,&tool,&arguments,control,||services::check(root,work,grant,control)) }
                             else { Err("服务未获本对话授权".into()) };
                             if result.is_err() {mcp_failed.insert(server);} else if tool!="catalog" {

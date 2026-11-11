@@ -6,6 +6,8 @@ use super::*;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Options {
     pub model: Option<crate::model_runtime::Settings>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub research_policy: Option<ResearchPolicy>,
     #[serde(default)]
     pub auto_flashcard_inbox: bool,
     #[serde(default, skip_serializing_if = "disabled")]
@@ -17,6 +19,33 @@ pub(super) struct Options {
         skip_serializing_if = "crate::model_runtime::agent_web::Mode::disabled"
     )]
     pub web_search: crate::model_runtime::agent_web::Mode,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum ResearchPolicy {
+    MaterialFirst,
+    MaterialsOnly,
+    Open,
+}
+impl Options {
+    pub fn materials_only(&self) -> bool {
+        self.research_policy == Some(ResearchPolicy::MaterialsOnly)
+    }
+    pub fn effective_web_search(&self) -> crate::model_runtime::agent_web::Mode {
+        if self.materials_only() {
+            Default::default()
+        } else {
+            self.web_search
+        }
+    }
+    pub fn research_guide(&self) -> &'static str {
+        match self.research_policy {
+            Some(ResearchPolicy::MaterialFirst) => "资料策略：材料优先。先实际读取用户明确指定的核心材料，再在已授权范围检索；遇到时效变化、信息缺口或冲突时才按本轮联网授权补充公开来源。区分原文、外部来源和推断。未读完不能声称全面审阅。",
+            Some(ResearchPolicy::MaterialsOnly) => "资料策略：仅依据材料。事实与引用仅来自本轮已授权材料；不搜索网页、不读取公共链接或外部 MCP、不使用共享记忆补事实，不以模型常识填补材料缺口。可以对已读材料做归纳和推理，需明确标注推断。材料不足时说明缺口。历史对话只用于理解用户要求，不作为本轮事实证据。",
+            Some(ResearchPolicy::Open) => "资料策略：开放研究。以用户问题为主，可按本轮联网授权研究公开来源。所选本地材料作为背景与约束，仍只读取明确授权范围，不扩大到其他库。区分本地原文、外部来源和推断。",
+            None => "",
+        }
+    }
 }
 fn disabled(v: &bool) -> bool {
     !*v
@@ -51,7 +80,7 @@ pub(super) fn configure(root: &Path, args: &Value) -> Result<Value, String> {
     {
         return Err("本轮MCP通道仅支持Codex，不自动更换已选提供方".into());
     }
-    if !options.web_search.disabled()
+    if !options.effective_web_search().disabled()
         && !crate::model_runtime::native_agent_provider(
             &crate::model_runtime::selected_settings(root, options.model.clone())?.provider,
         )
@@ -101,7 +130,7 @@ pub(super) fn preflight(
     {
         return Err("当前入口或提供方不支持本轮MCP通道；未创建运行或预留额度".into());
     }
-    if !load_on(&c, id)?.web_search.disabled()
+    if !load_on(&c, id)?.effective_web_search().disabled()
         && (!prepare_drafts || !crate::model_runtime::native_agent_provider(&settings.provider))
     {
         return Err("此入口或提供方不支持对话的联网设置；未创建运行或预留额度".into());
@@ -189,4 +218,29 @@ fn cn04_options_preserve_old_identity_and_reject_unknown_modes() {
     let mut invalid = old;
     invalid["webSearch"] = json!("unrestricted");
     assert!(serde_json::from_value::<Options>(invalid).is_err());
+}
+
+#[cfg(test)]
+#[test]
+fn research_policy_is_versioned_and_materials_only_masks_external_access_without_erasing_preferences(
+) {
+    let legacy = json!({"model":null,"autoFlashcardInbox":false});
+    assert_eq!(
+        json!(serde_json::from_value::<Options>(legacy.clone()).unwrap()),
+        legacy
+    );
+    for policy in ["material-first", "materials-only", "open"] {
+        let wire = json!({"model":null,"autoFlashcardInbox":false,"webSearch":"live","researchPolicy":policy});
+        let options: Options = serde_json::from_value(wire.clone()).unwrap();
+        assert_eq!(json!(options), wire);
+        assert_eq!(
+            options.effective_web_search().disabled(),
+            policy == "materials-only"
+        );
+        assert!(!options.web_search.disabled());
+        assert!(!options.research_guide().is_empty());
+    }
+    assert!(
+        serde_json::from_value::<Options>(json!({"model":null,"researchPolicy":"guess"})).is_err()
+    );
 }

@@ -2,6 +2,9 @@
 use super::*;
 #[path = "conversion_agent.rs"]
 mod agent;
+#[path = "conversion_assistant.rs"]
+mod assistant_save;
+pub(crate) use assistant_save::{answer_target, inspect_answer, save_answer};
 #[path = "conversion_context.rs"]
 mod model_context;
 #[cfg(feature = "integration-agent-acceptance")]

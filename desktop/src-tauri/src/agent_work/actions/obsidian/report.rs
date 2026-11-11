@@ -34,7 +34,7 @@ pub(super) fn payload(context: &Value) -> Result<Value, String> {
     Ok(result)
 }
 
-fn markdown(delivery: &Value) -> Result<String, String> {
+pub(in crate::agent_work) fn markdown(delivery: &Value) -> Result<String, String> {
     let r = &delivery["report"];
     let mut lines = Vec::new();
     let mut citations = Vec::new();

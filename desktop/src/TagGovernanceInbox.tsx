@@ -286,7 +286,7 @@ export function proposalEvidenceSearchResult(evidence: ProposalEvidence): Search
   };
 }
 
-export function TagGovernanceInbox({ tagId, onOpenEvidence, onTaxonomyChanged }: { tagId?: string; onOpenEvidence?: (result: SearchResult) => void; onTaxonomyChanged?: () => void }) {
+export function TagGovernanceInbox({ tagId, onOpenEvidence, onTaxonomyChanged, assistantOnly=false, proposalIds }: { assistantOnly?:boolean;proposalIds?:string[];tagId?: string; onOpenEvidence?: (result: SearchResult) => void; onTaxonomyChanged?: () => void }) {
   const globalInbox = !tagId;
   const [statusFilter, setStatusFilter] = useState<ProposalStatus>("pending");
   const [proposalLists, setProposalLists] = useState<Record<ProposalStatus, Proposal[]>>({ pending: [], accepted: [], rejected: [], withdrawn: [] });
@@ -306,8 +306,8 @@ export function TagGovernanceInbox({ tagId, onOpenEvidence, onTaxonomyChanged }:
   const [loadingMore, setLoadingMore] = useState<string[]>([]);
   const requestGeneration = useRef(0);
   const moreRequests = useRef(new Set<string>());
-  const proposals = proposalLists[globalInbox ? statusFilter : "pending"];
-  const currentStatus = globalInbox ? statusFilter : "pending";
+  const proposals = proposalLists[globalInbox||assistantOnly ? statusFilter : "pending"].filter(p=>!proposalIds||proposalIds.includes(p.proposalId));
+  const currentStatus = globalInbox||assistantOnly ? statusFilter : "pending";
   const currentPage = pages[currentStatus];
 
   const refreshTaxonomyHealth = useCallback(async () => {
@@ -316,6 +316,7 @@ export function TagGovernanceInbox({ tagId, onOpenEvidence, onTaxonomyChanged }:
     setTaxonomyHealth(health);
   }, [globalInbox]);
 
+  const proposalFilter=JSON.stringify(proposalIds);
   const load = useCallback(async () => {
     const generation = ++requestGeneration.current;
     moreRequests.current.clear();
@@ -323,7 +324,13 @@ export function TagGovernanceInbox({ tagId, onOpenEvidence, onTaxonomyChanged }:
     setLoading(true);
     setError("");
     try {
-      if (globalInbox) {
+      if(assistantOnly){
+        const statuses:ProposalStatus[]=["pending","accepted","rejected","withdrawn"];
+        const results=await Promise.all(statuses.map(status=>invoke<ProposalList>("list_tag_governance_proposals",{tag:tagId,status,limit:100,proposalIds})));
+        if(generation!==requestGeneration.current)return;
+        setProposalLists({pending:results[0].proposals,accepted:results[1].proposals,rejected:results[2].proposals,withdrawn:results[3].proposals});
+        setPages({pending:pageMeta(results[0],results[0].proposals.length),accepted:pageMeta(results[1],results[1].proposals.length),rejected:pageMeta(results[2],results[2].proposals.length),withdrawn:pageMeta(results[3],results[3].proposals.length)});
+      }else if (globalInbox) {
         const statuses: ProposalStatus[] = ["pending", "accepted", "rejected", "withdrawn"];
         const [results, health, repairHistory] = await Promise.all([
           Promise.all(statuses.map((status) => invoke<ProposalList>("list_tag_governance_proposals", { tag: null, status, limit: 200 }))),
@@ -352,7 +359,7 @@ export function TagGovernanceInbox({ tagId, onOpenEvidence, onTaxonomyChanged }:
     } finally {
       if (generation === requestGeneration.current) setLoading(false);
     }
-  }, [globalInbox, tagId]);
+  }, [globalInbox, tagId, assistantOnly, proposalFilter]);
 
   useEffect(() => {
     setExpandedId("");
@@ -385,7 +392,7 @@ export function TagGovernanceInbox({ tagId, onOpenEvidence, onTaxonomyChanged }:
         setTaxonomyRepairRuns((current) => Array.from(new Map([...current, ...result.repairs].map((item) => [item.repairRunId, item])).values()));
         setRepairPage(pageMeta(result, result.repairs.length));
       } else {
-        const result = await invoke<ProposalList>("list_tag_governance_proposals", { tag: tagId ?? null, status: key, limit: globalInbox ? 200 : 50, cursor: nextCursor });
+        const result = await invoke<ProposalList>("list_tag_governance_proposals", { tag: tagId ?? null, status: key, limit: globalInbox ? 200 : 50, cursor: nextCursor,...(proposalIds?{proposalIds}:{}) });
         if (generation !== requestGeneration.current) return;
         setProposalLists((current) => ({ ...current, [key]: Array.from(new Map([...current[key], ...result.proposals].map((item) => [item.proposalId, item])).values()) }));
         setPages((current) => ({ ...current, [key]: pageMeta(result, result.proposals.length) }));
@@ -567,8 +574,8 @@ export function TagGovernanceInbox({ tagId, onOpenEvidence, onTaxonomyChanged }:
         <button onClick={() => void load()} disabled={loading} title="刷新建议" aria-label="刷新建议"><RefreshCw className={loading ? "spin" : ""} size={13} /></button>
       </div>
     </header>
-    <CodexTagGovernance tagId={tagId} onCompleted={() => { setStatusFilter("pending"); void load(); }} />
-    {globalInbox && <nav className="tag-governance-status-filter" aria-label="审核状态">
+    {!assistantOnly&&<CodexTagGovernance tagId={tagId} onCompleted={() => { setStatusFilter("pending"); void load(); }} />}
+    {(globalInbox||assistantOnly) && <nav className="tag-governance-status-filter" aria-label="审核状态">
       {(["pending", "accepted", "rejected", "withdrawn"] as ProposalStatus[]).map((status) => <button type="button" key={status} aria-pressed={statusFilter === status} onClick={() => { setStatusFilter(status); setExpandedId(""); setWithdrawConfirmId(""); }}>
         {STATUS_LABELS[status]}<small>{pages[status].total}</small>
       </button>)}

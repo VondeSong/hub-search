@@ -23,6 +23,9 @@ pub(super) fn check(
     control.check()?;
     let c = crate::source_evidence::open_read_database(root)?;
     let current = store::load(&c, &work.id)?;
+    if options::load_on(&c, &work.id)?.materials_only() {
+        return Err("仅依据材料时不调用外部 MCP 服务".into());
+    }
     if current.state == "revoked"
         || current.authorization_version != work.authorization_version
         || !options::load_on(&c, &work.id)?.mcp_services.contains(grant)
@@ -111,3 +114,35 @@ pub(super) fn normalize_report(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[test]
+fn materials_only_rejects_an_already_discovered_service_before_transport() {
+    let f = crate::source_evidence::tests::Fixture::new();
+    let id = store::create(
+        &f.root,
+        "只读本地资料".into(),
+        "".into(),
+        None::<EvidenceLocator>,
+        crate::agent_work::Grant::default(),
+    )
+    .unwrap();
+    store::write(&f.root, |c| {
+        store::insert(
+            c,
+            &id,
+            None,
+            "assistantOptions",
+            &json!({"model":null,"autoFlashcardInbox":false,"researchPolicy":"materials-only"}),
+        )
+    })
+    .unwrap();
+    let work = store::load(&f.c(), &id).unwrap();
+    let grant: Grant = serde_json::from_value(
+        json!({"server":"context7","catalogSha256":"x","tools":["query-docs"],"resourceUris":[]}),
+    )
+    .unwrap();
+    assert!(check(&f.root, &work, &grant, &Control::default())
+        .unwrap_err()
+        .contains("仅依据材料"));
+}

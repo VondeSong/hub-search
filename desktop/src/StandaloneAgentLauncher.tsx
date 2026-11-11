@@ -16,11 +16,14 @@ const Reading = lazy(() => import("./AgentInvestigation").then(m => ({ default:m
 export type Entry = { result:SearchResult } | { itemKey:string; title?:string } | null;
 export type TextMaterial={kind:"text"|"flashcard";title:string;text:string;file?:boolean};
 export const AgentTextMaterialContext=createContext<{selection:TextMaterial|null;clearSelection:()=>void;pending:TextMaterial|null;setPending:(value:TextMaterial|null)=>void}|null>(null);
+export type AgentTagRequest={tagId:string;label:string;task:"definition"|"missing"|"relations"};
+export const AgentTagRequestContext=createContext<{pending:AgentTagRequest|null;setPending:(v:AgentTagRequest|null)=>void}|null>(null);
 export const AgentPanelContext = createContext<((entry:Entry)=>void)|null>(null);
 export const AgentAccountVisibleContext = createContext(true);
 export const AgentBrowsingContext = createContext<{entry:Entry;setEntry:React.Dispatch<React.SetStateAction<Entry>>}|null>(null);
 export function AgentPanelProvider({children}:{children:ReactNode}) {
  const [browsing,setBrowsing]=useState<Entry>(null);
+ const [tagRequest,setTagRequest]=useState<AgentTagRequest|null>(null);
  const [citation,setCitation]=useState<CitationLocation|null>(null);
  const [owner,setOwner]=useState("initial");
  const [entries,setEntries]=useState<Record<string,Entry|undefined>>({});
@@ -52,20 +55,20 @@ export function AgentPanelProvider({children}:{children:ReactNode}) {
    routes.current.set(route,next);
    if(next!=="initial")freshOwners.current.add(next);
    setEntries(current=>entry!==undefined && current[next]===undefined?{...current,[next]:null}:current);
-   setOwner(next);setCitation(null);setSelection(null);setPending(null);
+   setOwner(next);setCitation(null);setSelection(null);setPending(null);setTagRequest(null);
   };
   window.addEventListener("hub:agent-account-changed",change);
   return()=>window.removeEventListener("hub:agent-account-changed",change);
  },[owner,entry]);
  const open=(next:Entry)=>{setEntries(values=>{const current=values[owner];return {...values,[owner]:current===undefined?next:current&&next&&'result' in current&&'result' in next?next:current};});setRequest(n=>n+1);};
  useEffect(()=>{if(request)window.dispatchEvent(new Event('hub:show-agent'));},[request,owner]);
- return <AgentCitationContext.Provider value={{value:citation,show:setCitation}}><AgentTextMaterialContext.Provider value={{selection,clearSelection:()=>setSelection(null),pending,setPending}}><AgentBrowsingContext.Provider value={{entry:browsing,setEntry:setBrowsing}}><AgentPanelContext.Provider value={open}>
+ return <AgentTagRequestContext.Provider value={{pending:tagRequest,setPending:setTagRequest}}><AgentCitationContext.Provider value={{value:citation,show:setCitation}}><AgentTextMaterialContext.Provider value={{selection,clearSelection:()=>setSelection(null),pending,setPending}}><AgentBrowsingContext.Provider value={{entry:browsing,setEntry:setBrowsing}}><AgentPanelContext.Provider value={open}>
   {children}
   {runtimeCapabilities.desktop && entry===undefined && createPortal(<button type="button" className="agent-floating-launcher" aria-label="打开助手" aria-expanded={false} title="打开 Hub 助手" onClick={()=>open(null)}><span className="agent-launcher-orb" aria-hidden="true"/>助手</button>,document.body)}
   {runtimeCapabilities.desktop && Object.entries(entries).map(([key,value])=>value===undefined?null:<AgentAccountVisibleContext.Provider key={key} value={key===owner}><div hidden={key!==owner} className="agent-global-owner"><Suspense fallback={<p role="status">正在打开助手…</p>}>
    {value&&'result' in value?<Source result={value.result} initiallyOpen startFresh={freshOwners.current.has(key)}/>:value&&'itemKey' in value?<Reading itemKey={value.itemKey} initiallyOpen startFresh={freshOwners.current.has(key)}/>:<Standalone initiallyOpen startFresh={freshOwners.current.has(key)}/>}
   </Suspense></div></AgentAccountVisibleContext.Provider>)}
- </AgentPanelContext.Provider></AgentBrowsingContext.Provider></AgentTextMaterialContext.Provider></AgentCitationContext.Provider>;
+ </AgentPanelContext.Provider></AgentBrowsingContext.Provider></AgentTextMaterialContext.Provider></AgentCitationContext.Provider></AgentTagRequestContext.Provider>;
 }
 export function AgentFlashcardMaterial({title,text}:{title:string;text:string}){
  const context=useContext(AgentTextMaterialContext),open=useContext(AgentPanelContext);

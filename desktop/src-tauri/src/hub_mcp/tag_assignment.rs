@@ -3,7 +3,7 @@ use super::*;
 #[path = "tag_assignment_definition_draft.rs"]
 pub(super) mod definition_draft;
 #[path = "tag_assignment_discover.rs"]
-mod discover;
+pub(super) mod discover;
 #[path = "tag_assignment_exclusion.rs"]
 mod exclusion;
 #[path = "tag_assignment_generate.rs"]
@@ -423,15 +423,27 @@ pub(super) fn list(root: &Path, args: &Value) -> Result<Value, String> {
         _ => return Err("建议状态无效".into()),
     };
     let limit = argument_usize(args, "limit", 20, 100);
+    let filter = if let Some(raw) = args.get("proposalIds") {
+        let ids: Vec<String> = serde_json::from_value(raw.clone()).map_err(|_| "建议筛选无效")?;
+        if ids.len() > 100 {
+            return Err("建议筛选过多".into());
+        }
+        json!(ids).to_string()
+    } else {
+        String::new()
+    };
     let cursor = argument_text(args, "cursor");
     let (time, id) = if cursor.is_empty() {
         (i64::MAX, String::new())
     } else {
         serde_json::from_str::<(i64, String)>(cursor).map_err(|_| "分页游标无效")?
     };
-    let mut st=c.prepare(&format!("SELECT {SELECT} FROM tag_assignment_proposals WHERE (?1='' OR tag=?1) AND status=?2 AND (created_at<?3 OR (created_at=?3 AND id<?4)) ORDER BY created_at DESC,id DESC LIMIT ?5")).map_err(|e|e.to_string())?;
+    let mut st=c.prepare(&format!("SELECT {SELECT} FROM tag_assignment_proposals WHERE (?1='' OR tag=?1) AND status=?2 AND (?6='' OR id IN (SELECT value FROM json_each(?6))) AND (created_at<?3 OR (created_at=?3 AND id<?4)) ORDER BY created_at DESC,id DESC LIMIT ?5")).map_err(|e|e.to_string())?;
     let mut proposals = st
-        .query_map(params![tag, status, time, id, (limit + 1) as i64], row)
+        .query_map(
+            params![tag, status, time, id, (limit + 1) as i64, filter],
+            row,
+        )
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
