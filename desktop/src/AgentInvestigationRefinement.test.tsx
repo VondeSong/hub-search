@@ -94,7 +94,6 @@ it.each(["live", "cached", "disabled"] as const)("restores Codex search after a 
   await render(<StandaloneInvestigation initiallyOpen/>);
   async function choose(provider: ModelProvider) {
     await activate(select<HTMLElement>(".agent-option-model > summary"));
-    await activate([...document.querySelectorAll<HTMLButtonElement>(".agent-model-providers button")].find(button => button.textContent === (provider === "codex" ? "Codex" : "DeepSeek"))!);
     await activate(select<HTMLButtonElement>(`.agent-model-list button[title="${provider}-search-test"]`));
   }
   await choose("deepseek");
@@ -299,13 +298,9 @@ describe("assistant refinement integration", () => {
     expect(document.querySelector('[aria-label="Hub 助手"]')).not.toBeNull();
   });
 
-  it("reaches skills through the visible plus menu and applies the selected skill to the next message", async () => {
+  it("reaches skills through the bottom toolbar and applies the selected skill to the next message", async () => {
     await render(<StandaloneInvestigation initiallyOpen startFresh />);
-    await activate(select<HTMLElement>('summary[aria-label="添加资料或技能"]'));
-    const choices = select<HTMLElement>(".agent-add-choices");
-    const skills = [...choices.querySelectorAll<HTMLButtonElement>("button")].find(button => button.querySelector("strong")?.textContent === "技能");
-    expect(skills).toBeDefined();
-    await activate(skills!);
+    await activate(select<HTMLButtonElement>('button[aria-label="添加技能"]'));
     expect(calls("skills")).toHaveLength(1);
     await activate(select<HTMLButtonElement>('button[aria-label="查看技能 资料分析与核对"]'));
     const add = [...select(".agent-skill-actions").querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "添加到本次对话");
@@ -317,5 +312,28 @@ describe("assistant refinement integration", () => {
 
     await submit("请比较这两项观点");
     expect(calls("create")[0].goal).toBe("$hub-research 请比较这两项观点");
+  });
+});
+
+
+describe("site v71 assistant controls",()=>{
+  it("switches task modes without clearing the current input or dispatching a model",async()=>{
+    await render(<StandaloneInvestigation initiallyOpen startFresh/>);
+    const input=select<HTMLTextAreaElement>('[name="investigationGoal"]');await type(input,"保留这段手写草稿");
+    await activate(select<HTMLElement>('.agent-task-mode>summary'));
+    const choice=(name:string)=>[...document.querySelectorAll<HTMLButtonElement>('.agent-mode-menu button')].find(button=>button.querySelector('strong')?.textContent===name)!;
+    await activate(choice("标签助手"));expect(input.value).toBe("保留这段手写草稿");expect(select('.agent-tag-workspace')).not.toBeNull();
+    await activate(select<HTMLElement>('.agent-task-mode>summary'));await activate(choice("通用助手"));
+    expect(input.value).toBe("保留这段手写草稿");expect(select<HTMLElement>('.agent-tag-workspace').parentElement?.hidden).toBe(true);
+    expect(calls("create")).toHaveLength(0);expect(calls("respond")).toHaveLength(0);
+  });
+  it("toggles the layout directly and keeps layout choices out of conversation details",async()=>{
+    await render(<StandaloneInvestigation initiallyOpen startFresh/>);
+    const panel=select<HTMLElement>('.agent-panel');const wasDocked=panel.dataset.agentDocked;
+    await activate(select<HTMLButtonElement>('.agent-header-end>button:first-child'));
+    expect(panel.dataset.agentDocked).not.toBe(wasDocked);
+    await activate(select<HTMLButtonElement>('button[aria-label="对话详情"]'));
+    expect(select('.agent-display-controls').textContent).not.toContain('浮窗');expect(select('.agent-display-controls').textContent).not.toContain('侧边栏');
+    expect(document.querySelector('.agent-provider-budget')).toBeNull();expect(document.querySelector('.agent-followup-mode')).toBeNull();
   });
 });

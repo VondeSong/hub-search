@@ -18,7 +18,8 @@ import { useAgentPanelResize } from "./useAgentPanelResize";
 import { CodexAccountBadge } from "./CodexAccountsSettings";
 import { authorizeCodexConversation, getCodexAccountSnapshot, refreshCodexAccounts } from "./CodexAccounts";
 import { isInsideKeyboardDialog } from "./AppKeyboardScope";
-import {AgentProviderBudget} from "./AgentProviderBudget";
+import { AgentTagWorkspace } from "./AgentTagWorkspace";
+import { userProfileStorage } from "./UserProfileStorage";
 import {AgentNativeContext,type NativeContext} from "./AgentNativeContext";
 import {AgentImageCards,AgentTextFileCard,isTextAttachment,agentFileAccept,prepareImage,readTextFile} from "./AgentFileInputs";
 import {AgentImages,type ImageGrant,type ImageChange} from "./AgentImages";
@@ -28,7 +29,7 @@ import { AgentSourceScope, type SourceSelection } from "./AgentSourceScope";
 import { AgentScopeCoverage } from "./AgentScopeCoverage";
 import { useContext, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronRight, WandSparkles, FileText, ListChecks, Maximize2, Menu, MessageSquare, Minimize2, MoreHorizontal, Quote, Plus, Search, SlidersHorizontal, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronRight, WandSparkles, FileText, ListChecks, Maximize2, Menu, MessageSquare, Minimize2, PanelRight, PanelsTopLeft, MoreHorizontal, Quote, Plus, Search, X } from "lucide-react";
 import type { SearchResult } from "./SearchTypes";
 import { isTaskPreviewResult } from "./TaskResultIdentity";
 import { runtimeCapabilities } from "./RuntimePlatform";
@@ -37,7 +38,7 @@ import { useAgentUiTiming, type TimedEvent } from "./useAgentUiTiming";
 import { AgentTagAction, type AgentActions } from "./AgentTagAction";
 import { AgentAssistantOptions, defaultAssistantOptions, type AssistantOptions } from "./AgentAssistantOptions";
 import { AgentBusinessActions, ArchiveRecord, FlashcardRecord } from "./AgentBusinessActions";
-import { AgentObsidianEdit, AgentReportSave, AgentObsidianTarget } from "./AgentObsidianEdit";
+import { AgentObsidianEdit, AgentObsidianTarget } from "./AgentObsidianEdit";
 import { AgentConditions, type AgentCondition } from "./AgentConditions";
 import { codexSelectionLabel, useCodexSuite, type CodexSettings, type ModelExecution } from "./CodexSuite";
 import { SharedMemory, type MemorySelection, type MemoryUse } from "./SharedMemory";
@@ -154,7 +155,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const workControls=useRef<HTMLDetailsElement>(null);
   const materialPopover=useAgentPopover();
   const [addMenuOpen,setAddMenuOpen]=useState(false);
-  const [addPage,setAddPage]=useState<"home"|"materials"|"scope"|"skills"|"settings"|"web"|"images">("home");
+  const [addPage,setAddPage]=useState<"home"|"materials"|"scope"|"skills"|"web"|"images"|"pages">("home");
   const addBack=useRef<HTMLButtonElement>(null);
   useEffect(()=>{if(addMenuOpen){if(addPage!=="home")addBack.current?.focus();else materialPopover.ref.current?.querySelector<HTMLButtonElement>(".agent-add-choices button")?.focus();}},[addPage,addMenuOpen]);
   const panelId = useId();
@@ -200,8 +201,15 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const canEditNote=pageCanEditNote && sameNoteAnchor(anchor,pageAnchor) && (pageAttached || !!view);
   const hasDraftSources=selectedLibraries.length>0 || pageAttached || materials.length>0 || dropped.length>0 || snippets.length>0;
   const [removals, setRemovals] = useState<NoteLocator[]>([]);
+  const coreMaterialCount=new Set([...(view?.work.grant.notes||[]).filter(note=>!removals.some(removed=>materialKey(removed)===materialKey(note))).map(materialKey),...materials.map(item=>materialKey(item.locator)),...dropped.map(item=>item.locator.kind==="note"?materialKey(item.locator):JSON.stringify(item.locator)),...(!view&&pageAttached&&anchor?[anchor.kind==="note"?materialKey(anchor):JSON.stringify(anchor)]:[])]).size;
+
   const [memorySelection, setMemorySelection] = useState<MemorySelection>(loadMemoryPreference);
-  const [mode, setMode] = useState("quick");
+  const [mode] = useState("quick");
+  const [tagMode,setTagMode]=useState(false);
+  const [tagVisited,setTagVisited]=useState(false);
+  const enableTagMode=()=>{setTagVisited(true);setTagMode(true);};
+  const [pinnedSkills,setPinnedSkills]=useState<string[]>(()=>{try{const v=JSON.parse(userProfileStorage.getItem("hub.agent.pinned-skills.v1")||"[]");return Array.isArray(v)?v.filter((x:unknown)=>typeof x==="string"):[];}catch{return [];}});
+  const toggleSkillPin=(name:string)=>setPinnedSkills(current=>{const next=current.includes(name)?current.filter(x=>x!==name):[...current,name];userProfileStorage.setItem("hub.agent.pinned-skills.v1",JSON.stringify(next));return next;});
   const [draftOptions,setAssistantOptions]=useState<AssistantOptions>(loadAgentPreferences);
   const runtime = useCodexSuite();
   const assistantOptions = (draftOptions.model ?? runtime.settings)?.provider === "deepseek" ? {...draftOptions, webSearch: "disabled" as const} : draftOptions;
@@ -210,6 +218,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const [confirmMessage, setConfirmMessage] = useState(false);
   const [sourceVisible, setSourceVisible] = useState(false);
   const [reportReading, setReportReading] = useState(false);
+  const readingOrigin=useRef<{scope:string;scrollTop:number;focus:HTMLElement|null}|null>(null);
   const [sourcePreview, setSourcePreview] = useState<{excerpt: Evidence; quote: string} | null>(null);
   const [sourceError, setSourceError] = useState("");
   const [sourceLoading, setSourceLoading] = useState(false);
@@ -253,7 +262,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     document.body.classList.toggle("agent-sidebar-open", open && docked);
     return () => document.body.classList.remove("agent-sidebar-open");
   }, [open, docked, accountVisible]);
-  const { width: panelWidth, setWidth: setPanelWidth } = panelResize;
+  const { width: panelWidth } = panelResize;
   const messageIdentity = useRef<{ text: string; id: string } | null>(null);
   const manifestIdentity = useRef<{key:string;id:string}|null>(null);
   const scopeIdentity = useRef<{ key: string; id: string } | null>(null);
@@ -266,8 +275,6 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   },[view]);
   const [busy, setBusy] = useState(false);
   const [filePreparing,setFilePreparing]=useState(false);
-  const [followupMode,setFollowupMode]=useState<"steer"|"queue">("steer");
-  const alternateSend=useRef(false);
   const [pendingRun, setPendingRun] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const businessInFlight = useRef<object | null>(null);
@@ -334,7 +341,11 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       }
       return;
     }
-    if (!reportReading) return;
+    if (!reportReading) {
+      const origin=readingOrigin.current;readingOrigin.current=null;
+      if(origin?.scope===sourceScopeKey){conversationScroll.holdPosition();element.scrollTop=origin.scrollTop;origin.focus?.isConnected&&origin.focus.focus({preventScroll:true});}
+      return;
+    }
     conversationScroll.holdPosition();
     const answers=element.querySelectorAll<HTMLElement>(".agent-message-assistant");
     const latest=answers[answers.length-1] || element.querySelector<HTMLElement>(".agent-report");
@@ -470,7 +481,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       if(change.deleted && view?.work.id===work.id)newInvestigation(true);
     }catch(reason){if(alive.current)setWorksError(String(reason));throw reason;}finally{if(alive.current)setBusy(false);}
   };
-  const openCitation = async (runId: string, evidenceIndex: number, quote: string) => {
+  const openCitation = async (runId: string, evidenceIndex: number, quote: string, inline = false) => {
     if (!view || view.work.state === "revoked" || businessInFlight.current || businessChecks.current.has(view.work.id)) return;
     const ticket=++sourceSequence.current;
     const requestScope=sourceScopeKey; sourceScope.current=requestScope;
@@ -483,7 +494,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     try {
       const value=await call<{excerpt:Evidence}>({action:"source",id:view.work.id,runId,evidenceIndex,quote});
       if(alive.current && ticket===sourceSequence.current && sourceScope.current===requestScope) {
-        if (onPreviewCitation) {
+        if (onPreviewCitation && !inline) {
           setReportReading(false); setSourceVisible(true);
           onPreviewCitation({...value,quote,onReturn:()=>{if(alive.current && ticket===sourceSequence.current && sourceScope.current===requestScope)returnFromCitation();}});
         } else setSourcePreview({...value,quote});
@@ -529,10 +540,6 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       if(alive.current && ticket===sequence.current)setView(current=>current?.work.id===id?acceptLifecycleSnapshot(current,value):current);
     }catch(reason){if(alive.current && ticket===sequence.current)setError(String(reason));}
     finally{if(alive.current)setBusy(false);}
-  };
-  const saveBudget=async(request:Record<string,unknown>)=>{
-    if(!view)return;setBusy(true);
-    try{const next=await call<View>({...request,id:view.work.id,expectedWorkRevision:view.work.revision,expectedAuthorizationVersion:view.work.authorizationVersion});if(alive.current)setView(next);}finally{if(alive.current)setBusy(false);}
   };
   const buildDraftGrant=()=>{
       const grant: {libraryIds:string[];notes:InvestigationLocator[];readingItemKeys:string[];sources?:InvestigationLocator[];attachmentLibraryIds?:string[]} = !anchor ? {libraryIds:[],notes:[],readingItemKeys:[]} : anchor.kind === "reading" ? { libraryIds: [], notes: materials.map(m=>m.locator), readingItemKeys: [anchor.itemKey] } : { libraryIds: wholeLibrary ? [anchor.libraryId] : [], ...(wholeLibrary ? { attachmentLibraryIds: [anchor.libraryId] } : {}), notes: [...(anchor?.kind === "note" && pageAttached && pageAnchor ? [pageAnchor] : []),...materials.map(m=>m.locator)], ...(anchor?.kind !== "note" ? { sources: [anchor] } : {}), readingItemKeys: [] };
@@ -634,8 +641,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     if (view && (materials.length || dropped.length || removals.length || snippets.length || imagesChanged || libraryDraft!==null) && (confirmMessage || businessCheck)) { setError("请在本轮及结果核对结束后，以普通追问发送追加材料。"); return; }
     if(view && active){
       if(libraryDraft!==null||imageChanges.removeImages.length){setError("请在本轮结束后撤回资料或调整整库范围。");return;}
-      const deliveryMode=!steerable?"queue":alternateSend.current?(followupMode==="steer"?"queue":"steer"):followupMode;
-      alternateSend.current=false;
+      const deliveryMode=steerable?"steer":"queue";
       const payload={text:messageText,addNotes:materials.map(m=>m.locator),addSources:dropped.map(m=>m.locator),addImages:imageChanges.addImages,deliveryMode};
       const identity=JSON.stringify(payload);
       if(!messageIdentity.current||messageIdentity.current.text!==identity)messageIdentity.current={text:identity,id:crypto.randomUUID()};
@@ -645,7 +651,6 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         if(alive.current){setView(current=>acceptLifecycleSnapshot(current,value));setGoal(current=>current===submittedGoal?"":current);setMaterials([]);setDropped([]);setSnippets([]);setImageDraft(null);messageIdentity.current=null;}
       }catch(reason){if(alive.current)setError(String(reason));}finally{if(alive.current)setBusy(false);}return;
     }
-    alternateSend.current=false;
     conversationScroll.scrollToLatest();
     uiTiming.begin(steerable ? "steer" : view ? "revision" : "submit");
     if (view) {
@@ -825,7 +830,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     const replies=same.filter(m=>m.role==="assistant");
     const owner=replies[replies.length-1] || same[same.length-1];
     if(owner?.id!==message.id || message.revision===undefined)return null;
-    return outcomes(view?.actions?.items.filter(a=>a.kind!=="tagProposal" && a.baseRevision===message.revision) || []);
+    return <>{message.role==="assistant"&&messages.filter(m=>m.role==="assistant").slice(-1)[0]?.id===message.id&&view?.actions?.obsidianReportTarget&&<div className="agent-answer-destinations"><button type="button" disabled={businessDisabled||!!active||!!view.lifecycle?.requiresExplicitResume} onClick={()=>void businessAction({action:"prepareObsidianReportSave"})}>插入当前页面</button></div>}{outcomes(view?.actions?.items.filter(a=>a.kind!=="tagProposal" && a.baseRevision===message.revision) || [])}</>;
   };
   const report = view?.work.report;
   const nativeRun = view?.activity?.find(run=>run.runId===view.run?.id && run.native);
@@ -849,6 +854,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     setDropped(current=>current.some(m=>JSON.stringify(m.locator)===key)?current:[...current,{locator,title:(entry.title||entry.result?.title||"阅读条目").slice(0,200)}]);
   };
   const newInvestigation = (preserveHistory=false) => {
+    setTagMode(false);setTagVisited(false);
     sequence.current++; setLibraryDraft(null); setView(null); setPublicUrl(""); setAssistantOptions(loadAgentPreferences()); setGoal(""); setWholeLibrary(false); setMaterials([]);setDropped([]);setSnippets([]);setImageDraft(null); setRemovals([]);
     setMemorySelection(loadMemoryPreference()); setConfirmMessage(false); setError("");  setSourcePreview(null); setSourceError(""); setSourceLoading(false); sourceSequence.current++; messageIdentity.current=null;
     setDraftRevision(value => value + 1);
@@ -873,7 +879,6 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         {!!view.run?.usage.outputRepairs && <p className="agent-note">结果核验后已纠错 {view.run.usage.outputRepairs} 次，计入本轮调用次数与总时限。</p>}
         </details>
         {!!view.decisions.length && <details><summary>你确认的决定（{view.decisions.length}）</summary><ul>{[...view.decisions].reverse().map((item, index) => <li key={index}>{item.text}</li>)}</ul></details>}
-        {report && view.work.state !== "revoked" && <AgentReportSave actions={view.actions} disabled={businessDisabled || !!view.lifecycle?.requiresExplicitResume} onAction={businessAction} />}
         <details className="agent-more-tools" open={canEditNote && (view.work.goal === "修改当前 Obsidian 笔记" || !!view.actions?.items.some(item => item.kind === "obsidianEdit"))}><summary>记忆与后续操作</summary>
         {view.work.anchor === null && view.work.state !== "revoked" && <AgentObsidianTarget key={`target-${view.work.id}-${view.work.authorizationVersion}-${view.work.actionTargetIdentity}`} targets={view.actions?.obsidianTargets || []} current={view.work.actionTarget} disabled={businessDisabled || !!view.lifecycle?.requiresExplicitResume} onAction={businessAction}/>}
         {anchor?.kind === "note" && <AgentTagAction key={view.work.id} actions={view.actions} revoked={view.work.state === "revoked"} disabled={businessDisabled || !!view.lifecycle?.requiresExplicitResume} onAction={businessAction} />}
@@ -902,7 +907,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       onPin?.();
       if (!loaded.current) { loaded.current = true; void load(); }
     }}><span className="agent-launcher-orb" aria-hidden="true"/>助手</button>, document.body)}
-    {loaded.current && createPortal(<><div hidden={!open || docked} className="agent-panel-height-resizer" role="separator" aria-label="调整助手高度" aria-controls={panelId} aria-orientation="horizontal" aria-valuemin={panelHeightResize.minimum} aria-valuemax={panelHeightResize.maximum} aria-valuenow={panelHeightResize.width} aria-valuetext={`${panelHeightResize.width} 像素`} tabIndex={0} title="拖动调整高度，双击恢复默认" onPointerDown={panelHeightResize.onPointerDown} onKeyDown={panelHeightResize.onKeyDown} onDoubleClick={panelHeightResize.reset}/><div hidden={!open} className="agent-panel-resizer" role="separator" aria-label="调整助手宽度" aria-controls={panelId} aria-orientation="vertical" aria-valuemin={panelResize.minimum} aria-valuemax={panelResize.maximum} aria-valuenow={panelWidth} aria-valuetext={`${panelWidth} 像素`} tabIndex={0} title="拖动调整宽度，双击恢复默认" onPointerDown={panelResize.onPointerDown} onKeyDown={panelResize.onKeyDown} onDoubleClick={panelResize.reset}/><aside id={panelId} hidden={!open} data-agent-source-visible={sourceVisible} data-agent-reading={reportReading} data-hub-keyboard-scope="assistant" className="agent-investigation agent-panel" aria-label="Hub 助手" onDragOver={event=>{if(event.dataTransfer.types.includes(libraryDragType)||event.dataTransfer.types.includes("application/x-hub-agent-source")||event.dataTransfer.types.includes("Files")){event.preventDefault();event.dataTransfer.dropEffect="copy";}}} onDrop={event=>{
+    {loaded.current && createPortal(<><div hidden={!open || docked} className="agent-panel-height-resizer" role="separator" aria-label="调整助手高度" aria-controls={panelId} aria-orientation="horizontal" aria-valuemin={panelHeightResize.minimum} aria-valuemax={panelHeightResize.maximum} aria-valuenow={panelHeightResize.width} aria-valuetext={`${panelHeightResize.width} 像素`} tabIndex={0} title="拖动调整高度，双击恢复默认" onPointerDown={panelHeightResize.onPointerDown} onKeyDown={panelHeightResize.onKeyDown} onDoubleClick={panelHeightResize.reset}/><div hidden={!open} className="agent-panel-resizer" role="separator" aria-label="调整助手宽度" aria-controls={panelId} aria-orientation="vertical" aria-valuemin={panelResize.minimum} aria-valuemax={panelResize.maximum} aria-valuenow={panelWidth} aria-valuetext={`${panelWidth} 像素`} tabIndex={0} title="拖动调整宽度，双击恢复默认" onPointerDown={panelResize.onPointerDown} onKeyDown={panelResize.onKeyDown} onDoubleClick={panelResize.reset}/><aside id={panelId} hidden={!open} data-agent-source-visible={sourceVisible} data-agent-reading={reportReading} data-agent-docked={docked} data-hub-keyboard-scope="assistant" className="agent-investigation agent-panel" aria-label="Hub 助手" onDragOver={event=>{if(event.dataTransfer.types.includes(libraryDragType)||event.dataTransfer.types.includes("application/x-hub-agent-source")||event.dataTransfer.types.includes("Files")){event.preventDefault();event.dataTransfer.dropEffect="copy";}}} onDrop={event=>{
         const libraryData=event.dataTransfer.types?.includes(libraryDragType)?event.dataTransfer.getData(libraryDragType):"";
         if(libraryData){
           event.preventDefault();event.stopPropagation();
@@ -915,31 +920,35 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     }}>
       <header className="agent-panel-header">
         <div className="agent-header-start">
-        <details ref={detailsMenu} className="agent-dialogue-details" onClickCapture={event=>{const menu=event.currentTarget;if(!menu.open&&(event.target as Element).closest("summary")===menu.firstElementChild){detailsReturn.current=menu.firstElementChild as HTMLElement;setHistoryExpanded(true);}}} onToggle={event=>{if(event.target!==event.currentTarget)return;const menu=event.currentTarget;if(!menu.open&&detailsReturn.current?.isConnected&&(menu.contains(document.activeElement)||document.activeElement===document.body))detailsReturn.current.focus();}}><summary aria-label="对话历史" title="对话历史"><Menu size={18} aria-hidden="true"/></summary><div className="agent-details-content">
+        <details ref={detailsMenu} data-history={historyExpanded} className="agent-dialogue-details" onClickCapture={event=>{const menu=event.currentTarget;if(!menu.open&&(event.target as Element).closest("summary")===menu.firstElementChild){detailsReturn.current=menu.firstElementChild as HTMLElement;setHistoryExpanded(true);}}} onToggle={event=>{if(event.target!==event.currentTarget)return;const menu=event.currentTarget;if(!menu.open&&detailsReturn.current?.isConnected&&(menu.contains(document.activeElement)||document.activeElement===document.body))detailsReturn.current.focus();}}><summary aria-label="对话历史" title="对话历史"><Menu size={18} aria-hidden="true"/></summary><div className="agent-details-content">
           <div hidden={!historyExpanded} className="agent-history-container">
       <AgentConversationHistory query={historyQuery} archived={historyArchived} onQueryChange={query=>filterHistory(query,historyFilter.current.archived)} onArchivedChange={archived=>filterHistory(historyFilter.current.query,archived)} works={works} currentId={view?.work.id} disabled={busy||!!active} more={!!worksCursor} loading={worksLoading} error={worksError} states={states} onRetry={()=>void reloadWorks()} onClose={()=>{if(detailsMenu.current)detailsMenu.current.open=false;}} onMore={()=>void loadEarlierWorks()} onChange={changeHistory} onOpen={work=>{setLibraryDraft(null);setError("");setGoal("");setMaterials([]);setDropped([]);setSnippets([]);setImageDraft(null);setRemovals([]);clearSourcePreview();void refresh(work.id).then(()=>{if(detailsMenu.current)detailsMenu.current.open=false;}).catch(reason=>setError(String(reason)));}}/>
           </div>
           <div className="agent-details-sections" hidden={historyExpanded}>
           <div className="agent-details-heading"><strong>对话详情</strong><button type="button" aria-label="关闭对话详情" onClick={()=>detailsPopover.close(true)}><X size={16}/></button></div>
           <div className="agent-display-controls">
-            <button type="button" onClick={() => {if(sourceVisible)returnFromCitation();else{clearSourcePreview();setReportReading(false);setSourceVisible(true);}detailsPopover.close();}}><FileText size={16}/>{sourceVisible ? "返回对话" : "查看正文"}</button>
-            {report && view?.work.state!=="revoked" && <button type="button" className="agent-reading-toggle" aria-pressed={reportReading} disabled={!!active} onClick={()=>{clearSourcePreview();setReportReading(current=>!current);detailsPopover.close();}}>{reportReading?<Minimize2 size={16}/>:<Maximize2 size={16}/>} {reportReading?"返回对话布局":"专注阅读报告"}</button>}
-            <button type="button" aria-pressed={docked} onClick={() => {setDocked(value => !value);detailsPopover.close();}}>{docked ? <Minimize2 size={16}/> : <Maximize2 size={16}/>} {docked ? "切换为浮窗" : "展开为侧边栏"}</button>
+
+            {report && view?.work.state!=="revoked" && <button type="button" className="agent-reading-toggle" aria-pressed={reportReading} disabled={!!active} onClick={()=>{if(!reportReading)readingOrigin.current={scope:sourceScopeKey,scrollTop:conversationScroll.element.current?.scrollTop||0,focus:detailsReturn.current||goalInput.current};clearSourcePreview();setReportReading(current=>!current);detailsPopover.close();}}>{reportReading?<Minimize2 size={16}/>:<Maximize2 size={16}/>} {reportReading?"返回对话布局":"只看最新回答"}</button>}
+
             {onTopicBack&&<button type="button" disabled={busy||!!active} onClick={onTopicBack}><ArrowLeft size={16}/>返回专题所在工作</button>}
           </div>
+          <h3 className="agent-detail-group-title">资料与工具</h3>
+          <details className="agent-run-details"><summary>联网与工具</summary><AgentAssistantOptions section="connection" value={view?view.assistantOptions||defaultAssistantOptions:assistantOptions} disabled={busy||!!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/></details>
           {anchor?.kind==="note"&&canEditNote&&<AgentTopics key={`topics-${view?.work.id||draftRevision}`} anchor={anchor} work={view?.work} disabled={businessDisabled||!!active} onOpenWork={async (id,source,draft)=>{if(source&&!sameNoteAnchor(source.anchor,anchor)){if(!onOpenTopicWork)throw new Error("此入口尚不支持跨笔记继续，请从本期笔记打开原工作");onOpenTopicWork(id,source,view?.work.id,draft);return;}setLibraryDraft(null);setError("");setGoal("");setMaterials([]);setDropped([]);setRemovals([]);setSourcePreview(null);sourceSequence.current++;await refresh(id);if(alive.current){void reloadWorks();if(draft){setGoal(draft);goalInput.current?.focus();}}}}/>}
           <SharedMemory key={'details-memory-'+(view?.work.id || draftRevision)} compact workId={view?.work.id} initialSelection={memorySelection} disabled={busy || !!active} onSelectionChange={setMemorySelection} usage={view?.memoryUse}/>
           {conversationDetails}
-        <details ref={workControls} className="agent-work-controls"><summary>用量与任务{controlsNeedAttention ? " · 需要处理" : ""}</summary>
+        <details ref={workControls} className="agent-work-controls"><summary>任务状态{controlsNeedAttention ? " · 需要处理" : ""}</summary>
+        <dl className="agent-task-facts"><div><dt>任务进展</dt><dd>{active?"正在处理":view?states[view.work.state]||view.work.state:"尚未开始"}</dd></div><div><dt>对话消息</dt><dd>{view?.conversation?.messages.length||0} 条</dd></div><div><dt>上下文占用</dt><dd>{view?.nativeContext?.usedPercent==null?"尚未报告":view.nativeContext.usedPercent+"%"}</dd></div></dl>
+        {view&&<label className="agent-confirm-message"><input type="checkbox" checked={confirmMessage} disabled={busy||!!active} onChange={event=>setConfirmMessage(event.target.checked)}/>这条内容是我确认的决定</label>}
+
         {view && view.work.state!=="revoked" ? <>
-        {!businessCheck?.scopeChanging && <details><summary>任务核对详情</summary>
+        {!businessCheck?.scopeChanging && <details><summary>计划与完成情况</summary>
         {view.work.state !== "revoked" && view.goalRevision && <AgentGoalRevision value={view.goalRevision} />}
         {view.work.state !== "revoked" && view.taskTree && <AgentTaskTree value={view.taskTree} />}
         {view.work.state !== "revoked" && view.workingState && view.work.revision!==undefined && view.work.authorizationVersion!==undefined && <AgentWorkingState value={view.workingState} scope={{workId:view.work.id,currentWorkRevision:view.work.revision,authorizationVersion:view.work.authorizationVersion}}/>}
         {view.work.state !== "revoked" && view.goalAssessment && <AgentGoalAssessment value={view.goalAssessment} answered={!active && view.work.state === "completed" && report?.status === "completed"} />}
         </details>}
         <AgentMaterialBudget value={view.materialBudget}/>
-        <AgentProviderBudget key={view.work.id} value={view.lifecycle?.providerBudget} execution={view.lifecycle?.executionBudget} disabled={busy || !!active} onSave={saveBudget}/>
         <AgentNativeContext value={view.nativeContext}/>
         <AgentContextCompaction value={view.contextCompaction} disabled={busy || !!active} onRequest={()=>void changeCompaction()} onCancel={()=>void changeCompaction(true)}/>
         {view.lifecycle && <AgentLifecycle value={view.lifecycle} mode={mode} disabled={busy || !!active} onResume={()=>{uiTiming.begin("resume");void run(view.work.id,view.lifecycle);}} onCancel={()=>void mutate("cancelGoal")}/> }
@@ -949,8 +958,9 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         </div></details>
           <button type="button" title="新对话" aria-label="新对话" disabled={busy || !!active} onClick={()=>newInvestigation()}><Plus size={19} /></button>
         </div>
-        <AgentTaskMode title={chatTitle} value={mode} disabled={busy || !!active} onChange={setMode}/>
+        <AgentTaskMode title={chatTitle} disabled={busy || !!active} tagMode={tagMode} onGeneral={()=>setTagMode(false)} onTag={enableTagMode} selectedSkills={selectedSkills.map(token=>token.slice(1))} pinnedSkills={pinnedSkills} onSkill={name=>{setGoal(current=>selectedSkills.includes("$"+name)?current:('$'+name+' '+current));goalInput.current?.focus();}} onSkills={()=>{setAddPage("skills");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}} onTopics={()=>{setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;setTimeout(()=>{const node=detailsMenu.current?.querySelector<HTMLDetailsElement>(".agent-topics");if(node){node.open=true;node.querySelector("summary")?.focus();}else setError("当前专题支持可编辑的 Obsidian 笔记，请从该笔记打开。通用资料专题正在接入。");},0);}} onUsage={()=>{setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current)workControls.current.open=true;}}/>
         <div className="agent-header-end">
+          <button type="button" aria-label={docked?"切换为浮窗":"展开为侧边栏"} title={docked?"切换为浮窗":"展开为侧边栏"} onClick={()=>{setDocked(value=>!value);detailsPopover.close();}}>{docked?<PanelsTopLeft size={18}/>:<PanelRight size={18}/>}</button>
           <button type="button" title="对话详情" aria-label="对话详情" onClick={event=>{detailsReturn.current=event.currentTarget;setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-sections .agent-details-heading button")?.focus();},0);}}><MoreHorizontal size={18}/></button>
           <button type="button" title="关闭助手（Esc）" aria-label="关闭助手" onClick={closePanel}><X size={19} /></button>
         </div>
@@ -963,7 +973,8 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       {controlsNeedAttention && view?.work.state!=="revoked" && <div className="agent-task-notice" role="status"><span>{view?.materialBudget?.preflight?.allowed===false || !!view?.materialBudget?.overrunBytes ? "资料处理容量不足" : view?.lifecycle?.requiresExplicitResume ? "任务已暂停，需手动恢复" : view?.lifecycle?.usageCompleteness==="incomplete" ? "部分模型用量尚未返回" : "任务状态需要处理"}</span><button type="button" onClick={()=>{setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current){workControls.current.open=true;workControls.current.querySelector("summary")?.focus();setTimeout(()=>workControls.current?.querySelector("summary")?.focus(),0);}}}>查看任务详情</button></div>}
 
       {newSource && <div className="agent-notice"><p>正在讨论「{sourceTitle || currentObjectLabel}」。当前浏览：{newSource.title}</p><button type="button" disabled={busy || !!active} onClick={newSource.use}>用当前材料新建对话</button></div>}
-      {!view && <div className="agent-welcome">
+      <div hidden={!tagMode}>{tagVisited&&<AgentTagWorkspace/>}</div>
+      {!view && !tagMode && <div className="agent-welcome">
         <h2>{hasDraftSources?"从这份材料开始":"有什么可以帮你？"}</h2><p>{hasDraftSources?"提一个问题，或试试下面的建议。":"直接提问，或从＋添加需要使用的资料。"}</p>
         {hasDraftSources && <div className="agent-suggestions">{suggestions.map(({ label, icon: Icon, prompt }) => <button key={label} type="button" disabled={busy} onClick={() => { setGoal(prompt); goalInput.current?.focus(); }}><Icon size={18} aria-hidden="true" /><span>{label}</span></button>)}</div>}
       </div>}
@@ -1001,6 +1012,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         </div>}
         <AgentSleepDatasets workId={view.work.id} recordVersion={view.recordVersion} items={(view.sleepDatasets || []).filter(dataset => !(view.analysisArtifacts || []).some(chart => chart.content?.data.extractionDataset?.datasetId === dataset.datasetId && chart.content?.data.extractionDataset?.revision === dataset.revision))} revoked={view.work.state === "revoked"} />
         <AgentDelivery workId={view.work.id} recordVersion={view.recordVersion} report={view.conversation ? null : report ?? null} evidence={view.evidence} progress={view.activity?.length || (view.conversation && report) ? null : view.progress} history={view.conversation ? [] : view.history} running={!!running} revoked={view.work.state === "revoked"} runId={view.run?.id} onOpenCitation={(...args)=>void openCitation(...args)}/>
+        {!view.conversation&&report&&view.actions?.obsidianReportTarget&&<div className="agent-answer-destinations"><button type="button" disabled={businessDisabled||!!active||!!view.lifecycle?.requiresExplicitResume} onClick={()=>void businessAction({action:"prepareObsidianReportSave"})}>插入当前页面</button></div>}
         {sourceScope.current===sourceScopeKey && view.work.state!=="revoked" && (sourcePreview || sourceError || sourceLoading) && <section ref={sourcePreviewElement} className="agent-source-preview" aria-label="引用原文"><header><strong>{sourcePreview?.excerpt.title || (sourceLoading?"正在核对引用来源…":"引用暂不可读取")}</strong><button type="button" aria-label="关闭引用原文" onClick={returnFromCitation}>关闭</button></header>{sourceLoading ? <p role="status">正在读取当前版本的原文…</p> : sourceError ? <p role="alert">{sourceError}。可核对来源后重新打开引用。</p> : sourcePreview && <><p className="agent-note">{sourcePreview.excerpt.sourcePath} · 第 {sourcePreview.excerpt.startChar+1}–{sourcePreview.excerpt.endChar} 字符{sourcePreview.excerpt.truncated?"（原文节选）":""}</p><blockquote>{sourcePreview.excerpt.content.includes(sourcePreview.quote)?<>{sourcePreview.excerpt.content.slice(0,sourcePreview.excerpt.content.indexOf(sourcePreview.quote))}<mark>{sourcePreview.quote}</mark>{sourcePreview.excerpt.content.slice(sourcePreview.excerpt.content.indexOf(sourcePreview.quote)+sourcePreview.quote.length)}</>:sourcePreview.excerpt.content}</blockquote></>}</section>}
         {outcomes(view.actions?.items.filter(a=>a.kind!=="tagProposal" && (!view.conversation || a.baseRevision===undefined || !view.conversation.messages.some(m=>m.revision===a.baseRevision))) || [])}
         {view.draftRequest && !active && <button type="button" disabled={businessDisabled} onClick={()=>void businessAction({action:"prepareResponse",runId:view.draftRequest!.runId})}>继续准备本轮草稿</button>}
@@ -1045,31 +1057,35 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         {view?.work.state !== "revoked" && <form onSubmit={create}>
           {!!selectedSkills.length && <div className="agent-selected-skills" aria-label="本次指定技能">{selectedSkills.map(token=><span key={token}><WandSparkles size={13} aria-hidden="true"/>{skillTitle(token.slice(1))}<button type="button" aria-label={`移除技能 ${skillTitle(token.slice(1))}`} disabled={busy} onClick={()=>setGoal(selectedSkills.filter(item=>item!==token).map(item=>item+" ").join("")+questionText)}><X size={13}/></button></span>)}</div>}
           <label className="agent-question"><span className="agent-visually-hidden">{view ? "继续对话" : "希望助手做什么"}</span><textarea rows={2} ref={goalInput} name="investigationGoal" value={questionText} maxLength={(view?4000:2000)-skillPrefix.length} disabled={busy} onChange={event => setGoal(skillPrefix+event.target.value)} placeholder={view?"继续追问，或告诉我接下来做什么…":hasDraftSources?"询问 Hub 助手…":"询问 Hub 助手…"} onKeyDown={event => {
-            if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.nativeEvent.isComposing) { event.preventDefault(); alternateSend.current=event.shiftKey; event.currentTarget.form?.requestSubmit(); }
+            if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
           }} /></label>
           <div className="agent-composer-controls">
             <details ref={materialPopover.ref} className="agent-add-menu agent-popover" name="hub-agent-preference" onToggle={event=>{if(event.target!==event.currentTarget)return;setAddMenuOpen(event.currentTarget.open);if(!event.currentTarget.open)setAddPage("home");}}>
-              <summary aria-label="添加资料或技能" title="添加资料或技能"><Plus size={20} aria-hidden="true"/></summary>
-              <div className={`agent-add-content${(addPage==="materials" || addPage==="scope")?" agent-add-materials":addPage==="skills"?" agent-add-skills":""}`}>
-                <div className="agent-popover-header">{addPage==="home"?<strong>添加到本次对话</strong>:<button type="button" className="agent-menu-back" ref={addBack} onClick={()=>setAddPage("home")}><ArrowLeft size={16} aria-hidden="true"/>返回</button>}<button type="button" aria-label="关闭添加菜单" onClick={()=>materialPopover.close(true)}><X size={16} aria-hidden="true"/></button></div>
+              <summary aria-label="添加附件" title="添加附件"><Plus size={20} aria-hidden="true"/></summary>
+              <div className={`agent-add-content${(addPage==="materials" || addPage==="scope" || addPage==="pages")?" agent-add-materials":addPage==="skills"?" agent-add-skills":""}`}>
+                <div className="agent-popover-header">{addPage==="home"?<strong>添加到本次对话</strong>:<button type="button" className="agent-menu-back" ref={addBack} onClick={()=>setAddPage(addPage==="pages"?"scope":"home")}><ArrowLeft size={16} aria-hidden="true"/>返回</button>}<button type="button" aria-label="关闭添加菜单" onClick={()=>materialPopover.close(true)}><X size={16} aria-hidden="true"/></button></div>
                 {addPage==="home" && <div className="agent-add-choices">
-                  <button type="button" className="agent-menu-choice" disabled={busy||filePreparing||!!businessCheck} onClick={()=>setAddPage("materials")}><FileText size={18}/><span><strong>资料库与页面</strong><small>选择材料与允许查找的范围</small></span><ChevronRight size={15}/></button>
-                  <button type="button" className="agent-menu-choice" disabled={busy||!!active&&!steerable} onClick={()=>setAddPage("skills")}><WandSparkles size={18}/><span><strong>技能</strong><small>选择本次使用的处理方法</small></span><ChevronRight size={15}/></button>
-                  {textMaterials?.selection && <button type="button" className="agent-menu-choice" disabled={busy||filePreparing||!!view?.work.grant.manifest} onClick={()=>{addTextMaterial(textMaterials.selection!);textMaterials.clearSelection();materialPopover.close(false);goalInput.current?.focus();}}><Quote size={18}/><span><strong>添加当前所选文字</strong><small>将选中的文字作为本次对话资料</small></span><ChevronRight size={15}/></button>}
-                  <button type="button" className="agent-menu-choice" disabled={busy||filePreparing||!!businessCheck||!!view?.work.grant.manifest||!!publicUrl} onClick={()=>fileInput.current?.click()}><FileText size={18}/><span><strong>添加图片或文件</strong><small>文本每份最多 2 MiB、50 万字符；也可拖入文件或粘贴截图</small></span><ChevronRight size={15}/></button>
-                  <button type="button" className="agent-menu-choice" disabled={!!view?.work.grant.manifest || !!publicUrl} onClick={()=>setAddPage("images")}><FileText size={18}/><span><strong>从资料库添加图片</strong><small>选择已有图片，随问题一起发送</small></span><ChevronRight size={15}/></button>
-                  {!view && !pageAttached && !materials.length && <button type="button" className="agent-menu-choice" onClick={()=>setAddPage("web")}><FileText size={18}/><span><strong>读取公共链接</strong><small>发送问题时保存网页快照</small></span><ChevronRight size={15}/></button>}
-                  <button type="button" className="agent-menu-choice" onClick={()=>setAddPage("settings")}><SlidersHorizontal size={18}/><span><strong>更多设置</strong><small>任务额度、联网搜索与工具连接</small></span><ChevronRight size={15}/></button>
+                  <button type="button" className="agent-menu-choice" disabled={busy||filePreparing||!!businessCheck||!!view?.work.grant.manifest||!!publicUrl} onClick={()=>fileInput.current?.click()}><FileText size={18}/><span><strong>添加图片或文件</strong><small>也可以直接拖入或粘贴到输入框</small></span><ChevronRight size={15}/></button>
+                  <button type="button" className="agent-menu-choice" onClick={()=>{enableTagMode();materialPopover.close();}}><WandSparkles size={18}/><span><strong>添加标签</strong><small>选择目标标签并核对定义与关系</small></span><ChevronRight size={15}/></button>
+                  <p className="agent-note">资料库里的图片和文档可直接拖入，也可通过「资料范围」查找。</p>
                 </div>}
                 {addMenuOpen && addPage==="images" && <AgentImages current={selectedImages} disabled={busy || filePreparing || !!businessCheck || !!view?.work.grant.manifest || !!publicUrl} onApply={updateImages}/>}
                 {addMenuOpen && addPage==="web" && <div className="agent-add-section"><label>公共网页地址<input type="url" aria-label="公共网页地址" value={publicUrl} disabled={busy} onChange={event=>setPublicUrl(event.target.value)} placeholder="https://example.org/article"/></label><p className="agent-note">发送问题即读取并保存此公开网页。仅支持 HTTPS 文本与 HTML 源码；不登录、不跟随跳转，不加载脚本和图片。每次最多 256 KiB，30 秒超时。遇到代理虚拟地址时向 Cloudflare 加密查询域名，不发送正文。</p><button type="button" onClick={()=>{materialPopover.close(true);goalInput.current?.focus();}}>返回填写问题</button></div>}
-                {addMenuOpen && addPage==="skills" && <AgentSkills selected={selectedSkills.map(token=>token.slice(1))} onReset={()=>setGoal(questionText)} disabled={busy || (!!active && !steerable)} onSelect={name=>{setGoal(current=>new RegExp(`(^|[^a-zA-Z0-9_$\\\\-])\\$${name}(?=$|[^a-zA-Z0-9_-])`).test(current)?current:`$${name} ${current}`);materialPopover.close(false);goalInput.current?.focus();}} embedded/>}
-                {addMenuOpen && (addPage==="materials" || addPage==="scope") && <div className="agent-add-section"><strong>资料</strong>
+                {addMenuOpen && addPage==="skills" && <AgentSkills pinned={pinnedSkills} onPin={toggleSkillPin} selected={selectedSkills.map(token=>token.slice(1))} onReset={()=>setGoal(questionText)} disabled={busy || (!!active && !steerable)} onSelect={name=>{setGoal(current=>new RegExp(`(^|[^a-zA-Z0-9_$\\\\-])\\$${name}(?=$|[^a-zA-Z0-9_-])`).test(current)?current:`$${name} ${current}`);materialPopover.close(false);goalInput.current?.focus();}} embedded/>}
+                {addMenuOpen && (addPage==="materials" || addPage==="scope" || addPage==="pages") && <div className="agent-add-section"><strong>{addPage==="pages"?"核心材料":"资料范围"}</strong>
+            {addPage!=="pages"&&<div className="agent-scope-overview">
+              <details><summary>资料策略 <small>按对话设置</small></summary><p className="agent-note">只读取已授权范围。网页补充由本对话的联网设置控制。</p><AgentAssistantOptions section="connection" value={view?view.assistantOptions||defaultAssistantOptions:assistantOptions} disabled={busy||!!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/></details>
+              <button type="button" onClick={()=>setAddPage("pages")}><FileText size={16}/><strong>核心材料</strong><span>{coreMaterialCount} 份资料</span><ChevronRight size={14}/></button>
+              <details><summary>可检索的资料库 <small>{composerLibraries.length?composerLibraries.length+" 个库":"未选择"}</small></summary>{!view?.work.grant.manifest&&<AgentLibraryScope registry={libraryRegistry} selected={composerLibraries} disabled={businessDisabled||!!active||confirmMessage||view?.work.state==="revoked"} onChange={changeLibraries}/>}</details>
+              <button type="button" disabled={!canEditNote||anchor?.kind!=="note"} onClick={()=>{materialPopover.close();setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;setTimeout(()=>{const node=detailsMenu.current?.querySelector<HTMLDetailsElement>(".agent-topics");if(node)node.open=true;},0);}}>保存为专题<ChevronRight size={14}/></button>
+            </div>}
+            {addPage!=="pages"&&<div className="agent-scope-extra"><button type="button" disabled={!!view?.work.grant.manifest||!!publicUrl} onClick={()=>setAddPage("images")}>选择资料库图片</button>{!view&&!pageAttached&&!materials.length&&<button type="button" onClick={()=>setAddPage("web")}>读取公共链接</button>}</div>}
+            {addPage==="pages"&&<>
             
             {(browsing?.entry || (!view && pageAnchor)) && <button type="button" className="agent-menu-choice" disabled={busy || filePreparing || !!businessCheck || !!view?.work.grant.manifest || (!browsing?.entry && pageAttached)} onClick={()=>{if(browsing?.entry)addExternalMaterial(browsing.entry);else if(pageAnchor){setPageAttached(true);setMaterials(current=>current.filter(item=>!sameNoteAnchor(item.locator,pageAnchor)));}}}><FileText size={18}/><span><strong>{!browsing?.entry && pageAttached?"当前页面已加入":"添加当前页面"}</strong><small>{(browsing?.entry && ("result" in browsing.entry ? browsing.entry.result.title : browsing.entry.title)) || pageTitle || currentObjectLabel}</small></span></button>}
-            {!view?.work.grant.manifest && <AgentLibraryScope registry={libraryRegistry} selected={composerLibraries} disabled={businessDisabled||!!active||confirmMessage||view?.work.state==="revoked"} onChange={changeLibraries}/>}
             {!view?.work.grant.manifest && <AgentMaterials embedded onDone={()=>{materialPopover.close(false);goalInput.current?.focus();}} key={view?.work.id || draftRevision} anchor={anchor?.kind==="note" ? anchor : undefined} anchorIncluded={!!anchor && (!!view || pageAttached)} selected={materials} retained={view ? view.work.grant.notes || (anchor?.kind==="note" ? [anchor] : []) : undefined} libraryIds={view?.work.grant.libraryIds} disabled={busy || filePreparing || !!businessCheck || confirmMessage} onChange={setMaterials} removed={removals} onRemove={view&&!active ? setRemovals : undefined} onWithdraw={view&&!active ? ()=>void withdrawMaterials() : undefined}/>}
-            <details className="agent-material-advanced" key={addPage} open={addPage==="scope" || undefined}><summary>高级范围</summary><p className="agent-note">{selectedLibraries.length ? `当前库范围：${selectedLibraries.map(l=>l.name).join("、")}` : (!view && !hasDraftSources || !!view && !anchor && !view.work.grant.notes?.length) ? "未添加资料，可直接对话；可在这里添加资料" : view?.work.state==="revoked" ? "来源授权已撤回" : view?.work.grant.manifest ? `已固定授权 ${view.work.grant.manifest.members.length} 份资料` : (view ? !!view.work.grant.libraryIds.length : wholeLibrary) ? `当前范围：${view?.work.grant.libraryIds.length || 1} 个资料库` : !anchor && view ? `当前范围：${view.work.grant.notes?.length || 0} 份明确选中的文档/页面` : `当前范围：${sourceTitle || currentObjectLabel}，另有 ${view ? Math.max(0,(view.work.grant.notes?.length || 1)-1) : Math.max(0,materials.length+dropped.length-(pageAttached?0:1))} 份资料`}。添加和撤回单篇笔记请使用“+”菜单中的“资料库与页面”；原始记录与累计预算保留。</p>
+            </>}
+            <details className="agent-material-advanced" key={addPage} ><summary>固定清单与覆盖核对</summary><p className="agent-note">{selectedLibraries.length ? `当前库范围：${selectedLibraries.map(l=>l.name).join("、")}` : (!view && !hasDraftSources || !!view && !anchor && !view.work.grant.notes?.length) ? "未添加资料，可直接对话；可在这里添加资料" : view?.work.state==="revoked" ? "来源授权已撤回" : view?.work.grant.manifest ? `已固定授权 ${view.work.grant.manifest.members.length} 份资料` : (view ? !!view.work.grant.libraryIds.length : wholeLibrary) ? `当前范围：${view?.work.grant.libraryIds.length || 1} 个资料库` : !anchor && view ? `当前范围：${view.work.grant.notes?.length || 0} 份明确选中的文档/页面` : `当前范围：${sourceTitle || currentObjectLabel}，另有 ${view ? Math.max(0,(view.work.grant.notes?.length || 1)-1) : Math.max(0,materials.length+dropped.length-(pageAttached?0:1))} 份资料`}。这里的固定清单按已有版本核验；添加资料不会改动原文件。</p>
             {!view && canEditNote && anchor?.kind==="note" && <AgentSourceScope key={`source-scope-${draftRevision}`} libraryId={anchor.libraryId} disabled={busy || wholeLibrary || !!selectedLibraries.length || !!materials.length} canConfirm={!!goal.trim()} onConfirm={createSourceScope}/>}
             {view?.work.grant.manifest && view.work.revision!==undefined && view.work.authorizationVersion!==undefined && <AgentScopeCoverage key={`scope-coverage-${view.work.id}-${view.work.revision}-${view.work.authorizationVersion}-${view.recordVersion}`} workId={view.work.id} revision={view.work.revision} authorizationVersion={view.work.authorizationVersion} disabled={businessDisabled || !!active}/> }
             {view?.work.grant.manifest?.selection && anchor?.kind==="note" && <AgentSourceScope key={`scope-refresh-${view.work.id}-${view.work.revision}`} libraryId={anchor.libraryId} initialSelection={view.work.grant.manifest.selection} disabled={businessDisabled || !!active || confirmMessage} canConfirm={view.work.revision!==undefined} confirmationLabel="确认新范围，保留本对话（不启动分析）" onConfirm={replaceSourceScope}/>}
@@ -1079,22 +1095,19 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
               {!view && anchor?.kind==="note" && <label className="agent-grant"><input type="checkbox" disabled={busy} checked={composerLibraries.some(library=>library.id===anchor.libraryId)} onChange={event=>changeLibraries(event.target.checked?[...composerLibraries.filter(library=>library.id!==anchor.libraryId),{id:anchor.libraryId,name:libraryName}]:composerLibraries.filter(library=>library.id!==anchor.libraryId))}/>允许查找「{libraryName}」整个资料库的相关资料</label>}
               {!view && anchor?.kind!=="note" && <p className="agent-note">可在上方选择资料库范围，或单独添加页面。</p>}
             </div>}
-            </details></div>}
-                {addMenuOpen && addPage==="settings" && <div className="agent-add-section"><strong>更多设置</strong><p className="agent-note">任务额度：{mode==="deep"?"扩展":"标准"}。可通过顶部中间的任务模式调整。</p><label>助手宽度<input type="range" min={panelResize.minimum} max={panelResize.maximum} step="1" value={panelWidth} onChange={event=>setPanelWidth(Number(event.target.value))}/></label>{view && <label className="agent-confirm-message"><input type="checkbox" checked={confirmMessage} disabled={busy || !!active} onChange={event=>setConfirmMessage(event.target.checked)}/>这条内容是我确认的决定</label>}
-                  <details className="agent-menu-advanced"><summary>联网搜索与工具连接</summary><AgentAssistantOptions section="connection" value={(view ? view.assistantOptions || defaultAssistantOptions : assistantOptions)} disabled={busy || !!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/></details>
-                </div>}
+            </details><footer className="agent-scope-footer"><button type="button" onClick={()=>{materialPopover.close(true);goalInput.current?.focus();}}>完成</button></footer></div>}
+
               </div>
             </details>
             <AgentAssistantOptions section="permissions" value={(view ? view.assistantOptions || defaultAssistantOptions : assistantOptions)} disabled={busy || !!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
             <AgentScopeTrigger selected={composerLibraries} registry={libraryRegistry} fallbackLabel={view?.work.grant.manifest ? `固定 ${view.work.grant.manifest.members.length} 份资料` : (materials.length || dropped.length || snippets.length || (view?.work.grant.notes?.length || 0)>1) ? "已添加资料" : (pageAttached || !!anchor) ? "当前页面" : "添加资料范围"} pending={libraryDraft!==null} disabled={busy || filePreparing || !!publicUrl} onClick={()=>{setAddPage("scope");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}/>
-          <button type="button" className="agent-current-page agent-secondary-tool" aria-label="添加资料" title="资料：添加、移除与授权范围" disabled={busy || filePreparing || !!publicUrl} onClick={()=>{setAddPage("materials");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}><FileText size={18}/></button>
-          <button type="button" className="agent-current-page agent-secondary-tool" aria-label="添加技能" title="技能：选择本次使用的处理方法" disabled={busy || (!!active && !steerable)} onClick={()=>{setAddPage("skills");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}><WandSparkles size={18} aria-hidden="true"/></button>
+          <button type="button" className="agent-current-page agent-skill-shortcut" aria-label="添加技能" title="技能：选择本次使用的处理方法" disabled={busy || (!!active && !steerable)} onClick={()=>{setAddPage("skills");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}><WandSparkles size={18} aria-hidden="true"/></button>
           {textMaterials?.selection&&<button type="button" className="agent-current-page agent-selection-tool" aria-label="添加所选文字" title="添加所选文字（文字快照，不是区块）" disabled={busy||filePreparing||!!view?.work.grant.manifest} onMouseDown={event=>event.preventDefault()} onClick={()=>{addTextMaterial(textMaterials.selection!);textMaterials.clearSelection();}}><Quote size={18}/></button>}
             <AgentAssistantOptions value={(view ? view.assistantOptions || defaultAssistantOptions : assistantOptions)} disabled={busy || !!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
             {active && <button className="agent-send" type="button" aria-label="停止本轮" title="停止本轮" disabled={busy || stopping} onClick={()=>void mutate("cancel")}><Square size={13} fill="currentColor" aria-hidden="true" /></button>}
-            {(!active || !!goal.trim() || !!materials.length || !!dropped.length || !!snippets.length || !!imageChanges.addImages.length) && <button className="agent-send" type="submit" aria-label={active?(followupMode==="queue"||!steerable?"排队发送":"追加要求"):saveOnly?"保存补充":view?"发送追问":"开始调查"} aria-keyshortcuts="Control+Enter Meta+Enter" title="发送" disabled={busy || filePreparing || stopping || !!removals.length || (!goal.trim()&&!materials.length&&!dropped.length&&!snippets.length&&!imageChanges.addImages.length)}><ArrowUp size={19} /></button>}
+            {(!active || !!goal.trim() || !!materials.length || !!dropped.length || !!snippets.length || !!imageChanges.addImages.length) && <button className="agent-send" type="submit" aria-label={saveOnly&&!active?"保存补充":"发送"} aria-keyshortcuts="Control+Enter Meta+Enter" title="发送" disabled={busy || filePreparing || stopping || !!removals.length || (!goal.trim()&&!materials.length&&!dropped.length&&!snippets.length&&!imageChanges.addImages.length)}><ArrowUp size={19} /></button>}
           </div>
-          {filePreparing&&<p className="agent-composer-note" role="status">正在准备附件，可继续输入…</p>}{saveOnly&&!active&&<p className="agent-composer-note">保存补充，不启动运行</p>}{active&&<label className="agent-followup-mode">发送方式<select aria-label="运行中发送方式" value={!steerable?"queue":followupMode} onChange={e=>setFollowupMode(e.target.value as "steer"|"queue")}><option value="steer" disabled={!steerable}>立即追加</option><option value="queue">排队下一轮</option></select><span>Ctrl+Enter 发送 · 加 Shift 切换方式</span></label>}
+          {filePreparing&&<p className="agent-composer-note" role="status">正在准备附件，可继续输入…</p>}{saveOnly&&!active&&<p className="agent-composer-note">保存补充，不启动运行</p>}
         </form>}
       </div>
       </div>

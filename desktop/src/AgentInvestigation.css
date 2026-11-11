@@ -611,5 +611,3 @@ body.agent-sidebar-open > #root { width:calc(100% - min(var(--agent-panel-width,
 .agent-followups small { color:var(--hub-text-secondary); }
 .agent-followups button { margin:4px 8px 0 0; }
 .agent-followups textarea { box-sizing:border-box; width:100%; min-height:64px; resize:vertical; }
-.agent-followup-mode { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px; color:var(--hub-text-secondary); margin-top:6px; }
-.agent-followup-mode select { max-width:100%; }

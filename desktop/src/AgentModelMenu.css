@@ -98,3 +98,22 @@
   .agent-reasoning-bars i { background: GrayText; opacity: 1; }
   .agent-reasoning-bars i[data-active] { background: Highlight; }
 }
+.agent-panel .agent-model-controls .agent-assistant-options>summary { border:0; background:transparent; }
+.agent-model-controls .agent-option-effort>.agent-effort-menu { width:min(290px,calc(100cqw - 24px)); }
+.agent-model-controls .agent-effort-menu>.agent-effort-model { text-align:start; margin:0 4px 8px; color:var(--hub-text-secondary); }
+.agent-model-controls .agent-effort-levels { display:flex; flex-direction:column; gap:2px; }
+.agent-model-controls .agent-effort-levels>.agent-menu-choice { display:flex; align-items:center; gap:10px; width:100%; min-height:57px; padding:9px 10px; border:0; background:transparent; text-align:start; }
+.agent-model-controls .agent-effort-levels>.agent-menu-choice>span:not(.agent-reasoning-bars) { flex:1; }
+.agent-model-controls .agent-effort-levels strong { display:block; font-size:14px; font-weight:500; }
+.agent-model-controls .agent-effort-levels small { display:block; font-size:11px; color:var(--hub-text-secondary); line-height:1.6; margin-top:3px; }
+.agent-model-controls .agent-menu-choice[aria-pressed=true] { background:var(--hub-control-fill); }
+.agent-model-controls .agent-effort-reset { margin:6px 4px; display:flex; gap:5px; border:0; background:transparent; color:var(--hub-text-secondary); font-size:11px; }
+.agent-model-controls .agent-model-effective { margin:6px 4px 0; color:var(--hub-text-secondary); font-size:11px; }
+.agent-model-controls .agent-model-heading { display:block; margin:8px 4px; color:var(--hub-text-secondary); font-size:12px; }
+.agent-model-controls .agent-model-list .agent-menu-choice { display:flex; align-items:center; gap:10px; min-height:38px; }
+.agent-model-controls .agent-model-list .agent-menu-choice>span { flex:1; }
+.agent-provider-icon { width:20px; height:20px; object-fit:contain; flex:none; }
+.agent-model-controls .agent-speed-segments { display:flex; gap:3px; padding:3px; border-radius:10px; background:var(--hub-control-fill); margin-top:8px; }
+.agent-model-controls .agent-speed-segments>button { display:flex; flex:1; justify-content:center; align-items:center; gap:7px; min-height:34px; border:0; background:transparent; color:var(--hub-text-secondary); }
+.agent-model-controls .agent-speed-segments>button[aria-pressed=true] { color:var(--hub-text-primary); background:var(--hub-content-surface); box-shadow:0 1px 4px color-mix(in srgb,var(--hub-text-primary) 8%,transparent); }
+.agent-model-controls .agent-model-footer { flex-wrap:wrap; justify-content:space-between; font-size:10px; }

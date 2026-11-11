@@ -147,7 +147,12 @@ beforeEach(() => {
   });
 });
 afterEach(async () => { await act(async () => root.unmount()); resetCodexAccountsForTests(); host.remove(); document.body.style.direction = ""; Reflect.deleteProperty(document.body, "clientWidth"); vi.useRealTimers(); });
-const button = (text: string) => Array.from(document.body.querySelectorAll<HTMLButtonElement>("button")).find(item => (item.getAttribute("aria-label") || item.textContent)?.includes(text))!;
+const button = (label: string) => {
+ if(label==="添加资料")return document.body.querySelector<HTMLButtonElement>(".agent-scope-trigger")!;
+ if(["开始调查","发送追问","追加要求","排队发送","发送"].includes(label))return document.body.querySelector<HTMLButtonElement>('.agent-send[type="submit"]')!;
+ const text=label==="专注阅读报告"?"只看最新回答":label==="预览追加当前报告"?"插入当前页面":label;
+ return Array.from(document.body.querySelectorAll<HTMLButtonElement>("button")).find(item=>(item.getAttribute("aria-label")||item.textContent)?.includes(text))!;
+};
 async function openDialogueDetails() {
   const menu=document.body.querySelector<HTMLDetailsElement>(".agent-dialogue-details")!;
   const sections=menu.querySelector<HTMLElement>(".agent-details-sections")!;
@@ -163,6 +168,7 @@ async function openHistory() {
   expect(menu.open).toBe(true);expect(menu.querySelector<HTMLElement>(".agent-history-container")!.hidden).toBe(false);
 }
 async function revealButton(text:string) {
+  if(["添加当前页面","添加资料"].includes(text)&&!document.body.querySelector('.agent-material-picker')){await click("搜索范围：");await click("核心材料");if(text==="添加资料")return document.body.querySelector<HTMLButtonElement>('.agent-material-picker button')!;}
   const target=button(text);expect(target,text).toBeDefined();
   if (target.closest(".agent-details-sections")) {
     await openDialogueDetails();
@@ -174,14 +180,6 @@ async function revealButton(text:string) {
   return target;
 }
 const click = async (text: string) => { const target=await revealButton(text);await act(async () => target.click()); };
-async function selectTaskMode(label:"标准"|"扩展") {
-  const menu=document.body.querySelector<HTMLDetailsElement>(".agent-task-mode")!;
-  await act(async()=>menu.querySelector<HTMLElement>(":scope > summary")!.click());
-  expect(menu.open).toBe(true);
-  const choice=[...menu.querySelectorAll<HTMLButtonElement>(".agent-mode-choice")].find(item=>item.querySelector("strong")?.textContent===label)!;
-  await act(async()=>choice.click());
-  expect(menu.open).toBe(false);expect(menu.querySelector(".agent-mode-badge")?.textContent).toBe(label);
-}
 const fill = async (name: string, value: string) => {
   const input = document.body.querySelector<HTMLTextAreaElement>(`[name="${name}"]`)!;
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); });
@@ -273,7 +271,11 @@ it("reading investigations grant only the explicit item and do not assume a note
 async function openAddPage(label:string){
  if(label==="使用技能"){await click("添加技能");return;}
  if(label==="资料范围"){await click("搜索范围：");return;}
- if(label==="从笔记库添加"){await click("添加资料");return;}
+ if(label==="资料库与页面"){await click("搜索范围：");await click("核心材料");return;}
+ if(label==="从笔记库添加"){await click("搜索范围：");await click("核心材料");return;}
+ if(label==="更多设置"){await openDialogueDetails();const connection=[...document.body.querySelectorAll<HTMLDetailsElement>(".agent-details-sections details")].find(d=>d.querySelector("summary")?.textContent==="联网与工具")!;connection.open=true;connection.classList.add("agent-menu-advanced");return;}
+ if(label==="从资料库添加图片"){await click("搜索范围：");await click("选择资料库图片");return;}
+ if(label==="读取公共链接"){await click("搜索范围：");await click("读取公共链接");return;}
  const menu=document.body.querySelector<HTMLDetailsElement>(".agent-add-menu")!;
  if(menu.open){if(!menu.querySelector(".agent-add-choices"))await click("返回");}else await act(async()=>menu.querySelector<HTMLElement>(":scope > summary")!.click());
  await click(label);
@@ -283,7 +285,7 @@ async function open() { await act(async () => root.render(<AgentInvestigation re
 it("keeps scope inside the primary materials panel and removes the duplicate plus-menu entry",async()=>{
  await open();
  await act(async()=>{const d=document.body.querySelector<HTMLDetailsElement>('.agent-add-menu')!;d.open=true;d.dispatchEvent(new Event('toggle'));});
- expect(document.body.querySelector('.agent-add-choices')?.textContent).not.toContain('资料范围');
+ expect([...document.body.querySelectorAll('.agent-add-choices strong')].map(e=>e.textContent)).not.toContain('资料范围');
  await click('添加资料');
  const advanced=document.body.querySelector<HTMLDetailsElement>('.agent-material-advanced')!;
  expect(advanced.open).toBe(false);
@@ -362,14 +364,10 @@ it("opens recovery details above a stable composer while reading a saved report"
  expect(controls.closest('[hidden]')).toBeNull();expect(document.activeElement).toBe(controls.querySelector('summary'));
  expect(invoke.mock.calls.some(([,v])=>["respond","resume","create"].includes(v?.args?.action))).toBe(false);
 });
-it("returns from focused reading to the original text without leaving the narrow-window body hidden",async()=>{
- invoke.mockImplementation(async(_,{args})=>args.action==="list"?{works:[{id:current.work.id,goal:current.work.goal,state:current.work.state}]}:current);
- await open();await click("专注阅读报告");await click("查看正文");
- const panel=document.body.querySelector<HTMLElement>('.agent-panel')!;
- expect(panel.dataset.agentReading).toBe('false');expect(panel.dataset.agentSourceVisible).toBe('true');
- await click('返回对话');expect(panel.dataset.agentSourceVisible).toBe('false');
- expect(invoke.mock.calls.some(([,v])=>["respond","resume","create"].includes(v?.args?.action))).toBe(false);
+it("returns from latest-answer reading without an extra source menu",async()=>{
+ invoke.mockImplementation(async(_,{args})=>args.action==="list"?{works:[{id:current.work.id,goal:current.work.goal,state:current.work.state}]}:current);await open();await click("只看最新回答");const panel=document.body.querySelector<HTMLElement>('.agent-panel')!;expect(panel.dataset.agentReading).toBe('true');expect(button('查看正文')).toBeUndefined();await click('返回对话布局');expect(panel.dataset.agentReading).toBe('false');expect(invoke.mock.calls.some(([,v])=>['respond','resume','create'].includes(v?.args?.action))).toBe(false);
 });
+
 it("opens a Topic period on its actual note and returns to the originating Work without model dispatch",async()=>{
  const originalAnchor={documentId:"doc",kind:"note",pageId:null,libraryId:"notes"};
  const nextAnchor={documentId:"november",kind:"note",pageId:null,libraryId:"notes"};
@@ -431,18 +429,8 @@ it("keeps an unsaved supplement after commit failure without reporting saved or 
  expect(document.body.textContent).toContain("补充提交失败，结果未确认");
  expect(invoke.mock.calls.some(([,p])=>p?.args?.action==="respond")).toBe(false);
 });
-it("honours per-mode admission and starts only the permitted mode after a fresh message",async()=>{
- current={...makeView("failed"),lifecycle:quotaLifecycle(true,false)};
- invoke.mockImplementation(async(_,{args})=>args.action==="list"?{works:[{id:"work-1",goal:current.work.goal,state:current.work.state}]}:current);
- await open();
- await selectTaskMode("扩展");
- expect(button("继续调查").disabled).toBe(true);await click("继续调查");
- await fill("investigationGoal","深度额度不足时仅保存");await click("保存补充");
- expect(invoke.mock.calls.some(([,p])=>p?.args?.action==="respond")).toBe(false);
- await selectTaskMode("标准");
- expect(button("继续调查").disabled).toBe(false);
- await fill("investigationGoal","在同事项既有标准额度内处理");await click("发送追问");
- const calls=invoke.mock.calls.filter(([,p])=>p?.args?.action==="respond");expect(calls).toHaveLength(1);expect(calls[0][1].args.mode).toBe("quick");
+it("uses permitted standard execution automatically without a manual mode picker",async()=>{
+ current={...makeView("failed"),lifecycle:quotaLifecycle(true,false)};invoke.mockImplementation(async(_,{args})=>args.action==="list"?{works:[{id:"work-1",goal:current.work.goal,state:current.work.state}]}:current);await open();expect(button("继续调查").disabled).toBe(false);await fill("investigationGoal","在既有额度内处理");await click("发送");const calls=invoke.mock.calls.filter(([,p])=>p?.args?.action==="respond");expect(calls).toHaveLength(1);expect(calls[0][1].args.mode).toBe("quick");expect(document.body.querySelector('.agent-mode-badge')).toBeNull();
 });
 
 function historyFixture():typeof current {
@@ -617,7 +605,7 @@ it("resizes the assistant from its divider, clamps to the viewport limits and re
   await act(async () => window.dispatchEvent(resizePointer("pointermove", 400)));
   expect(dock.width()).toBe(640);
   await openAddPage("更多设置");
-  expect([...document.body.querySelectorAll<HTMLInputElement>('[type="range"]')].map(input => input.value)).toEqual(["640"]);
+  expect(dock.separator.getAttribute("aria-valuenow")).toBe("640");
   await act(async () => window.dispatchEvent(resizePointer("pointermove", 900)));
   expect(dock.width()).toBe(140);
   await act(async () => window.dispatchEvent(resizePointer("pointerup", 900)));
@@ -697,7 +685,7 @@ it("sends an additional user instruction into the active native turn without sta
   });
   await open();await fill('investigationGoal','整理这篇笔记');await click('开始调查');
   await act(async()=>vi.advanceTimersByTime(1600));
-  expect(button('追加要求')).toBeUndefined();
+  expect(button('追加要求')).toBeNull();
   expect(button('停止本轮').textContent).toBe('');
   expect(button('停止本轮').querySelector('svg')).not.toBeNull();
   expect(button('停止本轮').getAttribute('type')).toBe('button');
@@ -1461,7 +1449,7 @@ it("public URL is fetched only on explicit send, with no inherited library grant
   invoke.mockImplementation(async(_,{args})=>args.action==="list"?{works:[]}:current);
   await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
   await act(async()=>{const menu=document.body.querySelector<HTMLDetailsElement>(".agent-add-menu")!;menu.open=true;menu.dispatchEvent(new Event("toggle"));});
-  await click("读取公共链接");
+  await click("搜索范围：");await click("读取公共链接");
   const input=document.body.querySelector<HTMLInputElement>('[aria-label="公共网页地址"]')!;
   await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(input,"https://example.org/a");input.dispatchEvent(new Event("input",{bubbles:true}));});
   expect(invoke.mock.calls.some(([,v])=>v?.args?.action==="createFromPublicUrl")).toBe(false);
@@ -1491,7 +1479,7 @@ it("standalone material picker never offers a fabricated current page",async()=>
   await act(async()=>root.render(<StandaloneInvestigation/>));await click("Hub 助手");
   await act(async()=>{const menu=document.body.querySelector<HTMLDetailsElement>(".agent-add-menu")!;menu.open=true;menu.dispatchEvent(new Event("toggle"));});
   expect(document.body.querySelector('[aria-label="添加当前页面"]')).toBeNull();expect(button("添加资料").disabled).toBe(false);await click("添加资料");
-  expect(document.body.textContent).toContain("完成选择");
+  expect(document.body.textContent).toContain("完成");
   expect(invoke.mock.calls.some(([,v])=>v?.args?.action==="materials")).toBe(true);
 });
 it.each(["Escape","close button"])("local standalone citation returns to its original report using %s",async(method)=>{
@@ -1637,14 +1625,8 @@ it("CN05B standalone image authorization preserves options, draft and saves with
  expect(invoke.mock.calls.some(([,p])=>p?.args?.action==='respond')).toBe(true);
 });
 
-it("CN06 budget entry sends current identities and never starts analysis",async()=>{
- Object.assign(current.work,{revision:7,authorizationVersion:3});
- Object.assign(current,{lifecycle:{providerBudget:{state:"unconfigured",legacy:{measured:{inputTokens:0,uncachedInputTokens:0,outputTokens:0},unknownRuns:[]}}}});
- invoke.mockImplementation(async(_,{args})=>args.action==="list"?{works:[{id:"work-1",goal:current.work.goal,state:current.work.state}]}:current);
- await open();const check=Array.from(document.body.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(e=>e.parentElement?.textContent?.includes('确认本次额度'))!;
- await act(async()=>check.click());await click('保存预算（不启动分析）');
- const requests=invoke.mock.calls.filter(([,v])=>v?.args?.action==='freezeProviderBudget');expect(requests).toHaveLength(1);expect(requests[0][1].args).toMatchObject({id:'work-1',expectedWorkRevision:7,expectedAuthorizationVersion:3,unknownReservations:{}});
- expect(invoke.mock.calls.some(([,v])=>['respond','resume','create','message'].includes(v?.args?.action))).toBe(false);
+it("does not offer a token-budget form or start analysis from task status",async()=>{
+ Object.assign(current.work,{revision:7,authorizationVersion:3});Object.assign(current,{lifecycle:{providerBudget:{state:"unconfigured"}}});invoke.mockImplementation(async(_,{args})=>args.action==="list"?{works:[{id:"work-1",goal:current.work.goal,state:current.work.state}]}:current);await open();await openDialogueDetails();expect(document.body.querySelector('.agent-provider-budget')).toBeNull();expect(invoke.mock.calls.some(([,v])=>['freezeProviderBudget','extendProviderBudget','respond','resume'].includes(v?.args?.action))).toBe(false);
 });
 
 it.each(["completed","needsDecision","investigating"])("only labels a settled delivered answer as answered (%s)",async status=>{
@@ -1943,7 +1925,7 @@ it("stages a dropped local text file without sending and includes it only with t
  invoke.mockImplementation(async(_,{args})=>args.action==='list'?{works:[]}:args.action==='stageTextFile'?{locator,title:'核对.md',libraryName:'本地文本附件',path:'核对.md',totalChars:8}:current);
  await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
  await act(async()=>{const event=new Event('drop',{bubbles:true,cancelable:true});Object.defineProperty(event,'dataTransfer',{value:{files:[new File(['附件里的核对事项'],'核对.md',{type:'text/markdown'})]}});document.querySelector('.agent-composer')!.dispatchEvent(event);await new Promise(r=>setTimeout(r,30));});
- expect(document.querySelector('[data-material-kind="page"]')?.textContent).toContain('核对.md');
+ await vi.waitFor(async()=>{await act(async()=>{await new Promise(resolve=>setTimeout(resolve,0));});expect(document.querySelector('[data-material-kind="page"]')?.textContent).toContain('核对.md');});
  expect(invoke.mock.calls.some(([,p])=>['create','message','respond'].includes(p?.args?.action))).toBe(false);
  await fill('investigationGoal','核对附件');await click('开始调查');
  const request=invoke.mock.calls.find(([,p])=>p?.args?.action==='create')![1].args;
@@ -2033,7 +2015,7 @@ it("keeps history and menu sections visible when there are no saved conversation
  invoke.mockImplementation(async(_,{args})=>args.action==='list'?{works:[]}:current);
  await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
  const menu=document.querySelector('.agent-details-content')!;
- expect(menu.textContent).toContain('还没有历史对话');expect(menu.textContent).toContain('资料范围');expect(menu.textContent).toContain('记忆与后续操作');expect(menu.textContent).toContain('用量与任务');
+ expect(menu.textContent).toContain('还没有历史对话');expect(menu.textContent).toContain('资料范围');expect(menu.textContent).toContain('记忆与后续操作');expect(menu.textContent).toContain('任务状态');
  expect(menu.querySelector('.agent-provider-budget')).toBeNull();expect(button('停止此任务')).toBeUndefined();
 });
 
@@ -2165,7 +2147,7 @@ it("keeps stop available and suppresses verified stop errors during selected que
  expect(document.querySelector('.agent-error')).toBeNull();
 });
 
-it("keeps file-only followup and typed draft through a send failure, then queues the exact attachment",async()=>{
+it("keeps file-only followup and typed draft through a send failure, then sends the exact attachment to the running task",async()=>{
  const locator={kind:"note",libraryId:"files",documentId:"staged",pageId:null};
  current={...makeView("investigating"),activity:[{runId:"native-run",revision:1,state:"investigating",running:true,native:true,canSteer:true,startedAt:Date.now(),steps:0,events:[]}]};
  Object.assign(current.work,{authorizationVersion:7});
@@ -2185,11 +2167,11 @@ it("keeps file-only followup and typed draft through a send failure, then queues
  expect(document.body.textContent).toContain("暂时无法保存");
  expect(document.body.textContent).toContain("追加.md");
  await fill("investigationGoal","下一轮核对附件");
- await act(async()=>{const select=document.querySelector<HTMLSelectElement>('[aria-label="运行中发送方式"]')!;select.value="queue";select.dispatchEvent(new Event("change",{bubbles:true}));});
+ expect(document.querySelector('[aria-label="运行中发送方式"]')).toBeNull();
  reject=false;await click("排队发送");
  const requests=invoke.mock.calls.filter(([,p])=>p?.args?.action==="followup").map(([,p])=>p.args);
  expect(requests[0]).toMatchObject({text:"请查看本次提供的附件。",deliveryMode:"steer",addNotes:[locator]});
- expect(requests[1]).toMatchObject({text:"下一轮核对附件",deliveryMode:"queue",addNotes:[locator],expectedAuthorizationVersion:7});
+ expect(requests[1]).toMatchObject({text:"下一轮核对附件",deliveryMode:"steer",addNotes:[locator],expectedAuthorizationVersion:7});
  expect(invoke.mock.calls.some(([,p])=>["respond","message","steer"].includes(p?.args?.action))).toBe(false);
  expect(document.querySelector<HTMLTextAreaElement>('[name="investigationGoal"]')!.value).toBe("");
  read.mockRestore();

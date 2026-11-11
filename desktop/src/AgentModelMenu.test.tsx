@@ -51,27 +51,19 @@ const summary = (kind: "effort" | "model") => details(kind).querySelector("summa
 async function open(kind: "effort" | "model") {
   await act(async () => { details(kind).open = true; details(kind).dispatchEvent(new Event("toggle")); });
 }
-async function browse(provider: ModelProvider) {
-  await open("model");
-  await act(async () => [...host.querySelectorAll<HTMLButtonElement>(".agent-model-providers button")].find(button => button.textContent === (provider === "codex" ? "Codex" : "DeepSeek"))!.click());
-}
+async function browse(_provider: ModelProvider) { await open("model"); }
+
 async function choose(id: string) {
   await act(async () => host.querySelector<HTMLButtonElement>(`.agent-model-list button[title="${id}"]`)!.click());
 }
-async function setRange(index: number, interaction: "pointer" | "assistive" = "pointer") {
-  const range = host.querySelector<HTMLInputElement>('[aria-label="推理强度"]')!;
-  await act(async () => {
-    if (interaction === "pointer") range.dispatchEvent(new Event("pointerdown", { bubbles: true }));
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(range, String(index));
-    range.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  if (interaction === "pointer") await act(async () => range.dispatchEvent(new Event("pointerup", { bubbles: true })));
+async function setRange(index: number, _interaction: "pointer" | "assistive" = "pointer") {
+  await act(async () => host.querySelectorAll<HTMLButtonElement>('.agent-effort-levels button')[index].click());
 }
 
 it("uses DeepSeek's actual effort levels and never exposes speed, even with a malformed speed hint", async () => {
   catalogs.deepseek[0].fastDescription = "not a DeepSeek capability";
   await render(options("deepseek-flash", "deepseek")); await open("effort");
-  expect(host.querySelector<HTMLInputElement>('[aria-label="推理强度"]')?.max).toBe("3");
+  expect(host.querySelectorAll('.agent-effort-levels button').length).toBe(4);
   expect(host.querySelector('[aria-label="快速模式"]')).toBeNull();
   expect(host.querySelector(".agent-speed-setting")).toBeNull();
   expect(host.querySelector(".agent-model-fast-active")).toBeNull();
@@ -100,7 +92,7 @@ it.each([["fixed-fast", "high"], ["fast-no-effort", ""]])("keeps real Fast acces
   const initial = options(model, "codex", effort);
   await render(initial); await open("effort");
   expect(details("effort").hidden).toBe(false);
-  expect(host.querySelector('[aria-label="推理强度"]')).toBeNull();
+  expect(host.querySelectorAll(".agent-effort-levels button").length).toBeLessThanOrEqual(1);
   await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="快速模式"]')!.click());
   expect(save).toHaveBeenCalledExactlyOnceWith({ ...initial, model: { ...initial.model!, fast: true } });
   expect(summary("model").getAttribute("aria-label")).toContain("Fast 已开启");
@@ -147,17 +139,9 @@ it("keeps inherited global settings intact when setting or clearing a conversati
   expect(host.querySelector(".agent-model-fast-active")).toBeNull();
 });
 
-it("cancels an unfinished slider drag and dismisses with focus restored without saving", async () => {
+it("dismisses effort choices with focus restored without saving", async () => {
   await render(); await open("effort");
-  const range = host.querySelector<HTMLInputElement>('[aria-label="推理强度"]')!;
-  await act(async () => {
-    range.dispatchEvent(new Event("pointerdown", { bubbles: true }));
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(range, "0");
-    range.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  await act(async () => range.dispatchEvent(new Event("pointercancel", { bubbles: true })));
-  expect(range.value).toBe("2"); expect(save).not.toHaveBeenCalled();
-  await act(async () => { range.focus(); range.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
-  expect(details("effort").open).toBe(false);
-  expect(document.activeElement).toBe(summary("effort"));
+  const choice=host.querySelector<HTMLButtonElement>('.agent-effort-levels button')!;
+  await act(async()=>{choice.focus();choice.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}));});
+  expect(save).not.toHaveBeenCalled();expect(details("effort").open).toBe(false);expect(document.activeElement).toBe(summary("effort"));
 });

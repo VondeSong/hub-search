@@ -1,3 +1,4 @@
+import { BookOpen, Sparkles } from "lucide-react";
 import { AgentWebSources, type WebSource } from "./AgentWebSources";
 import { AgentAnswerActions } from "./AgentAnswerActions";
 import { AgentArtifactRevision } from "./AgentArtifactRevision";
@@ -20,7 +21,7 @@ export function prependConversation(current: Conversation, older: Conversation):
   const additional = older.messages.filter(message => !known.has(message.id));
   return { ...current, messages: current.messages.length ? [current.messages[0], ...additional, ...current.messages.slice(1)] : additional, hasEarlier: older.hasEarlier, nextCursor: older.nextCursor };
 }
-export type CitationOpening = (runId: string, evidenceIndex: number, quote: string) => void;
+export type CitationOpening = (runId: string, evidenceIndex: number, quote: string, inline?: boolean) => void;
 
 const ReportCitationContext = createContext<{ citations: Citation[]; evidence: Evidence[]; runId?: string; onOpenCitation?: CitationOpening }>({ citations: [], evidence: [] });
 function ReportLink({ href, children }: { href?: string; children?: ReactNode }) {
@@ -30,7 +31,7 @@ function ReportLink({ href, children }: { href?: string; children?: ReactNode })
     const citation = citations[Number(index) - 1];
     const sourceIndex = Number(citation?.evidenceId.slice(1)) - 1;
     const source = evidence[sourceIndex];
-    return citation ? <button type="button" className="agent-inline-citation" title={source?.title || "查看引用原文"} aria-label={"查看引用 " + index + "：" + (source?.title || citation.evidenceId)} disabled={!source || !runId || !onOpenCitation} onClick={() => runId && onOpenCitation?.(runId, sourceIndex, citation.quote)}>{children}</button> : <span>{children}</span>;
+    return citation ? <span className="agent-citation-actions"><button type="button" className="agent-inline-citation" title={source?.title || "查看引用原文"} aria-label={"查看引用 " + index + "：" + (source?.title || citation.evidenceId)} disabled={!source || !runId || !onOpenCitation} onClick={() => runId && onOpenCitation?.(runId, sourceIndex, citation.quote)}>{children}</button><button type="button" className="agent-citation-book" aria-label={"在助手内预览引用 " + index} title="在助手内预览原文" disabled={!source || !runId || !onOpenCitation} onClick={() => runId && onOpenCitation?.(runId, sourceIndex, citation.quote, true)}><BookOpen size={13} aria-hidden="true"/></button></span> : <span>{children}</span>;
   }
   return <a href={href} target="_blank" rel="noreferrer">{children}</a>;
 }
@@ -137,6 +138,7 @@ export function AgentConversation({ conversation, revoked, onOpenCitation, rende
         {Number.isFinite(message.createdAt)&&message.createdAt>0&&!Number.isNaN(new Date(message.createdAt).getTime())&&<time dateTime={new Date(message.createdAt).toISOString()} title={new Date(message.createdAt).toLocaleString("zh-CN",{hour12:false})}>{new Date(message.createdAt).toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit",hour12:false})}</time>}
         <AgentAnswerActions text={message.text || ""} label="消息"/>
       </div></> : <>
+        <div className="agent-message-author"><Sparkles size={14} aria-hidden="true"/><span>Hub 助手</span></div>
         {message.validity && <p className="agent-note">{revisedText ? "此前回答" : message.validity}</p>}
         {message.report && <BoundReport workId={workId} recordVersion={recordVersion} value={message} report={message.report} evidence={message.evidence || []} runId={message.runId} onOpenCitation={onOpenCitation} keepHistoricalTextVisible={revisedText} />}
       </>}

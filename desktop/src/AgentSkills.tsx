@@ -1,6 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import { useEffect, useRef, useState } from "react";
-import { WandSparkles, Check } from "lucide-react";
+import { WandSparkles, Check, Pin, PinOff } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAgentPopover } from "./useAgentPopover";
 import {AgentSkillPackages} from "./AgentSkillPackages";
@@ -20,7 +20,7 @@ const builtinTitles: Record<string,string> = {"hub-research":"资料分析与核
 export const skillTitle = (name:string) => builtinTitles[name] || name;
 const purposes: Record<string,string> = {"hub-research":"比较材料中的观点，核对原文与矛盾","hub-statistics":"统计材料中的数量、日期与覆盖范围","hub-flashcards":"根据笔记制作或检查学习卡片","hub-note-edit":"整理、改写当前可编辑的 Obsidian 笔记","hub-archive":"为阅读材料准备归档方案","hub-tool-guide":"查看标签、媒体和闪卡工具的使用约定"};
 
-export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], onReset }: { disabled: boolean; onSelect: (name: string) => void; embedded?: boolean; selected?:string[]; onReset?:()=>void }) {
+export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], onReset, pinned=[], onPin }: { disabled: boolean; onSelect: (name: string) => void; embedded?: boolean; selected?:string[]; onReset?:()=>void; pinned?:string[]; onPin?:(name:string)=>void }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -71,6 +71,7 @@ export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], o
       <span className="agent-skill-copy"><strong>{skill.title}</strong><span>{purposes[skill.name] || skill.description.split(/[。；]/)[0] || "未提供用途说明"}</span></span>
       {selected.includes(skill.name) && <Check size={16} className="agent-skill-check" aria-hidden="true"/>}
     </button>
+    {onPin && <button type="button" className="agent-skill-pin" aria-label={(pinned.includes(skill.name)?"取消置顶技能 ":"置顶技能 ")+skill.title} aria-pressed={pinned.includes(skill.name)} onClick={()=>onPin(skill.name)}>{pinned.includes(skill.name)?<PinOff size={15}/>:<Pin size={15}/>}</button>}
   </div>;
   const content = <div className="agent-skill-menu" ref={menuElement} aria-label="可用技能">
     {!embedded && <div className="agent-popover-header"><strong>使用技能</strong><button type="button" aria-label="关闭技能菜单" onClick={() => popover.close(true)}>关闭</button></div>}
