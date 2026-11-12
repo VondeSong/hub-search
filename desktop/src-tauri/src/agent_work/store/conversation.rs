@@ -51,7 +51,7 @@ pub(in crate::agent_work) fn message(root: &Path, id: &str, value: &Value) -> Re
     write(root, |c| message_on(root, c, id, value))
 }
 
-pub(super) fn message_on(
+pub(in crate::agent_work) fn message_on(
     root: &Path,
     c: &Connection,
     id: &str,

@@ -15,6 +15,7 @@ import {
   Tags,
   Layers,
   PanelLeft,
+  Sparkles,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { DesktopSidebarView } from "./DesktopSidebar";
@@ -74,6 +75,7 @@ export function WorkspaceRail({
     { view: "collections", label: "阅读", icon: <Bookmark size={17} />, count: 0 },
     { view: "tasks", label: "任务", icon: <ListTodo size={17} />, count: taskOpenCount },
     { view: "journals", label: "日志", icon: <CalendarDays size={17} />, count: journalCount },
+    { view: "insights", label: "洞察", icon: <Sparkles size={17} />, count: 0 },
     { view: "favorites", label: "收藏", icon: <Star size={17} />, count: favoriteCount },
     { view: "history", label: "最近浏览", icon: <Clock3 size={17} />, count: historyCount },
     { view: "tags", label: "标签", icon: <Tags size={17} />, count: tagCount },

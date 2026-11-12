@@ -19,8 +19,8 @@ use std::{
 // Epoch 81 adds fixed method/topic bindings. Older writers must not silently
 // ignore them when continuing work; existing data and budget roots are retained.
 // Epoch 84 installs memory proposals and provenance for existing epoch 83 databases.
-// Epoch 85 installs reusable research scopes and idempotent answer save receipts.
-pub(crate) const DATABASE_SCHEMA_VERSION: i64 = 85;
+// Epoch 86 adds durable insight identities, revisions, origins and user events.
+pub(crate) const DATABASE_SCHEMA_VERSION: i64 = 86;
 #[cfg(test)]
 mod recovery_version_tests;
 static DATABASE_INITIALIZATION_LOCK: Mutex<()> = Mutex::new(());

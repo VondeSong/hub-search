@@ -1,0 +1,11 @@
+import type { Evidence } from "./AgentDelivery";
+export type InsightSource={ evidenceId:string;quote?:string;excerpt:Evidence & {locator:unknown;version:unknown} };
+export type InsightOrigin={workId:string;runId:string;deliveryRecordId:string;deliveryHash:string;generatedAt:number};
+export type InsightSnapshot={text:string;origin:InsightOrigin;sourceCitations:InsightSource[];contextDependencies:InsightSource[];userContextRefs:{feedbackId:string;text:string;nature:string}[]};
+export type InsightReason={id:string;kind:string;active:boolean;reference?:{feedbackId?:string}};
+export type InsightEvent={id:string;kind:string;targetRevision:number;createdAt:number;restricted?:boolean;body?:{text?:string;kind?:string;feedbackId?:string;withdrawn?:boolean;[key:string]:unknown}|null};
+export type Insight={id:string;workId:string;headRevision:number;rowRevision:number;createdAt:number;updatedAt:number;processingState:"attention"|"later"|"done";snoozeUntil:number|null;followed:boolean;validity:"available"|"review"|"unavailable";reasons:InsightReason[];snapshot?:InsightSnapshot;events?:InsightEvent[];contentRevision?:number;restorePending?:boolean};
+export type InsightCandidate={findingPointer:string;eligibility:"verifiedSources"|"unavailable";text?:string;sourceCitations?:InsightSource[];reason?:string};
+export type InsightCandidates={origin:InsightOrigin;candidates:InsightCandidate[];contextOptions?:{evidenceId:string;title:string;locator:unknown;version:unknown}[];reason?:string};
+export type InsightDelivery={deliveryRecordId:string;deliveryHash:string;runId:string;generatedAt:number;findingCount:number;status:string};
+export type InsightList={items:Insight[];hasMore:boolean;nextBefore?:{createdAt:number;id:string}|null};

@@ -74,6 +74,7 @@ import { journalDataVersion, useJournalData } from "./useJournalData";
 const LazyPreviewRenderer = lazy(() => import("./PreviewRenderer").then((module) => ({ default: module.PreviewRenderer })));
 const LazySettingsDialog = lazy(() => import("./SettingsDialog").then((module) => ({ default: module.SettingsDialog })));
 const LazySettingsContent = lazy(() => import("./SettingsContent").then((module) => ({ default: module.SettingsContent })));
+const LazyInsightsWorkspace = lazy(() => import("./InsightsWorkspace").then((module) => ({ default: module.InsightsWorkspace })));
 const LazyTaskWorkspace = lazy(() => import("./TaskWorkspace").then((module) => ({ default: module.TaskWorkspace })));
 const LazyCollectionsWorkspace = lazy(() => import("./CollectionsWorkspace").then((module) => ({ default: module.CollectionsWorkspace })));
 const LazyCloudAgents = lazy(() => import("./CloudAgents"));
@@ -278,7 +279,7 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
     desktopSidebarEnabled,
     isMobileLayout,
     query,
-    view: desktopSidebarView === "collections" ? "home" : desktopSidebarView,
+    view: desktopSidebarView === "collections" || desktopSidebarView === "insights" ? "home" : desktopSidebarView,
     results,
     journalResults,
     favoriteResults: filteredFavorites,
@@ -294,6 +295,7 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
   const flashcardsActive = flashcardsStandaloneOpen || desktopSidebarView === "flashcards";
   const { flashcardDueCount, taskOpenCount, updateFlashcardDueCount, updateTaskOpenCount } = useNavigationBadges({ ready, flashcardsActive });
 
+  const insightsActive = desktopSidebarView === "insights" && !flashcardsStandaloneOpen;
   const tasksActive = desktopSidebarView === "tasks" && !flashcardsStandaloneOpen;
   const collectionsActive = desktopSidebarView === "collections" && !flashcardsStandaloneOpen;
   const sharedTasks = useUnifiedTasks({ enabled: ready && !flashcardsStandaloneOpen && (tasksActive || desktopSidebarView === "journals") });
@@ -507,7 +509,7 @@ useEffect(() => {
         return;
       }
       if (showConnection) return;
-      const searchWorkspaceActive = !collectionsActive && !tasksActive && !flashcardsActive
+      const searchWorkspaceActive = !insightsActive && !collectionsActive && !tasksActive && !flashcardsActive
         && !(isMobileLayout && mobileBrowseOpen) && !showingTagOverview;
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "f") {
         if (searchWorkspaceActive) {
@@ -571,7 +573,7 @@ useEffect(() => {
     }
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [collectionsActive, commandPaletteOpen, dateMenuOpen, filtersOpen, flashcardsActive, folderMenuOpen, isMobileLayout, mobileBrowseOpen, mobilePreviewOpen, navigatePreviewHistory, navigatePreviewMatch, openHubSearch, openSelectedResult, previewMatchCount, previewNavigation.entries.length, previewNavigation.index, previewOpen, query, rememberQuery, searchFocused, searchScopeMenuOpen, selected, showConnection, showingTagOverview, spaceMenuOpen, spaces.length, tasksActive, visibleResults.length]);
+  }, [insightsActive, collectionsActive, commandPaletteOpen, dateMenuOpen, filtersOpen, flashcardsActive, folderMenuOpen, isMobileLayout, mobileBrowseOpen, mobilePreviewOpen, navigatePreviewHistory, navigatePreviewMatch, openHubSearch, openSelectedResult, previewMatchCount, previewNavigation.entries.length, previewNavigation.index, previewOpen, query, rememberQuery, searchFocused, searchScopeMenuOpen, selected, showConnection, showingTagOverview, spaceMenuOpen, spaces.length, tasksActive, visibleResults.length]);
 
   const restoredResultIndex = useRef<number | null>(null);
   const restoreResultSelection = useCallback((index: number) => {
@@ -985,7 +987,7 @@ useEffect(() => {
       onRevealResult: revealResult,
       canRevealResult: (result) => result.provider === "obsidian" && Boolean(libraryById.get(result.libraryId)?.location),
       renderLibraryIcon: renderResultLibraryIcon,
-      collectionView: (desktopSidebarEnabled || isMobileLayout) && desktopSidebarView !== "home" && desktopSidebarView !== "flashcards" && desktopSidebarView !== "tasks" && desktopSidebarView !== "collections" && !query.trim() ? desktopSidebarView : undefined,
+      collectionView: (desktopSidebarEnabled || isMobileLayout) && desktopSidebarView !== "home" && desktopSidebarView !== "flashcards" && desktopSidebarView !== "tasks" && desktopSidebarView !== "collections" && desktopSidebarView !== "insights" && !query.trim() ? desktopSidebarView : undefined,
       selectedCollectionTag: desktopSidebarView === "tags" ? selectedSidebarTagSummary : undefined,
       selectedTagColor: selectedSidebarTagSummary
         ? resolveTagColor(tagProperties, selectedSidebarTagSummary.normalizedName)
@@ -1221,7 +1223,9 @@ useEffect(() => {
       onOpenSettings={() => setShowConnection(true)}
       onOpenSyncHealth={() => setIndexDetailsOpen(true)}
       syncNeedsAttention={Boolean(indexStatus?.failedJobs)}
-    /> : collectionsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开阅读…</div>}><LazyCollectionsWorkspace
+    /> : insightsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开洞察…</div>}><LazyInsightsWorkspace
+      onToggleDesktopSidebar={!isMobileLayout ? () => changeDesktopSidebarSetting(!desktopSidebarEnabled) : undefined}
+    /></Suspense> : collectionsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开阅读…</div>}><LazyCollectionsWorkspace
       onToggleDesktopSidebar={!isMobileLayout ? () => changeDesktopSidebarSetting(!desktopSidebarEnabled) : undefined}
     /></Suspense> : tasksActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开任务…</div>}><LazyTaskWorkspace
       libraries={spaces}

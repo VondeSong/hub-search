@@ -618,3 +618,7 @@
 .ip-original-summary small { color: var(--muted); font-size: 11px; }
 .ip-original-summary p { font-size: 13px; line-height: 1.85; }
 .ip-original-summary a { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-size: 12px; text-decoration: none; }
+
+.ip-dependency-confirmation{padding-top:18px;border-top:1px solid var(--line)}
+.ip-dependency-confirmation h4{font-size:14px}
+.ip-dependency-confirmation>p,.ip-dependency-confirmation label{font-size:12px}

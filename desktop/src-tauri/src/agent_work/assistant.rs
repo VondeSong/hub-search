@@ -113,7 +113,13 @@ pub(super) fn schema(mut base: Value) -> Value {
     base["properties"]["report"] = json!({"anyOf":[object(json!({
         "status":{"type":"string","enum":["completed","needsDecision","waiting","insufficientEvidence"]},
         "completion":store::goal::completion::schema(),"markdown":{"type":"string","minLength":1,"maxLength":runner::ANSWER_CHARS},"citations":{"type":"array","items":object(json!({"quoteId":string}))},
+        "findings":{"type":"array","maxItems":12,"description":"仅在用户要求结构化发现时交付有精确引用的独立结论；普通问答为空，不从正文自动拆段。","items":object(json!({"text":{"type":"string","minLength":1,"maxLength":6000},"citations":{"type":"array","minItems":1,"maxItems":40,"items":object(json!({"quoteId":string}))}}))},
         "questions":strings,"limitations":strings,"waitCondition":string})),{"type":"null"}]});
+    // Existing ordinary-answer callers may omit structured findings.
+    base["properties"]["report"]["anyOf"][0]["required"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|field| field != "findings");
     base["description"] = json!(runner::TOOL_ENVELOPE);
     base
 }
@@ -123,11 +129,19 @@ pub(super) fn normalize(mut value: Value, quote_catalog: &Value) -> Result<Value
         return Ok(value);
     }
     #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct PendingFinding {
+        text: String,
+        citations: Vec<Value>,
+    }
+    #[derive(Deserialize)]
     #[serde(rename_all = "camelCase", deny_unknown_fields)]
     struct Answer {
         status: String,
         markdown: String,
         citations: Vec<Value>,
+        #[serde(default)]
+        findings: Vec<PendingFinding>,
         questions: Vec<String>,
         limitations: Vec<String>,
         wait_condition: String,
@@ -156,6 +170,32 @@ pub(super) fn normalize(mut value: Value, quote_catalog: &Value) -> Result<Value
         resolved.push(json!({"evidenceId":choice["evidenceId"],"quote":choice["text"]}));
     }
     let markers = regex::Regex::new(r"\[(\d+)\]").expect("static citation pattern");
+    if answer.findings.len() > 12 {
+        return Err("结构化发现超出容量上限".into());
+    }
+    let mut findings = Vec::new();
+    for finding in answer.findings {
+        if finding.text.trim().is_empty()
+            || finding.text.chars().count() > 6000
+            || finding.citations.is_empty()
+            || finding.citations.len() > 40
+        {
+            return Err("结构化发现正文或引用不符合合同".into());
+        }
+        let mut citations = Vec::new();
+        for selected in finding.citations {
+            if selected.as_object().is_none_or(|o| o.len() != 1) {
+                return Err("发现引用只接受本轮原文编号".into());
+            }
+            let id = selected["quoteId"].as_str().ok_or("发现引用选择无效")?;
+            let chosen = quote_catalog
+                .as_array()
+                .and_then(|rows| rows.iter().find(|v| v["quoteId"] == id))
+                .ok_or("发现引用不属于本轮已读原文")?;
+            citations.push(json!({"evidenceId":chosen["evidenceId"],"quote":chosen["text"]}));
+        }
+        findings.push(json!({"text":finding.text,"citations":citations}));
+    }
     for marker in markers.captures_iter(&answer.markdown) {
         let index = marker[1].parse::<usize>().map_err(|_| "正文引用编号无效")?;
         if index == 0 || index > resolved.len() {
@@ -163,7 +203,7 @@ pub(super) fn normalize(mut value: Value, quote_catalog: &Value) -> Result<Value
         }
     }
     value["report"] = json!({"status":answer.status,"summary":answer.markdown,"completion":answer.completion,
-        "findings":[],"nextSteps":[],"questions":answer.questions,"limitations":answer.limitations,
+        "findings":findings,"nextSteps":[],"questions":answer.questions,"limitations":answer.limitations,
         "waitCondition":answer.wait_condition,"prose":{"markdown":answer.markdown,"citations":resolved}});
     Ok(value)
 }

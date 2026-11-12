@@ -51,6 +51,7 @@ pub(crate) fn migrate(c: &Connection) -> Result<(), String> {
         super::skills::migrate(c)?;
         super::research::migrate(c)?;
         super::answer_save::migrate(c)?;
+        super::insights::migrate(c)?;
         for (table,columns) in [
         ("agent_works","id,goal,success_criteria,anchor_json,grant_json,revision,authorization_version,state,active_run,report_json,updated_at"),
         ("agent_runs","id,work_id,base_revision,authorization_version,state,started_at,finished_at,error,usage_json"),

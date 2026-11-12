@@ -8,7 +8,7 @@ export type SidebarMode = "standard" | "compact" | "focus";
 export const workspaceLabels: Record<DesktopSidebarView, string> = {
   home: "全部内容", tasks: "任务", journals: "日志", favorites: "收藏",
   history: "最近浏览", tags: "标签", flashcards: "闪卡复习",
-  collections: "阅读",
+  collections: "阅读", insights: "洞察",
 };
 export function loadSidebarMode(): SidebarMode {
   try { const value = userProfileStorage.getItem("hub.sidebar.mode"); return value === "standard" || value === "focus" ? value : "compact"; }

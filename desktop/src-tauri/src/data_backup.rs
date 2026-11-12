@@ -695,6 +695,7 @@ pub(crate) fn restore(
         {
             let restored = Connection::open(staging.join(DATABASE)).map_err(|e| e.to_string())?;
             crate::shared_memory::quarantine_restored(&restored)?;
+            crate::agent_work::quarantine_insights_restored(&restored)?;
         }
         let mut mappings = vec![PathMapping {
             source_path: header.source_root,

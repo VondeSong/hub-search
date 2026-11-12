@@ -144,6 +144,7 @@ export default function InsightPanel(props: Props) {
   const [reportGroup, setReportGroup] = useState("normal");
   const [reportWork, setReportWork] = useState("all");
   const [chosenPointers, setChosenPointers] = useState<string[]>([]);
+  const [dependenciesConfirmed, setDependenciesConfirmed] = useState(false);
   const [acknowledgedFeedback, setAcknowledgedFeedback] = useState<string[]>([]);
   const [originalReport, setOriginalReport] = useState(false);
   const [operationId, setOperationId] = useState(() => ledgerId());
@@ -310,11 +311,11 @@ export default function InsightPanel(props: Props) {
       REPORT_FIXTURES.find(x => !target || x.workId === target.ownerWorkId);
     setReportId(report?.id || REPORT_FIXTURES[0]?.id);
     setReportGroup(target && candidates.length ? "revision" : "normal"); setReportWork("all");
-    setChosenPointers([]); setAcknowledgedFeedback([]); setOriginalReport(false);
+    setChosenPointers([]); setDependenciesConfirmed(false); setAcknowledgedFeedback([]); setOriginalReport(false);
     showModal({ type: "reports", targetId: target?.id, baseRevision: target?.rowRevision });
   }
   function chooseReport(report: ReportFixture) {
-    setReportId(report.id); setChosenPointers([]); setAcknowledgedFeedback([]); setOriginalReport(false); setNotice(""); setOperationId(ledgerId());
+    setReportId(report.id); setChosenPointers([]); setDependenciesConfirmed(false); setAcknowledgedFeedback([]); setOriginalReport(false); setNotice(""); setOperationId(ledgerId());
   }
   async function act(command: LedgerCommand, successMessage?: string) {
     if (busy) return null;
@@ -354,7 +355,7 @@ export default function InsightPanel(props: Props) {
     }
   }
   async function saveCandidates() {
-    if (!selectedReport || !chosenPointers.length || busy) return;
+    if (!selectedReport || !chosenPointers.length || busy || !dependenciesConfirmed) return;
     if (targetInsight && modal?.type === "reports") {
       const result = await act({
         type: "update", insightId: targetInsight.id, expectedRowRevision: modal.baseRevision!,
@@ -575,7 +576,7 @@ export default function InsightPanel(props: Props) {
             </div>
           </>}
           <details className="ip-revision-history" id="ip-revision-history"><summary><span><History size={15}/>修订与处理记录</span><span>{selected.revisions.length} 次修订<ChevronDown size={14}/></span></summary>
-            {selectedValidity !== "unavailable" && <button className="ip-text-button ip-original-link" onClick={() => { setReportId(inspectedRevision!.reportId); setReportGroup("all"); setReportWork("all"); setChosenPointers([]); setOriginalReport(true); showModal({ type: "reports" }); }}>打开原成果快照<ArrowUpRight size={13}/></button>}
+            {selectedValidity !== "unavailable" && <button className="ip-text-button ip-original-link" onClick={() => { setReportId(inspectedRevision!.reportId); setReportGroup("all"); setReportWork("all"); setChosenPointers([]); setDependenciesConfirmed(false); setOriginalReport(true); showModal({ type: "reports" }); }}>打开原成果快照<ArrowUpRight size={13}/></button>}
             {selectedValidity !== "unavailable" && <div className="ip-revisions">{selected.revisions.map(revision => <button key={revision.revision} className={(inspectedRevision?.revision === revision.revision ? "selected" : "")} onClick={() => setHistoryRevision(revision.revision === selected.headRevision ? null : revision.revision)}><span>修订 {revision.revision}{revision.revision === selected.headRevision ? " · 当前" : ""}</span><small>{dateText(revision.savedAt, true)}</small></button>)}</div>}
             <EventList events={eventsFor(selected.id).slice(0, 8)} state={state} onOpenItem={onOpenSource}/>
             {selectedValidity !== "unavailable" && inspectedRevision && <details className="ip-origin-details"><summary>查看出处与时间<ChevronDown size={13}/></summary><dl><div><dt>原工作</dt><dd>{selected.workTitle}</dd></div><div><dt>固定交付</dt><dd>{inspectedRevision.reportTitle}</dd></div><div><dt>来源截至</dt><dd>{dateText(inspectedRevision.coverageAsOf, true)}</dd></div><div><dt>成果生成</dt><dd>{dateText(inspectedRevision.generatedAt, true)}</dd></div><div><dt>发现保存</dt><dd>{dateText(inspectedRevision.savedAt, true)}</dd></div><div><dt>发现身份</dt><dd><code>{selected.id}</code></dd></div><div><dt>引用定位</dt><dd><code>{inspectedRevision.reportId} · {inspectedRevision.pointer}</code></dd></div></dl><p>身份在首次保存时分配。另一份成果的发现需要你显式关联，不会按标题或位置自动继承状态。</p></details>}
@@ -592,8 +593,8 @@ export default function InsightPanel(props: Props) {
 
     {modal?.type === "reports" && <Dialog title={targetInsight ? "更新这条发现" : "从已有成果保存发现"} subtitle={targetInsight ? "选择同一工作的新成果，明确对应的发现，再发布一个新修订。" : "只提取已发布成果中有可读引用的发现。打开这份列表不会启动分析。"} wide onClose={() => setModal(null)}>
       <div className="ip-report-browser">
-        <aside className="ip-report-nav"><div className="ip-report-filter"><label><span>{targetInsight ? "当前工作" : "事项范围"}</span>{targetInsight ? <strong>{targetInsight.workTitle}</strong> : <select aria-label="成果事项范围" value={reportWork} onChange={e => { setReportWork(e.target.value); setChosenPointers([]); }}><option value="all">全部事项</option>{Array.from(new Map(REPORT_FIXTURES.map(x => [x.workId, x.workTitle]))).map(([id, title]) => <option key={id} value={id}>{title}</option>)}</select>}</label>
-          <label><span>成果类型</span><select aria-label="成果类型" value={reportGroup} onChange={e => { setReportGroup(e.target.value); setChosenPointers([]); }}><option value="normal">已发布成果</option><option value="revision">后续核对成果</option><option value="boundary">无发现与异常示例</option><option value="all">所有示例成果</option></select></label></div>
+        <aside className="ip-report-nav"><div className="ip-report-filter"><label><span>{targetInsight ? "当前工作" : "事项范围"}</span>{targetInsight ? <strong>{targetInsight.workTitle}</strong> : <select aria-label="成果事项范围" value={reportWork} onChange={e => { setReportWork(e.target.value); setChosenPointers([]); setDependenciesConfirmed(false); }}><option value="all">全部事项</option>{Array.from(new Map(REPORT_FIXTURES.map(x => [x.workId, x.workTitle]))).map(([id, title]) => <option key={id} value={id}>{title}</option>)}</select>}</label>
+          <label><span>成果类型</span><select aria-label="成果类型" value={reportGroup} onChange={e => { setReportGroup(e.target.value); setChosenPointers([]); setDependenciesConfirmed(false); }}><option value="normal">已发布成果</option><option value="revision">后续核对成果</option><option value="boundary">无发现与异常示例</option><option value="all">所有示例成果</option></select></label></div>
           <div className="ip-report-options">{availableReports.map(report => <button key={report.id} className={reportId === report.id ? "selected" : ""} onClick={() => chooseReport(report)}><FileText size={15}/><span><strong>{report.title}</strong><small>{report.workTitle}</small><small>{dateText(report.publishedAt, true)} · {report.kind === "native" ? "原生正文" : report.findings.length + " 条候选"}</small></span><ChevronRight size={12}/></button>)}
             {!availableReports.length && <p className="ip-report-nav-empty">这个范围暂时没有成果。可以切换成果类型。</p>}</div>
         </aside>
@@ -617,7 +618,7 @@ export default function InsightPanel(props: Props) {
                 const eligible = availability.eligible && (!targetInsight || !alreadyOther) && !olderDelivery;
                 const checked = chosenPointers.includes(candidate.pointer);
                 return <div className={"ip-candidate" + (checked ? " selected" : "") + (!eligible ? " disabled" : "")} key={candidate.pointer}>
-                  <label><input type={targetInsight ? "radio" : "checkbox"} name="report-candidate" checked={checked} disabled={!eligible || busy} onChange={() => { setChosenPointers(targetInsight ? [candidate.pointer] : checked ? chosenPointers.filter(x => x !== candidate.pointer) : [...chosenPointers, candidate.pointer]); setAcknowledgedFeedback([]); setNotice(""); setOperationId(ledgerId()); }}/><span><strong>{currentAccess ? candidate.title : "来源受限，候选内容已隐藏"}</strong>{currentAccess && <p>{candidate.summary}</p>}<small>{currentAccess ? candidate.evidence.length + " 处引用 · " + categoryNames[candidate.category] : "不可发布"}</small></span></label>
+                  <label><input type={targetInsight ? "radio" : "checkbox"} name="report-candidate" checked={checked} disabled={!eligible || busy} onChange={() => { setChosenPointers(targetInsight ? [candidate.pointer] : checked ? chosenPointers.filter(x => x !== candidate.pointer) : [...chosenPointers, candidate.pointer]); setAcknowledgedFeedback([]); setDependenciesConfirmed(false); setNotice(""); setOperationId(ledgerId()); }}/><span><strong>{currentAccess ? candidate.title : "来源受限，候选内容已隐藏"}</strong>{currentAccess && <p>{candidate.summary}</p>}<small>{currentAccess ? candidate.evidence.length + " 处引用 · " + categoryNames[candidate.category] : "不可发布"}</small></span></label>
                   {currentAccess && <div className="ip-candidate-sources">{candidate.evidence.map((e, index) => <span key={index}>{e.title} · v{e.version}</span>)}</div>}
                   {(availability.reason || alreadyOther || olderDelivery) && <p className="ip-candidate-reason"><Info size={12}/>{olderDelivery ? "这份成果早于当前修订，请选择核对后的新成果。" : alreadyOther && targetInsight ? "这条候选已绑定另一条发现，不能重新分配。" : availability.reason}</p>}
                   {availability.existingInsightId && !targetInsight && <button className="ip-text-button" onClick={() => openSavedInsight(availability.existingInsightId!)}>查看已保存的发现<ArrowRight size={12}/></button>}
@@ -626,11 +627,12 @@ export default function InsightPanel(props: Props) {
               {targetInsight && chosenFinding && chosenReadable && <section className="ip-update-comparison"><h4>核对这次变化</h4><div><span>当前修订</span><p>{getVisibleFinding(state, targetInsight)?.summary || "来源不可用"}</p></div><div><span>将要发布</span><p>{chosenFinding.summary}</p></div><p className="ip-muted">{chosenFinding.changeSummary || "请确认它对应原来的这条发现；相同文字或顺序并不能自动证明身份相同。"}</p></section>}
               {targetInsight && getVisibleFinding(state, targetInsight) && unresolvedFeedback.length > 0 && <section className="ip-acknowledge"><h4>这份成果处理了哪些反馈？</h4><p>仅确认已经核对并体现在新成果中的补充。未处理的反馈会继续保留。</p>{unresolvedFeedback.map(feedback => <label key={feedback.id}><input type="checkbox" checked={acknowledgedFeedback.includes(feedback.id)} disabled={!chosenFinding || !chosenReadable || !chosenFinding.resolvesFeedback} onChange={e => setAcknowledgedFeedback(ids => e.target.checked ? [...ids, feedback.id] : ids.filter(x => x !== feedback.id))}/><span>{feedback.text}</span></label>)}</section>}
             </div>}
+            {!originalReport && chosenPointers.length > 0 && <section className="ip-acknowledge ip-dependency-confirmation"><h4>确认这次保存的依据</h4><p>每条发现只依赖它列出的引用。原工作中读过的其他资料不会自动成为依据；如结论还依赖共同背景，应先在成果中明确列出并核对。</p><label><input type="checkbox" checked={dependenciesConfirmed} disabled={busy} onChange={e => { setDependenciesConfirmed(e.target.checked); setOperationId(ledgerId()); }}/><span>我已核对所选发现的引用与适用背景，确认这些依据足以支持本次保存。</span></label></section>}
           </> : <div className="ip-report-empty"><FileText size={30}/><h3>选择一份成果</h3><p>左侧只显示当前工作与类型范围内的报告。</p></div>}
         </div>
       </div>
       {!!notice && <div className="ip-dialog-notice" role="alert"><AlertCircle size={14}/><span>{notice}</span>{conflict && targetInsight && <button onClick={() => { setModal({ ...modal, baseRevision: targetInsight.rowRevision }); setAcknowledgedFeedback([]); setConflict(false); setNotice("已载入当前修订，请重新核对后提交。"); setOperationId(ledgerId()); }}>重新核对当前修订</button>}</div>}
-      <footer className="ip-dialog-footer"><p>{targetInsight ? "更新不会清除你的反馈或改变处理状态。" : "重复保存同一候选，不会新增卡片或重置状态。"}</p><button className="ip-button" onClick={() => setModal(null)}>取消</button><button className="ip-button ip-primary" disabled={busy || !chosenPointers.length || originalReport || !availableReports.some(x => x.id === selectedReport?.id)} onClick={saveCandidates}>{busy ? "正在保存…" : targetInsight ? "核对并发布修订" : "保存所选发现" + (chosenPointers.length ? " · " + chosenPointers.length : "")}<Check size={14}/></button></footer>
+      <footer className="ip-dialog-footer"><p>{targetInsight ? "更新不会清除你的反馈或改变处理状态。" : "重复保存同一候选，不会新增卡片或重置状态。"}</p><button className="ip-button" onClick={() => setModal(null)}>取消</button><button className="ip-button ip-primary" disabled={busy || !chosenPointers.length || !dependenciesConfirmed || originalReport || !availableReports.some(x => x.id === selectedReport?.id)} onClick={saveCandidates}>{busy ? "正在保存…" : targetInsight ? "核对并发布修订" : "保存所选发现" + (chosenPointers.length ? " · " + chosenPointers.length : "")}<Check size={14}/></button></footer>
     </Dialog>}
 
     {modal?.type === "practice" && <Dialog title="把案例变成自己的实践清单" subtitle="内容可以先调整。保存后会成为 Hub 中的一份笔记，并保留这条发现与官方出处。" onClose={() => setModal(null)}>

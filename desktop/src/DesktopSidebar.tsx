@@ -170,7 +170,7 @@ const SidebarLibraryPanel = memo(function SidebarLibraryPanel({
   );
 });
 
-export type DesktopSidebarView = "home" | "tasks" | "journals" | "favorites" | "history" | "tags" | "flashcards" | "collections";
+export type DesktopSidebarView = "home" | "tasks" | "journals" | "favorites" | "history" | "tags" | "flashcards" | "collections" | "insights";
 
 type DesktopSidebarProps = {
   contextualTitle?: string;

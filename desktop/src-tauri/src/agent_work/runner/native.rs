@@ -151,6 +151,7 @@ pub(super) fn investigate(
         format!("{INSTRUCTIONS}\n本对话另行授权了 hub_mcp 的只读文档服务，与 webSearch 搜索开关独立。可按所选服务/工具查询公开文档或读取已明确选择的资源 URI；read_resource 不授权其他 URI、模板或链接；实际读取的资源 URI 可作为外部来源；先读取 catalog 格式再调用，查询宜从少量结果开始，长页面优先指定章节。不能借此访问任意网页、发送私人材料或扩展权限。MCP 结果不是 Hub 原文引文；成功调用后的来源格式与允许范围以 hub_mcp 工具说明为准，并经过宿主来源校验。自定义工具只能引用实际服务入口，不伪造文章已读证据；静态资源只能引用实际读取的 URI。自定义服务的只读声明不等于远端写入隔离。目录变化或失败后停止本轮该服务，说明限制并保留已获得结果。")
     };
     let instructions = format!("{}\n{instructions}", options.research_guide());
+    let instructions = format!("{instructions}\n用户明确要求有依据的结构化发现时，使用 hub_finish 的 findings 交付独立结论与本轮 quoteCatalog 引用；不强制固定条数。普通问答仍可直接输出自然正文，findings 为空。用户补充与资料引文分开说明，不能把用户自述写成原文引句。发现需要共同背景时在正文说明，便于用户保存时核对依赖；网页、图像、统计或未核验背景不冒充普通笔记证据。");
     let mut tool_specs = tools(context.skills.as_ref())?;
     if options.external_mcp {
         tool_specs

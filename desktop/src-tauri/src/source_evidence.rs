@@ -668,6 +668,18 @@ impl EvidenceReader {
         })
     }
 
+    /// A domain owner can check current reachability separately from staleness,
+    /// using the same authorization and database snapshot as its state commit.
+    pub(crate) fn version_in_transaction(
+        &self,
+        c: &Connection,
+        locator: &EvidenceLocator,
+    ) -> Result<EvidenceVersion, String> {
+        self.checkpoint()?;
+        let libraries = self.visible(c)?;
+        Ok(self.snapshot(c, &libraries, locator)?.version)
+    }
+
     /// Re-read rather than trusting a remembered citation or an index hit.
     pub(crate) fn verify(&self, excerpt: &EvidenceExcerpt) -> Result<(), String> {
         let current = self.read(

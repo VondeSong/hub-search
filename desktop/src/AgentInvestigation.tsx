@@ -18,6 +18,7 @@ import { AgentSkills, skillTitle } from "./AgentSkills";
 import { AgentTopics, type TopicWorkSource } from "./AgentTopics";
 import { useAgentPopover } from "./useAgentPopover";
 import { useAgentPanelResize } from "./useAgentPanelResize";
+import {useInsightWork} from "./useInsights";
 import { CodexAccountBadge } from "./CodexAccountsSettings";
 import { authorizeCodexConversation, getCodexAccountSnapshot, refreshCodexAccounts } from "./CodexAccounts";
 import { isInsideKeyboardDialog } from "./AppKeyboardScope";
@@ -124,6 +125,10 @@ export function PersistentSourceInvestigation({ result, compact = false, onPrevi
 export function StandaloneInvestigation({ initiallyOpen=false, startFresh=false }: { initiallyOpen?:boolean; startFresh?:boolean } = {}) {
   const [generation,setGeneration]=useState(0);
   return runtimeCapabilities.desktop ? <Investigation key={generation} anchor={null} libraryName="" initialOpen={initiallyOpen || generation>0} startNew={startFresh||generation>0} onNewConversation={()=>setGeneration(value=>value+1)}/> : null;
+}
+export function ExistingWorkInvestigation({workId}:{workId:string}){
+ const {source,error}=useInsightWork(workId);
+ return error?<p role="alert">{error}</p>:source?<Investigation key={source.id} anchor={source.anchor} libraryName="" initialOpen initialWorkId={source.id}/>:<p role="status">正在打开原事项…</p>;
 }
 export function ReadingInvestigation({itemKey,title}:{itemKey:string;title?:string}) {
  const open=useContext(AgentPanelContext);

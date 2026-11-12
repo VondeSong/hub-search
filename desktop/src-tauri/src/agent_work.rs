@@ -13,6 +13,7 @@ mod conversation_tests;
 #[cfg(test)]
 mod delivery_tests;
 mod images;
+mod insights;
 #[cfg(test)]
 mod memory_lifecycle_tests;
 #[cfg(test)]
@@ -50,6 +51,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
+pub(crate) use insights::quarantine_restored as quarantine_insights_restored;
 pub(crate) use store::migrate;
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -230,6 +232,7 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
         account_binding::pin(root, args)?;
     }
     match args["action"].as_str().unwrap_or("status") {
+        action if action.starts_with("insight") => insights::ui(root, args),
         "authorizeCodexConversation" => account_binding::authorize(root, args),
         action if action.starts_with("topic") => topics::ui(root, args),
         "previewSourceScope" => source_scope::preview(root, args),
