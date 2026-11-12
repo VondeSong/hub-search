@@ -953,3 +953,89 @@ async fn runtime_ignores_retired_budgets_and_keeps_upload_download_filters_indep
         .unwrap();
     assert!(local_available(&b.c(), &b.db, NS, KEY, URL).unwrap());
 }
+
+#[tokio::test]
+async fn local_intake_originals_upload_after_policy_change_without_promoting_cloud_consumers() {
+    let server = server().await;
+    let remote = store(&server);
+    let a = Device::new();
+    let b = Device::new();
+    let vault = a.root.join("source-vault");
+    fs::create_dir_all(vault.join("Telegram")).unwrap();
+    fs::create_dir_all(vault.join("99_Meta/assets")).unwrap();
+    fs::write(vault.join("99_Meta/assets/proof.png"), png()).unwrap();
+    fs::write(vault.join("Telegram/proof.md"), "---\nurl: https://t.me/hub_media_intake/1\n---\n\n正文先同步，图片后补。\n\n![图片](../99_Meta/assets/proof.png)\n").unwrap();
+    meta(
+        &a.c(),
+        "collection_storage_v1",
+        &json!({"mode":"obsidian","vaultPath":vault,"downloadMedia":true}).to_string(),
+    )
+    .unwrap();
+    let outcome = x_bookmarks::local_sources::scan(&mut a.c()).unwrap();
+    assert_eq!(outcome.changed, 1);
+    let key: String = a
+        .c()
+        .query_row(
+            "SELECT item_key FROM collection_local_source_items",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(!remote_only(&a.c(), &key).unwrap());
+    let none = crate::cloud_sync::attachments::Selection {
+        image: false,
+        video: false,
+        pdf: false,
+        other: false,
+        max_mb: 1,
+    };
+    let mut rules = crate::cloud_sync::attachments::Directions {
+        upload: none.clone(),
+        download: none,
+    };
+    let save = |d: &Device, rules: &crate::cloud_sync::attachments::Directions| {
+        meta(
+            &d.c(),
+            "cloud_attachments_reading_v1",
+            &serde_json::to_string(rules).unwrap(),
+        )
+        .unwrap();
+    };
+    save(&a, &rules);
+    save(&b, &rules);
+    a.round(&remote, "a").await;
+    b.round(&remote, "b").await;
+    assert!(remote_only(&b.c(), &key).unwrap());
+    assert_eq!(
+        stage(&b.c(), NS, "b", &policy(&b.c()).unwrap(), None).unwrap(),
+        0
+    );
+    assert!(!server
+        .state
+        .lock()
+        .unwrap()
+        .files
+        .keys()
+        .any(|k| k.contains("/blobs/")));
+    rules.upload.image = true;
+    save(&a, &rules);
+    a.round(&remote, "a").await;
+    rules.download.image = true;
+    save(&b, &rules);
+    b.round(&remote, "b").await;
+    let (post, urls) = current(&b.c(), &key).unwrap();
+    assert_eq!(urls.len(), 1);
+    let manifest = load_manifest(&b.c(), NS, &key, &post, &urls[0])
+        .unwrap()
+        .unwrap();
+    assert_eq!(manifest.state, "ready");
+    assert!(local_available(&b.c(), &b.db, NS, &key, &urls[0]).unwrap());
+    assert_eq!(
+        fs::read(local_path(&b.c(), &key, &urls[0]).unwrap()).unwrap(),
+        png()
+    );
+    assert_eq!(
+        fs::read(vault.join("99_Meta/assets/proof.png")).unwrap(),
+        png()
+    );
+}

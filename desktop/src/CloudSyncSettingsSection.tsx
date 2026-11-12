@@ -91,8 +91,10 @@ export function CloudSyncSettingsSection({
   const [connectionBusy, setConnectionBusy] = useState(false);
   const [maintenanceBusy, setMaintenanceBusy] = useState(false);
   const [error, setError] = useState("");
+  const [syncError, setSyncError] = useState("");
   const [notice, setNotice] = useState("");
   const running = useRef(false);
+  const operation = useRef(0);
   const mounted = useRef(true);
   const sectionRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -162,10 +164,27 @@ export function CloudSyncSettingsSection({
   useVisiblePolling(
     async () => {
       if (running.current) return;
-      const next = await invoke<ReadingSyncState>("get_reading_sync_status");
-      if (mounted.current) setReading(next);
-      const nextQuick = await invoke<QuickState>("get_quick_journal_settings");
-      if (mounted.current) setQuick(nextQuick);
+      const version = operation.current;
+      const [nextConnection, nextReading, nextQuick] = await Promise.all([
+        invoke<FlashcardSyncSettings>("get_flashcard_sync_settings"),
+        invoke<ReadingSyncState>("get_reading_sync_status"),
+        invoke<QuickState>("get_quick_journal_settings"),
+      ]);
+      if (!mounted.current || running.current || version !== operation.current)
+        return;
+      setConnection(nextConnection);
+      setReading(nextReading);
+      setQuick(nextQuick);
+      if (
+        !(policy?.flashcards && nextConnection.lastError) &&
+        !(policy?.reading &&
+          (nextReading.running ||
+            nextReading.lastError ||
+            nextReading.report?.media?.failed)) &&
+        !(nextQuick.settings.sync && nextQuick.supported && nextQuick.error)
+      ) {
+        setSyncError("");
+      }
     },
     active && Boolean(policy),
     5000,
@@ -174,8 +193,10 @@ export function CloudSyncSettingsSection({
   const run = async (label: string, action: () => Promise<void>) => {
     if (running.current) return;
     running.current = true;
+    operation.current += 1;
     setBusy(label);
     setError("");
+    setSyncError("");
     setNotice("");
     try {
       await action();
@@ -243,8 +264,8 @@ export function CloudSyncSettingsSection({
       }
       window.dispatchEvent(new Event("hub:reading-data-changed"));
       await changed();
-      if (failures.length) throw new Error(failures.join("；"));
-      setNotice("本轮同步结束，结果见各模块状态。");
+      if (failures.length) setSyncError(failures.join("；"));
+      else setNotice("本轮同步结束，结果见各模块状态。");
     });
   const updateQuick = (value: QuickSettings) =>
     void run("正在保存速记设置…", async () => {
@@ -348,7 +369,7 @@ export function CloudSyncSettingsSection({
             {busy}
           </p>
         )}
-        {error && <p role="alert">{error}</p>}
+        {(error || syncError) && <p role="alert">{error || syncError}</p>}
         {!busy && notice && <p role="status">{notice}</p>}
         {!policy && !busy && (
           <button

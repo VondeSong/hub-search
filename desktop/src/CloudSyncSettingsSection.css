@@ -130,7 +130,8 @@
   flex: 1;
   min-width: 0;
 }
-.cloud-sync-center .cloud-primary {
+.cloud-sync-center .cloud-primary,
+.cloud-sync-center .cloud-primary:hover:not(:disabled) {
   background: var(--cs-text);
   color: var(--cs-surface);
   border: 0;

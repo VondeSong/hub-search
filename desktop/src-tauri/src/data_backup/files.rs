@@ -410,7 +410,37 @@ fn move_file(source: &Path, target: &Path, replace: bool) -> Result<(), String> 
     }
     Ok(())
 }
-#[cfg(not(windows))]
+#[cfg(target_os = "android")]
+fn move_file(source: &Path, target: &Path, replace: bool) -> Result<(), String> {
+    use std::{ffi::CString, os::unix::ffi::OsStrExt};
+    if replace {
+        return fs::rename(source, target).map_err(io_error);
+    }
+    let from = CString::new(source.as_os_str().as_bytes()).map_err(io_error)?;
+    let to = CString::new(target.as_os_str().as_bytes()).map_err(io_error)?;
+    // Android forbids app-data hard links. The syscall keeps no-clobber atomicity on API < 30 too.
+    let result = unsafe {
+        libc::syscall(
+            libc::SYS_renameat2,
+            libc::AT_FDCWD as libc::c_long,
+            from.as_ptr(),
+            libc::AT_FDCWD as libc::c_long,
+            to.as_ptr(),
+            libc::RENAME_NOREPLACE as libc::c_uint,
+        )
+    };
+    if result == 0 {
+        return Ok(());
+    }
+    let error = std::io::Error::last_os_error();
+    if error.raw_os_error() == Some(libc::ENOSYS) {
+        // Older vendor kernels retain the previous exclusive publication path.
+        fs::hard_link(source, target).map_err(io_error)?;
+        return fs::remove_file(source).map_err(io_error);
+    }
+    Err(io_error(error))
+}
+#[cfg(not(any(windows, target_os = "android")))]
 fn move_file(source: &Path, target: &Path, replace: bool) -> Result<(), String> {
     if replace {
         fs::rename(source, target).map_err(io_error)
@@ -430,6 +460,55 @@ pub(super) fn publish_new_file(source: &Path, target: &Path) -> Result<(), Strin
     reject_links(source)?;
     reject_links(target)?;
     move_file(source, target, false)
+}
+
+#[cfg(test)]
+mod publication_tests {
+    use super::*;
+
+    #[test]
+    fn exclusive_file_publication_preserves_existing_bytes_and_has_one_race_winner() {
+        let root = std::env::temp_dir().join(format!("hub-publish-{}", identifier()));
+        fs::create_dir(&root).unwrap();
+        let first = root.join("first");
+        let second = root.join("second");
+        let target = root.join("published");
+        fs::write(&first, b"first").unwrap();
+        fs::write(&second, b"second").unwrap();
+        fs::write(&target, b"existing").unwrap();
+        assert!(publish_new_file(&first, &target).is_err());
+        assert_eq!(fs::read(&first).unwrap(), b"first");
+        assert_eq!(fs::read(&target).unwrap(), b"existing");
+        fs::remove_file(&target).unwrap();
+        let gate = std::sync::Arc::new(std::sync::Barrier::new(3));
+        let workers = [&first, &second].map(|source| {
+            let source = source.clone();
+            let target = target.clone();
+            let gate = gate.clone();
+            std::thread::spawn(move || {
+                gate.wait();
+                publish_new_file(&source, &target).is_ok()
+            })
+        });
+        gate.wait();
+        assert_eq!(
+            workers
+                .into_iter()
+                .map(|worker| worker.join().unwrap())
+                .filter(|published| *published)
+                .count(),
+            1
+        );
+        let bytes = fs::read(&target).unwrap();
+        assert!(bytes == b"first" || bytes == b"second");
+        assert_ne!(first.exists(), second.exists());
+        for file in [&first, &second, &target] {
+            if file.exists() {
+                fs::remove_file(file).unwrap();
+            }
+        }
+        fs::remove_dir(&root).unwrap();
+    }
 }
 pub(super) fn publish_new_directory(source: &Path, target: &Path) -> Result<(), String> {
     reject_links(source)?;

@@ -776,6 +776,7 @@ dependencies = [
  "infer 0.22.0",
  "jni",
  "keyring",
+ "libc",
  "lopdf",
  "notify",
  "pbkdf2",

@@ -161,6 +161,83 @@ it("does not poll when the cloud panel is inactive", async () => {
     vi.useRealTimers();
   }
 });
+it("refreshes all module results after automatic recovery and clears only the sync failure", async () => {
+  vi.useFakeTimers();
+  try {
+    let offline = true;
+    const fallback = invoke.getMockImplementation()!;
+    invoke.mockImplementation(async (command, args) => {
+      if (command === "get_flashcard_sync_settings")
+        return {
+          configured: true,
+          url: "",
+          username: "",
+          lastError: offline ? "网络不可用" : "",
+          lastSyncAt: offline ? 0 : 100,
+        };
+      if (command === "sync_flashcards") throw Error("网络不可用");
+      return fallback(command, args);
+    });
+    await load();
+    await click("立即同步");
+    expect(host.querySelector("[role=alert]")?.textContent).toContain(
+      "网络不可用",
+    );
+    const manualCalls = invoke.mock.calls.filter(([c]) =>
+      c.startsWith("sync_"),
+    ).length;
+    offline = false;
+    await act(async () => vi.advanceTimersByTimeAsync(5000));
+    expect(host.querySelector("[role=alert]")).toBeNull();
+    expect(
+      host.querySelector(".cloud-module-results")?.textContent,
+    ).not.toContain("网络不可用");
+    expect(
+      invoke.mock.calls.filter(([c]) => c.startsWith("sync_")),
+    ).toHaveLength(manualCalls);
+    await click("同步设置");
+    invoke.mockImplementation(async (command, args) => {
+      if (command === "update_cloud_sync_policy") throw Error("设置保存失败");
+      return fallback(command, args);
+    });
+    await act(async () =>
+      host.querySelector<HTMLInputElement>('[aria-label="同步阅读"]')!.click(),
+    );
+    await act(async () => vi.advanceTimersByTimeAsync(5000));
+    expect(host.querySelector("[role=alert]")?.textContent).toContain(
+      "设置保存失败",
+    );
+  } finally {
+    vi.useRealTimers();
+  }
+});
+it("does not let an older poll overwrite the result of a newer manual sync", async () => {
+  vi.useFakeTimers();
+  try {
+    const fallback = invoke.getMockImplementation()!;
+    let deferPoll = false;
+    let resolvePoll: ((value: unknown) => void) | undefined;
+    invoke.mockImplementation(async (command, args) => {
+      if (command === "get_flashcard_sync_settings" && deferPoll) {
+        deferPoll = false;
+        return new Promise((resolve) => { resolvePoll = resolve; });
+      }
+      return fallback(command, args);
+    });
+    await load();
+    deferPoll = true;
+    await act(async () => vi.advanceTimersByTimeAsync(5000));
+    expect(resolvePoll).toBeDefined();
+    await click("立即同步");
+    await act(async () => resolvePoll!({ configured: true, lastError: "过期的网络错误" }));
+    expect(host.querySelector(".cloud-module-results")?.textContent).not.toContain(
+      "过期的网络错误",
+    );
+    expect(host.querySelector(".cloud-overview-status h3")?.textContent).toBe("云同步");
+  } finally {
+    vi.useRealTimers();
+  }
+});
 
 it("keeps attachment failures visible only while their module participates", async () => {
   const fallback = invoke.getMockImplementation()!;

@@ -17,6 +17,8 @@
 
 后续真实服务验收见 [2026-11-12 专项记录](CLOUD_SYNC_ACCEPTANCE_2026-11-12.md)：三个模块经真实 OSS 的两份独立 Windows 数据库传输已通过，包含方向、补传、反向更新与大小限制。Android 编译、包身份与实体设备验收分别记录，不能以 Windows 后端或模拟器结果代替手机实机。
 
+Android 模拟器与 Windows 实际互传、三模块附件规则及断网恢复的后续检查见 [模拟器专项验收](CLOUD_SYNC_EMULATOR_2026-11-12.md)，其中记录本地来源上传、Android 原件发布和恢复状态刷新的修复；实体手机仍单独待验证。
+
 
 本文件记录共享同步中心、阅读同步、来源恢复与长期维护的当前合同。闪卡协议与恢复细节继续由 [FLASHCARD_CLOUD_SYNC.md](FLASHCARD_CLOUD_SYNC.md) 维护。
 

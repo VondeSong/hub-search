@@ -319,7 +319,7 @@ fn stage(
     only: Option<(&str, &str)>,
 ) -> Result<usize, String> {
     let keys = {
-        let mut q=c.prepare("SELECT item_key FROM collection_x_items WHERE NOT EXISTS(SELECT 1 FROM reading_cloud_items r WHERE r.item_key=collection_x_items.item_key) AND NOT EXISTS(SELECT 1 FROM collection_lifecycle l WHERE l.item_key=collection_x_items.item_key AND l.state IN ('deleted','deleting'))").map_err(|e|e.to_string())?;
+        let mut q=c.prepare("SELECT item_key FROM collection_x_items WHERE (NOT EXISTS(SELECT 1 FROM reading_cloud_items r WHERE r.item_key=collection_x_items.item_key) OR EXISTS(SELECT 1 FROM collection_local_source_items s WHERE s.item_key=collection_x_items.item_key)) AND NOT EXISTS(SELECT 1 FROM collection_lifecycle l WHERE l.item_key=collection_x_items.item_key AND l.state IN ('deleted','deleting'))").map_err(|e|e.to_string())?;
         let result = q
             .query_map([], |r| r.get::<_, String>(0))
             .map_err(|e| e.to_string())?
@@ -573,6 +573,12 @@ pub(crate) async fn update_reading_media_policy(
     )?;
     policy(&c)
 }
+fn remote_only(c: &Connection, key: &str) -> Result<bool, String> {
+    // Local intake keeps the passive cloud marker for rollback, but still owns its originals.
+    c.query_row("SELECT EXISTS(SELECT 1 FROM reading_cloud_items WHERE item_key=?1) AND NOT EXISTS(SELECT 1 FROM collection_local_source_items WHERE item_key=?1)", [key], |r| r.get(0))
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub(crate) fn reading_attachment_status(app: AppHandle, key: String) -> Result<Value, String> {
     let database = database_path(&app)?;
@@ -580,13 +586,7 @@ pub(crate) fn reading_attachment_status(app: AppHandle, key: String) -> Result<V
     x_bookmarks::storage::schema(&c)?;
     let ns = object_store::namespace(&c).unwrap_or_default();
     let (post, urls) = current(&c, &key)?;
-    let imported: bool = c
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM reading_cloud_items WHERE item_key=?1)",
-            [&key],
-            |r| r.get(0),
-        )
-        .map_err(|e| e.to_string())?;
+    let imported = remote_only(&c, &key)?;
     let mut items = Vec::new();
     for url in urls {
         let m = load_manifest(&c, &ns, &key, &post, &url)?;
@@ -635,13 +635,7 @@ pub(crate) async fn transfer_reading_attachment(
     if upload {
         {
             let c = open_database(&database)?;
-            if c.query_row(
-                "SELECT EXISTS(SELECT 1 FROM reading_cloud_items WHERE item_key=?1)",
-                [&key],
-                |r| r.get::<_, bool>(0),
-            )
-            .map_err(|e| e.to_string())?
-            {
+            if remote_only(&c, &key)? {
                 return Err("请在采集此文章的原设备上传附件".into());
             }
         }
