@@ -36,6 +36,8 @@ beforeEach(()=>{
    case "insightDeliveries":return {items:[{deliveryRecordId:"delivery-a",deliveryHash:"hash-a",generatedAt:Date.now(),findingCount:1,status:"completed",runId:"run-a"}],nextBeforeRecordId:null};
    case "insightCandidates":return {origin:store.items[0].snapshot!.origin,candidates:[{findingPointer:"/report/findings/0",text:"验证前先固定通过条件。",eligibility:"verifiedSources",sourceCitations:[source]}],contextOptions:[]};
    case "insightImport":return structuredClone({committed:true,item:store.items[0]});
+   case "insightRecall":return {scopeCount:2,candidates:[{locator:source.excerpt.locator,version:source.excerpt.version,title:"项目复盘",snippet:"本周已完成原型验证",matchStartChar:0}],limitReached:false,unavailableCandidates:0};
+   case "insightRecallSource":return structuredClone(source.excerpt);
    default:throw new Error(`Unexpected command: ${String(args.action)}`);
   }
  });
@@ -202,4 +204,38 @@ it("saves manual replacement links without completing or changing the original d
  await mount();await click("查看发现");await act(async()=>{const section=document.querySelector<HTMLDetailsElement>(".insights-relations")!;section.open=true;section.dispatchEvent(new Event("toggle"));});const choice=document.querySelector<HTMLInputElement>('input[aria-label="替代：需要保留的原发现。"]')!;expect(choice).not.toBeNull();await act(async()=>choice.click());expect(button("保存替代关系").disabled).toBe(true);
  const confirm=[...document.querySelectorAll<HTMLLabelElement>('.insights-relations label')].find(label=>label.textContent?.includes("我已核对这些发现"))!.querySelector<HTMLInputElement>('input')!;await act(async()=>confirm.click());await click("保存替代关系");
  expect(invoke.mock.calls.find(([,v])=>v.args.action==="insightRelate")?.[1].args).toMatchObject({insightId:"fresh",expectedRevision:1,supersedes:["old"]});expect(old.processingState).toBe("done");expect(old.headRevision).toBe(1);expect(fresh.headRevision).toBe(1);expect(fresh.supersedes).toEqual(["old"]);expect(document.querySelector('.insights-relations')!.textContent).toContain("1 条");
+});
+
+async function recallSearchDraft(){
+ await click("寻找旧知识");
+ const work=document.querySelector<HTMLSelectElement>('select[aria-label="原事项"]')!;
+ await act(async()=>{work.value="work-a";work.dispatchEvent(new Event("change",{bubbles:true}));});
+ const input=document.querySelector<HTMLInputElement>('.insights-recall input')!;
+ await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(input,"验证");input.dispatchEvent(new Event("input",{bubbles:true}));});
+ return input;
+}
+it("recalls only inside the selected original Work and opens version-bound text without model or writes",async()=>{
+ await mount();await recallSearchDraft();await click("在已选资料中查找");
+ expect(document.body.textContent).toContain("2 份已选笔记");
+ expect(invoke.mock.calls.find(([,v])=>v.args.action==="insightRecall")?.[1].args).toEqual({action:"insightRecall",id:"work-a",query:"验证"});
+ await click("查看原文");expect(document.querySelector('[aria-label="候选资料原文"]')?.textContent).toContain(source.excerpt.content);
+ expect(invoke.mock.calls.find(([,v])=>v.args.action==="insightRecallSource")?.[1].args.version).toEqual(source.excerpt.version);
+ await click("在原事项核对");expect(openWork).toHaveBeenCalledWith({workId:"work-a",question:{id:expect.any(String),text:expect.stringContaining('关键词 "验证"')}});
+ expect(document.querySelector('.insights-recall')).toBeNull();
+ expect(invoke.mock.calls.every(([,v])=>!["respond","resume","create","message","insightImport","insightUpdate"].includes(v.args.action))).toBe(true);
+});
+it("changing a recall query rejects a late old result",async()=>{
+ await mount();const input=await recallSearchDraft();let resolve!:(v:unknown)=>void;const original=invoke.getMockImplementation()!;
+ invoke.mockImplementation((c,v)=>v.args.action==="insightRecall"?new Promise(r=>{resolve=r;}):original(c,v));
+ await click("在已选资料中查找");
+ await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(input,"没有资料");input.dispatchEvent(new Event("input",{bubbles:true}));});
+ await act(async()=>resolve({scopeCount:2,candidates:[{title:"STALE_RECALL_SENTINEL",snippet:"old"}],limitReached:false,unavailableCandidates:0}));
+ expect(document.body.textContent).not.toContain("STALE_RECALL_SENTINEL");expect(button("在已选资料中查找").disabled).toBe(false);
+});
+it("recall source errors clear candidates, and access invalidation closes the bounded search",async()=>{
+ await mount();await recallSearchDraft();await click("在已选资料中查找");const original=invoke.getMockImplementation()!;
+ invoke.mockImplementation((c,v)=>v.args.action==="insightRecallSource"?Promise.reject(new Error("证据版本已改变")):original(c,v));
+ await click("查看原文");expect(document.body.textContent).toContain("原文未显示，请重新查找");expect(document.querySelector('[aria-label="候选资料原文"]')).toBeNull();
+ await act(async()=>listeners.get("library-registry-updated")?.({payload:{}}));
+ expect(document.querySelector('.insights-recall')).toBeNull();
 });

@@ -3,7 +3,7 @@ import { AgentPanelProvider, StandaloneAgentLauncher,AgentFlashcardMaterial,Agen
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { AgentInvestigation, ReadingInvestigation, StandaloneInvestigation, investigationAnchor } from "./AgentInvestigation";
+import { AgentInvestigation, ReadingInvestigation, StandaloneInvestigation, ExistingWorkInvestigation, investigationAnchor } from "./AgentInvestigation";
 import * as fileInputs from "./AgentFileInputs";
 import type { LibrarySummary, SearchResult } from "./SearchTypes";
 import type { AgentActions } from "./AgentTagAction";
@@ -2197,4 +2197,16 @@ it("keeps file-only followup and typed draft through a send failure, then sends 
  expect(invoke.mock.calls.some(([,p])=>["respond","message","steer"].includes(p?.args?.action))).toBe(false);
  expect(document.querySelector<HTMLTextAreaElement>('[name="investigationGoal"]')!.value).toBe("");
  read.mockRestore();
+});
+
+it.each([null,{kind:"note",libraryId:"notes",documentId:"doc",pageId:null},{kind:"reading",itemKey:"reading-item"},{kind:"task",libraryId:"notes",sourceId:"task"},{kind:"attachment",libraryId:"notes",documentId:"doc",sourceItemId:"pdf",chunkId:"chunk",pageNumber:1}])("association handoff preserves an unsent draft for the original Work anchor %j",async anchor=>{
+ Object.assign(current.work,{anchor});
+ const question={id:"recall-1",text:"请核对孔位验证与旧知识的适用条件；验证是否完成需要原文依据。"};
+ await act(async()=>root.render(<ExistingWorkInvestigation workId="work-1" question={question}/>));
+ const input=document.querySelector<HTMLTextAreaElement>('textarea[name="investigationGoal"]')!;
+ expect(input.value).toBe("");expect(document.body.textContent).toContain("不会自动发送");
+ await click("使用关联核对提问");expect(input.value).toBe(question.text);
+ await act(async()=>root.render(<ExistingWorkInvestigation workId="work-1" question={{id:"recall-2",text:"不得覆盖现有输入"}}/>));
+ expect(input.value).toBe(question.text);expect(button("使用关联核对提问").disabled).toBe(true);
+ expect(invoke.mock.calls.some(([,v])=>["create","message","respond","resume"].includes(v?.args?.action))).toBe(false);
 });

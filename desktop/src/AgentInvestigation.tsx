@@ -1,6 +1,6 @@
 import {AgentFollowups,type Followup} from "./AgentFollowups";
 import { loadAgentPreferences, rememberAgentPreferences, loadCodexWebSearchPreference, loadMemoryPreference, rememberMemoryPreference } from "./AgentPreferences";
-import { AgentTagRequestContext, AgentCitationContext, AgentBrowsingContext, AgentPanelContext,AgentAccountVisibleContext,AgentTextMaterialContext,type TextMaterial } from "./StandaloneAgentLauncher";
+import { AgentTagRequestContext, AgentCitationContext, AgentBrowsingContext, AgentPanelContext,AgentAccountVisibleContext,AgentTextMaterialContext,type TextMaterial,type AgentQuestion } from "./StandaloneAgentLauncher";
 import {AgentMaterialCard} from "./AgentMaterialCard";
 import {AgentConversationHistory,type WorkSummary,type HistoryChange} from "./AgentConversationHistory";
 import { AgentAnswerSave, type AnswerSave } from "./AgentAnswerSave";
@@ -78,6 +78,13 @@ function historyViewScope(view: View | null) {
 function sameNoteAnchor(a:InvestigationLocator|null|undefined,b:InvestigationLocator|null|undefined){
   return a?.kind==="note"&&b?.kind==="note"&&a.libraryId===b.libraryId&&a.documentId===b.documentId&&a.pageId===b.pageId;
 }
+function sameWorkAnchor(a:InvestigationLocator|null|undefined,b:InvestigationLocator|null|undefined){
+ if(!a||!b)return !a&&!b;
+ if(a.kind==="note")return sameNoteAnchor(a,b);
+ if(a.kind==="reading")return b.kind==="reading"&&a.itemKey===b.itemKey;
+ if(a.kind==="task")return b.kind==="task"&&a.libraryId===b.libraryId&&a.sourceId===b.sourceId;
+ return b.kind==="attachment"&&a.libraryId===b.libraryId&&a.documentId===b.documentId&&a.sourceItemId===b.sourceItemId&&a.chunkId===b.chunkId&&a.pageNumber===b.pageNumber;
+}
 type WorkListCursor = { updatedAt: number; id: string; pinned?:boolean; anchor: InvestigationLocator | null; query?:string; archived?:boolean };
 type WorkListPage = { works: WorkSummary[]; nextCursor?: WorkListCursor | null };
 const states: Record<string, string> = { paused: "本轮已停止", cancelled: "目标已取消", ready: "可以开始", investigating: "正在处理", completed: "本轮已完成", needsDecision: "需要你的决定", waiting: "等待条件满足", insufficientEvidence: "证据不足", interrupted: "已中断，可继续", failed: "本次调查失败", expired: "需要重新核对来源", revoked: "授权已撤回" };
@@ -126,9 +133,9 @@ export function StandaloneInvestigation({ initiallyOpen=false, startFresh=false 
   const [generation,setGeneration]=useState(0);
   return runtimeCapabilities.desktop ? <Investigation key={generation} anchor={null} libraryName="" initialOpen={initiallyOpen || generation>0} startNew={startFresh||generation>0} onNewConversation={()=>setGeneration(value=>value+1)}/> : null;
 }
-export function ExistingWorkInvestigation({workId}:{workId:string}){
+export function ExistingWorkInvestigation({workId,question}:{workId:string;question?:AgentQuestion}){
  const {source,error}=useInsightWork(workId);
- return error?<p role="alert">{error}</p>:source?<Investigation key={source.id} anchor={source.anchor} libraryName="" initialOpen initialWorkId={source.id}/>:<p role="status">正在打开原事项…</p>;
+ return error?<p role="alert">{error}</p>:source?<Investigation key={source.id} anchor={source.anchor} libraryName="" initialOpen initialWorkId={source.id} suggestedQuestion={question}/>:<p role="status">正在打开原事项…</p>;
 }
 export function ReadingInvestigation({itemKey,title}:{itemKey:string;title?:string}) {
  const open=useContext(AgentPanelContext);
@@ -144,7 +151,7 @@ export function PersistentReadingInvestigation({ itemKey, initiallyOpen=false, s
   return runtimeCapabilities.desktop && context ? <Investigation key={context+":"+newChat} anchor={{ kind: "reading", itemKey: context }} libraryName="当前阅读条目" initialOpen={!!pinned} startNew={startFresh||newChat>0} onNewConversation={startNew} onPin={() => setPinned(context)} newSource={pinned && pinned!==itemKey ? {title:"当前阅读条目",use:startNew} : undefined} /> : null;
 }
 
-function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pageLibraryName, sourceTitle: pageTitle, canEditNote: pageCanEditNote = false, compact = false, initialOpen = false, initialWorkId, initialDraft, startNew=false, onNewConversation, onOpenTopicWork, onTopicBack, onPin, newSource }: { onPreviewCitation?: (value: CitationLocation | null) => void; anchor: InvestigationLocator|null; libraryName: string; sourceTitle?: string; canEditNote?: boolean; compact?: boolean; initialOpen?: boolean; initialWorkId?:string; initialDraft?:string; startNew?:boolean; onNewConversation?:()=>void; onOpenTopicWork?:(id:string,source:TopicWorkSource,originId?:string,draft?:string)=>void; onTopicBack?:()=>void; onPin?: () => void; newSource?: { title: string; use: () => void } }) {
+function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pageLibraryName, sourceTitle: pageTitle, canEditNote: pageCanEditNote = false, compact = false, initialOpen = false, initialWorkId, initialDraft, suggestedQuestion, startNew=false, onNewConversation, onOpenTopicWork, onTopicBack, onPin, newSource }: { onPreviewCitation?: (value: CitationLocation | null) => void; anchor: InvestigationLocator|null; libraryName: string; sourceTitle?: string; canEditNote?: boolean; compact?: boolean; initialOpen?: boolean; initialWorkId?:string; initialDraft?:string; suggestedQuestion?:AgentQuestion; startNew?:boolean; onNewConversation?:()=>void; onOpenTopicWork?:(id:string,source:TopicWorkSource,originId?:string,draft?:string)=>void; onTopicBack?:()=>void; onPin?: () => void; newSource?: { title: string; use: () => void } }) {
   const browsing=useContext(AgentBrowsingContext);
   const tagRequest=useContext(AgentTagRequestContext);
   const textMaterials=useContext(AgentTextMaterialContext);
@@ -197,6 +204,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const libraryRegistry = useAgentLibraryRegistry(open);
   const [worksError, setWorksError] = useState("");
   const [goal, setGoal] = useState(initialDraft||"");
+  const [usedQuestion,setUsedQuestion]=useState("");
   const skillPrefix = goal.match(/^(?:\$[a-z0-9]+(?:-[a-z0-9]+)*\s+)+/)?.[0] || "";
   const selectedSkills = [...new Set(skillPrefix.match(/\$[a-z0-9]+(?:-[a-z0-9]+)*/g) || [])];
   const questionText = goal.slice(skillPrefix.length);
@@ -404,7 +412,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         const value = await call<View>({ action: "status", id });
         if (!alive.current || job.ticket !== sequence.current) return value;
         if (value.work.id !== id) throw new Error("返回的事项状态不匹配，请重新核对");
-        if(id===initialWorkId&&!sameNoteAnchor(value.work.anchor,anchor))throw new Error("本期工作与实际笔记锚点不一致，未显示内容");
+        if(id===initialWorkId&&!sameWorkAnchor(value.work.anchor,anchor))throw new Error("本期工作与实际笔记锚点不一致，未显示内容");
         const knownVersion = observedVersions.current.get(id);
         const currentEnough = knownVersion === undefined || (value.recordVersion !== undefined && value.recordVersion >= knownVersion);
         if (currentEnough) {
@@ -1172,6 +1180,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         {view?.work.state !== "revoked" && <form onSubmit={event=>void create(event)}>
           {tagSuggestion&&<button type="button" className="agent-tag-open" disabled={busy||!!active} onClick={()=>prepareTagTask(tagSuggestion)}>准备标签任务 · {tagTaskNames[tagSuggestion]}</button>}<AgentTagReferences value={tagPreparation} mode={tagMode} disabled={busy||!!active} onChange={setTagPreparation} searchOpen={tagSearchOpen} onSearchClose={()=>setTagSearchOpen(false)}/><AgentTagRelated tags={[...tagPreparation.references,...(tagMode&&tagPreparation.tag?[tagPreparation.tag]:[])]} grant={researchGrant(manualResearchGrant(),research?.topic.grant,research?.includeManual)} disabled={busy||!!active} onAdd={item=>setMaterials(items=>items.some(m=>materialKey(m.locator)===materialKey(item.locator))?items:[...items,item])}/>
           {!!selectedSkills.length && <div className="agent-selected-skills" aria-label="本次指定技能">{selectedSkills.map(token=><span key={token}><WandSparkles size={13} aria-hidden="true"/>{skillTitle(token.slice(1))}<button type="button" aria-label={`移除技能 ${skillTitle(token.slice(1))}`} disabled={busy} onClick={()=>setGoal(selectedSkills.filter(item=>item!==token).map(item=>item+" ").join("")+questionText)}><X size={13}/></button></span>)}</div>}
+          {suggestedQuestion&&usedQuestion!==suggestedQuestion.id&&view?.work.id===initialWorkId&&<div className="agent-note"><p>关联核对提问已准备，不会自动发送。{goal.trim()?"先保留当前输入，再使用这条提问。":"可先检查资料范围，再开始核对。"}</p><button type="button" disabled={busy||!!active||!!goal.trim()} onClick={()=>{setGoal(suggestedQuestion.text);setUsedQuestion(suggestedQuestion.id);goalInput.current?.focus();}}>使用关联核对提问</button><button type="button" onClick={()=>setUsedQuestion(suggestedQuestion.id)}>忽略这条提问</button></div>}
           <label className="agent-question"><span className="agent-visually-hidden">{view ? "继续对话" : "希望助手做什么"}</span><textarea rows={2} ref={goalInput} name="investigationGoal" value={questionText} maxLength={(view?4000:2000)-skillPrefix.length} disabled={busy} onChange={event => setGoal(skillPrefix+event.target.value)} placeholder={view?"继续追问，或告诉我接下来做什么…":hasDraftSources?"询问 Hub 助手…":"询问 Hub 助手…"} onKeyDown={event => {
             if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
           }} /></label>

@@ -15,7 +15,8 @@ const Standalone = lazy(() => import("./AgentInvestigation").then(m => ({ defaul
 const Reading = lazy(() => import("./AgentInvestigation").then(m => ({ default:m.PersistentReadingInvestigation })));
 const Existing = lazy(() => import("./AgentInvestigation").then(m => ({ default:m.ExistingWorkInvestigation })));
 export type Entry = { result:SearchResult } | { itemKey:string; title?:string } | null;
-type PanelEntry=Entry|{workId:string};
+export type AgentQuestion={id:string;text:string};
+type PanelEntry=Entry|{workId:string;question?:AgentQuestion};
 export type TextMaterial={kind:"text"|"flashcard";title:string;text:string;file?:boolean};
 export const AgentTextMaterialContext=createContext<{selection:TextMaterial|null;clearSelection:()=>void;pending:TextMaterial|null;setPending:(value:TextMaterial|null)=>void}|null>(null);
 export type AgentTagRequest={tagId:string;label:string;task:"definition"|"missing"|"relations"};
@@ -68,7 +69,7 @@ export function AgentPanelProvider({children}:{children:ReactNode}) {
   {children}
   {runtimeCapabilities.desktop && entry===undefined && createPortal(<button type="button" className="agent-floating-launcher" aria-label="打开助手" aria-expanded={false} title="打开 Hub 助手" onClick={()=>open(null)}><span className="agent-launcher-orb" aria-hidden="true"/>助手</button>,document.body)}
   {runtimeCapabilities.desktop && Object.entries(entries).map(([key,value])=>value===undefined?null:<AgentAccountVisibleContext.Provider key={key} value={key===owner}><div hidden={key!==owner} className="agent-global-owner"><Suspense fallback={<p role="status">正在打开助手…</p>}>
-   {value&&'result' in value?<Source result={value.result} initiallyOpen startFresh={freshOwners.current.has(key)}/>:value&&'itemKey' in value?<Reading itemKey={value.itemKey} initiallyOpen startFresh={freshOwners.current.has(key)}/>:value&&'workId' in value?<Existing key={value.workId} workId={value.workId}/>:<Standalone initiallyOpen startFresh={freshOwners.current.has(key)}/>}
+   {value&&'result' in value?<Source result={value.result} initiallyOpen startFresh={freshOwners.current.has(key)}/>:value&&'itemKey' in value?<Reading itemKey={value.itemKey} initiallyOpen startFresh={freshOwners.current.has(key)}/>:value&&'workId' in value?<Existing key={value.workId} workId={value.workId} question={value.question}/>:<Standalone initiallyOpen startFresh={freshOwners.current.has(key)}/>}
   </Suspense></div></AgentAccountVisibleContext.Provider>)}
  </AgentPanelContext.Provider></AgentBrowsingContext.Provider></AgentTextMaterialContext.Provider></AgentCitationContext.Provider></AgentTagRequestContext.Provider>;
 }

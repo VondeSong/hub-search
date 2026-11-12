@@ -262,6 +262,8 @@
 .ip-form>label:not(.ip-check-label){display:flex;flex-direction:column;gap:8px;font-size:11px;color:var(--subtle);margin-bottom:20px}
 .ip-form select,.ip-form textarea,.ip-form input[type="datetime-local"]{background:var(--surface-2);border:1px solid var(--line);border-radius:7px;font-size:12px;padding:10px 12px;line-height:1.8;color:var(--text);width:100%;resize:vertical}
 .ip-form input[type="checkbox"]{accent-color:var(--accent)}
+.ip-recall input[type="text"]{background:var(--surface-2);border:1px solid var(--line);border-radius:7px;font-size:13px;padding:10px 12px;line-height:1.8;color:var(--text);width:100%}
+.ip-recall article{padding:14px 0;border-bottom:1px solid var(--line);font-size:13px;line-height:1.8}.ip-recall summary{cursor:pointer;color:var(--muted);font-size:12px}.ip-recall blockquote{margin:10px 0;padding:12px;background:var(--surface-2);border-radius:7px;white-space:pre-wrap;overflow-wrap:anywhere}
 .ip-check-label{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--subtle);margin:20px 0 12px}
 .ip-form-help{font-size:10px;line-height:1.85;color:var(--muted)}
 .ip-example-fill{font-size:10px;color:var(--accent);padding:0;text-align:left;margin-top:-8px}

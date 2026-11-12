@@ -1,3 +1,4 @@
+import {recallFixture} from "../app/insight-recall";
 import assert from "node:assert/strict";
 import {
   candidateAvailability, emptyLedger, ensureLedgerSeed, executeLedger, expireSnoozes,
@@ -55,6 +56,20 @@ function mutate(state: LedgerState, id: string, update: object): LedgerState {
 
 async function main(): Promise<void> {
   let state = importR1();
+  {
+    const state=makeState(),before=JSON.stringify(state),hits=recallFixture(state,SAMPLE_WORK_A,"验证");
+    assert.deepEqual(hits.map(h=>h.id).sort(),[SAMPLE_METHOD_SOURCE_ID,SAMPLE_REVIEW_SOURCE_ID].sort());
+    assert.deepEqual(recallFixture(state,"missing-work","验证"),[]);
+    assert.deepEqual(recallFixture(state,SAMPLE_WORK_A,"没有匹配的耳机"),[]);
+    assert.deepEqual(recallFixture(state,SAMPLE_WORK_A," "),[]);
+    assert.equal(JSON.stringify(state),before);
+    state.sources[SAMPLE_METHOD_SOURCE_ID].available=false;
+    assert(!recallFixture(state,SAMPLE_WORK_A,"验证").some(h=>h.id===SAMPLE_METHOD_SOURCE_ID));
+    state.sources[SAMPLE_REVIEW_SOURCE_ID].version=999;
+    assert.deepEqual(recallFixture(state,SAMPLE_WORK_A,"验证"),[]);
+    passed("keyword pilot stays in original Work fixtures, hides unavailable or changed sources and writes nothing");
+  }
+
   {
     const source = importR1(), one=source.insights[0], two=source.insights[1];
     const related=run(source,{type:"relate",insightId:two.id,expectedRowRevision:two.rowRevision,supersedes:[one.id],operationId:op()});
