@@ -17,6 +17,16 @@ class MainActivity : TauriActivity() {
     super.onCreate(savedInstanceState)
 
     val content = findViewById<android.view.View>(android.R.id.content)
+    val bottomPadding = content.paddingBottom
+    ViewCompat.setOnApplyWindowInsetsListener(content) { view, insets ->
+      // Edge-to-edge WebView does not resize itself for the keyboard on Android 15.
+      val bottom = bottomPadding + insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+      if (view.paddingBottom != bottom) {
+        view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, bottom)
+      }
+      insets
+    }
+    ViewCompat.requestApplyInsets(content)
     val keyboardBack = object : OnBackPressedCallback(false) {
       override fun handleOnBackPressed() {
         WindowInsetsControllerCompat(window, content).hide(WindowInsetsCompat.Type.ime())

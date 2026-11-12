@@ -59,6 +59,38 @@ export function sampleTimes(duration: number, limit: number) {
   return Array.from({ length: count }, (_, i) => duration * (i + 0.5) / count);
 }
 
+function drawVideoFrame(video: HTMLVideoElement, seconds: number, context: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
+  return new Promise<number>((resolve, reject) => {
+    if (typeof video.requestVideoFrameCallback !== "function") {
+      reject(new Error("当前设备不支持可靠的视频抽帧，请更新系统 WebView 或改为选择图片。"));
+      return;
+    }
+    let callback = 0;
+    const failed = () => {
+      clearTimeout(timeout);
+      video.cancelVideoFrameCallback(callback);
+      video.removeEventListener("error", failed);
+      reject(new Error("这段视频无法在当前设备解码或抽帧。"));
+    };
+    const timeout = setTimeout(failed, 10000);
+    const draw: VideoFrameRequestCallback = (_, metadata) => {
+      if (video.seeking) { callback = video.requestVideoFrameCallback(draw); return; }
+      clearTimeout(timeout);
+      video.removeEventListener("error", failed);
+      // A seeked event can precede the decoded frame on Android WebView.
+      try {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        resolve(metadata.mediaTime);
+      } catch (error) { reject(error); }
+    };
+    video.addEventListener("error", failed);
+    try {
+      callback = video.requestVideoFrameCallback(draw);
+      video.currentTime = seconds;
+    } catch { failed(); }
+  });
+}
+
 export async function videoUploads(file: File, limit: number): Promise<Upload[]> {
   const video = document.createElement("video");
   video.muted = true;
@@ -77,13 +109,10 @@ export async function videoUploads(file: File, limit: number): Promise<Upload[]>
     if (!context) throw new Error("当前设备无法提取视频画面。");
     const frames: Upload[] = [];
     for (const seconds of times) {
-      if (Math.abs(video.currentTime - seconds) > 0.001) {
-        await mediaEvent(video, "seeked", () => { video.currentTime = seconds; });
-      }
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const frameTime = await drawVideoFrame(video, seconds, context, canvas);
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/jpeg", 0.82));
       if (!blob) throw new Error("无法保存视频关键帧。");
-      frames.push(await encode(blob, file.name, Number(seconds.toFixed(2))));
+      frames.push(await encode(blob, file.name, Number(frameTime.toFixed(2))));
     }
     return frames;
   } finally {

@@ -31,7 +31,7 @@
         "connect-src": "ipc: http://ipc.localhost",
         "font-src": "'self' data:",
         "img-src": "'self' asset: http://asset.localhost blob: data: https: http://craft-media.localhost craft-media:",
-        "media-src": "'self' http://craft-media.localhost craft-media:",
+        "media-src": "'self' blob: http://craft-media.localhost craft-media:",
         "style-src": "'self' 'unsafe-inline'"
       }
     }
