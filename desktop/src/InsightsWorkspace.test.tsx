@@ -146,6 +146,8 @@ it("resumes an already queued supplement without saving another user message",as
 it("keeps prototype navigation honest and filters review findings without a model",async()=>{
  const second=item("two");second.validity="review";second.reasons=[{id:"changed",kind:"sourceChanged",active:true}];second.snapshot!.text="来源变化，需要重新核对。";store.items.push(second);
  await mount();expect(host.querySelector('aside[aria-label="洞察导航"]')).not.toBeNull();
+ const navOpen=host.querySelector<HTMLButtonElement>('button[aria-label="展开洞察侧边栏"]')!;await act(async()=>navOpen.click());expect(document.activeElement?.getAttribute("aria-label")).toBe("收起洞察侧边栏");
+ await act(async()=>document.activeElement!.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true})));expect(document.activeElement).toBe(navOpen);
  expect(button("阶段回顾").disabled).toBe(true);expect(host.querySelectorAll('.insights-card')).toHaveLength(2);
  await act(async()=>host.querySelector<HTMLButtonElement>('nav button[aria-current="page"]')!.click());
  const review=[...host.querySelectorAll<HTMLButtonElement>('nav button')].find(node=>node.textContent?.startsWith("待复核"))!;await act(async()=>review.click());
