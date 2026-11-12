@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "site": "mobile",
+  "project_id": "appgprj_6af1d2dc12308191acc37e5566699c2d",
+  "site_url": "https://hub-mobile-lab-von11.song02211368537057.chatgpt.site",
+  "source_commit": "46d6fc81061a00a2abbdb564f7aa0bb06f247e81",
+  "published_version": 6,
+  "deployment_id": "appgdep_6af48e6482808191b148ff767513bd00",
+  "files": {
+    ".openai/hosting.json": {
+      "sha256": "543a776095c0181cc870f784c075ab4f263fb739e3649cd8db74f493fb5b4ca3",
+      "mode": "100644",
+      "bytes": 106
+    },
+    "DESIGN.md": {
+      "sha256": "b409a89e0c070c8cbdbe55c9c83097811fe5168963208a705a39d30ee189b02c",
+      "mode": "100644",
+      "bytes": 5241
+    },
+    "PRODUCT.md": {
+      "sha256": "76d3b3fea9660811f5305787950ab41f4e286d1d805d8311ad24695744f55a93",
+      "mode": "100644",
+      "bytes": 1544
+    },
+    "README.md": {
+      "sha256": "265c7df12311dd82fae87eee47f29c68256a6e607419869b9c825c614bcb3b88",
+      "mode": "100644",
+      "bytes": 6287
+    },
+    "checks/mobile-checks.cjs": {
+      "sha256": "d2749a71e062fc22565011d2fad0b776507c3316e06df713a1e56d323778675c",
+      "mode": "100644",
+      "bytes": 6298
+    },
+    "dist/agents-runtime.js": {
+      "sha256": "b162bf9c51c50f4d1fd4c6aea679551457b95a4e4fc1612fb09928109fbd6609",
+      "mode": "100644",
+      "bytes": 22710
+    },
+    "dist/agents-ui.js": {
+      "sha256": "2468f2012f2a842444be27221d611355f8a502f157746652de82c29e60fb104c",
+      "mode": "100644",
+      "bytes": 45900
+    },
+    "dist/agents.css": {
+      "sha256": "efb9478d09cd485e3ba008a7c3e026a91e7a40e5c112110a5fec064a6ab32b16",
+      "mode": "100644",
+      "bytes": 29176
+    },
+    "dist/app.js": {
+      "sha256": "bb7c90ec7f2c3e4deb994d65b214416b1386d1fb3c9ad63ccaaba0dc68983ce6",
+      "mode": "100644",
+      "bytes": 62809
+    },
+    "dist/hub.svg": {
+      "sha256": "a7229c43b74d0dba3e1441f0d14c62320e441a8c16df9c1f2378f88ffbe172b1",
+      "mode": "100644",
+      "bytes": 254
+    },
+    "dist/index.html": {
+      "sha256": "526c7ef191ae37459d82f64e27a97d171d3a6f3c68071d4703fc222f75881500",
+      "mode": "100644",
+      "bytes": 1074
+    },
+    "dist/mobile-features.js": {
+      "sha256": "8458863f18d25793fd7e3c2cf2a5cb9658c623a227d78b3fa7f2535bb8071b1b",
+      "mode": "100644",
+      "bytes": 27420
+    },
+    "dist/mobile.js": {
+      "sha256": "cdd94b93e875bb86d8b140a49c58606ace473847a34f69f6e7b47747c8f509fd",
+      "mode": "100644",
+      "bytes": 13417
+    },
+    "dist/style.css": {
+      "sha256": "b97c2863349fd0a517dc86bb5b3f2cc7b575601a79b95888a1e92ce327269b72",
+      "mode": "100644",
+      "bytes": 45279
+    },
+    "dist/workflows.js": {
+      "sha256": "5e64ae1549330ec17bd9197fee357882057de266fda6e075d7f5616bc8e7ac34",
+      "mode": "100644",
+      "bytes": 20279
+    },
+    "docs/agents-32.md": {
+      "sha256": "a99e49f958912215e09edd366db9c75baab115312e59c637c9960366bf97a0a8",
+      "mode": "100644",
+      "bytes": 4349
+    },
+    "docs/hub-mobile-agents-chat.png": {
+      "sha256": "7700010aa7b136594e8aa47c1bee66f88beffd8a1c06589a4af82d5b9fe9bd59",
+      "mode": "100644",
+      "bytes": 62530
+    },
+    "docs/hub-mobile-agents-list.png": {
+      "sha256": "6af966bffee53c0456ab4a379f2695418d6bfba22fc958f91795c9ee5407145c",
+      "mode": "100644",
+      "bytes": 54635
+    },
+    "docs/mobile-insights-v3.png": {
+      "sha256": "428c32f3126b9157ada5806bf0055eec5be879dc3c092324abee01726750d8a7",
+      "mode": "100644",
+      "bytes": 33786
+    },
+    "docs/mobile-scope.md": {
+      "sha256": "4ae74524a5fa0c239aba168a122b7f4e00e8a0f9f0805344f4373737186a5ad3",
+      "mode": "100644",
+      "bytes": 4244
+    }
+  },
+  "imported_at": "2026-11-12T10:52:06.973006+00:00"
+}

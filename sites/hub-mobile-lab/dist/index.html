@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="description" content="Hub 的独立手机端交互原型。">
+<title>Hub 手机端原型</title>
+<link rel="icon" href="hub.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="agents.css">
+<script src="mobile.js" defer></script>
+<script src="mobile-features.js" defer></script>
+<script src="workflows.js" defer></script>
+<script src="agents-runtime.js" defer></script>
+<script src="agents-ui.js" defer></script>
+<script src="app.js" defer></script>
+</head>
+<body>
+<div class="app">
+  <header id="header" class="top"></header>
+  <main id="content" tabindex="-1"></main>
+  <nav id="tabs" class="tabs nav-dock" aria-label="主要导航"></nav>
+</div>
+<dialog id="sheet" aria-labelledby="sheet-title"></dialog>
+<div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+</body>
+</html>

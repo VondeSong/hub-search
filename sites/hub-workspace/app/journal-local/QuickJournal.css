@@ -1,0 +1,46 @@
+.quick-journal { max-width: 760px; margin: 0 auto; padding: 16px 20px 40px; display: flex; flex-direction: column; gap: 16px; }
+.quick-journal .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.quick-journal-attachments { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.quick-journal-attachments button { max-width: 100%; overflow-wrap: anywhere; }
+.quick-journal button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 6px 10px; border: 1px solid var(--journal-db-line); border-radius: 8px; background: var(--journal-db-surface); }
+.quick-journal button:hover:not(:disabled) { background: var(--journal-db-muted); }
+.quick-journal button:disabled { opacity: .55; cursor: default; }
+.quick-journal :is(button, input, textarea, select, summary):focus-visible { outline: 2px solid var(--journal-db-accent); outline-offset: 3px; }
+.quick-journal :is(input, textarea, select) { color: inherit; background: var(--journal-db-surface); font: inherit; accent-color: var(--journal-db-accent); caret-color: var(--journal-db-accent); }
+.quick-journal :is(input, select) { max-width: 100%; border: 1px solid var(--journal-db-line); border-radius: 6px; padding: 6px; }
+.quick-journal :is(label, footer, .quick-journal-controls, .quick-journal-card header) { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.quick-journal-settings { font-size: .92em; }
+.quick-journal-settings summary { cursor: pointer; padding: 8px 0; }
+.quick-journal-settings label { margin: 10px 0; }
+.quick-journal-settings p { overflow-wrap: anywhere; }
+.quick-journal-settings p, .quick-journal-notice, .quick-journal-empty { color: var(--hub-text-secondary, #626b77); line-height: 1.6; margin: 0; }
+.quick-journal-compose { border: 1px solid var(--journal-db-line); border-radius: 12px; padding: 16px; }
+.quick-journal-compose textarea { display: block; width: 100%; box-sizing: border-box; min-height: 110px; border: 0; resize: vertical; line-height: 1.6; padding: 4px; }
+.quick-journal-compose textarea::placeholder { color: var(--hub-text-secondary, #626b77); }
+.quick-journal-compose footer { margin-top: 12px; }
+.quick-journal-compose button[type=submit] { margin-left: auto; background: var(--journal-db-accent); color: #fff; border-color: transparent; }
+.quick-journal-compose button[type=submit]:hover:not(:disabled) { filter: brightness(.9); background: var(--journal-db-accent); }
+.quick-journal-compose ul { padding: 0; list-style: none; }
+.quick-journal-compose li { display: flex; gap: 6px; align-items: center; }
+.quick-journal-compose li span { overflow-wrap: anywhere; }
+.quick-journal-card { border: 1px solid var(--journal-db-line); border-radius: 12px; padding: 20px; min-width: 0; }
+.quick-journal-card header { color: var(--hub-text-secondary, #626b77); font-size: .88em; font-variant-numeric: tabular-nums; margin-bottom: 14px; }
+.quick-journal-card header span:nth-child(2) { margin-left: auto; }
+.quick-journal-prose { line-height: 1.75; overflow-wrap: anywhere; }
+.quick-journal-prose.is-collapsed { max-height: 320px; overflow: hidden; }
+.quick-journal-prose > :first-child { margin-top: 0; }
+.quick-journal-prose img { display: block; max-width: 100%; max-height: 360px; object-fit: contain; border-radius: 8px; margin: 10px 0; }
+.quick-journal-prose pre, .quick-journal-prose table { overflow-x: auto; max-width: 100%; }
+.quick-journal-prose a { color: var(--journal-db-accent); text-underline-offset: 3px; }
+.quick-journal-expand { margin-top: 12px; }
+.quick-journal-controls { color: var(--hub-text-secondary, #626b77); font-size: .92em; }
+.quick-journal-controls > button { margin-left: auto; }
+.quick-journal-error { color: var(--hub-text-primary, #202124); background: var(--journal-db-muted); padding: 12px; border-radius: 8px; overflow-wrap: anywhere; }
+.quick-journal-error button { margin-left: 8px; }
+.quick-journal-empty { padding: 24px 0; }
+@container journal-workspace (max-width: 500px) {
+  .quick-journal { padding: 12px 10px 32px; }
+  .quick-journal-card, .quick-journal-compose { padding: 14px; }
+  .quick-journal button { min-height: 44px; }
+  .quick-journal-compose footer label { width: 100%; }
+}

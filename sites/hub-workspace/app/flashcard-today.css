@@ -1,0 +1,101 @@
+/* Today uses the workspace's accent and type system, with stronger contrast for controls. */
+.flashcards-workspace {
+  --flashcards-action: color-mix(in srgb, var(--flashcards-accent) 72%, #19354b);
+  --flashcards-success-text: #217354;
+  --flashcards-success-surface: #edf8f2;
+  --flashcards-input-border: #8494a5;
+}
+.flashcards-workspace .flashcards-main:has(.flashcards-overview-due) { container: flashcard-today / inline-size; padding-top: 32px; }
+.flashcards-workspace .flashcards-overview.flashcards-overview-due {
+  width: min(100%,1080px); max-width: 1080px; box-sizing: border-box;
+  display: grid; grid-template-columns: minmax(0,1fr) minmax(250px,320px); align-items: center;
+  gap: 32px; padding: 32px; margin: 8px auto 28px;
+  border: 1px solid var(--flashcards-hairline); border-radius: 24px;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--flashcards-accent) 8%, white), #f8fafc 75%);
+}
+.flashcards-workspace .flashcards-overview.flashcards-overview-due > div { min-width: 0; }
+.flashcards-workspace .flashcards-overview.flashcards-overview-due .flashcards-overview-eyebrow { color: var(--flashcards-secondary); font-size: .8125rem; gap: 8px; }
+.flashcard-today-date { margin-inline-start: auto; font-weight: 400; }
+.flashcards-workspace .flashcards-overview.flashcards-overview-due h1 { margin: 22px 0 14px; font-size: clamp(26px,3vw,34px); font-weight: 650; line-height: 1.3; text-wrap: balance; }
+.flashcard-today-remaining { color: var(--flashcards-action); font-size: 1.65em; font-weight: 700; font-variant-numeric: tabular-nums; }
+.flashcards-workspace .flashcards-overview.flashcards-overview-due p { display: block; color: var(--flashcards-secondary); font-size: .875rem; line-height: 1.6; text-wrap: pretty; }
+.flashcards-workspace .flashcards-overview.flashcards-overview-due .flashcards-daily-new-progress { display: inline-flex; align-items: center; gap: 6px; width: auto; box-sizing: border-box; margin-top: 20px; padding: 8px 10px; background: white; color: var(--flashcards-secondary); border: 1px solid var(--flashcards-hairline); border-radius: 9px; font-size: .75rem; line-height: 1.5; }
+.flashcards-workspace .flashcards-overview.flashcards-overview-due .flashcards-session-actions { width: 100%; box-sizing: border-box; grid-template-columns: repeat(2,minmax(0,1fr)); padding: 18px; gap: 12px; border-radius: 16px; box-shadow: 0 4px 16px #263a5510; }
+.flashcards-workspace .flashcards-overview.flashcards-overview-due .flashcards-session-actions label { color: var(--flashcards-secondary); font-size: .8125rem; }
+.flashcards-workspace .flashcards-overview.flashcards-overview-due .flashcards-session-actions select { min-height: 42px; height: auto; padding: 9px; border-color: var(--flashcards-input-border); font-size: .875rem; color: var(--flashcards-text); }
+.flashcards-workspace .flashcards-overview.flashcards-overview-due .flashcards-start,
+.flashcards-workspace .flashcards-overview.flashcards-overview-due .flashcards-resume-panel > button.primary { min-height: 46px; border-color: var(--flashcards-action); background: var(--flashcards-action); color: white; font-size: .9375rem; box-shadow: none; }
+.flashcards-overview-due .flashcards-start svg { margin-inline-end: 2px; }
+.flashcards-workspace .flashcards-overview.flashcards-overview-due button:focus-visible,
+.flashcards-workspace .flashcards-overview.flashcards-overview-due select:focus-visible,
+.flashcard-today-heading button:focus-visible { outline: 2px solid var(--flashcards-action); outline-offset: 3px; }
+.flashcard-today-progress { width: min(100%,1080px); margin: 0 auto 24px; color: var(--flashcards-text); }
+.flashcard-today-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+.flashcard-today-progress h2 { margin: 0; font-size: 1rem; font-weight: 650; line-height: 1.4; }
+.flashcard-today-heading button { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 6px 10px; border: 1px solid var(--flashcards-hairline); border-radius: 9px; background: white; color: var(--flashcards-secondary); font: inherit; font-size: .8125rem; cursor: pointer; }
+.flashcard-today-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
+.flashcard-today-metrics article { min-width: 0; padding: 20px; border: 1px solid var(--flashcards-hairline); border-radius: 16px; background: #fbfcfe; }
+.flashcard-today-metric-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 15px; }
+.flashcard-today-metric-heading h3 { margin: 0; color: var(--flashcards-secondary); font-size: .8125rem; line-height: 1.4; font-weight: 500; }
+.flashcard-today-metric-heading svg { color: var(--flashcards-action); flex: none; stroke-width: 1.75; }
+.flashcard-today-value { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; min-height: 48px; }
+.flashcard-today-value strong { font-size: 2.25rem; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.flashcard-today-value span { color: var(--flashcards-secondary); font-size: .8125rem; }
+.flashcard-today-metrics p { margin: 12px 0 0; color: var(--flashcards-secondary); font-size: .75rem; line-height: 1.5; text-wrap: pretty; }
+.flashcard-today-new.quota-complete { background: var(--flashcards-success-surface); }
+.flashcard-today-new.quota-complete .flashcard-today-metric-heading svg,
+.flashcard-today-new.quota-complete p { color: var(--flashcards-success-text); }
+.flashcard-today-new .study-progress { justify-content: flex-start; gap: 12px; min-height: 48px; }
+.flashcard-today-new .study-progress svg { width: 48px; height: 48px; }
+.flashcard-today-new .study-progress strong { color: var(--flashcards-text); font-size: 2rem; line-height: 1.2; }
+.flashcard-today-new .study-progress small { color: var(--flashcards-secondary); font-size: .75rem; line-height: 1.5; }
+.flashcard-today-rhythm { margin-top: 20px; padding: 22px; border: 1px solid var(--flashcards-hairline); border-radius: 16px; background: white; }
+.flashcard-today-rhythm header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; }
+.flashcard-today-rhythm header p { margin: 6px 0 0; color: var(--flashcards-secondary); font-size: .8125rem; line-height: 1.5; }
+.flashcard-today-rhythm header > span { color: var(--flashcards-secondary); font-size: .75rem; line-height: 1.5; }
+.flashcard-today-rhythm ol { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 10px; margin: 20px 0 0; padding: 0; list-style: none; }
+.flashcard-today-rhythm li { display: grid; justify-items: center; gap: 10px; padding: 10px 0 6px; border-radius: 10px; min-width: 0; font-variant-numeric: tabular-nums; }
+.flashcard-today-rhythm li.today { background: var(--flashcards-accent-soft); }
+.flashcard-today-rhythm li > strong { font-size: .875rem; font-weight: 550; line-height: 1.4; }
+.flashcard-today-rhythm li > span { color: var(--flashcards-secondary); font-size: .75rem; line-height: 1.5; }
+.flashcard-today-rhythm li.today > span { color: var(--flashcards-action); font-weight: 600; }
+.flashcard-today-bar-track { display: flex; align-items: flex-end; width: min(50%,36px); height: 84px; }
+.flashcard-today-bar-track span { width: 100%; border-radius: 5px 5px 2px 2px; background: color-mix(in srgb, var(--flashcards-accent) 30%, #e9edf3); }
+.flashcard-today-rhythm li.today .flashcard-today-bar-track span { background: var(--flashcards-action); }
+@media (hover: hover) {
+  .flashcard-today-heading button:hover { background: #f3f6fa; color: var(--flashcards-text); }
+  .flashcards-workspace .flashcards-overview.flashcards-overview-due .flashcards-start:not(:disabled):hover { filter: brightness(.94); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .flashcards-overview-due .flashcards-start { transition: transform 150ms ease-out; }
+  .flashcards-overview-due .flashcards-start:not(:disabled):active { transform: scale(.96); }
+}
+@container flashcard-today (max-width: 760px) {
+  .flashcards-workspace .flashcards-overview.flashcards-overview-due { grid-template-columns: minmax(0,1fr); gap: 24px; padding: 24px; }
+  .flashcards-workspace .flashcards-overview.flashcards-overview-due > :last-child { width: 100%; }
+  .flashcard-today-metrics article { padding: 16px; }
+  .flashcard-today-new .study-progress { gap: 8px; }
+}
+@container flashcard-today (max-width: 460px) {
+  .flashcards-workspace .flashcards-overview.flashcards-overview-due { padding: 20px; border-radius: 20px; margin-bottom: 24px; }
+  .flashcard-today-date { display: none; }
+  .flashcard-today-metrics { gap: 8px; }
+  .flashcard-today-metrics article { padding: 14px 10px; }
+  .flashcard-today-metric-heading { margin: 0 0 12px; }
+  .flashcard-today-metric-heading h3 { font-size: .75rem; }
+  .flashcard-today-metric-heading svg { display: none; }
+  .flashcard-today-value { display: grid; gap: 4px; min-height: 0; }
+  .flashcard-today-value strong { font-size: 1.75rem; }
+  .flashcard-today-metrics p { display: none; }
+  .flashcard-today-new .study-progress svg { display: none; }
+  .flashcard-today-new .study-progress { min-height: 0; }
+  .flashcard-today-new .study-progress strong { font-size: 1.75rem; }
+  .flashcard-today-rhythm { padding: 16px 12px; }
+  .flashcard-today-rhythm ol { gap: 4px; }
+  .flashcard-today-bar-track { height: 60px; }
+  .flashcards-workspace .flashcards-overview.flashcards-overview-due .flashcards-session-actions select { font-size: 1rem; }
+}
+@media (forced-colors: active) {
+  .flashcard-today-rhythm li.today { outline: 1px solid Highlight; }
+  .flashcard-today-bar-track span { background: CanvasText; }
+}

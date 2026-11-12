@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+const text = readFileSync(new URL('../app/assistant-insert.ts', import.meta.url), 'utf8');
+const { outputText } = ts.transpileModule(text, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } });
+const { appendAssistantAnswer, pageBody, visibleAssistantSections } = await import('data:text/javascript;base64,' + Buffer.from(outputText).toString('base64'));
+const original = { id: 'target', title: '目标', kind: 'note', sections: [{ type: 'p', text: '原文内容' }, { type: 'checklist', items: ['原有待办'] }] };
+const operation = { targetId: 'target', expectedBody: pageBody(original.sections), body: '回答第一段\n\n回答第二段', sourceIds: ['a', 'a', 'b'], operationId: 'insert-1' };
+const next = appendAssistantAnswer(original, operation);
+assert.equal(original.sections.length, 2); assert.deepEqual(next.sections.slice(0, 2), original.sections); assert.equal(next.sections.length, 5); assert.deepEqual(next.sections[2].assistantSourceIds, ['a', 'b']);
+assert.equal(appendAssistantAnswer(next, operation), next);
+assert.throws(() => appendAssistantAnswer(original, { ...operation, expectedBody: '旧版内容' }), /已变化/);
+assert.throws(() => appendAssistantAnswer(original, { ...operation, targetId: 'other' }), /无效/);
+assert.throws(() => appendAssistantAnswer(original, { ...operation, body: ' ' }), /无效/);
+assert.deepEqual(visibleAssistantSections(next.sections, id => id !== 'a'), original.sections);
+assert.equal(visibleAssistantSections(next.sections, () => true).length, 5);
+console.log('7 项页面插入检查通过：追加保留原文、原始对象不变、去重、版本冲突、目标校验、内容校验、按插入段落隐藏失效来源。');

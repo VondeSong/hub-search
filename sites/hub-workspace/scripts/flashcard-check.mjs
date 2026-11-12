@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+const source = readFileSync(new URL('../app/flashcard-demo.ts', import.meta.url), 'utf8');
+const js = ts.transpileModule(source, {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+const {demoCards, reviewPlan} = await import('data:text/javascript;base64,' + Buffer.from(js).toString('base64'));
+const ids = demoCards.map(c => c.id);
+assert.equal(reviewPlan(ids, [], 10, 1, 20).session.length, 4);
+assert.equal(reviewPlan(ids, [], 5, 5, 20).session.length, 2, 'quota only blocks unseen new cards');
+assert.equal(reviewPlan(ids, [], 5, 4, 20).session.length, 3);
+assert.equal(reviewPlan(ids, ['engineering'], 5, 5, 20).session.length, 3, 'new card rated again remains eligible');
+assert.equal(reviewPlan(ids, [], 0, 100, 0).session.length, 4, 'unlimited daily and session options');
+assert.equal(reviewPlan(ids, [], 10, 1, 1).session.length, 1);
+assert.deepEqual(reviewPlan(ids, [], 10, 1, 20, '工程知识').session.map(c => c.id), ['engineering']);
+assert.equal(reviewPlan([], [], 10, 1, 20).session.length, 0);
+console.log('通过：每日额度、已学新卡、单轮上限、不限额、牌组范围与完成状态，共 8 项检查');

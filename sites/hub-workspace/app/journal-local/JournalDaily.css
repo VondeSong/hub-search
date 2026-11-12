@@ -1,0 +1,823 @@
+/* Daily stream: document thumbnails and real task rows follow the reference layout.
+   Dimensions are estimated from the supplied screenshot at a 1× CSS scale. */
+.journal-database.is-daily .journal-db-heading,
+.journal-database.is-daily.is-compact .journal-db-heading {
+  gap: 12px;
+  padding: 19px 24px 16px;
+}
+
+.journal-database.is-daily .journal-db-heading h1 {
+  font-size: 24px;
+  line-height: 1.3;
+}
+
+.journal-database.is-daily .journal-db-heading p {
+  margin-block-start: 5px;
+}
+
+.journal-database.is-daily .journal-db-body {
+  padding: 4px 24px 28px;
+}
+
+.journal-daily-stream {
+  position: relative;
+  --daily-surface: var(--hub-content-surface, #fff);
+  --daily-ink: var(--hub-text-primary, #202124);
+  --daily-secondary: var(--hub-text-secondary, #6e6e73);
+  --daily-tertiary: var(--hub-text-tertiary, #92918b);
+  --daily-accent: var(--hub-accent, #0a84ff);
+  --daily-date-fill: color-mix(in srgb, var(--daily-ink) 8%, var(--daily-surface));
+  --daily-today-fill: color-mix(in srgb, var(--journal-accent, #245fc7) 12%, var(--daily-surface));
+  --daily-line: var(--hub-separator, rgba(60, 60, 67, .12));
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  color: var(--daily-ink);
+  font-variant-numeric: tabular-nums;
+  container-name: journal-daily;
+  container-type: inline-size;
+}
+
+.journal-daily-stream :where(button, input, summary) {
+  box-sizing: border-box;
+  font: inherit;
+}
+
+.journal-daily-stream :where(button, summary) {
+  cursor: pointer;
+}
+
+.journal-daily-stream :where(button:not(.task-status-control), input, summary):focus-visible {
+  outline: 2px solid var(--daily-accent);
+  outline-offset: 3px;
+}
+
+.journal-daily-stream > .journal-daily-previous,
+.journal-daily-stream > .journal-daily-next {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  align-self: flex-start;
+  min-height: 36px;
+  margin: 0 12px 20px;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--daily-tertiary);
+  background: transparent;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.journal-daily-stream > .journal-daily-next {
+  margin-block: 12px 0;
+}
+
+.journal-daily-stream > .journal-daily-previous:hover,
+.journal-daily-stream > .journal-daily-next:hover {
+  color: var(--daily-secondary);
+  background: var(--hub-control-fill, rgba(118, 118, 128, .08));
+}
+
+.journal-daily-stream .journal-daily-day {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 20px;
+  min-width: 0;
+  min-height: 128px;
+  padding: 12px;
+  border: 1px solid transparent;
+  border-radius: 28px;
+  scroll-margin-block-start: 12px;
+}
+
+.journal-daily-stream .journal-daily-day:has(.journal-daily-docs, .journal-daily-tasks) {
+  min-height: 180px;
+}
+
+.journal-daily-stream .journal-daily-day.is-today {
+  min-height: 246px;
+  margin-block-end: 10px;
+  border-color: color-mix(in srgb, var(--daily-ink) 6%, transparent);
+  background: var(--daily-surface);
+  box-shadow: 0 2px 2px color-mix(in srgb, var(--daily-ink) 5%, transparent),
+    0 4px 9px color-mix(in srgb, var(--daily-ink) 6%, transparent);
+}
+
+.journal-daily-stream .journal-daily-date {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 4px;
+  align-self: stretch;
+  width: 100%;
+  min-width: 0;
+  min-height: 104px;
+  padding: 18px;
+  border: 1px solid transparent;
+  border-radius: 22px;
+  color: var(--daily-ink);
+  background: var(--daily-date-fill);
+  text-align: start;
+}
+
+.journal-daily-stream .journal-daily-day:has(.journal-daily-docs, .journal-daily-tasks) > .journal-daily-date {
+  min-height: 156px;
+}
+
+.journal-daily-stream .journal-daily-date .date-title {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+.journal-daily-stream .journal-daily-date .relative-day {
+  color: var(--daily-secondary);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.journal-daily-stream .journal-daily-date .weekday {
+  color: var(--daily-tertiary);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.journal-daily-stream .is-today > .journal-daily-date {
+  background: var(--daily-today-fill);
+}
+
+.journal-daily-stream .is-today .relative-day {
+  color: var(--daily-accent);
+}
+
+.journal-daily-stream .journal-daily-date:hover {
+  border-color: var(--daily-line);
+}
+
+.journal-daily-stream .journal-daily-date[aria-pressed="true"] {
+  border-color: var(--daily-line);
+}
+
+.journal-daily-stream .is-today > .journal-daily-date[aria-pressed="true"] {
+  border-color: transparent;
+}
+
+.journal-daily-stream .journal-daily-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+  min-width: 0;
+  padding-block: 0 10px;
+}
+
+.journal-daily-stream .journal-daily-docs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+.journal-daily-stream .journal-daily-document {
+  display: flex;
+  flex: 0 0 194px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: 194px;
+  max-width: 100%;
+  min-width: 0;
+  height: 98px;
+  min-height: 98px;
+  max-height: 98px;
+  overflow: hidden;
+  padding: 14px 17px 11px;
+  border: 1px solid color-mix(in srgb, var(--daily-ink) 7%, transparent);
+  border-radius: 22px;
+  color: var(--daily-ink);
+  background: var(--daily-surface);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--daily-ink) 6%, transparent),
+    0 4px 8px color-mix(in srgb, var(--daily-ink) 7%, transparent);
+  text-align: start;
+}
+
+.journal-daily-stream .journal-daily-document:hover {
+  border-color: color-mix(in srgb, var(--daily-ink) 22%, transparent);
+}
+
+.journal-daily-stream .journal-daily-document.is-selected {
+  border-color: color-mix(in srgb, var(--daily-ink) 12%, transparent);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--daily-ink) 6%, transparent),
+    0 4px 8px color-mix(in srgb, var(--daily-ink) 7%, transparent);
+}
+
+.journal-daily-stream .document-heading {
+  display: -webkit-box;
+  flex-shrink: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  color: var(--daily-ink);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.journal-daily-stream .document-body {
+  display: -webkit-box;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  margin: 0;
+  padding-block-start: 4px;
+  border-block-start: 1px solid var(--daily-line);
+  color: var(--daily-secondary);
+  font-size: 6px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  mask-image: linear-gradient(to bottom, #000 45%, transparent);
+}
+
+.journal-daily-stream .document-library {
+  flex-shrink: 0;
+  overflow: hidden;
+  color: var(--daily-tertiary);
+  font-size: 9px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.journal-daily-stream .journal-daily-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0 8px;
+}
+
+.journal-daily-stream .journal-daily-task-heading {
+  margin: 0 0 3px;
+  color: var(--daily-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.journal-daily-stream .journal-daily-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  min-height: 34px;
+}
+
+.journal-daily-stream .journal-daily-task > .task-status-control {
+  margin-block-start: 3px;
+}
+
+.journal-daily-stream .journal-daily-task > button:not(.task-status-control):not(.journal-task-retry) {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px 9px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 5px 0;
+  border: 0;
+  border-radius: 5px;
+  color: var(--daily-ink);
+  background: transparent;
+  text-align: start;
+}
+
+.journal-daily-stream .journal-daily-task > .journal-task-retry {
+  flex: 0 0 auto;
+  align-self: center;
+  min-height: 26px;
+  padding: 2px 5px;
+  color: var(--daily-accent);
+  font-size: 11px;
+}
+
+.journal-daily-stream .task-title {
+  min-width: 0;
+  color: var(--daily-ink);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.journal-daily-stream .task-library {
+  display: inline-block;
+  flex: 0 1 auto;
+  max-width: 100%;
+  padding: 2px 8px;
+  border-radius: 8px;
+  color: var(--daily-secondary);
+  background: var(--hub-control-fill, rgba(118, 118, 128, .08));
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.journal-daily-stream .journal-daily-task-reasons {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: var(--daily-secondary);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.journal-daily-stream .journal-daily-task-reasons > span {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--daily-line);
+  border-radius: 5px;
+}
+
+.journal-daily-stream .journal-daily-task-history {
+  display: inline-block;
+  color: var(--daily-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.journal-daily-stream .journal-daily-task.is-reopened .task-title,
+.journal-daily-stream .journal-daily-task.is-completed.is-reopened .task-title {
+  color: var(--daily-ink);
+  text-decoration: none;
+}
+
+.journal-daily-stream .journal-daily-task.is-completed .task-title {
+  color: var(--daily-tertiary);
+  text-decoration: line-through;
+}
+
+.journal-daily-stream :is(.journal-daily-completed, .journal-daily-created) {
+  width: 100%;
+  min-width: 0;
+  color: var(--daily-tertiary);
+}
+
+.journal-daily-stream :is(.journal-daily-completed, .journal-daily-created) > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: fit-content;
+  min-height: 38px;
+  padding: 4px 0;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  list-style: none;
+}
+
+.journal-daily-stream :is(.journal-daily-completed, .journal-daily-created) > summary::-webkit-details-marker {
+  display: none;
+}
+
+.journal-daily-stream :is(.journal-daily-completed, .journal-daily-created) > summary :is(b, strong, .completed-count) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 19px;
+  min-height: 19px;
+  padding: 0 4px;
+  border-radius: 5px;
+  color: var(--daily-surface);
+  background: var(--daily-tertiary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.journal-daily-stream :is(.journal-daily-completed, .journal-daily-created)[open] > summary {
+  margin-block-end: 6px;
+}
+
+.journal-daily-stream .journal-daily-created > summary :is(b, strong, .created-count) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 19px;
+  min-height: 19px;
+  padding: 0 4px;
+  border-radius: 5px;
+  color: var(--daily-secondary);
+  background: var(--hub-control-fill, rgba(118, 118, 128, .08));
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.journal-daily-stream .journal-daily-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--daily-accent);
+  background: transparent;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.journal-daily-stream .journal-daily-add:hover {
+  background: var(--daily-today-fill);
+}
+
+.journal-daily-stream .journal-daily-status {
+  margin: 0;
+  padding: 8px;
+  color: var(--daily-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+/* Refresh status never changes the calendar's position or row geometry. */
+.journal-daily-stream .journal-daily-loading {
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-end: 0;
+  pointer-events: none;
+}
+
+.journal-daily-stream .journal-daily-completed-trigger {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 8px;
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1px solid var(--daily-line);
+  border-radius: 5px;
+  color: var(--daily-tertiary);
+  background: var(--daily-surface);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--daily-ink) 10%, transparent);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.journal-daily-completed-trigger > b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  min-height: 17px;
+  padding-inline: 3px;
+  border-radius: 4px;
+  color: var(--hub-content-surface, #fff);
+  background: var(--hub-text-tertiary, #92918b);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.journal-daily-stream .journal-daily-completed-trigger:is(:hover, [aria-expanded="true"]) {
+  border-color: color-mix(in srgb, var(--daily-accent) 30%, var(--daily-surface));
+  box-shadow: 0 1px 6px color-mix(in srgb, var(--daily-accent) 20%, transparent);
+}
+
+.journal-daily-completed-trigger:is(:hover, [aria-expanded="true"]) > b {
+  background: var(--hub-accent, #0a84ff);
+}
+
+.journal-completed-dialog {
+  box-sizing: border-box;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 64px);
+  margin: auto;
+  padding: 16px;
+  overflow: hidden;
+  border: 1px solid var(--hub-separator, rgba(60, 60, 67, .12));
+  border-radius: 16px;
+  color: var(--hub-text-primary, #202124);
+  background: color-mix(in srgb, var(--hub-text-primary, #202124) 3%, var(--hub-content-surface, #fff));
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .18);
+  font: inherit;
+}
+
+.journal-completed-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.journal-completed-dialog::backdrop { background: rgba(0, 0, 0, .16); }
+
+.journal-completed-handle {
+  position: absolute;
+  inset-block-start: 5px;
+  inset-inline-start: calc(50% - 14px);
+  width: 28px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--hub-control-fill, rgba(118, 118, 128, .08));
+}
+
+.journal-completed-dialog > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block-end: 12px;
+  border-block-end: 1px solid var(--hub-separator, rgba(60, 60, 67, .12));
+}
+
+.journal-completed-dialog h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.journal-completed-dialog > header > button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--hub-content-surface, #fff);
+  background: radial-gradient(circle, color-mix(in srgb, var(--hub-text-secondary, #6e6e73) 40%, transparent) 9px, transparent 9px);
+  cursor: pointer;
+}
+
+.journal-completed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-block-start: 10px;
+}
+
+.journal-completed-dialog .journal-daily-task {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+}
+
+.journal-completed-dialog .journal-daily-task > button:not(.task-status-control):not(.journal-task-retry) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  padding: 5px 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+  font: inherit;
+}
+
+.journal-completed-date {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 5px;
+  color: var(--hub-accent, #0a84ff);
+  background: var(--hub-selection, rgba(10, 132, 255, .10));
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.journal-completed-dialog .task-title {
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.journal-completed-dialog .journal-daily-task-history {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.journal-completed-empty {
+  margin: 0;
+  padding: 12px 0;
+  color: var(--hub-text-secondary, #6e6e73);
+  font-size: 13px;
+}
+
+.journal-completed-dialog :is(button:not(.task-status-control), input):focus-visible {
+  outline: 2px solid var(--hub-accent, #0a84ff);
+  outline-offset: 3px;
+}
+
+@container journal-workspace (max-width: 600px) {
+  .journal-database.is-daily .journal-db-heading,
+  .journal-database.is-daily.is-compact .journal-db-heading {
+    padding-inline: 14px;
+  }
+
+  .journal-database.is-daily .journal-db-body {
+    padding-inline: 10px;
+  }
+}
+
+@container journal-daily (max-width: 600px) {
+  .journal-daily-stream .journal-daily-day {
+    grid-template-columns: 124px minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .journal-daily-stream .journal-daily-date {
+    padding: 18px 16px;
+  }
+
+  .journal-daily-stream .journal-daily-date .date-title {
+    font-size: 16px;
+  }
+
+  .journal-daily-stream .journal-daily-date .relative-day {
+    font-size: 15px;
+  }
+
+  .journal-daily-stream .journal-daily-date .weekday {
+    font-size: 13px;
+  }
+
+  .journal-daily-stream .journal-daily-tasks {
+    padding-inline: 0;
+  }
+
+  .journal-daily-stream .journal-daily-task {
+    gap: 10px;
+  }
+
+  .journal-daily-stream .task-title {
+    font-size: 14px;
+  }
+
+  .journal-daily-stream .task-library {
+    font-size: 12px;
+  }
+}
+
+@container journal-daily (max-width: 440px) {
+  .journal-daily-stream .journal-daily-day {
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 12px;
+    padding: 8px;
+    border-radius: 22px;
+  }
+
+  .journal-daily-stream .journal-daily-date {
+    min-height: 104px;
+    padding: 18px 10px;
+    border-radius: 17px;
+  }
+
+  .journal-daily-stream .journal-daily-date .date-title {
+    font-size: 15px;
+  }
+
+  .journal-daily-stream .journal-daily-date .relative-day {
+    font-size: 15px;
+  }
+
+  .journal-daily-stream .journal-daily-date .weekday {
+    font-size: 12px;
+  }
+
+  .journal-daily-stream .journal-daily-document {
+    flex-basis: 180px;
+    width: 180px;
+    padding-inline: 13px;
+    border-radius: 18px;
+  }
+
+  .journal-daily-stream .journal-daily-task {
+    gap: 8px;
+  }
+
+  .journal-daily-stream .journal-daily-task input[type="checkbox"] {
+    flex-basis: 20px;
+    width: 20px;
+    min-width: 20px;
+    height: 20px;
+    min-height: 20px;
+  }
+
+  .journal-daily-stream .task-title {
+    font-size: 13px;
+  }
+
+  .journal-daily-stream .task-library {
+    padding-inline: 6px;
+  }
+
+  .journal-daily-stream :is(.journal-daily-completed, .journal-daily-created) > summary {
+    gap: 8px;
+    font-size: 13px;
+  }
+}
+
+@media (pointer: coarse) {
+  .journal-daily-stream > .journal-daily-previous,
+  .journal-daily-stream > .journal-daily-next,
+  .journal-daily-stream .journal-daily-add,
+  .journal-daily-stream .journal-daily-task > button,
+  .journal-daily-stream :is(.journal-daily-completed, .journal-daily-created) > summary {
+    min-height: 44px;
+  }
+
+  .journal-daily-stream .journal-daily-task input[type="checkbox"] {
+    margin-block-start: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journal-daily-stream,
+  .journal-daily-stream * {
+    scroll-behavior: auto;
+    transition: none;
+    animation: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .journal-completed-dialog { border-color: CanvasText; }
+  .journal-completed-dialog input[type="checkbox"] {
+    appearance: auto;
+    background: none;
+  }
+  .journal-completed-dialog > header > button {
+    color: ButtonText;
+    background: ButtonFace;
+    border: 1px solid ButtonText;
+  }
+  .journal-daily-completed-trigger > b {
+    color: CanvasText;
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+  .journal-daily-stream .journal-daily-task input[type="checkbox"],
+  .journal-daily-stream .journal-daily-task input[type="checkbox"]:checked,
+  .journal-daily-stream .journal-daily-task input[type="checkbox"]:disabled,
+  .journal-daily-stream .journal-daily-task input[type="checkbox"]:checked:disabled {
+    appearance: auto;
+    -webkit-appearance: auto;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    accent-color: auto;
+    forced-color-adjust: auto;
+  }
+
+  .journal-daily-stream .journal-daily-day.is-today,
+  .journal-daily-stream .journal-daily-date,
+  .journal-daily-stream .journal-daily-document {
+    border-color: CanvasText;
+    box-shadow: none;
+  }
+
+  .journal-daily-stream .journal-daily-date[aria-pressed="true"],
+  .journal-daily-stream .journal-daily-document.is-selected {
+    outline: 2px solid Highlight;
+    outline-offset: -3px;
+  }
+
+  .journal-daily-stream :is(.journal-daily-completed, .journal-daily-created) > summary :is(b, strong, .completed-count) {
+    color: CanvasText;
+    border: 1px solid CanvasText;
+  }
+}

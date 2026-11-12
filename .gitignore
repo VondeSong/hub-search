@@ -88,3 +88,8 @@ secrets.*.json
 *.sqlite3
 *.sqlite3-*
 
+# The mobile Sites prototype is buildless: dist/ contains its authored source.
+# Keep this exception scoped; framework build output remains ignored elsewhere.
+!/sites/hub-mobile-lab/dist/
+!/sites/hub-mobile-lab/dist/**
+/sites/.sync-site-sources-*.lock

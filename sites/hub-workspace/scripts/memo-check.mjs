@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+const source=readFileSync(new URL('../app/memo-data.ts',import.meta.url),'utf8');
+const js=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+const {memoTags,memoMatches,sortMemos}=await import('data:text/javascript;base64,'+Buffer.from(js).toString('base64'));
+assert.deepEqual(memoTags('#项目/Hub 一条想法 #阅读。\n#项目/Hub 网址example#片段'),['项目/Hub','阅读']);
+const old={id:'existing',date:'2026-10-01',text:'#项目/Hub 保留原有记录',files:['Sketch.PNG']};
+assert.ok(memoMatches(old,{kind:'tag',value:'项目'},''));
+assert.ok(!memoMatches(old,{kind:'tag',value:'项'},''));
+assert.ok(memoMatches(old,{kind:'all'},' sketch.png '));
+assert.ok(!memoMatches(old,{kind:'day',value:'2026-11-08'},''));
+assert.ok(!memoMatches(old,{kind:'pinned'},''));
+const pin={...old,id:'pinned',pinned:true},newer={...old,id:'newer',date:'2026-11-08'};
+const records=[old,newer,pin];
+assert.deepEqual(sortMemos(records).map(r=>r.id),['pinned','newer','existing']);
+assert.deepEqual(records.map(r=>r.id),['existing','newer','pinned']);
+console.log('✓ 中文层级标签、旧记录兼容、附件搜索、日期范围和置顶顺序');

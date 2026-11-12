@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+const source=readFileSync(new URL('../app/layout-data.ts',import.meta.url),'utf8');
+const js=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+const {journalActivity,journalHeatLevel,parseSidebarWidths,defaultSidebarWidth}=await import('data:text/javascript;base64,'+Buffer.from(js).toString('base64'));
+const entries=[{id:'a',date:'2026-11-08',library:'OS'},{id:'b',date:'2026-11-08',library:'OS'},{id:'a',date:'2026-11-08',library:'OS'},{id:'c',date:'2026-11-08',library:'Car'},{id:'d',date:'2026-11-09'},{id:'bad',date:''}];
+assert.deepEqual(journalActivity(entries),[{date:'2026-11-08',count:3,sources:2},{date:'2026-11-09',count:1,sources:1}]);
+assert.deepEqual(journalActivity(entries.filter(x=>x.id!=='b'))[0],{date:'2026-11-08',count:2,sources:2});
+assert.deepEqual([-1,0,1,2,3,4,5,20,NaN].map(journalHeatLevel),[0,0,1,2,3,3,4,4,0]);
+assert.deepEqual(parseSidebarWidths('{broken'),{});assert.deepEqual(parseSidebarWidths('[]'),{});
+assert.deepEqual(parseSidebarWidths(JSON.stringify({all:900,journal:100,tasks:'300',libraries:312.8})),{all:420,journal:200,libraries:313});
+assert.deepEqual(['all','journal','tasks','libraries','flashcards'].map(defaultSidebarWidth),[224,224,224,248,232]);
+console.log('✓ 按记录计数、资料库去重、动态条数和固定热力等级');
+console.log('✓ 侧栏宽度上下限、旧/损坏偏好恢复及各模块默认值');

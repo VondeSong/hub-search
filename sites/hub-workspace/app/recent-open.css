@@ -1,0 +1,21 @@
+.global-search{position:relative}
+.global-search:has(.recent-open) input{outline:1px solid var(--accent)!important;outline-offset:3px;border-radius:3px}
+.recent-open{position:absolute;top:calc(100% + 6px);left:0;z-index:36;width:min(420px,calc(100vw - 75px));background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:5px}
+.hub-app[data-view="insights"] .recent-open{left:auto;right:0;width:100%}
+.recent-open header,.recent-open footer{display:flex;align-items:center;gap:10px;padding:6px 8px;font-size:11px;color:var(--muted)}
+.recent-open h2{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;margin:0 auto 0 0;color:var(--text)}
+.recent-open header button,.recent-open footer button{border-radius:5px;padding:5px 6px;min-height:28px;color:var(--accent);font-size:11px;white-space:nowrap}
+.recent-open footer{flex-wrap:wrap;gap:3px;border-top:1px solid var(--line)}
+.recent-open footer span{margin-right:auto}
+.recent-open ul{padding:0;margin:0 0 4px;list-style:none;max-height:min(330px,calc(100dvh - 165px));overflow:auto;overscroll-behavior:contain}
+.recent-open li{display:flex;align-items:center;border-radius:6px}
+.recent-open li:hover,.recent-open button:hover{background:var(--surface-2)}
+.recent-open-item{display:flex;flex-direction:column;align-items:stretch;justify-content:center;text-align:left;flex:1;min-width:0;min-height:42px;border-radius:6px;padding:4px 8px}
+.recent-open-item strong,.recent-open-item small span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recent-open-item strong{font-size:12px;font-weight:550}
+.recent-open-item small{display:flex;gap:7px;justify-content:space-between;color:var(--muted);font-size:11px}
+.recent-open-item time{flex-shrink:0}
+.recent-open-remove{display:grid;place-items:center;width:32px;height:36px;margin-right:2px;border-radius:5px;color:var(--muted);flex-shrink:0}
+.recent-open button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.recent-open p{padding:12px 8px;color:var(--muted);font-size:12px}
+@media(max-width:760px){.recent-open-item{min-height:45px}.recent-open-remove{width:40px;height:42px}.recent-open header button,.recent-open footer button{min-height:34px}}

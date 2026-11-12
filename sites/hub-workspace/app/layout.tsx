@@ -1,0 +1,19 @@
+import type { Metadata } from "next";
+import "./globals.css";
+import "./cloud-sync.css";
+import "./insights.css";
+import "./insight-panel.css";
+import "./assistant.css";
+import "./library-browser.css";
+import "./journal-local/JournalWorkspace.css";
+import "./journal-local/JournalDatabase.css";
+import "./journal-local/JournalDaily.css";
+import "./journal-local/QuickJournal.css";
+import "./task-journal.css";
+import "./task-local-aligned.css";
+import "./memo.css";
+import "./flashcards-refined.css";
+import "./navigation-layout.css";
+import "./preview-theme.css";
+export const metadata: Metadata = {title:"Hub · 工作与生活工作台",description:"一个安静、有联系的工作空间。Hub 桌面浏览器交互原型。",icons:{icon:"/favicon.svg",shortcut:"/favicon.svg"}};
+export default function RootLayout({children}:{children:React.ReactNode}) {return <html lang="zh-CN"><body>{children}</body></html>;}
