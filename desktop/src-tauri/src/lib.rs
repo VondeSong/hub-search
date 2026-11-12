@@ -34888,6 +34888,7 @@ pub fn run() {
                 reading_sync::media::cache::unpin_reading_attachment,
                 flashcard_cloud_sync::get_flashcard_cloud_sync_settings,
                 flashcard_cloud_sync::save_flashcard_oss_config,
+                flashcard_cloud_sync::save_cloud_connection,
                 flashcard_cloud_sync::test_flashcard_oss_connection,
                 flashcard_cloud_sync::activate_flashcard_cloud_sync,
                 flashcard_cloud_sync::get_flashcard_cloud_sync_report,

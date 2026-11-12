@@ -270,8 +270,9 @@ it("keeps attachment failures visible only while their module participates", asy
 it("preserves an unsaved connection form across navigation", async () => {
   await load();
   await click("云连接");
+  await click("更换云空间");
   const input = host.querySelector<HTMLInputElement>(
-    '[aria-label="阿里云 OSS 配置"] input',
+    '[aria-label="管理云连接"] input[minlength="3"]',
   )!;
   const set = Object.getOwnPropertyDescriptor(
     HTMLInputElement.prototype,
@@ -285,7 +286,7 @@ it("preserves an unsaved connection form across navigation", async () => {
   await click("云连接");
   expect(
     host.querySelector<HTMLInputElement>(
-      '[aria-label="阿里云 OSS 配置"] input',
+      '[aria-label="管理云连接"] input[minlength="3"]',
     )!.value,
   ).toBe("draft-bucket");
 });

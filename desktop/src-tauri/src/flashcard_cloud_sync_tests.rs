@@ -2,6 +2,51 @@ use super::*;
 use crate::flashcard_authoring::{import_flashcard_values, resolve_flashcard_drafts_in_connection};
 #[path = "flashcard_cloud_sync/resource_tests.rs"]
 mod resource_tests;
+
+#[test]
+fn connection_flow_guards_keep_credentials_and_location_changes_separate() {
+    let c = Connection::open_in_memory().unwrap();
+    c.execute_batch("CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL)")
+        .unwrap();
+    let saved = config();
+    assert!(validate_connection_change(&c, &saved, ConnectionChange::Connect).is_ok());
+    assert!(validate_connection_change(&c, &saved, ConnectionChange::Credentials).is_err());
+    assert!(validate_connection_change(&c, &saved, ConnectionChange::Location).is_err());
+    meta(&c, "flashcard_cloud_provider", "oss").unwrap();
+    let encoded = serde_json::to_string(&saved).unwrap();
+    meta(&c, "flashcard_oss_config", &encoded).unwrap();
+    assert!(validate_connection_change(&c, &saved, ConnectionChange::Connect).is_err());
+    let mut new_key = saved.clone();
+    new_key.access_key_id = "NEWEXAMPLE".into();
+    assert!(validate_connection_change(&c, &new_key, ConnectionChange::Credentials).is_ok());
+    new_key.prefix = "AnotherSpace".into();
+    assert!(validate_connection_change(&c, &new_key, ConnectionChange::Credentials).is_err());
+    assert!(validate_connection_change(&c, &new_key, ConnectionChange::Location).is_ok());
+    assert_eq!(metadata_string(&c, "flashcard_oss_config"), encoded);
+    assert_eq!(connection_name(&c), "我的 Hub");
+    meta(&c, "cloud_connection_name", "工作资料").unwrap();
+    assert_eq!(connection_name(&c), "工作资料");
+}
+
+#[test]
+fn connection_flow_only_bound_quick_notes_block_location_migration() {
+    let c = Connection::open_in_memory().unwrap();
+    assert!(!migration::quick_journal_bound(&c).unwrap());
+    c.execute_batch("CREATE TABLE quick_journal_records(namespace TEXT NOT NULL);INSERT INTO quick_journal_records VALUES('')").unwrap();
+    assert!(!migration::quick_journal_bound(&c).unwrap());
+    c.execute(
+        "INSERT INTO quick_journal_records VALUES('oss://old-space')",
+        [],
+    )
+    .unwrap();
+    assert!(migration::quick_journal_bound(&c).unwrap());
+    assert_eq!(
+        c.query_row("SELECT count(*) FROM quick_journal_records", [], |r| r
+            .get::<_, i64>(0))
+            .unwrap(),
+        2
+    );
+}
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 

@@ -83,6 +83,7 @@ export function CloudSyncSettingsSection({
   const [reading, setReading] = useState<ReadingSyncState | null>(null);
   const [history, setHistory] = useState<FlashcardSyncHistoryItem[]>([]);
   const [provider, setProvider] = useState<"none" | "oss">("none");
+  const [cloudName, setCloudName] = useState("阿里云 OSS");
   const [busy, setBusy] = useState("");
   const [connectionBusy, setConnectionBusy] = useState(false);
   const [maintenanceBusy, setMaintenanceBusy] = useState(false);
@@ -123,7 +124,7 @@ export function CloudSyncSettingsSection({
       invoke<ReadingSyncState>("get_reading_sync_status"),
       invoke<Transfers>("get_cloud_attachment_policies"),
       invoke<QuickState>("get_quick_journal_settings"),
-      invoke<{ provider: "none" | "oss" }>(
+      invoke<{ provider: "none" | "oss"; name?: string }>(
         "get_flashcard_cloud_sync_settings",
       ),
     ]);
@@ -136,6 +137,7 @@ export function CloudSyncSettingsSection({
     setQuick(quickState);
     setQuickDraft(quickState?.settings ?? null);
     setProvider(cloudState.provider);
+    setCloudName(cloudState.name || "阿里云 OSS");
     return status;
   };
   useEffect(() => {
@@ -320,8 +322,8 @@ export function CloudSyncSettingsSection({
       <header>
         <Cloud size={22} />
         <div>
-          <h2>云同步</h2>
-          <p>管理本设备的云连接与同步范围。</p>
+          <h2>{page === "overview" ? "云同步" : page === "preferences" ? "同步设置" : page === "connection" ? "云连接" : "同步诊断与修复"}</h2>
+          {page === "overview" && <p>闪卡、阅读与速记，在设备间接着用。</p>}
         </div>
       </header>
       <div className="cloud-sync-notice" aria-live="polite">
@@ -383,7 +385,7 @@ export function CloudSyncSettingsSection({
               <p>
                 {connection?.configured
                   ? provider === "oss"
-                    ? "阿里云 OSS"
+                    ? cloudName
                     : "尚未连接云空间"
                   : "尚未连接"}
               </p>
@@ -645,7 +647,6 @@ export function CloudSyncSettingsSection({
           aria-label="云连接"
         >
           <CloudConnectionOptions
-            showDownloadPolicy={false}
             syncing={Boolean(busy) || maintenanceBusy || !policy || !connection}
             onBusyChange={setConnectionBusy}
             onProviderChange={setProvider}

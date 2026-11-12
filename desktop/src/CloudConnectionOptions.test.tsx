@@ -1,92 +1,123 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
-vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
+const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
+vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 import { CloudConnectionOptions } from "./CloudConnectionOptions";
 
-let container: HTMLDivElement;
-let root: Root;
-const onChanged = vi.fn(async () => {});
-const config = { bucket: "private-bucket", region: "cn-hangzhou", prefix: "HubFlashcards", accessKeyId: "EXAMPLE" };
-const settings = { provider: "none", legacyRetired: true, oss: config, hasSecret: true, deviceId: "device-a", mediaPolicy: "all" };
-const button = (text: string) => [...container.querySelectorAll("button")].find(b => b.textContent?.includes(text))!;
+const config = { bucket: "private-bucket", region: "cn-hangzhou", prefix: "hub", accessKeyId: "EXAMPLE" };
+let stored: { provider: "none" | "oss"; configured: boolean; name: string; oss?: typeof config; hasSecret: boolean; migrationBlocked: boolean; legacyRetired?: boolean; mediaPolicy: "all"; migration?: { state: string; error: string } };
+let host: HTMLDivElement, root: Root, saveError: string, checkError: string;
+const changed = vi.fn(async () => {}), busyChanged = vi.fn();
+const button = (text: string) => [...host.querySelectorAll("button")].find(b => b.textContent === text)!;
+const field = (label: string) => [...host.querySelectorAll("label")].find(l => l.querySelector("span")?.textContent === label)!.querySelector<HTMLInputElement>("input")!;
 const settle = () => act(async () => { await new Promise(r => setTimeout(r, 0)); });
-beforeEach(async () => {
-  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  invokeMock.mockReset(); onChanged.mockClear();
-  invokeMock.mockImplementation(async (command: string) => {
-    if (command === "get_flashcard_cloud_sync_settings") return settings;
-    if (command === "get_flashcard_cloud_sync_report") return null;
-    throw new Error("配置暂时无法保存");
+const click = async (text: string) => { await act(async () => button(text).click()); await settle(); };
+const enter = async (label: string, value: string) => act(async () => {
+  const input = field(label);
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+});
+const mount = async (paused = false) => { await act(async () => root.render(<CloudConnectionOptions syncing={false} transfersAllowed={!paused} onChanged={changed} onBusyChange={busyChanged} />)); await settle(); };
+const saves = () => invoke.mock.calls.filter(([command]) => command === "save_cloud_connection");
+beforeEach(() => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  host = document.createElement("div"); document.body.append(host); root = createRoot(host);
+  stored = { provider: "oss", configured: true, name: "我的 Hub", oss: { ...config }, hasSecret: true, migrationBlocked: false, mediaPolicy: "all" };
+  saveError = ""; checkError = ""; changed.mockReset().mockResolvedValue(); busyChanged.mockClear(); invoke.mockReset();
+  invoke.mockImplementation(async (command, args) => {
+    if (command === "get_flashcard_cloud_sync_settings") return structuredClone(stored);
+    if (command === "test_flashcard_oss_connection") { if (checkError) throw new Error(checkError); return "OSS 列表、上传、下载和读回校验通过；不代表内容已同步"; }
+    if (command === "save_cloud_connection") {
+      if (saveError) throw new Error(saveError);
+      stored = { ...stored, provider: "oss", configured: true, name: args.name || stored.name, oss: args.oss, hasSecret: true, legacyRetired: false };
+      return structuredClone(stored);
+    }
+    throw new Error("Unexpected command: " + command);
   });
-  container = document.createElement("div"); document.body.append(container); root = createRoot(container);
-  await act(async () => root.render(<CloudConnectionOptions syncing={false} onChanged={onChanged} />));
-  await settle();
 });
-afterEach(async () => {
-  await act(async () => root.unmount()); container.remove();
-  delete (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
-});
-it("keeps the connection inactive and retryable after configuration activation fails", async () => {
-  expect(button("连接 OSS 云空间").disabled).toBe(false);
-  await act(async () => button("连接 OSS 云空间").click()); await settle();
-  expect(invokeMock).toHaveBeenCalledWith("activate_flashcard_cloud_sync", { target: "oss" });
-  expect(container.textContent).toContain("配置暂时无法保存");
-  expect(container.textContent).toContain("当前同步服务：尚未连接");
-  expect(onChanged).not.toHaveBeenCalled();
-  expect(button("连接 OSS 云空间").disabled).toBe(false);
-});
-it("keeps credentials out of the settings display and disables edits while syncing", async () => {
-  const password = container.querySelector('input[type="password"]') as HTMLInputElement;
-  expect(password.value).toBe(""); expect(password.placeholder).toContain("已安全保存");
-  await act(async () => root.render(<CloudConnectionOptions syncing={true} onChanged={onChanged} />));
-  expect(container.querySelector("fieldset")?.disabled).toBe(true);
-  expect(invokeMock.mock.calls.some(([name]) => name === "activate_flashcard_cloud_sync")).toBe(false);
-});
-it("reports OSS only after the saved connection has been enabled", async () => {
-  const onProviderChange = vi.fn();
-  const fallback = invokeMock.getMockImplementation()!;
-  invokeMock.mockImplementation(async (command: string) => command === "activate_flashcard_cloud_sync" ? { ...settings, provider: "oss" } : fallback(command));
-  await act(async () => root.render(<CloudConnectionOptions syncing={false} onChanged={onChanged} onProviderChange={onProviderChange} />));
-  expect(onProviderChange).toHaveBeenLastCalledWith("none");
-  await act(async () => button("连接 OSS 云空间").click());
-  await settle();
-  expect(onChanged).toHaveBeenCalledOnce();
-  expect(onProviderChange).toHaveBeenLastCalledWith("oss");
-  expect(onProviderChange.mock.calls.map(([provider]) => provider)).toEqual(["none", "oss"]);
-});
+afterEach(async () => { await act(async () => root.unmount()); host.remove(); delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT; });
 
-it("retired connections offer no editing, service picker or reverse migration", () => {
-  expect(container.textContent).toContain("仅存在旧云端的内容，请先用旧版取回");
-  expect(container.querySelector('[aria-label="选择要配置的云服务"]')).toBeNull();
-  expect(container.querySelector('[aria-label="WebDAV 配置"]')).toBeNull();
-  expect([...container.querySelectorAll("button")].some(b => /WebDAV|坚果云/.test(b.textContent || ""))).toBe(false);
+it("shows the prototype connection summary and reveals credentials only on demand", async () => {
+  await mount();
+  expect(host.textContent).toContain("管理云空间"); expect(host.textContent).toContain("private-bucket · cn-hangzhou · hub");
+  expect(host.querySelector("input")).toBeNull();
+  await click("更新凭据");
+  expect(host.querySelectorAll("input")).toHaveLength(2);
+  expect(field("AccessKey Secret").value).toBe(""); expect(field("AccessKey Secret").placeholder).toContain("已安全保存");
+  await enter("AccessKey Secret", "synthetic-secret"); await click("取消");
+  expect(host.querySelector("form")).toBeNull(); expect(saves()).toHaveLength(0);
+  await click("更新凭据"); expect(field("AccessKey Secret").value).toBe("");
 });
-it("allows configuration while paused without starting content synchronization", async () => {
-  await act(async () => root.render(<CloudConnectionOptions syncing={false} transfersAllowed={false} onChanged={onChanged} />));
-  expect(button("连接 OSS 云空间").disabled).toBe(false);
-  expect(container.textContent).toContain("启用连接后仍不会开始同步");
-  expect(invokeMock.mock.calls.some(([name]) => ["sync_flashcards", "sync_reading", "sync_quick_journal"].includes(name))).toBe(false);
+it("checks the current connection without submitting a draft or starting content sync", async () => {
+  await mount(); await click("检查连接");
+  expect(host.querySelector("input")).toBeNull(); await click("开始检查");
+  expect(invoke).toHaveBeenCalledWith("test_flashcard_oss_connection"); expect(saves()).toHaveLength(0);
+  expect(host.textContent).toContain("不代表内容已同步");
 });
-
-it("requires coordination before moving the active OSS location and preserves edits after failure", async () => {
-  await act(async () => root.unmount());
-  invokeMock.mockImplementation(async command => command === "get_flashcard_cloud_sync_settings" ? { ...settings, provider: "oss" } : command === "get_flashcard_cloud_sync_report" ? null : Promise.reject(new Error("本批迁移未结束")));
-  root = createRoot(container);
-  await act(async () => root.render(<CloudConnectionOptions syncing={false} onChanged={onChanged} />)); await settle();
-  const prefix = [...container.querySelectorAll("label")].find(label => label.textContent?.includes("同步目录"))!.querySelector("input")!;
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(prefix, "NewReadingSpace");
-    prefix.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  expect(button("迁移并保存 OSS 配置").disabled).toBe(true);
-  await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
-  expect(button("迁移并保存 OSS 配置").disabled).toBe(false);
-  await act(async () => button("迁移并保存 OSS 配置").click()); await settle();
-  expect(invokeMock).toHaveBeenCalledWith("save_flashcard_oss_config", expect.objectContaining({ oss: { ...config, prefix: "NewReadingSpace" }, otherDevicesReady: true }));
-  expect(prefix.value).toBe("NewReadingSpace");
-  expect(container.textContent).toContain("本批迁移未结束");
-  expect(onChanged).not.toHaveBeenCalled();
+it("retains the old connection and the credential draft after a failed candidate check", async () => {
+  saveError = "新凭据检查失败"; await mount(); await click("更新凭据");
+  await enter("AccessKey ID", "NEWEXAMPLE"); await enter("AccessKey Secret", "synthetic-secret"); await click("检查并保存凭据");
+  expect(saves()[0][1]).toEqual({ oss: { ...config, accessKeyId: "NEWEXAMPLE" }, secret: "synthetic-secret", change: "credentials", name: null, otherDevicesReady: false });
+  expect(host.textContent).toContain("新凭据检查失败"); expect(field("AccessKey Secret").value).toBe("synthetic-secret");
+  expect(stored.oss).toEqual(config); expect(changed).not.toHaveBeenCalled();
+  saveError = ""; await click("检查并保存凭据"); expect(host.querySelector("form")).toBeNull(); expect(changed).toHaveBeenCalledOnce();
+});
+it("updates credentials while paused and leaves module and attachment policies untouched", async () => {
+  await mount(true); await click("更新凭据"); await enter("AccessKey Secret", "synthetic-new-secret"); await click("检查并保存凭据");
+  expect(saves()[0][1].change).toBe("credentials");
+  expect(invoke.mock.calls.some(([name]) => name.startsWith("sync_") || name.includes("attachment_policy") || name === "update_cloud_sync_policy")).toBe(false);
+});
+it("connects in two steps through one checked command and preserves the paused state", async () => {
+  stored = { ...stored, provider: "none", configured: false, oss: undefined, hasSecret: false, legacyRetired: true };
+  await mount(true); expect(host.textContent).toContain("旧 WebDAV（含坚果云）同步已停用");
+  expect([...host.querySelectorAll("button")].some(b => /WebDAV|坚果云/.test(b.textContent || ""))).toBe(false);
+  await click("连接阿里云 OSS"); await enter("连接名称", "学习资料"); await enter("Bucket 名称", "fresh-bucket"); await click("下一步");
+  expect(saves()).toHaveLength(0); expect(host.textContent).toContain("本设备已暂停");
+  await enter("AccessKey ID", "EXAMPLE"); await enter("AccessKey Secret", "synthetic-secret"); await click("检查并保存连接");
+  expect(saves()[0][1]).toMatchObject({ change: "connect", name: "学习资料", otherDevicesReady: false });
+  expect(host.textContent).toContain("学习资料"); expect(host.querySelector("form")).toBeNull();
+  expect(invoke.mock.calls.some(([name]) => name.startsWith("sync_") || name === "activate_flashcard_cloud_sync" || name === "save_flashcard_oss_config")).toBe(false);
+});
+it("requires migration coordination and retains both the source summary and target after failure", async () => {
+  saveError = "本次迁移未结束，进度已保存"; stored.migration = { state: "partial", error: "待继续" };
+  await mount(); await click("更换云空间"); await enter("目录前缀", "NewSpace"); await click("下一步");
+  expect(button("开始迁移并核验").disabled).toBe(true);
+  await act(async () => host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click()); await click("开始迁移并核验");
+  expect(saves()[0][1]).toMatchObject({ change: "location", oss: { ...config, prefix: "NewSpace" }, otherDevicesReady: true });
+  expect(host.textContent).toContain("private-bucket · cn-hangzhou · hub"); expect(host.textContent).toContain("再次执行可继续");
+  await click("上一步"); expect(field("目录前缀").value).toBe("NewSpace");
+});
+it("blocks migration for bound quick notes before any command is sent", async () => {
+  stored.migrationBlocked = true; await mount(); await click("更换云空间"); await enter("目录前缀", "NewSpace"); await click("下一步");
+  expect(host.textContent).toContain("速记已绑定当前云空间，暂时不能切换"); expect(button("开始迁移并核验").disabled).toBe(true);
+  expect(host.querySelector('input[type="checkbox"]')).toBeNull(); expect(saves()).toHaveLength(0);
+});
+it("blocks a location migration while paused even after acknowledgement", async () => {
+  await mount(true); await click("更换云空间"); await enter("目录前缀", "NewSpace"); await click("下一步");
+  await act(async () => host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+  expect(button("开始迁移并核验").disabled).toBe(true); expect(saves()).toHaveLength(0);
+});
+it("normalizes equivalent directory paths and does not ask for a migration for a name change", async () => {
+  await mount(); await click("更换云空间"); await enter("连接名称", "工作资料"); await enter("目录前缀", "/hub/"); await click("下一步");
+  expect(host.querySelector('input[type="checkbox"]')).toBeNull(); await click("检查并保存连接");
+  expect(saves()[0][1]).toMatchObject({ name: "工作资料", change: "location", otherDevicesReady: false });
+});
+it("does not report a saved connection as unsaved when overview refresh fails", async () => {
+  changed.mockRejectedValue(new Error("刷新失败")); await mount(); await click("更新凭据"); await click("检查并保存凭据");
+  expect(host.textContent).toContain("连接已保存，但同步状态刷新失败"); expect(host.querySelector("form")).toBeNull(); expect(saves()).toHaveLength(1);
+});
+it("keeps failed current-connection checks retryable and locks edits while syncing", async () => {
+  checkError = "当前离线"; await mount(); await click("检查连接"); await click("开始检查"); expect(host.textContent).toContain("当前离线");
+  await act(async () => root.render(<CloudConnectionOptions syncing onChanged={changed} />));
+  expect(host.querySelector("fieldset")?.disabled).toBe(true); expect(saves()).toHaveLength(0);
+});
+it("ignores an older initial settings reply after StrictMode remounts the effect", async () => {
+  let first: (value: unknown) => void = () => {}; const base = invoke.getMockImplementation()!;
+  invoke.mockImplementationOnce(() => new Promise(resolve => { first = resolve; })).mockImplementation(base);
+  await act(async () => root.render(<StrictMode><CloudConnectionOptions syncing={false} onChanged={changed} /></StrictMode>)); await settle();
+  expect(host.textContent).toContain("管理云空间");
+  await act(async () => first({ ...stored, configured: false, provider: "none", oss: undefined }));
+  expect(host.textContent).toContain("管理云空间");
 });

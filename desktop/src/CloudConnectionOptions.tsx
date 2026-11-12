@@ -1,93 +1,162 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Check, ChevronRight, Cloud, KeyRound, LoaderCircle } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import "./CloudConnectionOptions.css";
 
 type OssConfig = { bucket: string; region: string; prefix: string; accessKeyId: string };
-type CloudSettings = { provider: "none" | "oss"; legacyRetired?: boolean; oss?: OssConfig; hasSecret: boolean; deviceId: string; mediaPolicy: "all" | "onDemand"; migration?: { state: string; error?: string; updatedAt?: number } | null };
-type Report = { uploadedBytes: number; downloadedBytes: number; pendingMedia: number; uploadedChanges: number; downloadedChanges: number; completedAt: number };
+type CloudSettings = {
+  provider: "none" | "oss";
+  configured?: boolean;
+  name?: string;
+  migrationBlocked?: boolean;
+  legacyRetired?: boolean;
+  oss?: OssConfig;
+  hasSecret: boolean;
+  mediaPolicy: "all" | "onDemand";
+  migration?: { state: string; error?: string } | null;
+};
+type Flow = "location" | "credentials" | "verify" | "check" | null;
 const empty: OssConfig = { bucket: "", region: "cn-hangzhou", prefix: "HubFlashcards", accessKeyId: "" };
+const location = (c: OssConfig) => JSON.stringify([c.bucket.trim(), c.region.trim(), c.prefix.trim().replace(/^\/+|\/+$/g, "") || "HubFlashcards"]);
 
-export function CloudConnectionOptions({ syncing, onChanged, onProviderChange, transfersAllowed = true, onBusyChange, showDownloadPolicy = true }: { syncing: boolean; onChanged: () => Promise<void>; onProviderChange?: (provider: CloudSettings["provider"]) => void; transfersAllowed?: boolean; onBusyChange?: (busy: boolean) => void; showDownloadPolicy?: boolean }) {
+export function CloudConnectionOptions({ syncing, onChanged, onProviderChange, transfersAllowed = true, onBusyChange }: {
+  syncing: boolean;
+  onChanged: () => Promise<void>;
+  onProviderChange?: (provider: CloudSettings["provider"]) => void;
+  transfersAllowed?: boolean;
+  onBusyChange?: (busy: boolean) => void;
+}) {
   const [settings, setSettings] = useState<CloudSettings | null>(null);
-  const [oss, setOss] = useState(empty);
+  const [flow, setFlow] = useState<Flow>(null);
+  const [draft, setDraft] = useState(empty);
+  const [name, setName] = useState("我的 Hub");
   const [secret, setSecret] = useState("");
-  const [policy, setPolicy] = useState<"all" | "onDemand">("all");
-  const [ready, setReady] = useState(false);
+  const [ack, setAck] = useState(false);
   const [busy, setBusy] = useState("");
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [report, setReport] = useState<Report | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => {
-    let active = true;
-    void invoke<CloudSettings>("get_flashcard_cloud_sync_settings").then(s => {
-      if (!active) return;
-      setSettings(s); setOss(s.oss || empty); setPolicy(s.mediaPolicy); setLoaded(true);
-    }).catch(e => { if (active) setError(String(e)); });
-    return () => { active = false; };
-  }, []);
-  useEffect(() => {
-    if (settings) onProviderChange?.(settings.provider);
-  }, [settings?.provider, onProviderChange]);
-  useEffect(() => {
-    if (syncing) return;
-    let active = true;
-    void invoke<Report | null>("get_flashcard_cloud_sync_report").then(r => { if (active) setReport(r); }).catch(() => {});
-    return () => { active = false; };
-  }, [syncing, settings]);
-  useEffect(() => { onBusyChange?.(Boolean(busy)); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
-  const dirty = secret !== "" || JSON.stringify(oss) !== JSON.stringify(settings?.oss || empty) || policy !== (settings?.mediaPolicy || "all");
-  const movingActiveOss = settings?.provider === "oss" && Boolean(settings.oss) && JSON.stringify(oss) !== JSON.stringify(settings.oss);
-  const disabled = !!busy || syncing || !loaded;
-  const run = async (action: "save" | "test" | "oss") => {
-    setBusy(action); setError(""); setMessage("");
+  const [message, setMessage] = useState("");
+  const mounted = useRef(true);
+  const loadSequence = useRef(0);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const connected = settings?.configured ?? (settings?.provider === "oss" && Boolean(settings.oss));
+  const moving = Boolean(connected && settings?.oss && location(settings.oss) !== location(draft));
+  const blocked = syncing || Boolean(busy) || !settings;
+  const needsSecret = !settings?.hasSecret || draft.accessKeyId.trim() !== settings?.oss?.accessKeyId;
+
+  const load = async () => {
+    const request = ++loadSequence.current;
+    setError("");
     try {
-      if (action === "test") setMessage(await invoke<string>("test_flashcard_oss_connection"));
-      else {
-        const next = action === "save"
-          ? await invoke<CloudSettings>("save_flashcard_oss_config", { oss, secret: secret || null, mediaPolicy: policy, otherDevicesReady: ready })
-          : await invoke<CloudSettings>("activate_flashcard_cloud_sync", { target: action });
-        setSettings(next); setOss(next.oss || empty); setPolicy(next.mediaPolicy); setSecret("");
-        setReady(false);
-        setMessage(action === "save" ? next.provider === "oss" ? "阿里云 OSS 配置已保存，后续同步使用此配置。" : "配置已保存，可测试连接并启用云空间。" : "OSS 连接已启用，内容同步结果请查看概览。");
-        await onChanged();
+      const next = await invoke<CloudSettings>("get_flashcard_cloud_sync_settings");
+      if (mounted.current && request === loadSequence.current) setSettings(next);
+    } catch (e) { if (mounted.current && request === loadSequence.current) setError(String(e)); }
+  };
+  useEffect(() => {
+    mounted.current = true;
+    void load();
+    return () => { mounted.current = false; ++loadSequence.current; };
+  }, []);
+  useEffect(() => { if (settings) onProviderChange?.(settings.provider); }, [settings?.provider, onProviderChange]);
+  useEffect(() => { onBusyChange?.(Boolean(busy)); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
+  useEffect(() => { if (flow) heading.current?.focus(); }, [flow]);
+
+  const begin = (next: Exclude<Flow, null>) => {
+    setDraft(settings?.oss || empty); setName(settings?.name || "我的 Hub");
+    setSecret(""); setAck(false); setError(""); setMessage(""); setFlow(next);
+  };
+  const cancel = () => { setFlow(null); setSecret(""); setError(""); setAck(false); };
+  const update = (key: keyof OssConfig, value: string) => {
+    setDraft(v => ({ ...v, [key]: value })); setAck(false); setError("");
+  };
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (blocked) return;
+    if (flow === "location") { setError(""); setFlow("verify"); return; }
+    if (moving && flow === "verify" && (!ack || !transfersAllowed || settings?.migrationBlocked)) return;
+    const checkOnly = flow === "check";
+    setBusy(checkOnly ? "正在检查连接…" : moving && flow === "verify" ? "正在迁移并核验…" : "正在检查并保存…");
+    setError(""); setMessage("");
+    try {
+      if (checkOnly) {
+        const result = await invoke<string>("test_flashcard_oss_connection");
+        if (mounted.current) { setMessage(result); setFlow(null); }
+      } else {
+        const next = await invoke<CloudSettings>("save_cloud_connection", {
+          oss: draft,
+          secret: secret || null,
+          change: flow === "credentials" ? "credentials" : connected ? "location" : "connect",
+          name: flow === "credentials" ? null : name,
+          otherDevicesReady: ack,
+        });
+        if (!mounted.current) return;
+        setSettings(next); setFlow(null); setSecret(""); setAck(false);
+        setMessage(flow === "credentials" ? "新凭据已检查并保存，云空间保持不变。" : moving ? "迁移与读回核验通过，已使用新云空间。" : "连接已检查并保存，内容同步结果请查看概览。");
+        try { await onChanged(); }
+        catch { if (mounted.current) setError("连接已保存，但同步状态刷新失败。可切回概览重新读取。"); }
       }
     } catch (e) {
+      if (!mounted.current) return;
       setError(String(e));
-      await invoke<CloudSettings>("get_flashcard_cloud_sync_settings").then(setSettings).catch(() => undefined);
-    } finally { setBusy(""); }
+      await invoke<CloudSettings>("get_flashcard_cloud_sync_settings").then(next => { if (mounted.current) setSettings(next); }).catch(() => undefined);
+    } finally { if (mounted.current) setBusy(""); }
   };
-  const update = (key: keyof OssConfig, value: string) => { setOss(v => ({ ...v, [key]: value })); setReady(false); };
-  const size = (n: number) => n >= 1048576 ? `${(n / 1048576).toFixed(2)} MB` : `${(n / 1024).toFixed(1)} KB`;
-  const targetReady = !dirty && !!settings?.oss && settings.hasSecret;
-  return <div className="cloud-connection-options">
-    <div className="cloud-sync-section-heading"><strong id="cloud-sync-connection-title">云服务</strong></div>
-    <p className="cloud-connection-current">当前同步服务：<strong>{settings ? settings.provider === "oss" ? "阿里云 OSS" : "尚未连接" : "读取中…"}</strong></p>
-    {settings?.legacyRetired && <p role="status">旧 WebDAV（含坚果云）同步已停用。本机内容、附件和待同步记录保留；本版本不会访问或删除旧云端文件。仅存在旧云端的内容，请先用旧版取回，再连接 OSS。</p>}
-    <section aria-label="阿里云 OSS 配置">
-      <div className="cloud-sync-section-heading"><strong>阿里云 OSS 配置</strong></div>
-      <p>先创建私有 Bucket，使用只允许访问本同步目录的专用密钥。密钥仅保存在本设备安全存储中。</p>
-      <fieldset disabled={disabled}>
-        <label><span>Bucket 名称</span><input value={oss.bucket} onChange={e => update("bucket", e.target.value)} placeholder="你的私有 Bucket 名称" spellCheck={false} /></label>
-        <label><span>地域</span><input value={oss.region} onChange={e => update("region", e.target.value)} placeholder="cn-hangzhou" spellCheck={false} /></label>
-        <label><span>同步目录</span><input value={oss.prefix} onChange={e => update("prefix", e.target.value)} spellCheck={false} /></label>
-        <label><span>AccessKey ID</span><input value={oss.accessKeyId} onChange={e => update("accessKeyId", e.target.value)} autoComplete="off" spellCheck={false} /></label>
-        <label><span>AccessKey Secret</span><input type="password" value={secret} onChange={e => setSecret(e.target.value)} placeholder={settings?.hasSecret ? "已安全保存；留空保持" : "专用密钥，不要发到聊天里"} autoComplete="new-password" /></label>
-        {showDownloadPolicy && <label><span>闪卡附件下载</span><select value={policy} onChange={e => setPolicy(e.target.value as typeof policy)}><option value="all">全部下载，供离线使用</option><option value="onDemand">打开时下载，减少占用</option></select></label>}
-        {movingActiveOss && <><p>更改正在使用的云位置会迁移全部模块。分批传输未结束前继续使用原位置，再次保存可继续；原云数据保留。</p><label className="cloud-auto-sync"><input type="checkbox" checked={ready} onChange={e => setReady(e.target.checked)} /><span>其它设备已同步并暂停编辑和自动同步</span></label></>}
-        <div className="cloud-sync-actions"><button disabled={!dirty || (movingActiveOss && (!ready || !transfersAllowed))} onClick={() => void run("save")}>{busy === "save" ? "保存中…" : movingActiveOss ? "迁移并保存 OSS 配置" : "保存 OSS 配置"}</button><button disabled={!settings?.oss || dirty} onClick={() => void run("test")}>{busy === "test" ? "校验中…" : "测试 OSS 连接"}</button></div>
+
+  if (!settings) return <div className="cloud-connection-options" aria-busy={!error}>
+    <p role={error ? "alert" : "status"}>{error || "正在读取云连接…"}</p>
+    {error && <button onClick={() => void load()}>重新读取连接</button>}
+  </div>;
+
+  const credentials = <>
+    <label><span>AccessKey ID</span><input required value={draft.accessKeyId} onChange={e => update("accessKeyId", e.target.value)} autoComplete="off" spellCheck={false} /></label>
+    <label><span>AccessKey Secret</span><input type="password" required={needsSecret} value={secret} onChange={e => setSecret(e.target.value)} placeholder={needsSecret ? "填写此密钥对应的 Secret" : "已安全保存；留空沿用"} autoComplete="new-password" /></label>
+    <p>使用只允许访问同步目录的专用密钥，仅保存在本设备。检查失败会保留原连接与凭据。</p>
+  </>;
+  return <div className="cloud-connection-options" aria-busy={Boolean(busy)}>
+    <h3>{connected ? "管理云空间" : "连接一个云空间"}</h3>
+    <p>日常无需修改连接。更新凭据与更换云空间分别处理。</p>
+    <div className="cloud-connection-summary">
+      <span className="cloud-connection-icon"><Cloud size={22} aria-hidden="true" /></span>
+      <div><strong>{connected ? settings.name || "我的 Hub" : "尚未连接"}</strong><p>{connected && settings.oss ? `${settings.oss.bucket} · ${settings.oss.region} · ${settings.oss.prefix}` : "电脑和手机使用同一个云空间"}</p></div>
+      {connected && <span className="cloud-connection-tag">当前连接</span>}
+    </div>
+    {!flow && <div className="cloud-connection-actions">
+      {connected && <><button disabled={blocked} onClick={() => begin("credentials")}><KeyRound size={15} aria-hidden="true" />更新凭据</button><button disabled={blocked || !settings.hasSecret} onClick={() => begin("check")}>检查连接</button></>}
+      <button disabled={blocked} onClick={() => begin("location")}>{connected ? "更换云空间" : "连接阿里云 OSS"}<ChevronRight size={15} aria-hidden="true" /></button>
+    </div>}
+    {settings.legacyRetired && <p className="cloud-connection-warning">旧 WebDAV（含坚果云）同步已停用。本机内容与待同步记录保留；本版本不会访问或删除旧云端文件。仅存在旧云端的内容，请先用旧版取回，再连接 OSS。</p>}
+    {flow && <form className="cloud-connection-form" aria-label="管理云连接" aria-describedby={error ? "cloud-connection-error" : undefined} onSubmit={event => void submit(event)}>
+      <h3 ref={heading} tabIndex={-1}>{flow === "location" ? "云空间位置" : flow === "credentials" ? "更新连接凭据" : flow === "check" ? "检查连接" : moving ? "确认迁移范围" : connected ? "检查并保存" : "检查并连接"}</h3>
+      <fieldset disabled={blocked}>
+        {flow === "location" && <>
+          <label><span>连接名称</span><input required maxLength={60} value={name} onChange={e => setName(e.target.value)} /></label>
+          <label><span>Bucket 名称</span><input required minLength={3} maxLength={63} pattern="[a-z0-9][a-z0-9-]{1,61}[a-z0-9]" value={draft.bucket} onChange={e => update("bucket", e.target.value)} spellCheck={false} /></label>
+          <label><span>地域</span><input required value={draft.region} onChange={e => update("region", e.target.value)} placeholder="cn-hangzhou" spellCheck={false} /></label>
+          <label><span>目录前缀</span><input maxLength={180} pattern="[a-zA-Z0-9_/-]*" value={draft.prefix} onChange={e => update("prefix", e.target.value)} spellCheck={false} /></label>
+          <p>位置变化才进入迁移；仅更新密钥请返回“更新凭据”。</p>
+        </>}
+        {flow === "credentials" && credentials}
+        {flow === "check" && <p>检查当前 OSS 目录的列表、上传、下载与读回权限，不执行内容同步。检查成功不代表内容已同步。</p>}
+        {flow === "verify" && <>
+          <p className="cloud-connection-destination">{name} · {draft.bucket} · {draft.region} · {draft.prefix || "HubFlashcards"}</p>
+          {moving && <>
+            <ul className="cloud-connection-scope"><li><Check size={14} aria-hidden="true" />闪卡、复习记录与闪卡附件</li><li><Check size={14} aria-hidden="true" />阅读正文、记录与阅读附件</li></ul>
+            <p className="cloud-connection-warning">速记尚未纳入统一迁移与恢复，不能随云空间迁移。</p>
+            {settings.migrationBlocked ? <p role="alert">速记已绑定当前云空间，暂时不能切换。请保留原连接。</p> : <label className="cloud-connection-check"><input type="checkbox" checked={ack} onChange={e => setAck(e.target.checked)} /><span>其它设备已同步并暂停编辑与自动同步</span></label>}
+            {!transfersAllowed && <p>此设备已暂停，请先恢复云同步才能迁移内容。</p>}
+            <p>读回核验通过后才切换；失败继续使用原连接，原云副本保留。</p>
+          </>}
+          {credentials}
+          {!moving && <p>{transfersAllowed ? "连接检查不会开始内容同步；正文和附件仍按同步设置处理。" : "本设备已暂停，保存连接后仍不会开始内容同步。"}</p>}
+        </>}
+        <div className="cloud-connection-form-actions">
+          {flow === "verify" && <button type="button" onClick={() => { setFlow("location"); setError(""); }}>上一步</button>}
+          <button type="button" onClick={cancel}>取消</button>
+          <button className="cloud-primary" disabled={flow === "verify" && moving && (!ack || !transfersAllowed || settings.migrationBlocked)} type="submit">{busy ? <><LoaderCircle size={15} className="spin" aria-hidden="true" />{busy}</> : flow === "location" ? "下一步" : flow === "credentials" ? "检查并保存凭据" : flow === "check" ? "开始检查" : moving ? "开始迁移并核验" : "检查并保存连接"}</button>
+        </div>
       </fieldset>
-    </section>
-    {settings?.provider === "none" && <section className="cloud-connection-switch" aria-label="连接云空间">
-      <p>电脑和手机使用同一 OSS 目录。启用连接只保存配置，内容按同步方式和附件策略处理。</p>
-      <fieldset disabled={disabled}>
-        {!transfersAllowed && <p>本设备已暂停，启用连接后仍不会开始同步。</p>}
-        <div className="cloud-sync-actions"><button className="primary" disabled={!targetReady} onClick={() => void run("oss")}>{busy === "oss" ? "正在启用…" : "连接 OSS 云空间"}</button></div>
-      </fieldset>
-      <p>连接失败可重试，本机内容与云端文件保留。</p>
-    </section>}
-    {settings?.provider === "oss" && report && <details className="cloud-sync-help"><summary>最近一次 OSS 传输详情</summary><p>上传 {report.uploadedChanges} 项变更（{size(report.uploadedBytes)}），下载 {report.downloadedChanges} 项变更（{size(report.downloadedBytes)}）。<br />{report.pendingMedia ? `本次同步结束时有 ${report.pendingMedia} 个附件待下载，可打开附件或再次同步下载。` : "本次同步结束时，所需附件均已在本机。"}</p></details>}
-    {(error || message) && <p role={error ? "alert" : "status"} className={error ? "cloud-sync-last-error" : ""}>{error || message}</p>}
-    {settings?.migration?.state === "partial" && <p role="status">上次迁移未完成，当前仍使用原服务。{settings.migration.error} 保持目标配置和暂停状态，再次执行可继续。</p>}
+      {settings.migration?.state === "partial" && moving && <p role="status">上次迁移未完成，仍使用原连接。保持相同目标，再次执行可继续。{settings.migration.error}</p>}
+    </form>}
+    {error && <p id="cloud-connection-error" role="alert">{error}</p>}
+    {message && <p role="status">{message}</p>}
   </div>;
 }

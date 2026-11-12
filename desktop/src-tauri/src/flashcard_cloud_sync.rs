@@ -32,6 +32,9 @@ fn record_identity(field: &str, value: &Value) -> String {
 #[serde(rename_all = "camelCase")]
 pub(super) struct CloudSettings {
     provider: String,
+    configured: bool,
+    name: String,
+    migration_blocked: bool,
     legacy_retired: bool,
     oss: Option<OssConfig>,
     has_secret: bool,
@@ -69,6 +72,9 @@ pub(super) fn get_flashcard_cloud_sync_settings(app: AppHandle) -> Result<CloudS
     let (c, _writer) = open_write_database(&database_path(&app)?)?;
     Ok(CloudSettings {
         provider: provider(&c),
+        configured: configured(&c),
+        name: connection_name(&c),
+        migration_blocked: migration::quick_journal_bound(&c)?,
         legacy_retired: legacy_retired(&c),
         oss: config(&c).ok(),
         has_secret: stored_secret_get(&app, OSS_SECRET)?.is_some(),
@@ -90,25 +96,133 @@ pub(super) async fn save_flashcard_oss_config(
     media_policy: String,
     other_devices_ready: Option<bool>,
 ) -> Result<CloudSettings, String> {
+    save_configuration(
+        app,
+        oss,
+        secret,
+        Some(media_policy),
+        other_devices_ready,
+        None,
+        None,
+    )
+    .await
+}
+
+#[derive(Clone, Copy, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(super) enum ConnectionChange {
+    Connect,
+    Credentials,
+    Location,
+}
+
+fn connection_name(c: &Connection) -> String {
+    let value = metadata_string(c, "cloud_connection_name");
+    if value.trim().is_empty() {
+        "我的 Hub".into()
+    } else {
+        value
+    }
+}
+
+fn validate_connection_change(
+    c: &Connection,
+    oss: &OssConfig,
+    change: ConnectionChange,
+) -> Result<(), String> {
+    match change {
+        ConnectionChange::Connect if configured(c) => {
+            Err("已有云连接，请使用更新凭据或更换云空间".into())
+        }
+        ConnectionChange::Credentials | ConnectionChange::Location if !configured(c) => {
+            Err("尚未连接云空间，请先连接 OSS".into())
+        }
+        ConnectionChange::Credentials
+            if config(c)?.normalized()?.namespace() != oss.namespace() =>
+        {
+            Err("更新凭据不能更换云空间，请使用更换云空间入口".into())
+        }
+        _ => Ok(()),
+    }
+}
+
+#[tauri::command]
+pub(super) async fn save_cloud_connection(
+    app: AppHandle,
+    oss: OssConfig,
+    secret: Option<String>,
+    change: ConnectionChange,
+    name: Option<String>,
+    other_devices_ready: Option<bool>,
+) -> Result<CloudSettings, String> {
+    save_configuration(
+        app,
+        oss,
+        secret,
+        None,
+        other_devices_ready,
+        Some(change),
+        name,
+    )
+    .await
+}
+
+async fn save_configuration(
+    app: AppHandle,
+    oss: OssConfig,
+    secret: Option<String>,
+    media_policy: Option<String>,
+    other_devices_ready: Option<bool>,
+    change: Option<ConnectionChange>,
+    name: Option<String>,
+) -> Result<CloudSettings, String> {
     let _guard = FLASHCARD_SYNC_LOCK.lock().await;
     let _reading_guard = reading_sync::LOCK.lock().await;
     let _quick_guard = quick_journal::LOCK.lock().await;
     let oss = oss.normalized()?;
+    let db = database_path(&app)?;
+    let c = open_database(&db)?;
+    let media_policy = media_policy.unwrap_or_else(|| {
+        match metadata_string(&c, "flashcard_cloud_media_policy").as_str() {
+            "onDemand" => "onDemand".into(),
+            _ => "all".into(),
+        }
+    });
     if !matches!(media_policy.as_str(), "all" | "onDemand") {
         return Err("附件下载策略无效".into());
     }
-    let db = database_path(&app)?;
-    let c = open_database(&db)?;
+    if let Some(change) = change {
+        validate_connection_change(&c, &oss, change)?;
+    }
+    let name = name.map(|n| n.trim().to_string());
+    if name
+        .as_ref()
+        .is_some_and(|n| n.is_empty() || n.chars().count() > 60 || n.chars().any(char::is_control))
+    {
+        return Err("连接名称需为 1–60 个字符，不能包含换行或控制字符".into());
+    }
     let active_change =
         provider(&c) == "oss" && config(&c)?.normalized()?.namespace() != oss.namespace();
     let secret = secret.filter(|s| !s.is_empty());
     if config(&c).is_ok_and(|old| old.access_key_id != oss.access_key_id) && secret.is_none() {
         return Err("更换 AccessKey ID 时，请同时填写对应的 Secret".into());
     }
-    if secret.is_none() && stored_secret_get(&app, OSS_SECRET)?.is_none() {
+    let previous = stored_secret_get(&app, OSS_SECRET)?;
+    if secret.is_none() && previous.is_none() {
         return Err("请填写 AccessKey Secret".into());
     }
     drop(c);
+    if change.is_some() {
+        // Check the candidate before writing either configuration or the secure-store secret.
+        let candidate = OssStore::new(
+            oss.clone(),
+            secret
+                .clone()
+                .or_else(|| previous.clone())
+                .unwrap_or_default(),
+        )?;
+        probe_connection(&candidate).await?;
+    }
     let receipt = if active_change {
         Some(
             migration::prepare(
@@ -126,7 +240,6 @@ pub(super) async fn save_flashcard_oss_config(
     };
     let (mut c, _writer) = open_write_database(&db)?;
     cloud_sync::initialize(&c)?;
-    let previous = stored_secret_get(&app, OSS_SECRET)?;
     if let Some(secret) = &secret {
         stored_secret_set(&app, OSS_SECRET, secret)?;
     }
@@ -141,6 +254,14 @@ pub(super) async fn save_flashcard_oss_config(
             &serde_json::to_string(&oss).map_err(|e| e.to_string())?,
         )?;
         meta(&tx, "flashcard_cloud_media_policy", &media_policy)?;
+        if let Some(name) = &name {
+            meta(&tx, "cloud_connection_name", name)?;
+        }
+        if change == Some(ConnectionChange::Connect) {
+            meta(&tx, "flashcard_cloud_provider", "oss")?;
+            meta(&tx, "flashcard_sync_last_error", "")?;
+            meta(&tx, "flashcard_sync_last_success", "0")?;
+        }
         mark_flashcard_sync_dirty(&tx)?;
         tx.commit().map_err(|e| e.to_string())
     })();
