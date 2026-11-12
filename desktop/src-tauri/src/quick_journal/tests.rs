@@ -240,7 +240,7 @@ fn sync_report_does_not_call_pending_records_uploaded_or_written() {
 }
 
 #[tokio::test]
-async fn cloud_replay_preserves_manual_edits_and_receipts_follow_verified_attachments() {
+async fn cloud_replay_writes_body_before_attachments_and_preserves_manual_edits() {
     let f = Fixture::new();
     let store = MemoryStore::default();
     let mut r = record();
@@ -259,8 +259,12 @@ async fn cloud_replay_preserves_manual_edits_and_receipts_follow_verified_attach
         )
         .await
         .unwrap();
-    assert!(transfer(&f.db, &store, "test").await.is_err());
-    assert!(!f.dir.join("vault/Journals/2026-11-07.md").exists());
+    transfer(&f.db, &store, "test").await.unwrap();
+    assert!(
+        fs::read_to_string(f.dir.join("vault/Journals/2026-11-07.md"))
+            .unwrap()
+            .contains("附件未下载")
+    );
     store
         .put_verified(&store.key(&format!("journal/assets/{hash}")), bytes)
         .await
@@ -371,4 +375,147 @@ fn folder_never_escapes_vault() {
         assert!(!safe_folder(f));
     }
     assert!(safe_folder("日记/每日"));
+}
+
+#[test]
+fn deferred_attachments_patch_only_generated_markers_without_replaying_body() {
+    let f = Fixture::new();
+    let mut r = record();
+    let bytes = b"late asset";
+    let a = Attachment {
+        hash: digest(bytes),
+        name: "proof.pdf".into(),
+        size: bytes.len(),
+        image: false,
+    };
+    r.attachments.push(a.clone());
+    assert!(enqueue(&f.db, &r).is_err());
+    insert_record(&f.db, &r).unwrap();
+    apply_local(&f.db).unwrap();
+    let path = f.dir.join("vault/Journals/2026-11-07.md");
+    let initial = fs::read_to_string(&path).unwrap();
+    assert!(initial.contains("附件未下载"));
+    fs::write(&path, initial.replace("记录", "人工修改")).unwrap();
+    data_portability::atomic_write(&asset(&f.db, &a.hash).unwrap(), bytes).unwrap();
+    apply_local(&f.db).unwrap();
+    apply_local(&f.db).unwrap();
+    let after = fs::read_to_string(&path).unwrap();
+    assert!(after.contains("人工修改"));
+    assert!(!after.contains("附件未下载"));
+    assert!(after.contains(&a.filename()));
+    assert_eq!(format::blocks(&after).unwrap().len(), 1);
+    fs::write(&path, "用户已删除整个速记区块\n").unwrap();
+    apply_local(&f.db).unwrap();
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        "用户已删除整个速记区块\n"
+    );
+}
+
+#[tokio::test]
+async fn direction_choices_defer_assets_and_later_patch_the_original_edited_diary() {
+    direction_roundtrip(&MemoryStore::default(), "test").await;
+}
+
+#[cfg(windows)]
+#[tokio::test]
+#[ignore = "explicit real OSS integration; requires HUB_OSS_INTEGRATION_CONFIG_DB and existing Windows credential"]
+async fn real_oss_quick_journal_defers_assets_and_preserves_edited_diary() {
+    let (config, store, run) = crate::reading_sync::real_cloud_tests::isolated_oss("quick");
+    direction_roundtrip(&store, &config.namespace()).await;
+    let (uploaded, downloaded) = store.transferred();
+    assert!(uploaded + downloaded < 4 * 1024 * 1024);
+    println!(
+        "{}",
+        json!({"status":"success", "module":"quick", "namespaceSuffixHash":digest(run.as_bytes()),
+        "uploadedBytes":uploaded,"downloadedBytes":downloaded,"bodyBeforeAssets":true,
+        "independentDirections":true,"deferredUploadAndDownload":true,"uploadAndDownloadSizeLimits":true,"editedDiaryPreserved":true,"remoteObjectsRetained":true})
+    );
+}
+
+async fn direction_roundtrip(store: &dyn Store, namespace: &str) {
+    let sender = Fixture::new();
+    let receiver = Fixture::new();
+    let mut bytes = b"%PDF-1.4\n".to_vec();
+    bytes.resize(1024 * 1024 + 1, b' ');
+    let a = Attachment {
+        hash: digest(&bytes),
+        name: "proof.pdf".into(),
+        size: bytes.len(),
+        image: false,
+    };
+    let mut r = record();
+    r.attachments.push(a.clone());
+    data_portability::atomic_write(&asset(&sender.db, &a.hash).unwrap(), &bytes).unwrap();
+    enqueue(&sender.db, &r).unwrap();
+    let c = open_database(&sender.db).unwrap();
+    let mut s = settings(&c).unwrap();
+    s.library_id.clear(); // Producer has no desktop writer, as on mobile.
+    meta(
+        &c,
+        "quick_journal_settings",
+        &serde_json::to_string(&s).unwrap(),
+    )
+    .unwrap();
+    let none = crate::cloud_sync::attachments::Selection {
+        image: false,
+        video: false,
+        pdf: false,
+        other: false,
+        max_mb: 1,
+    };
+    let mut rules = crate::cloud_sync::attachments::Directions {
+        upload: none.clone(),
+        download: none,
+    };
+    let save = |db: &PathBuf, rules: &crate::cloud_sync::attachments::Directions| {
+        meta(
+            &open_database(db).unwrap(),
+            "cloud_attachments_quick_v1",
+            &serde_json::to_string(rules).unwrap(),
+        )
+        .unwrap();
+    };
+    save(&sender.db, &rules);
+    save(&receiver.db, &rules);
+    transfer(&sender.db, store, namespace).await.unwrap();
+    transfer(&receiver.db, store, namespace).await.unwrap();
+    let path = receiver.dir.join("vault/Journals/2026-11-07.md");
+    let initial = fs::read_to_string(&path).unwrap();
+    assert!(initial.contains("附件未下载"));
+    fs::write(&path, initial.replace("第二段", "人工修改")).unwrap();
+    assert!(store
+        .head_size(&store.key(&format!("journal/assets/{}", a.hash)))
+        .await
+        .unwrap()
+        .is_none());
+    rules.upload.pdf = true;
+    save(&sender.db, &rules);
+    transfer(&sender.db, store, namespace).await.unwrap();
+    assert!(store
+        .head_size(&store.key(&format!("journal/assets/{}", a.hash)))
+        .await
+        .unwrap()
+        .is_none());
+    rules.upload.max_mb = 2;
+    save(&sender.db, &rules);
+    transfer(&sender.db, store, namespace).await.unwrap();
+    transfer(&receiver.db, store, namespace).await.unwrap();
+    assert!(!asset(&receiver.db, &a.hash).unwrap().exists());
+    rules.download.pdf = true;
+    save(&receiver.db, &rules);
+    transfer(&receiver.db, store, namespace).await.unwrap();
+    assert!(!asset(&receiver.db, &a.hash).unwrap().exists());
+    rules.download.max_mb = 2;
+    save(&receiver.db, &rules);
+    transfer(&receiver.db, store, namespace).await.unwrap();
+    assert_eq!(
+        fs::read(asset(&receiver.db, &a.hash).unwrap()).unwrap(),
+        bytes
+    );
+    let final_text = fs::read_to_string(&path).unwrap();
+    assert!(final_text.contains("人工修改"));
+    assert!(!final_text.contains("附件未下载"));
+    assert!(final_text.contains(&a.filename()));
+    assert_eq!(format::blocks(&final_text).unwrap().len(), 1);
 }

@@ -22,6 +22,25 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); node.remove(); vi.useRealTimers(); });
 const render = async (dataVersion = "1") => { await act(async () => root.render(<QuickJournal libraries={[]} scope={null} dataVersion={dataVersion} view={{ ...defaultJournalView(), period: "all", layout: "records" }} />)); };
+it("clears a recovered background sync error while preserving a failed local capture", async () => {
+  const original = invoke.getMockImplementation()!;
+  let remoteError = "OSS 下载中断；稍后可重试";
+  invoke.mockImplementation(async (cmd: string, args: unknown) => {
+    if (cmd === "list_quick_journal") return { ...await original(cmd, args), error: remoteError };
+    if (cmd === "capture_quick_journal") throw new Error("本机保存失败，请重试");
+    return original(cmd, args);
+  });
+  await render();
+  expect(node.querySelector('[role="alert"]')?.textContent).toContain(remoteError);
+  remoteError = "";
+  await render("recovered");
+  expect(node.querySelector('[role="alert"]')).toBeNull();
+  await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  expect(node.querySelector('[role="alert"]')?.textContent).toContain("本机保存失败");
+  await render("refreshed-again");
+  expect(node.querySelector('[role="alert"]')?.textContent).toContain("本机保存失败");
+  expect(node.querySelector("textarea")?.value).toBe(record.text);
+});
 it("restores a draft and displays each record's current Markdown without clock times", async () => {
   await render(); expect(node.querySelector("textarea")?.value).toBe(record.text);
   expect(node.querySelector("article")?.textContent).toContain("OS 中手动修改后的正文");

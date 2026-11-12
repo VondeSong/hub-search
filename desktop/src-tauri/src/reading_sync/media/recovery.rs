@@ -90,9 +90,6 @@ fn inspect(c: &Connection, ns: &str, key: &str, extras: bool) -> Result<Snapshot
     if offline::incomplete(post) || unknown_content(post) {
         warnings.push("正文完整性未确认，或引用、回复、原附件地址不完整；不能确认完整恢复".into());
     }
-    if !urls.is_empty() && !p.enabled {
-        warnings.push("请先在云同步设置中开启阅读附件同步，再执行原附件恢复检查".into());
-    }
     let mut payload = body.len() as u64;
     let mut unique_blobs = BTreeMap::new();
     let mut items = Vec::new();
@@ -113,7 +110,7 @@ fn inspect(c: &Connection, ns: &str, key: &str, extras: bool) -> Result<Snapshot
                     "原设备尚未上传完整原附件"
                 }
                 .into();
-            } else if !allowed(&p, &m.mime, m.size, extras) {
+            } else if !allowed_explicit(&m.mime, m.size, extras) {
                 e.state = "excluded".into();
                 e.reason = "未包含音视频/ZIP，或超过当前类型和大小限制".into();
             } else {
@@ -169,7 +166,7 @@ fn inspect(c: &Connection, ns: &str, key: &str, extras: bool) -> Result<Snapshot
             post_hash,
             total: items.len(),
             download_bytes: payload,
-            actionable: urls.is_empty() || p.enabled,
+            actionable: true,
             warnings,
             items,
             previous,

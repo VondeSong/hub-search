@@ -35,6 +35,6 @@ export function ReadingCacheSettings() {
     {!!state?.pins.length && <details><summary>离线保留的附件 · {state.pins.length}</summary><ul>{state.pins.map(pin => <li key={pin.hash}><span>{label(pin.label)}{!pin.available && " · 本机文件缺失，请在原文章重新下载"}</span><button disabled={busy} onClick={() => void unpin(pin.hash)}>取消保留</button></li>)}</ul></details>}
     {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
     <button disabled={busy} onClick={() => void inspect()}>{busy ? "正在处理…" : "预览可清理缓存"}</button>
-    {preview && <div className="reading-cache-confirm" role="group" aria-label="缓存清理预览"><p>将清理 {preview.removableCount} 个文件，共 {size(preview.removableBytes)}。正文、原附件、资料库文件和云端副本保留。再次打开附件会按同步开关和额度重新下载；自动同步不会立即下载刚清理的文件。</p><button disabled={busy || !preview.removableCount} onClick={() => void clean()}>确认清理本机缓存</button><button disabled={busy} onClick={() => setPreview(null)}>取消</button></div>}
+    {preview && <div className="reading-cache-confirm" role="group" aria-label="缓存清理预览"><p>将清理 {preview.removableCount} 个文件，共 {size(preview.removableBytes)}。正文、原附件、资料库文件和云端副本保留。再次打开附件会按同步与网络设置重新下载；自动同步不会立即下载刚清理的文件。</p><button disabled={busy || !preview.removableCount} onClick={() => void clean()}>确认清理本机缓存</button><button disabled={busy} onClick={() => setPreview(null)}>取消</button></div>}
   </section>;
 }

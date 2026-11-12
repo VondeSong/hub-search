@@ -51,6 +51,37 @@ pub(super) fn config(c: &Connection) -> Result<OssConfig, String> {
     serde_json::from_str(&metadata_string(c, "flashcard_oss_config"))
         .map_err(|_| "尚未配置阿里云 OSS".into())
 }
+fn first_connection(c: &Connection) -> bool {
+    [
+        "flashcard_cloud_provider",
+        "flashcard_webdav_url",
+        "flashcard_oss_config",
+    ]
+    .iter()
+    .all(|key| metadata_string(c, key).is_empty())
+}
+
+#[cfg(test)]
+#[test]
+fn only_fresh_devices_select_oss_without_migration() {
+    let c = Connection::open_in_memory().unwrap();
+    c.execute_batch("CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);")
+        .unwrap();
+    assert!(first_connection(&c));
+    for (key, value) in [
+        ("flashcard_cloud_provider", "webdav"),
+        ("flashcard_cloud_provider", "oss"),
+        ("flashcard_webdav_url", "https://example.invalid/existing"),
+        ("flashcard_oss_config", "existing or damaged configuration"),
+    ] {
+        c.execute("DELETE FROM metadata", []).unwrap();
+        meta(&c, key, value).unwrap();
+        assert!(
+            !first_connection(&c),
+            "Existing {key} must keep migration protection"
+        );
+    }
+}
 fn meta(c: &Connection, key: &str, value: &str) -> Result<(), String> {
     c.execute("INSERT INTO metadata(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",params![key,value])
         .map_err(|e| e.to_string())?;
@@ -90,12 +121,14 @@ pub(super) async fn save_flashcard_oss_config(
 ) -> Result<CloudSettings, String> {
     let _guard = FLASHCARD_SYNC_LOCK.lock().await;
     let _reading_guard = reading_sync::LOCK.lock().await;
+    let _quick_guard = quick_journal::LOCK.lock().await;
     let oss = oss.normalized()?;
     if !matches!(media_policy.as_str(), "all" | "onDemand") {
         return Err("附件下载策略无效".into());
     }
     let db = database_path(&app)?;
     let c = open_database(&db)?;
+    let initial_connection = first_connection(&c);
     let active_change =
         provider(&c) == "oss" && config(&c)?.normalized()?.namespace() != oss.namespace();
     let secret = secret.filter(|s| !s.is_empty());
@@ -138,6 +171,10 @@ pub(super) async fn save_flashcard_oss_config(
             &serde_json::to_string(&oss).map_err(|e| e.to_string())?,
         )?;
         meta(&tx, "flashcard_cloud_media_policy", &media_policy)?;
+        if initial_connection {
+            // A fresh device has no source cloud to migrate. Existing locations keep the migration gate.
+            meta(&tx, "flashcard_cloud_provider", "oss")?;
+        }
         mark_flashcard_sync_dirty(&tx)?;
         tx.commit().map_err(|e| e.to_string())
     })();
@@ -544,6 +581,7 @@ pub(super) async fn activate_flashcard_cloud_sync(
     let _guard = FLASHCARD_SYNC_LOCK.lock().await;
     let database = database_path(&app)?;
     let _reading_guard = reading_sync::LOCK.lock().await;
+    let _quick_guard = quick_journal::LOCK.lock().await;
     let (current, target_config) = {
         let c = open_database(&database)?;
         if !cloud_sync::policy(&c).enabled {
@@ -686,6 +724,8 @@ async fn verify_webdav_migration(
     Ok(())
 }
 
+#[cfg(all(test, windows))]
+mod real_cloud_tests;
 #[cfg(test)]
 #[path = "flashcard_cloud_sync_tests.rs"]
 pub(crate) mod tests;

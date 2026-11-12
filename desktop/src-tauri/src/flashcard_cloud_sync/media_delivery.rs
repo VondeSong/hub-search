@@ -222,6 +222,8 @@ pub(super) async fn deliver(
     // Reuse one scalar reader for the batch. Reopening the whole database for
     // each missing or unchanged hash would repeat schema validation per item.
     let reader = open_database(db)?;
+    let rules = crate::cloud_sync::attachments::policy(&reader, "flashcards")?;
+    let custom = crate::cloud_sync::attachments::explicit(&reader, "flashcards")?.is_some();
     loop {
         let candidate:Option<(String,bool,bool,Option<String>)>=reader.query_row("SELECT hash,referenced,queued,mime_payload FROM flashcard_cloud_media_candidates WHERE namespace=?1 AND batch=?2 AND hash>?3 ORDER BY hash LIMIT 1",params![ns,batch,cursor],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).optional().map_err(|e|e.to_string())?;
         let Some((hash, _referenced, queued, mime)) = candidate else {
@@ -234,13 +236,56 @@ pub(super) async fn deliver(
         }
         let mut path = blobs.path_for(&hash)?;
         let key = remote.key(&format!("media/{hash}"));
+        let descriptor: Value = mime
+            .as_deref()
+            .and_then(|s| serde_json::from_str(s).ok())
+            .unwrap_or(Value::Null);
+        let mime_type = descriptor["mimeType"].as_str().unwrap_or("");
+        let name = descriptor["name"].as_str().unwrap_or("");
         remote.check_network(&key)?;
         if !path.is_file() {
-            if !download {
+            if !force
+                && !(if custom {
+                    rules.download.any()
+                } else {
+                    download
+                })
+            {
                 report.pending_media += 1;
                 continue;
             }
-            match remote.get_media_blob(&key, &hash, blobs).await? {
+            let size = if force {
+                0
+            } else {
+                remote
+                    .head_identity(&key)
+                    .await?
+                    .and_then(|h| h.size)
+                    .unwrap_or(u64::MAX)
+            };
+            if !force
+                && (!(if custom {
+                    rules.download.any()
+                } else {
+                    download
+                }) || !rules.download.allows(mime_type, name, size))
+            {
+                report.pending_media += 1;
+                continue;
+            }
+            match remote
+                .get_media_blob_limited(
+                    &key,
+                    &hash,
+                    blobs,
+                    if force {
+                        FLASHCARD_SYNC_MAX_MEDIA_BYTES
+                    } else {
+                        rules.download.max_mb * 1024 * 1024
+                    },
+                )
+                .await?
+            {
                 Some(size) => {
                     counts.1 += 1;
                     report.downloaded_bytes += size;
@@ -261,6 +306,16 @@ pub(super) async fn deliver(
             Some(value) => value,
             None => verify_local_async(db, blobs, &hash, force).await?,
         };
+        let actual_mime = reader
+            .query_row("SELECT mime_type FROM blobs WHERE hash=?1", [&hash], |r| {
+                r.get::<_, String>(0)
+            })
+            .optional()
+            .map_err(|e| e.to_string())?
+            .unwrap_or_else(|| mime_type.into());
+        if !force && !rules.upload.allows(&actual_mime, name, size) {
+            continue;
+        }
         let previous: Option<String> = reader
             .query_row(
                 "SELECT remote_identity FROM flashcard_cloud_media_receipts

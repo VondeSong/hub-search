@@ -271,7 +271,7 @@ async fn migration_blocked_network_does_not_reserve_quota_or_switch_connection()
 }
 
 #[tokio::test]
-async fn migration_quota_pause_keeps_copy_payload_and_read_cursor_for_larger_than_single_batch() {
+async fn migration_legacy_budgets_do_not_pause_copy_or_change_connection() {
     let server = oss::server().await;
     let source = oss::store(&server);
     let target_server = dav::server().await;
@@ -294,26 +294,18 @@ async fn migration_quota_pause_keeps_copy_payload_and_read_cursor_for_larger_tha
     meta(
         &a.c(),
         "reading_media_policy",
-        r#"{"enabled":false,"batchMb":4,"dailyMb":64}"#,
+        r#"{"enabled":false,"batchMb":4,"dailyMb":4}"#,
     )
     .unwrap();
     let mut finished = false;
-    let mut saw_staged = false;
-    let mut saw_read_cursor = false;
     for _ in 0..20 {
         let result = copy(&a.db, &source, &target, &from, &to, false).await;
-        let c = a.c();
-        saw_staged |= c
-            .query_row("SELECT count(*)>0 FROM cloud_migration_payloads", [], |r| {
-                r.get::<_, bool>(0)
-            })
-            .unwrap();
-        saw_read_cursor |= c
-            .query_row("SELECT count(*)>0 FROM cloud_migration_checks", [], |r| {
-                r.get::<_, bool>(0)
-            })
-            .unwrap();
-        drop(c);
+        if let Err(error) = &result {
+            assert!(
+                !error.contains("额度"),
+                "retired budgets must not pause migration: {error}"
+            );
+        }
         forget_initialized_database(&a.db);
         if result.is_ok() {
             finished = true;
@@ -322,11 +314,10 @@ async fn migration_quota_pause_keeps_copy_payload_and_read_cursor_for_larger_tha
     }
     assert!(
         finished,
-        "aggregate cloud content must finish under unchanged 4 MiB batch allowance"
+        "aggregate cloud content must finish despite retired 4 MiB budgets"
     );
-    assert!(saw_staged);
-    assert!(saw_read_cursor);
-    assert!(metadata_u64(&a.c(), "reading_media_reserved", 0) < 64 * 1024 * 1024);
+    assert!(metadata_u64(&a.c(), "reading_media_reserved", 0) > 4 * 1024 * 1024);
+    assert_eq!(provider(&a.c()), "webdav");
     assert_eq!(
         a.c()
             .query_row("SELECT count(*) FROM cloud_migration_payloads", [], |r| {

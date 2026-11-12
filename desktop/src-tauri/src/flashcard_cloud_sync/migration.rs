@@ -415,7 +415,7 @@ fn receipt(c: &Connection) -> Result<Receipt, String> {
         flashcard_token: flashcard_token(c)?,
     })
 }
-/// Caller holds FLASHCARD_SYNC_LOCK followed by reading_sync::LOCK, through final commit.
+/// Caller holds flashcard, reading and quick-journal locks, in that order, through final commit.
 pub(super) async fn prepare(
     app: &AppHandle,
     target_config: &Configuration,
@@ -429,6 +429,17 @@ pub(super) async fn prepare(
     let c = open_database(&db)?;
     if !cloud_sync::policy(&c).enabled {
         return Err("请先开启本设备云同步总开关，再迁移全部模块".into());
+    }
+    let journal_table:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='quick_journal_records')",[],|r|r.get(0)).map_err(|e|e.to_string())?;
+    if journal_table
+        && c.query_row(
+            "SELECT EXISTS(SELECT 1 FROM quick_journal_records WHERE namespace<>'')",
+            [],
+            |r| r.get::<_, bool>(0),
+        )
+        .map_err(|e| e.to_string())?
+    {
+        return Err("速记已绑定当前云空间，尚不支持随连接迁移；原连接及内容保留".into());
     }
     let source_config = object_store::configuration(&c).ok();
     let source = source_config
@@ -584,6 +595,7 @@ async fn sync_webdav_configuration(
             &remote_hashes,
             &flashcard_snapshot_media_hashes(&snapshot),
             &legacy_key,
+            None,
         )
         .await?;
         let mut request = webdav_request(

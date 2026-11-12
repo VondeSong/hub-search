@@ -57,4 +57,4 @@ node qa/android-back-check.mjs first-back.json second-back.json reopened.json
 
 ## 仍未完成的验收
 
-当前未连接真实手机；厂商省电策略、真实网络下锁屏上传，以及实际 OSS → 指定电脑 → 个人 OS 日记和附件回执，未在本轮执行。模拟器持久队列、临时库单元测试和构建通过均不能替代这条链路。Issue #22 保持打开、看板“待验证”。
+本记录初次自测时未连接 OSS。后续已在独立安卓模拟器中补做 [真实 OSS → 当前电脑 → 实际 OS 日记联调](MOBILE_OSS_OS_ROUNDTRIP.md)，包括锁屏上传、进程终止后恢复、附件及回执和去重。当前仍未连接真实手机，厂商省电策略及实体设备长期后台行为保持待验证；Issue #22 保持打开。

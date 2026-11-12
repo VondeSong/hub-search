@@ -68,6 +68,7 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
 }) {
   const [draft, setDraft] = useState<Record>(blank), [ready, setReady] = useState(false), [saving, setSaving] = useState(false), [uploading, setUploading] = useState(false);
   const [items, setItems] = useState<Item[]>([]), [error, setError] = useState(""), [notice, setNotice] = useState(""), [busy, setBusy] = useState(false);
+  const [listError, setListError] = useState("");
   const [mobile, setMobile] = useState(mode === "compose" || runtimeCapabilities.mobile), [settings, setSettings] = useState<Settings>({ libraryId: "", folder: "Journals", sync: false, dateFolders: true }), [settingsReady, setSettingsReady] = useState(false);
   const [savedSettings, setSavedSettings] = useState<Settings | null>(null), [settingsOpen, setSettingsOpen] = useState(false);
   const [cloud, setCloud] = useState<{ enabled?: boolean; auto?: boolean }>({});
@@ -85,7 +86,7 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
   };
   async function refresh() {
     const result = await invoke<{ items: Item[]; error: string }>("list_quick_journal");
-    if (mounted.current) { setItems(result.items); if (result.error) setError(result.error); }
+    if (mounted.current) { setItems(result.items); setListError(result.error || ""); }
   }
   useEffect(() => {
     mounted.current = true;
@@ -101,7 +102,7 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
   useEffect(() => { if (mode === "compose" && ready) textInput.current?.focus({ preventScroll: true }); }, [mode, ready]);
   useEffect(() => {
     if (mode === "compose") return;
-    const reload = () => { void refresh().catch(e => setError(message(e))); };
+    const reload = () => { void refresh().catch(e => setListError(message(e))); };
     reload(); const timer = setInterval(reload, 15000);
     window.addEventListener(QUICK_JOURNAL_UPDATED, reload);
     return () => { clearInterval(timer); window.removeEventListener(QUICK_JOURNAL_UPDATED, reload); };
@@ -118,7 +119,7 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
       if (manual) setNotice(report ? `本轮同步已结束。本机队列：待上传 ${report.pendingUpload} 条，等待电脑写入 ${report.awaitingOs} 条，已确认写入 OS ${report.written} 条。` : "同步请求已结束，请查看卡片状态。");
     } catch (e) { setError(message(e)); setSettingsOpen(true); }
     finally {
-      await refresh().catch(e => setError(message(e)));
+      await refresh().catch(e => setListError(message(e)));
       await invoke<SettingsResult>("get_quick_journal_settings").then(v => setCloud({ enabled: v.cloudEnabled, auto: v.autoSync })).catch(() => {});
       setBusy(false);
     }
@@ -229,7 +230,7 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
     </details>}
     {mode !== "settings" && mode !== "feed" && compose}
     {notice && <p className="quick-journal-notice" role="status">{notice}</p>}
-    {error && <div className="quick-journal-error" role="alert">{error}<button onClick={() => { setError(""); if (!ready || !settingsReady) setLoadRevision(v => v + 1); if (mode !== "compose") void refresh().catch(e => setError(message(e))); }}>重新读取</button></div>}
+    {(error || listError) && <div className="quick-journal-error" role="alert">{error || listError}<button onClick={() => { setError(""); setListError(""); if (!ready || !settingsReady) setLoadRevision(v => v + 1); if (mode !== "compose") void refresh().catch(e => setListError(message(e))); }}>重新读取</button></div>}
     {mode === "compose" && <p className="quick-journal-capture-help">保存到本机后可锁屏。{!settingsReady ? "正在读取同步设置。" : !settings.sync ? "速记云同步尚未开启。" : cloud.enabled === false ? "云同步总开关尚未开启。" : "后台会继续上传。"}<button onClick={openSyncSettings}>同步设置</button></p>}
     {mode !== "compose" && <>
     {mobile && mode === "feed" && <div className="quick-journal-mobile-filters"><label>搜索记录或附件<input type="search" aria-label="搜索记录或附件" placeholder="搜索记录或附件" value={view.query} onChange={e => onViewChange?.({ query: e.target.value })} /></label><div><button aria-pressed={!pendingOnly && view.period === "all"} onClick={() => { setPendingOnly(false); onViewChange?.({ period: "all" }); }}>全部</button><button aria-pressed={!pendingOnly && view.period === "day" && view.day === localJournalDate()} onClick={() => { setPendingOnly(false); onViewChange?.({ period: "day", day: localJournalDate() }); }}>今天</button><button aria-pressed={pendingOnly} onClick={() => { setPendingOnly(true); onViewChange?.({ period: "all" }); }}>待同步</button><button onClick={openQuickJournalCapture}><Plus size={16} />记一条</button></div></div>}

@@ -107,3 +107,29 @@ it("requires coordination before moving the active OSS location and preserves ed
   expect(container.textContent).toContain("本批迁移未结束");
   expect(onChanged).not.toHaveBeenCalled();
 });
+
+it("reflects the first OSS save as the active connection without a second migration", async () => {
+  await act(async () => root.unmount());
+  invokeMock.mockImplementation(async command => command === "get_flashcard_cloud_sync_settings"
+    ? { ...settings, oss: undefined, hasSecret: false }
+    : command === "save_flashcard_oss_config" ? { ...settings, provider: "oss" } : null);
+  root = createRoot(container);
+  const onProviderChange = vi.fn();
+  await act(async () => root.render(<CloudConnectionOptions syncing={false} onChanged={onChanged} onProviderChange={onProviderChange} />));
+  await settle();
+  await act(async () => button("阿里云 OSS").click());
+  for (const [name, value] of [["Bucket 名称", config.bucket], ["AccessKey ID", config.accessKeyId], ["AccessKey Secret", "synthetic-test-secret"]]) {
+    const field = [...container.querySelectorAll("label")].find(label => label.textContent?.includes(name))!.querySelector("input")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, value);
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+  await act(async () => button("保存 OSS 配置").click()); await settle();
+  expect(container.textContent).toContain("当前同步服务：阿里云 OSS");
+  expect(container.querySelector('[aria-label="切换云服务"]')).toBeNull();
+  expect(container.querySelector<HTMLInputElement>('input[type="password"]')!.value).toBe("");
+  expect(onProviderChange).toHaveBeenLastCalledWith("oss");
+  expect(onChanged).toHaveBeenCalledOnce();
+  expect(invokeMock.mock.calls.some(([command]) => command === "activate_flashcard_cloud_sync")).toBe(false);
+});

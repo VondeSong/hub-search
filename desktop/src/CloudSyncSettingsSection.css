@@ -1,32 +1,528 @@
-.cloud-sync-center { display: grid; gap: 16px; color: #27303a; min-width: 0; }
-.cloud-sync-center > header { display: flex; align-items: center; gap: 12px; }
-.cloud-sync-center h2, .cloud-sync-center h3 { margin: 0; font-size: 16px; }
-.cloud-sync-center h3 { font-size: 14px; }
-.cloud-sync-center p { margin: 8px 0; color: #69737d; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
-.cloud-sync-center .cloud-sync-card { display: grid; gap: 12px; margin: 0; padding: 16px; border: 1px solid #e1e5ea; border-radius: 12px; background: #fff; box-shadow: none; max-width: none; }
-.cloud-sync-center .cloud-sync-switch { display: flex; flex-direction: row; justify-content: space-between; align-items: center; gap: 16px; padding: 8px 0; }
-.cloud-sync-switch > span:first-child { display: grid; gap: 5px; }
-.cloud-sync-switch > span:last-child { flex-shrink: 0; white-space: nowrap; }
-.cloud-sync-switch small { color: #69737d; line-height: 1.6; }
-.cloud-sync-center input[type="checkbox"] { width: 18px; height: 18px; flex: 0 0 18px; accent-color: #2776bd; }
-.cloud-sync-center label { display: grid; gap: 6px; font-size: 12px; color: #525c66; }
-.cloud-sync-center input:not([type="checkbox"]), .cloud-sync-center select { box-sizing: border-box; width: 100%; min-width: 0; padding: 9px 10px; font: inherit; border: 1px solid #dce1e6; border-radius: 7px; background: #fff; color: #27303a; }
-.cloud-sync-center button { border: 1px solid #dce1e6; border-radius: 7px; background: #fff; padding: 8px 12px; color: #27303a; font: inherit; font-size: 12px; cursor: pointer; }
-.cloud-sync-center button:disabled { opacity: .5; cursor: default; }
-.cloud-sync-center button:hover:not(:disabled) { background: #f1f5fa; }
-.cloud-sync-center :is(button,input,select,summary):focus-visible { outline: 2px solid #2776bd; outline-offset: 2px; }
-.cloud-sync-center .cloud-sync-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.cloud-sync-center .cloud-sync-section-heading { display: flex; justify-content: space-between; margin-bottom: 12px; }
-.cloud-sync-center .cloud-auto-sync { display: flex; flex-direction: row; align-items: center; gap: 10px; }
-.cloud-sync-center .cloud-sync-last-error, .cloud-sync-center [role="alert"] { color: #a23d36; }
-.cloud-sync-center details { color: #69737d; font-size: 12px; }
-.cloud-sync-center summary { cursor: pointer; }
-.cloud-sync-center article { padding: 12px 0; border-top: 1px solid #eef0f2; }
-.cloud-sync-status-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.cloud-sync-notice { min-height: 24px; }
-.cloud-sync-notice:empty { display: none; }
-.cloud-sync-notice p { display: flex; align-items: center; gap: 8px; margin: 0; }
-@media (max-width: 600px) {
-  .cloud-sync-center .cloud-sync-card { padding: 12px; }
-  .cloud-sync-center button { min-height: 44px; }
+.cloud-sync-center {
+  --cs-text: var(--text-primary, #30343a);
+  --cs-muted: var(--text-secondary, #70757d);
+  --cs-line: var(--border-color, #e7e9ec);
+  --cs-surface: var(--bg-primary, #fff);
+  --cs-soft: var(--hover-bg, #f5f6f7);
+  display: grid;
+  container-type: inline-size;
+  gap: 18px;
+  min-width: 0;
+  color: var(--cs-text);
+  padding: 8px 0 28px;
+}
+.cloud-sync-center > header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.cloud-sync-center > header > svg {
+  display: none;
+}
+.cloud-sync-center h2 {
+  font-size: 28px !important;
+  font-weight: 650;
+  margin: 0;
+}
+.cloud-sync-center h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+.cloud-sync-center p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--cs-muted);
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+.cloud-sync-center label {
+  font-size: 12px;
+  color: var(--cs-text);
+}
+.cloud-sync-center button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 12px;
+  min-height: 34px;
+  border: 1px solid var(--cs-line);
+  border-radius: 6px;
+  color: var(--cs-text);
+  background: var(--cs-surface);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cloud-sync-center button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.cloud-sync-center button:hover:not(:disabled) {
+  background: var(--cs-soft);
+}
+.cloud-sync-center :is(button, input, select, summary):focus-visible {
+  outline: 2px solid var(--accent-color, #557eaa);
+  outline-offset: 3px;
+}
+.cloud-sync-center :is(input:not([type="checkbox"]), select) {
+  font: inherit;
+  color: var(--cs-text);
+  background: var(--cs-surface);
+  border: 1px solid var(--cs-line);
+  border-radius: 5px;
+  padding: 7px 10px;
+  max-width: 100%;
+  min-width: 0;
+}
+.cloud-sync-notice:empty {
+  display: none;
+}
+.cloud-sync-notice p[role="alert"] {
+  color: #b5473f;
+}
+.cloud-sync-notice p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cloud-page-nav {
+  display: flex;
+  gap: 26px;
+  border-bottom: 1px solid var(--cs-line);
+}
+.cloud-sync-center .cloud-page-nav button {
+  border: 0;
+  border-radius: 0;
+  padding: 0 1px 12px;
+  background: transparent;
+  color: var(--cs-muted);
+  position: relative;
+}
+.cloud-sync-center .cloud-page-nav button[aria-current="page"] {
+  color: var(--cs-text);
+  font-weight: 600;
+}
+.cloud-page-nav button[aria-current="page"]:after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--cs-text);
+}
+.cloud-overview-status {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  background: var(--cs-soft);
+  padding: 24px;
+  border-radius: 9px;
+}
+.cloud-overview-status > svg {
+  color: var(--cs-muted);
+  flex-shrink: 0;
+}
+.cloud-overview-status > div {
+  flex: 1;
+  min-width: 0;
+}
+.cloud-sync-center .cloud-primary {
+  background: var(--cs-text);
+  color: var(--cs-surface);
+  border: 0;
+}
+.cloud-module-results > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--cs-line);
+  font-size: 13px;
+}
+.cloud-module-results > div > svg {
+  color: var(--cs-muted);
+  flex-shrink: 0;
+}
+.cloud-module-results strong {
+  font-weight: 550;
+}
+.cloud-module-results span {
+  margin-left: auto;
+  text-align: right;
+  max-width: 65%;
+  font-size: 12px;
+}
+.cloud-overview-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--cs-muted);
+}
+.cloud-sync-center .cloud-overview-footer button {
+  border: 0;
+  color: var(--cs-muted);
+}
+.cloud-sync-center details {
+  border-bottom: 1px solid var(--cs-line);
+  padding: 12px 0;
+}
+.cloud-sync-center summary {
+  cursor: pointer;
+  font-size: 12px;
+  min-height: 32px;
+  line-height: 32px;
+}
+.cloud-sync-center .cloud-sync-card {
+  box-shadow: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  max-width: none;
+  display: grid;
+  gap: 12px;
+}
+.cloud-sync-center .cloud-sync-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 4px 0 14px;
+}
+.cloud-sync-switch > span {
+  display: grid;
+  gap: 4px;
+}
+.cloud-sync-switch small {
+  font-size: 11px;
+  color: var(--cs-muted);
+}
+.cloud-general {
+  border-bottom: 1px solid var(--cs-line);
+  padding-bottom: 18px;
+}
+.cloud-sync-center .cloud-scope {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  font-size: 12px;
+}
+.cloud-scope > span {
+  flex: 1;
+  color: var(--cs-muted);
+}
+.cloud-sync-center .cloud-scope label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cloud-scope input[role="switch"] {
+  appearance: none;
+  width: 32px;
+  height: 19px;
+  min-width: 32px;
+  position: relative;
+  background: var(--cs-soft);
+  border: 1px solid var(--cs-muted);
+  border-radius: 12px;
+  margin: 0;
+  cursor: pointer;
+}
+.cloud-scope input[role="switch"]:before {
+  content: "";
+  width: 13px;
+  height: 13px;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  background: var(--cs-muted);
+  border-radius: 50%;
+  transition: transform 0.15s ease-out;
+}
+.cloud-scope input[role="switch"]:checked {
+  background: var(--accent-color, #577a67);
+  border-color: var(--accent-color, #577a67);
+}
+.cloud-scope input[role="switch"]:checked:before {
+  transform: translateX(13px);
+  background: #fff;
+}
+.cloud-sync-center input:disabled {
+  opacity: 0.45;
+}
+.cloud-transfer-group {
+  margin: 3px 0 8px;
+}
+.cloud-transfer-group > p {
+  margin: 5px 0 10px;
+}
+.cloud-policy-rows {
+  border: 1px solid var(--cs-line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.cloud-policy-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  min-height: 64px;
+}
+.cloud-policy-row + .cloud-policy-row {
+  border-top: 1px solid var(--cs-line);
+}
+.cloud-policy-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 72px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.cloud-policy-name > svg {
+  color: var(--cs-muted);
+}
+.cloud-type-options {
+  display: flex;
+  gap: 5px;
+  flex: 1;
+}
+.cloud-sync-center .cloud-type-options label {
+  display: flex;
+  align-items: center;
+  position: relative;
+  min-height: 36px;
+  cursor: pointer;
+}
+.cloud-type-options input {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  z-index: 1;
+  cursor: pointer;
+}
+.cloud-type-options span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 12px;
+  padding: 6px 7px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: var(--cs-soft);
+  color: var(--cs-muted);
+}
+.cloud-type-options input:checked + span {
+  color: var(--cs-text);
+  border-color: var(--cs-line);
+  background: var(--selected-bg, #edf0f2);
+}
+.cloud-type-options input:disabled + span {
+  opacity: 0.45;
+}
+.cloud-type-options input:focus-visible + span {
+  outline: 2px solid var(--accent-color, #557eaa);
+  outline-offset: 2px;
+}
+.cloud-type-options .unselected {
+  visibility: hidden;
+}
+.cloud-sync-center .cloud-size-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  color: var(--cs-muted);
+  font-size: 10px;
+  margin-left: auto;
+}
+.cloud-size-field > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--cs-line);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+.cloud-sync-center .cloud-size-field input[type="number"] {
+  appearance: textfield;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  width: 40px;
+  min-width: 0;
+  padding: 3px 0;
+  font-size: 12px;
+  text-align: right;
+}
+.cloud-size-field input::-webkit-inner-spin-button,
+.cloud-size-field input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+.cloud-sync-center .cloud-transfer-group > .cloud-policy-rows + p {
+  font-size: 11px;
+  margin-top: 8px;
+}
+.cloud-sync-center .cloud-related-link {
+  justify-content: space-between;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--cs-line);
+  border-radius: 0;
+  padding: 12px 0;
+  text-align: left;
+}
+.cloud-sync-center .cloud-sync-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cloud-sync-center fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.cloud-sync-center .cloud-sync-settings label {
+  display: grid;
+  gap: 6px;
+}
+.cloud-sync-center .cloud-auto-sync {
+  display: flex !important;
+  align-items: center;
+  gap: 9px;
+}
+.cloud-sync-center details > label {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+}
+@container (max-width: 600px) {
+  .cloud-policy-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    padding: 12px;
+    gap: 8px;
+  }
+  .cloud-type-options {
+    grid-row: 2;
+    grid-column: 1/-1;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .cloud-type-options span {
+    width: 100%;
+    justify-content: center;
+  }
+  .cloud-size-field {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+@media (max-width: 680px) {
+  .cloud-sync-center {
+    padding-top: 0;
+  }
+  .cloud-sync-center h2 {
+    font-size: 24px !important;
+  }
+  .cloud-overview-status {
+    flex-wrap: wrap;
+    padding: 18px;
+    gap: 12px;
+  }
+  .cloud-overview-status > .cloud-primary {
+    margin-left: 38px;
+  }
+  .cloud-sync-center .cloud-scope {
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  .cloud-scope > span {
+    flex-basis: 100%;
+  }
+  .cloud-scope label {
+    flex: 1;
+  }
+  .cloud-type-options span > svg:first-child {
+    display: none;
+  }
+  .cloud-sync-center .cloud-policy-name {
+    font-size: 12px;
+  }
+  .cloud-type-options span {
+    padding: 6px 4px;
+  }
+  .cloud-sync-center .cloud-module-results span {
+    max-width: 55%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cloud-scope input[role="switch"]:before {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .cloud-type-options span {
+    border: 1px solid ButtonText;
+  }
+  .cloud-type-options input:checked + span {
+    outline: 2px solid Highlight;
+  }
+  .cloud-scope input[role="switch"] {
+    appearance: auto;
+  }
+  .cloud-scope input[role="switch"]:before {
+    display: none;
+  }
+}
+
+.cloud-result-detail {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--cs-muted);
+}
+
+.space-settings[data-category="cloud"] .settings-detail {
+  background: var(--bg-primary, #fff);
+}
+.cloud-sync-center .cloud-provider-picker > button {
+  border-radius: 7px;
+  box-shadow: none;
+  background: var(--cs-surface);
+}
+.cloud-sync-center .cloud-provider-picker > button[aria-pressed="true"] {
+  border-color: var(--cs-text);
+  background: var(--cs-soft);
+}
+.cloud-sync-center .cloud-provider-picker small {
+  color: var(--cs-muted);
+  background: var(--cs-soft);
+}
+.cloud-sync-center .cloud-connection-switch-note {
+  color: var(--cs-text);
+  border-color: var(--cs-muted);
+  background: var(--cs-soft);
+}
+
+.space-settings[data-category="cloud"] .settings-content-panels {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }

@@ -24,6 +24,10 @@ const MANIFESTS: &str = "reading/media-v1/manifests/";
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 pub(crate) struct Policy {
+    #[serde(skip)]
+    transfer_rules: Option<crate::cloud_sync::attachments::Directions>,
+    #[serde(skip)]
+    unlimited: bool,
     enabled: bool,
     download: String,
     image_mb: u64,
@@ -35,6 +39,8 @@ pub(crate) struct Policy {
 impl Default for Policy {
     fn default() -> Self {
         Self {
+            transfer_rules: None,
+            unlimited: false,
             enabled: false,
             download: "onDemand".into(),
             image_mb: 10,
@@ -50,8 +56,8 @@ impl Policy {
         if !matches!(self.download.as_str(), "onDemand" | "all")
             || !(1..=100).contains(&self.image_mb)
             || !(1..=100).contains(&self.document_mb)
-            || !(4..=512).contains(&self.batch_mb)
-            || !(self.batch_mb..=10240).contains(&self.daily_mb)
+            || (!self.unlimited && !(4..=512).contains(&self.batch_mb))
+            || (!self.unlimited && !(self.batch_mb..=10240).contains(&self.daily_mb))
             || !(100..=10240).contains(&self.cache_mb)
         {
             return Err("附件策略超出允许范围；每日额度不能小于单轮额度".into());
@@ -61,12 +67,18 @@ impl Policy {
 }
 fn policy(c: &Connection) -> Result<Policy, String> {
     let value = metadata_string(c, "reading_media_policy");
-    let p = if value.is_empty() {
+    let mut p = if value.is_empty() {
         Policy::default()
     } else {
         serde_json::from_str(&value).map_err(|_| "附件同步设置损坏")?
     };
+    p.unlimited = true;
     p.validate()?;
+    p.transfer_rules = crate::cloud_sync::attachments::explicit(c, "reading")?;
+    if p.transfer_rules.is_some() {
+        p.enabled = true;
+        p.download = "all".into();
+    }
     Ok(p)
 }
 pub(super) fn schema(c: &Connection) -> Result<(), String> {
@@ -182,6 +194,12 @@ fn allowed(p: &Policy, mime: &str, size: u64, manual: bool) -> bool {
     if !supported(mime) || size == 0 || size > MAX_FILE {
         return false;
     }
+    if manual {
+        return true;
+    }
+    if let Some(rules) = &p.transfer_rules {
+        return rules.download.allows(mime, "", size);
+    }
     if mime.starts_with("image/") {
         size <= p.image_mb * MB
     } else if mime == "application/pdf" {
@@ -189,6 +207,13 @@ fn allowed(p: &Policy, mime: &str, size: u64, manual: bool) -> bool {
     } else {
         manual
     }
+}
+// Explicit offline/recovery actions choose their own range, independently of automatic preferences.
+fn allowed_explicit(mime: &str, size: u64, extras: bool) -> bool {
+    supported(mime)
+        && size > 0
+        && size <= MAX_FILE
+        && (extras || mime.starts_with("image/") || mime == "application/pdf")
 }
 fn allowed_resource(
     c: &Connection,
@@ -201,6 +226,24 @@ fn allowed_resource(
 ) -> Result<bool, String> {
     Ok(allowed(p, mime, size, manual)
         && (!preview_only(c, key, url)? || (mime.starts_with("image/") && size <= MAX_PREVIEW)))
+}
+fn allowed_upload_resource(
+    c: &Connection,
+    key: &str,
+    url: &str,
+    p: &Policy,
+    mime: &str,
+    size: u64,
+    manual: bool,
+) -> Result<bool, String> {
+    if let Some(rules) = &p.transfer_rules {
+        return Ok(supported(mime)
+            && size > 0
+            && size <= MAX_FILE
+            && (manual || rules.upload.allows(mime, "", size))
+            && (!preview_only(c, key, url)? || mime.starts_with("image/") && size <= MAX_PREVIEW));
+    }
+    allowed_resource(c, key, url, p, mime, size, manual)
 }
 fn local_path(c: &Connection, key: &str, url: &str) -> Option<PathBuf> {
     c.query_row(
@@ -301,7 +344,11 @@ fn stage(
                 "{post_hash}:{path:?}:{:?}:{:?}:{}",
                 stat.as_ref().map(|s| s.len()),
                 stat.and_then(|s| s.modified().ok()),
-                serde_json::to_string(p).map_err(|e| e.to_string())?
+                format!(
+                    "{}:{:?}",
+                    serde_json::to_string(p).map_err(|e| e.to_string())?,
+                    p.transfer_rules
+                )
             );
             let old_stamp:Option<String>=c.query_row("SELECT stamp FROM reading_media_sources WHERE namespace=?1 AND item_key=?2 AND url=?3",params![ns,key,url],|r|r.get(0)).optional().map_err(|e|e.to_string())?;
             if only.is_none() && old_stamp.as_deref() == Some(&stamp) {
@@ -332,13 +379,20 @@ fn stage(
                     m.mime = infer::get(&bytes)
                         .map(|v| v.mime_type().to_string())
                         .unwrap_or_default();
-                    m.state =
-                        if allowed_resource(c, &key, &url, p, &m.mime, m.size, only.is_some())? {
-                            "ready"
-                        } else {
-                            "skipped"
-                        }
-                        .into();
+                    m.state = if allowed_upload_resource(
+                        c,
+                        &key,
+                        &url,
+                        p,
+                        &m.mime,
+                        m.size,
+                        only.is_some(),
+                    )? {
+                        "ready"
+                    } else {
+                        "skipped"
+                    }
+                    .into();
                 } else {
                     m.size = size;
                     m.state = "skipped".into();
@@ -346,11 +400,7 @@ fn stage(
             }
             if let Some(old) = load_manifest(c, ns, &key, &post_hash, &url)? {
                 // A previously explicit upload is not withdrawn by the automatic policy.
-                if only.is_none()
-                    && old.state == "ready"
-                    && old.hash == m.hash
-                    && allowed_resource(c, &key, &url, p, &old.mime, old.size, true)?
-                {
+                if only.is_none() && old.state == "ready" && old.hash == m.hash {
                     m = old.clone();
                 }
                 m.version = old.version.clone();
@@ -570,9 +620,7 @@ pub(crate) async fn transfer_reading_attachment(
         let (c, _writer) = open_write_database(&database)?;
         cloud_sync::require_reading(&c, false)?;
         let p = policy(&c)?;
-        if !p.enabled {
-            return Err("请先开启阅读附件同步".into());
-        }
+
         let (_, urls) = current(&c, &key)?;
         if !urls.contains(&url) {
             return Err("附件不属于当前阅读条目".into());
