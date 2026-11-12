@@ -29,13 +29,13 @@ export function useInsights(){
    if(!alive.current||ticket!==sequence.current)return;
    setItems(old=>append?[...old,...result.items.filter(v=>!old.some(o=>o.id===v.id))]:result.items);setMore(result.nextBefore??null);
    if(detailId.current){const selectedId=detailId.current,detailTicket=detailSequence.current;const value=await call<Insight>({action:"insightDetail",insightId:selectedId});if(alive.current&&ticket===sequence.current&&detailTicket===detailSequence.current)setDetail(value);}
-  }catch(e){if(alive.current&&ticket===sequence.current){setError(message(e));setItems([]);setDetail(null);}}
+  }catch(e){if(alive.current&&ticket===sequence.current){setError(message(e));setItems([]);setDetail(old=>old?{...old,snapshot:undefined,events:undefined,reasons:[],validity:"unavailable",checking:false}:null);}}
   finally{if(alive.current&&ticket===sequence.current)setLoading(false);}
  },[more]);
  const refreshRef=useRef(refresh);refreshRef.current=refresh;
  useEffect(()=>{
   alive.current=true;void refreshRef.current();let unlisten:(()=>void)[]=[];let disposed=false;let timer:ReturnType<typeof setTimeout>|undefined;
-  const invalidate=()=>{++accessEpoch.current;++sequence.current;++detailSequence.current;setGeneration(n=>n+1);setItems([]);setDetail(null);clearTimeout(timer);timer=setTimeout(()=>void refreshRef.current(),150);};
+  const invalidate=()=>{++accessEpoch.current;++sequence.current;++detailSequence.current;setGeneration(n=>n+1);setItems([]);setDetail(old=>old?{...old,snapshot:undefined,events:undefined,reasons:[],validity:"unavailable",checking:true}:null);clearTimeout(timer);timer=setTimeout(()=>void refreshRef.current(),150);};
   window.addEventListener("focus",invalidate);
   for(const name of ["agent-work-updated","library-registry-updated","library-runtime-updated","task-list-updated","task-sync-updated","data-portability-updated"]){void listen<{eventCategory?:string}>(name,event=>{if(disposed||event.payload?.eventCategory==="publicStream")return;invalidate();}).then(stop=>{if(disposed)stop();else unlisten.push(stop);}).catch(()=>{if(!disposed)setError("无法订阅资料变化；请用核对按钮读取当前依据。");});}
   const onVisible=()=>{if(document.visibilityState==="visible")invalidate();};document.addEventListener("visibilitychange",onVisible);
@@ -68,7 +68,7 @@ export function useInsights(){
  const candidates=(id:string,deliveryRecordId:string)=>call<InsightCandidates>({action:"insightCandidates",id,deliveryRecordId});
  const saveCandidate=(origin:InsightOrigin,candidate:InsightCandidate,target?:Insight,feedbackIds:string[]=[],contextEvidenceIds:string[]=[])=>execute({action:target?"insightUpdate":"insightImport",id:origin.workId,...(target?{insightId:target.id,expectedRevision:target.rowRevision}:{}),deliveryRecordId:origin.deliveryRecordId,deliveryHash:origin.deliveryHash,findingPointer:candidate.findingPointer,confirmDependencies:true,feedbackIds,confirmFeedbackHandled:feedbackIds.length>0,contextEvidenceIds});
  const change=(item:Insight,action:string,fields:Record<string,unknown>={})=>execute({action,insightId:item.id,expectedRevision:item.rowRevision,...fields});
- const source=(item:Insight,index:number)=>call<InsightSource>({action:"insightSource",insightId:item.id,revision:item.contentRevision??item.headRevision,sourceIndex:index});
+ const source=async(item:Insight,index:number)=>{const epoch=accessEpoch.current;const value=await call<InsightSource>({action:"insightSource",insightId:item.id,revision:item.contentRevision??item.headRevision,sourceIndex:index});if(epoch!==accessEpoch.current)throw new Error("引用读取期间访问状态已改变，请重新核对");return value;};
  const runReview=async(item:Insight,feedbackIds:string[],onOpenWork:(id:string)=>void)=>{
   const saved=await change(item,"insightContinue",{feedbackIds});onOpenWork(item.workId);
   setBusy(true);try{await call({action:"resume",id:item.workId,mode:"quick"});await refreshRef.current();}

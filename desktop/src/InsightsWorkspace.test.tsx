@@ -114,3 +114,17 @@ it.each(["执行失败","用户已停止"])("preserves the old finding and feedb
  expect(document.body.textContent).toContain("本次核对未完成");expect(store.items[0].headRevision).toBe(1);expect(store.items[0].validity).toBe("review");expect(store.items[0].events?.[0].id).toBe("u1");expect(store.items[0].reasons.every(r=>r.active)).toBe(true);
  expect(invoke.mock.calls.filter(([,v])=>v.args.action==="resume")).toHaveLength(1);expect(invoke.mock.calls.some(([,v])=>v.args.action==="insightUpdate")).toBe(false);
 });
+
+
+it("keeps an unsaved feedback draft and the current discovery while masking content on window focus",async()=>{
+ vi.useFakeTimers();await mount();await click("查看发现");
+ const area=document.querySelector<HTMLTextAreaElement>('textarea[aria-label="你的补充"]')!;
+ await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value")!.set!.call(area,"未保存的验证范围补充");area.dispatchEvent(new Event("input",{bubbles:true}));});
+ await act(async()=>window.dispatchEvent(new Event("focus")));
+ expect(document.querySelector('dialog[aria-label="发现与依据"]')).not.toBeNull();
+ expect(document.body.textContent).not.toContain("本周已完成原型验证。");
+ expect(document.body.textContent).toContain("未保存的补充已暂时保留");
+ await act(async()=>vi.advanceTimersByTimeAsync(160));
+ expect(document.querySelector<HTMLTextAreaElement>('textarea[aria-label="你的补充"]')!.value).toBe("未保存的验证范围补充");
+ expect(document.body.textContent).toContain("本周已完成原型验证。");
+});
