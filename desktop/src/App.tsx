@@ -1223,9 +1223,7 @@ useEffect(() => {
       onOpenSettings={() => setShowConnection(true)}
       onOpenSyncHealth={() => setIndexDetailsOpen(true)}
       syncNeedsAttention={Boolean(indexStatus?.failedJobs)}
-    /> : insightsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开洞察…</div>}><LazyInsightsWorkspace
-      onToggleDesktopSidebar={!isMobileLayout ? () => changeDesktopSidebarSetting(!desktopSidebarEnabled) : undefined}
-    /></Suspense> : collectionsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开阅读…</div>}><LazyCollectionsWorkspace
+    /> : insightsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开洞察…</div>}><LazyInsightsWorkspace/></Suspense> : collectionsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开阅读…</div>}><LazyCollectionsWorkspace
       onToggleDesktopSidebar={!isMobileLayout ? () => changeDesktopSidebarSetting(!desktopSidebarEnabled) : undefined}
     /></Suspense> : tasksActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开任务…</div>}><LazyTaskWorkspace
       libraries={spaces}

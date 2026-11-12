@@ -1,10 +1,11 @@
 import {useContext,useEffect,useMemo,useRef,useState,type ReactNode} from "react";
-import {ArrowUpRight,Check,CheckCircle2,Clock3,FileText,History,MessageSquare,PanelLeft,Plus,RefreshCw,Search,Sparkles,Star,X} from "lucide-react";
+import {ArrowUpRight,BellOff,BookOpen,CalendarDays,Check,CheckCircle2,ChevronDown,ChevronRight,Clock3,FileText,Globe2,History,LayoutGrid,Layers3,MessageSquare,MoreHorizontal,PanelLeft,PanelRight,Plus,RefreshCw,Search,SlidersHorizontal,Sparkles,Star,X} from "lucide-react";
 import {useInsights} from "./useInsights";
 import type {Insight,InsightCandidates,InsightDelivery,InsightEvent,InsightSource} from "./InsightTypes";
 import type {WorkSummary} from "./AgentConversationHistoryData";
 import {AgentPanelContext} from "./StandaloneAgentLauncher";
 import {AgentCitationPreview} from "./AgentCitationPreview";
+import {WorkspaceHeaderContext} from "./WorkspaceChrome";
 import "./InsightsWorkspace.css";
 
 const stateNames={attention:"待关注",later:"稍后",done:"已处理"};
@@ -13,9 +14,10 @@ const reasonNames:Record<string,string>={sourceChanged:"资料内容已变化",s
 const time=(at:number)=>new Intl.DateTimeFormat("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}).format(at);
 type Data=ReturnType<typeof useInsights>;
 
-function InsightDialog({title,children,onClose,wide=false}:{title:string;children:ReactNode;onClose:()=>void;wide?:boolean}){
+function InsightDialog({title,children,onClose,wide=false,inline=false}:{title:string;children:ReactNode;onClose:()=>void;wide?:boolean;inline?:boolean}){
  const ref=useRef<HTMLDialogElement>(null);
- useEffect(()=>{const node=ref.current;if(node?.showModal)node.showModal();else if(node)node.open=true;return()=>{node?.close?.();};},[]);
+ useEffect(()=>{if(inline)return;const node=ref.current;if(node?.showModal)node.showModal();else if(node)node.open=true;return()=>{node?.close?.();};},[inline]);
+ if(inline)return <section className="insights-inline-detail" aria-label={title}><header><h2>{title}</h2><button type="button" aria-label="关闭详情" onClick={onClose}><X size={18}/></button></header>{children}</section>;
  return <dialog ref={ref} className={`insights-dialog${wide?" insights-dialog-wide":""}`} aria-label={title} onCancel={event=>{event.preventDefault();onClose();}}>
   <header><h2>{title}</h2><button type="button" className="icon-button" aria-label="关闭对话框" onClick={onClose}><X size={19}/></button></header>{children}
  </dialog>;
@@ -57,7 +59,7 @@ function ResultPicker({data,target,onClose}:{data:Data;target?:Insight;onClose:(
  </InsightDialog>;
 }
 
-function InsightDetail({data,item,onClose,onUpdate,onOpenWork}:{data:Data;item:Insight;onClose:()=>void;onUpdate:()=>void;onOpenWork:(id:string)=>void}){
+function InsightDetail({data,item,onClose,onUpdate,onOpenWork,inline=false}:{data:Data;item:Insight;onClose:()=>void;onUpdate:()=>void;onOpenWork:(id:string)=>void;inline?:boolean}){
  const [feedback,setFeedback]=useState(""),[kind,setKind]=useState("correction"),[source,setSource]=useState<InsightSource|null>(null),[error,setError]=useState(""),[sendFeedbackIds,setSendFeedbackIds]=useState<string[]>([]),[restoreConfirmed,setRestoreConfirmed]=useState(false);
  useEffect(()=>{if(item.checking||!item.snapshot)setSource(null);},[item.checking,item.snapshot]);
  const current=(item.contentRevision??item.headRevision)===item.headRevision;
@@ -65,7 +67,7 @@ function InsightDetail({data,item,onClose,onUpdate,onOpenWork}:{data:Data;item:I
  const pending=item.events?.filter(e=>e.kind==="insightFeedback"&&e.body?.kind==="correction"&&item.reasons.some(r=>r.active&&r.kind==="feedback"&&r.reference?.feedbackId===e.id))??[];
  const lastStatus=[...(item.events??[])].reverse().find(e=>e.kind==="insightStatus");
  const submit=async()=>{try{await data.change(item,"insightFeedback",{text:feedback.trim(),kind});setFeedback("");}catch(e){setError(String(e));}};
- return <InsightDialog title="发现与依据" onClose={onClose} wide>
+ return <InsightDialog title="发现与依据" onClose={onClose} wide inline={inline}>
   <div className="insights-detail-body">{source&&item.snapshot&&!item.checking?<AgentCitationPreview value={{excerpt:source.excerpt,quote:source.quote??"",onReturn:()=>setSource(null)}}/>:<>
    <div className="insights-detail-meta"><span>{stateNames[item.processingState]}</span><span>{validityNames[item.validity]}</span><span>内容版本 {item.contentRevision??item.headRevision}</span><span>{time(item.updatedAt)}</span></div>
    {!item.snapshot?<section className="insights-notice"><p>{item.checking?"正在重新核对当前访问；未保存的补充已暂时保留。":item.restorePending?"这条发现来自恢复的备份。请重新确认原事项的资料访问，旧授权不会自动恢复。":"来源或原事项当前不可访问，已隐藏正文、引文与历史内容。"}</p>{item.restorePending&&<><button type="button" onClick={()=>onOpenWork(item.workId)}>到原事项查看资料范围</button><label className="insights-confirm"><input type="checkbox" checked={restoreConfirmed} onChange={e=>setRestoreConfirmed(e.target.checked)}/>我已核对当前本机资料的访问范围；远端最新状态仍需在来源库核对</label><button type="button" disabled={data.busy||!restoreConfirmed} onClick={()=>void act("insightRestoreAccess",{confirmCurrentAccess:true})}>重新确认原事项的本机访问</button></>}</section>:<>
@@ -88,22 +90,51 @@ function InsightDetail({data,item,onClose,onUpdate,onOpenWork}:{data:Data;item:I
 }
 function eventLabel(event:InsightEvent){const labels:Record<string,string>={content:"保存了内容修订",existingOrigin:"确认了已有出处",reconcile:"核对了来源和出现时间",restore:"恢复后等待来源校验",insightStatus:"更新了处理状态",insightContinue:"将所选反馈送入原事项",insightWithdrawFeedback:"撤回了纠正，保留历史与依赖影响",insightFollow:"更新了关注设置",insightRelate:"关联了替代关系",insightUndoStatus:"撤销了处理动作"};return labels[event.kind]??"保存了用户操作";}
 
-export function InsightsWorkspace({onToggleDesktopSidebar}:{onToggleDesktopSidebar?:()=>void}){
- const data=useInsights(),openAgent=useContext(AgentPanelContext);
+// Presentation only: shorten the heading without changing the saved finding or its evidence.
+function findingPreview(text:string){
+ const firstLine=text.split(/\n/)[0].trim();
+ const sentence=firstLine.match(/^.{1,90}?[。！？](?:[”’」』])?/u)?.[0];
+ const title=firstLine.length<=90?firstLine:sentence??`${firstLine.slice(0,72)}…`;
+ const rest=text.startsWith(title)?text.slice(title.length).trim():text;
+ return {title,body:rest};
+}
+
+export function InsightsWorkspace(){
+ const data=useInsights(),openAgent=useContext(AgentPanelContext),chrome=useContext(WorkspaceHeaderContext);
  const [filter,setFilter]=useState<Insight["processingState"]|"all">("attention"),[query,setQuery]=useState(""),[days,setDays]=useState(0),[picker,setPicker]=useState<{target?:Insight}|null>(null);
+ const [scope,setScope]=useState<"all"|"review">("all"),[validity,setValidity]=useState("all"),[layout,setLayout]=useState<"cards"|"split">("cards"),[navigation,setNavigation]=useState<"auto"|"open"|"closed">("auto");
  useEffect(()=>setPicker(null),[data.generation]);
  const openWork=(id:string)=>{data.closeDetail();setPicker(null);openAgent?.({workId:id});};
- const visible=useMemo(()=>data.items.filter(item=>(filter==="all"||item.processingState===filter)&&(!days||item.createdAt>=Date.now()-days*86_400_000)&&(!query.trim()||item.snapshot?.text.toLowerCase().includes(query.trim().toLowerCase())||item.snapshot?.sourceCitations.some(s=>s.excerpt.title.includes(query.trim())))),[data.items,filter,query,days]);
- return <section className="insights-workspace" aria-label="洞察发现工作区">
-  <header className="insights-heading"><div><div className="insights-title">{onToggleDesktopSidebar&&<button type="button" className="icon-button" aria-label="切换洞察侧边栏" onClick={onToggleDesktopSidebar}><PanelLeft size={19}/></button>}<h1>洞察</h1></div><p>看见资料里的变化与关联，保留依据，继续核对。</p></div><div><button type="button" className="icon-button" aria-label="核对当前来源" disabled={data.loading||data.busy} onClick={()=>void data.refresh()}><RefreshCw size={17}/></button><button type="button" className="insights-primary" onClick={()=>setPicker({})}><Plus size={16}/>选择已有成果</button></div></header>
-  <div className="insights-controls"><div className="insights-tabs" role="tablist" aria-label="发现处理状态">{(["attention","later","done","all"] as const).map(state=><button type="button" key={state} role="tab" aria-selected={filter===state} onClick={()=>setFilter(state)}>{state==="all"?"全部":stateNames[state]}<span>{data.items.filter(i=>state==="all"||i.processingState===state).length}</span></button>)}</div><label className="insights-search"><Search size={16}/><input aria-label="搜索发现与依据" value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索发现与依据"/></label><select aria-label="发现时间" value={days} onChange={e=>setDays(Number(e.target.value))}><option value={0}>全部时间</option><option value={7}>最近 7 天</option><option value={30}>最近 30 天</option></select></div>
-  {data.error&&<p className="insights-error" role="alert">{data.error}</p>}
-  {data.unresolved&&!data.busy&&<div className="insights-notice" role="status"><p>上一次操作的提交结果需要核对。</p><button type="button" onClick={()=>void data.inspectPending()}>核对提交结果</button><button type="button" onClick={()=>void data.retryPending().catch(()=>undefined)}>按原请求重试</button>{data.pendingChecked&&<button type="button" onClick={data.discardPending}>放弃未提交请求并刷新</button>}</div>}
-  <div className="insights-content" aria-busy={data.loading}>{data.loading&&!data.items.length?<p role="status">正在读取发现和核对依据…</p>:!visible.length?<div className="insights-empty"><Sparkles size={26}/><h2>{data.items.length?"没有符合筛选条件的发现":"从一份已有成果开始"}</h2><p>{data.items.length?"调整状态、时间或搜索条件，再看看其他发现。":"先在 Hub 助手分析选定资料，再选择有依据的结构化发现保存到这里。"}</p><button type="button" onClick={()=>data.items.length?(setFilter("all"),setQuery(""),setDays(0)):setPicker({})}>{data.items.length?"显示全部发现":"选择已有成果"}</button></div>:<div className="insights-grid">{visible.map(item=><article className="insights-card" key={item.id}><div className="insights-card-meta"><span>{stateNames[item.processingState]}</span><span className={`insights-validity insights-validity-${item.validity}`}>{validityNames[item.validity]}</span><time>{time(item.createdAt)}</time></div><button type="button" className="insights-card-open" aria-label={item.snapshot?.text??"查看来源不可用的发现"} onClick={()=>void data.open(item.id).catch(()=>undefined)}><h2>{item.snapshot?.text??"这条发现的来源当前不可访问"}</h2></button><p className="insights-card-sources">{item.snapshot?.sourceCitations.map(s=>s.excerpt.title).filter((v,i,a)=>a.indexOf(v)===i).join(" · ")??"用户处理记录与历史身份已保留"}</p><footer><span>{item.snapshot?`${item.snapshot.sourceCitations.length} 处依据` : "正文已隐藏"}{!item.followed?" · 不再关注":""}</span><button type="button" onClick={()=>void data.open(item.id).catch(()=>undefined)}>{item.validity==="review"?"核对这条发现":"查看发现"}<ArrowUpRight size={14}/></button></footer></article>)}</div>}
-   {data.more&&<button type="button" className="insights-load-more" disabled={data.loading} onClick={()=>void data.refresh(true)}>再看更多发现</button>}
+ const visible=useMemo(()=>data.items.filter(item=>(filter==="all"||item.processingState===filter)&&(scope!=="review"||item.validity==="review")&&(validity==="all"||item.validity===validity)&&(!days||item.createdAt>=Date.now()-days*86_400_000)&&(!query.trim()||item.snapshot?.text.toLowerCase().includes(query.trim().toLowerCase())||item.snapshot?.sourceCitations.some(s=>s.excerpt.title.includes(query.trim())))),[data.items,filter,query,days,scope,validity]);
+ const reviewCount=data.items.filter(item=>item.validity==="review").length;
+ const filtered=days!==0||validity!=="all";
+ const reset=()=>{setFilter("all");setQuery("");setDays(0);setValidity("all");setScope("all");};
+ const openFinding=(item:Insight)=>void data.open(item.id).catch(()=>undefined);
+ return <section className={`insights-workspace insights-navigation-${navigation}`} aria-label="洞察发现工作区">
+  <aside className="insights-navigation" aria-label="洞察导航">
+   <header><strong>洞察</strong><button type="button" className="icon-button" aria-label="收起洞察侧边栏" onClick={()=>setNavigation("closed")}><PanelLeft size={17}/></button></header>
+   <nav aria-label="我的洞察"><p>我的洞察</p><button type="button" className={scope==="all"?"selected":""} aria-current={scope==="all"?"page":undefined} onClick={()=>{setScope("all");setFilter("attention");}}><Sparkles size={18}/><span>发现</span><small>{data.items.length}</small></button>
+    {[[Globe2,"真实案例"],[CalendarDays,"阶段回顾"],[SlidersHorizontal,"关注主题"],[FileText,"工作草稿"],[History,"处理记录"]].map(([Icon,label])=>{const Glyph=Icon as typeof Sparkles;return <button type="button" key={String(label)} disabled title={`${label}尚未开放`}><Glyph size={18}/><span>{String(label)}</span></button>;})}
+    <p>我的筛选</p><button type="button" className={scope==="review"?"selected":""} aria-current={scope==="review"?"page":undefined} onClick={()=>{setScope("review");setFilter("all");}}><History size={18}/><span>待复核</span><small>{reviewCount}</small></button><button type="button" disabled title="星标发现尚未开放"><Star size={18}/><span>星标发现</span></button>
+    <p>发现视角</p>{[[BookOpen,"知识与工作"],[CalendarDays,"生活与进展"],[ArrowUpRight,"决定与变化"]].map(([Icon,label])=>{const Glyph=Icon as typeof Sparkles;return <button type="button" key={String(label)} disabled title="发现视角尚未开放"><Glyph size={18}/><span>{String(label)}</span></button>;})}
+   </nav><footer><BookOpen size={16}/><p>每条发现都保留依据。<br/>先理解，再决定下一步。</p></footer>
+  </aside>
+  <div className="insights-page">
+   <div className="insights-topbar"><div className="insights-breadcrumb" onMouseDown={chrome?.onMouseDown}><button type="button" className="insights-nav-trigger icon-button" aria-label="展开洞察侧边栏" onClick={()=>setNavigation("open")}><PanelLeft size={17}/></button><span>我的 Hub</span><ChevronRight size={14}/><span>洞察</span></div><label className="insights-search"><Search size={18}/><input aria-label="搜索发现与依据" value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索发现、事项与依据…"/></label>{chrome?.actions}</div>
+   <header className="insights-heading"><div className="insights-title"><div className="insights-title-icon" aria-hidden="true"><Sparkles size={25}/></div><div><span className="insights-overline">让已有的积累，接着发挥作用</span><h1>洞察</h1><p>看见资料里的变化与关联，找到可以继续的一步。</p></div></div><div className="insights-header-actions"><button type="button" className="insights-primary" onClick={()=>setPicker({})}><Plus size={16}/>选择已有成果</button><details className="insights-menu"><summary aria-label="洞察更多操作"><MoreHorizontal size={21}/></summary><div className="insights-menu-content"><button type="button" aria-label="核对当前来源" disabled={data.loading||data.busy} onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");void data.refresh();}}><RefreshCw size={15}/>核对当前来源</button></div></details></div></header>
+   <div className="insights-controls"><div className="insights-tabs" role="tablist" aria-label="发现处理状态">{(["attention","later","done","all"] as const).map((state,index,states)=><button type="button" key={state} role="tab" aria-selected={filter===state} tabIndex={filter===state?0:-1} onClick={()=>setFilter(state)} onKeyDown={e=>{if(e.key!=="ArrowLeft"&&e.key!=="ArrowRight")return;e.preventDefault();const next=(index+(e.key==="ArrowRight"?1:-1)+states.length)%states.length;setFilter(states[next]);(e.currentTarget.parentElement?.children[next] as HTMLElement)?.focus();}}>{state==="all"?"全部":stateNames[state]}<span>{data.items.filter(i=>state==="all"||i.processingState===state).length}</span></button>)}</div><div className="insights-view-tools"><details className="insights-menu insights-filter-menu"><summary aria-label="筛选发现" className={filtered?"is-filtered":""}><SlidersHorizontal size={16}/><span>筛选</span>{filtered&&<b>{Number(days!==0)+Number(validity!=="all")}</b>}</summary><div className="insights-filter-popover"><header><strong>筛选发现</strong><button type="button" onClick={()=>{setDays(0);setValidity("all");}}>重置</button></header><label>时间范围<select aria-label="发现时间" value={days} onChange={e=>setDays(Number(e.target.value))}><option value={0}>全部时间</option><option value={7}>最近 7 天</option><option value={30}>最近 30 天</option></select></label><label>结论有效性<select aria-label="结论有效性" value={validity} onChange={e=>setValidity(e.target.value)}><option value="all">全部结论</option><option value="available">依据已核对</option><option value="review">待复核</option><option value="unavailable">来源不可用</option></select></label><button type="button" className="insights-primary" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}>完成</button></div></details><span className="insights-toolbar-divider"/><div className="insights-layout-switch" aria-label="发现布局"><button type="button" aria-label="卡片浏览" aria-pressed={layout==="cards"} onClick={()=>setLayout("cards")}><LayoutGrid size={16}/></button><button type="button" aria-label="列表与详情" aria-pressed={layout==="split"} onClick={()=>setLayout("split")}><PanelRight size={16}/></button></div></div></div>
+   {data.error&&<p className="insights-error" role="alert">{data.error}</p>}
+   {data.unresolved&&!data.busy&&<div className="insights-notice" role="status"><p>上一次操作的提交结果需要核对。</p><button type="button" onClick={()=>void data.inspectPending()}>核对提交结果</button><button type="button" onClick={()=>void data.retryPending().catch(()=>undefined)}>按原请求重试</button>{data.pendingChecked&&<button type="button" onClick={data.discardPending}>放弃未提交请求并刷新</button>}</div>}
+   <div className={`insights-panels insights-layout-${layout}${data.detail?" has-detail":""}`}>
+    <div className="insights-browse"><div className="insights-list-heading"><h2>{scope==="review"?"需要重新核对":filter==="later"?"留给稍后的发现":filter==="done"?"已经留下的收获":filter==="all"?"全部已保存发现":"值得留意"}<span>{visible.length}</span></h2><span>每个发现，都能回到依据</span></div>
+     <div className="insights-content" aria-busy={data.loading}>{data.loading&&!data.items.length?<p role="status">正在读取发现和核对依据…</p>:!visible.length?<div className="insights-empty"><Sparkles size={26}/><h2>{data.items.length?"没有符合筛选条件的发现":"从一份已有成果开始"}</h2><p>{data.items.length?"调整状态、时间或搜索条件，再看看其他发现。":"先在 Hub 助手分析选定资料，再选择有依据的结构化发现保存到这里。"}</p><button type="button" onClick={()=>data.items.length?reset():setPicker({})}>{data.items.length?"显示全部发现":"选择已有成果"}</button></div>:<div className="insights-grid">{visible.map(item=>{const preview=findingPreview(item.snapshot?.text??"这条发现的来源当前不可访问");return <article className="insights-card" key={item.id}><div className="insights-card-main"><div className="insights-card-meta"><span className="insights-category"><Sparkles size={13}/>已保存发现</span>{item.validity!=="available"&&<span className={`insights-validity insights-validity-${item.validity}`}>{validityNames[item.validity]}</span>}<time dateTime={new Date(item.updatedAt).toISOString()} title={time(item.updatedAt)}>{new Intl.DateTimeFormat("zh-CN",{month:"numeric",day:"numeric"}).format(item.updatedAt)}</time></div><button type="button" className="insights-card-open" aria-label={item.snapshot?.text??"查看来源不可用的发现"} onClick={()=>openFinding(item)}><h2>{preview.title}</h2></button>{preview.body&&<p className="insights-card-summary">{preview.body}</p>}<p className="insights-card-sources"><Layers3 size={14}/><span>{item.snapshot?.sourceCitations.map(s=>s.excerpt.title).filter((v,i,a)=>a.indexOf(v)===i).join(" · ")??"用户处理记录与历史身份已保留"}</span></p>{(item.processingState!=="attention"||!item.followed)&&<p className="insights-card-state">{stateNames[item.processingState]}{!item.followed&&<> · <BellOff size={12}/>不再关注</>}</p>}</div><footer><span><Layers3 size={14}/>{item.snapshot?`${item.snapshot.sourceCitations.length} 处依据`:"正文已隐藏"}{item.headRevision>1?` · 修订 ${item.headRevision}`:""}</span><button type="button" onClick={()=>openFinding(item)}>{item.validity==="review"?"核对这条发现":"查看发现"}<ArrowUpRight size={14}/></button></footer></article>;})}</div>}
+     {data.more&&<button type="button" className="insights-load-more" disabled={data.loading} onClick={()=>void data.refresh(true)}>再看更多发现<ChevronDown size={14}/></button>}
+     </div>
+    </div>
+    {data.detail&&!picker&&<InsightDetail key={data.detail.id} inline={layout==="split"} data={data} item={data.detail} onClose={data.closeDetail} onUpdate={()=>setPicker({target:data.detail!})} onOpenWork={openWork}/>}
+    {layout==="split"&&!data.detail&&<div className="insights-detail-empty"><Sparkles size={30}/><h2>从一条发现，接着看下去</h2><p>选择左侧发现，查看资料依据与处理记录。</p></div>}
+   </div><p className="insights-footnote">保存在本机 · 资料按 Hub 当前同步内容核对 · 打开和筛选不会启动分析</p>
   </div>
-  <p className="insights-footnote">保存在本机 · 资料按 Hub 当前同步内容核对 · 打开和筛选不会启动分析</p>
   {picker&&<ResultPicker key={picker.target?.id??"import"} data={data} target={picker.target} onClose={()=>setPicker(null)}/>}
-  {data.detail&&!picker&&<InsightDetail key={data.detail.id} data={data} item={data.detail} onClose={data.closeDetail} onUpdate={()=>setPicker({target:data.detail!})} onOpenWork={openWork}/>}
  </section>;
 }

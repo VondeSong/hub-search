@@ -141,3 +141,25 @@ it("resumes an already queued supplement without saving another user message",as
  await mount();await click("核对这条发现");await act(async()=>document.querySelector<HTMLInputElement>('.insights-feedback-choice input')!.click());await click("按补充继续核对");
  expect(invoke.mock.calls.some(([,v])=>v.args.action==="insightContinue")).toBe(false);expect(invoke.mock.calls.filter(([,v])=>v.args.action==="respond")).toHaveLength(1);expect(openWork).toHaveBeenCalledWith({workId:"work-a"});
 });
+
+
+it("keeps prototype navigation honest and filters review findings without a model",async()=>{
+ const second=item("two");second.validity="review";second.reasons=[{id:"changed",kind:"sourceChanged",active:true}];second.snapshot!.text="来源变化，需要重新核对。";store.items.push(second);
+ await mount();expect(host.querySelector('aside[aria-label="洞察导航"]')).not.toBeNull();
+ expect(button("阶段回顾").disabled).toBe(true);expect(host.querySelectorAll('.insights-card')).toHaveLength(2);
+ await act(async()=>host.querySelector<HTMLButtonElement>('nav button[aria-current="page"]')!.click());
+ const review=[...host.querySelectorAll<HTMLButtonElement>('nav button')].find(node=>node.textContent?.startsWith("待复核"))!;await act(async()=>review.click());
+ expect(host.querySelectorAll('.insights-card')).toHaveLength(1);expect(host.querySelector('.insights-card')?.textContent).toContain("来源变化");
+ expect(invoke.mock.calls.some(([,v])=>["respond","resume","run"].includes(v.args.action))).toBe(false);
+});
+
+it("preserves the draft and original finding when switching between cards and contextual detail",async()=>{
+ store.items[0].snapshot!.text="验证范围需要补充。\n这里只完成纸面原型，尚未完成实机验证。";
+ await mount();expect(host.querySelector('.insights-card h2')?.textContent).toBe("验证范围需要补充。");expect(host.querySelector('.insights-card-summary')?.textContent).toContain("尚未完成实机验证");
+ await click("查看发现");const area=document.querySelector<HTMLTextAreaElement>('textarea[aria-label="你的补充"]')!;
+ await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value")!.set!.call(area,"尚未保存的补充");area.dispatchEvent(new Event("input",{bubbles:true}));});
+ await act(async()=>host.querySelector<HTMLButtonElement>('button[aria-label="列表与详情"]')!.click());
+ expect(host.querySelector('section[aria-label="发现与依据"]')).not.toBeNull();expect(host.querySelector('textarea')!.value).toBe("尚未保存的补充");
+ await act(async()=>host.querySelector<HTMLButtonElement>('button[aria-label="卡片浏览"]')!.click());
+ expect(host.querySelector('dialog[aria-label="发现与依据"]')).not.toBeNull();expect(host.querySelector('textarea')!.value).toBe("尚未保存的补充");expect(store.items[0].headRevision).toBe(1);
+});
