@@ -23,21 +23,21 @@ function InsightDialog({title,children,onClose,wide=false,inline=false}:{title:s
  </dialog>;
 }
 
-function ResultPicker({data,target,onClose}:{data:Data;target?:Insight;onClose:()=>void}){
+function ResultPicker({data,target,onClose,onOpenWork}:{data:Data;target?:Insight;onClose:()=>void;onOpenWork:(id:string)=>void}){
  const [works,setWorks]=useState<WorkSummary[]>([]),[workId,setWorkId]=useState(target?.workId??"");
  const [deliveries,setDeliveries]=useState<InsightDelivery[]>([]),[before,setBefore]=useState<string|null>(null),[deliveryId,setDeliveryId]=useState("");
  const [candidates,setCandidates]=useState<InsightCandidates|null>(null),[selected,setSelected]=useState<string[]>([]),[contexts,setContexts]=useState<string[]>([]),[checked,setChecked]=useState(false);
  const [feedbacks,setFeedbacks]=useState<string[]>([]),[error,setError]=useState(""),[loading,setLoading]=useState(true),[saved,setSaved]=useState(0),[workCursor,setWorkCursor]=useState<unknown>(null);
- const request=useRef(0);
+ const request=useRef(0),saving=useRef(false);
  useEffect(()=>{let active=true;void data.selectWorks().then(v=>{if(!active)return;setWorks(v.works);setWorkCursor(v.nextCursor);if(!target)setWorkId(v.works[0]?.id??"");}).catch(e=>active&&setError(String(e))).finally(()=>active&&setLoading(false));return()=>{active=false;};},[]);
- useEffect(()=>{if(!workId)return;const ticket=++request.current;setLoading(true);setError("");setCandidates(null);setSelected([]);setDeliveries([]);setDeliveryId("");void data.deliveries(workId).then(v=>{if(ticket!==request.current)return;setDeliveries(v.items);setBefore(v.nextBeforeRecordId??null);setDeliveryId(v.items[0]?.deliveryRecordId??"");}).catch(e=>ticket===request.current&&setError(String(e))).finally(()=>ticket===request.current&&setLoading(false));return()=>{++request.current;};},[workId]);
+ useEffect(()=>{if(!workId)return;const ticket=++request.current;setLoading(true);setError("");setCandidates(null);setSelected([]);setChecked(false);setContexts([]);setDeliveries([]);setDeliveryId("");void data.deliveries(workId).then(v=>{if(ticket!==request.current)return;setDeliveries(v.items);setBefore(v.nextBeforeRecordId??null);setDeliveryId(v.items[0]?.deliveryRecordId??"");}).catch(e=>ticket===request.current&&setError(String(e))).finally(()=>ticket===request.current&&setLoading(false));return()=>{++request.current;};},[workId]);
  useEffect(()=>{if(!deliveryId)return;const ticket=++request.current;setLoading(true);setChecked(false);setContexts([]);setSelected([]);void data.candidates(workId,deliveryId).then(v=>{if(ticket===request.current)setCandidates(v);}).catch(e=>ticket===request.current&&setError(String(e))).finally(()=>ticket===request.current&&setLoading(false));return()=>{++request.current;};},[deliveryId]);
  const pendingFeedback=(target?.events??[]).filter(e=>e.kind==="insightFeedback"&&e.body?.kind==="correction"&&target?.reasons.some(r=>r.active&&r.kind==="feedback"&&r.reference?.feedbackId===e.id));
  const toggle=(values:string[],key:string)=>values.includes(key)?values.filter(v=>v!==key):[...values,key];
  const save=async()=>{
-  if(!candidates)return;setError("");
-  try{let count=0;for(const candidate of candidates.candidates.filter(v=>selected.includes(v.findingPointer))){await data.saveCandidate(candidates.origin,candidate,target,feedbacks,contexts);setSelected(old=>old.filter(v=>v!==candidate.findingPointer));++count;}setSaved(n=>n+count);await data.refresh();if(target)onClose();}
-  catch(e){setError(String(e));}
+  if(!candidates||saving.current||!checked)return;saving.current=true;setError("");
+  try{for(const candidate of candidates.candidates.filter(v=>selected.includes(v.findingPointer))){await data.saveCandidate(candidates.origin,candidate,target,feedbacks,contexts);setSelected(old=>old.filter(v=>v!==candidate.findingPointer));setSaved(n=>n+1);}await data.refresh();if(target)onClose();}
+  catch(e){setError(String(e));}finally{saving.current=false;}
  };
  return <InsightDialog title={target?"更新这条发现":"从已有成果保存发现"} onClose={onClose} wide>
   <p className="insights-dialog-intro">选择已发布、带可核对引用的结构化发现。浏览与保存不会启动分析。</p>
@@ -46,16 +46,18 @@ function ResultPicker({data,target,onClose}:{data:Data;target?:Insight;onClose:(
    <label>已发布成果<select aria-label="选择固定成果" value={deliveryId} disabled={loading} onChange={e=>setDeliveryId(e.target.value)}><option value="">选择成果</option>{deliveries.map(d=><option key={d.deliveryRecordId} value={d.deliveryRecordId}>{time(d.generatedAt)} · {d.findingCount} 条候选</option>)}</select></label>
    {before&&<button type="button" disabled={loading} onClick={()=>void data.deliveries(workId,before).then(v=>{setDeliveries(old=>[...old,...v.items]);setBefore(v.nextBeforeRecordId??null);}).catch(e=>setError(String(e)))}>更早的成果</button>}
   </div>
+  {candidates&&<p className="insights-dialog-intro">成果生成于 {time(candidates.origin.generatedAt)}。下方逐条列出实际依据；核对范围是 Hub 当前已同步的内容，远端最新状态仍需到来源查看。</p>}
   <div className="insights-picker-body" aria-busy={loading}>{loading?<p role="status">正在核对成果和当前依据…</p>:!workId?<p>尚无可选择的事项。先在 Hub 助手中分析授权资料，明确要求“给出有依据的结构化发现”。</p>:!deliveryId?<p>该事项尚无已发布成果，可在原事项中继续。</p>:candidates?.reason?<p role="status">{candidates.reason}</p>:candidates?.candidates.map(candidate=><div className="insights-candidate" key={candidate.findingPointer}>
-   {candidate.eligibility==="unavailable"?<p className="insights-notice">{candidate.reason}</p>:<><label><input type={target?"radio":"checkbox"} name="insightCandidate" checked={selected.includes(candidate.findingPointer)} onChange={()=>setSelected(target?[candidate.findingPointer]:toggle(selected,candidate.findingPointer))}/><strong>{candidate.text}</strong></label>
+   {candidate.eligibility==="unavailable"?<p className="insights-notice">{candidate.reason}</p>:<><label><input type={target?"radio":"checkbox"} name="insightCandidate" checked={selected.includes(candidate.findingPointer)} onChange={()=>{setSelected(target?[candidate.findingPointer]:toggle(selected,candidate.findingPointer));setChecked(false);}}/><strong>{candidate.text}</strong></label>
     <div className="insights-source-list">{candidate.sourceCitations?.map((source,index)=><details key={index}><summary><FileText size={14}/>{source.excerpt.title} · 已核对版本</summary><blockquote>{source.quote}</blockquote><small>{source.excerpt.sourcePath} · 第 {source.excerpt.startChar+1}–{source.excerpt.endChar} 字符</small></details>)}</div></>}
    </div>)}
-   {!!candidates?.candidates.some(v=>v.eligibility==="verifiedSources")&&<fieldset className="insights-background"><legend>影响判断的共同背景（如有）</legend><p>这里只列出本次成果实际读取且当前可用的材料；按选中发现的实际依赖选择。</p>{candidates.contextOptions?.map(context=><label key={context.evidenceId}><input type="checkbox" checked={contexts.includes(context.evidenceId)} onChange={()=>setContexts(toggle(contexts,context.evidenceId))}/>{context.title}</label>)}
+   {!!candidates?.candidates.some(v=>v.eligibility==="verifiedSources")&&<fieldset className="insights-background"><legend>影响判断的共同背景（如有）</legend><p>这里只列出本次成果实际读取且当前可用的材料；按选中发现的实际依赖选择。</p>{candidates.contextOptions?.map(context=><label key={context.evidenceId}><input type="checkbox" checked={contexts.includes(context.evidenceId)} onChange={()=>{setContexts(toggle(contexts,context.evidenceId));setChecked(false);}}/>{context.title}</label>)}
     <label className="insights-confirm"><input type="checkbox" checked={checked} onChange={e=>setChecked(e.target.checked)}/>已核对所选发现的直接依据和必要背景</label></fieldset>}
    {!!pendingFeedback.length&&<fieldset className="insights-background"><legend>这次成果已按哪些补充修正</legend><p>只选择本次实际送入运行、并已在新结论中处理的补充；未选项继续待复核。</p>{pendingFeedback.map(f=><label key={f.id}><input type="checkbox" checked={feedbacks.includes(f.id)} onChange={()=>setFeedbacks(toggle(feedbacks,f.id))}/>{f.body?.text}</label>)}</fieldset>}
   </div>
   {error&&<p className="insights-error" role="alert">{error}</p>}{saved>0&&<p role="status">已保存 {saved} 条；重复选择不会新增发现或重置状态。</p>}
-  <footer><button type="button" onClick={onClose}>取消</button><button type="button" className="insights-primary" disabled={!selected.length||!checked||data.busy||loading} onClick={()=>void save()}><Check size={16}/>{data.busy?"正在保存…":target?"确认更新这条发现":"保存所选发现"}</button></footer>
+  {data.unresolved&&<p className="insights-dialog-intro" role="status">有一项保存结果需要核对，已确认保存的内容会保留。关闭此窗口后，可在发现页核对提交结果。</p>}
+  <footer>{workId&&<button type="button" onClick={()=>onOpenWork(workId)}>查看原事项</button>}<button type="button" onClick={onClose}>取消</button><button type="button" className="insights-primary" disabled={!selected.length||!checked||data.busy||loading||!!data.unresolved} onClick={()=>void save()}><Check size={16}/>{data.busy?"正在保存…":target?"确认更新这条发现":"保存所选发现"}</button></footer>
  </InsightDialog>;
 }
 
@@ -80,6 +82,7 @@ function InsightDetail({data,item,onClose,onUpdate,onOpenWork,inline=false}:{dat
     {current&&<section className="insights-feedback"><h4>补充与纠正</h4><label>反馈类型<select aria-label="反馈类型" value={kind} onChange={e=>setKind(e.target.value)}><option value="correction">事实或关联需要纠正</option><option value="notNeeded">现在不需要</option></select></label><label>你的补充<textarea aria-label="你的补充" rows={3} maxLength={3000} value={feedback} onChange={e=>setFeedback(e.target.value)} placeholder="说明哪一点需要补充或纠正…"/></label><button type="button" disabled={data.busy||!feedback.trim()} onClick={()=>void submit()}><MessageSquare size={15}/>保存反馈</button>
      {!!pending.length&&<div className="insights-review-action"><p>已保存 {pending.length} 条待处理纠正。选择本轮补充，在原事项中运行助手；生成后仍需选择新成果明确更新。</p>{pending.map(f=><label className="insights-feedback-choice" key={f.id}><input type="checkbox" checked={sendFeedbackIds.includes(f.id)} onChange={()=>setSendFeedbackIds(old=>old.includes(f.id)?old.filter(id=>id!==f.id):[...old,f.id])}/>{f.body?.text}</label>)}<button type="button" disabled={data.busy||!sendFeedbackIds.some(id=>pending.some(f=>f.id===id))} onClick={()=>void data.runReview(item,sendFeedbackIds.filter(id=>pending.some(f=>f.id===id)),onOpenWork).catch(e=>setError(String(e)))}><RefreshCw size={15}/>按补充继续核对</button></div>}
     </section>}
+    {current&&<ReplacementRelations data={data} item={item}/>}
     <section><h4><History size={16}/>历史与用户记录</h4><label>查看内容版本<select aria-label="查看内容版本" value={item.contentRevision??item.headRevision} onChange={e=>void data.open(item.id,Number(e.target.value)).catch(e=>setError(String(e)))}>{Array.from({length:item.headRevision},(_,i)=>i+1).reverse().map(n=><option key={n} value={n}>版本 {n}{n===item.headRevision?"（当前）":""}</option>)}</select></label>
      <ol className="insights-events">{item.events?.map(event=><li key={event.id}><span>{time(event.createdAt)}</span><p>{event.restricted?"该修订当前不可访问":event.body?.text??eventLabel(event)}</p>{current&&!event.restricted&&event.kind==="insightFeedback"&&event.body?.kind==="correction"&&item.reasons.some(r=>r.active&&r.reference?.feedbackId===event.id)&&<button type="button" disabled={data.busy} onClick={()=>void act("insightWithdrawFeedback",{feedbackId:event.id})}>撤回这条纠正</button>}</li>)}</ol>
     </section>
@@ -88,6 +91,21 @@ function InsightDetail({data,item,onClose,onUpdate,onOpenWork,inline=false}:{dat
   <footer>{item.snapshot&&current&&<><button type="button" disabled={data.busy} onClick={()=>void act("insightStatus",{state:"attention"})}>待关注</button><button type="button" disabled={data.busy} onClick={()=>void act("insightStatus",{state:"later",snoozeUntil:Date.now()+86_400_000})}><Clock3 size={15}/>稍后一天</button><button type="button" disabled={data.busy} onClick={()=>void act("insightStatus",{state:"done"})}><CheckCircle2 size={15}/>已处理</button>{lastStatus&&<button type="button" disabled={data.busy} onClick={()=>void act("insightUndoStatus",{eventId:lastStatus.id})}>撤销上次处理</button>}</>}<button type="button" onClick={onClose}>返回列表</button></footer>
  </InsightDialog>;
 }
+function ReplacementRelations({data,item}:{data:Data;item:Insight}){
+ const [chosen,setChosen]=useState(item.supersedes??[]),[confirmed,setConfirmed]=useState(false),[error,setError]=useState(""),[expanded,setExpanded]=useState(false);
+ useEffect(()=>{setChosen(item.supersedes??[]);setConfirmed(false);setError("");},[item.rowRevision]);
+ const eligible=data.items.filter(other=>other.id!==item.id&&other.workId===item.workId&&other.snapshot);
+ const ids=[...new Set([...eligible.map(other=>other.id),...(item.supersedes??[])])];
+ const unchanged=JSON.stringify([...chosen].sort())===JSON.stringify([...(item.supersedes??[])].sort());
+ return <details className="insights-relations" onToggle={e=>setExpanded(e.currentTarget.open)}><summary>关联替代发现 · {item.supersedes?.length??0} 条<ChevronDown size={14}/></summary>{expanded&&<><p className="insights-muted">拆分或合并后，先将新发现单独保存，再关联它替代的原发现。原发现、处理状态和任务均会保留。</p>
+  {ids.map(id=>{const other=data.items.find(value=>value.id===id);return <label key={id}><input type="checkbox" aria-label={other?.snapshot?`替代：${findingPreview(other.snapshot.text).title}`:"移除当前无法读取的替代关系"} checked={chosen.includes(id)} disabled={data.busy||(!chosen.includes(id)&&chosen.length>=12)} onChange={()=>{setChosen(old=>old.includes(id)?old.filter(value=>value!==id):[...old,id]);setConfirmed(false);}}/><span>{other?.snapshot?findingPreview(other.snapshot.text).title:other?"关联发现当前不可访问":"尚未载入的已关联发现"}{other?.snapshot?` · ${stateNames[other.processingState]}`:""}</span></label>;})}
+  {!ids.length&&<p className="insights-muted">当前已载入的发现中，没有属于同一事项的其他可访问发现。</p>}
+  {data.more&&<button type="button" disabled={data.loading||data.busy} onClick={()=>void data.refresh(true)}>载入更多已保存发现</button>}
+  <label><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/><span>我已核对这些发现的对应关系；旧内容和处理状态仍保留</span></label>
+  <button type="button" disabled={!confirmed||unchanged||data.busy||!!data.unresolved} onClick={()=>void data.change(item,"insightRelate",{supersedes:chosen}).then(()=>setConfirmed(false)).catch(e=>setError(String(e)))}>保存替代关系</button>{error&&<p className="insights-error" role="alert">{error}</p>}
+ </>}</details>;
+}
+
 function eventLabel(event:InsightEvent){const labels:Record<string,string>={content:"保存了内容修订",existingOrigin:"确认了已有出处",reconcile:"核对了来源和出现时间",restore:"恢复后等待来源校验",insightStatus:"更新了处理状态",insightContinue:"将所选反馈送入原事项",insightWithdrawFeedback:"撤回了纠正，保留历史与依赖影响",insightFollow:"更新了关注设置",insightRelate:"关联了替代关系",insightUndoStatus:"撤销了处理动作"};return labels[event.kind]??"保存了用户操作";}
 
 // Presentation only: shorten the heading without changing the saved finding or its evidence.
@@ -133,10 +151,10 @@ export function InsightsWorkspace(){
      {data.more&&<button type="button" className="insights-load-more" disabled={data.loading} onClick={()=>void data.refresh(true)}>再看更多发现<ChevronDown size={14}/></button>}
      </div>
     </div>
-    {data.detail&&!picker&&<InsightDetail key={data.detail.id} inline={layout==="split"} data={data} item={data.detail} onClose={data.closeDetail} onUpdate={()=>setPicker({target:data.detail!})} onOpenWork={openWork}/>}
+    {data.detail&&<InsightDetail key={data.detail.id} inline={layout==="split"} data={data} item={data.detail} onClose={data.closeDetail} onUpdate={()=>setPicker({target:data.detail!})} onOpenWork={openWork}/>}
     {layout==="split"&&!data.detail&&<div className="insights-detail-empty"><Sparkles size={30}/><h2>从一条发现，接着看下去</h2><p>选择左侧发现，查看资料依据与处理记录。</p></div>}
    </div><p className="insights-footnote">保存在本机 · 资料按 Hub 当前同步内容核对 · 打开和筛选不会启动分析</p>
   </div>
-  {picker&&<ResultPicker key={picker.target?.id??"import"} data={data} target={picker.target} onClose={()=>setPicker(null)}/>}
+  {picker&&<ResultPicker key={picker.target?.id??"import"} data={data} target={picker.target} onClose={()=>setPicker(null)} onOpenWork={openWork}/>}
  </section>;
 }

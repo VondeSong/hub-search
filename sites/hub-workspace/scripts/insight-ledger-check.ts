@@ -55,6 +55,15 @@ function mutate(state: LedgerState, id: string, update: object): LedgerState {
 
 async function main(): Promise<void> {
   let state = importR1();
+  {
+    const source = importR1(), one=source.insights[0], two=source.insights[1];
+    const related=run(source,{type:"relate",insightId:two.id,expectedRowRevision:two.rowRevision,supersedes:[one.id],operationId:op()});
+    assert.deepEqual(related.insights[1].supersedes,[one.id]);assert.equal(related.insights[0].headRevision,one.headRevision);assert.equal(related.insights[0].status,one.status);
+    rejected(reduceLedger(source,{type:"relate",insightId:two.id,expectedRowRevision:two.rowRevision,supersedes:[two.id],operationId:op()},NOW),"relation");
+    assert.deepEqual(parseLedger(JSON.stringify(related)).insights[1].supersedes,[one.id]);
+    passed("manual replacement relation preserves old identities and states and survives browser storage");
+  }
+
   const methodId = r1Insight(state, 0).id;
   const progressId = r1Insight(state, 1).id;
   assert.notEqual(methodId, progressId);

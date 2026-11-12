@@ -54,6 +54,7 @@ export type LedgerRevision = {
 export type LedgerInsight = {
   id: string;
   ownerWorkId: string;
+  supersedes?: string[];
   workTitle: string;
   headRevision: number;
   rowRevision: number;
@@ -86,7 +87,7 @@ export type LedgerEvent = {
   operationId: string;
   insightId?: string;
   sourceId?: string;
-  type: "import" | "update" | "status" | "feedback" | "mute" | "star" | "source" | "check" | "undo" | "update-outcome" | "snooze-expired" | "receipt";
+  type: "import" | "update" | "status" | "feedback" | "mute" | "star" | "source" | "check" | "undo" | "update-outcome" | "snooze-expired" | "receipt" | "relate";
   text: string;
   detail?: string;
   createdAt: string;
@@ -122,6 +123,7 @@ type InsightMutation = { insightId: string; expectedRowRevision: number; operati
 export type LedgerCommand =
   | { type: "import"; report: ReportFixture; findingPointer: string; operationId: string }
   | (InsightMutation & { type: "update"; report: ReportFixture; findingPointer: string; acknowledgedFeedbackIds?: string[] })
+  | (InsightMutation & { type: "relate"; supersedes: string[] })
   | (InsightMutation & { type: "status"; status: InsightStatus; snoozeUntil?: string })
   | (InsightMutation & { type: "feedback"; kind: FeedbackKind; text: string })
   | (InsightMutation & { type: "mute" | "star"; value: boolean })
@@ -445,6 +447,13 @@ export function reduceLedger(input: LedgerState, command: LedgerCommand, now = n
     if (command.status === "later") insight.snoozeUntil = command.snoozeUntil;
     else delete insight.snoozeUntil;
     message = `已移至${statusLabel(insight.status)}，来源任务和结论有效性保持原样。`;
+  } else if (command.type === "relate") {
+    const ids = command.supersedes;
+    if (!Array.isArray(ids) || ids.length > 12 || new Set(ids).size !== ids.length || ids.some(id => !safeKey(id) || id === insight.id)) return fail(input, "relation", "请选择其他已保存发现，最多关联 12 条。");
+    if (!getVisibleFinding(state, insight) || ids.some(id => { const other = state.insights.find(item => item.id === id); return !other || other.ownerWorkId !== insight.ownerWorkId || !getVisibleFinding(state, other); })) return fail(input, "relation", "关联发现当前不可访问或不属于同一工作。");
+    insight.supersedes = [...ids];
+    event = addEvent(state, { operationId: command.operationId, insightId, type: "relate", text: "已保存人工替代关系", detail: "只关联发现身份，旧发现的内容、处理状态与原任务均不改变。", createdAt: now, targetRevision: insight.headRevision, rowRevision: insight.rowRevision + 1 });
+    message = "替代关系已保存，原发现及其处理状态保留。";
   } else if (command.type === "feedback") {
     if (!isInsightAccessible(insight.id, state)) return fail(input, "unavailable", "来源不可用时无法新增内容反馈，请先核对来源访问。");
     if (!["fact", "association", "context"].includes(command.kind) || !command.text.trim()) return fail(input, "feedback", "请填写要纠正的事实、关联或补充背景。");
@@ -519,6 +528,7 @@ export function parseLedger(raw: string): LedgerState {
       if (!dictionary(revision) || revision.revision !== index + 1 || !safeKey(revision.reportId) || !nonempty(revision.reportTitle) || !nonempty(revision.pointer) || !nonempty(revision.deliveryHash) || !validDate(revision.savedAt) || !validDate(revision.generatedAt) || typeof revision.coverageAsOf !== "string" || !validFinding(revision.finding) || !Array.isArray(revision.acknowledgedFeedbackIds)) throw new Error("内容修订不完整");
     }
     for (const feedback of entry.feedback) if (!dictionary(feedback) || !safeKey(feedback.id) || !["fact", "association", "context"].includes(feedback.kind as string) || !nonempty(feedback.text) || !positive(feedback.targetRevision) || feedback.targetRevision > entry.headRevision || !validDate(feedback.createdAt) || (feedback.resolvedInRevision !== undefined && (!positive(feedback.resolvedInRevision) || feedback.resolvedInRevision > entry.headRevision))) throw new Error("反馈记录不完整");
+    if (entry.supersedes !== undefined && (!Array.isArray(entry.supersedes) || entry.supersedes.length > 12 || entry.supersedes.some(id => !safeKey(id) || id === entry.id))) throw new Error("替代关系不可识别");
     for (const [id, revision] of Object.entries(entry.accessChecks)) if (!safeKey(id) || !nonnegative(revision)) throw new Error("访问核对记录不可识别");
   }
   for (const [id, source] of Object.entries(value.sources)) if (!safeKey(id) || !dictionary(source) || source.id !== id || !positive(source.version) || typeof source.available !== "boolean" || !nonnegative(source.accessRevision) || !validDate(source.updatedAt)) throw new Error("来源状态不完整");

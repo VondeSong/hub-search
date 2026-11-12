@@ -482,7 +482,9 @@ fn s15_two_hundred_long_chinese_items_are_paged_without_cutting_off_remaining_re
         )
         .unwrap();
     }
+    let first_started = std::time::Instant::now();
     let first = command(&c, json!({"action":"insightList"})).unwrap();
+    let first_ms = first_started.elapsed().as_secs_f64() * 1000.0;
     assert_eq!(first["items"].as_array().unwrap().len(), 200);
     assert_eq!(first["hasMore"], true);
     let second = command(
@@ -496,6 +498,21 @@ fn s15_two_hundred_long_chinese_items_are_paged_without_cutting_off_remaining_re
         .unwrap()
         .iter()
         .any(|i| i["id"] == second["items"][0]["id"]));
+    let refresh_started = std::time::Instant::now();
+    let refreshed = command(&c, json!({"action":"insightList"})).unwrap();
+    let refresh_ms = refresh_started.elapsed().as_secs_f64() * 1000.0;
+    assert_eq!(refreshed["items"].as_array().unwrap().len(), 200);
+    let before_feedback = detail(&c, &a);
+    let feedback_started = std::time::Instant::now();
+    let feedback = command(&c, json!({"action":"insightFeedback","insightId":a["id"],"expectedRevision":before_feedback["rowRevision"],"operationId":"scale-feedback-timing","kind":"notNeeded","text":"规模夹具：本轮已知晓。"})).unwrap();
+    let feedback_ms = feedback_started.elapsed().as_secs_f64() * 1000.0;
+    assert_eq!(feedback["item"]["headRevision"], 1);
+    let performance_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join(".local/insights-ui-scale");
+    std::fs::create_dir_all(&performance_root).unwrap();
+    std::fs::write(performance_root.join("native-operation-timings.json"), serde_json::to_vec_pretty(&json!({"surface":"formal native insight dispatch on synthetic SQLite; excludes frontend rendering","records":201,"returnedFirstPage":200,"firstReadMs":first_ms,"refreshMs":refresh_ms,"feedbackSaveMs":feedback_ms,"modelCalls":0,"observedAt":store::stamp()})).unwrap()).unwrap();
     let preview = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()

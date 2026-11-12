@@ -581,6 +581,7 @@ export default function InsightPanel(props: Props) {
             <EventList events={eventsFor(selected.id).slice(0, 8)} state={state} onOpenItem={onOpenSource}/>
             {selectedValidity !== "unavailable" && inspectedRevision && <details className="ip-origin-details"><summary>查看出处与时间<ChevronDown size={13}/></summary><dl><div><dt>原工作</dt><dd>{selected.workTitle}</dd></div><div><dt>固定交付</dt><dd>{inspectedRevision.reportTitle}</dd></div><div><dt>来源截至</dt><dd>{dateText(inspectedRevision.coverageAsOf, true)}</dd></div><div><dt>成果生成</dt><dd>{dateText(inspectedRevision.generatedAt, true)}</dd></div><div><dt>发现保存</dt><dd>{dateText(inspectedRevision.savedAt, true)}</dd></div><div><dt>发现身份</dt><dd><code>{selected.id}</code></dd></div><div><dt>引用定位</dt><dd><code>{inspectedRevision.reportId} · {inspectedRevision.pointer}</code></dd></div></dl><p>身份在首次保存时分配。另一份成果的发现需要你显式关联，不会按标题或位置自动继承状态。</p></details>}
           </details>
+          {inspectedFinding && !inspectingOld && <PrototypeRelations key={selected.id} insight={selected} state={state} disabled={busy} onSave={async supersedes => !!(await act({type:"relate",insightId:selected.id,expectedRowRevision:selected.rowRevision,supersedes,operationId:ledgerId()}))?.ok}/>}
           <footer className="ip-detail-footer"><span>{inspectedFinding?.caseStudy ? "公开资料案例 · 应用场景为推演" : "示例成果 · 保存在当前浏览器"}</span><button className="ip-text-button" onClick={() => showModal({ type: "about" })}>本版说明<ArrowUpRight size={12}/></button></footer>
         </div> : <div className="ip-detail-empty"><div className="ip-empty-glyph"><Sparkles size={29}/></div><h2>每个发现，都可以回到依据</h2><p>从左侧选择一条发现，查看它与你的关系、引用和变化。<br/>没有足够依据时，留白也是合适的结果。</p>{totalReview > 0 && <button className="ip-button" onClick={() => { clearFilters(); onScopeChange?.("review"); switchTab("everything"); }}>查看 {totalReview} 条待复核发现<ArrowRight size={14}/></button>}</div>}
       </main>
@@ -693,6 +694,19 @@ export default function InsightPanel(props: Props) {
       </div><footer className="ip-dialog-footer"><button className="ip-button" onClick={() => { setModal(null); onExplore(); }}>更多发现示例<ArrowRight size={14}/></button><button className="ip-button ip-primary" onClick={() => setModal(null)}>开始体验</button></footer>
     </Dialog>}
   </section>;
+}
+
+function PrototypeRelations({insight,state,disabled,onSave}:{insight:LedgerInsight;state:LedgerState;disabled:boolean;onSave:(ids:string[])=>Promise<boolean>}) {
+  const [chosen,setChosen]=useState(insight.supersedes??[]),[confirmed,setConfirmed]=useState(false);
+  useEffect(()=>{setChosen(insight.supersedes??[]);setConfirmed(false);},[insight.rowRevision]);
+  const choices=state.insights.filter(other=>other.id!==insight.id&&other.ownerWorkId===insight.ownerWorkId&&getVisibleFinding(state,other));
+  const unchanged=JSON.stringify([...chosen].sort())===JSON.stringify([...(insight.supersedes??[])].sort());
+  return <details className="ip-origin-details"><summary>关联替代发现 · {insight.supersedes?.length??0} 条<ChevronDown size={13}/></summary><div className="ip-form"><p className="ip-form-help">拆分或合并后，先将新发现单独保存，再关联它替代的原发现。原发现、处理状态和任务均会保留。</p>
+    {choices.map(other=><label className="ip-check-label" key={other.id}><input type="checkbox" checked={chosen.includes(other.id)} disabled={disabled||(!chosen.includes(other.id)&&chosen.length>=12)} onChange={()=>{setChosen(old=>old.includes(other.id)?old.filter(id=>id!==other.id):[...old,other.id]);setConfirmed(false);}}/><span>{shownTitle(state,other)} · {statusNames[other.status]}</span></label>)}
+    {!choices.length&&<p className="ip-form-help">这个工作还没有其他可访问的已保存发现。</p>}
+    <label className="ip-check-label"><input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/><span>我已核对这些发现的对应关系；旧内容和处理状态仍保留</span></label>
+    <button className="ip-button" disabled={disabled||!confirmed||unchanged} onClick={async()=>{if(await onSave(chosen))setConfirmed(false);}}>保存替代关系</button>
+  </div></details>;
 }
 
 function EvidenceCard({ evidence, index, state, onOpen }: { evidence: ReportEvidence; index: number; state: LedgerState; onOpen: () => void }) {
