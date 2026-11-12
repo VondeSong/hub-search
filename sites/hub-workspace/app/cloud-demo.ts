@@ -4,8 +4,8 @@ export type AttachmentPolicy = Record<AttachmentType,boolean> & {maxMb:number};
 export type MediaPolicy = {attachments:Record<CloudModule,AttachmentPolicy>; downloaded:Record<CloudModule,AttachmentType[]>; network:'any'|'unmetered'|'wifi'; cacheMb:number};
 export type CloudState = MediaPolicy & {
   craftInterval:number; sourceImages:boolean; sourcePdf:boolean; sourceOriginals:boolean; deviceSeen:string; deviceConfirmed:boolean; restoreStep:number; historyStep:number; repairPaused:boolean; repairFailed:boolean;
-  flashCloud:boolean; pinA:boolean; pinB:boolean; backupFolder:string; backupHours:number; backupKeep:number; backupCount:number; craftReplica:string; webdavUrl:string; webdavUser:string; journalMigration:string;
-  connected:boolean; provider:'oss'|'webdav'; name:string; bucket:string; region:string; prefix:string; credential:boolean;
+  flashCloud:boolean; pinA:boolean; pinB:boolean; backupFolder:string; backupHours:number; backupKeep:number; backupCount:number; craftReplica:string; legacyRetired:boolean; journalMigration:string;
+  connected:boolean; provider:'oss'|'none'; name:string; bucket:string; region:string; prefix:string; credential:boolean;
   enabled:boolean; auto:boolean; online:boolean; modules:Record<CloudModule,boolean>; pending:Record<CloudModule,number>;
   uploads:Record<CloudModule,AttachmentPolicy>; uploaded?:Partial<Record<CloudModule,AttachmentType[]>>;
   media:boolean; cloudMedia:boolean; uploadFlash:boolean; uploadQuick:boolean; quickCloud:boolean;
@@ -27,7 +27,7 @@ export const attachmentSamples:Record<CloudModule,{type:AttachmentType;name:stri
 };
 const defaultAttachments=():Record<CloudModule,AttachmentPolicy> => ({flashcards:{image:true,video:false,pdf:true,other:false,maxMb:20},reading:{image:true,video:false,pdf:true,other:false,maxMb:20},quick:{image:true,video:false,pdf:true,other:false,maxMb:20}});
 export const makeCloudState = ():CloudState => ({
-  uploads:{flashcards:{image:true,video:true,pdf:true,other:true,maxMb:250},reading:{image:true,video:true,pdf:true,other:true,maxMb:100},quick:{image:true,video:true,pdf:true,other:true,maxMb:20}},attachments:defaultAttachments(),downloaded:{flashcards:[],reading:[],quick:[]},network:'any',cacheMb:1024,craftInterval:1440,sourceImages:true,sourcePdf:true,sourceOriginals:true,deviceSeen:'尚未刷新',deviceConfirmed:false,restoreStep:0,historyStep:0,repairPaused:false,repairFailed:false,flashCloud:true,pinA:true,pinB:true,backupFolder:'Hub Backups',backupHours:24,backupKeep:7,backupCount:1,craftReplica:'',webdavUrl:'https://dav.example.invalid/hub/',webdavUser:'demo-user',journalMigration:'pending', connected:true,provider:'oss',name:'我的 Hub',bucket:'hub-personal-demo',region:'cn-hangzhou',prefix:'hub/',credential:true,
+  uploads:{flashcards:{image:true,video:true,pdf:true,other:true,maxMb:250},reading:{image:true,video:true,pdf:true,other:true,maxMb:100},quick:{image:true,video:true,pdf:true,other:true,maxMb:20}},attachments:defaultAttachments(),downloaded:{flashcards:[],reading:[],quick:[]},network:'any',cacheMb:1024,craftInterval:1440,sourceImages:true,sourcePdf:true,sourceOriginals:true,deviceSeen:'尚未刷新',deviceConfirmed:false,restoreStep:0,historyStep:0,repairPaused:false,repairFailed:false,flashCloud:true,pinA:true,pinB:true,backupFolder:'Hub Backups',backupHours:24,backupKeep:7,backupCount:1,craftReplica:'',legacyRetired:false,journalMigration:'pending', connected:true,provider:'oss',name:'我的 Hub',bucket:'hub-personal-demo',region:'cn-hangzhou',prefix:'hub/',credential:true,
   enabled:true,auto:false,online:true,modules:{flashcards:true,reading:true,quick:true},pending:{flashcards:2,reading:1,quick:2},
   media:true,cloudMedia:false,uploadFlash:true,uploadQuick:true,quickCloud:true,awaiting:1,written:8,writerOnline:false,quickBound:true,
   phase:0,error:false,last:null,log:[],retired:false,cacheUsed:186,pinnedMb:32,historyClean:false,
@@ -70,7 +70,7 @@ export function downloadAttachments(s:CloudState,module:CloudModule):CloudState 
   return {...s,downloaded:{...s.downloaded,[module]:[...new Set([...s.downloaded[module],...types])]}};
 }
 export function cloudStep(s:CloudState):CloudState {
-  if(!s.phase||!s.enabled||!s.online||!s.credential||s.error==='auth')return {...s,phase:0};
+  if(!s.phase||!s.connected||s.provider!=='oss'||!s.enabled||!s.online||!s.credential||s.error==='auth')return {...s,phase:0};
   if(s.phase===1){const next=s.modules.flashcards?downloadAttachments(uploadAttachments(s,'flashcards'),'flashcards'):s;return {...next,phase:2,pending:{...s.pending,...(s.modules.flashcards?{flashcards:0}:{})}};}
   if(s.phase===2)return {...s,phase:3,pending:{...s.pending,...(s.modules.reading?{reading:0}:{})}};
   if(s.phase===3){
@@ -88,7 +88,7 @@ export function cloudScenario(name:string):CloudState {
   if(name==='unconnected')return {...s,connected:false,credential:false,quickBound:false};
   if(name==='paused')return {...s,enabled:false};
   if(name==='offline')return {...s,online:false};
-  if(name==='legacy')return {...s,provider:'webdav',name:'原有 WebDAV 连接',quickBound:false,pending:{...s.pending,quick:0},awaiting:0};
+  if(name==='retired')return {...s,provider:'none',connected:false,credential:false,legacyRetired:true,quickBound:false};
   if(name==='flashmedia')return {...s,pending:{flashcards:0,reading:0,quick:0},awaiting:0,cloudMedia:true,flashCloud:false};
   if(name==='auth')return {...s,error:'auth'};
   if(name==='waiting')return {...s,pending:{flashcards:0,reading:0,quick:0},cloudMedia:true,awaiting:3};
@@ -103,7 +103,7 @@ export function loadCloudState(raw:string|null):CloudState {
     const v:unknown=JSON.parse(raw||'null');
     if(!record(v)||!record(v.modules)||!record(v.pending))return base;
     const s:CloudState={...base,uploads:{...base.uploads},attachments:{...base.attachments},modules:{...base.modules},pending:{...base.pending}};
-    for(const key of ['connected','enabled','auto','online','media','cloudMedia','uploadFlash','uploadQuick','quickCloud','credential','writerOnline','quickBound','sourceImages','sourcePdf','sourceOriginals','deviceConfirmed','repairPaused','repairFailed','retired','flashCloud','pinA','pinB','historyClean','dateFolders','cleanup','backupAuto'] as const){
+    for(const key of ['connected','enabled','auto','online','media','cloudMedia','uploadFlash','uploadQuick','quickCloud','credential','writerOnline','quickBound','sourceImages','sourcePdf','sourceOriginals','deviceConfirmed','repairPaused','repairFailed','retired','legacyRetired','flashCloud','pinA','pinB','historyClean','dateFolders','cleanup','backupAuto'] as const){
       if(key in v){if(typeof v[key]!=='boolean')return base;s[key]=v[key];}
     }
     for(const m of modules){
@@ -113,7 +113,7 @@ export function loadCloudState(raw:string|null):CloudState {
     // Existing prototype preferences stay intact; newly introduced sync is opt-in on upgrade.
     if(!('quick' in v.modules)){s.modules.quick=false;s.pending.quick=0;s.awaiting=0;s.quickBound=false;}
     for(const key of ['awaiting','written','cacheUsed','pinnedMb','backupCount','restoreStep','historyStep'] as const)if(key in v){if(!count(v[key]))return base;s[key]=v[key];}
-    for(const key of ['name','bucket','region','prefix','journalFolder','journalLibrary','backupFolder','craftReplica','webdavUrl','webdavUser','journalMigration','deviceSeen'] as const)if(key in v){if(typeof v[key]!=='string'||v[key].length>160)return base;s[key]=v[key];}
+    for(const key of ['name','bucket','region','prefix','journalFolder','journalLibrary','backupFolder','craftReplica','journalMigration','deviceSeen'] as const)if(key in v){if(typeof v[key]!=='string'||v[key].length>160)return base;s[key]=v[key];}
     if('attachments' in v){
       if(!record(v.attachments))return base;
       for(const m of modules){
@@ -146,7 +146,7 @@ export function loadCloudState(raw:string|null):CloudState {
       if(v.flashLocal===true)s.downloaded.flashcards=['image'];
       if(v.localMedia===true)s.downloaded.reading=['pdf'];
     }
-    if('provider' in v){if(v.provider!=='oss'&&v.provider!=='webdav')return base;s.provider=v.provider;}
+    if('provider' in v){if(v.provider==='webdav'){s.provider='none';s.connected=false;s.credential=false;s.legacyRetired=true;}else if(v.provider==='oss'||v.provider==='none')s.provider=v.provider;else return base;}
     if('network' in v){if(!['any','unmetered','wifi'].includes(String(v.network)))return base;s.network=v.network as CloudState['network'];}
     for(const [key,min,max] of [['cacheMb',100,10240],['sourceMinutes',0,1440],['backupHours',1,720],['backupKeep',1,100],['craftInterval',0,1440]] as const){
       if(key in v){if(!count(v[key],max)||Number(v[key])<min)return base;s[key]=v[key];}

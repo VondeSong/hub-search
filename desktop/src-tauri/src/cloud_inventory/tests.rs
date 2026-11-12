@@ -105,38 +105,6 @@ async fn inventory_repeated_provider_token_preserves_prefix_and_never_completes(
         .is_err());
 }
 
-#[tokio::test]
-async fn inventory_real_nested_webdav_uses_durable_directory_frontier() {
-    use crate::reading_sync::object_store::tests::{remote as dav_remote, server as dav_server};
-    let s = dav_server().await;
-    let remote = dav_remote(&s);
-    for name in [
-        "reading/source-v1/a/one.json",
-        "reading/source-v1/b/nested/two.json",
-        "reading/source-v1/root.json",
-    ] {
-        remote
-            .put_verified(&remote.key(name), name.as_bytes())
-            .await
-            .unwrap();
-    }
-    let db = fixture("dav-nested");
-    let inventory = acquire(&db, &remote, "dav", "nested", "reading/source-v1/")
-        .await
-        .unwrap();
-    let c = open_database(&db).unwrap();
-    assert_eq!(inventory.count(&c).unwrap(), 3);
-    assert_eq!(c.query_row("SELECT count(*) FROM cloud_inventory_directories WHERE namespace=?1 AND epoch=?2 AND state='complete'",params![inventory.namespace,inventory.epoch],|r|r.get::<_,usize>(0)).unwrap(),4);
-    let mut cursor = None;
-    let mut seen = 0;
-    while let Some(key) = inventory.next(&c, cursor.as_deref()).unwrap() {
-        assert!(key.starts_with("v2/reading/source-v1/"));
-        cursor = Some(key);
-        seen += 1;
-    }
-    assert_eq!(seen, 3);
-}
-
 struct Pages {
     page: Arc<Mutex<InventoryPage>>,
 }

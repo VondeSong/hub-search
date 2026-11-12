@@ -2,7 +2,6 @@
 use super::*;
 use crate::reading_sync::object_store::{self, Configuration, Store};
 mod inventory;
-mod legacy_snapshot;
 const PREFIXES: &[&str] = &[
     "reading/v1/changes/",
     "reading/media-v1/manifests/",
@@ -459,7 +458,6 @@ pub(super) async fn prepare(
         policy: policy.clone(),
         budget: allowance.clone(),
     };
-    let mut source_proof = None;
     if let (Some(config), Some(source)) = (&source_config, &source) {
         let source = Metered {
             inner: &**source,
@@ -467,10 +465,10 @@ pub(super) async fn prepare(
             policy: policy.clone(),
             budget: allowance.clone(),
         };
-        source_proof = sync_configuration(app, config, None).await?;
+        sync_configuration(app, config, None).await?;
         drain_reading(&db, &source, &config.namespace(), &device).await?;
     }
-    let target_proof = sync_configuration(app, target_config, target_secret.clone()).await?;
+    sync_configuration(app, target_config, target_secret).await?;
     drain_reading(&db, &target, &target_config.namespace(), &device).await?;
     let before = receipt(&open_database(&db)?)?;
     if let (Some(config), Some(source)) = (&source_config, &source) {
@@ -484,16 +482,7 @@ pub(super) async fn prepare(
     } else {
         copy_inner(&db, &target, &target, target_config, target_config, true).await?;
     }
-    let final_check: Result<(), String> = async {
-        if let (Some(config), Some(proof)) = (&source_config, &source_proof) {
-            verify_webdav_proof(app, config, None, proof).await?;
-        }
-        if let Some(proof) = target_proof {
-            verify_webdav_proof(app, target_config, target_secret, &proof).await?;
-        }
-        before.verify(&open_database(&db)?)
-    }
-    .await;
+    let final_check = before.verify(&open_database(&db)?);
     if let Err(error) = final_check {
         let (c, _writer) = open_write_database(&db)?;
         let mut report: Value =
@@ -512,7 +501,7 @@ async fn sync_configuration(
     app: &AppHandle,
     config: &Configuration,
     secret: Option<String>,
-) -> Result<Option<String>, String> {
+) -> Result<(), String> {
     match config {
         Configuration::Oss { config } => {
             let remote = OssStore::new(
@@ -530,109 +519,10 @@ async fn sync_configuration(
                 false,
             )
             .await
-            .map(|_| None)
-        }
-        Configuration::Webdav { url, username } => {
-            sync_webdav_configuration(app, url, username, secret)
-                .await
-                .map(Some)
+            .map(|_| ())
         }
     }
 }
-async fn sync_webdav_configuration(
-    app: &AppHandle,
-    url: &str,
-    username: &str,
-    secret: Option<String>,
-) -> Result<String, String> {
-    let password = secret.unwrap_or(flashcard_webdav_password(app));
-    let settings = FlashcardSyncSettings {
-        url: url.into(),
-        username: username.into(),
-        has_password: !password.is_empty(),
-        auto_sync: false,
-        configured: true,
-        last_sync_at: None,
-        last_error: String::new(),
-    };
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(Duration::from_secs(180))
-        .build()
-        .map_err(|_| "无法创建迁移客户端")?;
-    let base = Url::parse(url).map_err(|_| "WebDAV 迁移目录无效")?;
-    ensure_flashcard_webdav_directory(&client, base.clone(), &settings, &password).await?;
-    let state = app.state::<AppState>();
-    let blobs = blob_store_for(app, &state)?;
-    let db = database_path(app)?;
-    let legacy_key = flashcard_sync_encryption_key(app);
-    for attempt in 0..3 {
-        let (remote, etag) = read_remote_flashcard_snapshot(
-            &client,
-            base.join(FLASHCARD_SYNC_FILE).map_err(|_| "快照地址无效")?,
-            &settings,
-            &password,
-            &legacy_key,
-        )
-        .await?;
-        let remote_hashes = remote
-            .as_ref()
-            .map(flashcard_snapshot_media_hashes)
-            .unwrap_or_default();
-        let (snapshot, body, snapshot_token) = {
-            let (mut c, _writer) = open_write_database(&db)?;
-            if let Some(r) = &remote {
-                merge_flashcard_snapshot(&mut c, r)?;
-            }
-            legacy_snapshot::read(&c)?
-        };
-        sync_flashcard_media(
-            &client,
-            &base,
-            &settings,
-            &password,
-            &blobs,
-            &remote_hashes,
-            &flashcard_snapshot_media_hashes(&snapshot),
-            &legacy_key,
-            None,
-        )
-        .await?;
-        let mut request = webdav_request(
-            &client,
-            reqwest::Method::PUT,
-            base.join(FLASHCARD_SYNC_FILE).map_err(|_| "快照地址无效")?,
-            username,
-            &password,
-        )
-        .header(CONTENT_TYPE, "application/json");
-        if let Some(tag) = etag {
-            request = request.header("If-Match", tag)
-        } else if remote.is_none() {
-            request = request.header("If-None-Match", "*")
-        }
-        let response = request
-            .body(body)
-            .send()
-            .await
-            .map_err(|_| "迁移快照上传中断；原服务保持")?;
-        if response.status() == reqwest::StatusCode::PRECONDITION_FAILED && attempt < 2 {
-            continue;
-        }
-        if !response.status().is_success() {
-            return Err("迁移快照写入失败；原服务保持".into());
-        }
-        verify_webdav_migration(&client, &settings, &password, &snapshot).await?;
-        let (c, _writer) = open_write_database(&db)?;
-        if flashcard_token(&c)? != snapshot_token {
-            return Err("迁移期间本机闪卡发生变化；原服务保持".into());
-        }
-        register_media_index(&c, &snapshot, &blobs, None)?;
-        return Ok(snapshot_token);
-    }
-    Err("目标闪卡持续变化；原服务保持".into())
-}
-
 async fn verify_objects(
     db: &PathBuf,
     source: &dyn Store,
@@ -870,62 +760,6 @@ fn verification_path(db: &PathBuf, attempt: &str) -> Result<PathBuf, String> {
         .parent()
         .ok_or("迁移数据库目录缺失")?
         .join(format!(".cloud-migration-verification-{attempt}.sqlite3")))
-}
-
-async fn verify_webdav_proof(
-    app: &AppHandle,
-    config: &Configuration,
-    secret: Option<String>,
-    expected: &str,
-) -> Result<(), String> {
-    let Configuration::Webdav { url, username } = config else {
-        return Err("快照核验服务不匹配".into());
-    };
-    let password = secret.unwrap_or(flashcard_webdav_password(app));
-    let settings = FlashcardSyncSettings {
-        url: url.clone(),
-        username: username.clone(),
-        has_password: !password.is_empty(),
-        auto_sync: false,
-        configured: true,
-        last_sync_at: None,
-        last_error: String::new(),
-    };
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(Duration::from_secs(180))
-        .build()
-        .map_err(|_| "无法创建快照核验客户端")?;
-    check_webdav_snapshot(
-        &client,
-        &settings,
-        &password,
-        &flashcard_sync_encryption_key(app),
-        expected,
-    )
-    .await
-}
-async fn check_webdav_snapshot(
-    client: &reqwest::Client,
-    settings: &FlashcardSyncSettings,
-    password: &str,
-    legacy: &str,
-    expected: &str,
-) -> Result<(), String> {
-    let url = Url::parse(&settings.url)
-        .map_err(|_| "快照核验目录无效")?
-        .join(FLASHCARD_SYNC_FILE)
-        .map_err(|_| "快照核验地址无效")?;
-    let (snapshot, _) =
-        read_remote_flashcard_snapshot(client, url, settings, password, legacy).await?;
-    let actual = snapshot
-        .as_ref()
-        .map(crate::flashcard_snapshot::identity::content)
-        .transpose()?;
-    if actual.as_deref() != Some(expected) {
-        return Err("迁移期间 WebDAV 闪卡快照新增或改变；原服务保持，请重新同步后继续".into());
-    }
-    Ok(())
 }
 
 fn flashcard_token(c: &Connection) -> Result<String, String> {

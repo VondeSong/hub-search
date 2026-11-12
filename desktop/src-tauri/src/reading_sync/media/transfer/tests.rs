@@ -861,7 +861,7 @@ async fn reading_quota_changed_cloud_size_cannot_expand_the_reserved_download() 
     assert_eq!(metadata_u64(&d.c(), "reading_transfer_pending", 0), 0);
 }
 #[tokio::test]
-async fn reading_quota_webdav_measures_upload_readback_and_existing_object_read() {
+async fn reading_quota_oss_measures_upload_readback_and_existing_object_read() {
     let server = crate::reading_sync::object_store::tests::server().await;
     let remote = crate::reading_sync::object_store::tests::remote(&server);
     let d = Device::new();

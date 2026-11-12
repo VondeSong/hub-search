@@ -8,7 +8,6 @@ mod media_index;
 mod migration;
 use crate::flashcard_snapshot::records;
 mod recovery;
-pub(crate) use migration::Receipt as MigrationReceipt;
 const OSS_SECRET: &str = "hub-flashcard-oss-secret-v1";
 const SNAPSHOT_RECORD_FIELDS: [&str; 8] = [
     "folders",
@@ -33,6 +32,7 @@ fn record_identity(field: &str, value: &Value) -> String {
 #[serde(rename_all = "camelCase")]
 pub(super) struct CloudSettings {
     provider: String,
+    legacy_retired: bool,
     oss: Option<OssConfig>,
     has_secret: bool,
     device_id: String,
@@ -43,7 +43,7 @@ pub(super) struct CloudSettings {
 pub(super) fn provider(c: &Connection) -> String {
     match metadata_string(c, "flashcard_cloud_provider").as_str() {
         "oss" => "oss",
-        _ => "webdav",
+        _ => "none",
     }
     .into()
 }
@@ -56,18 +56,20 @@ fn meta(c: &Connection, key: &str, value: &str) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     Ok(())
 }
+pub(super) fn legacy_retired(c: &Connection) -> bool {
+    provider(c) != "oss"
+        && (metadata_string(c, "flashcard_cloud_provider") == "webdav"
+            || !metadata_string(c, "flashcard_webdav_url").trim().is_empty())
+}
 pub(super) fn configured(c: &Connection) -> bool {
-    if provider(c) == "oss" {
-        config(c).and_then(OssConfig::normalized).is_ok()
-    } else {
-        !metadata_string(c, "flashcard_webdav_url").trim().is_empty()
-    }
+    provider(c) == "oss" && config(c).and_then(OssConfig::normalized).is_ok()
 }
 #[tauri::command]
 pub(super) fn get_flashcard_cloud_sync_settings(app: AppHandle) -> Result<CloudSettings, String> {
     let (c, _writer) = open_write_database(&database_path(&app)?)?;
     Ok(CloudSettings {
         provider: provider(&c),
+        legacy_retired: legacy_retired(&c),
         oss: config(&c).ok(),
         has_secret: stored_secret_get(&app, OSS_SECRET)?.is_some(),
         device_id: flashcard_sync_device_id(&c)?,
@@ -537,66 +539,37 @@ pub(super) async fn ensure_flashcard_cloud_attachment(
 pub(super) async fn activate_flashcard_cloud_sync(
     app: AppHandle,
     target: String,
-    other_devices_ready: bool,
 ) -> Result<CloudSettings, String> {
-    if !matches!(target.as_str(), "oss" | "webdav") || !other_devices_ready {
-        return Err("请先让其它设备完成同步并暂停旧服务同步，再开始迁移".into());
+    if target != "oss" {
+        return Err("仅支持阿里云 OSS，旧 WebDAV 同步已停用".into());
     }
     let _guard = FLASHCARD_SYNC_LOCK.lock().await;
     let database = database_path(&app)?;
     let _reading_guard = reading_sync::LOCK.lock().await;
     let _quick_guard = quick_journal::LOCK.lock().await;
-    let (current, target_config) = {
+    let current = {
         let c = open_database(&database)?;
-        if !cloud_sync::policy(&c).enabled {
-            return Err("请先开启本设备云同步总开关".into());
+        reading_sync::object_store::configuration_for(&c, &target)?;
+        if stored_secret_get(&app, OSS_SECRET)?.is_none() {
+            return Err("请先保存 OSS 访问密钥".into());
         }
-        (
-            provider(&c),
-            reading_sync::object_store::configuration_for(&c, &target)?,
-        )
+        provider(&c)
     };
     if current == target {
         return get_flashcard_cloud_sync_settings(app);
     }
-    let receipt = migration::prepare(&app, &target_config, None, other_devices_ready).await?;
+    // Initial activation changes configuration only. The ordinary sync path then honors
+    // module and attachment preferences; it never reads or migrates the retired service.
     {
         let (mut c, _writer) = open_write_database(&database)?;
         let tx = c.transaction().map_err(|e| e.to_string())?;
-        receipt.verify(&tx)?;
         meta(&tx, "flashcard_cloud_provider", &target)?;
         meta(&tx, "flashcard_sync_last_error", "")?;
-        meta(
-            &tx,
-            "flashcard_sync_last_success",
-            &now_timestamp().to_string(),
-        )?;
+        meta(&tx, "flashcard_sync_last_success", "0")?;
         mark_flashcard_sync_dirty(&tx)?;
         tx.commit().map_err(|e| e.to_string())?;
     }
     get_flashcard_cloud_sync_settings(app)
-}
-
-pub(crate) async fn migrate_webdav_configuration(
-    app: &AppHandle,
-    url: &str,
-    username: &str,
-    password: &str,
-    other_devices_ready: bool,
-) -> Result<MigrationReceipt, String> {
-    let normalized = normalize_flashcard_webdav_url(url)?;
-    let config = reading_sync::object_store::Configuration::Webdav {
-        url: normalized,
-        username: username.into(),
-    };
-    migration::prepare(app, &config, Some(password.into()), other_devices_ready).await
-}
-
-fn commit_provider(c: &Connection, target: &str, revision: u64) -> Result<(), String> {
-    if metadata_u64(c, "flashcard_sync_revision", 0) != revision {
-        return Err("迁移期间有本机内容修改；当前服务保持不变，请停止编辑后重试".into());
-    }
-    meta(c, "flashcard_cloud_provider", target)
 }
 
 #[cfg(test)]
@@ -607,87 +580,6 @@ pub(crate) fn content_identity(snapshot: &FlashcardSyncSnapshot) -> Result<Value
     object.remove("exportedAt");
     Ok(value)
 }
-pub(crate) async fn read_active_webdav_snapshot(
-    app: &AppHandle,
-) -> Result<Option<FlashcardSyncSnapshot>, String> {
-    if provider(&open_database(&database_path(app)?)?) != "webdav" {
-        return Err("当前云服务不是 WebDAV".into());
-    }
-    let settings = get_flashcard_sync_settings(app.clone())?;
-    let base = Url::parse(&settings.url).map_err(|_| "WebDAV 地址无效")?;
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(180))
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|_| "无法创建 WebDAV 客户端")?;
-    let (snapshot, _) = read_remote_flashcard_snapshot(
-        &client,
-        base.join(FLASHCARD_SYNC_FILE)
-            .map_err(|_| "WebDAV 快照地址无效")?,
-        &settings,
-        &flashcard_webdav_password(app),
-        &flashcard_sync_encryption_key(app),
-    )
-    .await?;
-    Ok(snapshot)
-}
-
-async fn verify_webdav_migration(
-    client: &reqwest::Client,
-    settings: &FlashcardSyncSettings,
-    password: &str,
-    expected: &FlashcardSyncSnapshot,
-) -> Result<(), String> {
-    let base = Url::parse(&settings.url).map_err(|e| e.to_string())?;
-    let (actual, _) = read_remote_flashcard_snapshot(
-        client,
-        base.join(FLASHCARD_SYNC_FILE).map_err(|e| e.to_string())?,
-        settings,
-        password,
-        "",
-    )
-    .await?;
-    if actual
-        .as_ref()
-        .map(crate::flashcard_snapshot::identity::content)
-        .transpose()?
-        != Some(crate::flashcard_snapshot::identity::content(expected)?)
-    {
-        return Err("迁回内容读回与本机不一致；当前服务保持不变".into());
-    }
-    for hash in flashcard_snapshot_media_hashes(expected) {
-        let url = base
-            .join(&format!("media/{hash}"))
-            .map_err(|e| e.to_string())?;
-        let mut response = webdav_request(
-            client,
-            reqwest::Method::GET,
-            url,
-            &settings.username,
-            password,
-        )
-        .send()
-        .await
-        .map_err(|_| "迁回附件读回失败")?;
-        if !response.status().is_success() {
-            return Err("迁回附件缺失；当前服务保持不变".into());
-        }
-        let mut digest = Sha256::new();
-        let mut size = 0u64;
-        while let Some(chunk) = response.chunk().await.map_err(|_| "迁回附件读取中断")? {
-            size = size.saturating_add(chunk.len() as u64);
-            if size > FLASHCARD_SYNC_MAX_MEDIA_BYTES {
-                return Err("迁回附件超出大小限制".into());
-            }
-            digest.update(chunk);
-        }
-        if format!("{:x}", digest.finalize()) != hash {
-            return Err("迁回附件哈希不符；当前服务保持不变".into());
-        }
-    }
-    Ok(())
-}
-
 #[cfg(all(test, windows))]
 mod real_cloud_tests;
 #[cfg(test)]

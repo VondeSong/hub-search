@@ -1,15 +1,14 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./CloudConnectionOptions.css";
 
 type OssConfig = { bucket: string; region: string; prefix: string; accessKeyId: string };
-type CloudSettings = { provider: "webdav" | "oss"; oss?: OssConfig; hasSecret: boolean; deviceId: string; mediaPolicy: "all" | "onDemand"; migration?: { state: string; error?: string; updatedAt?: number } | null };
+type CloudSettings = { provider: "none" | "oss"; legacyRetired?: boolean; oss?: OssConfig; hasSecret: boolean; deviceId: string; mediaPolicy: "all" | "onDemand"; migration?: { state: string; error?: string; updatedAt?: number } | null };
 type Report = { uploadedBytes: number; downloadedBytes: number; pendingMedia: number; uploadedChanges: number; downloadedChanges: number; completedAt: number };
 const empty: OssConfig = { bucket: "", region: "cn-hangzhou", prefix: "HubFlashcards", accessKeyId: "" };
 
-export function CloudConnectionOptions({ syncing, onChanged, onProviderChange, webdavSettings, webdavReady = false, webdavDirty = false, transfersAllowed = true, onBusyChange, showDownloadPolicy = true }: { syncing: boolean; onChanged: () => Promise<void>; onProviderChange?: (provider: CloudSettings["provider"]) => void; webdavSettings?: ReactNode; webdavReady?: boolean; webdavDirty?: boolean; transfersAllowed?: boolean; onBusyChange?: (busy: boolean) => void; showDownloadPolicy?: boolean }) {
+export function CloudConnectionOptions({ syncing, onChanged, onProviderChange, transfersAllowed = true, onBusyChange, showDownloadPolicy = true }: { syncing: boolean; onChanged: () => Promise<void>; onProviderChange?: (provider: CloudSettings["provider"]) => void; transfersAllowed?: boolean; onBusyChange?: (busy: boolean) => void; showDownloadPolicy?: boolean }) {
   const [settings, setSettings] = useState<CloudSettings | null>(null);
-  const [selected, setSelected] = useState<CloudSettings["provider"] | null>(null);
   const [oss, setOss] = useState(empty);
   const [secret, setSecret] = useState("");
   const [policy, setPolicy] = useState<"all" | "onDemand">("all");
@@ -23,7 +22,7 @@ export function CloudConnectionOptions({ syncing, onChanged, onProviderChange, w
     let active = true;
     void invoke<CloudSettings>("get_flashcard_cloud_sync_settings").then(s => {
       if (!active) return;
-      setSettings(s); setSelected(s.provider); setOss(s.oss || empty); setPolicy(s.mediaPolicy); setLoaded(true);
+      setSettings(s); setOss(s.oss || empty); setPolicy(s.mediaPolicy); setLoaded(true);
     }).catch(e => { if (active) setError(String(e)); });
     return () => { active = false; };
   }, []);
@@ -40,17 +39,17 @@ export function CloudConnectionOptions({ syncing, onChanged, onProviderChange, w
   const dirty = secret !== "" || JSON.stringify(oss) !== JSON.stringify(settings?.oss || empty) || policy !== (settings?.mediaPolicy || "all");
   const movingActiveOss = settings?.provider === "oss" && Boolean(settings.oss) && JSON.stringify(oss) !== JSON.stringify(settings.oss);
   const disabled = !!busy || syncing || !loaded;
-  const run = async (action: "save" | "test" | "oss" | "webdav") => {
+  const run = async (action: "save" | "test" | "oss") => {
     setBusy(action); setError(""); setMessage("");
     try {
       if (action === "test") setMessage(await invoke<string>("test_flashcard_oss_connection"));
       else {
         const next = action === "save"
           ? await invoke<CloudSettings>("save_flashcard_oss_config", { oss, secret: secret || null, mediaPolicy: policy, otherDevicesReady: ready })
-          : await invoke<CloudSettings>("activate_flashcard_cloud_sync", { target: action, otherDevicesReady: ready });
+          : await invoke<CloudSettings>("activate_flashcard_cloud_sync", { target: action });
         setSettings(next); setOss(next.oss || empty); setPolicy(next.mediaPolicy); setSecret("");
         setReady(false);
-        setMessage(action === "save" ? next.provider === "oss" ? "阿里云 OSS 配置已保存，后续同步使用此配置。" : "阿里云 OSS 配置已保存。当前仍使用 WebDAV，可在下方确认切换。" : `内容和附件校验通过，当前使用${next.provider === "oss" ? "阿里云 OSS" : "WebDAV"}。`);
+        setMessage(action === "save" ? next.provider === "oss" ? "阿里云 OSS 配置已保存，后续同步使用此配置。" : "配置已保存，可测试连接并启用云空间。" : "OSS 连接已启用，内容同步结果请查看概览。");
         await onChanged();
       }
     } catch (e) {
@@ -60,20 +59,12 @@ export function CloudConnectionOptions({ syncing, onChanged, onProviderChange, w
   };
   const update = (key: keyof OssConfig, value: string) => { setOss(v => ({ ...v, [key]: value })); setReady(false); };
   const size = (n: number) => n >= 1048576 ? `${(n / 1048576).toFixed(2)} MB` : `${(n / 1024).toFixed(1)} KB`;
-  const names = { oss: "阿里云 OSS", webdav: "WebDAV" };
-  const switching = settings && selected && selected !== settings.provider;
-  const targetReady = !dirty && !webdavDirty && (selected === "oss" ? !!settings?.oss && settings.hasSecret : webdavReady);
+  const targetReady = !dirty && !!settings?.oss && settings.hasSecret;
   return <div className="cloud-connection-options">
     <div className="cloud-sync-section-heading"><strong id="cloud-sync-connection-title">云服务</strong></div>
-    <p className="cloud-connection-current">当前同步服务：<strong>{settings ? names[settings.provider] : "读取中…"}</strong></p>
-    <div className="cloud-provider-picker" role="group" aria-label="选择要配置的云服务">
-      {(["oss", "webdav"] as const).map(provider => <button key={provider} type="button" aria-pressed={selected === provider} disabled={disabled} onClick={() => { setSelected(provider); setReady(false); setError(""); setMessage(""); }}>
-        <span><strong>{names[provider]}</strong>{settings?.provider === provider && <small>当前使用</small>}</span>
-        <span>{provider === "oss" ? "阿里云对象存储" : "旧 WebDAV 连接兼容"}</span>
-      </button>)}
-    </div>
-    {switching && <p className="cloud-connection-switch-note" role="status">正在配置 {names[selected]}，尚未启用。同步仍使用 {names[settings.provider]}。</p>}
-    {selected === "oss" && <section aria-label="阿里云 OSS 配置">
+    <p className="cloud-connection-current">当前同步服务：<strong>{settings ? settings.provider === "oss" ? "阿里云 OSS" : "尚未连接" : "读取中…"}</strong></p>
+    {settings?.legacyRetired && <p role="status">旧 WebDAV（含坚果云）同步已停用。本机内容、附件和待同步记录保留；本版本不会访问或删除旧云端文件。仅存在旧云端的内容，请先用旧版取回，再连接 OSS。</p>}
+    <section aria-label="阿里云 OSS 配置">
       <div className="cloud-sync-section-heading"><strong>阿里云 OSS 配置</strong></div>
       <p>先创建私有 Bucket，使用只允许访问本同步目录的专用密钥。密钥仅保存在本设备安全存储中。</p>
       <fieldset disabled={disabled}>
@@ -86,19 +77,14 @@ export function CloudConnectionOptions({ syncing, onChanged, onProviderChange, w
         {movingActiveOss && <><p>更改正在使用的云位置会迁移全部模块。分批传输未结束前继续使用原位置，再次保存可继续；原云数据保留。</p><label className="cloud-auto-sync"><input type="checkbox" checked={ready} onChange={e => setReady(e.target.checked)} /><span>其它设备已同步并暂停编辑和自动同步</span></label></>}
         <div className="cloud-sync-actions"><button disabled={!dirty || (movingActiveOss && (!ready || !transfersAllowed))} onClick={() => void run("save")}>{busy === "save" ? "保存中…" : movingActiveOss ? "迁移并保存 OSS 配置" : "保存 OSS 配置"}</button><button disabled={!settings?.oss || dirty} onClick={() => void run("test")}>{busy === "test" ? "校验中…" : "测试 OSS 连接"}</button></div>
       </fieldset>
-    </section>}
-    {selected === "webdav" && <fieldset disabled={disabled} aria-label="WebDAV 配置">{webdavSettings}</fieldset>}
-    {switching && <section className="cloud-connection-switch" aria-label="切换云服务">
-      <div className="cloud-sync-section-heading"><strong>切换到 {names[selected]}</strong></div>
-      <p>先保存上方配置。确认切换时，会合并两边的闪卡和复习记录，迁移阅读正文、附件、来源凭证及资料库副本记录，并逐项读取目标云核验。全部通过后才更换本机的同步服务。</p>
-      <ol><li>其它设备先完成当前服务的同步，并暂停自动同步和编辑。</li><li>在本机确认切换，等待合并与校验完成。</li><li>其它设备配置相同的 {names[selected]} 位置并完成切换，再恢复自动同步。</li></ol>
+    </section>
+    {settings?.provider === "none" && <section className="cloud-connection-switch" aria-label="连接云空间">
+      <p>电脑和手机使用同一 OSS 目录。启用连接只保存配置，内容按同步方式和附件策略处理。</p>
       <fieldset disabled={disabled}>
-        <label className="cloud-auto-sync"><input type="checkbox" checked={ready} onChange={e => setReady(e.target.checked)} /><span>其它设备已同步并暂停编辑和自动同步</span></label>
-        {!transfersAllowed && <p>切换需要传输内容，请先开启本设备云同步。</p>}
-        {!targetReady && <p>请先保存所选服务的有效配置；其它服务如有未保存的修改，也请先保存。</p>}
-        <div className="cloud-sync-actions"><button className="primary" disabled={!ready || !targetReady || !transfersAllowed} onClick={() => void run(selected)}>{busy === "oss" || busy === "webdav" ? "合并并校验中…" : `确认切换到 ${names[selected]}`}</button></div>
+        {!transfersAllowed && <p>本设备已暂停，启用连接后仍不会开始同步。</p>}
+        <div className="cloud-sync-actions"><button className="primary" disabled={!targetReady} onClick={() => void run("oss")}>{busy === "oss" ? "正在启用…" : "连接 OSS 云空间"}</button></div>
       </fieldset>
-      <p>切换失败不会更换当前服务。原服务的配置和云端数据会保留，但不会同时向两种服务同步。</p>
+      <p>连接失败可重试，本机内容与云端文件保留。</p>
     </section>}
     {settings?.provider === "oss" && report && <details className="cloud-sync-help"><summary>最近一次 OSS 传输详情</summary><p>上传 {report.uploadedChanges} 项变更（{size(report.uploadedBytes)}），下载 {report.downloadedChanges} 项变更（{size(report.downloadedBytes)}）。<br />{report.pendingMedia ? `本次同步结束时有 ${report.pendingMedia} 个附件待下载，可打开附件或再次同步下载。` : "本次同步结束时，所需附件均已在本机。"}</p></details>}
     {(error || message) && <p role={error ? "alert" : "status"} className={error ? "cloud-sync-last-error" : ""}>{error || message}</p>}

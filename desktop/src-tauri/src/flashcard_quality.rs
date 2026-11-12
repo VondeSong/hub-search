@@ -1045,7 +1045,7 @@ mod tests {
             UPDATE metadata SET value='webdav' WHERE key='flashcard_cloud_provider';",
         )
         .unwrap();
-        assert_eq!(quality_sync_status(&c)["enabled"], true);
+        assert_eq!(quality_sync_status(&c)["enabled"], false);
         c.execute(
             "UPDATE metadata SET value=' ' WHERE key='flashcard_webdav_url'",
             [],

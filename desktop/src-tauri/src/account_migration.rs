@@ -173,16 +173,6 @@ fn specs(root: &Path) -> Result<BTreeMap<String, Spec>, String> {
         }
     }
     for (key, label, category) in [
-        (
-            crate::FLASHCARD_WEBDAV_CREDENTIAL_ID,
-            "WebDAV 密码",
-            "services",
-        ),
-        (
-            crate::FLASHCARD_SYNC_ENCRYPTION_CREDENTIAL_ID,
-            "云同步加密口令",
-            "services",
-        ),
         ("hub-flashcard-oss-secret-v1", "OSS 访问密钥", "services"),
         ("hub-telegram-bot-token-v1", "Telegram Bot 令牌", "services"),
     ] {

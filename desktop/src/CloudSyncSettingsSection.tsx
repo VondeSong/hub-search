@@ -82,11 +82,7 @@ export function CloudSyncSettingsSection({
   );
   const [reading, setReading] = useState<ReadingSyncState | null>(null);
   const [history, setHistory] = useState<FlashcardSyncHistoryItem[]>([]);
-  const [url, setUrl] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [provider, setProvider] = useState<"webdav" | "oss">("webdav");
-  const [locationReady, setLocationReady] = useState(false);
+  const [provider, setProvider] = useState<"none" | "oss">("none");
   const [busy, setBusy] = useState("");
   const [connectionBusy, setConnectionBusy] = useState(false);
   const [maintenanceBusy, setMaintenanceBusy] = useState(false);
@@ -127,7 +123,7 @@ export function CloudSyncSettingsSection({
       invoke<ReadingSyncState>("get_reading_sync_status"),
       invoke<Transfers>("get_cloud_attachment_policies"),
       invoke<QuickState>("get_quick_journal_settings"),
-      invoke<{ provider: "webdav" | "oss" }>(
+      invoke<{ provider: "none" | "oss" }>(
         "get_flashcard_cloud_sync_settings",
       ),
     ]);
@@ -145,11 +141,7 @@ export function CloudSyncSettingsSection({
   useEffect(() => {
     mounted.current = true;
     void refresh()
-      .then((status) => {
-        if (status) {
-          setUrl(status.url);
-          setUsername(status.username);
-        }
+      .then(() => {
         void invoke<LibrarySummary[]>("list_libraries")
           .then(setLibraries)
           .catch(() => {});
@@ -219,28 +211,6 @@ export function CloudSyncSettingsSection({
       }
     });
   };
-  const saveConnection = (clearPassword = false) =>
-    void run("正在保存连接…", async () => {
-      const next = await invoke<FlashcardSyncSettings>(
-        "update_flashcard_sync_settings",
-        {
-          url,
-          username,
-          password: password || null,
-          clearPassword,
-          autoSync: null,
-          otherDevicesReady: locationReady,
-        },
-      );
-      if (mounted.current) {
-        setConnection(next);
-        setUrl(next.url);
-        setUsername(next.username);
-        setPassword("");
-        setLocationReady(false);
-        setNotice("WebDAV 配置已保存");
-      }
-    });
   const changed = async () => {
     // Consumers refresh their lists, while their active review/editor session stays intact.
     window.dispatchEvent(new Event("hub:cloud-data-changed"));
@@ -294,14 +264,6 @@ export function CloudSyncSettingsSection({
     maintenanceBusy ||
     !policy ||
     !connection;
-  const dirty =
-    url !== connection?.url ||
-    username !== connection?.username ||
-    Boolean(password);
-  const movingActiveWebdav =
-    provider === "webdav" &&
-    Boolean(connection?.url) &&
-    (url !== connection?.url || username !== connection?.username);
   const needsAttention = Boolean(
     (policy?.flashcards && connection?.lastError) ||
       (policy?.reading &&
@@ -375,11 +337,7 @@ export function CloudSyncSettingsSection({
           <button
             onClick={() =>
               void run("正在读取设置…", async () => {
-                const next = await refresh();
-                if (next) {
-                  setUrl(next.url);
-                  setUsername(next.username);
-                }
+                await refresh();
               })
             }
           >
@@ -426,7 +384,7 @@ export function CloudSyncSettingsSection({
                 {connection?.configured
                   ? provider === "oss"
                     ? "阿里云 OSS"
-                    : "原有 WebDAV 连接"
+                    : "尚未连接云空间"
                   : "尚未连接"}
               </p>
             </div>
@@ -671,7 +629,7 @@ export function CloudSyncSettingsSection({
             className="cloud-related-link"
             onClick={() => setPage("connection")}
           >
-            云连接 · {provider === "oss" ? "阿里云 OSS" : "WebDAV"}
+            云连接 · {provider === "oss" ? "阿里云 OSS" : "未连接"}
           </button>
           <button
             className="cloud-related-link"
@@ -692,100 +650,7 @@ export function CloudSyncSettingsSection({
             onBusyChange={setConnectionBusy}
             onProviderChange={setProvider}
             transfersAllowed={Boolean(policy?.enabled)}
-            webdavReady={Boolean(connection?.url)}
-            webdavDirty={dirty}
             onChanged={changed}
-            webdavSettings={
-              <>
-                <label>
-                  <span>WebDAV 目录地址</span>
-                  <input
-                    value={url}
-                    onChange={(e) => {
-                      setUrl(e.target.value);
-                      setLocationReady(false);
-                    }}
-                    placeholder="https://dav.example.com/HubFlashcards/"
-                    spellCheck={false}
-                  />
-                </label>
-                <label>
-                  <span>用户名</span>
-                  <input
-                    value={username}
-                    onChange={(e) => {
-                      setUsername(e.target.value);
-                      setLocationReady(false);
-                    }}
-                    autoComplete="username"
-                  />
-                </label>
-                <label>
-                  <span>密码</span>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder={
-                      connection?.hasPassword
-                        ? "已安全保存；留空保持"
-                        : "WebDAV 密码"
-                    }
-                    autoComplete="new-password"
-                  />
-                </label>
-                {movingActiveWebdav && (
-                  <>
-                    <p>
-                      更改正在使用的目录或账号会迁移全部模块，读回核验完成后才保存。未结束时再次保存可继续，原位置数据保留。
-                    </p>
-                    <label className="cloud-auto-sync">
-                      <input
-                        type="checkbox"
-                        checked={locationReady}
-                        onChange={(e) => setLocationReady(e.target.checked)}
-                      />
-                      <span>其它设备已同步并暂停编辑和自动同步</span>
-                    </label>
-                  </>
-                )}
-                <div className="cloud-sync-actions">
-                  {connection?.hasPassword && (
-                    <button onClick={() => saveConnection(true)}>
-                      清除 WebDAV 密码
-                    </button>
-                  )}
-                  <button
-                    disabled={!connection?.url || dirty}
-                    onClick={() =>
-                      void run("正在测试连接…", async () => {
-                        const message = await invoke<string>(
-                          "test_flashcard_sync_connection",
-                        );
-                        if (mounted.current) setNotice(message);
-                      })
-                    }
-                  >
-                    测试 WebDAV 连接
-                  </button>
-                  <button
-                    disabled={
-                      !url.trim() ||
-                      (movingActiveWebdav &&
-                        (!locationReady || !policy?.enabled))
-                    }
-                    onClick={() => saveConnection()}
-                  >
-                    {movingActiveWebdav
-                      ? "迁移并保存 WebDAV 配置"
-                      : "保存 WebDAV 配置"}
-                  </button>
-                </div>
-                <p>
-                  原有目录继续使用，无需改名。配置保存在本设备；连接测试会访问所选服务。保存配置不会切换云服务。
-                </p>
-              </>
-            }
           />
         </section>
       </div>

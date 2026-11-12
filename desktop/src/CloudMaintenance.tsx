@@ -20,7 +20,7 @@ const phases: Record<string, string> = {
   ready: "检查点已核验", deleteVerify: "删除前再次校验", delete: "清理已覆盖记录", done: "本轮已结束",
   restoreReady: "恢复范围已检查", restoreSourceVerify: "恢复前再次校验", restoreVerify: "恢复前再次校验", restore: "合并恢复记录", released: "本机维护暂存已释放",
 };
-const moduleNames: Record<string, string> = { flashcards: "闪卡", webdavSnapshot: "WebDAV 闪卡快照", reading: "阅读正文与状态", copies: "资料库副本记录", manifests: "附件清单", devices: "设备记录" };
+const moduleNames: Record<string, string> = { flashcards: "闪卡", webdavSnapshot: "旧版闪卡快照", reading: "阅读正文与状态", copies: "资料库副本记录", manifests: "附件清单", devices: "设备记录" };
 const size = (bytes: number) => `${(bytes / 1048576).toFixed(1)} MB`;
 const progress = (plan: CloudMaintenancePlan) => [plan.state, plan.phase, plan.read, plan.checkpoints, plan.verified, plan.deleted].join(":");
 
@@ -118,7 +118,7 @@ export function CloudMaintenance({ blocked = false, onBusyChange }: { blocked?: 
       <button disabled={locked} onClick={() => preview(true)}>预览恢复范围</button>
     </details>
     {runtimeCapabilities.desktop && <details><summary>检查点与历史清理</summary>
-      <p>先归并并读回校验检查点，再单独确认清理。仅移除已被确切覆盖的不可变历史；保留删除记录、复习事实、并发新增对象及全部附件文件，WebDAV 当前闪卡快照也保留。</p>
+      <p>先归并并读回校验检查点，再单独确认清理。仅移除已被确切覆盖的不可变历史；保留删除记录、复习事实、并发新增对象及全部附件文件。</p>
       <p>维护会读取云内容并产生流量；每次请求最多处理 100 项，进度保存在本机。读取范围上限 200000 项、暂存上限 2 GB，达到限制停止并保留原历史。清理需要当前目录的删除权限。</p>
       <button disabled={locked} onClick={() => preview(false)}>预览历史清理范围</button>
     </details>}

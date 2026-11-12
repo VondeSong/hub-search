@@ -20,9 +20,11 @@ assert.equal(finish(cloudScenario('partial')).error,false);
 
 const scoped=finish({...s,modules:{flashcards:true,reading:false,quick:false}});
 assert.equal(scoped.pending.reading,1);assert.equal(scoped.pending.quick,2);assert.equal(scoped.cloudMedia,false);assert.equal(scoped.awaiting,1);assert.equal(cloudComplete(scoped),true);
-const legacy=finish({...cloudScenario('legacy'),pending:{flashcards:1,reading:1,quick:2}});
-assert.equal(legacy.pending.flashcards,0);assert.equal(legacy.pending.quick,2);assert.equal(cloudComplete(legacy),false);
-assert.equal(quickMigrationBlocked(s),true);assert.equal(quickMigrationBlocked(cloudScenario('legacy')),false);
+const legacy=loadCloudState(JSON.stringify({...s,provider:'webdav',pending:{flashcards:1,reading:1,quick:2}}));
+assert.equal(legacy.provider,'none');assert.equal(legacy.connected,false);assert.equal(legacy.legacyRetired,true);
+assert.equal(cloudCanStart(legacy),false);assert.deepEqual(finish(legacy).pending,legacy.pending);
+assert.deepEqual(legacy.attachments,s.attachments);assert.deepEqual(legacy.uploads,s.uploads);
+assert.equal(quickMigrationBlocked(s),true);assert.equal(cloudScenario('retired').legacyRetired,true);
 const stopped=cloudStep({...s,phase:1,enabled:false});assert.equal(stopped.phase,0);assert.equal(stopped.pending.flashcards,2);
 const custom={...s,network:'unmetered',cacheMb:888,media:false,cloudMedia:true,modules:{...s.modules,reading:false}};
 for(const module of ['flashcards','reading','quick']){
@@ -59,7 +61,7 @@ assert.equal(finish(written).written,11,'retry does not write the same note twic
 assert.equal(cloudComplete(finish({...s,writerOnline:true})),true,'intentional attachment omissions are not failures');
 assert.equal(loadCloudState(JSON.stringify({...s,phase:2})).phase,0);
 assert.equal(loadCloudState(JSON.stringify({...s,retired:true,sourceMinutes:60,journalFolder:'Diary'})).journalFolder,'Diary');
-console.log('通过：三模块范围、速记上传/写入区分、迁移限制、WebDAV能力、暂停/离线/凭据门禁、附件重试、独立下载选项和旧偏好保留、存储校验');
+console.log('通过：三模块范围、速记上传/写入区分、OSS迁移限制、旧WebDAV停止且保留偏好与队列、暂停/离线/凭据门禁、附件重试、独立下载选项和存储校验');
 
 const disabledError={...cloudScenario('partial'),modules:{flashcards:true,reading:false,quick:false}};
 assert.equal(cloudComplete(disabledError),true,'disabled module errors do not block other modules');

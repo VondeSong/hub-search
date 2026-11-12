@@ -83,21 +83,6 @@ fn check_network(remote: &dyn Store) -> Result<(), String> {
     // Maintenance contains reading records too; its small control objects follow that policy.
     remote.check_network(&remote.key("reading/"))
 }
-async fn active_snapshot(
-    app: &AppHandle,
-    db: &PathBuf,
-    remote: &dyn Store,
-) -> Result<Option<Vec<u8>>, String> {
-    if flashcard_cloud_sync::provider(&open_database(db)?) != "webdav" {
-        return Ok(None);
-    }
-    check_network(remote)?;
-    flashcard_cloud_sync::read_active_webdav_snapshot(app)
-        .await?
-        .map(|s| serde_json::to_vec(&s))
-        .transpose()
-        .map_err(|e| e.to_string())
-}
 fn set_run(
     c: &Connection,
     ns: &str,
@@ -314,7 +299,7 @@ pub(crate) async fn preview_cloud_history_cleanup(app: AppHandle) -> Result<Plan
     let _reading = reading_sync::LOCK.lock().await;
     let db = database_path(&app)?;
     let (remote, ns, configuration) = remote(&app, &db)?;
-    let snapshot = active_snapshot(&app, &db, remote.as_ref()).await?;
+    let snapshot = None;
     history::preview_with_snapshot(
         &db,
         remote.as_ref(),
@@ -354,7 +339,7 @@ pub(crate) async fn restore_cloud_history(app: AppHandle, token: String) -> Resu
     let _reading = reading_sync::LOCK.lock().await;
     let db = database_path(&app)?;
     let (remote, ns, configuration) = remote(&app, &db)?;
-    let snapshot = active_snapshot(&app, &db, remote.as_ref()).await?;
+    let snapshot = None;
     history::restore_with_snapshot(&db, remote.as_ref(), &ns, &configuration, &token, snapshot)
         .await
 }
@@ -364,7 +349,7 @@ pub(crate) async fn preview_cloud_restore(app: AppHandle) -> Result<Plan, String
     let _reading = reading_sync::LOCK.lock().await;
     let db = database_path(&app)?;
     let (remote, ns, configuration) = remote(&app, &db)?;
-    let snapshot = active_snapshot(&app, &db, remote.as_ref()).await?;
+    let snapshot = None;
     history::preview_with_snapshot(
         &db,
         remote.as_ref(),

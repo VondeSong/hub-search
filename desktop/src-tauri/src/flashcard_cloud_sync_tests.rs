@@ -865,56 +865,6 @@ async fn recovery_handles_review_before_card_and_repeated_checkpoints() {
 }
 
 #[tokio::test]
-async fn migration_readback_requires_all_attachments_and_provider_commit_rejects_new_edits() {
-    let server = server().await;
-    let (db, blobs) = device("migration-readback");
-    let bytes = b"migration evidence";
-    let blob = blobs.put(bytes).unwrap();
-    import_flashcard_values(&db,"manual","学习".into(),json!({"source":"manual"}),vec![json!({"question":"证据？","answer":"附件","media":[{"url":media_protocol_url(&blob.hash),"mimeType":"text/plain"}]})],true).unwrap();
-    let mut c = open_database(&db).unwrap();
-    meta(&c, "flashcard_cloud_provider", "oss").unwrap();
-    let expected = local_flashcard_snapshot(&c).unwrap();
-    let body = serde_json::to_vec(&expected).unwrap();
-    server.state.lock().unwrap().files.insert(
-        format!("rollback/{FLASHCARD_SYNC_FILE}"),
-        (body, String::new()),
-    );
-    let settings = FlashcardSyncSettings {
-        configured: true,
-        url: server.url.join("rollback/").unwrap().to_string(),
-        username: String::new(),
-        has_password: false,
-        auto_sync: false,
-        last_sync_at: None,
-        last_error: String::new(),
-    };
-    let client = reqwest::Client::new();
-    assert!(verify_webdav_migration(&client, &settings, "", &expected)
-        .await
-        .is_err());
-    assert_eq!(provider(&c), "oss");
-    server.state.lock().unwrap().files.insert(
-        format!("rollback/media/{}", blob.hash),
-        (bytes.to_vec(), String::new()),
-    );
-    verify_webdav_migration(&client, &settings, "", &expected)
-        .await
-        .unwrap();
-    let revision = metadata_u64(&c, "flashcard_sync_revision", 0);
-    mark_flashcard_sync_dirty(&c).unwrap();
-    {
-        let tx = c.transaction().unwrap();
-        assert!(commit_provider(&tx, "webdav", revision).is_err());
-    }
-    assert_eq!(provider(&c), "oss");
-    let revision = metadata_u64(&c, "flashcard_sync_revision", 0);
-    let tx = c.transaction().unwrap();
-    commit_provider(&tx, "webdav", revision).unwrap();
-    tx.commit().unwrap();
-    assert_eq!(provider(&c), "webdav");
-}
-
-#[tokio::test]
 async fn unchanged_sync_skips_own_log_reads_and_received_record_echoes() {
     let server = server().await;
     let ns = config().namespace();

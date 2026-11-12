@@ -132,19 +132,19 @@ async fn attachment_traffic_admission_wait_preserves_retries_and_next_day_resume
 }
 
 #[tokio::test]
-async fn attachment_traffic_webdav_existing_bytes_are_read_once_without_etag_shortcuts() {
+async fn attachment_traffic_oss_existing_bytes_are_read_once_without_etag_shortcuts() {
     let server = crate::reading_sync::object_store::tests::server().await;
     let remote = crate::reading_sync::object_store::tests::remote(&server);
     let a = Device::new();
     let bytes = png();
     let key = remote.key(&format!("reading/media-v1/blobs/{}", hash(&bytes)));
-    let request_key = format!("/dav/{key}");
+    let request_key = key.clone();
     server
         .state
         .lock()
         .unwrap()
         .files
-        .insert(request_key.clone(), bytes.clone());
+        .insert(request_key.clone(), (bytes.clone(), String::new()));
     for _ in 0..2 {
         verified_put(
             &a.db,

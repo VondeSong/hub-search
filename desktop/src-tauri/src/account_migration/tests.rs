@@ -165,7 +165,7 @@ fn retired_ai_secret_does_not_block_current_credential_import() {
             .unwrap();
     }
     let current = specs(&root).unwrap();
-    let active_id = format!("secret:{}", crate::FLASHCARD_WEBDAV_CREDENTIAL_ID);
+    let active_id = "secret:hub-flashcard-oss-secret-v1".to_string();
     let retired_id = "secret:ai-tag-api-key";
     assert!(current.contains_key(&active_id));
     assert!(!current.contains_key(retired_id));

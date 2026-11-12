@@ -63,9 +63,6 @@ pub(super) fn require_flashcards(c: &Connection, auto: bool) -> Result<(), Strin
 }
 
 fn save(c: &mut Connection, settings: &Policy) -> Result<(), String> {
-    if settings.enabled && settings.reading {
-        reading_sync::object_store::configuration(c)?;
-    }
     let tx = c.transaction().map_err(|e| e.to_string())?;
     for (key, value) in [
         ("cloud_sync_enabled", settings.enabled),
@@ -137,10 +134,14 @@ mod tests {
         put(&c, "flashcard_sync_auto", "1");
         put(&c, "flashcard_sync_device_id", "original-device");
         initialize(&c).unwrap();
-        assert!(automatic(&c));
+        assert!(!automatic(&c));
+        assert!(
+            policy(&c).auto_sync,
+            "keep the saved preference without enabling a retired service"
+        );
         put(&c, "flashcard_sync_auto", "0");
         initialize(&c).unwrap();
-        assert!(automatic(&c));
+        assert!(!automatic(&c));
         assert_eq!(
             metadata_string(&c, "flashcard_sync_device_id"),
             "original-device"
@@ -252,7 +253,7 @@ mod tests {
             reading: true,
             ..legacy
         };
-        assert!(save(&mut c, &requested).is_err());
+        save(&mut c, &requested).unwrap();
         put(&c, "flashcard_cloud_provider", "oss");
         put(
             &c,
@@ -284,7 +285,7 @@ mod tests {
     }
 
     #[test]
-    fn reading_policy_accepts_configured_webdav_and_rejects_missing_active_connection() {
+    fn legacy_connection_never_enables_reading_and_preserves_preferences() {
         let mut c = database();
         let requested = Policy {
             enabled: true,
@@ -293,7 +294,7 @@ mod tests {
             reading: true,
         };
         put(&c, "flashcard_cloud_provider", "webdav");
-        assert!(save(&mut c, &requested).is_err());
+        save(&mut c, &requested).unwrap();
         put(
             &c,
             "flashcard_webdav_url",
@@ -301,8 +302,11 @@ mod tests {
         );
         put(&c, "flashcard_webdav_username", "isolated");
         save(&mut c, &requested).unwrap();
-        assert!(require_reading(&c, false).is_ok());
+        assert!(require_reading(&c, false).is_err());
         assert!(require_reading(&c, true).is_err());
+        assert!(flashcard_cloud_sync::legacy_retired(&c));
+        assert_eq!(metadata_string(&c, "flashcard_webdav_username"), "isolated");
+        assert_eq!(policy(&c), requested);
         put(&c, "flashcard_webdav_url", "");
         assert!(require_reading(&c, false).is_err());
     }

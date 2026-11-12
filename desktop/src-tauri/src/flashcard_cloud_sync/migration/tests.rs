@@ -1,6 +1,6 @@
 use super::*;
 use crate::flashcard_cloud_sync::tests as oss;
-use crate::reading_sync::object_store::tests as dav;
+use crate::reading_sync::object_store::tests as target_fixture;
 use crate::x_bookmarks::Post;
 fn oss_config() -> Configuration {
     Configuration::Oss {
@@ -14,15 +14,16 @@ fn oss_config() -> Configuration {
 }
 
 #[tokio::test]
-async fn all_module_migration_restores_formal_oss_objects_on_webdav_and_rechecks_cloud_damage() {
+async fn all_module_migration_restores_formal_oss_objects_at_new_oss_location_and_rechecks_cloud_damage(
+) {
     let server = oss::server().await;
     let source = oss::store(&server);
-    let target_server = dav::server().await;
-    let target = dav::remote(&target_server);
-    let a = dav::Device::new(&target_server);
+    let target_server = target_fixture::server().await;
+    let target = target_fixture::remote(&target_server);
+    let a = target_fixture::Device::new(&target_server);
     a.seed();
     let from = oss_config();
-    let to = dav::config(&target_server);
+    let to = target_fixture::config(&target_server);
     let ns = from.namespace();
     a.round(&source, &ns, "source").await;
     let blobs = BlobStore::open(&a.root.join("flashcard-blobs")).unwrap();
@@ -68,23 +69,23 @@ async fn all_module_migration_restores_formal_oss_objects_on_webdav_and_rechecks
         .files
         .keys()
         .any(|k| k.contains("reading/media-v1/blobs/")));
-    let b = dav::Device::new(&target_server);
+    let b = target_fixture::Device::new(&target_server);
     b.round(&target, &to.namespace(), "restored").await;
     let path: String = b
         .c()
         .query_row(
             "SELECT path FROM collection_saved_media WHERE item_key=?1 AND media_url=?2",
-            params![dav::KEY, dav::URL],
+            params![target_fixture::KEY, target_fixture::URL],
             |r| r.get(0),
         )
         .unwrap();
-    assert_eq!(fs::read(path).unwrap(), dav::png());
+    assert_eq!(fs::read(path).unwrap(), target_fixture::png());
     // A completed older receipt cannot suppress the new verification epoch's actual GET.
     let blob = target.key(&format!(
         "reading/media-v1/blobs/{}",
-        hash_bytes(&dav::png())
+        hash_bytes(&target_fixture::png())
     ));
-    let path = format!("/dav/{blob}");
+    let path = blob;
     let before = target_server
         .state
         .lock()
@@ -93,42 +94,43 @@ async fn all_module_migration_restores_formal_oss_objects_on_webdav_and_rechecks
         .get(&path)
         .copied()
         .unwrap_or(0);
-    target_server
-        .state
-        .lock()
-        .unwrap()
-        .files
-        .insert(path.clone(), vec![0; dav::png().len()]);
+    target_server.state.lock().unwrap().files.insert(
+        path.clone(),
+        (vec![0; target_fixture::png().len()], String::new()),
+    );
     assert!(copy(&a.db, &source, &target, &from, &to, true)
         .await
         .is_err());
     assert!(target_server.state.lock().unwrap().gets[&path] > before);
-    assert_eq!(fs::read(a.root.join("source.png")).unwrap(), dav::png());
+    assert_eq!(
+        fs::read(a.root.join("source.png")).unwrap(),
+        target_fixture::png()
+    );
     target_server
         .state
         .lock()
         .unwrap()
         .files
-        .insert(path, dav::png());
+        .insert(path, (target_fixture::png(), String::new()));
     let source_blob = source.key(&format!(
         "reading/media-v1/blobs/{}",
-        hash_bytes(&dav::png())
+        hash_bytes(&target_fixture::png())
     ));
     server.state.lock().unwrap().files.remove(&source_blob);
     let error = copy(&a.db, &source, &target, &from, &to, true)
         .await
         .unwrap_err();
     assert!(error.contains("缺失"));
-    assert_eq!(provider(&a.c()), "webdav");
+    assert_eq!(provider(&a.c()), "oss");
 }
 
 #[tokio::test]
 async fn migration_copy_and_independent_read_verification_resume_across_database_reopen() {
     let server = oss::server().await;
     let source = oss::store(&server);
-    let target_server = dav::server().await;
-    let target = dav::remote(&target_server);
-    let a = dav::Device::new(&target_server);
+    let target_server = target_fixture::server().await;
+    let target = target_fixture::remote(&target_server);
+    let a = target_fixture::Device::new(&target_server);
     a.seed();
     for i in 0..100 {
         x_bookmarks::reading_sync_test_import(
@@ -142,7 +144,7 @@ async fn migration_copy_and_independent_read_verification_resume_across_database
         );
     }
     let from = oss_config();
-    let to = dav::config(&target_server);
+    let to = target_fixture::config(&target_server);
     let ns = from.namespace();
     for _ in 0..3 {
         a.round(&source, &ns, "producer").await;
@@ -188,7 +190,7 @@ async fn migration_copy_and_independent_read_verification_resume_across_database
         serde_json::from_str(&metadata_string(&a.c(), "cloud_migration_report")).unwrap();
     assert_eq!(report["state"], "verified");
     assert_eq!(report["verified"], report["verifyTotal"]);
-    let b = dav::Device::new(&target_server);
+    let b = target_fixture::Device::new(&target_server);
     for _ in 0..3 {
         b.round(&target, &to.namespace(), "restored").await;
     }
@@ -200,7 +202,7 @@ async fn migration_copy_and_independent_read_verification_resume_across_database
         101
     );
     let old_receipt = receipt(&a.c()).unwrap();
-    a.c().execute("UPDATE collection_x_items SET post_json=json_set(post_json,'$.text','changed while migrating') WHERE item_key=?1",[dav::KEY]).unwrap();
+    a.c().execute("UPDATE collection_x_items SET post_json=json_set(post_json,'$.text','changed while migrating') WHERE item_key=?1",[target_fixture::KEY]).unwrap();
     assert!(old_receipt.verify(&a.c()).is_err());
     let error = copy(&a.db, &source, &target, &from, &to, false)
         .await
@@ -253,20 +255,20 @@ async fn migration_copy_and_independent_read_verification_resume_across_database
 async fn migration_blocked_network_does_not_reserve_quota_or_switch_connection() {
     let server = oss::server().await;
     let source = oss::store(&server);
-    let target_server = dav::server().await;
-    let target =
-        dav::remote(&target_server).with_network_guard(Arc::new(|| Err("blocked network".into())));
-    let a = dav::Device::new(&target_server);
+    let target_server = target_fixture::server().await;
+    let target = target_fixture::remote(&target_server)
+        .with_network_guard(String::new(), Arc::new(|| Err("blocked network".into())));
+    let a = target_fixture::Device::new(&target_server);
     a.seed();
     let from = oss_config();
-    let to = dav::config(&target_server);
+    let to = target_fixture::config(&target_server);
     a.round(&source, &from.namespace(), "producer").await;
     let before = metadata_u64(&a.c(), "reading_media_reserved", 0);
     assert!(copy(&a.db, &source, &target, &from, &to, false)
         .await
         .is_err());
     assert_eq!(metadata_u64(&a.c(), "reading_media_reserved", 0), before);
-    assert_eq!(provider(&a.c()), "webdav");
+    assert_eq!(provider(&a.c()), "oss");
     assert!(target_server.state.lock().unwrap().files.is_empty());
 }
 
@@ -274,9 +276,9 @@ async fn migration_blocked_network_does_not_reserve_quota_or_switch_connection()
 async fn migration_legacy_budgets_do_not_pause_copy_or_change_connection() {
     let server = oss::server().await;
     let source = oss::store(&server);
-    let target_server = dav::server().await;
-    let target = dav::remote(&target_server);
-    let a = dav::Device::new(&target_server);
+    let target_server = target_fixture::server().await;
+    let target = target_fixture::remote(&target_server);
+    let a = target_fixture::Device::new(&target_server);
     for i in 0..4 {
         x_bookmarks::reading_sync_test_import(
             &mut a.c(),
@@ -289,7 +291,7 @@ async fn migration_legacy_budgets_do_not_pause_copy_or_change_connection() {
         );
     }
     let from = oss_config();
-    let to = dav::config(&target_server);
+    let to = target_fixture::config(&target_server);
     a.round(&source, &from.namespace(), "producer").await;
     meta(
         &a.c(),
@@ -317,7 +319,7 @@ async fn migration_legacy_budgets_do_not_pause_copy_or_change_connection() {
         "aggregate cloud content must finish despite retired 4 MiB budgets"
     );
     assert!(metadata_u64(&a.c(), "reading_media_reserved", 0) > 4 * 1024 * 1024);
-    assert_eq!(provider(&a.c()), "webdav");
+    assert_eq!(provider(&a.c()), "oss");
     assert_eq!(
         a.c()
             .query_row("SELECT count(*) FROM cloud_migration_payloads", [], |r| {
@@ -329,64 +331,12 @@ async fn migration_legacy_budgets_do_not_pause_copy_or_change_connection() {
 }
 
 #[tokio::test]
-async fn migration_final_webdav_snapshot_recheck_catches_review_appended_in_long_window() {
-    let server = dav::server().await;
-    let a = dav::Device::new(&server);
-    let c = a.c();
-    c.execute("INSERT INTO flashcard_decks(id,name,created_at,updated_at) VALUES('migration-deck','Migration',10,10)",[]).unwrap();
-    c.execute("INSERT INTO flashcards(id,deck_id,question,answer,created_at,updated_at,due_at) VALUES('migration-card','migration-deck','Q','A',10,10,10)",[]).unwrap();
-    let before = local_flashcard_snapshot(&c).unwrap();
-    let proof = hash_bytes(&serde_json::to_vec(&content_identity(&before).unwrap()).unwrap());
-    server.state.lock().unwrap().files.insert(
-        "/dav/hub-flashcards-v1.json".into(),
-        serde_json::to_vec(&before).unwrap(),
-    );
-    let settings = FlashcardSyncSettings {
-        url: server.url.clone(),
-        username: "test-account".into(),
-        has_password: true,
-        auto_sync: false,
-        configured: true,
-        last_sync_at: None,
-        last_error: String::new(),
-    };
-    let client = reqwest::Client::new();
-    check_webdav_snapshot(&client, &settings, "synthetic-test-password", "", &proof)
-        .await
-        .unwrap();
-    let preview =
-        serde_json::to_value(flashcard_scheduler::preview(&c, "migration-card", 1000).unwrap())
-            .unwrap();
-    flashcard_scheduler::commit(
-        &c,
-        "migration-card",
-        3,
-        None,
-        preview["reviewKey"].as_str().unwrap(),
-        1000,
-    )
-    .unwrap();
-    let current = local_flashcard_snapshot(&c).unwrap();
-    server.state.lock().unwrap().files.insert(
-        "/dav/hub-flashcards-v1.json".into(),
-        serde_json::to_vec(&current).unwrap(),
-    );
-    assert!(
-        check_webdav_snapshot(&client, &settings, "synthetic-test-password", "", &proof)
-            .await
-            .unwrap_err()
-            .contains("原服务保持")
-    );
-    assert_eq!(provider(&c), "webdav");
-}
-
-#[tokio::test]
 async fn migration_replayed_read_scratch_rejects_version_conflict_after_cursor_boundary() {
     let server = oss::server().await;
     let source = oss::store(&server);
-    let target_server = dav::server().await;
-    let target = dav::remote(&target_server);
-    let a = dav::Device::new(&target_server);
+    let target_server = target_fixture::server().await;
+    let target = target_fixture::remote(&target_server);
+    let a = target_fixture::Device::new(&target_server);
     a.seed();
     for i in 0..100 {
         x_bookmarks::reading_sync_test_import(
@@ -400,7 +350,7 @@ async fn migration_replayed_read_scratch_rejects_version_conflict_after_cursor_b
         );
     }
     let from = oss_config();
-    let to = dav::config(&target_server);
+    let to = target_fixture::config(&target_server);
     for _ in 0..3 {
         a.round(&source, &from.namespace(), "producer").await;
     }
@@ -415,7 +365,7 @@ async fn migration_replayed_read_scratch_rejects_version_conflict_after_cursor_b
             .iter()
             .find_map(|(_, (b, _))| {
                 let v: Value = serde_json::from_slice(b).unwrap();
-                (v["record"]["key"] == dav::KEY).then_some(v)
+                (v["record"]["key"] == target_fixture::KEY).then_some(v)
             })
             .unwrap();
         let max = records
@@ -470,5 +420,5 @@ async fn migration_replayed_read_scratch_rejects_version_conflict_after_cursor_b
         rejected,
         "formal conflict proof must survive the 100-GET restart boundary"
     );
-    assert_eq!(provider(&a.c()), "webdav");
+    assert_eq!(provider(&a.c()), "oss");
 }
