@@ -10,6 +10,7 @@ import type {Insight} from "./InsightTypes";
 
 const {invoke,listeners,store}=vi.hoisted(()=>({invoke:vi.fn(),listeners:new Map<string,(event:unknown)=>void>(),store:{items:[] as Insight[],lostReply:false}}));
 vi.mock("@tauri-apps/api/core",()=>({invoke}));
+vi.mock("./CodexAccounts",()=>({getCodexAccountSnapshot:()=>({loaded:true,loading:false,current:{scopeId:"a".repeat(64)}}),refreshCodexAccounts:vi.fn(async()=>undefined)}));
 vi.mock("@tauri-apps/api/event",()=>({listen:vi.fn(async(name:string,handler:(e:unknown)=>void)=>{listeners.set(name,handler);return()=>listeners.delete(name);})}));
 let root:Root,host:HTMLDivElement;
 const openWork=vi.fn();
@@ -23,6 +24,7 @@ beforeEach(()=>{
  invoke.mockImplementation(async(_command:string,{args}:{args:Record<string,unknown>})=>{
   const current=store.items.find(i=>i.id===(args.insightId??"one"))!;
   switch(args.action){
+   case "status":return {work:{id:"work-a",revision:2,report:null},lifecycle:{controlRevision:7,workRevision:2,activeRunId:null,requiresExplicitResume:true,canResume:true,executionModes:{quick:true}},assistantOptions:{model:{provider:"codex"}}};
    case "insightList":return structuredClone({items:store.items,hasMore:false,nextBefore:null});
    case "insightDetail":return structuredClone({...current,contentRevision:Number(args.revision??current.headRevision)});
    case "insightStatus":current.processingState=args.state as Insight["processingState"];++current.rowRevision;if(store.lostReply){store.lostReply=false;throw new Error("reply lost");}return structuredClone({committed:true,item:current});
@@ -48,9 +50,10 @@ it("reads and filters stored findings without invoking a model",async()=>{
 });
 
 it("opens the same original Work and rechecks a citation before showing its source",async()=>{
- await mount();await click("查看发现");await click("原事项");expect(openWork).toHaveBeenCalledWith({workId:"work-a"});
+ await mount();await click("查看发现");
  await act(async()=>button("查看引用原文").click());expect(document.querySelector('[aria-label="引用定位"]')).not.toBeNull();
  expect(invoke.mock.calls.some(([,v])=>v.args.action==="insightSource"&&v.args.insightId==="one")).toBe(true);
+ await click("返回回答");await click("原事项");expect(openWork).toHaveBeenCalledWith({workId:"work-a"});expect(document.querySelector('dialog[aria-label="发现与依据"]')).toBeNull();
 });
 
 it("requires source confirmation before saving a selected structured candidate",async()=>{
@@ -112,7 +115,9 @@ it.each(["执行失败","用户已停止"])("preserves the old finding and feedb
  await mount();await click("核对这条发现");
  const choice=document.querySelector<HTMLInputElement>('.insights-feedback-choice input')!;await act(async()=>choice.click());await click("按补充继续核对");
  expect(document.body.textContent).toContain("本次核对未完成");expect(store.items[0].headRevision).toBe(1);expect(store.items[0].validity).toBe("review");expect(store.items[0].events?.[0].id).toBe("u1");expect(store.items[0].reasons.every(r=>r.active)).toBe(true);
- expect(invoke.mock.calls.filter(([,v])=>v.args.action==="resume")).toHaveLength(1);expect(invoke.mock.calls.some(([,v])=>v.args.action==="insightUpdate")).toBe(false);
+ expect(invoke.mock.calls.filter(([,v])=>v.args.action==="resume")).toHaveLength(1);
+ const run=invoke.mock.calls.find(([,v])=>v.args.action==="resume")![1].args;expect(run).toMatchObject({id:"work-a",mode:"quick",expectedControlRevision:7,expectedWorkRevision:2,expectedRunId:null,codexScopeId:"a".repeat(64),commandId:expect.any(String)});
+ expect(invoke.mock.calls.some(([,v])=>v.args.action==="insightUpdate")).toBe(false);
 });
 
 
@@ -127,4 +132,12 @@ it("keeps an unsaved feedback draft and the current discovery while masking cont
  await act(async()=>vi.advanceTimersByTimeAsync(160));
  expect(document.querySelector<HTMLTextAreaElement>('textarea[aria-label="你的补充"]')!.value).toBe("未保存的验证范围补充");
  expect(document.body.textContent).toContain("本周已完成原型验证。");
+});
+
+
+it("resumes an already queued supplement without saving another user message",async()=>{
+ const original=store.items[0];original.validity="review";original.reasons=[{id:"u1-reason",kind:"feedback",active:true,reference:{feedbackId:"u1"}}];original.events=[{id:"u1",kind:"insightFeedback",targetRevision:1,createdAt:Date.now(),body:{kind:"correction",text:"这里只完成纸面原型。"}},{id:"sent-u1",kind:"insightContinue",targetRevision:1,createdAt:Date.now(),body:{workRevision:2,feedbackIds:["u1"]}}];
+ const normal=invoke.getMockImplementation()!;invoke.mockImplementation(async(command,args)=>{if(args.args.action==="respond")return {};const value=await normal(command,args);if(args.args.action==="status")value.lifecycle.requiresExplicitResume=false;return value;});
+ await mount();await click("核对这条发现");await act(async()=>document.querySelector<HTMLInputElement>('.insights-feedback-choice input')!.click());await click("按补充继续核对");
+ expect(invoke.mock.calls.some(([,v])=>v.args.action==="insightContinue")).toBe(false);expect(invoke.mock.calls.filter(([,v])=>v.args.action==="respond")).toHaveLength(1);expect(openWork).toHaveBeenCalledWith({workId:"work-a"});
 });

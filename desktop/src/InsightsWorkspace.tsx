@@ -92,7 +92,7 @@ export function InsightsWorkspace({onToggleDesktopSidebar}:{onToggleDesktopSideb
  const data=useInsights(),openAgent=useContext(AgentPanelContext);
  const [filter,setFilter]=useState<Insight["processingState"]|"all">("attention"),[query,setQuery]=useState(""),[days,setDays]=useState(0),[picker,setPicker]=useState<{target?:Insight}|null>(null);
  useEffect(()=>setPicker(null),[data.generation]);
- const openWork=(id:string)=>openAgent?.({workId:id});
+ const openWork=(id:string)=>{data.closeDetail();setPicker(null);openAgent?.({workId:id});};
  const visible=useMemo(()=>data.items.filter(item=>(filter==="all"||item.processingState===filter)&&(!days||item.createdAt>=Date.now()-days*86_400_000)&&(!query.trim()||item.snapshot?.text.toLowerCase().includes(query.trim().toLowerCase())||item.snapshot?.sourceCitations.some(s=>s.excerpt.title.includes(query.trim())))),[data.items,filter,query,days]);
  return <section className="insights-workspace" aria-label="洞察发现工作区">
   <header className="insights-heading"><div><div className="insights-title">{onToggleDesktopSidebar&&<button type="button" className="icon-button" aria-label="切换洞察侧边栏" onClick={onToggleDesktopSidebar}><PanelLeft size={19}/></button>}<h1>洞察</h1></div><p>看见资料里的变化与关联，保留依据，继续核对。</p></div><div><button type="button" className="icon-button" aria-label="核对当前来源" disabled={data.loading||data.busy} onClick={()=>void data.refresh()}><RefreshCw size={17}/></button><button type="button" className="insights-primary" onClick={()=>setPicker({})}><Plus size={16}/>选择已有成果</button></div></header>

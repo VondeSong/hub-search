@@ -1,6 +1,8 @@
 import {invoke} from "@tauri-apps/api/core";
 import {listen} from "@tauri-apps/api/event";
 import {useCallback,useEffect,useRef,useState} from "react";
+import {canRunMode,lifecycleRequest,type Lifecycle} from "./AgentLifecycle";
+import {getCodexAccountSnapshot,refreshCodexAccounts} from "./CodexAccounts";
 import {userProfileStorage} from "./UserProfileStorage";
 import type {Insight,InsightCandidate,InsightCandidates,InsightDelivery,InsightList,InsightOrigin,InsightSource} from "./InsightTypes";
 import type {WorkSummary} from "./AgentConversationHistoryData";
@@ -70,9 +72,25 @@ export function useInsights(){
  const change=(item:Insight,action:string,fields:Record<string,unknown>={})=>execute({action,insightId:item.id,expectedRevision:item.rowRevision,...fields});
  const source=async(item:Insight,index:number)=>{const epoch=accessEpoch.current;const value=await call<InsightSource>({action:"insightSource",insightId:item.id,revision:item.contentRevision??item.headRevision,sourceIndex:index});if(epoch!==accessEpoch.current)throw new Error("引用读取期间访问状态已改变，请重新核对");return value;};
  const runReview=async(item:Insight,feedbackIds:string[],onOpenWork:(id:string)=>void)=>{
-  const saved=await change(item,"insightContinue",{feedbackIds});onOpenWork(item.workId);
-  setBusy(true);try{await call({action:"resume",id:item.workId,mode:"quick"});await refreshRef.current();}
-  catch(e){setError(`本次核对未完成：${message(e)}。原发现与反馈已保留，请在原事项查看实际状态。`);}
+  if(unresolved)throw new Error("请先核对上一次操作的提交结果");
+  type ReviewStatus={work:{revision:number;report:unknown};lifecycle?:Lifecycle;assistantOptions?:{model?:{provider?:string}};modelSelection?:{provider?:string}};
+  let status=await call<ReviewStatus>({action:"status",id:item.workId});
+  const queued=status.work.report==null&&(item.events??[]).some(event=>event.kind==="insightContinue"&&event.targetRevision===item.headRevision&&event.body?.workRevision===status.work.revision&&Array.isArray(event.body.feedbackIds)&&event.body.feedbackIds.length===feedbackIds.length&&feedbackIds.every(id=>(event.body!.feedbackIds as unknown[]).includes(id)));
+  const saved=queued?{item}:await change(item,"insightContinue",{feedbackIds});
+  if(!queued)status=await call<ReviewStatus>({action:"status",id:item.workId});
+  onOpenWork(item.workId);setBusy(true);
+  try{
+   if(!status.lifecycle||!canRunMode(status.lifecycle,"quick"))throw new Error("当前原事项不能开始新分析，请在原事项核对额度与待处理结果");
+   let codexScopeId:string|undefined;
+   if((status.assistantOptions?.model?.provider??status.modelSelection?.provider??"codex")==="codex"){
+    if(!getCodexAccountSnapshot().loaded||getCodexAccountSnapshot().loading)await refreshCodexAccounts();
+    codexScopeId=getCodexAccountSnapshot().current?.scopeId;
+    if(!codexScopeId)throw new Error("当前 Codex 账号不可用，请在原事项刷新登录状态");
+   }
+   const recovery=status.lifecycle.requiresExplicitResume;
+   if(recovery&&!status.lifecycle.canResume)throw new Error("原事项仍有待核对结果，当前不能恢复运行");
+   await call({action:recovery?"resume":"respond",id:item.workId,mode:"quick",...(recovery?lifecycleRequest(status.lifecycle,crypto.randomUUID()):{}),...(codexScopeId?{codexScopeId}:{})});await refreshRef.current();
+  }catch(e){setError(`本次核对未完成：${message(e)}。原发现与反馈已保留，请在原事项查看实际状态。`);}
   finally{if(alive.current)setBusy(false);}return saved;
  };
  const discardPending=()=>{if(!pendingChecked)return;userProfileStorage.removeItem(pendingKey);setUnresolved(null);setError("");void refreshRef.current();};
