@@ -103,7 +103,7 @@ function marked(text,q){const i=q?text.toLowerCase().indexOf(q.toLowerCase()):-1
 function searchInput(id,label,value=''){return '<div class="field"><label for="'+id+'">'+esc(label)+'</label><input type="search" id="'+id+'" value="'+esc(value)+'" placeholder="'+esc(label)+'"></div>'}
 function searchPage(){return workspaceSearchPage()}
 function searchResults(){return workspaceSearchResults()}
-function refreshSearch(){ $('#results').innerHTML=searchResults();$('#search-extra').hidden=Boolean(query||workspaceFacets().length);const clear=$('.search-clear');if(clear)clear.hidden=!query;mobileRememberView() }
+function refreshSearch(){ $('#results').innerHTML=searchResults();const active=Boolean(query||workspaceFacets().length);$('#search-extra').hidden=active;const suggestions=$('#workspace-suggestions');if(suggestions)suggestions.hidden=active;const clear=$('.search-clear');if(clear)clear.hidden=!query;mobileRememberView() }
 
 function selectField(id,label,items,current){return '<div class="field"><label for="'+id+'">'+esc(label)+'</label><select id="'+id+'">'+items.map(x=>'<option '+(x===current?'selected':'')+'>'+esc(x)+'</option>').join('')+'</select></div>'}
 
@@ -324,13 +324,14 @@ function render(restore=false){
  document.title=(p==='search'?'Hub':routes[p]+' · Hub')+' · 手机原型';
  if(restore){window.scrollTo(0,scrolls[key]||0);$('#content').focus({preventScroll:true})}
  mobileUpdateViewport();
+ if(p==='search')workspaceRevealActiveType();
  if(typeof agentUIAfterRender==='function')agentUIAfterRender();
 }
 function showSheet(t,html){
  const d=$('#sheet'),opened=d.open;
  if(!opened){mobileSheetFocus=document.activeElement?.closest('[data-act]')?.dataset.act||null;lockMobilePage()}
  d.innerHTML='<div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h2 id="sheet-title">'+esc(t)+'</h2>'+iconBtn('关闭','close','close')+'</div><div class="sheet-body">'+html+'</div><p id="sheet-feedback" class="info" role="status" hidden></p>';
- if(!opened)d.showModal();mobileUpdateViewport();
+ if(!opened)d.showModal();if(d.querySelector('#workspace-scope-form'))workspaceSyncScopeParents();mobileUpdateViewport();
 }
 function sheet(t,html){
  if(mobileClosingSheet)return;const state=history.state||{},id=state.sheet||++sheetSerial;

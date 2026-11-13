@@ -3,9 +3,9 @@
   "site": "mobile",
   "project_id": "appgprj_6af1d2dc12308191acc37e5566699c2d",
   "site_url": "https://hub-mobile-lab-von11.song02211368537057.chatgpt.site",
-  "source_commit": "53e785b0aeadd1b031a47f0f8a6ff66d86171496",
-  "published_version": 7,
-  "deployment_id": "appgdep_6af71e090ddc8191b8e143c128b8c7a9",
+  "source_commit": "a95ddbf525c6a4d5c9ac7e0d99bbdde20b7afd70",
+  "published_version": 8,
+  "deployment_id": "appgdep_6af726097e108191b5e883553df91110",
   "files": {
     ".openai/hosting.json": {
       "sha256": "543a776095c0181cc870f784c075ab4f263fb739e3649cd8db74f493fb5b4ca3",
@@ -13,9 +13,9 @@
       "bytes": 106
     },
     "DESIGN.md": {
-      "sha256": "24f19755badae5b1da7faef408feac5418e3971e0ca648eca2e55ce6273b754c",
+      "sha256": "6857b1fab0952496618c15bc4f4aec3f39910c047591ce6f5da7ab201e99867d",
       "mode": "100644",
-      "bytes": 8783
+      "bytes": 9607
     },
     "PRODUCT.md": {
       "sha256": "d784c781f91a182bb6f366929e45f44876850eea6bdcb900f87c1583056f4f56",
@@ -23,9 +23,9 @@
       "bytes": 3242
     },
     "README.md": {
-      "sha256": "65bdaeb396e4f6f10bce2f317795103cd30d93950e160c6d23f496e9bf1d1c3e",
+      "sha256": "9b4997cca3eb9eb21a8afc9f3b803259ea1693ee85861a469ab5d8d4da95dae8",
       "mode": "100644",
-      "bytes": 10521
+      "bytes": 11653
     },
     "checks/agents-enhancements-checks.cjs": {
       "sha256": "5b16c980f0559db1edf100b56298153d844492b32aaaff8bdfc32a251c589523",
@@ -36,6 +36,11 @@
       "sha256": "d2749a71e062fc22565011d2fad0b776507c3316e06df713a1e56d323778675c",
       "mode": "100644",
       "bytes": 6298
+    },
+    "checks/search-interactions-checks.cjs": {
+      "sha256": "4f829cdd23349c2eb0d28b387ff34e326241db7038a486f40dc2aa62acb44d65",
+      "mode": "100644",
+      "bytes": 20498
     },
     "checks/task-tools-checks.cjs": {
       "sha256": "3e00d81dbe4f3de9c7efa7902431897542f36455f154af58b5f1106c6e94ae63",
@@ -63,9 +68,9 @@
       "bytes": 32310
     },
     "dist/app.js": {
-      "sha256": "557582e02b5f3568675a7dd67609e141ab088382f800823a1df26168d293daef",
+      "sha256": "d0d2e0c143665b19a60650fdacca1f3648df77a78f28247be38a4d9ad496fbd3",
       "mode": "100644",
-      "bytes": 60287
+      "bytes": 60512
     },
     "dist/hub.svg": {
       "sha256": "a7229c43b74d0dba3e1441f0d14c62320e441a8c16df9c1f2378f88ffbe172b1",
@@ -83,9 +88,9 @@
       "bytes": 27446
     },
     "dist/mobile.js": {
-      "sha256": "c56dd470a717f2a7f5bfe4b571386c0e5fcc06a75b9397482b972e7259c1468c",
+      "sha256": "c999ca26698d556192cbe106e122d51c59a8b7b30c2a1952f685cb34578c7d9f",
       "mode": "100644",
-      "bytes": 14215
+      "bytes": 14771
     },
     "dist/style.css": {
       "sha256": "b97c2863349fd0a517dc86bb5b3f2cc7b575601a79b95888a1e92ce327269b72",
@@ -108,14 +113,14 @@
       "bytes": 20194
     },
     "dist/workspace-tools.css": {
-      "sha256": "f21c080ce1779fa8f589f26284124dae1b92f68edeeca12406b137de73456e4b",
+      "sha256": "dd3e00c2eef7973733f7676fc5d7c02be4a370e4558d6e08ad1fba9e2ff0c43a",
       "mode": "100644",
-      "bytes": 1095
+      "bytes": 12325
     },
     "dist/workspace-tools.js": {
-      "sha256": "ef093b84731a411da76615d9d7eb80ed483959b2e3de6fca9a70669250fe29fe",
+      "sha256": "67d03d14a139448a55be8e5994d38083e597dd66f2285bd0cef74a13f786bf57",
       "mode": "100644",
-      "bytes": 23787
+      "bytes": 30776
     },
     "docs/agents-32.md": {
       "sha256": "a4f3eb6917abc89147a0a9dd216484da3d3a5eeb5f9ab48af49c69c412398dcc",
@@ -138,15 +143,15 @@
       "bytes": 33786
     },
     "docs/mobile-scope.md": {
-      "sha256": "aa3f9dd40e844e909119d0941449b5a8f48fb1cac5210522bbd5058d7d10254b",
+      "sha256": "242139fe771ae4a2ba668a094761275c39e327008fb96664d57a7e6c34f39e8b",
       "mode": "100644",
-      "bytes": 8333
+      "bytes": 8784
     },
     "docs/qa-2026-11-13.md": {
-      "sha256": "8101faaa4ca8faa58bc17f6b6568bb9343253f8fd2619abaedd20597276a1b7a",
+      "sha256": "d6751b5aadad235de3a9144dc2f054b29e2babe38d2759998d136cd6b1dbfac6",
       "mode": "100644",
-      "bytes": 3993
+      "bytes": 6022
     }
   },
-  "imported_at": "2026-11-13T14:26:41.858779+00:00"
+  "imported_at": "2026-11-13T15:00:59.522735+00:00"
 }

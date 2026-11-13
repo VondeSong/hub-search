@@ -132,6 +132,7 @@ function mobileUpdateViewport() {
   document.documentElement.style.setProperty('--viewport-height', height + 'px');
   document.documentElement.style.setProperty('--viewport-bottom', bottom + 'px');
   document.body.classList.toggle('keyboard-open', Boolean(editable && mobileViewportBaseline - height > 140));
+  if(typeof workspaceRevealActiveType==='function'){workspaceRevealActiveType();requestAnimationFrame(workspaceRevealActiveType);}
 }
 function mobileRememberView() {
   clearTimeout(mobileViewTimer);
@@ -141,6 +142,12 @@ function mobileWriteView() {
   try { sessionStorage.setItem('hub-mobile-view-v2', JSON.stringify({ query, source, searchDate, searchType, searchFolder, readingQuery, readingFilter, readingSource, readingView, taskFilter, taskDate, taskTools: typeof taskToolsViewState==='function'?taskToolsViewState():undefined, agentListQuery, agentListScope, filter, scrolls: { ...scrolls, [activeRoute]: pageScroll() } })); } catch {}
 }
 function mobileRestoreView() {
+  // Applied filters persist across visits; legacy per-tab view state still takes precedence.
+  const search=workspacePrefs();
+  if(WORKSPACE_SOURCES.includes(search.source))source=search.source;
+  if(WORKSPACE_DATES.includes(search.date))searchDate=search.date;
+  if(WORKSPACE_TYPES.includes(search.type))searchType=search.type;
+  if(['全部分组',...allMobileLabels()].includes(search.folder))searchFolder=search.folder;
   try {
     const v = JSON.parse(sessionStorage.getItem('hub-mobile-view-v2') || '{}');
     if (typeof v.query === 'string') query = v.query;
