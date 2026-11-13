@@ -2,6 +2,7 @@
 
 // Mobile workflows share the existing sample store. No external service is called.
 function allTasks() {
+  if (typeof taskToolsTasks === 'function') return taskToolsTasks();
   return [...tasks, ...(Array.isArray(st.customTasks) ? st.customTasks : [])];
 }
 
@@ -169,7 +170,7 @@ document.addEventListener('keydown', event => {
 });
 
 function quickCapture(kind = 'note') {
-  if (kind === 'task') { sheet('任务创建', '<p class="prose">手机原型保留任务查看、完成与恢复。新建任务的保存目标尚未接入，请在现有任务来源中创建。</p>'); return; }
+  if (kind === 'task') { taskToolsOpenEditor(); return; }
   kind = 'note';
   sheet(kind === 'task' ? '新建任务' : '速记', captureForm(kind));
   document.querySelector('#sheet #quick-text')?.focus({ preventScroll: true });

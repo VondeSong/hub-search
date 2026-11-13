@@ -4,6 +4,9 @@
 // Request identity and server/client phases remain distinct to make recovery reviewable.
 const AGENT_MODEL = 'gpt-6.1-sol';
 const AGENT_ACTIVE_PHASES = ['queued', 'accepted', 'running', 'stop_pending', 'unknown'];
+// These are separate contracts: source-service limits are not a promise that this
+// browser-only prototype uploads or analyses media.
+const AGENT_INPUT_LIMITS = Object.freeze({ serviceImages: 6, serviceImageMiB: 4, serviceTotalMiB: 12, serviceVideoSeconds: 30, demoImages: 3, demoImageMiB: 2 });
 let agentRuntimeTimer = null;
 let agentRuntimeStoragePaused = false;
 
@@ -13,7 +16,39 @@ function agentDocMaterial(docId) {
   const note = st.notes?.find(item => item.id === docId);
   if (!doc && !note) return null;
   return { id: 'doc-' + docId, kind: 'doc', docId, name: doc?.t || note?.title || '本地记录',
-    source: doc?.s || '本地记录', date: doc?.date || note?.date || '', text: doc?.body || note?.text || '', demo: Boolean(doc) };
+    source: doc?.s || '本地记录', date: doc?.date || note?.date || '', text: doc?.body || note?.text || '', demo: Boolean(doc),
+    materialType: doc ? 'doc' : 'note', route: 'doc/' + docId };
+}
+function agentMaterialFromRecord(record) {
+  if (!record || typeof record !== 'object') return null;
+  const type = record.type || record.kind || 'note';
+  if (!['doc', 'note', 'reading', 'task'].includes(type)) return null;
+  const id = String(record.id || record.recordId || '').trim();
+  if (!id || id.length > 180) return null;
+  if (type === 'doc') {
+    const known = agentDocMaterial(id);
+    if (known) return known;
+  }
+  const localNote = type === 'note' ? st.notes?.find(item => item.id === id) : null;
+  const name = String(record.title || record.name || record.t || localNote?.title || localNote?.text?.slice(0, 40) || '').trim();
+  if (!name) return null;
+  const target = String(record.route || '').replace(/^#/, '');
+  // A material can link only to a known local detail route, never an external URL
+  // or an injected delegated action. Text is rendered with esc() by the UI.
+  const route = /^(doc|note|article|task)\/[A-Za-z0-9_-]+$/.test(target) ? target : '';
+  return { id: 'material-' + type + '-' + encodeURIComponent(id), kind: 'material', materialType: type, recordId: id,
+    name, source: String(record.source || record.src || (type === 'task' ? '任务' : type === 'reading' ? '阅读' : '本地记录')),
+    date: String(record.date || localNote?.date || ''), text: String(record.body ?? record.text ?? localNote?.text ?? ''), route, demo: record.demo === true };
+}
+function agentMaterialCatalog() {
+  const catalog = Object.keys(docs).map(agentDocMaterial);
+  for (const note of st.notes || []) catalog.push(agentMaterialFromRecord({ type: 'note', id: note.id, title: note.title || note.text?.slice(0, 40) || '本地记录',
+    body: note.text, source: '本地记录', date: note.date, route: 'note/' + note.id }));
+  if (typeof reading !== 'undefined' && Array.isArray(reading)) for (const item of reading) {
+    catalog.push(agentMaterialFromRecord({ type: 'reading', id: item.id, title: item.t, body: item.body,
+      source: item.src, route: 'article/' + item.id, demo: true }));
+  }
+  return [...new Map(catalog.filter(Boolean).map(item => [item.id, item])).values()];
 }
 function agentSeedState() {
   const now = Date.now();
@@ -62,6 +97,7 @@ function initAgents() {
     thread.materials = Array.isArray(thread.materials) ? thread.materials : [];
     thread.messages = Array.isArray(thread.messages) ? thread.messages : [];
     thread.model = AGENT_MODEL;
+    thread.archivedAt = Number.isFinite(thread.archivedAt) && thread.archivedAt > 0 ? thread.archivedAt : null;
     if (thread.activeRunId && !state.runs[thread.activeRunId]) thread.activeRunId = null;
   }
   return state;
@@ -113,8 +149,67 @@ function agentCreateThread(context = {}) {
     const attachments = [...(Array.isArray(context.attachments) ? context.attachments : []), ...materials];
     agentState().threads.unshift({ id, title: context.title || (materials.length ? '关于 ' + materials[0].name : '新对话'), model: AGENT_MODEL,
       createdAt: now, updatedAt: now, messages: [], draft: context.prompt || context.draft || '', attachments, materials: [],
-      activeRunId: null, view: 'chat', origin: 'mobile' });
+      activeRunId: null, view: 'chat', origin: 'mobile', archivedAt: null });
     return { ok: true, threadId: id };
+  });
+}
+function agentRenameThread(threadId, value) {
+  const thread = agentThread(threadId);
+  if (!thread) return agentFailure('找不到这条对话。', 'missing');
+  if (agentState().connection.device === 'revoked') return agentFailure('请先恢复演示设备访问。', 'revoked');
+  const title = typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
+  if (!title || title.length > 80) return agentFailure('请输入 1–80 个字符的会话名称。', 'invalid');
+  return agentTransaction(() => {
+    thread.title = title; thread.titleCustom = true;
+    return { ok: true, threadId };
+  });
+}
+function agentArchiveThread(threadId, archived) {
+  const thread = agentThread(threadId);
+  if (!thread) return agentFailure('找不到这条对话。', 'missing');
+  if (agentState().connection.device === 'revoked') return agentFailure('请先恢复演示设备访问。', 'revoked');
+  const run = thread.activeRunId && agentState().runs[thread.activeRunId];
+  if (archived && run && AGENT_ACTIVE_PHASES.includes(run.phase)) return agentFailure('这轮仍在进行或待发送，请先完成、停止或撤回，再归档。', 'busy');
+  return agentTransaction(() => {
+    thread.archivedAt = archived ? Date.now() : null;
+    return { ok: true, threadId, archived: Boolean(archived) };
+  });
+}
+function agentAttachMaterials(threadId, selected) {
+  const thread = agentThread(threadId);
+  if (!thread) return agentFailure('找不到这条对话。', 'missing');
+  if (thread.archivedAt) return agentFailure('先恢复这条会话，再添加材料。', 'archived');
+  if (agentState().connection.device === 'revoked') return agentFailure('请先恢复演示设备访问。', 'revoked');
+  if (!Array.isArray(selected) || !selected.length) return agentFailure('请至少选择一份资料。', 'empty');
+  const materials = selected.filter(item => item && ['doc', 'material'].includes(item.kind) && typeof item.id === 'string' && typeof item.text === 'string');
+  if (materials.length !== selected.length) return agentFailure('所选资料已变化，请重新选择。', 'invalid');
+  return agentTransaction(() => {
+    let count = 0;
+    for (const item of materials) if (!thread.attachments.some(a => a.id === item.id)) {
+      thread.attachments.push(structuredClone(item)); count++;
+    }
+    return { ok: true, threadId, count };
+  });
+}
+function agentValidateDemoConnection(address, nickname) {
+  const serviceAddress = String(address || '').trim(), deviceNickname = String(nickname || '').replace(/\s+/g, ' ').trim();
+  if (!deviceNickname || deviceNickname.length > 40) return agentFailure('设备名需为 1–40 个字符，不要填写密码或密钥。', 'invalid');
+  if (/(?:\bsk-|bearer\s|api[_ -]?key|access[_ -]?token|-----BEGIN)/i.test(serviceAddress + ' ' + deviceNickname)) return agentFailure('请勿输入真实密钥、令牌或密码。本向导只使用演示地址与设备名。', 'secret');
+  let parsed;
+  try { parsed = new URL(serviceAddress); } catch { return agentFailure('请输入完整的 HTTPS 演示地址，例如 https://hub.example.test。', 'invalid'); }
+  const localHttp = parsed.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname);
+  if (parsed.protocol !== 'https:' && !localHttp) return agentFailure('请输入 HTTPS 地址；只有本机 localhost 可使用 HTTP。此处不会发送请求。', 'invalid');
+  if (parsed.username || parsed.password || parsed.search || parsed.hash) return agentFailure('地址不能携带账号、密码、查询参数或令牌。请只填写服务地址。', 'secret');
+  if (serviceAddress.length > 300) return agentFailure('服务地址过长，请使用不带凭据的服务地址。', 'invalid');
+  return { ok: true, profile: { serviceAddress: parsed.href, deviceNickname, demo: true } };
+}
+function agentSaveDemoConnection(profile) {
+  const validated = agentValidateDemoConnection(profile?.serviceAddress, profile?.deviceNickname);
+  if (!validated.ok) return validated;
+  return agentTransaction(() => {
+    agentState().setup = { ...validated.profile, testedAt: Date.now(), pairedAt: Date.now() };
+    agentState().connection.device = 'active';
+    return { ok: true, demo: true };
   });
 }
 function agentDemoAnswer(thread, prompt, attachments) {
@@ -150,6 +245,7 @@ function agentAttempt(run, now) {
 function agentSend(threadId) {
   const thread = agentThread(threadId);
   if (!thread) return agentFailure('找不到这条对话。', 'missing');
+  if (thread.archivedAt) return agentFailure('这条会话已归档。恢复后可以继续提问。', 'archived');
   const active = thread.activeRunId && agentState().runs[thread.activeRunId];
   if (active && AGENT_ACTIVE_PHASES.includes(active.phase)) {
     if (!thread.draft.trim() && !thread.attachments.length) return { ok: true, reused: true, threadId, runId: active.id };
@@ -168,7 +264,7 @@ function agentSend(threadId) {
     thread.messages.push({ id: userMessageId, role: 'user', text: text || '请查看本轮选择的材料。', at: now, attachments, runId });
     thread.messages.push({ id: messageId, role: 'assistant', text: '', at: now, attachments: [], runId, citations: reply.citations, demo: true });
     for (const item of attachments) if (!thread.materials.some(material => material.id === item.id)) thread.materials.push(structuredClone(item));
-    if (thread.title === '新对话') thread.title = (text || attachments[0]?.name || '材料问答').replace(/\s+/g, ' ').slice(0, 25);
+    if (thread.title === '新对话' && !thread.titleCustom) thread.title = (text || attachments[0]?.name || '材料问答').replace(/\s+/g, ' ').slice(0, 25);
     thread.draft = ''; thread.attachments = []; thread.activeRunId = runId; thread.updatedAt = now;
     agentAttempt(run, now);
     return { ok: true, threadId, runId, phase: run.phase };

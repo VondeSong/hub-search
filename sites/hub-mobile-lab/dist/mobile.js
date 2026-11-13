@@ -32,9 +32,9 @@ function appearancePage() {
 }
 function settingsPage() {
   return intro('设置', '连接、数据与阅读偏好。') +
-    section('数据', group(row('Agents 云端连接', '云端会话、订阅与设备情景演示', 'cloud', 'go:agent-connection') + row('同步状态与范围', '速记、阅读、闪卡与异常重试', 'sync', 'go:sync') + row('资料库', '查看来源，选择搜索范围', 'folder', 'go:libraries'))) +
+    section('数据', group(row('连接总览', '内容同步与 Agents 会话分别查看', 'cloud', 'go:connections') + row('同步状态与范围', '速记、阅读、闪卡与异常重试', 'sync', 'go:sync') + row('资料库', '资料库、空间与分组的多选范围', 'folder', 'go:libraries'))) +
     section('偏好', group(row('外观与阅读', '页面底色、字号与透明效果', 'settings', 'go:appearance'))) +
-    section('关于', group(row('后续功能', '洞察、桌面协作与工作专题', 'spark', 'go:future'))) +
+    section('关于', group(row('后续功能', '桌面协作、工作专题与历史演示', 'spark', 'go:future') + row('功能与边界', '已实现交互、演示能力与后续验收', 'info', 'go:guide'))) +
     '<p class="settings-note">手机交互原型。记录与附件保存在当前浏览器，不读取实际云连接，不写入个人 OS。</p><div class="actions">' + plain('重置演示数据','reset') + '</div>';
 }
 function mobileHandleAction(a, k) {
@@ -58,7 +58,8 @@ function mobileHandleAction(a, k) {
   if (a === 'clear-query') { query = ''; render(); $('#query')?.focus(); mobileRememberView(); return true; }
   if (a === 'clear-search') { query = ''; source = '全部资料库'; searchDate = '不限日期'; searchFolder = '全部分组'; searchType = '全部类型'; render(); mobileRememberView(); return true; }
   if (a === 'doc-source') {
-    const local = st.notes.find(n => n.id === k), d = docs[k];
+    const noteOnly = route()[0] === 'note' || k.startsWith('note/'), id = k.startsWith('note/') ? k.slice(5) : k;
+    const d = noteOnly ? null : docs[id], local = d ? null : st.notes.find(n => n.id === id);
     sheet('资料出处', '<p class="prose">' + esc(d ? d.s + ' · ' + d.t : local?.title || '本地快速记录') + '</p><p class="info">' + (d ? '这是一份示例资料，保留了来源与日期，没有连接真实资料库。' : '此内容由你保存在当前浏览器。') + '</p>' + (local?.url && /^https?:\/\//i.test(local.url) ? '<p class="prose"><a href="' + esc(local.url) + '" target="_blank" rel="noopener noreferrer">打开保存的链接 ' + ico('link', 16) + '</a></p>' : ''));
     return true;
   }
@@ -69,7 +70,8 @@ function mobileHandleAction(a, k) {
   }
   if (a === 'reader-star') { st.stars[k] = !(st.stars[k] ?? k === 'd3'); close(); changed(st.stars[k] ? '已收藏' : '已取消收藏'); return true; }
   if (a === 'copy-doc') {
-    const d = docs[k], local = st.notes.find(n => n.id === k);
+    const noteOnly = k.startsWith('note/') || route()[0] === 'note', id = k.startsWith('note/') ? k.slice(5) : k;
+    const d = noteOnly ? null : docs[id], local = d ? null : st.notes.find(n => n.id === id);
     const text = d ? d.t + '\n\n' + d.body : local?.text || '';
     if (!navigator.clipboard?.writeText) { sheet('复制正文', '<div class="field"><label for="copy-text">长按文字即可选择并复制</label><textarea id="copy-text" readonly>' + esc(text) + '</textarea></div>'); return true; }
     navigator.clipboard.writeText(text).then(() => { close(); tell('正文已复制'); }).catch(() => { sheet('复制正文', '<p class="fine">浏览器未允许直接复制。可以选择下方文字。</p><div class="field"><label for="copy-text">正文</label><textarea id="copy-text" readonly>' + esc(text) + '</textarea></div>'); });
@@ -133,24 +135,28 @@ function mobileUpdateViewport() {
 }
 function mobileRememberView() {
   clearTimeout(mobileViewTimer);
-  mobileViewTimer = setTimeout(() => {
-    try { sessionStorage.setItem('hub-mobile-view-v2', JSON.stringify({ query, source, searchDate, searchType, searchFolder, readingQuery, readingFilter, readingSource, readingView, taskFilter, taskDate, filter, scrolls: { ...scrolls, [activeRoute]: pageScroll() } })); } catch {}
-  }, 120);
+  mobileViewTimer = setTimeout(mobileWriteView, 120);
+}
+function mobileWriteView() {
+  try { sessionStorage.setItem('hub-mobile-view-v2', JSON.stringify({ query, source, searchDate, searchType, searchFolder, readingQuery, readingFilter, readingSource, readingView, taskFilter, taskDate, taskTools: typeof taskToolsViewState==='function'?taskToolsViewState():undefined, agentListQuery, agentListScope, filter, scrolls: { ...scrolls, [activeRoute]: pageScroll() } })); } catch {}
 }
 function mobileRestoreView() {
   try {
     const v = JSON.parse(sessionStorage.getItem('hub-mobile-view-v2') || '{}');
     if (typeof v.query === 'string') query = v.query;
-    if (['全部资料库', 'Craft', 'Obsidian', '本地记录'].includes(v.source)) source = v.source;
-    if (['不限日期', '11 月', '10 月'].includes(v.searchDate)) searchDate = v.searchDate;
-    if (['全部类型', '笔记', 'PDF', '链接'].includes(v.searchType)) searchType = v.searchType;
-    if (['全部分组', ...labels].includes(v.searchFolder)) searchFolder = v.searchFolder;
+    if (WORKSPACE_SOURCES.includes(v.source)) source = v.source;
+    if (WORKSPACE_DATES.includes(v.searchDate)) searchDate = v.searchDate;
+    if (WORKSPACE_TYPES.includes(v.searchType)) searchType = v.searchType;
+    if (['全部分组', ...allMobileLabels()].includes(v.searchFolder)) searchFolder = v.searchFolder;
     if (typeof v.readingQuery === 'string') readingQuery = v.readingQuery;
     if (['全部', '未读', '阅读中', '已读'].includes(v.readingFilter)) readingFilter = v.readingFilter;
     if (['全部来源', ...reading.map(x => x.src)].includes(v.readingSource)) readingSource = v.readingSource;
     if (['全部内容', '继续阅读', '离线内容'].includes(v.readingView)) readingView = v.readingView;
     if (['待办', '已完成', '全部'].includes(v.taskFilter)) taskFilter = v.taskFilter;
-    if (['所有日期', '今天', '明天', '昨天'].includes(v.taskDate)) taskDate = v.taskDate;
+    if (['所有日期', '今天', '明天', '昨天', '已逾期', '未来7天', '未安排'].includes(v.taskDate)) taskDate = v.taskDate;
+    if(typeof taskToolsRestoreView==='function')taskToolsRestoreView(v.taskTools);
+    if(typeof v.agentListQuery==='string')agentListQuery=v.agentListQuery;
+    if(['active','archived','all'].includes(v.agentListScope))agentListScope=v.agentListScope;
     if (['待关注', '稍后', '已处理', '待复核'].includes(v.filter)) filter = v.filter;
     if (v.scrolls && typeof v.scrolls === 'object') for (const [key, value] of Object.entries(v.scrolls)) if (Number.isFinite(value) && value >= 0) scrolls[key] = value;
   } catch {}
@@ -172,6 +178,7 @@ function setupMobile() {
   });
   document.addEventListener('click', mobileRememberView);
   addEventListener('scroll', mobileRememberView, { passive: true });
+  addEventListener('pagehide', mobileWriteView);
   const dialog = $('#sheet');
   let backdropDown = false;
   dialog.addEventListener('pointerdown', e => { const r = dialog.getBoundingClientRect(); backdropDown = e.target === dialog && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom); });

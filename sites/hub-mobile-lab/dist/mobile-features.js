@@ -209,10 +209,11 @@ function syncJournalDemo() {
 function mobileBrowsePage() {
   return intro('浏览','从记录、阅读和收藏接着往下走。') +
     section('你的内容',group(row('日志','按天回看速记与日记','calendar','go:logs')+row('阅读','X、Telegram 与滴答稍后读','book','go:reading')+row('收藏','保存的页面与内容','star','go:favorites')+row('最近浏览','回到刚打开的资料','clock','go:recent')+row('标签','查找资料与新写的速记','tag','go:tags'))) +
-    section('数据',group(row('Agents','云端会话 · 文字、图片与继续追问','chat','go:agents')+row('资料库','选择搜索范围','folder','go:libraries')+row('同步状态','查看速记上传与电脑写入演示','sync','go:sync')));
+    section('发现与回看',group(row('洞察','有依据的发现、核对与下一步 · 演示','spark','go:insights','purple'))) +
+    section('数据',group(row('资料库','多选资料库、空间与分组','folder','go:libraries')+row('连接总览','内容同步和 Agents 会话分别查看','cloud','go:connections')));
 }
 function futurePage() {
-  return intro('后续功能','这些方向保留规划，暂不加入手机主流程。') + section('尚未接入安卓',group(row('洞察与阶段回顾','查看既有交互演示；不运行真实分析','spark','go:insights')+row('桌面协作与工作专题','提交、等待和回执的历史演示','chat','go:works')+row('桌面成果同步演示','查看原有请求和桌面离线流程','sync','go:collab-sync'))) + '<p class="settings-note">移动端 Agents 的远程执行与共享会话另有规划；下方保留早期桌面成果演示；云端 Agents 会话原型仍可从顶部或浏览进入。它们均未连接真实服务。</p>';
+  return intro('后续功能','桌面协作与阶段回顾保留交互演示。') + section('尚未接入本原型的真实服务',group(row('阶段回顾','查看既有交互演示；不运行真实分析','spark','go:recap')+row('桌面协作与工作专题','提交、等待和回执的历史演示','chat','go:works')+row('桌面成果同步演示','查看原有请求和桌面离线流程','sync','go:collab-sync'))) + '<p class="settings-note">洞察现可从浏览直接进入；Agents 是独立主入口。本站仍只演示交互，不代表 Android / VPS 的同名功能已接通。</p>';
 }
 function allReviewCards() { return [...cards, ...(st.customCards || [])]; }
 function reviewDecks() { return [...new Set(allReviewCards().map(c=>c.deck))]; }

@@ -1,0 +1,20 @@
+/* The fifth primary destination uses the same quiet control material. */
+.tabs { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.search-count { margin: 16px 2px 2px; color: var(--muted); font-size: 13px; }
+.workspace-insights { margin-block: 24px 4px; }
+.scope-tree { padding: 0; border: 0; margin: 0 0 20px; }
+.scope-library { border-bottom: 1px solid var(--line-soft); padding-block: 6px; }
+.scope-library summary { min-height: 44px; padding: 11px 2px; cursor: pointer; font-weight: 600; }
+.scope-library summary small { margin-left: 8px; font-weight: 400; color: var(--muted); font-size: 11px; }
+.scope-toolbar { display:flex; gap:20px; margin-bottom:6px; }
+.scope-parent { color:var(--muted); font-size:13px; }
+.scope-leaf { padding-left:20px; }
+.scope-leaf span { flex:1; min-width:0; }
+.scope-leaf small { color:var(--muted); }
+.reader-toolbar { flex-wrap:wrap; }
+.reader-toolbar .plain { min-height:44px; }
+.workspace-reading-actions { margin-top:18px; }
+@media (max-width:360px) {
+  .tab { font-size:11px; }
+  .scope-library summary small { display:block; margin:4px 0 0 16px; }
+}
