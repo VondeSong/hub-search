@@ -8,6 +8,7 @@ import {InsightCases} from "./InsightCases";
 import {StageReview} from "./StageReview";
 import {InsightRecall} from "./InsightRecall";
 import {InsightDiscovery} from "./InsightDiscovery";
+import {InsightMethods} from "./InsightMethods";
 import type {Insight,InsightCandidates,InsightDelivery,InsightEvent,InsightSource} from "./InsightTypes";
 import type {WorkSummary} from "./AgentConversationHistoryData";
 import {AgentPanelContext} from "./StandaloneAgentLauncher";
@@ -19,7 +20,7 @@ const stateNames={attention:"待关注",later:"稍后",done:"已处理"};
 const validityNames={available:"依据已核对",review:"待复核",unavailable:"来源不可用"};
 const reviewNatureNames={fact:"资料陈述",selfReported:"用户自述",coOccurrence:"共同出现",inference:"模型推测"};
 const inputNatureNames:Record<string,string>={selfReport:"本人记录",repost:"转贴材料",quotation:"引用他人",unknown:"性质未明确"};
-const reasonNames:Record<string,string>={sourceChanged:"资料内容已变化",sourceUnavailable:"资料已删除或撤回访问",feedback:"有待处理的用户纠正",restore:"恢复后需要核对来源",userContextChanged:"已采用的用户补充发生变化",reviewDependencyChanged:"回顾的材料、窗口或覆盖发生变化"};
+const reasonNames:Record<string,string>={methodContextChanged:"分析方法或工作约定已变化",sourceChanged:"资料内容已变化",sourceUnavailable:"资料已删除或撤回访问",feedback:"有待处理的用户纠正",restore:"恢复后需要核对来源",userContextChanged:"已采用的用户补充发生变化",reviewDependencyChanged:"回顾的材料、窗口或覆盖发生变化"};
 const time=(at:number)=>new Intl.DateTimeFormat("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}).format(at);
 type Data=ReturnType<typeof useInsights>;
 
@@ -63,10 +64,10 @@ function ResultPicker({data,target,onClose,onOpenWork}:{data:Data;target?:Insigh
   <div className="insights-picker-body" ref={pickerBody} onScroll={e=>{if(!loading)pickerScroll.current=e.currentTarget.scrollTop;}} aria-busy={loading}>{loading?<p role="status">正在核对成果和当前依据…</p>:!workId?<p>尚无可选择的事项。先在 Hub 助手中分析授权资料，明确要求“给出有依据的结构化发现”。</p>:!deliveryId?<p>该事项尚无已发布成果，可在原事项中继续。</p>:candidates?.reason?<p role="status">{candidates.reason}</p>:candidates?.candidates.map(candidate=><div className="insights-candidate" key={candidate.findingPointer}>
    {candidate.eligibility==="unavailable"?<p className="insights-notice">{candidate.reason}</p>:<><label><input type={target?"radio":"checkbox"} name="insightCandidate" checked={selected.includes(candidate.findingPointer)} onChange={()=>{setSelected(target?[candidate.findingPointer]:toggle(selected,candidate.findingPointer));setChecked(false);}}/><span className="insights-candidate-text"><ReactMarkdown skipHtml allowedElements={["strong","em","code","br"]} unwrapDisallowed>{candidate.text}</ReactMarkdown></span></label>
     {candidate.reviewDependency&&<div className="insights-notice"><p>{reviewNatureNames[candidate.reviewDependency.nature]} · 回顾依据</p>{candidate.reviewDependency.dependencies.filter(d=>d.kind==="userInput").map((d,i)=><blockquote key={i}>{d.quote}<small>{inputNatureNames[d.nature??"unknown"]} · 版本 {d.version}</small></blockquote>)}</div>}
-    <div className="insights-source-list">{candidate.sourceCitations?.map((source,index)=><details key={index}><summary><FileText size={14}/>{source.excerpt.title} · 已核对版本</summary><blockquote>{source.quote}</blockquote><small>{source.excerpt.sourcePath} · 第 {source.excerpt.startChar+1}–{source.excerpt.endChar} 字符</small></details>)}</div></>}
+    <InsightMethods entries={candidate.methodDependencies}/><div className="insights-source-list">{candidate.sourceCitations?.map((source,index)=><details key={index}><summary><FileText size={14}/>{source.excerpt.title} · 已核对版本</summary><blockquote>{source.quote}</blockquote><small>{source.excerpt.sourcePath} · 第 {source.excerpt.startChar+1}–{source.excerpt.endChar} 字符</small></details>)}</div></>}
    </div>)}
    {!!candidates?.candidates.some(v=>v.eligibility==="verifiedSources")&&<fieldset className="insights-background"><legend>影响判断的共同背景（如有）</legend><p>这里只列出本次成果实际读取且当前可用的材料；按选中发现的实际依赖选择。</p>{candidates.contextOptions?.map(context=><label key={context.evidenceId}><input type="checkbox" checked={contexts.includes(context.evidenceId)} onChange={()=>{setContexts(toggle(contexts,context.evidenceId));setChecked(false);}}/>{context.title}</label>)}
-    <label className="insights-confirm"><input type="checkbox" checked={checked} onChange={e=>setChecked(e.target.checked)}/>已核对所选发现的直接依据和必要背景</label></fieldset>}
+    <label className="insights-confirm"><input type="checkbox" checked={checked} onChange={e=>setChecked(e.target.checked)}/>已核对所选发现的直接依据、必要背景和分析方法</label></fieldset>}
    {!!pendingFeedback.length&&<fieldset className="insights-background"><legend>这次成果已按哪些补充修正</legend><p>只选择本次实际送入运行、并已在新结论中处理的补充；未选项继续待复核。</p>{pendingFeedback.map(f=><label key={f.id}><input type="checkbox" checked={feedbacks.includes(f.id)} onChange={()=>setFeedbacks(toggle(feedbacks,f.id))}/>{f.body?.text}</label>)}</fieldset>}
   </div>
   {error&&<p className="insights-error" role="alert">{error}</p>}{saved>0&&<p role="status">已保存 {saved} 条；重复选择不会新增发现或重置状态。</p>}
@@ -93,7 +94,7 @@ function InsightDetail({data,item,onClose,onUpdate,onOpenWork,inline=false,onPre
     <section className="insights-review-outcome">{item.snapshot.reviewOutcome&&<details><summary>{item.snapshot.reviewOutcome.kind==="maintain"?"本次核对：维持原判断":"本次核对：采用修订"}</summary><p className="insights-muted">对照修订 {item.snapshot.reviewOutcome.previousRevision}；原判断与本次新依据均在历史中保留。</p><ReactMarkdown skipHtml allowedElements={["p","strong","em","code","br","ul","ol","li","blockquote"]} unwrapDisallowed>{item.snapshot.reviewOutcome.comparison}</ReactMarkdown></details>}</section><div className="insights-detail-actions"><button type="button" onClick={()=>onOpenWork(item.workId)}><ArrowUpRight size={15}/>原事项</button><button type="button" disabled={!current||data.busy} onClick={()=>void act("insightFollow",{followed:!item.followed})}><Star size={15}/>{item.followed?"不再关注":"重新关注"}</button><button type="button" disabled={!current||data.busy} onClick={onUpdate}><RefreshCw size={15}/>选择新成果更新</button></div>
     {item.snapshot.reviewDependency&&<section><h4>回顾依据 · {{fact:"资料陈述",selfReported:"用户自述",coOccurrence:"共同出现",inference:"模型推测"}[item.snapshot.reviewDependency.nature]}</h4><p className="insights-muted">性质保留于保存时；“依据已核对”表示出处可用。</p>{item.snapshot.reviewDependency.dependencies.filter(d=>d.kind==="userInput").map((d,i)=><blockquote key={i}>{d.quote}<small>贴入材料 · {inputNatureNames[d.nature??"unknown"]} · 版本 {d.version}</small></blockquote>)}</section>}
     {current&&<label>发现视角<select aria-label="发现视角" value={item.perspective??""} disabled={data.busy} onChange={e=>void act("insightPerspective",{perspective:e.target.value})}><option value="">未指定</option><option value="knowledge">知识与工作</option><option value="life">生活与进展</option><option value="decision">决定与变化</option></select></label>}
-    <h4>资料依据</h4><p className="insights-muted">保存时的精确引文；查看原文时会再次核对当前权限和版本。</p>
+    <InsightMethods entries={item.snapshot.methodDependencies}/><h4>资料依据</h4><p className="insights-muted">保存时的精确引文；查看原文时会再次核对当前权限和版本。</p>
     <div className="insights-source-list">{item.snapshot.sourceCitations.map((citation,index)=><article key={index}><strong>{citation.excerpt.title}</strong><blockquote>{citation.quote}</blockquote><button type="button" disabled={data.busy} onClick={()=>void data.source(item,index).then(setSource).catch(e=>setError(String(e)))}>查看引用原文 <ArrowUpRight size={13}/></button></article>)}</div>
     {!!item.snapshot.contextDependencies.length&&<section><h4>共同背景</h4>{item.snapshot.contextDependencies.map((context,index)=><p key={index}>{context.excerpt.title}</p>)}</section>}
     {!!item.snapshot.userContextRefs.length&&<section><h4>已采用的用户补充</h4>{item.snapshot.userContextRefs.map(ref=><blockquote key={ref.feedbackId}>{ref.text}<small>用户自述 · 经明确确认采用</small></blockquote>)}</section>}

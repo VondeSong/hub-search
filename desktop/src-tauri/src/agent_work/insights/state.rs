@@ -146,6 +146,9 @@ fn access(root: &Path, c: &Connection, item: &Value, snap: &Value) -> bool {
     if !review::accessible(c, &work, &snap["reviewDependency"]) {
         return false;
     }
+    if !methods::accessible(root, &work, &snap["methodDependencies"]) {
+        return false;
+    }
     let Ok(reader) = current_reader(root, &work) else {
         return false;
     };
@@ -207,6 +210,18 @@ fn reconcile(root: &Path, c: &Connection, mut item: Value, now: i64) -> Result<V
     let operation = format!("check-{}", crate::random_url_safe(18));
     let mut active = reasons(&item)?;
     if let Ok(work) = work_on(c, item["workId"].as_str().unwrap()) {
+        if methods::verify(root, &work, &snap["methodDependencies"]).is_err() {
+            open_reason(
+                &mut active,
+                "methodContext",
+                "methodContextChanged",
+                json!({}),
+                item["headRevision"].as_i64().unwrap(),
+                &operation,
+            );
+        } else {
+            close_reason(&mut active, "methodContext", &operation);
+        }
         if !snap["reviewDependency"].is_null() {
             if review::verify_dependencies(root, c, &work, &snap["reviewDependency"]).is_err() {
                 open_reason(
@@ -568,6 +583,11 @@ fn ui_on(root: &Path, c: &Connection, args: &Value, now: i64) -> Result<Value, S
                 let comparison = candidate["text"].clone();
                 let origin = candidate["origin"].clone();
                 if outcome == "maintain" {
+                    methods::verify(root, &work, &previous["methodDependencies"])?;
+                    let method_dependencies = methods::merge(
+                        &previous["methodDependencies"],
+                        &candidate["methodDependencies"],
+                    )?;
                     if !previous["reviewDependency"].is_null()
                         || !candidate["reviewDependency"].is_null()
                     {
@@ -583,6 +603,7 @@ fn ui_on(root: &Path, c: &Connection, args: &Value, now: i64) -> Result<Value, S
                         .cloned()
                         .collect::<Vec<_>>();
                     candidate = previous.clone();
+                    candidate["methodDependencies"] = method_dependencies;
                     for addition in additions {
                         let contexts = candidate["contextDependencies"]
                             .as_array_mut()
@@ -621,7 +642,9 @@ fn ui_on(root: &Path, c: &Connection, args: &Value, now: i64) -> Result<Value, S
             if r["active"] == true
                 && matches!(
                     r["kind"].as_str(),
-                    Some("sourceChanged" | "sourceUnavailable" | "restore")
+                    Some(
+                        "sourceChanged" | "sourceUnavailable" | "restore" | "methodContextChanged"
+                    )
                 )
             {
                 r["active"] = json!(false);

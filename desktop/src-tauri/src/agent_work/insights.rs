@@ -6,6 +6,7 @@ mod analysis;
 mod discovery;
 #[cfg(all(test, windows))]
 mod live;
+mod methods;
 mod recall;
 pub(super) mod review;
 mod state;
@@ -160,7 +161,8 @@ fn candidates_on(root: &Path, c: &Connection, work: &Work, record: &str) -> Resu
             .get("artifactRefs")
             .is_some_and(|v| !v.is_null() && v != &json!([]) && v != &json!({}));
     // Backgrounds cannot be guessed from the report's global evidence inventory.
-    let memory: bool = c.query_row("SELECT EXISTS(SELECT 1 FROM agent_records WHERE run_id=?1 AND (kind IN ('topicMethodUse','nativeImages') OR (kind='libraryRules' AND (json_type(body_json)!='array' OR EXISTS(SELECT 1 FROM json_each(body_json) WHERE COALESCE(json_array_length(value,'$.entries'),1)>0))) OR (kind='sharedMemoryUse' AND COALESCE(json_array_length(body_json,'$.items'),1)>0) OR (kind='toolResult' AND (json_extract(body_json,'$.kind')='skillInstructions' OR json_extract(body_json,'$.value.kind')='skillInstructions'))))",[&run],|r|r.get(0)).map_err(|e|e.to_string())?;
+    let memory: bool = c.query_row("SELECT EXISTS(SELECT 1 FROM agent_records WHERE run_id=?1 AND (kind IN ('topicMethodUse','nativeImages') OR (kind='sharedMemoryUse' AND COALESCE(json_array_length(body_json,'$.items'),1)>0)))",[&run],|r|r.get(0)).map_err(|e|e.to_string())?;
+    let method_context = methods::capture(root, c, work, &run, record);
     let image_context = !work.grant.images.is_empty();
     let mut candidates = Vec::new();
     for (index, finding) in findings.iter().enumerate() {
@@ -169,6 +171,7 @@ fn candidates_on(root: &Path, c: &Connection, work: &Work, record: &str) -> Resu
             if complex_context || memory || image_context {
                 return Err("该成果含尚未接入的背景或派生材料，需先确认单条依赖".to_string());
             }
+            let methods = method_context.as_ref().map_err(|e| e.clone())?;
             let text = finding["text"]
                 .as_str()
                 .filter(|s| !s.trim().is_empty() && s.chars().count() <= 6000)
@@ -228,7 +231,7 @@ fn candidates_on(root: &Path, c: &Connection, work: &Work, record: &str) -> Resu
                 }
             }
             Ok::<_, String>(
-                json!({"findingPointer":pointer,"text":text,"sourceCitations":sources,"reviewDependency":review,"eligibility":"verifiedSources","requiresDependencyConfirmation":true}),
+                json!({"findingPointer":pointer,"text":text,"sourceCitations":sources,"methodDependencies":methods,"reviewDependency":review,"eligibility":"verifiedSources","requiresDependencyConfirmation":true}),
             )
         })();
         candidates.push(match checked {
