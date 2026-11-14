@@ -849,9 +849,16 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     if (!view) return;
     if (action === "revoke") { clearSourcePreview(); await businessAction({action}); return; }
     setBusy(true); setError("");
-    setStopping(true); cancelResponse.current=true;
+    setStopping(true);
     try {
-      const value = await call<View>({ action, id: view.work.id, ...(view.lifecycle ? lifecycleRequest(view.lifecycle,crypto.randomUUID()) : {}) });
+      const current = view.lifecycle ? await refresh(view.work.id) : view;
+      if (!alive.current) return;
+      if (action === "cancel" && view.lifecycle) {
+        if (view.lifecycle.activeRunId && current.lifecycle?.activeRunId && view.lifecycle.activeRunId !== current.lifecycle.activeRunId) throw new Error("运行已改变，请核对当前这一轮后再停止");
+        if (!current.runActive && !current.lifecycle?.activeRunId) return;
+      }
+      cancelResponse.current=true;
+      const value = await call<View>({ action, id: current.work.id, ...(current.lifecycle ? lifecycleRequest(current.lifecycle,crypto.randomUUID()) : {}) });
       sequence.current++;
       if (alive.current) setView(value);
     } catch (reason) { if (alive.current) { setError(String(reason)); setStopping(false); } }
@@ -1232,7 +1239,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
           <button type="button" className="agent-current-page agent-skill-shortcut" aria-label="添加技能" title="技能：选择本次使用的处理方法" disabled={busy || (!!active && !steerable)} onClick={()=>{setAddPage("skills");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}><WandSparkles size={18} aria-hidden="true"/></button>
           {textMaterials?.selection&&<button type="button" className="agent-current-page agent-selection-tool" aria-label="添加所选文字" title="添加所选文字（文字快照，不是区块）" disabled={busy||filePreparing||!!view?.work.grant.manifest} onMouseDown={event=>event.preventDefault()} onClick={()=>{addTextMaterial(textMaterials.selection!);textMaterials.clearSelection();}}><Quote size={18}/></button>}
             <AgentAssistantOptions value={(view ? view.assistantOptions || defaultAssistantOptions : assistantOptions)} disabled={busy || !!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
-            {active && <button className="agent-send" type="button" aria-label="停止本轮" title="停止本轮" disabled={busy || stopping} onClick={()=>void mutate("cancel")}><Square size={13} fill="currentColor" aria-hidden="true" /></button>}
+            {active && <button className="agent-send" type="button" aria-label="停止本轮" title="停止本轮" disabled={busy || stopping || !!view?.lifecycle && !view.lifecycle.activeRunId} onClick={()=>void mutate("cancel")}><Square size={13} fill="currentColor" aria-hidden="true" /></button>}
             {(!active || !!goal.trim() || !!materials.length || !!dropped.length || !!snippets.length || !!imageChanges.addImages.length) && <button className="agent-send" type="submit" aria-label={tagMode&&!active?tagTaskNames[tagPreparation.task]:saveOnly&&!active?"保存补充":"发送"} aria-keyshortcuts="Control+Enter Meta+Enter" title="发送" disabled={busy || filePreparing || stopping || !!removals.length || (!goal.trim()&&!materials.length&&!dropped.length&&!snippets.length&&!imageChanges.addImages.length&&!(tagMode&&tagPreparation.tag))}><ArrowUp size={19} /></button>}
           </div>
           {filePreparing&&<p className="agent-composer-note" role="status">正在准备附件，可继续输入…</p>}{saveOnly&&!active&&<p className="agent-composer-note">保存补充，不启动运行</p>}

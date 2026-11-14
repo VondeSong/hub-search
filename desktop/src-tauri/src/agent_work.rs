@@ -561,6 +561,13 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
 }
 
 pub(crate) async fn ui_app(app: tauri::AppHandle, args: Value) -> Result<Value, String> {
+    #[cfg(feature = "integration-agent-acceptance")]
+    if matches!(
+        args["action"].as_str(),
+        Some("mcpAcceptanceConfig" | "mcpAcceptanceCheckpoint" | "mcpAcceptanceExit")
+    ) {
+        return crate::agent_acceptance::mcp_channel::ui(&app, &args);
+    }
     if matches!(
         args["action"].as_str(),
         Some(

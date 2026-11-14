@@ -72,6 +72,11 @@ fn completion_distinguishes_run_settlement_and_goal_fulfillment_and_reopens() {
     )
     .unwrap();
     let changed = view(&f.root, &work.id).unwrap();
+    let stale_save =
+        answer_save_context(&f.root, &f.c(), &load(&f.c(), &work.id).unwrap(), &next_run)
+            .unwrap_err();
+    assert!(stale_save.contains("用户要求已更新"));
+    assert!(!stale_save.contains("图表版本"));
     assert_eq!(changed["goalAssessment"]["workFulfillment"], "partial");
     assert_eq!(
         changed["goalAssessment"]["requirements"]

@@ -2,6 +2,7 @@
 //! The frontend, IPC, Suite, archive planner/executor and receipts remain real.
 use crate::*;
 use sha2::{Digest, Sha256};
+pub(crate) mod mcp_channel;
 mod model_runtime;
 mod sources;
 pub(crate) use model_runtime::start as start_model_runtime;
@@ -48,6 +49,9 @@ pub(crate) fn allows_url(url: &Url) -> bool {
     fixture().ok().flatten().as_ref() == Some(url)
 }
 pub(crate) fn prepare(app: &AppHandle) -> Result<(), String> {
+    if mcp_channel::prepare(app)? {
+        return Ok(());
+    }
     if sources::prepare(app)? {
         return Ok(());
     }

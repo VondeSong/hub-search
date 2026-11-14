@@ -173,6 +173,45 @@ function deferred<T>() {
 }
 
 describe("assistant refinement integration", () => {
+  it("waits for the admitted run before enabling stop and refreshes its control identity before cancelling",async()=>{
+    const pending=deferred<ReturnType<typeof makeView>>();
+    const lifecycle=(activeRunId:string|null,controlRevision:number,state="running")=>({schemaVersion:1,controlRevision,workRevision:current.work.revision,activeRunId,state,requiresExplicitResume:false,canResume:false,recoveryMode:"fresh",runsUsed:1,runLimit:null,unresolvedActions:0,reason:"",recordedUsage:{}});
+    Object.assign(current,{lifecycle:lifecycle(null,1,"ready")});
+    list=async()=>({works:[{id:current.work.id,goal:current.work.goal,state:current.work.state}],nextCursor:null});
+    invoke.mockImplementation(async(command,payload)=>{
+      const args=payload?.args;
+      if(args?.action==="respond")return pending.promise;
+      if(args?.action==="cancel"){
+        expect(args).toMatchObject({expectedControlRevision:3,expectedRunId:"admitted-run",expectedWorkRevision:current.work.revision});
+        Object.assign(current,{work:{...current.work,state:"paused"},runActive:false,lifecycle:{...lifecycle(null,4,"paused"),requiresExplicitResume:true,canResume:true}});
+        return current;
+      }
+      const value=await native(command,payload);
+      if(args?.action==="message")Object.assign(current,{lifecycle:lifecycle(null,1,"ready")});
+      return value;
+    });
+    await render(<StandaloneInvestigation initiallyOpen/>);
+    await submit("开始后立即停止的回归");
+    expect(select<HTMLButtonElement>('[aria-label="停止本轮"]').disabled).toBe(true);
+    current=Object.assign({...current},{work:{...current.work,state:"investigating"},runActive:true,lifecycle:lifecycle("admitted-run",2)});
+    await act(async()=>{await new Promise(resolve=>setTimeout(resolve,1600));});
+    const stop=select<HTMLButtonElement>('[aria-label="停止本轮"]');expect(stop.disabled).toBe(false);
+    current=Object.assign({...current},{lifecycle:lifecycle("admitted-run",3)});
+    await activate(stop);
+    expect(calls("cancel")).toHaveLength(1);
+    await act(async()=>pending.resolve(current));
+    expect(document.body.textContent).toContain("本轮已停止");
+  });
+  it("does not cancel a different run that replaced the one shown when stop was clicked",async()=>{
+    const lifecycle=(activeRunId:string,controlRevision:number)=>({schemaVersion:1,controlRevision,workRevision:current.work.revision,activeRunId,state:"running",requiresExplicitResume:false,canResume:false,recoveryMode:"fresh",runsUsed:1,runLimit:null,unresolvedActions:0,reason:"",recordedUsage:{}});
+    Object.assign(current,{work:{...current.work,state:"investigating"},runActive:true,lifecycle:lifecycle("shown-run",1)});
+    list=async()=>({works:[{id:current.work.id,goal:current.work.goal,state:current.work.state}],nextCursor:null});
+    await render(<StandaloneInvestigation initiallyOpen/>);
+    current=Object.assign({...current},{lifecycle:lifecycle("replacement-run",2)});
+    await activate(select<HTMLButtonElement>('[aria-label="停止本轮"]'));
+    expect(calls("cancel")).toHaveLength(0);
+    expect(document.body.textContent).toContain("运行已改变");
+  });
   it.each([false, true])("lets a fresh chat send while history is pending and ignores late restoration (contextual=%s)", async contextual => {
     const history = deferred<Page>();
     list = () => history.promise;

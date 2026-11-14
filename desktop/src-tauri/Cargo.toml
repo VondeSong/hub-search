@@ -1,5 +1,6 @@
 [package]
 name = "craft-search"
+default-run = "craft-search"
 version = "0.16.396"
 description = "A fast local search companion for Craft"
 authors = ["Craft Search"]
@@ -21,6 +22,11 @@ experimental-feishu-task-sync = []
 # Explicit local integration executable only; never enabled in release defaults.
 integration-dida-source = []
 integration-agent-acceptance = []
+
+[[bin]]
+name = "hub-mcp-acceptance"
+path = "../qa/mcp-channel-acceptance.rs"
+required-features = ["integration-agent-acceptance"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

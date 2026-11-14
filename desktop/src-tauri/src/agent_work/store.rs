@@ -631,7 +631,11 @@ pub(super) fn answer_save_context(
     let (_, projection) =
         delivery_read::DeliveryRead::new(root, c, w).verify(w, run, &body, authorization)?;
     if projection["state"] == "stale" {
-        return Err("回答引用的图表版本已变化，请先核对后保存".into());
+        return Err(projection["reason"]
+            .as_str()
+            .filter(|reason| !reason.is_empty())
+            .unwrap_or("回答引用的图表版本已变化，请先核对后保存")
+            .into());
     }
     Ok(json!({"runId":run,"report":body["report"],"evidence":body["evidence"]}))
 }

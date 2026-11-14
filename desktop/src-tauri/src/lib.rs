@@ -34588,6 +34588,9 @@ pub fn run() {
         std::process::exit(2);
     }
     let mut context = tauri::generate_context!();
+    #[cfg(feature = "integration-agent-acceptance")]
+    agent_acceptance::mcp_channel::configure_context(&mut context)
+        .expect("MCP acceptance context must match its isolated fixture");
     if background_workers::manual_session() {
         eprintln!("Hub：本次启动已暂停自动任务，原有设置未更改。");
         for window in &mut context.config_mut().app.windows {
