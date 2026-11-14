@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock3,
+  FolderTree,
   Hash,
   Bookmark,
   BookOpenCheck,
@@ -170,7 +171,7 @@ const SidebarLibraryPanel = memo(function SidebarLibraryPanel({
   );
 });
 
-export type DesktopSidebarView = "home" | "tasks" | "journals" | "favorites" | "history" | "tags" | "flashcards" | "collections" | "insights";
+export type DesktopSidebarView = "home" | "tasks" | "journals" | "favorites" | "history" | "tags" | "flashcards" | "collections" | "insights" | "libraries";
 
 type DesktopSidebarProps = {
   contextualTitle?: string;
@@ -436,6 +437,7 @@ export const DesktopSidebar = memo(function DesktopSidebar({
       <nav className="sidebar-primary-nav" aria-label="浏览视图">
         <button onClick={() => onSelectView("collections")}><Bookmark size={16} /><span>阅读</span></button>
         <button className={activeView === "home" ? "active" : ""} onClick={() => onSelectView("home")}><Search size={16} /><span>全部内容</span></button>
+        <button className={activeView === "libraries" ? "active" : ""} onClick={() => onSelectView("libraries")}><FolderTree size={16} /><span>资料库</span></button>
         <button className={activeView === "tasks" ? "active" : ""} onClick={() => onSelectView("tasks")}>
           <ListTodo size={16} /><span>任务</span>{taskOpenCount > 0 && <small>{taskOpenCount}</small>}
         </button>

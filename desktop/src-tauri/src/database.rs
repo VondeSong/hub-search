@@ -2338,6 +2338,7 @@ pub(crate) fn initialize_database(path: &PathBuf) -> Result<Connection, String> 
     )?;
     crate::task_dates::install_schema(&connection)?;
     crate::user_profile::ensure_schema(&connection)?;
+    crate::library_browse::install_schema(&connection)?;
     if schema_version < DATABASE_SCHEMA_VERSION {
         crate::agent_work::migrate(&connection)?;
     }

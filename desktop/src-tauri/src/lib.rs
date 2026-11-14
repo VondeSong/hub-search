@@ -121,6 +121,7 @@ mod hub_mcp;
 mod isolated_runtime;
 mod journal_query;
 mod knowledge_rules;
+mod library_browse;
 mod library_location;
 #[cfg(test)]
 mod library_management_tests;
@@ -8915,22 +8916,39 @@ fn now_timestamp() -> i64 {
 async fn list_folders_remote(
     client: &reqwest::Client,
     session: &McpSession,
-) -> Result<Vec<(String, String)>, String> {
-    let result = call_craft_read_raw(client, session, "folders list", 400).await?;
-    Ok(parse_named_listing(&tool_result_text(&result)))
+) -> Result<Vec<library_browse::BrowseFolder>, String> {
+    let pages = read_craft_block_pages(client, session, "folders list", 400).await?;
+    let mut folders = Vec::new();
+    for page in pages {
+        folders.extend(library_browse::craft_folders(
+            parse_tool_json(&page).as_ref(),
+            &tool_result_text(&page),
+        )?);
+    }
+    library_browse::validate_craft_folders(&folders)?;
+    Ok(folders)
 }
 
 async fn map_documents_to_folders(
     client: &reqwest::Client,
     session: &McpSession,
-    folders: &[(String, String)],
+    folders: &[library_browse::BrowseFolder],
 ) -> Result<HashMap<String, String>, String> {
-    let mut mapping = HashMap::new();
-    let folder_requests = folders.iter().cloned().enumerate().collect::<Vec<_>>();
+    let mut candidates: HashMap<String, Vec<String>> = HashMap::new();
+    let parents = folders
+        .iter()
+        .map(|folder| (folder.id.as_str(), folder.parent_id.as_deref()))
+        .collect::<HashMap<_, _>>();
+    let folder_requests = folders
+        .iter()
+        .filter(|folder| folder.id != "trash")
+        .map(|folder| folder.id.clone())
+        .enumerate()
+        .collect::<Vec<_>>();
     let requests = stream::iter(
         folder_requests
             .into_iter()
-            .map(|(position, (folder_id, _))| {
+            .map(|(position, folder_id)| {
                 let client = client.clone();
                 let session = session.clone();
                 async move {
@@ -8953,12 +8971,18 @@ async fn map_documents_to_folders(
     for result in requests {
         let (folder_id, documents) = result?;
         for document in documents {
-            mapping
-                .entry(document.id)
-                .or_insert_with(|| folder_id.clone());
+            candidates.entry(document.id).or_default().push(folder_id.clone());
         }
     }
-    Ok(mapping)
+    // An ancestor listing can include the same document as its descendants.
+    candidates
+        .into_iter()
+        .map(|(document, locations)| {
+            library_browse::resolve_craft_location(&parents, &locations)
+                .map(|folder| (document, folder))
+                .ok_or_else(|| "Craft 返回了无法确认归属的重复文档，已保留上次目录，等候下次完整同步".into())
+        })
+        .collect()
 }
 
 fn session_for_space(state: &State<'_, AppState>, space_id: &str) -> Result<McpSession, String> {
@@ -13424,7 +13448,9 @@ fn persist_sync_snapshot(
     persist_sync_snapshot_controlled(
         path,
         space_id,
-        folders,
+        folders.into_iter().map(|(id, name)| library_browse::BrowseFolder {
+            id, name, parent_id: None,
+        }).collect(),
         seen_remote_ids,
         newly_missing_ids,
         deleted_ids,
@@ -13436,7 +13462,7 @@ fn persist_sync_snapshot(
 fn persist_sync_snapshot_controlled(
     path: &PathBuf,
     space_id: &str,
-    folders: Vec<(String, String)>,
+    folders: Vec<library_browse::BrowseFolder>,
     seen_remote_ids: Vec<String>,
     newly_missing_ids: Vec<String>,
     deleted_ids: Vec<String>,
@@ -13451,16 +13477,25 @@ fn persist_sync_snapshot_controlled(
     let transaction = connection
         .transaction()
         .map_err(|error| format!("无法开始同步快照事务：{error}"))?;
-    transaction
-        .execute("DELETE FROM folders WHERE space_id = ?1", params![space_id])
-        .map_err(|error| format!("无法更新文件夹索引：{error}"))?;
-    for (folder_id, folder_name) in folders {
+    if completed {
         transaction
-            .execute(
-                "INSERT INTO folders (space_id, id, name, path) VALUES (?1, ?2, ?3, ?4)",
-                params![space_id, folder_id, folder_name, folder_name],
-            )
-            .map_err(|error| format!("无法写入文件夹索引：{error}"))?;
+            .execute("DELETE FROM folders WHERE space_id = ?1", params![space_id])
+            .map_err(|error| format!("无法更新文件夹索引：{error}"))?;
+        for folder in folders.into_iter().filter(|folder| folder.id != "trash") {
+            transaction
+                .execute(
+                    "INSERT INTO folders (space_id, id, name, path, parent_id) VALUES (?1, ?2, ?3, ?3, ?4)",
+                    params![space_id, folder.id, folder.name, folder.parent_id],
+                )
+                .map_err(|error| format!("无法写入文件夹索引：{error}"))?;
+        }
+        if full_reconcile {
+            transaction.execute(
+                "INSERT INTO metadata(key,value) VALUES(?1,'1')
+                 ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                [format!("craft_browse_locations:{space_id}")],
+            ).map_err(|error| format!("无法记录 Craft 目录同步状态：{error}"))?;
+        }
     }
     for id in seen_remote_ids {
         transaction
@@ -13970,8 +14005,8 @@ async fn sync_index_inner(
         let folder_name = folder_id.as_ref().and_then(|folder_id| {
             folders
                 .iter()
-                .find(|(id, _)| id == folder_id)
-                .map(|(_, name)| name.clone())
+                .find(|folder| &folder.id == folder_id)
+                .map(|folder| folder.name.clone())
         });
         let document_path = folder_name.unwrap_or_else(|| "未分类".to_string());
         let recently_modified =
@@ -14645,8 +14680,8 @@ fn sync_obsidian_library_database_controlled(
         let connection = open_database(path)?;
         library_excluded_paths(&connection, library_id)?
     };
-    let scanned =
-        sources::scan_obsidian_vault_controlled(root, &excluded_paths, &|| operation.checkpoint())?;
+    let (scanned, folders) =
+        sources::scan_obsidian_vault_with_folders(root, &excluded_paths, &|| operation.checkpoint())?;
     let connection = open_database(path)?;
     let library_name: String = connection
         .query_row(
@@ -14733,6 +14768,7 @@ fn sync_obsidian_library_database_controlled(
             )
             .map_err(|error| format!("无法更新 Obsidian 同步状态：{error}"))?;
         cleanup_obsidian_folders(&transaction, library_id)?;
+        library_browse::save_obsidian_folders(&transaction, library_id, &folders)?;
         transaction
             .commit()
             .map_err(|error| format!("无法提交 Obsidian 同步：{error}"))?;
@@ -17761,6 +17797,7 @@ async fn local_search(
     space_id: Option<String>,
     space_ids: Option<Vec<String>>,
     folder_id: Option<String>,
+    folder_ids: Option<Vec<String>>,
     updated_after: Option<i64>,
     include_craft_pages: Option<bool>,
     include_dida_tasks: Option<bool>,
@@ -17790,11 +17827,12 @@ async fn local_search(
         };
         let mut hits = Vec::new();
         for search_query in search_queries {
-            hits.extend(index.search_with_space_ids_and_field_scope(
+            let legacy_folder = folder_id.as_ref().filter(|id| !id.is_empty()).map(std::slice::from_ref);
+            hits.extend(index.search_in_folders(
                 &search_query,
                 limit,
                 Some(selected_space_ids.as_slice()),
-                folder_id.as_deref(),
+                folder_ids.as_deref().or(legacy_folder),
                 updated_after,
                 include_pages || include_tasks,
                 include_image_ocr.unwrap_or(true),
@@ -34726,6 +34764,7 @@ pub fn run() {
                 update_library_icon,
                 rename_library,
                 list_folders,
+                library_browse::library_contents,
                 craft_read,
                 open_result,
                 open_craft_url,
