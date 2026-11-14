@@ -37,11 +37,34 @@ export function useLibraryBrowseNavigation() {
 
 export function groupBrowseContents({ folders, documents }: LibraryContents) {
   const nodes = new Map(folders.map(folder => [folder.id, folder]));
+  const parents = new Map<string, string>();
+  const detached = new Set<string>();
+  for (const folder of nodes.values()) {
+    const parent = folder.parentId && nodes.has(folder.parentId) ? folder.parentId : "";
+    parents.set(folder.id, parent);
+    if (folder.parentId && !parent) detached.add(folder.id);
+  }
+  // Repair only the navigation projection; cached source relationships stay intact.
+  const resolved = new Set<string>();
+  for (const id of nodes.keys()) {
+    const path = new Set<string>();
+    let cursor = id;
+    while (cursor && !resolved.has(cursor)) {
+      if (path.has(cursor)) {
+        parents.set(cursor, "");
+        detached.add(cursor);
+        break;
+      }
+      path.add(cursor);
+      cursor = parents.get(cursor) ?? "";
+    }
+    for (const visited of path) resolved.add(visited);
+  }
   const children = new Map<string, FolderNode[]>();
   const pages = new Map<string, DocumentNode[]>();
   const unresolved: DocumentNode[] = [];
-  for (const folder of folders) {
-    const parent = folder.parentId && nodes.has(folder.parentId) ? folder.parentId : "";
+  for (const folder of nodes.values()) {
+    const parent = parents.get(folder.id)!;
     const siblings = children.get(parent) ?? [];
     siblings.push(folder);
     children.set(parent, siblings);
@@ -61,7 +84,7 @@ export function groupBrowseContents({ folders, documents }: LibraryContents) {
     entries.push(document);
     pages.set(folder, entries);
   }
-  return { nodes, children, pages, unresolved, documentFolders };
+  return { nodes, parents, detached, children, pages, unresolved, documentFolders };
 }
 
 type BrowseTree = ReturnType<typeof groupBrowseContents>;
@@ -74,11 +97,11 @@ function libraryVersion(library: LibrarySummary, revision: number) {
 export function browseTrail(tree: BrowseTree, folderId: string) {
   const trail: FolderNode[] = [];
   const seen = new Set<string>();
-  for (let folder = tree.nodes.get(folderId); folder && !seen.has(folder.id); folder = tree.nodes.get(folder.parentId ?? "")) {
-    trail.unshift(folder);
+  for (let folder = tree.nodes.get(folderId); folder && !seen.has(folder.id); folder = tree.nodes.get(tree.parents.get(folder.id) ?? "")) {
+    trail.push(folder);
     seen.add(folder.id);
   }
-  return trail;
+  return trail.reverse();
 }
 
 export function browseFolderScope(tree: BrowseTree, folderId: string, includeDescendants: boolean) {
@@ -141,8 +164,10 @@ export function LibraryBrowse({
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<"library" | "subtree" | "folder">("subtree");
   const [hits, setHits] = useState<{ request: object; results?: SearchResult[]; error?: string }>();
+  // shortcut: loaded batches stay mounted; use windowing if real-library profiling requires it.
   const [limits, setLimits] = useState<Record<string, number>>({});
   const columnStrip = useRef<HTMLDivElement>(null);
+  const navigationTree = useRef<HTMLElement>(null);
   const currentFolders = useRef<Record<string, string>>({});
   const libraryIds = useMemo(() => libraries.map(item => item.id), [libraries]);
   const directoryQuery = folderQuery.trim().toLocaleLowerCase();
@@ -218,6 +243,10 @@ export function LibraryBrowse({
     if (strip && inColumns) strip.scrollLeft = strip.scrollWidth;
   }, [inColumns, library?.id, folderId, trail.length, Boolean(preview)]);
 
+  useLayoutEffect(() => {
+    navigationTree.current?.querySelector<HTMLElement>('[aria-current="location"]')?.scrollIntoView?.({ block: "nearest" });
+  }, [library?.id, folderId, tree, directoryQuery, navigationOpen]);
+
   useEffect(() => {
     if (library && tree) currentFolders.current[library.id] = folderId;
   }, [library?.id, tree, folderId]);
@@ -244,17 +273,22 @@ export function LibraryBrowse({
   const switchLibrary = (libraryId: string) => move(libraryId, currentFolders.current[libraryId] ?? "");
   const locate = (result: SearchResult) => {
     const resultTree = cache[result.libraryId]?.tree;
-    const scopedFolder = result.libraryId === library?.id && searchRequest?.documentIds && resultTree
-      ? browseFolderScope(resultTree, folderId, scope === "subtree")?.find(id => resultTree.pages.get(id)?.some(page => page.id === result.documentId))
-      : undefined;
-    const actualFolder = scopedFolder ?? resultTree?.documentFolders.get(result.documentId);
+    const scopedFolders = result.libraryId === library?.id && searchRequest?.documentIds && resultTree
+      ? browseFolderScope(resultTree, folderId, scope === "subtree") : null;
+    const ownFolder = result.folderId !== undefined && (!scopedFolders || scopedFolders.includes(result.folderId))
+      && resultTree?.pages.get(result.folderId)?.some(page => page.id === result.documentId) ? result.folderId : undefined;
+    const scopedFolder = scopedFolders?.find(id => resultTree?.pages.get(id)?.some(page => page.id === result.documentId));
+    const actualFolder = ownFolder ?? scopedFolder ?? resultTree?.documentFolders.get(result.documentId);
     move(result.libraryId, actualFolder ?? result.folderId ?? "", true, result.documentId);
     openPreview(result);
   };
   const up = () => library && move(trail.length ? library.id : "", trail[trail.length - 2]?.id ?? "");
 
   function folderTree(item: LibrarySummary, itemTree: BrowseTree, parent: string, depth: number, visited = new Set<string>()) {
-    return itemTree.children.get(parent)?.map(folder => {
+    const folders = itemTree.children.get(parent) ?? [];
+    const limitKey = JSON.stringify(["folders", item.id, parent]);
+    const limit = limits[limitKey] ?? 100;
+    return <>{folders.filter((folder, index) => index < limit || (item.id === library?.id && activePath.has(folder.id))).map(folder => {
       if (visited.has(folder.id)) return null;
       const hasChildren = Boolean(itemTree.children.get(folder.id)?.length);
       const key = JSON.stringify([item.id, folder.id]);
@@ -275,7 +309,10 @@ export function LibraryBrowse({
         </div>
         {expanded && hasChildren && <ul>{folderTree(item, itemTree, folder.id, depth + 1, new Set([...visited, folder.id]))}</ul>}
       </li>;
-    });
+    })}
+      {folders.length > limit && <li><button className="library-browser-text-button"
+        onClick={() => setLimits(current => ({ ...current, [limitKey]: limit + 100 }))}>显示更多目录</button></li>}
+    </>;
   }
 
   const directoryMatches = directoryQuery ? (library ? [library] : libraries).flatMap(item => {
@@ -304,11 +341,15 @@ export function LibraryBrowse({
     const documents = [...(tree.pages.get(parent) ?? []), ...(!parent ? tree.unresolved : [])];
     const key = JSON.stringify([library.id, parent]);
     const limit = limits[key] ?? 100;
+    const folderKey = JSON.stringify(["folders", library.id, parent]);
+    const folderLimit = limits[folderKey] ?? 100;
     return <>
-      {folders.map(folder => <button className="library-browser-row" key={folder.id} title={folder.name}
+      {folders.filter((folder, index) => index < folderLimit || folder.id === nextFolder).map(folder => <button className="library-browser-row" key={folder.id} title={folder.name}
         aria-current={folder.id === nextFolder ? "location" : undefined} onClick={() => move(library.id, folder.id)}>
         <Folder size={17} /><span>{folder.name}</span><ChevronRight size={14} />
       </button>)}
+      {folders.length > folderLimit && <button className="library-browser-text-button"
+        onClick={() => setLimits(current => ({ ...current, [folderKey]: folderLimit + 100 }))}>显示更多目录</button>}
       {documents.filter((document, index) => index < limit || (selected?.libraryId === library.id && selected.documentId === document.id)).map(document =>
         <button className="library-browser-row" key={JSON.stringify([document.nodeId, document.id])} title={document.path}
           aria-current={selected?.libraryId === library.id && selected.documentId === document.id && (!document.nodeId || selected.entityKey === rootResult(library, document).entityKey) ? "true" : undefined}
@@ -338,6 +379,7 @@ export function LibraryBrowse({
     {loaded?.version === activeVersion && loaded?.error && <p className="library-browser-hint" role="alert">{tree ? "目录刷新失败，正在显示上次读取的数据。" : loaded.error}</p>}
     {library && !library.connected && <p className="library-browser-hint">来源不可用，正在浏览本地缓存。</p>}
     {loaded?.contents?.notice && <p className="library-browser-hint">{loaded.contents.notice}</p>}
+    {Boolean(tree?.detached.size) && <p className="library-browser-hint">部分目录的上级关系缺失或成环，已在当前库根目录提供浏览入口。</p>}
     {library?.provider === "craft" && loaded?.contents && !loaded.contents.craftLocationsSynced &&
       <p className="library-browser-hint">当前显示已缓存目录和文档。完成同步后可刷新 Craft 文件夹归属。</p>}
     {tree && requestedFolder && !folderId && <p className="library-browser-hint">原目录已不可用，当前显示资料库根目录。</p>}
@@ -382,7 +424,7 @@ export function LibraryBrowse({
       <div className="library-browser-tree-caption"><span>{directoryQuery ? "匹配的目录" : "目录结构"}</span>
         <button className="library-browser-icon" onClick={() => refresh(value => value + 1)} title="重新读取本地目录" aria-label="重新读取本地目录"><RotateCw size={14} /></button>
       </div>
-      <nav className="library-browser-tree" aria-label="资料库目录">
+      <nav className="library-browser-tree" aria-label="资料库目录" ref={navigationTree}>
         {directoryQuery ? <>
           {directoryMatches.slice(0, 60).map(({item, folder, path}) =>
             <button className="library-browser-row" key={JSON.stringify([item.id, folder.id])} title={path}
