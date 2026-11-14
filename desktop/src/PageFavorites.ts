@@ -3,20 +3,24 @@ import type { SearchResult } from "./SearchTypes";
 // Use the same document boundary as search's page groups. Hit/block IDs must
 // never affect whether the containing page is already saved.
 export function pageFavoriteKey(result: SearchResult): string {
+  if (result.favoriteKind === "page" && result.provider === "craft" && result.pageId && result.pageId !== result.documentId) {
+    return JSON.stringify([result.provider, result.libraryId, result.spaceId, result.documentId, result.pageId]);
+  }
   return JSON.stringify([result.provider, result.libraryId, result.spaceId, result.documentId || result.id]);
 }
 
 export function asPageFavorite(result: SearchResult): SearchResult {
   const key = pageFavoriteKey(result);
+  const subpage = result.favoriteKind === "page" && result.provider === "craft" && result.pageId && result.pageId !== result.documentId;
   return {
     ...result,
     favoriteKind: "page",
     id: `favorite-page:${key}`,
     entityKey: key,
-    blockId: result.documentId,
-    pageId: result.documentId,
+    blockId: subpage ? result.pageId : result.documentId,
+    pageId: subpage ? result.pageId : result.documentId,
     title: result.documentTitle || result.title,
-    contentType: "document",
+    contentType: subpage ? "craft_subpage" : "document",
     sourceType: `${result.provider}_page`,
     sourceItemId: undefined,
     sourceTitle: undefined,

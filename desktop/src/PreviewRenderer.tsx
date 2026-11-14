@@ -1,5 +1,7 @@
 import { memo, useMemo, useState } from "react";
 import { renderableCraftMarkdown } from "./CraftDisplayMarkdown";
+import { decodeCraftCollection } from "./CraftCollectionData";
+import { CraftCollectionView } from "./CraftCollectionView";
 export { renderableCraftMarkdown } from "./CraftDisplayMarkdown";
 import { CalendarDays, Check, Copy, FileSpreadsheet, FileText, WrapText } from "lucide-react";
 import ReactMarkdown, { defaultUrlTransform, type Components } from "react-markdown";
@@ -427,7 +429,7 @@ export function previewHeadings(markdown: string): PreviewHeading[] {
   return headings;
 }
 
-function PreviewCodeBlock({ children, terms }: { children?: React.ReactNode; terms: string[] }) {
+function PreviewCodeBlock({ children, terms, renderCollectionValue }: { children?: React.ReactNode; terms: string[]; renderCollectionValue?: (value: string) => React.ReactNode }) {
   const [copied, setCopied] = useState(false);
   const [wrap, setWrap] = useState(false);
   const code = markdownNodeText(children).replace(/\n$/, "");
@@ -436,6 +438,10 @@ function PreviewCodeBlock({ children, terms }: { children?: React.ReactNode; ter
     ? String((child as { props?: { className?: string } }).props?.className ?? "")
     : "";
   const language = className.match(/language-([^\s]+)/)?.[1] || "文本";
+  if (language === "hub-craft-collection" && renderCollectionValue) {
+    const collection = decodeCraftCollection(code);
+    if (collection) return <CraftCollectionView collection={collection} renderValue={renderCollectionValue} />;
+  }
   const lines = code.split("\n");
   const copy = async () => {
     try {
@@ -539,7 +545,8 @@ function PreviewRendererComponent({ selected, markdown, matchTerms, hasSectionCo
     td: ({ children }) => <td><HighlightedChildren terms={matchTerms}>{children}</HighlightedChildren></td>,
     th: ({ children }) => <th><HighlightedChildren terms={matchTerms}>{children}</HighlightedChildren></th>,
     table: ({ children }) => <div className="preview-table-scroll"><table>{children}</table></div>,
-    pre: ({ children }) => <PreviewCodeBlock terms={matchTerms}>{children}</PreviewCodeBlock>,
+    pre: ({ children }) => <PreviewCodeBlock terms={matchTerms} renderCollectionValue={selectedProvider === "craft" ? value =>
+      <ReactMarkdown components={components} remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS} urlTransform={previewUrlTransform}>{renderableCraftMarkdown(value)}</ReactMarkdown> : undefined}>{children}</PreviewCodeBlock>,
     code: ({ children, className }) => <code className={className}><HighlightedChildren terms={matchTerms}>{children}</HighlightedChildren></code>,
     a: ({ href, children }) => {
       const localAnchor = href?.startsWith("#obsidian-wikilink=")

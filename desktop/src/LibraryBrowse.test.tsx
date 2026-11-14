@@ -1,12 +1,28 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import { browseFolderScope, browseSubpage, browseTrail, groupBrowseContents, LibraryBrowse, type LibraryPosition } from "./LibraryBrowse";
 import type { LibrarySummary, SearchResult } from "./SearchTypes";
+import { LIBRARY_BROWSE_STATE_KEY, LIBRARY_TOPICS_KEY } from "./LibraryBrowseState";
 
 const invoke = vi.hoisted(() => vi.fn());
+const profile = vi.hoisted(() => new Map<string, string>());
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
+vi.mock("./UserProfileStorage", () => ({ USER_PROFILE_PREPARE_FLUSH_EVENT: "hub:prepare-user-profile-flush", userProfileStorage: {
+  getItem: (key: string) => profile.get(key) ?? null,
+  setItem: (key: string, value: string) => profile.set(key, value),
+} }));
+beforeEach(() => profile.clear());
+
+it("keeps cyclic and missing-parent directories reachable without changing source metadata", () => {
+  const folders = [{id:"a",name:"甲",parentId:"b"},{id:"b",name:"乙",parentId:"a"},{id:"c",name:"丙",parentId:"unknown"}];
+  const before = JSON.stringify(folders);
+  const tree = groupBrowseContents({folders,documents:[],craftLocationsSynced:true});
+  expect(tree.children.get("")?.map(item => item.id).sort()).toEqual(["a","b","c"]);
+  expect(tree.brokenParents.size).toBe(3);
+  expect(JSON.stringify(folders)).toBe(before);
+});
 
 const contents = {
   folders: [
@@ -183,6 +199,7 @@ it("browses cached documents across libraries, preserves a hidden preview and to
   try {
     await act(async () => root.render(<LibraryBrowse libraries={libraries} onPosition={onPosition}
       onPreview={onPreview} onClosePreview={vi.fn()} onToggleFavorite={onToggleFavorite}
+      selected={{provider:"obsidian",libraryId:"vault",spaceId:"vault",documentId:"root",id:"root",entityKey:"root",title:"根文档"} as SearchResult}
       preview={<article><input aria-label="预览内状态" defaultValue="保留阅读状态" /></article>} />));
     expect(container.querySelector('[aria-label="当前目录内容"]')?.textContent).toContain("子目录文档");
     expect(container.textContent).toContain("部分资料库读取失败");
@@ -209,4 +226,80 @@ it("browses cached documents across libraries, preserves a hidden preview and to
     container.remove();
     invoke.mockReset();
   }
+});
+
+it("uses root and page identities for exact Craft page search and opens a navigable page body", async () => {
+  Object.assign(globalThis, {IS_REACT_ACT_ENVIRONMENT:true});
+  const library = {id:"craft",provider:"craft",name:"Craft",connected:true,documentCount:1,excludedPaths:[]} as LibrarySummary;
+  const documents = [{id:"root",title:"根",path:"根",folderId:"root-folder"},
+    {id:"craft-subpage:root:child",title:"子页",path:"根",folderId:"child-folder",documentId:"root",pageId:"child",contentType:"craft_subpage"},
+    {id:"craft-subpage:root:leaf",title:"下级页",path:"根",folderId:"child-folder",documentId:"root",pageId:"leaf",contentType:"craft_subpage"}];
+  invoke.mockImplementation(async command => command === "library_contents" ? {folders:[{id:"root-folder",name:"根"},{id:"child-folder",name:"子页",parentId:"root-folder"}],documents,craftLocationsSynced:true,
+    pageFolders:{"root-folder":"root","child-folder":"craft-subpage:root:child"}} : []);
+  const container=document.createElement("div"), root=createRoot(container), onPreview=vi.fn();
+  try {
+    await act(async()=>root.render(<LibraryBrowse libraries={[library]} position={{libraryId:"craft",folderId:"child-folder"}} onPosition={vi.fn()}
+      onPreview={onPreview} onClosePreview={vi.fn()} />));
+    const input=container.querySelector<HTMLInputElement>('[aria-label="在当前目录搜索"]')!;
+    await act(async()=>{
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(input,"依据"); input.dispatchEvent(new Event("input",{bubbles:true}));
+    });
+    await act(async()=>container.querySelector(".library-browser-search")!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
+    expect(invoke).toHaveBeenCalledWith("local_search",expect.objectContaining({documentIds:["root"],pageIds:["child","leaf"],folderIds:null}));
+    const folderButton=Array.from(container.querySelectorAll<HTMLButtonElement>(".library-browser-tree button.library-browser-row")).find(button=>button.textContent==="子页")!;
+    await act(async()=>folderButton.click());
+    expect(onPreview).toHaveBeenCalledWith(expect.objectContaining({documentId:"root",pageId:"child",contentType:"craft_subpage"}));
+  } finally {await act(async()=>root.unmount());invoke.mockReset();}
+});
+
+it("persists a real topic reference and view state without writing to any source", async () => {
+  Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});
+  const library={id:"vault",provider:"obsidian",name:"本地库",connected:true,documentCount:3,excludedPaths:[]} as LibrarySummary;
+  invoke.mockResolvedValue(contents);
+  const container=document.createElement("div"), root=createRoot(container);
+  const button=(label:string)=>Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(item=>item.getAttribute("aria-label")===label || item.textContent===label)!;
+  try {
+    await act(async()=>root.render(<LibraryBrowse libraries={[library]} onPosition={vi.fn()} onPreview={vi.fn()} onClosePreview={vi.fn()}/>));
+    await act(async()=>button("新建专题").click());
+    const input=container.querySelector<HTMLInputElement>('[aria-label="专题名称"]')!;
+    await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(input,"验收资料");input.dispatchEvent(new Event("input",{bubbles:true}));});
+    await act(async()=>container.querySelector(".library-browser-topic-editor")!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
+    const add=Array.from(container.querySelectorAll<HTMLButtonElement>(".library-browser-result .library-browser-topic-menu button")).find(item=>item.textContent==="验收资料")!;
+    await act(async()=>add.click());
+    const saved=JSON.parse(profile.get(LIBRARY_TOPICS_KEY)!);
+    expect(saved[0].items[0]).toEqual(expect.objectContaining({kind:"document",result:expect.objectContaining({libraryId:"vault"})}));
+    expect(invoke.mock.calls.every(([command])=>command==="library_contents")).toBe(true);
+    expect(JSON.parse(profile.get(LIBRARY_BROWSE_STATE_KEY)!)).toEqual(expect.objectContaining({mode:"tree",readerOpen:true}));
+    await act(async()=>root.unmount());
+    const restored=createRoot(container);
+    try {
+      await act(async()=>restored.render(<LibraryBrowse libraries={[library]} onPosition={vi.fn()} onPreview={vi.fn()} onClosePreview={vi.fn()}/>));
+      expect(container.querySelector(".library-browser-shortcuts")?.textContent).toContain("验收资料1");
+    } finally {await act(async()=>restored.unmount());}
+  } finally {invoke.mockReset();}
+});
+
+it("groups a large directory snapshot within the local two-second budget", () => {
+  const folders=Array.from({length:20000},(_,i)=>({id:String(i),name:`目录${i}`,parentId:i%10 ? String(i-i%10) : undefined}));
+  const documents=folders.map(folder=>({id:`doc-${folder.id}`,title:"同名笔记",path:`${folder.id}/笔记.md`,folderId:folder.id}));
+  const start=performance.now();
+  const tree=groupBrowseContents({folders,documents,craftLocationsSynced:true});
+  expect(tree.nodes.size).toBe(20000);
+  expect(tree.documentFolders.size).toBe(20000);
+  expect(performance.now()-start).toBeLessThan(2000);
+});
+
+it("restores the saved column scroll instead of jumping to the last column", async () => {
+  Object.assign(globalThis, {IS_REACT_ACT_ENVIRONMENT:true});
+  profile.set(LIBRARY_BROWSE_STATE_KEY, JSON.stringify({mode:"columns", scroll:{
+    [JSON.stringify(["vault", "a", false, "", "columns"])]: {list:0, tree:0, columns:72},
+  }}));
+  invoke.mockResolvedValue(contents);
+  const container=document.createElement("div"), root=createRoot(container);
+  const library={id:"vault",provider:"obsidian",name:"本地库",connected:true,documentCount:3,excludedPaths:[]} as LibrarySummary;
+  try {
+    await act(async()=>root.render(<LibraryBrowse libraries={[library]} position={{libraryId:"vault",folderId:"a"}}
+      onPosition={vi.fn()} onPreview={vi.fn()} onClosePreview={vi.fn()}/>));
+    expect(container.querySelector<HTMLElement>(".library-browser-columns")!.scrollLeft).toBe(72);
+  } finally {await act(async()=>root.unmount());invoke.mockReset();}
 });

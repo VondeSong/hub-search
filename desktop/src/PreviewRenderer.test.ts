@@ -117,12 +117,14 @@ describe("preview markdown conversion", () => {
   });
 
   it("preserves Craft collection labels and properties", () => {
-    const markdown = renderableCraftMarkdown(
-      '<collection><title>项目</title><collectionItem><property name="status">Done</property><title>任务一</title></collectionItem></collection>',
-    );
-    expect(markdown).toContain("**项目**");
-    expect(markdown).toContain("**status：** Done");
-    expect(markdown).toContain("**任务一**");
+    const html = renderToStaticMarkup(createElement(PreviewRenderer, {
+      selected: result(), markdown: '<collection><title>项目</title><collectionItem><property name="status">Done</property><title>任务一</title></collectionItem></collection>',
+      matchTerms: [], hasSectionContext: false, onOpenLink: () => {},
+    }));
+    expect(html).toContain("项目");
+    expect(html).toContain("<th>status</th>");
+    expect(html).toContain("Done");
+    expect(html).toContain("任务一");
   });
 
   it("preserves Craft highlight colors", () => {

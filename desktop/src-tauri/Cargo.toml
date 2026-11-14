@@ -22,6 +22,12 @@ experimental-feishu-task-sync = []
 # Explicit local integration executable only; never enabled in release defaults.
 integration-dida-source = []
 integration-agent-acceptance = []
+integration-library-acceptance = []
+
+[[bin]]
+name = "hub-library-acceptance"
+path = "../qa/library-acceptance.rs"
+required-features = ["integration-library-acceptance"]
 
 [[bin]]
 name = "hub-mcp-acceptance"
