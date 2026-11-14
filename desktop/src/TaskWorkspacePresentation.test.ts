@@ -130,7 +130,7 @@ describe("task workspace presentation", () => {
       task({ id: "obsidian", title: "Obsidian", provider: "obsidian" }),
     ];
 
-    expect(summarizeTasks(tasks)).toEqual({ total: 3, open: 2, completed: 1, abandoned: 0, linked: 1, craft: 1, dida365: 1, obsidian: 1 });
+    expect(summarizeTasks(tasks)).toEqual({ total: 3, projects: 0, open: 2, completed: 1, abandoned: 0, linked: 1, craft: 1, dida365: 1, obsidian: 1 });
     expect(groupTasksByProvider(tasks).map((group) => [group.provider, group.tasks.map((item) => item.id)])).toEqual([
       ["dida365", ["dida"]],
       ["craft", ["craft"]],
@@ -159,4 +159,16 @@ it("defaults to pending while preserving explicit saved filters", () => {
   for (const state of ["all", "open", "completed", "abandoned"]) {
     expect(restoreTaskStatusFilter(state)).toBe(state);
   }
+});
+
+it("finds verified linked sources once and counts project containers separately", () => {
+  const linked = task({ id: "linked", title: "One action", provider: "craft", sourceRefs: [
+    { provider: "craft", libraryId: "craft", documentId: "doc", sourceId: "block" },
+    { provider: "dida365", libraryId: "account", documentId: "remote", sourceId: "remote" },
+  ] });
+  const project = task({ id: "project", title: "Project", isProject: true });
+  const rows = [project, linked];
+  expect(filterAndSortTasks(rows, { query: "", status: "all", source: "dida365", sort: "default", ascending: true })).toEqual([linked]);
+  expect(summarizeTasks(rows)).toMatchObject({ total: 1, projects: 1, open: 1, craft: 1, dida365: 1 });
+  expect(groupTasksByProvider(rows).flatMap(g => g.tasks).filter(t => t.id === "linked")).toHaveLength(1);
 });

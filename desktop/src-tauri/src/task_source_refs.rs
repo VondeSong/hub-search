@@ -11,6 +11,13 @@ pub(super) struct TaskSourceRef {
     document_id: String,
     source_id: String,
 }
+pub(super) fn has_provider(task: &UnifiedTaskItem, provider: &str) -> bool {
+    task.provider == provider
+        || task
+            .source_refs
+            .iter()
+            .any(|source| source.provider == provider)
+}
 
 impl From<&UnifiedTaskItem> for TaskSourceRef {
     fn from(task: &UnifiedTaskItem) -> Self {

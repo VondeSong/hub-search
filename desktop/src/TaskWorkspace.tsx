@@ -1,5 +1,5 @@
 import { TaskPlanningPanel } from "./TaskPlanningPanel";
-import { loadPlanningRecords, planningEligible, taskIdentity, type PlanningRequest, type PlanningRecord, type PlanningMode } from "./TaskPlanning";
+import { loadPlanningRecords, removePlanningDay, planningEligible, taskIdentity, type PlanningRequest, type PlanningRecord, type PlanningMode } from "./TaskPlanning";
 import { writeResultDragData } from "./ResultActions";
 import { userProfileStorage } from "./UserProfileStorage";
 import { resolveTaskResult, taskSearchResult } from "./TaskWorkspaceResult";
@@ -963,12 +963,8 @@ export function TaskWorkspace({
   }), [collapsedTaskIds, query, taskIdsWithChildren, visibleMarkdownParentIds, visibleTasks]);
 
 
-  const sourceCounts: Record<SourceFilter, number> = {
-    all: scopedTasks.length,
-    craft: scopedTasks.filter(task => task.provider === "craft").length,
-    dida365: scopedTasks.filter(task => task.provider === "dida365").length,
-    obsidian: scopedTasks.filter(task => task.provider === "obsidian").length,
-  };
+  const scopeStats = summarizeTasks(scopedTasks);
+  const sourceCounts: Record<SourceFilter, number> = { all: scopeStats.total, craft: scopeStats.craft, dida365: scopeStats.dida365, obsidian: scopeStats.obsidian };
 
   const sourceOptions: Array<{ id: SourceFilter; label: string }> = [
     { id: "all", label: "全部" },
@@ -1035,8 +1031,8 @@ export function TaskWorkspace({
   return (
     <div className="task-module-layout">
       <aside className="task-module-sidebar" aria-label="任务导航">
-        <header><strong>任务</strong><span>{scopedTasks.length}</span></header>
-        <section aria-label="任务项目与清单"><h2>项目与清单</h2><button aria-current={!collectionKey ? "page" : undefined} onClick={() => setCollectionKey("")}><ListFilter size={15} /><span>全部项目与清单</span><small>{scopedTasks.length}</small></button>{collections.map(group => <div className="task-planning-project" key={group.key}><button aria-current={collectionKey === group.key ? "page" : undefined} onClick={() => setCollectionKey(group.key)} title={`${group.name} · ${group.library}`}><span>{group.name}<em>{group.library}</em></span><small>{group.count}</small></button><button className="task-planning-project-action" aria-label={`梳理项目：${group.library} / ${group.name}`} onClick={() => beginPlanning("project", undefined, group.key)}><Sparkles size={14}/></button></div>)}</section>
+        <header><strong>任务</strong><span>{scopeStats.total}</span></header>
+        <section aria-label="任务项目与清单"><h2>项目与清单</h2><button aria-current={!collectionKey ? "page" : undefined} onClick={() => setCollectionKey("")}><ListFilter size={15} /><span>全部项目与清单</span><small>{scopeStats.total}</small></button>{collections.map(group => <div className="task-planning-project" key={group.key}><button aria-current={collectionKey === group.key ? "page" : undefined} onClick={() => setCollectionKey(group.key)} title={`${group.name} · ${group.library}`}><span>{group.name}<em>{group.library}</em></span><small>{group.count}</small></button><button className="task-planning-project-action" aria-label={`梳理项目：${group.library} / ${group.name}`} onClick={() => beginPlanning("project", undefined, group.key)}><Sparkles size={14}/></button></div>)}</section>
         {!loading && !collections.length && <p>当前资料库没有任务</p>}
       </aside>
     <section className="task-workspace">
@@ -1273,7 +1269,7 @@ export function TaskWorkspace({
         <div className="task-secondary-actions">
           <div className="task-tool-popover-wrap">
             <button className={taskStatsOpen ? "active" : ""} onClick={() => setTaskStatsOpen((open) => !open)} title="任务统计" aria-label="任务统计"><BarChart3 size={17} /></button>
-            {taskStatsOpen && <div className="task-stats-popover"><header><strong>任务统计</strong><small>当前筛选结果</small></header><div><article><strong>{visibleTaskStats.total}</strong><span>任务</span></article><article><strong>{visibleTaskStats.open}</strong><span>待完成</span></article><article><strong>{visibleTaskStats.completed}</strong><span>已完成</span></article><article><strong>{visibleTaskStats.abandoned}</strong><span>已放弃</span></article><article><strong>{visibleTaskStats.linked}</strong><span>已关联</span></article></div><footer>Craft {visibleTaskStats.craft} · 滴答 {visibleTaskStats.dida365} · Obsidian {visibleTaskStats.obsidian}</footer></div>}
+            {taskStatsOpen && <div className="task-stats-popover"><header><strong>任务统计</strong><small>当前筛选结果</small></header><div><article><strong>{visibleTaskStats.total}</strong><span>任务</span></article><article><strong>{visibleTaskStats.open}</strong><span>待完成</span></article><article><strong>{visibleTaskStats.completed}</strong><span>已完成</span></article><article><strong>{visibleTaskStats.abandoned}</strong><span>已放弃</span></article><article><strong>{visibleTaskStats.linked}</strong><span>已关联</span></article></div><footer>项目容器 {visibleTaskStats.projects}（不计入行动） · 同一任务可有多个来源 · Craft {visibleTaskStats.craft} · 滴答 {visibleTaskStats.dida365} · Obsidian {visibleTaskStats.obsidian}</footer></div>}
           </div>
           <button onClick={() => void load()} disabled={loading} title="刷新本地任务数据" aria-label="刷新"><RefreshCw className={loading ? "spin" : ""} size={17} /></button>
           <button ref={runtimeCapabilities.mobile ? undefined : queryToolsButtonRef} className={queryToolsOpen || statusFilter !== "all" || sourceFilter !== "all" ? "active" : ""} onClick={() => setQueryToolsOpen((open) => !open)} title={queryToolsOpen ? "隐藏排序和筛选" : "显示排序和筛选"} aria-label="排序和筛选" aria-pressed={statusFilter !== "all" || sourceFilter !== "all"}><ListFilter size={18} /></button>
@@ -1340,7 +1336,7 @@ export function TaskWorkspace({
         </div>}
         {viewMode === "board" && visibleTasks.length > 0 && <div className="task-board">
           {boardGroups.map((group) => <section className={`task-board-column ${group.provider}`} key={group.provider}>
-            <header><span><i />{group.label}</span><small>{group.tasks.length}</small></header>
+            <header title="按主要预览来源分栏；关联任务只展示一次"><span><i />{group.label} · 主来源</span><small>{group.tasks.length}</small></header>
             <div>{group.tasks.map((task) => <article className={`${taskConditionalColor(task, taskColorMode)} ${task.completed ? "completed" : ""} ${selectedTask?.id === task.id ? "selected" : ""}`} key={`${task.id}:${task.provider}`} draggable onDragStart={event=>writeResultDragData(event.dataTransfer,taskSearchResult(task))} onClick={() => selectTaskPreview(task)}>
               <div className="task-board-card-title"><TaskStatusControl task={task} busy={taskBusyIds.has(task.id)} pendingStatus={taskStatusTargets.get(task.id)} onChange={changeTaskStatus}/><strong>{taskTitleContent(task.title, (href) => void openExternalLink(href))}</strong><TaskStatusNotice task={task} onRetry={retryTaskStatus}/></div>
               {Object.values(tableProperties).some(Boolean) && <footer className="task-board-properties">
@@ -1371,7 +1367,7 @@ export function TaskWorkspace({
             <summary title="更多预览操作" aria-label="更多预览操作"><MoreHorizontal size={18}/></summary>
             <div><button className="danger" disabled={syncing} onClick={event => { event.currentTarget.closest("details")?.removeAttribute("open"); void removeSelectedTaskFromDida(); }}>保留 Craft，移除滴答</button></div>
           </details>}
-          contentBefore={<><div className="task-planning-detail"><button disabled={!planningEligible(selectedTask)} onClick={() => beginPlanning("task", selectedTask)}><Sparkles size={14}/>分析并推进这条任务</button>{planningRecord(selectedTask)?.note && <section><h3>Hub 建议笔记</h3><p>{planningRecord(selectedTask)?.note}</p></section>}</div>{selectedTask.provider === "craft" && selectedTask.syncState === "paused" && <div className="task-sync-resume">
+          contentBefore={<><div className="task-planning-detail"><button disabled={!planningEligible(selectedTask)} onClick={() => beginPlanning("task", selectedTask)}><Sparkles size={14}/>分析并推进这条任务</button><button onClick={() => setPlanning({ id: crypto.randomUUID(), mode: "task", label: selectedTask.title, tasks: [selectedTask], historyOnly: true })}>查看来源操作记录</button>{planningRecord(selectedTask)?.day === planningDay && <button onClick={() => void removePlanningDay(selectedTask).then(refreshPlanningRecords).catch(e => onStatusMessage?.(String(e), "error"))}>移出今日计划</button>}{planningRecord(selectedTask)?.note && <section><h3>Hub 建议笔记</h3><p>{planningRecord(selectedTask)?.note}</p></section>}</div>{selectedTask.provider === "craft" && selectedTask.syncState === "paused" && <div className="task-sync-resume">
               <div><strong>{selectedTask.isProject ? "这个项目已停止同步到滴答" : "这个任务已停止同步到滴答"}</strong>
                 <p>{selectedTask.isProject ? "之前保存了停止同步规则。恢复后，缺少的项目父任务会进入收件箱；现有子任务的关联和所在清单会保留。" : "之前保存了停止同步规则。恢复后保留现有关联；尚未关联的任务会进入收件箱。"}</p>
               </div>

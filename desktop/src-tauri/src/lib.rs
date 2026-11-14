@@ -164,6 +164,7 @@ mod dida_task_status;
 mod sources;
 mod tag_source_writeback;
 mod task_dates;
+mod task_planning_source;
 mod task_source_refs;
 mod task_status_appearance;
 #[cfg(test)]
@@ -8949,33 +8950,32 @@ async fn map_documents_to_folders(
         .map(|folder| folder.id.clone())
         .enumerate()
         .collect::<Vec<_>>();
-    let requests = stream::iter(
-        folder_requests
-            .into_iter()
-            .map(|(position, folder_id)| {
-                let client = client.clone();
-                let session = session.clone();
-                async move {
-                    let command = format!("documents list --folder {folder_id}");
-                    let documents = list_documents_command(
-                        &client,
-                        &session,
-                        &command,
-                        false,
-                        500 + position as u64 * 1_000,
-                    )
-                    .await?;
-                    Ok::<_, String>((folder_id, documents))
-                }
-            }),
-    )
+    let requests = stream::iter(folder_requests.into_iter().map(|(position, folder_id)| {
+        let client = client.clone();
+        let session = session.clone();
+        async move {
+            let command = format!("documents list --folder {folder_id}");
+            let documents = list_documents_command(
+                &client,
+                &session,
+                &command,
+                false,
+                500 + position as u64 * 1_000,
+            )
+            .await?;
+            Ok::<_, String>((folder_id, documents))
+        }
+    }))
     .buffer_unordered(CRAFT_READ_CONCURRENCY)
     .collect::<Vec<_>>()
     .await;
     for result in requests {
         let (folder_id, documents) = result?;
         for document in documents {
-            candidates.entry(document.id).or_default().push(folder_id.clone());
+            candidates
+                .entry(document.id)
+                .or_default()
+                .push(folder_id.clone());
         }
     }
     // An ancestor listing can include the same document as its descendants.
@@ -8984,7 +8984,9 @@ async fn map_documents_to_folders(
         .map(|(document, locations)| {
             library_browse::resolve_craft_location(&parents, &locations)
                 .map(|folder| (document, folder))
-                .ok_or_else(|| "Craft 返回了无法确认归属的重复文档，已保留上次目录，等候下次完整同步".into())
+                .ok_or_else(|| {
+                    "Craft 返回了无法确认归属的重复文档，已保留上次目录，等候下次完整同步".into()
+                })
         })
         .collect()
 }
@@ -13452,9 +13454,14 @@ fn persist_sync_snapshot(
     persist_sync_snapshot_controlled(
         path,
         space_id,
-        folders.into_iter().map(|(id, name)| library_browse::BrowseFolder {
-            id, name, parent_id: None,
-        }).collect(),
+        folders
+            .into_iter()
+            .map(|(id, name)| library_browse::BrowseFolder {
+                id,
+                name,
+                parent_id: None,
+            })
+            .collect(),
         seen_remote_ids,
         newly_missing_ids,
         deleted_ids,
@@ -13494,11 +13501,13 @@ fn persist_sync_snapshot_controlled(
                 .map_err(|error| format!("无法写入文件夹索引：{error}"))?;
         }
         if full_reconcile {
-            transaction.execute(
-                "INSERT INTO metadata(key,value) VALUES(?1,'1')
+            transaction
+                .execute(
+                    "INSERT INTO metadata(key,value) VALUES(?1,'1')
                  ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                [format!("craft_browse_locations:{space_id}")],
-            ).map_err(|error| format!("无法记录 Craft 目录同步状态：{error}"))?;
+                    [format!("craft_browse_locations:{space_id}")],
+                )
+                .map_err(|error| format!("无法记录 Craft 目录同步状态：{error}"))?;
         }
     }
     for id in seen_remote_ids {
@@ -14685,7 +14694,9 @@ fn sync_obsidian_library_database_controlled(
         library_excluded_paths(&connection, library_id)?
     };
     let (scanned, folders) =
-        sources::scan_obsidian_vault_with_folders(root, &excluded_paths, &|| operation.checkpoint())?;
+        sources::scan_obsidian_vault_with_folders(root, &excluded_paths, &|| {
+            operation.checkpoint()
+        })?;
     let connection = open_database(path)?;
     let library_name: String = connection
         .query_row(
@@ -16360,7 +16371,13 @@ async fn list_feishu_space_document_refs(
     client: &reqwest::Client,
     session: &McpSession,
     space_id: &str,
-) -> Result<(Vec<FeishuDocumentRef>, Vec<library_browse::FeishuBrowseNode>), String> {
+) -> Result<
+    (
+        Vec<FeishuDocumentRef>,
+        Vec<library_browse::FeishuBrowseNode>,
+    ),
+    String,
+> {
     let mut parents = VecDeque::from([None::<String>]);
     let mut visited_parents = HashSet::new();
     let mut refs = Vec::new();
@@ -17026,7 +17043,8 @@ async fn sync_feishu_library(
             None,
         )]
     } else if let Some(space_id) = location.strip_prefix("space:") {
-        let (references, nodes) = list_feishu_space_document_refs(&client, &session, space_id).await?;
+        let (references, nodes) =
+            list_feishu_space_document_refs(&client, &session, space_id).await?;
         wiki_nodes = Some(nodes);
         references
     } else {
@@ -17088,7 +17106,10 @@ async fn sync_feishu_library(
                     if wiki_nodes.is_some() {
                         document_ids_by_node.insert(
                             reference.as_str(),
-                            records.iter().map(|item| item.id.clone()).collect::<Vec<_>>(),
+                            records
+                                .iter()
+                                .map(|item| item.id.clone())
+                                .collect::<Vec<_>>(),
                         );
                     }
                     for document in &mut records {
@@ -17156,7 +17177,9 @@ async fn sync_feishu_library(
     }
     if let Some(nodes) = &mut wiki_nodes {
         for node in nodes {
-            node.document_ids = document_ids_by_node.remove(node.id.as_str()).unwrap_or_default();
+            node.document_ids = document_ids_by_node
+                .remove(node.id.as_str())
+                .unwrap_or_default();
         }
     }
     let path = database_path(app)?;
@@ -18172,6 +18195,10 @@ struct UnifiedTaskItem {
     path: String,
     depth: usize,
     is_project: bool,
+    content_revision: String,
+    indexed_at: Option<i64>,
+    priority: Option<i64>,
+    tags: Vec<String>,
     linked_providers: Vec<String>,
     linked_library_ids: Vec<String>,
     source_refs: Vec<task_source_refs::TaskSourceRef>,
@@ -18203,6 +18230,7 @@ struct TaskSyncReviewItem {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct UnifiedTaskDashboard {
+    projects: usize,
     tasks: Vec<UnifiedTaskItem>,
     total: usize,
     open: usize,
@@ -19855,6 +19883,9 @@ fn apply_task_bindings(
                     task.time_zone.clone(),
                     task.collection_name.clone(),
                     task.status_write_blocked_reason.clone(),
+                    task.priority,
+                    task.tags.clone(),
+                    task.content_revision.clone(),
                 ),
             )
         })
@@ -19863,8 +19894,17 @@ fn apply_task_bindings(
         .iter_mut()
         .filter(|task| task.provider == PROVIDER_CRAFT)
     {
-        if let Some((start_at, due_at, is_all_day, time_zone, collection_name, blocked_reason)) =
-            dida_ranges.get(&task.id)
+        if let Some((
+            start_at,
+            due_at,
+            is_all_day,
+            time_zone,
+            collection_name,
+            blocked_reason,
+            priority,
+            tags,
+            revision,
+        )) = dida_ranges.get(&task.id)
         {
             task.start_at = start_at.clone();
             task.due_at = due_at.clone();
@@ -19872,6 +19912,9 @@ fn apply_task_bindings(
             task.time_zone = time_zone.clone();
             task.collection_name = collection_name.clone();
             task.status_write_blocked_reason = blocked_reason.clone();
+            task.priority = *priority;
+            task.tags = tags.clone();
+            task.content_revision = format!("{}:{}", task.content_revision, revision);
         }
     }
     task_dates::merge_linked_dates(tasks);
@@ -19961,20 +20004,21 @@ async fn list_unified_tasks(app: AppHandle) -> Result<UnifiedTaskDashboard, Stri
         apply_task_bindings(&connection, &mut tasks)?;
         dida_task_status::decorate(&connection, &mut tasks)?;
         sort_unified_tasks_preserving_markdown_trees(&mut tasks);
-        let total = tasks.len();
-        let completed = tasks.iter().filter(|task| task.status == "completed").count();
-        let open = tasks.iter().filter(|task| task.status == "open").count();
+        let projects = tasks.iter().filter(|task| task.is_project).count();
+        let total = tasks.len() - projects;
+        let completed = tasks.iter().filter(|task| !task.is_project && task.status == "completed").count();
+        let open = tasks.iter().filter(|task| !task.is_project && task.status == "open").count();
         let craft = tasks
             .iter()
-            .filter(|task| task.provider == PROVIDER_CRAFT)
+            .filter(|task| !task.is_project && task_source_refs::has_provider(task,PROVIDER_CRAFT))
             .count();
         let dida365 = tasks
             .iter()
-            .filter(|task| task.provider == PROVIDER_DIDA365)
+            .filter(|task| !task.is_project && task_source_refs::has_provider(task,PROVIDER_DIDA365))
             .count();
         let obsidian = tasks
             .iter()
-            .filter(|task| task.provider == PROVIDER_OBSIDIAN)
+            .filter(|task| !task.is_project && task_source_refs::has_provider(task,PROVIDER_OBSIDIAN))
             .count();
         let linked = tasks
             .iter()
@@ -20082,6 +20126,7 @@ async fn list_unified_tasks(app: AppHandle) -> Result<UnifiedTaskDashboard, Stri
                 .map_err(|error| format!("无法读取项目同步待处理项：{error}"))?
         };
         Ok(UnifiedTaskDashboard {
+            projects,
             tasks,
             total,
             open,
@@ -34979,6 +35024,7 @@ pub fn run() {
                 list_unified_tasks,
                 daily_task_status::set_unified_task_status,
                 dida_task_refresh::refresh_unified_task_sources,
+                task_planning_source::task_planning_source,
                 preview_task_sync,
                 inspect_task_sync_capabilities,
                 configure_task_sync,

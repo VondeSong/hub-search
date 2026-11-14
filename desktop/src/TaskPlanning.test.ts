@@ -4,7 +4,7 @@ const { invoke, flush, storage, preferences } = vi.hoisted(() => ({ invoke: vi.f
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("./UserProfileStorage", () => ({ userProfileStorage: { getItem: (k: string) => storage.get(k) ?? null, setItem: (k: string, v: string) => storage.set(k, v) }, flushUserProfileStorage: flush }));
 vi.mock("./AgentPreferences", () => ({ loadAgentPreferences: () => preferences }));
-import { analyzeTasks, loadPlanningRecords, planningSuggestions, savePlanningSuggestion, stopPlanningWork, taskIdentity, type PlanningView } from "./TaskPlanning";
+import { analyzeTasks, loadPlanningRecords, planningSuggestions, savePlanningSuggestion, removePlanningDay, stopPlanningWork, taskIdentity, type PlanningView } from "./TaskPlanning";
 import type { UnifiedTask } from "./TaskWorkspacePresentation";
 const sample = { id: "one", provider: "dida365", libraryId: "personal", libraryName: "个人", sourceId: "remote-1", documentId: "remote-1", documentTitle: "工程", title: "核对接口", status: "open", completed: false, isProject: false, modifiedAt: 1, dueAt: "2026-11-14", collectionId: "project-a" } as UnifiedTask;
 const view = { work: { id: "work-1", state: "completed", report: { summary: "已读取", nextSteps: [{ action: "[T1] 核对当前接口版本", reason: "存在版本差异", citations: [{ evidenceId: "e1", quote: "版本B" }] }] } }, evidence: [], validity: "" } as unknown as PlanningView;
@@ -15,6 +15,8 @@ it("binds only explicit in-scope tokens, never similar titles or invented identi
   const suggestions = planningSuggestions(report, [sample]);
   expect(suggestions).toHaveLength(1); expect(suggestions[0].task).toBe(sample);
   expect(planningSuggestions({ ...view, validity: "来源已变化" }, [sample])).toEqual([]);
+  expect(planningSuggestions({ ...view, work: { ...view.work, state: "failed" } }, [sample])).toEqual([]);
+  expect(planningSuggestions({ ...view, run: { error: "模型失败但保留旧报告" } }, [sample])).toEqual([]);
 });
 it("decodes the actual interactive prose contract and ignores invalid targets", () => {
   const current = structuredClone(view);
@@ -40,8 +42,18 @@ it("preserves original tasks and merges plan and notes under exact source identi
 });
 it("rejects changed, completed, deleted or replaced tasks before writing", async () => {
   const suggestion = planningSuggestions(view, [sample])[0];
-  for (const task of [undefined, { ...sample, modifiedAt: 2 }, { ...sample, completed: true }, { ...sample, libraryId: "other" }]) await expect(savePlanningSuggestion(suggestion, task, "task", "建议", "2026-11-14")).rejects.toThrow();
+  for (const task of [undefined, { ...sample, modifiedAt: 2 }, { ...sample, contentRevision: "changed body, same timestamp" }, { ...sample, completed: true }, { ...sample, libraryId: "other" }]) await expect(savePlanningSuggestion(suggestion, task, "task", "建议", "2026-11-14")).rejects.toThrow();
   expect(storage.size).toBe(0);
+});
+it("removes only today's reference while keeping the saved recommendation", async () => {
+  const suggestion = planningSuggestions(view, [sample])[0];
+  await savePlanningSuggestion(suggestion, sample, "today", suggestion.text, "2026-11-14");
+  await savePlanningSuggestion(suggestion, sample, "task", "Keep this note", "2026-11-14");
+  await removePlanningDay(sample);
+  expect(loadPlanningRecords()).toHaveLength(1);
+  expect(loadPlanningRecords()[0].note).toBe("Keep this note");
+  expect(loadPlanningRecords()[0].day).toBeUndefined();
+  expect(invoke).not.toHaveBeenCalled();
 });
 it("keeps malformed archives and propagates durable-save failure", async () => {
   storage.set("hub.tasks.planning.v1", "broken");
