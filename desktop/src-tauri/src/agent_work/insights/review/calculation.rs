@@ -20,6 +20,55 @@ pub(super) fn minor(s: &str) -> Result<i64, String> {
         .filter(|v| *v <= 100_000_000_000)
         .ok_or("金额超出本轮范围".into())
 }
+pub(super) fn source_has_day(source: &str, expected: NaiveDate) -> bool {
+    static DATES: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let pattern = DATES.get_or_init(|| {
+        regex::Regex::new(
+            r"([0-9]{4})\s*(?:-|/|年)\s*([0-9]{1,2})\s*(?:-|/|月)\s*([0-9]{1,2})(?:日|号)?",
+        )
+        .unwrap()
+    });
+    pattern.captures_iter(source).any(|c| {
+        let found = c.get(0).unwrap();
+        if source[..found.start()]
+            .chars()
+            .next_back()
+            .is_some_and(|c| c.is_ascii_digit())
+            || source[found.end()..]
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_digit())
+        {
+            return false;
+        }
+        NaiveDate::from_ymd_opt(
+            c[1].parse().unwrap_or(0),
+            c[2].parse().unwrap_or(0),
+            c[3].parse().unwrap_or(0),
+        ) == Some(expected)
+    })
+}
+pub(super) fn source_has_amount(source: &str, expected: i64) -> bool {
+    static NUMBERS: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let pattern = NUMBERS.get_or_init(|| {
+        regex::Regex::new(r"[0-9]{1,3}(?:,[0-9]{3})+(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?")
+            .unwrap()
+    });
+    pattern.find_iter(source).any(|m| {
+        if source[..m.start()]
+            .chars()
+            .next_back()
+            .is_some_and(|c| c.is_ascii_digit() || c == '.')
+            || source[m.end()..]
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_digit() || c == '.')
+        {
+            return false;
+        }
+        minor(&m.as_str().replace(',', "")) == Ok(expected)
+    })
+}
 fn money(n: i64) -> String {
     let sign = if n < 0 { "-" } else { "" };
     let n = n.unsigned_abs();
@@ -130,11 +179,11 @@ pub(super) fn calculate(
         } else {
             let at = text(&row, "eventDate", 40)?;
             let event_day = at.get(..10).ok_or("事件日期格式无效")?;
-            date(event_day)?;
+            let expected_day = date(event_day)?;
             let dependencies = row["dependencies"].as_array().unwrap().clone();
             if !dependencies
                 .iter()
-                .any(|d| d["quote"].as_str().unwrap_or_default().contains(event_day))
+                .any(|d| source_has_day(d["quote"].as_str().unwrap_or_default(), expected_day))
             {
                 return Err("归期日期缺少明确原文定位；不能用补录或修改时间猜测".into());
             }
@@ -148,10 +197,11 @@ pub(super) fn calculate(
                 let value = minor(&amount)?;
                 text(&row, "currency", 8)?;
                 text(&row, "account", 120)?;
-                if !dependencies
-                    .iter()
-                    .any(|d| d["quote"].as_str().is_some_and(|q| q.contains(&amount)))
-                {
+                if !dependencies.iter().any(|d| {
+                    d["quote"]
+                        .as_str()
+                        .is_some_and(|q| source_has_amount(q, value))
+                }) {
                     return Err("金额缺少精确原文定位".into());
                 }
                 row["minorUnits"] = json!(if kind == "refund" { -value } else { value });

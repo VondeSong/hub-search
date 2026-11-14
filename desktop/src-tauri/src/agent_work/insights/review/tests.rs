@@ -334,3 +334,27 @@ fn withdrawn_user_material_is_absent_from_fresh_conversation_and_native_binding_
     let required = store::goal::completion::sources_on(&db, &work).unwrap();
     assert!(!required.to_string().contains(NOTES));
 }
+
+#[test]
+fn natural_chinese_dates_and_decimal_formatting_keep_original_provenance() {
+    let c = Case::new(
+        "主账户CNY：2026年11月2日，实际餐饮支出1,200元。只有这一条已记录支出。",
+        "month",
+    );
+    let mut coverage = c.coverage();
+    coverage["current"] = json!("recorded");
+    coverage["previous"] = json!("missing");
+    coverage["comparable"] = json!(false);
+    let result = c
+        .calculate(
+            vec![c.row("food", "2026-11-02", "expense", Some("1200.00"))],
+            coverage,
+        )
+        .unwrap();
+    assert_eq!(result["metrics"][0]["current"], "1200.00");
+    assert!(!calculation::source_has_amount("金额12.345", 1234));
+    assert!(!calculation::source_has_day(
+        "2026年11月3日",
+        date("2026-11-02").unwrap()
+    ));
+}
