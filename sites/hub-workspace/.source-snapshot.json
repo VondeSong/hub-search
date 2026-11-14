@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "244b615b4565b600cdba7e3e5d2f8526c5959e2a",
-  "published_version": 93,
-  "deployment_id": "appgdep_6af84037a1bc81919ac619ce69c5438d",
+  "source_commit": "dd296f0e33648ac7fddf73609fc0abd40ee60405",
+  "published_version": 94,
+  "deployment_id": "appgdep_6af8448abcbc819183f04a1473a5258d",
   "files": {
     ".gitignore": {
       "sha256": "5ca3c39bdc1288c108a1931b3f6bc5795464b6253e9457390617774259deed0c",
@@ -428,9 +428,9 @@
       "bytes": 5280
     },
     "app/task-analysis.css": {
-      "sha256": "28e191de27aa622ceaac3fcc86bdd29ca086347810378dab49b8890b28557c5e",
+      "sha256": "4d8bb34b7a89d1d92cb4f027e02e39b72ecbd356d64dfc57c1e9b45fb64e2601",
       "mode": "100644",
-      "bytes": 8371
+      "bytes": 8482
     },
     "app/task-data.ts": {
       "sha256": "89774044dac6d00619e2029d44fd252b795b5da0db24a9dede10256177d8b592",
@@ -878,14 +878,14 @@
       "bytes": 2555
     },
     "docs/task-analysis-workspace.jpg": {
-      "sha256": "c6065f68a033d4f9b340e8ed18fab9418c8270baf2053b6b413ed3961d459a9f",
+      "sha256": "7e66a8cf9afe81ea33e5f704251959951f6f85f70f726f9478a4ed8de546a095",
       "mode": "100644",
-      "bytes": 68421
+      "bytes": 74961
     },
     "docs/task-analysis-workspace.md": {
-      "sha256": "286c2878d060dca4d14bc2731258322e86bf709d6ce51265f6b52dc07fcd6f98",
+      "sha256": "af05641cb367281fd0002d11e6b965d70bd3ee157f2f2121839364c92114befd",
       "mode": "100644",
-      "bytes": 3846
+      "bytes": 4813
     },
     "docs/task-journal-prototype.md": {
       "sha256": "3f9a10ba2e688506039a01011db473fb52b32f59bc29c5e6dbf3301bbf847450",
@@ -1213,5 +1213,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-14T11:05:58.591296+00:00"
+  "imported_at": "2026-11-14T11:24:43.723954+00:00"
 }
