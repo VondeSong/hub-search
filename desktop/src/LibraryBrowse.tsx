@@ -15,7 +15,12 @@ export function browseSubpage(result: SearchResult | undefined, href?: string, t
   try { blockId = decodeURIComponent(href.slice(marker.length)); } catch { return undefined; }
   if (!blockId) return undefined;
   const id = `craft-subpage:${result.spaceId}:${result.documentId}:${blockId}`;
-  return { ...result, id, entityKey: id, blockId, pageId: blockId, title: title || result.title, documentTitle: title || result.documentTitle };
+  return {
+    ...result, id, entityKey: id, blockId, pageId: blockId,
+    contentType: "craft_subpage", sourceType: "craft_page",
+    sourceItemId: undefined, sourceTitle: undefined, pageNumber: undefined,
+    title: title || result.title, documentTitle: title || result.documentTitle,
+  };
 }
 
 type FolderNode = { id: string; name: string; parentId?: string };
@@ -120,6 +125,7 @@ export function LibraryBrowse({
 }) {
   const header = useContext(WorkspaceHeaderContext);
   const library = libraries.find(item => item.id === position?.libraryId);
+  const subpageLibraryId = selected?.contentType === "craft_subpage" ? selected.libraryId : undefined;
   const [cache, setCache] = useState<Record<string, LoadedLibrary>>({});
   const requested = useRef(new Map<string, string>());
   const [revision, refresh] = useState(0);
@@ -141,7 +147,7 @@ export function LibraryBrowse({
 
   useEffect(() => {
     for (const item of libraries) {
-      const needed = item.id === library?.id || Boolean(directoryQuery && !library) || (!library && openRoots[item.id]);
+      const needed = item.id === library?.id || item.id === subpageLibraryId || Boolean(directoryQuery && !library) || (!library && openRoots[item.id]);
       if (!needed) continue;
       const version = libraryVersion(item, revision);
       if (requested.current.get(item.id) === version) continue;
@@ -156,7 +162,7 @@ export function LibraryBrowse({
         }
       });
     }
-  }, [libraries, library?.id, directoryQuery, openRoots, revision]);
+  }, [libraries, library?.id, subpageLibraryId, directoryQuery, openRoots, revision]);
 
   const loaded = library ? cache[library.id] : undefined;
   const tree = loaded?.tree;
@@ -325,7 +331,8 @@ export function LibraryBrowse({
       <p className="library-browser-hint">当前显示已缓存目录和文档。完成同步后可刷新 Craft 文件夹归属。</p>}
     {tree && requestedFolder && !folderId && <p className="library-browser-hint">原目录已不可用，当前显示资料库根目录。</p>}
   </>;
-  const rootDocument = selected?.contentType === "craft_subpage" && loaded?.contents?.documents.find(document => document.id === selected.documentId);
+  const subpageLibrary = subpageLibraryId ? libraries.find(item => item.id === subpageLibraryId) : undefined;
+  const rootDocument = subpageLibrary && cache[subpageLibrary.id]?.contents?.documents.find(document => document.id === selected?.documentId);
   const count = query ? matching?.results?.length : showFavorites ? libraryFavorites.length
     : library && tree ? (tree.children.get(folderId)?.length ?? 0) + (tree.pages.get(folderId)?.length ?? 0) + (!folderId ? tree.unresolved.length : 0)
       : library ? undefined : libraries.length;
@@ -426,7 +433,7 @@ export function LibraryBrowse({
           <button aria-pressed={mode === "tree"} onClick={() => setMode("tree")}><FolderTree size={15} />目录树</button>
           <button aria-pressed={mode === "columns"} onClick={() => setMode("columns")}><Columns3 size={15} />分栏浏览</button>
         </div>
-        {rootDocument && library && <button className="library-browser-text-button" onClick={() => onPreview(rootResult(library, rootDocument))}>返回文档首页</button>}
+        {rootDocument && subpageLibrary && <button className="library-browser-text-button" onClick={() => onPreview(rootResult(subpageLibrary, rootDocument))}>返回文档首页</button>}
       </div>
       <div className={`library-browser-body${inColumns ? " library-browser-column-mode" : ""}${preview ? " library-browser-reading" : ""}`}>
         {inColumns ? <div className="library-browser-columns" ref={columnStrip} aria-label="目录分栏">

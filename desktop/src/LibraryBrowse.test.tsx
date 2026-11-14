@@ -124,3 +124,41 @@ it("shows all libraries, opens real folder levels in column mode and restores th
     invoke.mockReset();
   }
 });
+
+it("returns from a Craft subpage to the original document without changing the browse scope", async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  const library: LibrarySummary = { id: "craft", provider: "craft", name: "Craft 库", connected: true, documentCount: 1, excludedPaths: [] };
+  const parent = {
+    id: "root", entityKey: "root", contentType: "document", provider: "craft",
+    libraryId: library.id, spaceId: library.id, documentId: "root", title: "根文档",
+  } as SearchResult;
+  invoke.mockResolvedValue({ ...contents, documents: [contents.documents[0]] });
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  const onPosition = vi.fn();
+  const onPreview = vi.fn();
+  const render = (selected: SearchResult | undefined) => root.render(<LibraryBrowse
+    libraries={[library]} onPosition={onPosition} selected={selected} onPreview={onPreview} onClosePreview={vi.fn()} />);
+  const home = () => Array.from(container.querySelectorAll("button")).find(item => item.textContent === "返回文档首页");
+  try {
+    await act(async () => render(parent));
+    expect(home()).toBeUndefined();
+    expect(invoke).not.toHaveBeenCalled();
+    const child = browseSubpage(parent, "#craft-subpage=child", "子页面");
+    const grandchild = browseSubpage(child, "#craft-subpage=grandchild", "深层子页面");
+    expect(grandchild).toEqual(expect.objectContaining({
+      contentType: "craft_subpage", sourceType: "craft_page", documentId: "root", pageId: "grandchild",
+    }));
+    await act(async () => render(grandchild));
+    expect(invoke).toHaveBeenCalledWith("library_contents", { libraryId: library.id });
+    expect(home()).toBeDefined();
+    await act(async () => home()!.click());
+    expect(onPreview).toHaveBeenCalledWith(expect.objectContaining({
+      documentId: "root", blockId: "root", contentType: "document", title: "根文档",
+    }));
+    expect(onPosition).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+    invoke.mockReset();
+  }
+});
