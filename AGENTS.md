@@ -41,18 +41,28 @@
 
 - 沿用私有的 [Hub 开发总看板](https://github.com/users/VondeSong/projects/2/views/1)，所属账号 `VondeSong`，Project 编号 `2`、ID `PVT_kwHOAzsX5M4BqkPh`，关联 `VondeSong/hub-search`；不新建或替换已有看板。
 - 状态字段为 `Status`，ID `PVTSSF_lAHOAzsX5M4BqkPhzho62Q8`，保留“待处理、处理中、待验证、已完成”及其现有选项身份。进度与验收按下方“开发进度与完成记录”执行，保留已有自动化配置，不擅自重置规则或事项状态。
-- “模块”为单选字段，ID `PVTSSF_lAHOAzsX5M4BqkPhzho62eM`，包含搜索、闪卡、Agents、同步、界面、移动端六类。Agents 由原 DeepSeek 选项原位更名，选项 ID 保持 `74a16a9d`，沿用已有事项归属和进度，不另建同名选项。以下均为现有 Board 视图，总看板不设模块过滤，各模块以 `模块:模块名` 筛选：
+- 用户于 2026-11-14 明确要求按功能模块整理全部任务的归属与父子层级，本轮不安排执行顺序。使用 GitHub 原生 Parent issue / Sub-issues：模块是父任务，具体功能 Issue 是子任务；每项具体功能只有一个主模块父任务，跨模块联系另行说明，不将关联或父子关系当作阻塞依赖。
+- “模块”为单选字段，ID `PVTSSF_lAHOAzsX5M4BqkPhzho62eM`，现有 11 类见下表。沿用搜索、闪卡、Agents 及同步选项身份，同步原位更名“同步与备份”；Agents 选项 ID 仍为 `74a16a9d`。不再用“界面”收纳所有业务面板，也不把“移动端”作为业务模块。
+- “平台”为独立单选字段，ID `PVTSSF_lAHOAzsX5M4BqkPhzhp0-HM`，使用“桌面、跨端、待确认”，仅说明需求范围，不代表已验收。手机 Agents 归 Agents，速记归日志与速记，跨端同步归同步与备份；Android/VPS 等细节在具体 Issue 中说明。
+- [模块总览](https://github.com/users/VondeSong/projects/2/views/1)保持原总入口 URL，采用 Table 布局，以 `label:"模块总览"` 仅展示模块父任务和子事项进度；[全部任务](https://github.com/users/VondeSong/projects/2/views/8)以 `-label:"模块总览"` 展示已收录的具体功能及其父任务字段。各模块 Table 视图按 `模块:模块名` 筛选；[跨端与移动端](https://github.com/users/VondeSong/projects/2/views/7)以 `平台:跨端 -label:"模块总览"` 跨模块查看，不复制事项。
 
-| 模块与视图 | 适用范围 |
-| --- | --- |
-| [搜索](https://github.com/users/VondeSong/projects/2/views/2) | 本地索引、检索、结果列表与内容预览相关需求 |
-| [闪卡](https://github.com/users/VondeSong/projects/2/views/3) | 闪卡生成、质量、牌组、学习与复习相关需求 |
-| [Agents](https://github.com/users/VondeSong/projects/2/views/4) | Hub Agents、共享记忆及模型提供方相关需求；视图筛选为 `模块:Agents` |
-| [同步](https://github.com/users/VondeSong/projects/2/views/5) | Craft、滴答、Obsidian 接入及云同步等相关需求，沿用已有归类 |
-| [界面](https://github.com/users/VondeSong/projects/2/views/6) | 导航、布局、交互与界面呈现相关需求 |
-| [移动端](https://github.com/users/VondeSong/projects/2/views/7) | 现有 Android 工程、移动布局与手机端功能适配 |
+| 模块与视图 | 模块父任务 | 归属范围 |
+| --- | --- | --- |
+| [资料库](https://github.com/users/VondeSong/projects/2/views/6) | [#35](https://github.com/VondeSong/hub-search/issues/35) | 来源接入、原生结构浏览、预览及受控编辑入口；#25 只跟踪结构浏览 |
+| [任务管理](https://github.com/users/VondeSong/projects/2/views/9) | [#36](https://github.com/VondeSong/hub-search/issues/36) | 独立任务面板、跨来源行动与执行流程；#34 不属于 #25 |
+| [搜索](https://github.com/users/VondeSong/projects/2/views/2) | [#37](https://github.com/VondeSong/hub-search/issues/37) | 全局检索、内容覆盖、排序、定位和搜索性能 |
+| [阅读](https://github.com/users/VondeSong/projects/2/views/10) | [#38](https://github.com/VondeSong/hub-search/issues/38) | 采集、稍后读、阅读状态和阅读工作区 |
+| [闪卡](https://github.com/users/VondeSong/projects/2/views/3) | [#39](https://github.com/VondeSong/hub-search/issues/39) | 制卡质量、牌组、学习、复习及模块专属备份 |
+| [日志与速记](https://github.com/users/VondeSong/projects/2/views/11) | [#40](https://github.com/VondeSong/hub-search/issues/40) | 日志视图、按天记录、OS 日记归档及回执 |
+| [洞察](https://github.com/users/VondeSong/projects/2/views/12) | [#41](https://github.com/VondeSong/hub-search/issues/41) | 发现、证据、反馈、更新及阶段回顾规划 |
+| [标签与关系](https://github.com/users/VondeSong/projects/2/views/13) | [#42](https://github.com/VondeSong/hub-search/issues/42) | 定义、补标、治理、质量、关系图及 TheBrain；#30 的标签业务归此 |
+| [Agents](https://github.com/users/VondeSong/projects/2/views/4) | [#43](https://github.com/VondeSong/hub-search/issues/43) | 统一助手、模型、材料策略、记忆、执行保护及云端 Agents |
+| [同步与备份](https://github.com/users/VondeSong/projects/2/views/5) | [#44](https://github.com/VondeSong/hub-search/issues/44) | 共用 OSS、跨端传输、附件、导出、备份与恢复 |
+| [设置与基础](https://github.com/users/VondeSong/projects/2/views/14) | [#45](https://github.com/VondeSong/hub-search/issues/45) | 配置、迁移、安装升级兼容和稳定性验收 |
 
-- 新收录事项按实际功能填写模块；跨模块事项选择主要模块并说明关联。既有事项不批量重分类，不为补齐视图虚构需求，不把普通 Bug 自动加入看板。
+- 模块父任务是长期目录，保持打开并用原生子事项统计展示进度，不因模块入口仍打开而重做已完成的子任务；新建目录不代表开始开发，也不以目录的默认“待处理”替代子任务真实状态。没有具体需求的模块不创建占位功能。
+- 新收录功能先检索现有事项，再归入对应模块父任务，填写模块与平台；跨模块只关联，不复制同一需求。界面优化、原型和验收记录跟随业务模块；资料库、任务、日志等混合历史只分流相关部分并保留原文、证据和正确接续入口，不把共享测试数字重复计为新成果。
+- 本轮已按明确授权完成既有事项归位，后续不无故批量重分类。普通 Bug 继续只留在 Issues，可关联模块父任务；添加父任务时核对 GitHub 带入的子事项并移出普通 Bug，不能因此绕过“不自动将所有 Issue 加入看板”的约定。#33 保留同步与备份父任务关联但不收录看板。
 - README 保留 Issues、开发总看板及本文件的协作导航与简短约定，原位更新并核对真实链接，不重复插入入口；产品说明仍保留在原有位置。
 - 发布时机继续由用户决定，沿用本项目已有发布授权边界；模块配置、任务完成、检查通过、Issue 关闭或里程碑完成均不自行触发标签、Release 或安装包发布。
 
