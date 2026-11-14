@@ -188,6 +188,15 @@ pub(super) fn search(
     }
     if reading && exists(c, "collection_x_items")? {
         let copies = crate::x_bookmarks::search_saved_copies(c)?;
+        // Ideographs cannot change under lowercase; avoid a Rust callback/allocation per JSON atom.
+        let contains = if query_lower
+            .chars()
+            .all(|ch| ('\u{3400}'..='\u{9fff}').contains(&ch))
+        {
+            "instr(atom.value,?1)>0"
+        } else {
+            "hub_module_contains(atom.value,?1)"
+        };
         let sql=format!("WITH saved_copies AS ({copies}) SELECT t.item_key,t.post_json,t.collected_at,t.read_at
           FROM collection_x_items t
           WHERE COALESCE((SELECT state FROM collection_lifecycle WHERE item_key=t.item_key),'active')='active'
@@ -200,7 +209,7 @@ pub(super) fn search(
             AND (?5 IS NULL OR n.id IN (SELECT value FROM json_each(?5)))
             AND (?6 IS NULL OR r.object_id IN (SELECT value FROM json_each(?6)) OR n.id IN (SELECT value FROM json_each(?6)))))
           AND (?7 IS NULL OR t.collected_at/1000>=?7)
-          AND (?1='' OR EXISTS(SELECT 1 FROM json_tree(t.post_json) atom WHERE atom.type='text' AND hub_module_contains(atom.value,?1)))
+          AND (?1='' OR EXISTS(SELECT 1 FROM json_tree(t.post_json) atom WHERE atom.type='text' AND {contains}))
           ORDER BY t.collected_at DESC,t.item_key");
         let mut s = c.prepare(&sql).map_err(|e| e.to_string())?;
         // Filter exact rendered fields before the result limit, so metadata-only matches never hide a later hit.
@@ -343,6 +352,39 @@ pub(crate) async fn module_search_document(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn reading_cjk_prefilter_keeps_escaped_text_ranking_and_unicode_case() {
+        let f = source_evidence::tests::Fixture::new();
+        f.reading("old", "知识");
+        f.reading("new", "其他标题\n知识正文");
+        f.reading("metadata", "无关正文");
+        f.reading("unicode", "KEY STRAẞE");
+        let c = f.c();
+        c.execute(
+            "UPDATE collection_x_items SET collected_at=3000 WHERE item_key='new'",
+            [],
+        )
+        .unwrap();
+        c.execute("UPDATE collection_x_items SET post_json=replace(post_json,'知识','\\u77e5\\u8bc6') WHERE item_key='old'",[]).unwrap();
+        c.execute("UPDATE collection_x_items SET post_json=json_set(post_json,'$.author_id','知识') WHERE item_key='metadata'",[]).unwrap();
+        let hits = search(&c, "知识", 1, &scope(true), true, false, "all").unwrap();
+        assert_eq!(hits[0].document_id, "old");
+        let hits = search(&c, "知识", 10, &scope(true), true, false, "all").unwrap();
+        assert_eq!(hits.len(), 2);
+        assert!(hits.iter().any(|hit| hit.document_id == "new"));
+        assert!(!hits.iter().any(|hit| hit.document_id == "metadata"));
+        assert_eq!(
+            search(&c, "知识", 10, &scope(true), true, false, "title")
+                .unwrap()
+                .len(),
+            1
+        );
+        for query in ["key", "straße"] {
+            let hits = search(&c, query, 10, &scope(true), true, false, "all").unwrap();
+            assert_eq!(hits.len(), 1);
+            assert_eq!(hits[0].document_id, "unicode");
+        }
+    }
     #[test]
     fn older_exact_reading_titles_survive_the_limit_and_json_escaping() {
         let f = source_evidence::tests::Fixture::new();

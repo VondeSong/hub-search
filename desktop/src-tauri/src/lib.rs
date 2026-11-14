@@ -152,6 +152,8 @@ mod reading_sync;
 mod search_index;
 mod search_index_runtime;
 #[cfg(test)]
+mod performance_baseline;
+#[cfg(test)]
 use search_index_runtime::{
     build_and_activate_search_generation, claim_index_batch, collect_index_records,
     visit_index_records, IndexRebuildSnapshot,
