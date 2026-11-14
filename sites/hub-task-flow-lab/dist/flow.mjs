@@ -2,10 +2,10 @@
 export function renderFlow() {
   return `
   <section class="flow-page" aria-labelledby="flow-title">
+    <div class="planning-form" style="margin-bottom:32px"><h2>v2：先选一个问题，再决定采用什么</h2><p>安排今天 → 读取全部示例任务；梳理项目 → 读取所选项目；推进任务 → 读取原任务与相关资料。</p><p>核对范围与数据时间 → 生成有依据的建议 → 逐条采用、保留或暂不采用。加入 Hub 今日计划只保存原任务引用；修改来源前先预览差异，保存后查看模拟回执。结果未知先核对，不重复提交。</p><button class="btn btn-primary" data-action="page" data-id="planning">体验三个 AI 入口</button></div>
     <header class="flow-header">
       <div>
-        <div class="flow-eyebrow">从信息到行动</div>
-        <h1 id="flow-title">任务，最终是为了推进一件事。</h1>
+        <h1 id="flow-title">进阶案例：从线索到完成。</h1>
         <p class="flow-intro">把分散的依据放在一起，把真正要做的事留在同一个任务里。Hub 帮你判断、推进和回顾，而不是多维护一份清单。</p>
       </div>
       <a class="flow-download" href="./task-flow.svg" download="hub-task-flow.svg">下载流程图 <span aria-hidden="true">↗</span></a>

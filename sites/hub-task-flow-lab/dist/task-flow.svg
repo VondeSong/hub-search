@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1290" viewBox="0 0 1000 1290" role="img" aria-labelledby="title desc">
-  <title id="title">Hub 任务闭环：从资料线索到可追溯的结果</title>
-  <desc id="desc">已有或明确新建任务直接进入。资料与 AI 建议先经过待整理，选择关联已有、确认新建或只留资料。现在分别显示硬截止、今日计划和最多五项的可选行动池。同一个任务执行或等待后恢复，完成后模拟来源同步。成功进入日志与回顾；失败重试同一操作，或先取消本次完成再编辑；待确认或结果未知时先核对，不盲目重试。全部外部能力为演示。</desc>
+  <title id="title">Hub 进阶案例：从资料线索到可追溯的结果</title>
+  <desc id="desc">这是保留的 v1 进阶案例，非 v2 AI 分析的必经步骤。v2 主入口是安排今天、梳理项目、推进任务，先读取再建议，采纳时分开 Hub 本地计划与来源修改。已有或明确新建任务直接进入。资料与 AI 建议先经过待整理，选择关联已有、确认新建或只留资料。现在分别显示硬截止、今日计划和最多五项的可选行动池。同一个任务执行或等待后恢复，完成后模拟来源同步。成功进入日志与回顾；失败重试同一操作，或先取消本次完成再编辑；待确认或结果未知时先核对，不盲目重试。全部外部能力为演示。</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 1 1 L 8 5 L 1 9" fill="none" stroke="#89958d" stroke-width="1.7" stroke-linejoin="round"/></marker>
     <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 1 1 L 8 5 L 1 9" fill="none" stroke="#527464" stroke-width="1.7" stroke-linejoin="round"/></marker>

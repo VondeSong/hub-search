@@ -4,6 +4,8 @@
  * All source acknowledgements are explicit simulations.
  */
 
+import {planningInitial, planningValid, reducePlanning} from './planning.mjs';
+
 export const MODEL_VERSION = 1;
 export const ACTION_POOL_LIMIT = 5;
 export const DEMO_DATE = '2026-11-14';
@@ -171,7 +173,7 @@ export function createInitialState(now = DEMO_DATE) {
       },
     ],
     journal: [{id: 'j-seed', taskId: 't-done', title: '归档上一次评审记录', project: 'BEV', type: 'completed', date: yesterday, at: yesterday, operationId: 'seed-complete', simulated: true, reopenedAt: null}],
-    events: [], nextId: 1, error: null,
+    events: [], nextId: 1, error: null, planning: planningInitial(),
   };
 }
 
@@ -228,6 +230,7 @@ export function reducer(state, action, now = state.demoDate) {
   if (action.type === 'CLEAR_ERROR') return {...state, error: null};
   const next = clone(state);
   next.error = null;
+  if (action.type.startsWith('PLAN_')) return reducePlanning(next, action, at);
 
   if (action.type === 'ADD_TASK') {
     const title = text(action.title);
@@ -489,6 +492,7 @@ export function validateState(state) {
     const timestamp = value => string(value) && validDate(value.slice(0, 10));
     const unique = values => values.length === new Set(values).size;
     if (!record(state) || state.version !== MODEL_VERSION || !validDate(state.demoDate)) return false;
+    if (!planningValid(state.planning, state.tasks, state.materials)) return false;
     if (!['tasks', 'candidates', 'materials', 'journal', 'events'].every(key => Array.isArray(state[key]))) return false;
     if (!Number.isSafeInteger(state.nextId) || state.nextId < 1 || !(state.error === null || string(state.error))) return false;
     for (const key of ['tasks', 'candidates', 'materials', 'journal', 'events']) {

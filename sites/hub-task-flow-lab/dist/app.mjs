@@ -1,12 +1,13 @@
 import {createInitialState, reducer, selectors, selectView, selectCounts, taskSources, validateState, ACTION_POOL_LIMIT} from './model.mjs';
 import {renderFlow} from './flow.mjs';
+import {renderPlanning} from './planning-ui.mjs';
 
 const STORAGE_KEY = 'hub-task-flow-lab-v1';
 const VIEW_KEY = 'hub-task-flow-lab-view-v1';
 const ORIGINAL_SITE = 'https://hub-workspace-von11.song02211368537057.chatgpt.site/?view=tasks';
 const SOURCE_NAMES = {dida:'滴答清单',craft:'Craft',feishu:'飞书',obsidian:'Obsidian',hub:'Hub 洞察'};
 const STATE_NAMES = {todo:'待办',doing:'进行中',waiting:'等待条件',done:'已完成'};
-const PAGES = {tasks:'任务',journal:'日志',insights:'洞察',materials:'关联资料',flow:'任务流程图'};
+const PAGES = {planning:'AI 规划',tasks:'任务',journal:'日志',insights:'洞察',materials:'关联资料',flow:'任务流程图'};
 const VIEWS = {now:'现在',triage:'待整理',waiting:'等待',all:'全部'};
 const LAYOUTS = {list:'列表',board:'看板',table:'表格',timeline:'时间线',tree:'项目树',relations:'关联图'};
 const root = document.getElementById('app');
@@ -78,12 +79,12 @@ function loadData(){
   return createInitialState(localDay());
 }
 let state=loadData();
-let ui={page:'tasks',view:'now',layout:'list',project:'all',source:'all',query:'',status:'open',selected:window.innerWidth>1050?'t-mobile':null,candidate:null,panelTab:'details',candidateMode:'link',candidateTarget:'t-harness',guide:false,guideStep:0,guideTaskId:'t-harness',navOpen:false,showResolved:false,theme:'light',simulation:'success',assistantDrafts:{},candidateDrafts:{}};
+let ui={planningMode:'today',planCapacity:'120',planProject:'BEV',planTask:'t-harness',planCoverage:'fresh',planningBusy:false,page:'planning',view:'now',layout:'list',project:'all',source:'all',query:'',status:'open',selected:window.innerWidth>1050?'t-mobile':null,candidate:null,panelTab:'details',candidateMode:'link',candidateTarget:'t-harness',guide:false,guideStep:0,guideTaskId:'t-harness',navOpen:false,showResolved:false,theme:'light',simulation:'success',assistantDrafts:{},candidateDrafts:{}};
 try{const saved=JSON.parse(localStorage.getItem(VIEW_KEY)||'{}');for(const key of ['project','source','layout','theme','simulation'])if(typeof saved[key]==='string')ui[key]=saved[key];for(const key of ['assistantDrafts','candidateDrafts'])if(saved[key]&&typeof saved[key]==='object'&&!Array.isArray(saved[key]))ui[key]=saved[key];if(!LAYOUTS[ui.layout])ui.layout='list';if(!['light','dark'].includes(ui.theme))ui.theme='light';if(!['success','failure','pending'].includes(ui.simulation))ui.simulation='success';}catch{}
 const initialHash=location.hash.slice(1);
 if(initialHash==='flow') {ui.page='flow';ui.selected=null;}
-else if(['journal','insights','materials'].includes(initialHash)){ui.page=initialHash;ui.selected=null;}
-else if(VIEWS[initialHash])ui.view=initialHash;
+else if(['planning','journal','insights','materials'].includes(initialHash)){ui.page=initialHash;ui.selected=null;}
+else if(VIEWS[initialHash]){ui.page='tasks';ui.view=initialHash;}
 
 function save(){
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));localStorage.setItem(VIEW_KEY,JSON.stringify(ui));if(storageWarning.startsWith('无法保存'))storageWarning='';}
@@ -131,7 +132,7 @@ function render(){
 function captureDrafts(){if(skipDraftCapture){skipDraftCapture=false;return;}const assistant=document.getElementById('assistant-form');if(assistant)ui.assistantDrafts[assistant.dataset.task]=assistant.querySelector('textarea')?.value||'';const candidate=document.getElementById('candidate-form');if(candidate)ui.candidateDrafts[`${candidate.dataset.id}:${candidate.dataset.mode}`]=Object.fromEntries(new FormData(candidate));}
 function guideTask(){return ui.guideTaskId||'t-harness';}
 function resumeGuide(){const c=candidateById('c-drawing');ui.guideTaskId=c?.resolvedTaskId||'t-harness';const t=taskById(guideTask());ui.guideStep=!c?.resolvedTaskId?0:t?.state==='done'?6:t?.state==='waiting'?4:t?.history.some(h=>h.type==='resumed')?5:t?.aiNote?3:t?.now?2:1;}
-function renderRail(){return `<nav class="rail" aria-label="Hub 模块"><a class="brand" href="#now" aria-label="Hub 任务工作台">H</a>${[['tasks','tasks','任务'],['materials','layers','资料'],['insights','spark','洞察'],['journal','journal','日志'],['flow','flow','流程图']].map(([page,glyph,label])=>`<button class="rail-btn ${ui.page===page?'active':''}" type="button" data-action="page" data-id="${page}" aria-label="${label}" title="${label}"${ui.page===page?' aria-current="page"':''}>${icon(glyph,18)}</button>`).join('')}<div class="rail-gap"></div><a class="rail-btn" href="${ORIGINAL_SITE}" target="_blank" rel="noopener" title="打开原 Hub 工作台（新标签页）" aria-label="打开原 Hub 工作台（新标签页）">${icon('external',17)}</a>${iconButton('theme',ui.theme==='dark'?'切换浅色':'切换深色',ui.theme==='dark'?'sun':'moon')}<div class="avatar" aria-label="个人工作空间">V</div></nav>`;}
+function renderRail(){return `<nav class="rail" aria-label="Hub 模块"><a class="brand" href="#now" aria-label="Hub 任务工作台">H</a>${[['planning','spark','AI 规划'],['tasks','tasks','任务'],['materials','layers','资料'],['insights','spark','洞察'],['journal','journal','日志'],['flow','flow','流程图']].map(([page,glyph,label])=>`<button class="rail-btn ${ui.page===page?'active':''}" type="button" data-action="page" data-id="${page}" aria-label="${label}" title="${label}"${ui.page===page?' aria-current="page"':''}>${icon(glyph,18)}</button>`).join('')}<div class="rail-gap"></div><a class="rail-btn" href="${ORIGINAL_SITE}" target="_blank" rel="noopener" title="打开原 Hub 工作台（新标签页）" aria-label="打开原 Hub 工作台（新标签页）">${icon('external',17)}</a>${iconButton('theme',ui.theme==='dark'?'切换浅色':'切换深色',ui.theme==='dark'?'sun':'moon')}<div class="avatar" aria-label="个人工作空间">V</div></nav>`;}
 function renderSidebar(counts){
   const projects=[...new Set(state.tasks.map(t=>t.project))];
   return `<aside class="sidebar"><div class="sidebar-title">任务工作台 <span>Hub</span></div><div class="sidebar-scroll"><button class="side-item ${ui.project==='all'?'active':''}" data-action="project" data-id="all">${icon('layers',15)}<span>全部项目</span><em>${counts.active}</em></button><div class="sidebar-label">项目与清单</div>${projects.map(project=>`<button class="side-item ${ui.project===project?'active':''}" data-action="project" data-id="${esc(project)}"><i class="project-dot"></i><span>${esc(project==='Hub'?'Hub 工作台':project==='BEV'?'BEV 线束':project==='160'?'160 项目':project)}</span><em>${state.tasks.filter(t=>t.project===project&&t.state!=='done').length}</em></button>`).join('')}<div class="sidebar-label">任务与关联来源</div>${Object.entries(SOURCE_NAMES).map(([source,label])=>`<button class="side-item ${ui.source===source?'active':''}" data-action="source" data-id="${source}">${sourceMark(source)}<span>${label}</span><em>${state.tasks.filter(t=>t.state!=='done'&&taskSources(state,t).includes(source)).length}</em></button>`).join('')}<div class="sidebar-note">任务留在原清单。<br>资料是依据，不是另一份待办。<br><button class="btn btn-link" data-action="page" data-id="flow">看看完整逻辑 ${icon('arrow',12)}</button></div></div><div class="sidebar-bottom"><span class="avatar">V</span><div>我的工作空间<small>独立原型 · 本机示例</small></div>${iconButton('about','原型说明','info')}</div></aside>`;
@@ -149,6 +150,7 @@ const guideSteps=[
 function renderGuide(){const [title,desc]=guideSteps[ui.guideStep]||guideSteps[0];return `<div class="guide"><span class="guide-number">${ui.guideStep+1}</span><div class="guide-text"><strong>${title}</strong><span>${desc}</span></div><div class="guide-track" aria-label="第 ${ui.guideStep+1} 步，共 7 步">${guideSteps.map((_,i)=>`<i class="${i<=ui.guideStep?'done':''}"></i>`).join('')}</div>${button('guide-go','前往此步','btn btn-small')}${iconButton('guide-close','结束案例引导','close')}</div>`;}
 
 function renderPage(counts){
+  if(ui.page==='planning')return renderPlanning(state,ui,{esc,icon,button,dateLabel});
   if(ui.page==='flow')return renderFlow();
   if(ui.page==='journal')return renderJournal();
   if(ui.page==='insights')return renderInsights();
@@ -205,7 +207,7 @@ function showDialog(title,body,actions,onSubmit){
   if(!dialog.open)dialog.showModal();
   const first=dialog.querySelector('input:not([type="checkbox"]),textarea,select');if(first)first.focus();
 }
-function closeDialog(){dialog.close();dialogSubmit=null;if(lastDialogFocus?.isConnected)lastDialogFocus.focus();}
+function closeDialog(){dialog.close();dialogSubmit=null;const origin=lastDialogFocus?.isConnected?lastDialogFocus:lastDialogFocus?.dataset.id?root.querySelector(`[data-suggestion="${CSS.escape(lastDialogFocus.dataset.id)}"]`):null;(origin||document.querySelector('#planning-form button[type="submit"]'))?.focus({preventScroll:true});}
 dialog.addEventListener('click',e=>{if(e.target.closest('[data-action="dialog-close"]'))closeDialog();});
 dialog.addEventListener('close',()=>{if(!dialog.open){dialogSubmit=null;if(lastDialogFocus?.isConnected)lastDialogFocus.focus();}});
 dialogContent.addEventListener('submit',event=>{event.preventDefault();if(dialogSubmit)dialogSubmit(new FormData(event.target));});
@@ -220,12 +222,28 @@ function confirmComplete(id){const t=taskById(id);if(!t)return;const s=selectors
 function completeTask(id,retry=false){if(!dispatch({type:retry?'RETRY_COMPLETE':'REQUEST_COMPLETE',id}))return;openTask(id);const t=taskById(id);if(t.syncStatus!=='pending')return;const operationId=t.pendingOperation.id;if(timers.has(operationId))return;toast(retry?'正在模拟重试同一次操作…':'正在等待模拟来源确认…');if(ui.simulation==='pending')return;const outcome=retry?'success':ui.simulation;const timer=setTimeout(()=>{timers.delete(operationId);resolveComplete(id,outcome,operationId);},850);timers.set(operationId,timer);}
 function resolveComplete(id,outcome,operationId){const t=taskById(id);if(!t?.pendingOperation)return;const op=operationId||t.pendingOperation.id;const timer=timers.get(op);if(timer){clearTimeout(timer);timers.delete(op);}if(dispatch({type:'RESOLVE_COMPLETE',id,outcome,operationId:op})){if(outcome==='success'&&taskById(id)?.state==='done'){if(ui.guide&&id===guideTask())ui.guideStep=6;render();toast('模拟来源已确认完成，日志已更新',id);}else if(outcome==='failure')toast('模拟同步失败：原任务仍未完成，可重试');}}
 function runAI(id,prompt='checklist',custom=''){const t=taskById(id);if(!t||busyAI.has(id))return;if(['pending','failed'].includes(t.syncStatus)){toast('请先核对或取消当前完成操作，再准备草稿');return;}const generation=asyncGeneration;busyAI.add(id);ui.panelTab='assistant';render();setTimeout(()=>{if(generation!==asyncGeneration)return;busyAI.delete(id);let text='';if(id!=='t-harness'||prompt!=='checklist')text=custom?`【针对输入的固定演示回复】\n你问：${custom}\n\n围绕“${t.title}”，先确认：${t.nextStep||'一个可执行的下一步'}。\n再查看 ${t.materialIds.length} 份关联资料，把不确定的信息列出来。\n草稿仅保存在原任务里；不会调用真实模型或自动执行。`:prompt==='reply'?`【反馈草稿 · 待人工核对，未发送】\n关于“${t.title}”：\n目前正在核对 ${t.materialIds.length} 份关联资料。\n已确认项：请按实际结果填写。\n待确认项：请补充具体问题与责任方。\n完成标准：${t.doneCriteria}\n\n这段示例不代表实际核对已经完成。`:`【AI 演示草稿 · 待人工核对】\n1. 明确目的：${t.purpose}\n2. 从这里开始：${t.nextStep||'先写下一个可立即开始的动作。'}\n3. 查看关联资料，记录不确定项。\n4. 按完成标准核对：${t.doneCriteria||'确认承诺的结果已经达成。'}\n\n没有新建任务，也没有自动标记完成。`;if(dispatch({type:'ADD_AI_NOTE',id,...(text?{text}:{})})){if(ui.guide&&id===guideTask())ui.guideStep=3;render();toast('演示草稿已附到原任务，等待你核对');}},650);}
+
+function adoptPlan(id){
+  const mode=ui.planningMode;const run=state.planning?.runs[mode];const suggestion=run?.suggestions.find(s=>s.id===id);
+  if(!suggestion)return;
+  if(suggestion.kind!=='nextStep'){dispatch({type:'PLAN_ADOPT',mode,id},'已采用，采纳记录已更新');return;}
+  const task=taskById(suggestion.taskId);
+  showDialog('预览来源修改（演示）',`<p>目标：${esc(SOURCE_NAMES[task.source])} / ${esc(task.list)}<br>原任务：${esc(task.title)}</p><dl class="planning-diff"><dt>修改前 · 下一步</dt><dd>${esc(task.nextStep||'未填写')}</dd><dt>修改后 · 下一步</dt><dd>${esc(suggestion.text)}</dd></dl><p>仅修改下一步；保留原任务 ID、清单、截止日和完成状态。</p><label class="form-field">模拟保存结果<select name="outcome"><option value="success">来源确认成功</option><option value="failure">保存失败，来源未改动</option><option value="unknown">连接中断，结果未知</option></select></label><p class="muted">这里只操作示例任务，不连接真实滴答。</p>`,formActions('确认模拟修改'),data=>{if(dispatch({type:'PLAN_ADOPT',mode,id,outcome:data.get('outcome')},'模拟操作已记录，请查看建议下方结果'))closeDialog();});
+}
+
 function openSimulation(){showDialog('选择演示情境',`<p>这里只模拟完成时的来源确认，不会向滴答、Craft 或飞书发送请求。</p><label class="form-field">下一次完成操作<select name="simulation"><option value="success"${ui.simulation==='success'?' selected':''}>正常：提交后收到确认</option><option value="failure"${ui.simulation==='failure'?' selected':''}>失败：保持未完成，可重试</option><option value="pending"${ui.simulation==='pending'?' selected':''}>待确认：手动模拟收到回执</option></select></label><p>“重试同一次操作”会演示恢复成功，保留原操作 ID，不产生重复任务或日志。</p><div class="divider"></div><button type="button" class="btn btn-danger" data-modal-reset>重置本原型的示例数据</button>`,formActions('应用情境'),data=>{ui.simulation=data.get('simulation');save();closeDialog();toast('已设置下一次完成操作的模拟情境');});}
-dialogContent.addEventListener('click',event=>{if(event.target.closest('[data-modal-reset]')){showDialog('重置这一个原型？','<p>这会清除此站点里你刚才创建或修改的演示记录，恢复初始示例。原 Hub 站点和真实滴答资料不受影响。</p>',formActions('确认重置示例'),()=>{for(const timer of timers.values())clearTimeout(timer);timers.clear();asyncGeneration++;busyAI.clear();skipDraftCapture=true;state=createInitialState(localDay());ui={...ui,assistantDrafts:{},candidateDrafts:{},page:'tasks',view:'now',query:'',project:'all',source:'all',selected:'t-mobile',candidate:null,panelTab:'details',showResolved:false,guide:false,layout:'list',status:'open'};save();closeDialog();navigate('tasks','now');toast('此原型的演示记录已重置；原站点未改动');});}});
+dialogContent.addEventListener('click',event=>{if(event.target.closest('[data-modal-reset]')){showDialog('重置这一个原型？','<p>这会清除此站点里你刚才创建或修改的演示记录，恢复初始示例。原 Hub 站点和真实滴答资料不受影响。</p>',formActions('确认重置示例'),()=>{for(const timer of timers.values())clearTimeout(timer);timers.clear();asyncGeneration++;busyAI.clear();skipDraftCapture=true;state=createInitialState(localDay());ui={...ui,planningBusy:false,planningMode:'today',assistantDrafts:{},candidateDrafts:{},page:'tasks',view:'now',query:'',project:'all',source:'all',selected:'t-mobile',candidate:null,panelTab:'details',showResolved:false,guide:false,layout:'list',status:'open'};save();closeDialog();navigate('tasks','now');toast('此原型的演示记录已重置；原站点未改动');});}});
 
 root.addEventListener('click',event=>{
   const target=event.target.closest('[data-action]');if(!target)return;const {action,id}=target.dataset;
   switch(action){
+    case 'plan-mode':ui.planningMode=id;navigate('planning');break;
+    case 'plan-task':ui.project='all';ui.source='all';ui.query='';ui.status='all';navigate('tasks','all');openTask(id);break;
+    case 'plan-remove':dispatch({type:'PLAN_REMOVE',taskId:id},'已移出 Hub 今日计划，原任务保留');break;
+    case 'plan-dismiss':dispatch({type:'PLAN_DISMISS',mode:ui.planningMode,id},'已暂不采用，原任务保持原样');break;
+    case 'plan-adopt':adoptPlan(id);break;
+    case 'plan-retry':dispatch({type:'PLAN_RETRY',mode:ui.planningMode,id},'同一条建议已模拟保存成功');break;
+    case 'plan-reconcile':dispatch({type:'PLAN_RECONCILE',mode:ui.planningMode,id},'核对结果：本次示例来源未修改，请重新分析后采用');break;
     case 'page': navigate(id);break;
     case 'view':ui.candidate=null;ui.showResolved=false;navigate('tasks',id);break;
     case 'task':openTask(id);break;
@@ -271,6 +289,7 @@ root.addEventListener('click',event=>{
 root.addEventListener('input',event=>{if(event.target.id==='task-search'){ui.query=event.target.value;render();}else if(event.target.closest('#assistant-form,#candidate-form')){captureDrafts();save();}});
 root.addEventListener('change',event=>{
   const el=event.target;
+  if(el.closest('#planning-form')){const values=Object.fromEntries(new FormData(el.form));ui.planCapacity=values.capacity||ui.planCapacity;ui.planProject=values.project||ui.planProject;ui.planTask=values.taskId||ui.planTask;ui.planCoverage=values.coverage;save();}
   if(el.id==='layout-select'){ui.layout=el.value;save();render();}
   if(el.id==='status-filter'){ui.status=el.value;if(ui.selected&&!visibleTasks().some(t=>t.id===ui.selected))ui.selected=null;save();render();}
   if(el.id==='candidate-target'){ui.candidateTarget=el.value;captureDrafts();save();}
@@ -278,6 +297,13 @@ root.addEventListener('change',event=>{
 });
 root.addEventListener('submit',event=>{
   event.preventDefault();const form=event.target;const data=new FormData(form);
+  if(form.id==='planning-form'){
+    if(ui.planningBusy)return;
+    const mode=ui.planningMode;const generation=asyncGeneration;const values=Object.fromEntries(data);
+    ui.planningBusy=true;render();
+    const timer=setTimeout(()=>{timers.delete('planning');if(generation!==asyncGeneration)return;ui.planningBusy=false;dispatch({type:'PLAN_RUN',mode,...values});},550);
+    timers.set('planning',timer);return;
+  }
   if(form.id==='candidate-form'){
     const c=candidateById(form.dataset.id);const before=state.tasks.length;const mode=ui.candidateMode;
     if(dispatch({type:'RESOLVE_CANDIDATE',id:c.id,decision:mode,...Object.fromEntries(data)})){

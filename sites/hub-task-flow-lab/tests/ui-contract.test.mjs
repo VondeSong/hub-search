@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 
 // Static integration contracts; these do not replace browser interaction,
 // responsive-layout, focus-return, or assistive-technology verification.
-const read = name => readFileSync(new URL(`../dist/${name}`, import.meta.url), 'utf8');
+const read = name => readFileSync(new URL(`../dist/${name}`, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const app = read('app.mjs');
 const model = read('model.mjs');
 const html = read('index.html');
