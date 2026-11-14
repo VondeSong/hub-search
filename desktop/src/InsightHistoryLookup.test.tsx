@@ -3,7 +3,8 @@ import {act} from "react";
 import {createRoot,type Root} from "react-dom/client";
 import {afterEach,beforeEach,expect,it,vi} from "vitest";
 import {InsightHistoryLookup} from "./InsightHistoryLookup";
-const {invoke,listeners}=vi.hoisted(()=>({invoke:vi.fn(),listeners:new Map<string,()=>void>()}));
+import {insightSourceChanged} from "./InsightTypes";
+const {invoke,listeners}=vi.hoisted(()=>({invoke:vi.fn(),listeners:new Map<string,(e?:{payload:unknown})=>void>()}));
 vi.mock("@tauri-apps/api/core",()=>({invoke}));
 vi.mock("@tauri-apps/api/event",()=>({listen:vi.fn(async(name:string,fn:()=>void)=>{listeners.set(name,fn);return()=>listeners.delete(name);})}));
 const current={kind:"note" as const,libraryId:"current",documentId:"now",pageId:null};
@@ -20,6 +21,15 @@ beforeEach(()=>{Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});host=d
  throw Error(args.action);
 });});
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();});
+it('ignores the native automatic-backup tick while still treating source or unknown changes conservatively',async()=>{
+ await mount();await search();const before=invoke.mock.calls.length;
+ await act(async()=>listeners.get('data-portability-updated')?.({payload:null}));
+ expect(host.textContent).toContain('旧方法');expect(invoke.mock.calls.length).toBe(before);
+ expect(insightSourceChanged('library-registry-updated',null)).toBe(true);
+ expect(insightSourceChanged('library-runtime-updated',null)).toBe(true);
+ expect(insightSourceChanged('data-portability-updated',undefined)).toBe(true);
+ expect(insightSourceChanged('data-portability-updated',{action:'restore'})).toBe(true);
+});
 it('requires explicit library choice, previews and version-checks only the selected addition without running a model',async()=>{
  await mount();await open();expect(button('查找可能相关的旧资料').disabled).toBe(true);
  await act(async()=>host.querySelector<HTMLInputElement>('fieldset input')!.click());await act(async()=>button('查找可能相关的旧资料').click());

@@ -7,6 +7,7 @@ import {userProfileStorage} from "./UserProfileStorage";
 import type {Insight,InsightCandidate,InsightCandidates,InsightDelivery,InsightList,InsightOrigin,InsightSource} from "./InsightTypes";
 import type {WorkSummary} from "./AgentConversationHistoryData";
 import type {InvestigationLocator} from "./AgentInvestigation";
+import {insightSourceChanged} from "./InsightTypes";
 
 const call=<T,>(args:Record<string,unknown>)=>invoke<T>("agent_investigation",{args});
 const pendingKey="hub.insights.pending-write.v1";
@@ -39,7 +40,7 @@ export function useInsights(){
   alive.current=true;void refreshRef.current();let unlisten:(()=>void)[]=[];let disposed=false;let timer:ReturnType<typeof setTimeout>|undefined;
   const invalidate=()=>{++accessEpoch.current;++sequence.current;++detailSequence.current;setGeneration(n=>n+1);setItems(old=>old.map(item=>({...item,snapshot:undefined,workTitle:undefined,events:undefined,reasons:[],validity:"unavailable",checking:true})));setDetail(old=>old?{...old,snapshot:undefined,events:undefined,reasons:[],validity:"unavailable",checking:true}:null);clearTimeout(timer);timer=setTimeout(()=>void refreshRef.current(),150);};
   window.addEventListener("focus",invalidate);
-  for(const name of ["agent-work-updated","library-registry-updated","library-runtime-updated","task-list-updated","task-sync-updated","data-portability-updated"]){void listen<{eventCategory?:string}>(name,event=>{if(disposed||event.payload?.eventCategory==="publicStream")return;invalidate();}).then(stop=>{if(disposed)stop();else unlisten.push(stop);}).catch(()=>{if(!disposed)setError("无法订阅资料变化；请用核对按钮读取当前依据。");});}
+  for(const name of ["agent-work-updated","library-registry-updated","library-runtime-updated","task-list-updated","task-sync-updated","data-portability-updated"]){void listen<{eventCategory?:string}>(name,event=>{if(disposed||event.payload?.eventCategory==="publicStream"||!insightSourceChanged(name,event.payload))return;invalidate();}).then(stop=>{if(disposed)stop();else unlisten.push(stop);}).catch(()=>{if(!disposed)setError("无法订阅资料变化；请用核对按钮读取当前依据。");});}
   const onVisible=()=>{if(document.visibilityState==="visible")invalidate();};document.addEventListener("visibilitychange",onVisible);
   return()=>{disposed=true;alive.current=false;++sequence.current;clearTimeout(timer);unlisten.forEach(f=>f());window.removeEventListener("focus",invalidate);document.removeEventListener("visibilitychange",onVisible);};
  },[]);

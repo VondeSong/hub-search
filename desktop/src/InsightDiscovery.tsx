@@ -15,6 +15,7 @@ import {InsightMethods} from "./InsightMethods";
 import {InsightFindingText} from "./InsightFindingText";
 import {InsightInlineHistory} from "./InsightInlineHistory";
 import {InsightHistoryLookup} from "./InsightHistoryLookup";
+import {insightSourceChanged} from "./InsightTypes";
 import "./InsightDiscovery.css";
 
 const call=<T,>(args:Record<string,unknown>)=>invoke<T>("agent_investigation",{args});
@@ -60,7 +61,7 @@ export function InsightDiscovery({data,target,onOpenWork,onView}:{data:ReturnTyp
    if(target){void Promise.all([call<Status>({action:"status",id}),call<{sources:typeof inherited}>({action:"insightAnalysisScope",id})]).then(([v,s])=>{if(!disposed){setStatus(v);setInherited(s.sources);}},e=>{if(!disposed){setError(String(e));setTargetItem(old=>old?{...old,snapshot:undefined}:old);}});}
    else void refresh(id);
   }
-  for(const event of ["library-registry-updated","library-runtime-updated","data-portability-updated"]){void listen(event,()=>{if(disposed)return;setBundle(null);setSource(null);setStatus(null);setInherited([]);setTargetItem(old=>old?{...old,snapshot:undefined}:old);setChecked({});if(currentId.current)void refresh(currentId.current);}).then(stop=>disposed?stop():stops.push(stop));}
+  for(const event of ["library-registry-updated","library-runtime-updated","data-portability-updated"]){void listen(event,e=>{if(disposed||!insightSourceChanged(event,e?.payload))return;setBundle(null);setSource(null);setStatus(null);setInherited([]);setTargetItem(old=>old?{...old,snapshot:undefined}:old);setChecked({});if(currentId.current)void refresh(currentId.current);}).then(stop=>disposed?stop():stops.push(stop));}
   const focus=()=>{setSource(null);setChecked({});if(currentId.current)void refresh(currentId.current);};window.addEventListener("focus",focus);
   return()=>{alive.current=false;disposed=true;++request.current;stops.forEach(stop=>stop());window.removeEventListener("focus",focus);};
  },[]);

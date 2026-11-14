@@ -1,4 +1,8 @@
 export type InsightMethodDependency={kind:string;title:string};
+export function insightSourceChanged(eventName:string,payload:unknown){
+ // The native automatic-backup poll emits null even when no source changed.
+ return eventName!=="data-portability-updated"||payload!==null;
+}
 import type { Evidence } from "./AgentDelivery";
 export type InsightSource={ evidenceId:string;quote?:string;excerpt:Evidence & {locator:unknown;version:unknown;facts?:{provider?:string;unreadImageCount?:number}} };
 export type InsightOrigin={workId:string;runId:string;deliveryRecordId:string;deliveryHash:string;generatedAt:number};
