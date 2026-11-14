@@ -1,6 +1,6 @@
 //! Semantic judgement stays in the existing agent, under the same explicit grant.
 use super::*;
-fn scope(root: &Path, work: &Work) -> Result<Vec<Value>, String> {
+pub(super) fn scope(root: &Path, work: &Work) -> Result<Vec<Value>, String> {
     if !work.grant.library_ids.is_empty() || !work.grant.attachment_library_ids.is_empty() {
         return Err("本轮关联需要明确选择的资料，不能使用整库授权".into());
     }

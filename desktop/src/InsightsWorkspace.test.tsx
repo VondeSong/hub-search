@@ -65,7 +65,7 @@ it("opens the same original Work and rechecks a citation before showing its sour
 });
 
 it("requires source confirmation before saving a selected structured candidate",async()=>{
- await mount();await click("选择已有成果");
+ await mount();await click("从已有分析导入");
  const save=button("保存所选发现");expect(save.disabled).toBe(true);
  const radio=document.querySelector<HTMLInputElement>('dialog input[name="insightCandidate"]')!;
  await act(async()=>radio.click());expect(save.disabled).toBe(true);
@@ -109,7 +109,7 @@ it("ignores an old detail and rechecks picker access while preserving the chosen
  expect(document.body.textContent).not.toContain("本周已完成原型验证。");
  invoke.mockImplementation(normal);
  await act(async()=>vi.advanceTimersByTimeAsync(160));
- await click("选择已有成果");
+ await click("从已有分析导入");
  expect(document.querySelector('dialog[aria-label="从已有成果保存发现"]')).not.toBeNull();
  await act(async()=>listeners.get("library-registry-updated")?.({payload:{}}));
  expect(document.querySelector('dialog[aria-label="从已有成果保存发现"]')).not.toBeNull();
@@ -181,7 +181,7 @@ function dependencyConfirm(){return [...document.querySelectorAll<HTMLLabelEleme
 
 it("invalidates source confirmation whenever selected candidates or common background change",async()=>{
  const normal=invoke.getMockImplementation()!;invoke.mockImplementation(async(command,args)=>args.args.action==="insightCandidates"?twoCandidates():normal(command,args));
- await mount();await click("选择已有成果");const choices=document.querySelectorAll<HTMLInputElement>('dialog input[name="insightCandidate"]');
+ await mount();await click("从已有分析导入");const choices=document.querySelectorAll<HTMLInputElement>('dialog input[name="insightCandidate"]');
  await act(async()=>choices[0].click());await act(async()=>dependencyConfirm().click());expect(button("保存所选发现").disabled).toBe(false);
  await act(async()=>choices[1].click());expect(dependencyConfirm().checked).toBe(false);expect(button("保存所选发现").disabled).toBe(true);
  await act(async()=>dependencyConfirm().click());const background=[...document.querySelectorAll<HTMLLabelElement>('dialog label')].find(label=>label.textContent?.includes("共同口径"))!.querySelector<HTMLInputElement>('input')!;
@@ -190,7 +190,7 @@ it("invalidates source confirmation whenever selected candidates or common backg
 
 it("keeps the original Work entry when a published answer has no extractable findings",async()=>{
  const normal=invoke.getMockImplementation()!;invoke.mockImplementation(async(command,args)=>args.args.action==="insightCandidates"?{origin:store.items[0].snapshot!.origin,candidates:[],reason:"本成果是普通正文，没有可提取发现。"}:normal(command,args));
- await mount();await click("选择已有成果");expect(document.body.textContent).toContain("没有可提取发现");await click("查看原事项");expect(openWork).toHaveBeenCalledWith({workId:"work-a"});expect(document.querySelector('dialog[aria-label="从已有成果保存发现"]')).toBeNull();expect(invoke.mock.calls.some(([,v])=>["respond","run","resume"].includes(v.args.action))).toBe(false);
+ await mount();await click("从已有分析导入");expect(document.body.textContent).toContain("没有可提取发现");await click("查看原事项");expect(openWork).toHaveBeenCalledWith({workId:"work-a"});expect(document.querySelector('dialog[aria-label="从已有成果保存发现"]')).toBeNull();expect(invoke.mock.calls.some(([,v])=>["respond","run","resume"].includes(v.args.action))).toBe(false);
 });
 
 it("preserves unsaved feedback while selecting a new result and returning to the finding",async()=>{
@@ -201,7 +201,7 @@ it("preserves unsaved feedback while selecting a new result and returning to the
 
 it("reports confirmed partial saves if a later selection has an unknown result",async()=>{
  const normal=invoke.getMockImplementation()!;let saved=0;invoke.mockImplementation(async(command,args)=>{if(args.args.action==="insightCandidates")return twoCandidates();if(args.args.action==="insightImport"&&++saved===2)throw new Error("第二项回执中断");return normal(command,args);});
- await mount();await click("选择已有成果");for(const choice of document.querySelectorAll<HTMLInputElement>('dialog input[name="insightCandidate"]'))await act(async()=>choice.click());await act(async()=>dependencyConfirm().click());await click("保存所选发现");
+ await mount();await click("从已有分析导入");for(const choice of document.querySelectorAll<HTMLInputElement>('dialog input[name="insightCandidate"]'))await act(async()=>choice.click());await act(async()=>dependencyConfirm().click());await click("保存所选发现");
  expect(document.querySelector('dialog')!.textContent).toContain("已保存 1 条");expect(document.querySelector('dialog')!.textContent).toContain("有一项保存结果需要核对");expect(button("保存所选发现").disabled).toBe(true);expect(document.querySelectorAll('dialog input[name="insightCandidate"]:checked')).toHaveLength(1);expect(invoke.mock.calls.filter(([,v])=>v.args.action==="insightImport")).toHaveLength(2);
 });
 
@@ -264,12 +264,12 @@ it("prepares explicit task comparison without starting a model or changing the t
  await mount();await click("寻找旧知识");const work=document.querySelector<HTMLSelectElement>('[aria-label="原事项"]')!;await act(async()=>{work.value="work-a";work.dispatchEvent(new Event("change",{bubbles:true}));});const mode=document.querySelector<HTMLSelectElement>('[aria-label="核对方式"]')!;await act(async()=>{mode.value="status";mode.dispatchEvent(new Event("change",{bubbles:true}));});const task=document.querySelector<HTMLSelectElement>('[aria-label="核对的任务"]')!;await act(async()=>{task.selectedIndex=1;task.dispatchEvent(new Event("change",{bubbles:true}));});const question=document.querySelector<HTMLInputElement>('.insights-recall input[type="text"]')!;await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(question,"验证完成了吗？");question.dispatchEvent(new Event("input",{bubbles:true}));});await click("保存问题并打开原事项");expect(invoke.mock.calls.find(([,v])=>v.args.action==="insightAnalysisPrepare")?.[1].args).toMatchObject({mode:"status",task:{kind:"task",sourceId:"t1"},expectedRevision:2});expect(openWork).toHaveBeenCalledWith({workId:"work-a"});expect(invoke.mock.calls.some(([,v])=>["run","respond","resume","updateTask"].includes(v.args.action))).toBe(false);
 });
 
-it("hides old picker candidates when a registry refresh revokes their access, keeping navigation usable",async()=>{await mount();await click("选择已有成果");expect(document.querySelector('.insights-candidate')).not.toBeNull();const normal=invoke.getMockImplementation()!;invoke.mockImplementation(async(c,v)=>v.args.action==="insightCandidates"?{origin:store.items[0].snapshot!.origin,candidates:[],reason:"来源已撤回"}:normal(c,v));await act(async()=>listeners.get("library-registry-updated")?.({payload:{}}));expect(document.querySelector('dialog[aria-label="从已有成果保存发现"]')).not.toBeNull();expect(document.querySelector('.insights-candidate')).toBeNull();expect(document.querySelector<HTMLButtonElement>('dialog footer button.insights-primary')!.disabled).toBe(true);expect(document.body.textContent).toContain("来源已撤回");});
+it("hides old picker candidates when a registry refresh revokes their access, keeping navigation usable",async()=>{await mount();await click("从已有分析导入");expect(document.querySelector('.insights-candidate')).not.toBeNull();const normal=invoke.getMockImplementation()!;invoke.mockImplementation(async(c,v)=>v.args.action==="insightCandidates"?{origin:store.items[0].snapshot!.origin,candidates:[],reason:"来源已撤回"}:normal(c,v));await act(async()=>listeners.get("library-registry-updated")?.({payload:{}}));expect(document.querySelector('dialog[aria-label="从已有成果保存发现"]')).not.toBeNull();expect(document.querySelector('.insights-candidate')).toBeNull();expect(document.querySelector<HTMLButtonElement>('dialog footer button.insights-primary')!.disabled).toBe(true);expect(document.body.textContent).toContain("来源已撤回");});
 
 it("searches stored Work titles and keeps paginated navigation across source refreshes",async()=>{
  const normal=invoke.getMockImplementation()!;
  invoke.mockImplementation(async(c,v)=>v.args.action==="list"?{works:[{id:v.args.before?"work-older":"work-a",goal:v.args.before?"早期事项":"当前事项",state:"completed"}],nextCursor:v.args.before?null:{id:"work-a"}}:normal(c,v));
- await mount();await click("选择已有成果");await click("更多事项");
+ await mount();await click("从已有分析导入");await click("更多事项");
  expect(document.querySelector<HTMLSelectElement>('[aria-label="成果事项"]')!.options.length).toBe(3);
  await act(async()=>listeners.get("library-registry-updated")?.({payload:{}}));
  expect(document.querySelector<HTMLSelectElement>('[aria-label="成果事项"]')!.options.length).toBe(3);
@@ -280,7 +280,7 @@ it("searches stored Work titles and keeps paginated navigation across source ref
 });
 
 it("hides candidate bodies during revalidation and restores confirmation only for identical evidence",async()=>{
- await mount();await click("选择已有成果");
+ await mount();await click("从已有分析导入");
  await act(async()=>document.querySelector<HTMLInputElement>('dialog input[name="insightCandidate"]')!.click());await act(async()=>dependencyConfirm().click());
  const normal=invoke.getMockImplementation()!;let finish!:(v:unknown)=>void;
  invoke.mockImplementation((c,v)=>v.args.action==="insightCandidates"?new Promise(resolve=>{finish=resolve;}):normal(c,v));

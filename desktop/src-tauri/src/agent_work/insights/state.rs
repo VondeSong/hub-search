@@ -368,6 +368,23 @@ fn expected(item: &Value, args: &Value) -> Result<(), String> {
     }
 }
 
+pub(super) fn discovery_target(root: &Path, c: &Connection, args: &Value) -> Result<Value, String> {
+    let item = reconcile(
+        root,
+        c,
+        load(c, &text(args, "targetInsightId", 150)?)?,
+        store::stamp(),
+    )?;
+    if item["rowRevision"] != args["targetRevision"] {
+        return Err("原发现已更新，请重新打开核对".into());
+    }
+    let value = view(root, c, &item, None)?;
+    if value["snapshot"].is_null() {
+        return Err("原发现当前不可访问".into());
+    }
+    Ok(value)
+}
+
 pub(super) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
     store::write(root, |c| ui_on(root, c, args, store::stamp()))
 }
@@ -543,6 +560,42 @@ fn ui_on(root: &Path, c: &Connection, args: &Value, now: i64) -> Result<Value, S
                 {
                     return Err("旧修订的共同背景须明确核对，不能静默移除".into());
                 }
+            }
+            if let Some(outcome) = args["reviewOutcome"].as_str() {
+                if !matches!(outcome, "maintain" | "revise") {
+                    return Err("复核处理方式无效".into());
+                }
+                let comparison = candidate["text"].clone();
+                let origin = candidate["origin"].clone();
+                if outcome == "maintain" {
+                    if !previous["reviewDependency"].is_null()
+                        || !candidate["reviewDependency"].is_null()
+                    {
+                        return Err("包含回顾派生依据时请采用完整修订，不能省略派生依赖".into());
+                    }
+                    current_reader(root, &work)?
+                        .verify_in_transaction(c, &dependencies(&previous)?)?;
+                    let additions = candidate["sourceCitations"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .chain(candidate["contextDependencies"].as_array().unwrap())
+                        .cloned()
+                        .collect::<Vec<_>>();
+                    candidate = previous.clone();
+                    for addition in additions {
+                        let contexts = candidate["contextDependencies"]
+                            .as_array_mut()
+                            .ok_or("旧背景依赖损坏")?;
+                        if !contexts.iter().any(|v| v["excerpt"] == addition["excerpt"]) {
+                            contexts.push(addition);
+                        }
+                    }
+                    if candidate["contextDependencies"].as_array().unwrap().len() > 32 {
+                        return Err("核对背景已超过32段，请采用完整修订并重新选择必要依据".into());
+                    }
+                }
+                candidate["reviewOutcome"] = json!({"kind":outcome,"comparison":comparison,"origin":origin,"previousRevision":current["headRevision"]});
             }
             adopt_feedback(c, current, &mut candidate, args)?;
         } else if item.is_some() {
