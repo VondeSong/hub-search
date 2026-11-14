@@ -28,7 +28,15 @@ pub(crate) enum Action {
         endpoint: String,
         token: String,
     },
-    List,
+    List {
+        #[serde(default)]
+        query: String,
+    },
+    Update {
+        thread: String,
+        title: Option<String>,
+        archived: Option<bool>,
+    },
     Read {
         thread: String,
         before: Option<u64>,
@@ -203,7 +211,34 @@ pub(crate) async fn cloud_agents(app: AppHandle, action: Action) -> Result<Value
         action => {
             let config = current()?.ok_or("请先连接 VPS。")?;
             let (method, path, body, image) = match action {
-                Action::List => (Method::GET, "/v1/threads".into(), None, false),
+                Action::List { query } => {
+                    if query.chars().count() > 200 {
+                        return Err("搜索内容最多 200 个字符。".into());
+                    }
+                    let query = url::form_urlencoded::Serializer::new(String::new())
+                        .append_pair("q", &query)
+                        .finish();
+                    (Method::GET, format!("/v1/threads?{query}"), None, false)
+                }
+                Action::Update {
+                    thread,
+                    title,
+                    archived,
+                } => {
+                    let mut changes = serde_json::Map::new();
+                    if let Some(title) = title {
+                        changes.insert("title".into(), json!(title));
+                    }
+                    if let Some(archived) = archived {
+                        changes.insert("archived".into(), json!(archived));
+                    }
+                    (
+                        Method::POST,
+                        format!("/v1/threads/{}/metadata", id(&thread)?),
+                        Some(Value::Object(changes)),
+                        false,
+                    )
+                }
                 Action::Read { thread, before } => (
                     Method::GET,
                     format!(

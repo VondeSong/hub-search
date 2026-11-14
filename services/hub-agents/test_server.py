@@ -3,13 +3,17 @@ import http.client
 import io
 import json
 import secrets
+import sqlite3
 import sys
 import tempfile
 import time
 import unittest
 import uuid
+import threading
 from contextlib import closing
 from pathlib import Path
+from types import SimpleNamespace
+from urllib.parse import quote
 
 from codex import CodexError, provider_error
 from server import Handler, RequestError, Store, Worker, digest
@@ -196,3 +200,97 @@ class GatewayTest(unittest.TestCase):
             self.assertEqual(store.thread(thread, 2**63 - 1)["turns"][0]["status"], "stopped")
             self.assertIsInstance(provider_error({"status": 401}), CodexError)
             self.assertEqual(provider_error({"status": 401}).code, "login")
+
+
+class ConversationManagementTest(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.store = Store(Path(self.directory.name))
+        self.thread, self.turn = str(uuid.uuid4()), str(uuid.uuid4())
+        self.payload = {"text": "原始问题：100%_完成", "attachments": []}
+        self.store.submit(self.thread, self.turn, self.payload)
+        with closing(self.store.connect()) as db, db:
+            db.execute("UPDATE turns SET status='completed',answer='历史正文中的独有词 证据链' WHERE id=?", (self.turn,))
+
+    def test_legacy_database_migration_and_metadata_persist(self):
+        path = Path(self.directory.name) / "legacy"
+        path.mkdir()
+        with closing(sqlite3.connect(path / "agents.sqlite3")) as db, db:
+            db.execute("CREATE TABLE threads(id TEXT PRIMARY KEY,title TEXT NOT NULL,updated INTEGER NOT NULL,codex_thread TEXT)")
+            db.execute("INSERT INTO threads VALUES('old','已有会话',12,'runtime-thread')")
+        migrated = Store(path)
+        self.assertEqual(migrated.threads()[0]["archived"], 0)
+        self.assertEqual(migrated.thread("old", 2**63 - 1)["title"], "已有会话")
+        original = self.store.thread(self.thread, 2**63 - 1)["turns"]
+        self.store.update_thread(self.thread, {"title": "  新名称  ", "archived": True})
+        reopened = Store(Path(self.directory.name)).thread(self.thread, 2**63 - 1)
+        self.assertEqual((reopened["title"], reopened["archived"]), ("新名称", 1))
+        self.assertEqual(reopened["turns"], original)
+        before = reopened["updated"]
+        self.assertEqual(self.store.update_thread(self.thread, {"archived": True})["updated"], before)
+
+    def test_searches_earlier_messages_and_escapes_literal_wildcards(self):
+        newer = str(uuid.uuid4())
+        self.store.submit(self.thread, newer, {"text": "后续问题", "attachments": []})
+        with closing(self.store.connect()) as db, db:
+            db.execute("UPDATE turns SET status='completed',answer='最新回答' WHERE id=?", (newer,))
+        for query in ("证据链", "100%_完成", "原始问题"):
+            row = self.store.threads(query)[0]
+            self.assertTrue(row["matches"])
+            self.assertEqual(row["preview"], "最新回答")
+        self.assertFalse(self.store.threads("不匹配%")[0]["matches"])
+        self.assertFalse(self.store.threads("原始问题_100")[0]["matches"])
+        with self.assertRaises(RequestError):
+            self.store.threads("x" * 201)
+
+    def test_archiving_requires_finished_turn_and_preserves_retry_identity(self):
+        running = str(uuid.uuid4())
+        self.store.submit(self.thread, running, {"text": "运行中", "attachments": []})
+        with self.assertRaises(RequestError) as error:
+            self.store.update_thread(self.thread, {"archived": True})
+        self.assertEqual(error.exception.status, 409)
+        self.store.stop(self.thread, running)
+        self.store.update_thread(self.thread, {"archived": True})
+        self.store.submit(self.thread, self.turn, self.payload)
+        with self.assertRaises(RequestError) as error:
+            self.store.submit(self.thread, str(uuid.uuid4()), {"text": "新请求", "attachments": []})
+        self.assertEqual(error.exception.status, 409)
+        self.store.update_thread(self.thread, {"archived": False})
+        self.store.submit(self.thread, str(uuid.uuid4()), {"text": "恢复后继续", "attachments": []})
+
+    def test_invalid_changes_preserve_existing_conversation(self):
+        original = self.store.thread(self.thread, 2**63 - 1)
+        for changes in ({}, [], {"title": " "}, {"title": "x" * 81}, {"title": "\ud800"}, {"title": None}, {"archived": 1}, {"delete": True}):
+            with self.assertRaises(RequestError):
+                self.store.update_thread(self.thread, changes)
+            self.assertEqual(self.store.thread(self.thread, 2**63 - 1), original)
+        with self.assertRaises(RequestError) as error:
+            self.store.update_thread(str(uuid.uuid4()), {"title": "不存在"})
+        self.assertEqual(error.exception.status, 404)
+
+    def test_http_search_and_metadata_enforce_device_auth(self):
+        token = secrets.token_urlsafe(32)
+        with closing(self.store.connect()) as db, db:
+            db.execute("INSERT INTO devices VALUES('device','test',?)", (digest(token.encode()),))
+        gateway = SimpleNamespace(store=self.store, worker=SimpleNamespace(account={"state": "ready"}, wake=threading.Event()))
+
+        def call(method, route, data=None, auth=token):
+            body = json.dumps(data).encode() if data is not None else b""
+            request = f"{method} {route} HTTP/1.0\r\nAuthorization: Bearer {auth}\r\nContent-Length: {len(body)}\r\n\r\n".encode() + body
+            sock = MemorySocket(request, False)
+            Handler(sock, ("127.0.0.1", 1), gateway)
+            response = http.client.HTTPResponse(SimpleNamespace(makefile=lambda *_: io.BytesIO(sock.output.getvalue())))
+            response.begin()
+            return response.status, json.loads(response.read())
+
+        route = f"/v1/threads/{self.thread}/metadata"
+        self.assertEqual(call("POST", route, {"title": "跨端名称"}, auth="invalid")[0], 403)
+        self.assertEqual(call("POST", route, {"title": "跨端名称"})[0], 200)
+        status, data = call("GET", "/v1/threads?q=" + quote("证据链"))
+        self.assertEqual(status, 200)
+        self.assertTrue(data["threadManagement"])
+        self.assertTrue(data["threads"][0]["matches"])
+        self.assertEqual(call("GET", "/v1/threads?q=a&q=b")[0], 400)
+        self.assertEqual(call("POST", route, {"archived": True})[0], 200)
+        self.assertEqual(call("POST", route, {"archived": False})[1]["thread"]["archived"], 0)

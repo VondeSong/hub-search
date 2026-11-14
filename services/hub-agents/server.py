@@ -147,6 +147,8 @@ class Store:
                     thread TEXT PRIMARY KEY REFERENCES threads(id), payload TEXT NOT NULL
                 );
             """)
+            if "archived" not in {row[1] for row in db.execute("PRAGMA table_info(threads)")}:
+                db.execute("ALTER TABLE threads ADD COLUMN archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0,1))")
 
     def connect(self):
         db = sqlite3.connect(self.root / "agents.sqlite3", timeout=6)
@@ -169,6 +171,8 @@ class Store:
                 if (old["thread"], old["fingerprint"]) != (thread, fingerprint):
                     raise RequestError(409, "这条消息的发送编号已用于其他内容。")
                 return
+            if db.execute("SELECT 1 FROM threads WHERE id=? AND archived=1", (thread,)).fetchone():
+                raise RequestError(409, "此对话已归档，请先恢复再发送。")
             if db.execute("SELECT count(*) FROM turns WHERE status='queued'").fetchone()[0] >= 8:
                 raise RequestError(429, "VPS 当前有多条消息在等待，请稍后重试。")
             if db.execute("SELECT 1 FROM turns WHERE thread=? AND status IN ('queued','running','stopping')", (thread,)).fetchone():
@@ -186,14 +190,53 @@ class Store:
                 (str(uuid.uuid4()), turn, i, name, mime, seconds, raw) for i, (name, mime, seconds, raw) in enumerate(attachments)
             ])
 
-    def threads(self):
+    def threads(self, query=""):
+        if len(query) > 200:
+            raise RequestError(400, "搜索内容最多 200 个字符。")
+        pattern = "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
         with closing(self.connect()) as db:
-            rows = [dict(row) for row in db.execute("SELECT id,title,updated FROM threads ORDER BY updated DESC,id")]
+            rows = [dict(row) for row in db.execute("""
+                SELECT t.id,t.title,t.updated,t.archived,
+                    (SELECT substr(CASE WHEN answer<>'' THEN answer ELSE text END,1,240)
+                     FROM turns WHERE thread=t.id ORDER BY seq DESC LIMIT 1) AS preview,
+                    (SELECT status FROM turns WHERE thread=t.id ORDER BY seq DESC LIMIT 1) AS status,
+                    (t.title LIKE :pattern ESCAPE '\\' OR EXISTS(
+                        SELECT 1 FROM turns WHERE thread=t.id AND
+                        (text LIKE :pattern ESCAPE '\\' OR answer LIKE :pattern ESCAPE '\\'))) AS matches
+                FROM threads t ORDER BY t.updated DESC,t.id
+            """, {"pattern": pattern})]
         return rows
+
+    def update_thread(self, thread, changes):
+        if not isinstance(changes, dict) or not changes or changes.keys() - {"title", "archived"}:
+            raise RequestError(400, "会话修改字段无效。")
+        if "title" in changes:
+            if not isinstance(changes["title"], str) or not 1 <= len(changes["title"].strip()) <= 80:
+                raise RequestError(400, "会话名称需为 1–80 个字符。")
+            try:
+                changes["title"].encode("utf-8")
+            except UnicodeError:
+                raise RequestError(400, "会话名称文字编码无效。") from None
+        if "archived" in changes and not isinstance(changes["archived"], bool):
+            raise RequestError(400, "归档状态无效。")
+        with closing(self.connect()) as db, db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT title,archived FROM threads WHERE id=?", (thread,)).fetchone()
+            if row is None:
+                raise RequestError(404, "尚未找到此对话。")
+            if changes.get("archived") and db.execute(
+                "SELECT 1 FROM turns WHERE thread=? AND status IN ('queued','running','stopping')", (thread,)
+            ).fetchone():
+                raise RequestError(409, "请等待本轮结束或停止后再归档。")
+            title, archived = changes.get("title", row["title"]).strip(), changes.get("archived", bool(row["archived"]))
+            if (title, archived) != (row["title"], bool(row["archived"])):
+                db.execute("UPDATE threads SET title=?,archived=?,updated=? WHERE id=?",
+                           (title, archived, int(time.time() * 1000), thread))
+        return self.thread(thread, 2**63 - 1)
 
     def thread(self, thread, before):
         with closing(self.connect()) as db:
-            entry = db.execute("SELECT id,title,updated FROM threads WHERE id=?", (thread,)).fetchone()
+            entry = db.execute("SELECT id,title,updated,archived FROM threads WHERE id=?", (thread,)).fetchone()
             if entry is None:
                 raise RequestError(404, "尚未找到此对话。")
             rows = db.execute("SELECT seq,id,text,status,answer,error,code,created FROM turns WHERE thread=? AND seq<? ORDER BY seq DESC LIMIT 31", (thread, before)).fetchall()
@@ -316,6 +359,17 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         self.handle_request(True)
 
+    def read_json(self, limit=MAX_BODY):
+        length = self.headers.get("Content-Length", "")
+        if self.headers.get("Transfer-Encoding"):
+            raise RequestError(400, "请使用定长消息上传。")
+        if not re.fullmatch(r"[0-9]{1,9}", length) or not 0 < int(length) <= limit:
+            raise RequestError(413, "消息或附件超出上传限制。")
+        try:
+            return json.loads(self.rfile.read(int(length)))
+        except (UnicodeError, ValueError, RecursionError):
+            raise RequestError(400, "消息格式无效。") from None
+
     def handle_request(self, post):
         try:
             self.route(post)
@@ -334,10 +388,16 @@ class Handler(BaseHTTPRequestHandler):
         url = urlsplit(self.path)
         parts = url.path.strip("/").split("/")
         if parts == ["v1", "threads"] and not post:
-            self.send(200, {"threads": store.threads(), "account": worker.account, "skillPackages": True})
+            queries = parse_qs(url.query, keep_blank_values=True).get("q", [""])
+            if len(queries) != 1:
+                raise RequestError(400, "搜索参数无效。")
+            self.send(200, {"threads": store.threads(queries[0]), "account": worker.account, "skillPackages": True, "threadManagement": True})
             return
         if len(parts) >= 3 and parts[:2] == ["v1", "threads"] and UUID.fullmatch(parts[2]):
             thread = parts[2]
+            if len(parts) == 4 and parts[3] == "metadata" and post:
+                self.send(200, {"thread": store.update_thread(thread, self.read_json(4096))})
+                return
             if len(parts) == 3 and not post:
                 before = parse_qs(url.query).get("before", [str(2**63 - 1)])[0]
                 if not before.isascii() or not before.isdecimal() or len(before) > 19 or not 0 < int(before) < 2**63:
@@ -349,16 +409,7 @@ class Handler(BaseHTTPRequestHandler):
                 if len(parts) == 6 and parts[5] == "stop":
                     store.stop(thread, turn)
                 elif len(parts) == 5:
-                    if self.headers.get("Transfer-Encoding"):
-                        raise RequestError(400, "请使用定长消息上传。")
-                    length = self.headers.get("Content-Length", "")
-                    if not re.fullmatch(r"[0-9]{1,9}", length) or not 0 < int(length) <= MAX_BODY:
-                        raise RequestError(413, "消息或附件超出上传限制。")
-                    try:
-                        data = json.loads(self.rfile.read(int(length)))
-                    except (UnicodeError, ValueError, RecursionError):
-                        raise RequestError(400, "消息格式无效。") from None
-                    store.submit(thread, turn, data)
+                    store.submit(thread, turn, self.read_json())
                 else:
                     raise RequestError(404, "此请求不存在。")
                 worker.wake.set()

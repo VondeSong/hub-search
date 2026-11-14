@@ -1,19 +1,20 @@
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { ArrowUp, Camera, Cloud, Image, PanelLeft, Plus, Settings2, Square, Video, X } from "lucide-react";
+import { Archive, ArrowUp, Camera, ChevronRight, Cloud, Image, MessageSquare, MoreHorizontal, PanelLeft, Plus, Search, Settings2, Square, Video, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import { imageUpload, outbox, uploadSize, videoUploads, type CloudSkillPayload, type DraftTurn, type Upload } from "./CloudAgentMedia";
 import "./CloudAgents.css";
+import { runtimeCapabilities } from "./RuntimePlatform";
 
 type Connection = { endpoint: string; binding: string };
 type Account = { state: "unknown" | "ready" | "login" | "quota"; plan?: string; model?: string; limits?: { usedPercent?: number; windowDurationMins?: number }[] };
-type Summary = { id: string; title: string; updated: number };
+type Summary = { id: string; title: string; updated: number; archived?: boolean; preview?: string; status?: Turn["status"]; matches?: boolean };
 type Attachment = { id: string; name: string; seconds?: number | null };
 type Turn = { id: string; seq: number; text: string; answer: string; error?: string; status: "queued" | "running" | "stopping" | "completed" | "failed" | "stopped"; attachments: Attachment[] };
 type Thread = Summary & { turns: Turn[]; before: number | null; skill?: { name: string; version: string; paths: string[] } | null };
 type SkillChoice = { name: string; title: string; methodVersion: string; paths: string[] };
-const active = (turn?: Turn) => turn && ["queued", "running", "stopping"].includes(turn.status);
+const active = (turn?: Pick<Turn, "status">) => turn && ["queued", "running", "stopping"].includes(turn.status);
 const statusText = { queued: "VPS 已接收", running: "正在回答", stopping: "正在停止", completed: "", failed: "未完成", stopped: "已停止" };
 const call = <T,>(op: string, fields: Record<string, unknown> = {}) => invoke<T>("cloud_agents", { action: { op, ...fields } });
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);
@@ -43,7 +44,14 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
   const [endpoint, setEndpoint] = useState("");
   const [token, setToken] = useState("");
   const [settings, setSettings] = useState(false);
-  const [listOpen, setListOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  const [catalogQuery, setCatalogQuery] = useState<string>();
+  const [scope, setScope] = useState<"active" | "archived" | "all">("active");
+  const [management, setManagement] = useState(false);
+  const [rename, setRename] = useState<string>();
+  const [updating, setUpdating] = useState(false);
   const [catalog, setCatalog] = useState<Summary[]>([]);
   const [selected, setSelected] = useState<string>();
   const [snapshot, setSnapshot] = useState<Thread>();
@@ -65,12 +73,30 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
   const scroll = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
   const sending = useRef(false);
+  const listScroll = useRef(0);
+  const list = useRef<HTMLDivElement>(null);
+  const drafts = useRef(new Map<string, { text: string; attachments: Upload[]; skillVersion: string; skillPaths: string[] }>());
   const current = snapshot?.id === selected ? snapshot : undefined;
   const last = current?.turns[current.turns.length - 1];
   const binding = connection?.binding;
   const known = Boolean(selected && catalog.some(item => item.id === selected));
   const chosenSkill = skills?.find(skill => skill.methodVersion === skillVersion);
   const boundSkill = current?.skill;
+  const archived = Boolean(current?.archived ?? catalog.find(item => item.id === selected)?.archived);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setQuery(search.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [search]);
+  useEffect(() => {
+    if (!chatOpen && list.current) list.current.scrollTop = listScroll.current;
+  }, [chatOpen, settings]);
+  useEffect(() => {
+    if (!runtimeCapabilities.mobile) return;
+    const pop = () => { setChatOpen(Boolean(window.history.state?.hubCloudAgentChat)); setSettings(false); setRename(undefined); };
+    window.addEventListener("popstate", pop);
+    return () => window.removeEventListener("popstate", pop);
+  }, []);
 
   async function showSkills() {
     try {
@@ -95,7 +121,7 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
     if (!binding) return;
     let live = true;
     void outbox(binding).then(saved => {
-      if (live && saved) { setPending(saved); setSelected(saved.thread); }
+      if (live && saved) { setPending(saved); select(saved.thread); }
     }).catch(() => { if (live) setNotice("无法读取本机待重试的消息。"); });
     return () => { live = false; };
   }, [binding]);
@@ -109,10 +135,12 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
       let delay = 4500;
       try {
         if (Date.now() >= nextList) {
-          const data = await call<{ threads: Summary[]; account: Account }>("list");
+          const data = await call<{ threads: Summary[]; account: Account; threadManagement?: boolean }>("list", { query });
           if (!live) return;
           setCatalog(data.threads);
           setAccount(data.account);
+          setManagement(Boolean(data.threadManagement));
+          setCatalogQuery(query);
           nextList = Date.now() + 4500;
         }
         if (selected && known) {
@@ -134,7 +162,7 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
     window.addEventListener("online", wake);
     void sync();
     return () => { live = false; clearTimeout(timer); document.removeEventListener("visibilitychange", wake); window.removeEventListener("online", wake); };
-  }, [binding, selected, settings, known, syncVersion]);
+  }, [binding, selected, settings, known, syncVersion, query]);
 
   useEffect(() => {
     if (follow.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
@@ -146,15 +174,40 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
     void outbox(binding, null).catch(() => setNotice("云端已收到消息，本机重试记录将在下次打开时重新核对。"));
   }, [binding, current, pending]);
 
-  function select(id?: string) {
+  function select(id?: string, sent = false) {
+    drafts.current.set(selected ?? "new", sent ? { text: "", attachments: [], skillVersion: "", skillPaths: [] } : { text, attachments, skillVersion, skillPaths });
+    const draft = sent ? undefined : drafts.current.get(id ?? "new");
+    setText(draft?.text ?? ""); setAttachments(draft?.attachments ?? []);
+    setSkillVersion(draft?.skillVersion ?? ""); setSkillPaths(draft?.skillPaths ?? []);
     follow.current = true;
     setSelected(id);
     setEarlier([]);
     setBefore(undefined);
-    setListOpen(false);
+    setChatOpen(true); setSettings(false); setRename(undefined);
+    if (runtimeCapabilities.mobile && !window.history.state?.hubCloudAgentChat) {
+      window.history.pushState({ ...(window.history.state ?? {}), hubCloudAgentChat: true }, "");
+    }
     setNotice("");
-    setSkillVersion("");
-    setSkillPaths([]);
+  }
+
+  function showList() {
+    setSettings(false); setRename(undefined); setChatOpen(false);
+    if (runtimeCapabilities.mobile && window.history.state?.hubCloudAgentChat) window.history.back();
+  }
+
+  async function updateThread(changes: { title?: string; archived?: boolean }) {
+    if (!selected || updating) return;
+    const thread = selected;
+    setUpdating(true); setNotice("");
+    try {
+      const result = await call<{ thread: Thread }>("update", { thread, ...changes });
+      if (selectedRef.current === thread) {
+        setSnapshot(result.thread); setRename(undefined);
+        if (changes.archived) showList();
+      }
+      refresh(v => v + 1);
+    } catch (error) { setNotice(errorText(error)); }
+    finally { setUpdating(false); }
   }
 
   async function connect(event: FormEvent) {
@@ -164,7 +217,7 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
     try {
       const value = await call<Connection>("connect", { endpoint, token });
       if (value.binding !== binding) {
-        setCatalog([]); setSnapshot(undefined); setAccount(undefined); setPending(undefined); setText(""); setAttachments([]); select();
+        setCatalog([]); setCatalogQuery(undefined); setSnapshot(undefined); setAccount(undefined); setPending(undefined); setText(""); setAttachments([]); setSelected(undefined); drafts.current.clear(); showList();
       }
       setConnection(value);
       setEndpoint(value.endpoint);
@@ -177,7 +230,7 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
 
   async function send(event?: FormEvent) {
     event?.preventDefault();
-    if (!binding || sending.current || preparing || (!pending && (!text.trim() && !attachments.length || active(last)))) return;
+    if (!binding || sending.current || preparing || archived || (pending && pending.thread !== selected) || (!pending && (!text.trim() && !attachments.length || active(last)))) return;
     sending.current = true;
     setBusy(true);
     setNotice("");
@@ -191,7 +244,8 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
         setPending(draft);
         setText(""); setAttachments([]);
       }
-      if (selected !== draft.thread) select(draft.thread);
+      if (selected !== draft.thread) select(draft.thread, true);
+      drafts.current.delete(draft.thread);
       await call("send", { thread: draft.thread, turn: draft.turn, message: { text: draft.text, attachments: draft.attachments, ...(draft.skill && { skill: draft.skill }) } });
       follow.current = true;
       refresh(v => v + 1);
@@ -238,14 +292,22 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
 
   const connectionLabel = network ? "连接中断" : account?.state === "login" ? "VPS 需要登录" : account?.state === "quota" ? "Codex 额度受限" : account?.state === "ready" ? [account.model || "Codex", account.plan].filter(Boolean).join(" · ") : connection ? "已配置 VPS" : "云端对话";
   const turns = [...earlier.filter(item => !current?.turns.some(turn => turn.id === item.id)), ...(current?.turns ?? [])];
+  const count = catalog.filter(item => item.archived).length;
+  const rows = catalog.filter(item => (scope === "all" || Boolean(item.archived) === (scope === "archived")) &&
+    (management ? item.matches : item.title.toLowerCase().includes(query.toLowerCase())));
+  const stamp = (value: number) => new Date(value).toLocaleString("zh-CN", new Date(value).toDateString() === new Date().toDateString() ? { hour: "2-digit", minute: "2-digit" } : { month: "numeric", day: "numeric" });
 
   return <section className="cloud-agents" aria-label="云端 Agents">
     <header className="cloud-agents-header">
-      {connection && <button type="button" onClick={() => setListOpen(v => !v)} aria-expanded={listOpen} aria-label="对话列表"><PanelLeft size={20} /></button>}
-      <div><h1>Agents</h1><span>{connectionLabel}</span></div>
+      {connection && <button type="button" onClick={showList} aria-label="对话列表"><PanelLeft size={20} /></button>}
+      <div><h1>{chatOpen ? selected ? current?.title || catalog.find(item => item.id === selected)?.title || "Agents" : "新对话" : "Agents"}</h1><span>{connectionLabel}</span></div>
       {connection && <button type="button" onClick={() => select()} disabled={busy || preparing} aria-label="新对话"><Plus size={22} /></button>}
       {connection && <button type="button" onClick={() => { setSettings(v => !v); setNotice(""); }} disabled={busy || preparing} aria-label="VPS 连接设置"><Settings2 size={20} /></button>}
-      {onClose && <button type="button" onClick={onClose} aria-label="关闭云端 Agents"><X size={21} /></button>}
+      {chatOpen && known && management && <details className="cloud-agents-menu"><summary aria-label="会话选项"><MoreHorizontal size={20} /></summary><div>
+        <button type="button" disabled={updating} onClick={event => { event.currentTarget.closest("details")!.open = false; setRename(current?.title ?? catalog.find(item => item.id === selected)?.title ?? ""); }}>重命名</button>
+        <button type="button" disabled={updating || Boolean(active(last)) || Boolean(pending)} onClick={event => { event.currentTarget.closest("details")!.open = false; void updateThread({ archived: !archived }); }}>{archived ? "恢复会话" : "归档会话"}</button>
+      </div></details>}
+      {onClose && <button type="button" onClick={runtimeCapabilities.mobile && chatOpen ? showList : onClose} aria-label={runtimeCapabilities.mobile && chatOpen ? "返回会话列表" : "关闭云端 Agents"}><X size={21} /></button>}
     </header>
     {connection === undefined ? <p className="cloud-agents-empty" role="status">正在读取连接…</p> : !connection || settings ? <form className="cloud-agents-connect" onSubmit={event => void connect(event)}>
       <h2><Cloud size={22} /> 连接 VPS</h2>
@@ -253,12 +315,21 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
       <label>设备密钥<input type="password" value={token} onChange={event => setToken(event.target.value)} autoComplete="off" required /></label>
       <button className="cloud-agents-primary" disabled={busy}>{busy ? "正在连接…" : "连接"}</button>
       {notice && <p role="alert">{notice}</p>}
-    </form> : <div className="cloud-agents-body">
-      {listOpen && <aside className="cloud-agents-list" aria-label="云端对话">
-        <button type="button" onClick={() => select()}><Plus size={18} /> 新对话</button>
-        {catalog.map(item => <button type="button" key={item.id} aria-current={item.id === selected ? "page" : undefined} onClick={() => select(item.id)}>{item.title}</button>)}
-      </aside>}
+    </form> : !chatOpen ? <div ref={list} className="cloud-agents-home" onScroll={event => { listScroll.current = event.currentTarget.scrollTop; }}>
+      <h2>你的云端对话</h2><p className="cloud-agents-lede">在手机上开始，随时接着聊。</p>
+      <button type="button" className="cloud-agents-connection-card" onClick={() => setSettings(true)}><Cloud size={21}/><span><strong>{network ? "暂时无法连接云端" : "个人云端"}</strong><small>{connectionLabel}</small></span><ChevronRight size={18}/></button>
+      <label className="cloud-agents-search"><Search size={20}/><input type="search" aria-label="搜索会话标题或消息" placeholder={management ? "搜索标题或消息" : "搜索会话标题"} maxLength={200} value={search} onChange={event => setSearch(event.target.value)}/></label>
+      <div className="cloud-agents-scopes" aria-label="会话范围">{([ ["active", "当前", catalog.length - count], ["archived", "已归档", count], ["all", "全部", catalog.length] ] as const).map(([id,label,total]) => <button type="button" key={id} aria-pressed={scope === id} onClick={() => { setScope(id); listScroll.current = 0; }}>{label} {total}</button>)}</div>
+      {(network || notice) && <p role="status" className="cloud-agents-notice">{notice || network} <button type="button" onClick={() => refresh(v => v + 1)}>重新读取</button></p>}
+      {pending && <button type="button" className="cloud-agents-resume" onClick={() => select(pending.thread)}>有一条待确认消息 · 返回原会话</button>}
+      <div className="cloud-agents-list-heading"><h3>会话</h3><button type="button" onClick={() => select()} disabled={busy || preparing}><Plus size={18}/>新对话</button></div>
+      {catalogQuery !== query || search.trim() !== query ? <p role="status">{network ? "恢复连接后继续查找。" : "正在读取会话…"}</p> : rows.length ? <div className="cloud-agents-rows">{rows.map(item => <button type="button" key={item.id} className="cloud-agents-thread" onClick={() => select(item.id)}>
+        <span className="cloud-agents-thread-icon">{item.archived ? <Archive size={20}/> : <MessageSquare size={20}/>}</span><span className="cloud-agents-thread-copy"><strong>{item.title}</strong><small>{item.status && active({ status: item.status }) ? statusText[item.status] : item.preview || "打开查看对话"}</small></span><span className="cloud-agents-thread-meta"><time dateTime={new Date(item.updated).toISOString()}>{stamp(item.updated)}</time><ChevronRight size={17}/></span>
+      </button>)}</div> : <div className="cloud-agents-home-empty"><MessageSquare size={28}/><h3>{query ? "没有找到这段对话" : scope === "archived" ? "还没有归档会话" : "从一个问题开始"}</h3><p>{query ? "换一个词，或切换会话范围再试。" : scope === "archived" ? "归档只收起会话，消息和附件都会保留。" : "点击新对话，写下你的问题。"}</p></div>}
+    </div> : <div className="cloud-agents-body">
       <div className="cloud-agents-chat">
+        {rename !== undefined && <form className="cloud-agents-rename" aria-label="重命名会话" onSubmit={event => { event.preventDefault(); void updateThread({ title: rename.trim() }); }}><label>会话名称<input autoFocus maxLength={80} value={rename} onChange={event => setRename(event.target.value)}/></label><button type="submit" disabled={updating || !rename.trim()}>保存名称</button><button type="button" disabled={updating} onClick={() => setRename(undefined)}>取消</button></form>}
+        {archived && <div className="cloud-agents-archived"><span>这段会话已归档，消息和附件均保留。</span><button type="button" disabled={updating} onClick={() => void updateThread({ archived: false })}>恢复会话</button></div>}
         <div ref={scroll} className="cloud-agents-messages" onScroll={event => {
           const el = event.currentTarget; follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
         }}>
@@ -293,13 +364,13 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
           </div> : <>
             {!!attachments.length && <div className="cloud-agents-files">{attachments.map((file, index) => <button type="button" key={index} disabled={preparing} onClick={() => setAttachments(list => list.filter((_, i) => i !== index))} aria-label={`移除 ${attachmentLabel(file)}`}>{attachmentLabel(file)} <X size={14} /></button>)}</div>}
             {attachments.some(file => file.seconds != null) && <small>将发送带时间戳的关键帧，短暂变化可能漏掉。</small>}
-            <textarea value={text} onChange={event => setText(event.target.value)} maxLength={20000} placeholder="给 Agents 发消息" aria-label="消息" rows={2} />
+          <textarea value={text} onChange={event => setText(event.target.value)} disabled={archived} maxLength={20000} placeholder={archived ? "恢复会话后可继续提问" : "给 Agents 发消息"} aria-label="消息" rows={2} />
             <div className="cloud-agents-tools">
               <label title="拍照"><Camera size={19} /><input type="file" aria-label="拍照" accept="image/*" capture="environment" disabled={busy || preparing} onChange={event => { void add(event.currentTarget.files); event.currentTarget.value = ""; }} /></label>
               <label title="选择图片"><Image size={19} /><input type="file" aria-label="选择图片" accept="image/jpeg,image/png,image/webp" multiple disabled={busy || preparing} onChange={event => { void add(event.currentTarget.files); event.currentTarget.value = ""; }} /></label>
               <label title="选择短视频"><Video size={19} /><input type="file" aria-label="选择短视频" accept="video/*" disabled={busy || preparing} onChange={event => { void add(event.currentTarget.files, true); event.currentTarget.value = ""; }} /></label>
               {preparing && <span role="status">正在处理附件…</span>}
-              {active(last) ? <button type="button" className="cloud-agents-primary" aria-label="停止生成" disabled={last?.status === "stopping"} onClick={() => void stop()}><Square size={18} /></button> : <button type="submit" className="cloud-agents-primary" aria-label="发送" disabled={busy || preparing || (!text.trim() && !attachments.length)}><ArrowUp size={20} /></button>}
+              {active(last) ? <button type="button" className="cloud-agents-primary" aria-label="停止生成" disabled={last?.status === "stopping"} onClick={() => void stop()}><Square size={18} /></button> : <button type="submit" className="cloud-agents-primary" aria-label="发送" disabled={archived || busy || preparing || (!text.trim() && !attachments.length)}><ArrowUp size={20} /></button>}
             </div>
           </>}
         </form>

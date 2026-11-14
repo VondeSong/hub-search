@@ -18,11 +18,12 @@
 .cloud-agents button:disabled, .cloud-agents-tools label:has(input:disabled) { opacity: .54; cursor: default; }
 .cloud-agents :focus-visible { outline: 2px solid var(--cloud-accent); outline-offset: 2px; }
 .cloud-agents-header {
+  position: relative; z-index: 2;
   flex: none; display: flex; align-items: center; gap: 7px; padding: 11px 15px;
   border-bottom: 1px solid var(--cloud-line); background: rgba(250,252,255,.82); backdrop-filter: blur(20px);
 }
 .cloud-agents-header > div { flex: 1; min-width: 0; }
-.cloud-agents-header h1 { margin: 0; font-size: 1.25rem; line-height: 1.2; letter-spacing: -.025em; }
+.cloud-agents-header h1 { margin: 0; font-size: 1.25rem; line-height: 1.2; letter-spacing: -.025em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cloud-agents-header span { display: block; margin-top: 3px; font-size: .75rem; color: var(--cloud-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cloud-agents-connect { align-self: center; width: min(100%, 420px); padding: 22px 18px; overflow: auto; }
 .cloud-agents-connect h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 18px; font-size: 1.1rem; }
@@ -34,12 +35,39 @@
 .cloud-agents-connect input { min-height: 46px; font-size: 1rem; }
 .cloud-agents button.cloud-agents-primary { background: var(--cloud-accent); color: #fff; border-color: transparent; }
 .cloud-agents-body { flex: 1; display: flex; min-height: 0; position: relative; }
-.cloud-agents-list {
-  flex: 0 0 205px; min-width: 0; padding: 10px; overflow: auto;
-  background: #f0f4fb; border-right: 1px solid var(--cloud-line);
-}
-.cloud-agents-list button { display: flex; justify-content: start; text-align: start; width: 100%; margin-bottom: 6px; overflow-wrap: anywhere; }
-.cloud-agents-list button[aria-current] { background: #e3edff; border-color: #c7d8f8; }
+.cloud-agents-home { flex: 1; min-height: 0; overflow: auto; padding: 22px 18px 28px; overscroll-behavior: contain; }
+.cloud-agents-home > h2 { margin: 0; font-size: 1.65rem; line-height: 1.3; }
+.cloud-agents-lede { margin: 9px 0 22px; color: var(--cloud-muted); line-height: 1.6; }
+.cloud-agents button.cloud-agents-connection-card { width: 100%; justify-content: start; gap: 12px; padding: 16px; border: 0; border-radius: 18px; background: var(--mobile-fill,#f0f4fb); text-align: start; }
+.cloud-agents-connection-card > span { flex: 1; min-width: 0; }
+.cloud-agents-connection-card strong,.cloud-agents-connection-card small { display: block; }
+.cloud-agents-connection-card small { margin-top: 5px; color: var(--cloud-muted); font-size: .85rem; }
+.cloud-agents-search { display: flex; align-items: center; gap: 10px; padding: 0 14px; margin-top: 22px; border-radius: 15px; background: var(--mobile-fill,#f0f4fb); color: var(--cloud-muted); }
+.cloud-agents-search input { width: 100%; min-width: 0; min-height: 50px; padding: 12px 0; border: 0; outline-offset: 2px; background: transparent; color: var(--cloud-text); font: inherit; }
+html[data-runtime-platform="android"] .cloud-agents .cloud-agents-search input { background-color: transparent; }
+.cloud-agents-scopes { display: flex; gap: 5px; margin: 10px 0 22px; }
+.cloud-agents-scopes button { border: 0; color: var(--cloud-muted); font-size: .88rem; font-weight: 600; }
+.cloud-agents-scopes button[aria-pressed="true"] { color: var(--cloud-accent); background: var(--mobile-selected,#e3edff); }
+.cloud-agents-list-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 8px 0; }
+.cloud-agents-list-heading h3 { margin: 0; font-size: 1.15rem; }
+.cloud-agents-list-heading button { color: var(--cloud-accent); border: 0; font-size: .9rem; }
+.cloud-agents button.cloud-agents-thread { display: flex; width: 100%; gap: 12px; align-items: flex-start; justify-content: start; padding: 19px 0; border: 0; border-bottom: 1px solid var(--cloud-line); border-radius: 0; text-align: start; background: transparent; }
+.cloud-agents-thread-icon { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: var(--mobile-selected,#e3edff); color: var(--cloud-accent); }
+.cloud-agents-thread-copy { flex: 1; min-width: 0; }
+.cloud-agents-thread-copy strong { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 1rem; line-height: 1.45; overflow-wrap: anywhere; }
+.cloud-agents-thread-copy small { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin-top: 5px; font-size: .86rem; line-height: 1.55; color: var(--cloud-muted); overflow-wrap: anywhere; }
+.cloud-agents-thread-meta { flex: none; display: flex; align-items: center; gap: 5px; color: var(--cloud-muted); padding-top: 4px; font-size: .73rem; }
+.cloud-agents-home-empty { display: grid; justify-items: center; gap: 10px; padding: 36px 8px; color: var(--cloud-muted); text-align: center; }
+.cloud-agents-home-empty h3,.cloud-agents-home-empty p { margin: 0; }
+.cloud-agents-home-empty p { font-size: .9rem; line-height: 1.6; }
+.cloud-agents-resume { margin: 12px 0; width: 100%; }
+.cloud-agents-menu { position: relative; flex: none; }
+.cloud-agents-menu > summary { display: grid; place-items: center; min-height: 44px; min-width: 44px; border: 1px solid var(--cloud-line); border-radius: 13px; background: var(--cloud-control); cursor: pointer; list-style: none; }
+.cloud-agents-menu > summary::-webkit-details-marker { display: none; }
+.cloud-agents-menu > div { position: absolute; z-index: 4; right: 0; top: calc(100% + 8px); display: grid; gap: 4px; width: 150px; padding: 6px; border: 1px solid var(--cloud-line); border-radius: 14px; background: var(--cloud-control); box-shadow: 0 8px 26px #1821381a; }
+.cloud-agents-rename,.cloud-agents-archived { display: flex; flex: none; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 14px; border-bottom: 1px solid var(--cloud-line); font-size: .9rem; }
+.cloud-agents-rename label { flex: 1 1 100%; display: grid; gap: 6px; }
+.cloud-agents-rename input { min-width: 0; min-height: 44px; padding: 8px 10px; border: 1px solid var(--cloud-line); border-radius: 10px; font: inherit; background: var(--cloud-control); color: var(--cloud-text); }
 .cloud-agents-chat { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .cloud-agents-messages { flex: 1; overflow: auto; padding: 15px clamp(14px,3vw,32px); overscroll-behavior: contain; }
 .cloud-agents-empty { display: grid; place-items: center; min-height: 40%; color: var(--cloud-muted); }
@@ -78,9 +106,10 @@
 .mobile-app-shell .cloud-agents-header { padding-top: calc(11px + env(safe-area-inset-top,0px)); }
 .mobile-app-shell.mobile-keyboard-open .main-content-override:has(.cloud-agents) { padding-bottom: 0; }
 @media (max-width: 620px) {
-  .cloud-agents-list { position: absolute; z-index: 1; inset: 0 auto 0 0; width: min(78%,280px); box-shadow: 14px 0 28px #27477425; }
   .cloud-agents-header { padding-inline: 10px; }
 }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.cloud-agents-home) > .mobile-navigation-footer { display: block; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .main-content-override:has(.cloud-agents-home) { padding-bottom: calc(87px + env(safe-area-inset-bottom,0px)); }
 @media (prefers-reduced-transparency: reduce) {
   .cloud-agents-header, .cloud-agents-compose { backdrop-filter: none; background: #f9fbff; }
 }
