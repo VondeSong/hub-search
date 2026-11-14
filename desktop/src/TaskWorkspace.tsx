@@ -1,3 +1,5 @@
+import { TaskPlanningPanel } from "./TaskPlanningPanel";
+import { loadPlanningRecords, planningEligible, taskIdentity, type PlanningRequest, type PlanningRecord, type PlanningMode } from "./TaskPlanning";
 import { writeResultDragData } from "./ResultActions";
 import { userProfileStorage } from "./UserProfileStorage";
 import { resolveTaskResult, taskSearchResult } from "./TaskWorkspaceResult";
@@ -31,6 +33,8 @@ import {
   ScanSearch,
   Search,
   ShieldCheck,
+  Sparkles,
+  CalendarCheck,
   Table2,
   Timer,
   Trash2,
@@ -322,9 +326,16 @@ export function TaskWorkspace({
   onStatusMessage,
   onOpenResult,
 }: Props) {
+  useEffect(() => { setPlanning(null); }, [selectedLibraryIds]);
   const initialViewPreferences = useMemo(loadTaskViewPreferences, []);
   const initialTaskViews = useMemo(() => loadTaskSavedViews(initialViewPreferences), [initialViewPreferences]);
   const { dashboard, loading, error: taskDataError, refresh, setTaskCompleted, taskBusyIds, taskStatusTargets } = useUnifiedTasks();
+  const [planning, setPlanning] = useState<PlanningRequest | null>(null);
+  const [todayOnly, setTodayOnly] = useState(false);
+  const [planningRecords, setPlanningRecords] = useState<PlanningRecord[]>(() => { try { return loadPlanningRecords(); } catch { return []; } });
+  const planningDay = new Date().toLocaleDateString("sv-SE");
+  const planningRecord = (t: UnifiedTask) => planningRecords.find(r => r.identity === taskIdentity(t));
+  const refreshPlanningRecords = () => { try { setPlanningRecords(loadPlanningRecords()); } catch (e) { onStatusMessage?.(String(e), "error"); } };
   const [localError, setError] = useState("");
   const error = localError || taskDataError;
   const openExternalLink = useExternalLinkOpener({ showStatus: onStatusMessage, setError });
@@ -374,6 +385,7 @@ export function TaskWorkspace({
     entries: selectedTask ? [selectedTask] : [], index: selectedTask ? 0 : -1,
   }));
   const selectTaskPreview = useCallback((task: UnifiedTask) => {
+    setPlanning(null);
     setPreviewEnabled(true);
     if (previewPinned) return;
     setSelectedTask(task);
@@ -764,15 +776,24 @@ export function TaskWorkspace({
     if (!loading && selectedTask && !collectionTasks.some(task => task.id === selectedTask.id && task.provider === selectedTask.provider)) setSelectedTask(null);
   }, [loading, collectionTasks, selectedTask, setSelectedTask]);
   const visibleTasks = useMemo(() => {
-    return filterAndSortTasks(collectionTasks, {
+    return filterAndSortTasks(todayOnly ? collectionTasks.filter(t => planningEligible(t) && planningRecord(t)?.day === planningDay) : collectionTasks, {
       query,
       status: statusFilter,
       source: sourceFilter,
       sort: taskSort,
       ascending: taskSortAscending,
     });
-  }, [collectionTasks, query, sourceFilter, statusFilter, taskSort, taskSortAscending]);
+  }, [collectionTasks, query, sourceFilter, statusFilter, taskSort, taskSortAscending, todayOnly, planningRecords, planningDay]);
   const visibleTaskStats = useMemo(() => summarizeTasks(visibleTasks), [visibleTasks]);
+  function beginPlanning(mode: PlanningMode, task?: UnifiedTask, key?: string) {
+    const project = key || collectionKey || (task || selectedTask ? taskCollectionKey((task || selectedTask)!) : "");
+    const tasks = mode === "task" ? task ? [task] : selectedTask ? [selectedTask] : [] : mode === "project" ? scopedTasks.filter(t => taskCollectionKey(t) === project) : visibleTasks;
+    if (mode === "project" && !project) { onStatusMessage?.("请先选择项目或清单，再梳理项目。"); return; }
+    if (!tasks.some(planningEligible)) { onStatusMessage?.("当前范围没有可分析的未完成行动，请选择原任务。"); return; }
+    if (mode === "project") { setCollectionKey(project); setSourceFilter("all"); setStatusFilter("all"); setQuery(""); setTodayOnly(false); }
+    setPlanning({ id: crypto.randomUUID(), mode, tasks, label: mode === "task" ? tasks[0].title : mode === "project" ? `${tasks[0].libraryName} / ${tasks[0].documentTitle}` : `当前列表 · ${activeCollection?.name || "全部项目与清单"}${sourceFilter !== "all" ? " · " + providerLabel(sourceFilter) : ""}${query ? " · 搜索：" + query : ""}${todayOnly ? " · 今日计划" : ""}` });
+  }
+
 
   const previousFilters = useRef([query, sourceFilter, statusFilter, selectedLibraryIds, collectionKey]);
   useEffect(() => {
@@ -780,7 +801,7 @@ export function TaskWorkspace({
     if (next.some((value, index) => value !== previousFilters.current[index])) listRef.current?.scrollTo({ top: 0 });
     previousFilters.current = next;
   }, [query, sourceFilter, statusFilter, selectedLibraryIds, collectionKey]);
-  const resetFilters = () => { setQuery(""); setStatusFilter("open"); setSourceFilter("all"); setCollectionKey(""); };
+  const resetFilters = () => { setQuery(""); setStatusFilter("open"); setSourceFilter("all"); setCollectionKey(""); setTodayOnly(false); };
 
   useEffect(() => {
     userProfileStorage.setItem(TASK_VIEW_STORAGE_KEY, JSON.stringify({
@@ -1015,7 +1036,7 @@ export function TaskWorkspace({
     <div className="task-module-layout">
       <aside className="task-module-sidebar" aria-label="任务导航">
         <header><strong>任务</strong><span>{scopedTasks.length}</span></header>
-        <section aria-label="任务项目与清单"><h2>项目与清单</h2><button aria-current={!collectionKey ? "page" : undefined} onClick={() => setCollectionKey("")}><ListFilter size={15} /><span>全部项目与清单</span><small>{scopedTasks.length}</small></button>{collections.map(group => <button key={group.key} aria-current={collectionKey === group.key ? "page" : undefined} onClick={() => setCollectionKey(group.key)} title={`${group.name} · ${group.library}`}><span>{group.name}<em>{group.library}</em></span><small>{group.count}</small></button>)}</section>
+        <section aria-label="任务项目与清单"><h2>项目与清单</h2><button aria-current={!collectionKey ? "page" : undefined} onClick={() => setCollectionKey("")}><ListFilter size={15} /><span>全部项目与清单</span><small>{scopedTasks.length}</small></button>{collections.map(group => <div className="task-planning-project" key={group.key}><button aria-current={collectionKey === group.key ? "page" : undefined} onClick={() => setCollectionKey(group.key)} title={`${group.name} · ${group.library}`}><span>{group.name}<em>{group.library}</em></span><small>{group.count}</small></button><button className="task-planning-project-action" aria-label={`梳理项目：${group.library} / ${group.name}`} onClick={() => beginPlanning("project", undefined, group.key)}><Sparkles size={14}/></button></div>)}</section>
         {!loading && !collections.length && <p>当前资料库没有任务</p>}
       </aside>
     <section className="task-workspace">
@@ -1277,7 +1298,8 @@ export function TaskWorkspace({
         ...(statusFilter !== "all" ? [{ label: statusFilter === "open" ? "待完成" : statusFilter === "abandoned" ? "已放弃" : "已完成", clear: () => setStatusFilter("all") }] : []),
         ...(sourceFilter !== "all" ? [{ label: sourceOptions.find(source => source.id === sourceFilter)!.label, clear: () => setSourceFilter("all") }] : []),
       ]} onReset={resetFilters} />
-      <div className={`task-workspace-body ${selectedTask && previewEnabled ? "has-preview" : ""}`}>
+      <div className="task-planning-toolbar" aria-label="任务 AI 操作"><span><Sparkles size={14}/>围绕原任务分析</span><button onClick={() => beginPlanning("today")}><CalendarCheck size={14}/>安排今天</button><button onClick={() => beginPlanning("project")}>梳理项目</button><button disabled={!selectedTask || !planningEligible(selectedTask)} onClick={() => beginPlanning("task")}>推进任务</button><button aria-pressed={todayOnly} onClick={() => setTodayOnly(v => !v)}>今日计划 {scopedTasks.filter(t => planningEligible(t) && planningRecord(t)?.day === planningDay).length}</button></div>
+      <div className={`task-workspace-body ${planning || selectedTask && previewEnabled ? "has-preview" : ""}`}>
       <div className={`task-workspace-list ${viewMode} density-${taskDensity}`} ref={listRef} onScroll={rememberScroll}>
         {error && <div className="task-empty error">{error}</div>}
         {!error && loading && dashboard.tasks.length === 0 && <div className="task-empty">正在读取任务…</div>}
@@ -1288,12 +1310,15 @@ export function TaskWorkspace({
             <div className="task-row-main">
               {taskDisclosure(task, "list")}
               <div className="task-row-title">{taskTitleContent(task.title, (href) => void openExternalLink(href))}</div>
+              {planningRecord(task)?.day === planningDay && <small className="task-planning-mark">今日计划</small>}
+              {planningRecord(task)?.note && <small className="task-planning-mark">有 AI 建议</small>}
               <TaskStatusNotice task={task} onRetry={retryTaskStatus}/>
               {task.isProject && <span className="task-project-badge">项目</span>}
               {task.syncState === "linked" && <span className="task-linked" title="已双向关联"><Link2 size={13} /></span>}
               {task.syncState === "conflict" && <span className="task-unlinked" title="两端均有修改，等待处理">冲突</span>}
               {task.syncState === "paused" && <span className="task-paused" title="已停止同步到滴答；可在任务预览中恢复">已暂停</span>}
             </div>
+            <button className="task-planning-row-action" aria-label={`分析任务：${task.title}`} disabled={!planningEligible(task)} onClick={e => { e.stopPropagation(); beginPlanning("task", task); }}><Sparkles size={14}/><span>分析</span></button>
             <span className={`task-provider ${task.provider}`} title={`${task.libraryName}${task.documentTitle && task.provider !== "dida365" ? ` / ${task.documentTitle}` : ""}`}>{providerLabel(task.provider)}</span>
             {(task.startAt || task.dueAt) && <time title={scheduleLabel(task.startAt, task.dueAt, task.isAllDay)}>{scheduleLabel(task.startAt, task.dueAt, task.isAllDay)}</time>}
           </article>
@@ -1332,7 +1357,7 @@ export function TaskWorkspace({
           </section>)}
         </div>}
       </div>
-      {previewEnabled && selectedTask && selectedResult && <TaskPreviewPane
+      {planning ? <TaskPlanningPanel key={planning.id} request={planning} onClose={() => setPlanning(null)} onSaved={refreshPlanningRecords} onTask={task => { setPreviewPinned(false); setPlanning(null); setCollectionKey(taskCollectionKey(task)); setSourceFilter("all"); setStatusFilter("all"); setQuery(""); setTodayOnly(false); setSelectedTask(task); setPreviewEnabled(true); }} /> : previewEnabled && selectedTask && selectedResult && <TaskPreviewPane
           selected={selectedResult} libraries={libraries}
           copiedResultId={previewLink.copiedKey === selectedTask.id ? selectedResult.id : ""}
           onCopyLink={() => previewLink.copy(selectedTask.id, async () => invoke<string>("result_link", resultLinkRequest(await resolveTaskResult(selectedTask))))}
@@ -1346,12 +1371,12 @@ export function TaskWorkspace({
             <summary title="更多预览操作" aria-label="更多预览操作"><MoreHorizontal size={18}/></summary>
             <div><button className="danger" disabled={syncing} onClick={event => { event.currentTarget.closest("details")?.removeAttribute("open"); void removeSelectedTaskFromDida(); }}>保留 Craft，移除滴答</button></div>
           </details>}
-          contentBefore={selectedTask.provider === "craft" && selectedTask.syncState === "paused" && <div className="task-sync-resume">
+          contentBefore={<><div className="task-planning-detail"><button disabled={!planningEligible(selectedTask)} onClick={() => beginPlanning("task", selectedTask)}><Sparkles size={14}/>分析并推进这条任务</button>{planningRecord(selectedTask)?.note && <section><h3>Hub 建议笔记</h3><p>{planningRecord(selectedTask)?.note}</p></section>}</div>{selectedTask.provider === "craft" && selectedTask.syncState === "paused" && <div className="task-sync-resume">
               <div><strong>{selectedTask.isProject ? "这个项目已停止同步到滴答" : "这个任务已停止同步到滴答"}</strong>
                 <p>{selectedTask.isProject ? "之前保存了停止同步规则。恢复后，缺少的项目父任务会进入收件箱；现有子任务的关联和所在清单会保留。" : "之前保存了停止同步规则。恢复后保留现有关联；尚未关联的任务会进入收件箱。"}</p>
               </div>
               <button disabled={syncing || backgroundSyncing} onClick={() => void resumeSelectedCraftSync()}>恢复同步到滴答</button>
-            </div>}/>}
+            </div>}</>}/>}
       </div>
     </section>
     </div>
