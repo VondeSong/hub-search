@@ -18,14 +18,14 @@ fn new_topic_grant_uses_the_explicit_scope_entry_without_a_model() {
 }
 
 fn capture(
-    f: &Fixture,
+    root: &Path,
     id: &str,
     name: &str,
     out: &Path,
     started: std::time::Instant,
     result: &Result<Value, String>,
 ) -> Value {
-    let view = store::view(&f.root, id).unwrap();
+    let view = store::view(root, id).unwrap();
     let mut records = serde_json::Map::new();
     for kind in [
         "nativeRuntime",
@@ -39,10 +39,10 @@ fn capture(
     ] {
         records.insert(
             kind.into(),
-            json!(store::records(&f.root, id, kind, 200).unwrap()),
+            json!(store::records(root, id, kind, 200).unwrap()),
         );
     }
-    let value = json!({"name":name,"root":f.root,"workId":id,"result":result,"elapsedMs":started.elapsed().as_millis(),"view":view,"records":records});
+    let value = json!({"name":name,"root":root,"workId":id,"result":result,"elapsedMs":started.elapsed().as_millis(),"view":view,"records":records});
     std::fs::write(
         out.join(format!("{name}.json")),
         serde_json::to_vec_pretty(&value).unwrap(),
@@ -121,7 +121,7 @@ fn live_material_policies_and_unified_tag_task() {
         options::configure(&f.root, &json!({"id":id,"options":{"model":model,"researchPolicy":policy,"webSearch":if name=="materials-only"{"live"}else{"disabled"}}})).unwrap();
         let started = std::time::Instant::now();
         let result = ui(&f.root, &json!({"action":"respond","id":id,"mode":"deep"}));
-        let value = capture(&f, id, name, &out, started, &result);
+        let value = capture(&f.root, id, name, &out, started, &result);
         result.unwrap();
         let answer = value["view"]["work"]["report"]["prose"]["markdown"]
             .as_str()
@@ -164,7 +164,7 @@ fn live_material_policies_and_unified_tag_task() {
         &f.root,
         &json!({"action":"respond","id":only_work,"mode":"deep"}),
     );
-    let denied = capture(&f, &only_work, "scope-denial", &out, started, &result);
+    let denied = capture(&f.root, &only_work, "scope-denial", &out, started, &result);
     result.unwrap();
     let answer = denied["view"]["work"]["report"]["prose"]["markdown"]
         .as_str()
@@ -181,7 +181,7 @@ fn live_material_policies_and_unified_tag_task() {
     tag_tasks::configure(&f.root,&json!({"id":id,"expectedRevision":scoped["work"]["revision"],"intent":{"task":"definition","tag":"工装计划","compareTag":null,"expectedVersion":0,"references":[]}})).unwrap();
     let started = std::time::Instant::now();
     let result = ui(&f.root, &json!({"action":"respond","id":id,"mode":"deep"}));
-    let value = capture(&f, id, "tag-definition", &out, started, &result);
+    let value = capture(&f.root, id, "tag-definition", &out, started, &result);
     let definition =
         crate::hub_mcp::agent_tags::definition(&f.root, &json!({"tag":"工装计划"})).unwrap();
     std::fs::write(
@@ -202,4 +202,73 @@ fn live_material_policies_and_unified_tag_task() {
         !definition["draft"].is_null(),
         "actual tag draft must be saved"
     );
+}
+
+#[test]
+#[ignore = "explicit daily-library/model acceptance; creates assistant works, never libraries or source content"]
+fn live_daily_material_policies() {
+    let config: Value = serde_json::from_slice(
+        &std::fs::read(
+            std::env::var_os("HUB_DAILY_ASSISTANT_CONFIG")
+                .expect("explicit daily-library config required"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(config["format"], "hub-daily-assistant-v1");
+    let root = PathBuf::from(config["dataRoot"].as_str().unwrap());
+    let out = PathBuf::from(config["evidenceDir"].as_str().unwrap());
+    assert!(root.join("craft-search.sqlite3").is_file() && out.is_dir());
+    std::fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(out.join("started"))
+        .unwrap();
+    let notes = config["notes"].as_array().unwrap();
+    assert!(
+        notes.len() >= 3,
+        "multi-source acceptance needs at least three existing notes"
+    );
+    let goal = config["goal"].as_str().unwrap();
+    assert!(!goal.trim().is_empty());
+    let mut failures = Vec::new();
+    for case in config["cases"].as_array().unwrap() {
+        let name = case["id"].as_str().unwrap();
+        assert!(name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'));
+        let created = ui(&root, &json!({"action":"create","goal":goal,"successCriteria":config["successCriteria"],"anchor":null,"grant":Grant::default()})).unwrap();
+        let id = created["work"]["id"].as_str().unwrap();
+        ui(&root, &json!({"action":"replaceResearchScope","id":id,"expectedRevision":created["work"]["revision"],"expectedAuthorizationVersion":created["work"]["authorizationVersion"],"grant":{"libraryIds":[],"notes":notes,"readingItemKeys":[]}})).unwrap();
+        options::configure(&root, &json!({"id":id,"options":{"model":case["model"],"researchPolicy":case["policy"],"webSearch":"disabled"}})).unwrap();
+        let admission = store::view(&root, id).unwrap();
+        let mode = if admission["lifecycle"]["executionModes"]["deep"] == true {
+            "deep"
+        } else {
+            "quick"
+        };
+        let started = std::time::Instant::now();
+        let result = ui(&root, &json!({"action":"respond","id":id,"mode":mode}));
+        let value = capture(&root, id, name, &out, started, &result);
+        if let Err(error) = result {
+            failures.push(format!("{name}: {error}"));
+            continue;
+        }
+        assert_eq!(value["view"]["work"]["id"], id);
+        assert_eq!(value["view"]["assistantOptions"]["model"], case["model"]);
+        assert!(
+            !value["view"]["work"]["report"]["prose"]["markdown"]
+                .as_str()
+                .unwrap_or_default()
+                .trim()
+                .is_empty(),
+            "{name}: no delivered answer"
+        );
+        assert!(
+            value["view"]["actions"]["items"]
+                .as_array()
+                .unwrap()
+                .is_empty(),
+            "research must not create source-write actions"
+        );
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
