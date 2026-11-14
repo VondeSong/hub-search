@@ -4,6 +4,7 @@ use super::*;
 #[derive(Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub(crate) struct Filters {
+    pub(crate) item_key: Option<String>,
     pub(crate) tags: Vec<String>,
     pub(crate) library_id: Option<String>,
     pub(crate) collected_within_days: Option<u32>,
@@ -124,7 +125,7 @@ fn needs_attention() -> String {
     format!("(EXISTS(SELECT 1 FROM collection_library_jobs j WHERE j.item_key=collection_x_items.item_key AND {blocked} AND {selected}) OR EXISTS(SELECT 1 FROM collection_library_pending j WHERE j.item_key=collection_x_items.item_key AND {blocked} AND {selected}) OR EXISTS(SELECT 1 FROM collection_x_outbox o WHERE o.item_key=collection_x_items.item_key AND o.error<>'') OR EXISTS(SELECT 1 FROM collection_x_enrichment e WHERE e.item_key=collection_x_items.item_key AND e.error<>''))")
 }
 
-fn saved_copies(c: &Connection) -> Result<String, String> {
+pub(crate) fn saved_copies(c: &Connection) -> Result<String, String> {
     let remote = "SELECT DISTINCT r.item_key,r.library_id FROM collection_remote_copies r JOIN collection_library_destinations d ON d.item_key=r.item_key AND d.target=r.library_id AND d.state='saved' AND d.selected=1 WHERE r.verified=1 AND r.parent_id<>'attachment'";
     let has_libraries: bool = c
         .query_row(
@@ -290,6 +291,7 @@ fn items_at(
     let search = query.trim().chars().take(200).collect::<String>();
     let include_abandoned = filters.include_abandoned;
     let tags = serde_json::to_string(&filters.tags).map_err(|e| e.to_string())?;
+    let item_key = filters.item_key.unwrap_or_default();
     let library_id = filters.library_id.unwrap_or_default();
     // X batch captures and both Telegram import paths store epoch milliseconds.
     let cutoff = filters
@@ -316,7 +318,8 @@ fn items_at(
         AND NOT EXISTS(SELECT 1 FROM json_each(?6) wanted WHERE NOT EXISTS(SELECT 1 FROM collection_x_properties p,json_each(p.tags) actual WHERE p.item_key=collection_x_items.item_key AND actual.value=wanted.value))
         AND (?7='' OR EXISTS(SELECT 1 FROM saved_copies s WHERE s.item_key=collection_x_items.item_key AND s.library_id=?7))
         AND collected_at>=?8
-        AND (?10 IS NULL OR collected_at<?10)");
+        AND (?10 IS NULL OR collected_at<?10)
+        AND (?11='' OR item_key=?11)");
     let prefix = format!("WITH saved_copies AS ({copies})");
     let matched: i64 = c
         .query_row(
@@ -331,7 +334,8 @@ fn items_at(
                 library_id,
                 cutoff,
                 include_abandoned,
-                collected_to
+                collected_to,
+                item_key
             ],
             |r| r.get(0),
         )
@@ -349,7 +353,8 @@ fn items_at(
                 library_id,
                 cutoff,
                 include_abandoned,
-                collected_to
+                collected_to,
+                item_key
             ],
             |r| {
                 Ok((

@@ -1,4 +1,5 @@
 import { MobileHeader } from "./MobileHeader";
+import { invoke } from "@tauri-apps/api/core";
 import { OPEN_QUICK_JOURNAL } from "./QuickJournalEvents";
 import type { QuickJournalSaved } from "./QuickJournal";
 import { AgentPanelProvider } from "./StandaloneAgentLauncher";
@@ -272,7 +273,7 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
   const { mcpUrl,setMcpUrl,craftApiUrl,setCraftApiUrl,craftApiKey,setCraftApiKey,obsidianPath,setObsidianPath,connectingAction,connectionError,setConnectionError,connectionErrorProvider,setConnectionErrorProvider,feishuAppId,setFeishuAppId,feishuAppSecret,setFeishuAppSecret,feishuAuthorization,setFeishuAuthorization,selectedFeishuSpaceIds,setSelectedFeishuSpaceIds,feishuBitableUrl,setFeishuBitableUrl,feishuBitableSourceId,setFeishuBitableSourceId,connect,saveCraftApiConnection,connectDida365,connectFeishu,addSelectedFeishuSpaces,addFeishuBitable,addObsidian } = useLibraryConnections({ ready, spaces, registryError, reloadSpaces, refreshStatus, libraryManagement, selectOnlyLibrary, selectLibraries, searchInput, showOperationStatus });
   const { editingExclusions,setEditingExclusions,exclusionDraft,setExclusionDraft,savingExclusions,renamingLibraryId,setRenamingLibraryId,libraryNameDraft,setLibraryNameDraft,iconCrop,setIconCrop,relocatingLibraryId,relocateObsidian,removeSpace,editExclusions,saveExclusions,updateLibraryIcon,resetLibraryIcon,beginRenameLibrary,saveLibraryName,commitLibraryIcon } = useManagedLibraryOperations({ libraryManagement, reloadSpaces, refreshStatus, removeLibrarySelection, setConnectionError, setConnectionErrorProvider, setMaintenanceMessage });
   useEffect(() => { if (connectionError) showOperationStatus(connectionError, "error", 10000); }, [connectionError, showOperationStatus]);
-  const { openFlashcards: openStandaloneFlashcards, closeFlashcards: closeStandaloneFlashcards, openPreview: openMobilePreview, closePreview: closeMobilePreview, bindRoute: bindMobileRoute } = useMobileOverlayHistory({
+  const { openFlashcards: openStandaloneFlashcards, closeFlashcards: closeStandaloneFlashcards, openPreview: openMobilePreview, closePreview: closeMobilePreview, bindRoute: bindMobileRoute, openRouteFromPreview } = useMobileOverlayHistory({
     enabled: isMobileLayout, filtersOpen, settingsOpen: showConnection, captureOpen: quickCaptureOpen, setCaptureOpen: setQuickCaptureOpen,
     setFiltersOpen, setSettingsOpen: setShowConnection, setPreviewOpen: setMobilePreviewOpen,
     setFlashcardsOpen: setFlashcardsStandaloneOpen, setSelectedTag: setSelectedSidebarTag,
@@ -428,14 +429,24 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
     setSpaceMenuOpen(false);
   }, [isMobileLayout, openMobilePreview, previewPinned, pushPreviewHistory, rememberViewedResult, visibleResults]);
 
+  const [moduleTarget,setModuleTarget]=useState<{kind:"reading"|"flashcard";id:string;query:string}>();
+  const moduleOpenSequence=useRef(0);
+  const clearModuleTarget=useCallback(()=>setModuleTarget(undefined),[]);
   const openResult = useResultOpener({
     settings: appSettings,
     showOperationStatus,
   });
   const openSelectedResult = useCallback((result?: SearchResult, source: "result" | "preview" = "result") => {
+    const ticket=++moduleOpenSequence.current;
+    if(result?.provider==="hub"&&(result.contentType==="reading"||result.contentType==="flashcard")){
+      const kind=result.contentType,id=result.documentId;
+      void invoke<string>("module_search_document",{kind,id}).then(()=>{
+        if(moduleOpenSequence.current===ticket)setModuleTarget({kind,id,query});
+      }).catch(e=>showOperationStatus(String(e),"error"));return;
+    }
     if (result) rememberViewedResult(result);
     openResult(result, source);
-  }, [openResult, rememberViewedResult]);
+  }, [openResult, rememberViewedResult,query,showOperationStatus]);
 
   const {
     preview,
@@ -761,7 +772,7 @@ useEffect(() => {
           setFolderId("");
           setDateFilter("any");
           setSearchScope("all");
-          setSourceFilters({ craft: true, task: true, pdf: true, media: true, attachment: true });
+          setSourceFilters({ craft: true, task: true, pdf: true, media: true, attachment: true, reading: true, flashcard: true });
           setFiltersOpen(false);
           showOperationStatus("已清除搜索筛选", "success");
         },
@@ -926,6 +937,14 @@ useEffect(() => {
     pushMobileRoute(destination);
     if (destination === "search") mobileSearch.open();
   }, [openStandaloneFlashcards, pushMobileRoute, mobileSearch.open]);
+  useEffect(()=>{
+    if(!moduleTarget)return;
+    if(moduleTarget.kind==="reading"){
+      if(isMobileLayout){if(!openRouteFromPreview("collections"))pushMobileRoute("collections");}
+      else selectDesktopSidebarView("collections");
+    }else openStandaloneFlashcards();
+    setQuery(moduleTarget.query);
+  },[moduleTarget,isMobileLayout,openRouteFromPreview,pushMobileRoute,selectDesktopSidebarView,openStandaloneFlashcards]);
 
   const openMobileCollection = useCallback((view: MobileBrowseView) => {
     pushMobileRoute(view);
@@ -1288,6 +1307,8 @@ useEffect(() => {
       onExit={() => selectDesktopSidebarView("home")}
       preview={browsingPreview && <PreviewPane {...workspaceProps.previewPaneProps} label="文档预览" onClose={() => setLibraryPreview(undefined)} />}
     /> : insightsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开洞察…</div>}><LazyInsightsWorkspace/></Suspense> : collectionsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开阅读…</div>}><LazyCollectionsWorkspace
+      initialItemKey={moduleTarget?.kind==="reading"?moduleTarget.id:undefined}
+      onSearchTargetHandled={clearModuleTarget}
       onToggleDesktopSidebar={!isMobileLayout ? () => changeDesktopSidebarSetting(!desktopSidebarEnabled) : undefined}
     /></Suspense> : tasksActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开任务…</div>}><LazyTaskWorkspace
       libraries={spaces}
@@ -1299,6 +1320,8 @@ useEffect(() => {
       onStatusMessage={showOperationStatus}
       onToggleDesktopSidebar={!isMobileLayout ? () => changeDesktopSidebarSetting(!desktopSidebarEnabled) : undefined}
     /></Suspense> : flashcardsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开闪卡…</div>}><LazyFlashcardsWorkspace
+      initialCardId={moduleTarget?.kind==="flashcard"?moduleTarget.id:undefined}
+      onSearchTargetHandled={clearModuleTarget}
       onDueCountChange={updateFlashcardDueCount}
       desktopSidebarVisible={desktopSidebarEnabled && !isMobileLayout}
       sourceOpenMode={appSettings.craftResultOpenMode}

@@ -1,6 +1,8 @@
 export type Provider = "craft" | "obsidian" | "dida365" | "feishu";
+export type SearchProvider = Provider | "hub";
 
-export function providerName(provider: Provider): string {
+export function providerName(provider: SearchProvider): string {
+  if (provider === "hub") return "Hub";
   if (provider === "obsidian") return "Obsidian";
   if (provider === "dida365") return "滴答清单";
   if (provider === "feishu") return "飞书";

@@ -48,10 +48,10 @@ export function QuickSearchResultList({ query, results, selectedIndex, renderLib
   const expandedKeys = expansion.query === query ? expansion.keys : new Set<string>();
 
   const actions = (result: SearchResult, index: number) => ({
-    onMouseEnter: () => onPrepareResultLink?.(result),
+    onMouseEnter: () => {if(result.provider!=="hub")onPrepareResultLink?.(result);},
     onContextMenu: (event: MouseEvent) => { event.preventDefault(); event.stopPropagation(); onContextResult?.(event, result, index); },
-    onPointerDown: () => onPrepareResultLink?.(result),
-    draggable: !isMobileLayout && Boolean(onDragResult),
+    onPointerDown: () => {if(result.provider!=="hub")onPrepareResultLink?.(result);},
+    draggable: result.provider!=="hub" && !isMobileLayout && Boolean(onDragResult),
     onDragStart: (event: DragEvent) => onDragResult?.(event, result),
     onClick: () => onSelectResult(index),
     onDoubleClick: isMobileLayout ? undefined : () => onOpenResult(result),
@@ -59,7 +59,7 @@ export function QuickSearchResultList({ query, results, selectedIndex, renderLib
       if (event.key === "Enter") { event.preventDefault(); event.stopPropagation(); onOpenResult(result); }
     },
   });
-  const favorite = (result: SearchResult) => onToggleFavorite && <button type="button" className="grouped-search-favorite"
+  const favorite = (result: SearchResult) => result.provider!=="hub" && onToggleFavorite && <button type="button" className="grouped-search-favorite"
     aria-label={favoriteIds?.has(pageFavoriteKey(result)) ? "取消收藏页面" : "收藏页面"}
     title={favoriteIds?.has(pageFavoriteKey(result)) ? "已收藏页面，点击取消" : "收藏整个页面"}
     aria-pressed={favoriteIds?.has(pageFavoriteKey(result)) ?? false}
@@ -122,7 +122,7 @@ export function QuickSearchResultList({ query, results, selectedIndex, renderLib
                 {excerpt ? <span className="grouped-passage-excerpt"><HighlightedText text={excerpt.text} terms={matchTerms} /></span> :
                   <span className="grouped-match-evidence">{compact ? <HighlightedText text={result.sourceTitle || result.title} terms={matchTerms} /> : <>{evidenceLabel(result)}{result.sourceTitle && <> · <HighlightedText text={result.sourceTitle} terms={matchTerms} /></>}</>}</span>}
               </button>
-              {onToggleSnippetFavorite && result.snippet.trim() && <div className="grouped-result-tools">
+              {result.provider!=="hub" && onToggleSnippetFavorite && result.snippet.trim() && <div className="grouped-result-tools">
                 <button type="button" className="grouped-snippet-favorite"
                   aria-label={snippetFavoriteIds?.has(snippetFavoriteKey(result)) ? "取消收藏此片段" : "收藏此片段"}
                   title={snippetFavoriteIds?.has(snippetFavoriteKey(result)) ? "已收藏此片段，点击取消" : "收藏此片段"}

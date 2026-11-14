@@ -96,6 +96,16 @@ async function openQualityFromToday() {
   return quality;
 }
 
+it("opens the exact search card from another deck without starting a review",async()=>{
+ const handled=vi.fn();
+ await act(async()=>root.render(<FlashcardsWorkspace onClose={()=>undefined} initialCardId={target.id} onSearchTargetHandled={handled}/>));
+ await settle();
+ expect(invokeMock).toHaveBeenCalledWith("get_flashcards_by_ids",{cardIds:[target.id]});
+ expect(handled).toHaveBeenCalledOnce();
+ expect(container.querySelector('[role="dialog"][aria-label="编辑闪卡"]')).not.toBeNull();
+ expect(invokeMock.mock.calls.some(([command])=>/review_flashcard|submit_flashcard_review/.test(command))).toBe(false);
+});
+
 it("keeps the selected deck when a prior deck's read finishes later and sends one read per navigation", async () => {
   await act(async () => root.render(<FlashcardsWorkspace onClose={() => undefined} />));
   await settle();

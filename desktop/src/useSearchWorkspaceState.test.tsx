@@ -18,7 +18,7 @@ afterEach(async () => { await act(async () => root.unmount()); host.remove(); lo
 
 it("restores legacy library and media filters then persists their current complete form", async () => {
   localStorage.setItem("craft-search-filters-v1", JSON.stringify({ libraryId: "b", folderId: "same", dateFilter: "30", searchScope: "title", sourceFilters: { image: false, task: false } })); await render();
-  expect(state.selectedLibraryIds).toEqual(["b"]); expect(state.dateFilter).toBe("30"); expect(state.searchScope).toBe("title"); expect(state.sourceFilters).toEqual({ craft: true, task: false, media: false, pdf: true, attachment: true });
+  expect(state.selectedLibraryIds).toEqual(["b"]); expect(state.dateFilter).toBe("30"); expect(state.searchScope).toBe("title"); expect(state.sourceFilters).toEqual({ craft: true, task: false, media: false, pdf: true, attachment: true, reading: false, flashcard: false });
   expect(state.folderId).toBe("a\u0000same"); expect(state.effectiveSpaceIds).toEqual(["a"]); expect(state.effectiveFolderId).toBe("same");
   const stored = JSON.parse(localStorage.getItem("craft-search-filters-v1")!); expect(stored.libraryIds).toEqual(["b"]); expect(stored).not.toHaveProperty("libraryId"); expect(stored.folderId).toBe("a\u0000same");
 });

@@ -1,4 +1,4 @@
-import { ArrowUpRight, Check, Link2, X } from "lucide-react";
+import { ArrowUpRight, Check, Copy, Link2, X } from "lucide-react";
 import type { MouseEventHandler, ReactNode, Ref } from "react";
 export { PreviewTitle } from "./PreviewTitle";
 
@@ -28,7 +28,8 @@ export function PreviewHeading({ source, actions, children, provider = "" }: {
   </div>;
 }
 
-export function PreviewToolbar({ children, copied, onCopy, onOpen, openTitle, openDisabled, hideOpen = false, onClose, closeLabel = "关闭预览" }: {
+export function PreviewToolbar({ children, copied, onCopy, onOpen, openTitle, openDisabled, hideOpen = false, onClose, closeLabel = "关闭预览", copyTitle="复制结果链接" }: {
+  copyTitle?: string;
   children?: ReactNode;
   copied?: boolean;
   onCopy: () => void | Promise<void>;
@@ -41,7 +42,7 @@ export function PreviewToolbar({ children, copied, onCopy, onOpen, openTitle, op
 }) {
   return <div className="preview-actions" role="group" aria-label="预览操作">
     {children}
-    <button type="button" className="preview-copy-action" title={copied ? "已复制" : "复制结果链接"} aria-label={copied ? "已复制" : "复制结果链接"} onClick={() => void onCopy()}>{copied ? <Check size={18} /> : <Link2 size={18} />}</button>
+    <button type="button" className="preview-copy-action" title={copied ? "已复制" : copyTitle} aria-label={copied ? "已复制" : copyTitle} onClick={() => void onCopy()}>{copied ? <Check size={18} /> : copyTitle==="复制内容"?<Copy size={18}/>:<Link2 size={18} />}</button>
     {!hideOpen && <button type="button" className="preview-open-action" title={openTitle} aria-label={openTitle} disabled={openDisabled} onClick={onOpen}><ArrowUpRight size={19} /></button>}
     {onClose && <button type="button" title={closeLabel} aria-label={closeLabel} onClick={onClose}><X size={17} /></button>}
   </div>;

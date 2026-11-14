@@ -1,4 +1,4 @@
-import type { Provider } from "./ProviderLabels";
+import type { Provider, SearchProvider } from "./ProviderLabels";
 
 export type LibrarySummary = {
   id: string;
@@ -50,7 +50,7 @@ export type SearchResult = {
   sourceTitle?: string;
   pageNumber?: number;
   score?: number;
-  provider: Provider;
+  provider: SearchProvider;
   libraryId: string;
   libraryName: string;
   spaceId: string;

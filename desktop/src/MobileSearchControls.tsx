@@ -3,17 +3,19 @@ import type { FilterBar } from "./FilterBar";
 import { WorkspaceFilterSummary } from "./WorkspaceFilterSummary";
 import type { LibrarySummary } from "./SearchTypes";
 import type { SourceFilters } from "./useLocalSearch";
+import { normalizeSourceFilters } from "./SearchSourceFilters";
 
 type Filters = ComponentProps<typeof FilterBar>;
-const types = [["craft", "资料"], ["task", "任务"], ["pdf", "PDF"], ["media", "媒体"], ["attachment", "附件"]] as const;
-const allTypes: SourceFilters = { craft: true, task: true, pdf: true, media: true, attachment: true };
+const types = [["craft", "资料"], ["task", "任务"], ["pdf", "PDF"], ["media", "媒体"], ["attachment", "附件"], ["reading", "阅读"], ["flashcard", "闪卡"]] as const;
+const allTypes: SourceFilters = { craft: true, task: true, pdf: true, media: true, attachment: true, reading: true, flashcard: true };
 
 export function MobileSearchControls({ filters, onSelectLibraries }: { filters: Filters; onSelectLibraries?: (ids: string[] | null) => void }) {
-  const all = Object.values(filters.sourceFilters).every(Boolean);
+  const resolvedSources=normalizeSourceFilters(filters.sourceFilters);
+  const all = Object.values(resolvedSources).every(Boolean);
   return <div className="mobile-search-facets">
     <div className="mobile-content-types" role="group" aria-label="内容类型">
       <button aria-pressed={all} onClick={() => filters.setSourceFilters({ ...allTypes })}>全部</button>
-      {types.map(([key, label]) => <button key={key} aria-pressed={!all && filters.sourceFilters[key] && Object.values(filters.sourceFilters).filter(Boolean).length === 1}
+      {types.map(([key, label]) => <button key={key} aria-pressed={!all && resolvedSources[key] && Object.values(resolvedSources).filter(Boolean).length === 1}
         onClick={() => filters.setSourceFilters(Object.fromEntries(types.map(([id]) => [id, id === key])) as SourceFilters)}>{label}</button>)}
     </div>
     <div className="mobile-applied-scope" aria-label="当前搜索范围与筛选">
@@ -21,7 +23,7 @@ export function MobileSearchControls({ filters, onSelectLibraries }: { filters: 
       {filters.selectedLibraryIds !== null && <button onClick={() => { onSelectLibraries?.(null); filters.setFolderId(""); }}>清除资料范围</button>}
     </div>
     <WorkspaceFilterSummary filters={[
-      ...(!all ? [{ label: `类型：${types.filter(([key]) => filters.sourceFilters[key]).map(([, label]) => label).join("、") || "未选择"}`, clear: () => filters.setSourceFilters({ ...allTypes }) }] : []),
+      ...(!all ? [{ label: `类型：${types.filter(([key]) => resolvedSources[key]).map(([, label]) => label).join("、") || "未选择"}`, clear: () => filters.setSourceFilters({ ...allTypes }) }] : []),
       ...(filters.dateFilter !== "any" ? [{ label: `近 ${filters.dateFilter} 天`, clear: () => filters.setDateFilter("any") }] : []),
       ...(filters.searchScope !== "all" ? [{ label: filters.searchScope === "title" ? "仅名称" : "名称与章节", clear: () => filters.setSearchScope("all") }] : []),
       ...(filters.folderId ? [{ label: `文件夹：${filters.selectedFolder?.path ?? "所选文件夹"}`, clear: () => filters.setFolderId("") }] : []),
@@ -35,7 +37,7 @@ export function MobileSearchFilterForm({ filters, onSelectLibraries, onApply }: 
 }) {
   const [date, setDate] = useState(filters.dateFilter);
   const [scope, setScope] = useState(filters.searchScope);
-  const [sources, setSources] = useState({ ...filters.sourceFilters });
+  const [sources, setSources] = useState<SourceFilters>(()=>normalizeSourceFilters(filters.sourceFilters));
   const [libraries, setLibraries] = useState<string[] | null>(filters.selectedLibraryIds && [...filters.selectedLibraryIds]);
   const [folder, setFolder] = useState(filters.folderId);
   const all = Object.values(sources).every(Boolean);

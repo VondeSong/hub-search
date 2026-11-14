@@ -1,4 +1,5 @@
 import type { SearchScope, SourceFilters } from "./useLocalSearch";
+import { normalizeSourceFilters as parseSourceFilters } from "./SearchSourceFilters";
 
 export type SmartCollectionDateFilter = "any" | "7" | "30" | "90";
 
@@ -22,16 +23,6 @@ export type SmartCollection = SmartCollectionSnapshot & {
 const DATE_FILTERS = new Set<SmartCollectionDateFilter>(["any", "7", "30", "90"]);
 const SEARCH_SCOPES = new Set<SearchScope>(["all", "title", "title_heading"]);
 
-function parseSourceFilters(value: unknown): SourceFilters {
-  const source = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  return {
-    craft: source.craft !== false,
-    task: source.task !== false,
-    pdf: source.pdf !== false,
-    media: source.media !== false,
-    attachment: source.attachment !== false,
-  };
-}
 
 function normalizeLibraryIds(value: unknown): string[] | null {
   if (value === null) return null;
@@ -47,7 +38,7 @@ export function normalizeSmartCollectionSnapshot(snapshot: SmartCollectionSnapsh
     folderId: snapshot.folderId,
     folderLabel: snapshot.folderLabel?.trim() || undefined,
     dateFilter: snapshot.dateFilter,
-    sourceFilters: { ...snapshot.sourceFilters },
+    sourceFilters: parseSourceFilters(snapshot.sourceFilters),
     searchScope: snapshot.searchScope,
   };
 }
@@ -122,12 +113,13 @@ export function smartCollectionMatches(
 }
 
 export function smartCollectionSourceLabel(sourceFilters: SourceFilters): string {
+  const resolved = parseSourceFilters(sourceFilters);
   const entries = ([
     ["craft", "页面"],
     ["task", "任务"],
     ["pdf", "PDF"],
     ["media", "媒体"],
-    ["attachment", "附件"],
-  ] as const).filter(([key]) => sourceFilters[key]).map(([, label]) => label);
-  return entries.length === 5 ? "全部类型" : entries.length ? entries.join("、") : "未选择类型";
+    ["attachment", "附件"], ["reading", "阅读"], ["flashcard", "闪卡"],
+  ] as const).filter(([key]) => resolved[key]).map(([, label]) => label);
+  return entries.length === 7 ? "全部类型" : entries.length ? entries.join("、") : "未选择类型";
 }

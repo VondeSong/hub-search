@@ -52,10 +52,10 @@ const ResultRow = memo(function ResultRow({
 
   return (
     <div
-      className={`result-group ${result.provider} ${onToggleFavorite ? "has-favorite-action" : ""} ${presentation.titleOnly ? "title-only" : ""} ${result.snippet.trim() ? "" : "empty-content"} ${selected ? "selected" : ""}`}
+      className={`result-group ${result.provider} ${onToggleFavorite && result.provider !== "hub" ? "has-favorite-action" : ""} ${presentation.titleOnly ? "title-only" : ""} ${result.snippet.trim() ? "" : "empty-content"} ${selected ? "selected" : ""}`}
       onMouseEnter={() => {
         if (!isMobileLayout) onHoverResult(index);
-        onPrepareResultLink(result);
+        if (result.provider !== "hub") onPrepareResultLink(result);
       }}
       onContextMenu={(event) => onContextResult(event, result, index)}
     >
@@ -63,9 +63,9 @@ const ResultRow = memo(function ResultRow({
         className="result-row"
         role="option"
         aria-selected={selected}
-        draggable={!isMobileLayout}
-        onPointerDown={() => onPrepareResultLink(result)}
-        onDragStart={isMobileLayout ? undefined : (event) => onDragResult(event, result)}
+        draggable={!isMobileLayout && result.provider !== "hub"}
+        onPointerDown={() => { if (result.provider !== "hub") onPrepareResultLink(result); }}
+        onDragStart={isMobileLayout || result.provider === "hub" ? undefined : (event) => onDragResult(event, result)}
         onClick={() => onSelectResult(index)}
         onDoubleClick={isMobileLayout ? undefined : () => onOpenResult(result)}
       >
@@ -94,7 +94,7 @@ const ResultRow = memo(function ResultRow({
         </span>
         {isMobileLayout && <span className="mobile-result-disclosure" aria-hidden="true">›</span>}
       </button>
-      {onToggleFavorite && <button
+      {onToggleFavorite && result.provider !== "hub" && <button
         className={`result-favorite-toggle ${favorite ? "active" : ""}`}
         onClick={(event) => { event.stopPropagation(); onToggleFavorite(result); }}
         aria-label={favorite ? "取消收藏页面" : "收藏页面"}

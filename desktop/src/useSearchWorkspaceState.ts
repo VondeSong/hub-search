@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { runtimeCapabilities } from "./RuntimePlatform";
 import type { FolderSummary, LibrarySummary } from "./SearchTypes";
 import type { SearchScope, SourceFilters } from "./useLocalSearch";
+import { normalizeSourceFilters } from "./SearchSourceFilters";
 import { activeFilterCount as countActiveFilters } from "./FilterPresentation";
 import { searchFilterSummary } from "./SearchSuggestions";
 import { createSmartCollection, parseSmartCollections, smartCollectionMatches, type SmartCollection, type SmartCollectionSnapshot, type SmartCollectionDateFilter } from "./SmartCollections";
@@ -34,19 +35,13 @@ function loadSearchFilters(): { dateFilter: DateFilter; sourceFilters: SourceFil
           ? [value.libraryId]
           : null,
       folderId: typeof value.folderId === "string" ? value.folderId : "",
-      sourceFilters: {
-        craft: source.craft !== false,
-        task: source.task !== false,
-        pdf: source.pdf !== false,
-        media: typeof source.media === "boolean" ? source.media : source.image !== false,
-        attachment: source.attachment !== false,
-      },
+      sourceFilters: normalizeSourceFilters(source),
     };
   } catch {
     return {
       dateFilter: "any",
       searchScope: "all",
-      sourceFilters: { craft: true, task: true, pdf: true, media: true, attachment: true },
+      sourceFilters: { craft: true, task: true, pdf: true, media: true, attachment: true, reading: true, flashcard: true },
       libraryIds: null,
       folderId: "",
     };

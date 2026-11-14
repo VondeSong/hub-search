@@ -4,6 +4,32 @@ const NOW_MS: i64 = 1_791_331_200_000;
 const DAY_MS: i64 = 86_400_000;
 
 #[test]
+fn exact_search_target_is_found_outside_the_first_page_and_respects_lifecycle() {
+    let c = database();
+    seed(&c, "old-target", "bookmarks", NOW_MS - 1000);
+    for i in 0..65 {
+        seed(&c, &format!("recent-{i}"), "bookmarks", NOW_MS + i);
+    }
+    assert!(!run(&c, "all", "all", 0, Filters::default())
+        .3
+        .iter()
+        .any(|v| v["key"] == "old-target"));
+    let exact = Filters {
+        item_key: Some("old-target".into()),
+        ..Filters::default()
+    };
+    let result = run(&c, "all", "all", 0, exact.clone());
+    assert_eq!(result.2, 1);
+    assert_eq!(result.3[0]["key"], "old-target");
+    c.execute(
+        "INSERT INTO collection_lifecycle(item_key,state) VALUES('old-target','deleted')",
+        [],
+    )
+    .unwrap();
+    assert_eq!(run(&c, "all", "all", 0, exact).2, 0);
+}
+
+#[test]
 fn collection_navigation_state_is_joined_once_per_item() {
     let c = database();
     seed(&c, "fixture", "bookmarks", NOW_MS);

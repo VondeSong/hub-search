@@ -9,7 +9,7 @@ import {
   Tags,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import type { Provider } from "./ProviderLabels";
+import type { SearchProvider } from "./ProviderLabels";
 import { searchMatchRanges } from "./SearchMatch";
 
 const EMPTY_HIGHLIGHT_TERMS: readonly string[] = [];
@@ -50,7 +50,7 @@ function matchFieldIcon(field: string) {
 
 const MATCH_FIELD_ORDER = ["title", "heading", "body", "alias", "tag", "attachment", "path", "document"];
 
-export function MatchFieldIcons({ matchField, provider }: { matchField: string; provider: Provider }) {
+export function MatchFieldIcons({ matchField, provider }: { matchField: string; provider: SearchProvider }) {
   const fields = matchField
     .split(",")
     .map((field) => field.trim())

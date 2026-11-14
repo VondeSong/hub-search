@@ -147,6 +147,7 @@ mod window_lifecycle;
 use window_lifecycle::configured_toggle_shortcut;
 mod reading_sync;
 mod search_index;
+mod module_search;
 mod search_index_runtime;
 #[cfg(test)]
 use search_index_runtime::{
@@ -17873,6 +17874,8 @@ async fn local_search(
     include_pdf: Option<bool>,
     include_pdf_ocr: Option<bool>,
     include_attachments: Option<bool>,
+    include_reading: Option<bool>,
+    include_flashcards: Option<bool>,
     search_scope: Option<String>,
 ) -> Result<Vec<IndexedSearchResult>, String> {
     let query = query.trim().to_string();
@@ -17882,9 +17885,10 @@ async fn local_search(
     tokio::task::spawn_blocking(move || {
         let connection = open_database(&path)?;
         let visible=visible_library_ids(&path,&connection)?;
+        let global_modules=space_ids.is_none()&&space_id.is_none();
         let selected_space_ids = space_ids.or_else(|| space_id.map(|id| vec![id]))
             .map(|ids|ids.into_iter().filter(|id|visible.contains(id)).collect::<Vec<_>>()).unwrap_or(visible);
-        if selected_space_ids.is_empty() {return Ok(Vec::new());}
+        if selected_space_ids.is_empty()&&(!global_modules||(!include_reading.unwrap_or(false)&&!include_flashcards.unwrap_or(false))) {return Ok(Vec::new());}
         let page_items = page_ids.as_ref().map(|pages| library_browse::page_content_ids(&connection, &selected_space_ids, pages)).transpose()?;
         let include_pages = include_craft_pages.unwrap_or(true);
         let include_tasks = include_dida_tasks.unwrap_or(true);
@@ -17941,7 +17945,7 @@ async fn local_search(
                 row.map_err(|error| format!("资料库名称无法读取：{error}"))?;
             libraries.insert(id, (provider, name));
         }
-        Ok(hits
+        let mut results=hits
             .into_iter()
             .filter(|hit| {
                 if hit.provider == PROVIDER_DIDA365 || hit.content_type == "dida_task" {
@@ -18049,7 +18053,15 @@ async fn local_search(
                     sub_matches,
                 }
             })
-            .collect())
+            .collect::<Vec<_>>();
+        let scope=module_search::Scope{
+            libraries:selected_space_ids.into_iter().filter(|id|!hidden.contains(id)).collect(),global:global_modules,
+            folders:folder_ids.or_else(||folder_id.filter(|id|!id.is_empty()).map(|id|vec![id])),documents:document_ids,pages:page_ids,updated_after,
+        };
+        if include_reading.unwrap_or(false)||include_flashcards.unwrap_or(false){
+            results.extend(module_search::search(&connection,&query,limit,&scope,include_reading.unwrap_or(false),include_flashcards.unwrap_or(false),field_scope)?);
+        }
+        Ok(module_search::finish(results,limit))
     })
     .await
     .map_err(|error| format!("本地搜索任务失败：{error}"))?
@@ -18134,9 +18146,15 @@ async fn dynamic_search_facets(
                     .insert(format!("{space_id}\u{0}{document_id}"));
             }
         }
+        let scope=module_search::Scope{libraries:visible.into_iter().filter(|id|!hidden.contains(id)).collect(),global:true,folders:None,documents:None,pages:None,updated_after};
+        let modules=module_search::search(&connection,query.trim(),FACET_LIMIT,&scope,true,true,search_scope.as_deref().unwrap_or("all"))?;
+        let mut module_counts=HashMap::<String,usize>::new();
+        for hit in &modules{*module_counts.entry(hit.content_type.clone()).or_default()+=1;}
+        let modules_truncated=module_counts.values().any(|count|*count==FACET_LIMIT);
+        sources.extend(module_counts);
         Ok(DynamicFacetCounts {
-            total: hits.len(),
-            truncated,
+            total: hits.len()+modules.len(),
+            truncated:truncated||modules_truncated,
             sources,
             libraries,
             folders,
@@ -35028,6 +35046,7 @@ pub fn run() {
                 library_control,
                 sync_all_libraries,
                 local_search,
+                module_search::module_search_document,
                 dynamic_search_facets,
                 resolve_unified_task_search_result,
                 list_unified_tasks,

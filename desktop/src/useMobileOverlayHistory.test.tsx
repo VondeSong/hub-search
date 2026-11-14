@@ -27,6 +27,23 @@ it("does not modify desktop history when opening or closing an overlay",async()=
   const push=vi.spyOn(window.history,"pushState"),back=vi.spyOn(window.history,"back");await act(async()=>root.render(<Harness enabled={false}/>));
   await act(async()=>{owner.openFlashcards();owner.closeFlashcards();});expect(push).not.toHaveBeenCalled();expect(back).not.toHaveBeenCalled();expect(setters.setFlashcardsOpen).toHaveBeenLastCalledWith(false);
 });
+it("opens reading from a search preview without leaving a stale preview Back owner",async()=>{
+ const route=vi.fn();await act(async()=>root.render(<Harness/>));owner.bindRoute(route);
+ window.history.replaceState({hubMobileRoute:"search"},"");
+ await act(async()=>owner.openPreview());
+ await act(async()=>{expect(owner.openRouteFromPreview("collections")).toBe(true);});
+ expect(window.history.state).toEqual({hubMobileRoute:"collections"});expect(route).toHaveBeenLastCalledWith("collections");
+ await act(async()=>{window.history.back();await new Promise(r=>setTimeout(r,30));});
+ expect(route).toHaveBeenLastCalledWith("search");
+});
+it("replaces the preview layer when a search result opens a flashcard",async()=>{
+ const route=vi.fn();await act(async()=>root.render(<Harness/>));owner.bindRoute(route);
+ window.history.replaceState({hubMobileRoute:"search"},"");await act(async()=>owner.openPreview());
+ const length=window.history.length;await act(async()=>owner.openFlashcards());
+ expect(window.history.length).toBe(length);expect(window.history.state.hubFlashcards).toBe(true);
+ await act(async()=>{window.history.back();await new Promise(r=>setTimeout(r,30));});
+ expect(setters.setFlashcardsOpen).toHaveBeenLastCalledWith(false);
+});
 
 it("closes capture on Android back without navigating the underlying page", async()=>{
   const route=vi.fn(); await act(async()=>root.render(<Harness captureOpen/>)); owner.bindRoute(route);

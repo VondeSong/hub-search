@@ -590,7 +590,7 @@ function PreviewRendererComponent({ selected, markdown, matchTerms, hasSectionCo
           <CraftPageIcon size={22} /><strong>{children}</strong>
         </a>;
       }
-      return href && ATTACHMENT_EXTENSIONS.has(extension)
+      return selectedProvider!=="hub" && href && ATTACHMENT_EXTENSIONS.has(extension)
         ? <PreviewAttachmentLink
           href={href}
           label={label || `附件.${extension}`}
@@ -601,7 +601,7 @@ function PreviewRendererComponent({ selected, markdown, matchTerms, hasSectionCo
         />
         : <a className="preview-text-link" href={href} onClick={(event) => { event.preventDefault(); onOpenLink(href); }}>{children}</a>;
     },
-    img: ({ src, alt }) => <PreviewMarkdownMedia
+    img: ({ src, alt }) => selectedProvider==="hub"?<span className="preview-note">{alt||"图片"} · 在原条目中查看</span>:<PreviewMarkdownMedia
       src={typeof src === "string" ? src : undefined}
       alt={alt}
       provider={selectedProvider}

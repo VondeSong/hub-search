@@ -3,9 +3,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { LatestRequestGate } from "./LatestRequestGate";
 import type { SearchResult } from "./SearchTypes";
+import { normalizeSourceFilters, type SourceFilters } from "./SearchSourceFilters";
+export type { SourceFilters } from "./SearchSourceFilters";
 
 export type SearchScope = "all" | "title" | "title_heading";
-export type SourceFilters = { craft: boolean; task: boolean; pdf: boolean; media: boolean; attachment: boolean };
 
 type SearchRequestOptions = {
   query: string;
@@ -19,6 +20,7 @@ type SearchRequestOptions = {
 };
 
 export function buildLocalSearchRequest(options: SearchRequestOptions) {
+  const sources=normalizeSourceFilters(options.sourceFilters);
   return {
     query: options.query,
     limit: 60,
@@ -31,6 +33,8 @@ export function buildLocalSearchRequest(options: SearchRequestOptions) {
     includePdf: options.sourceFilters.pdf,
     includePdfOcr: options.sourceFilters.pdf,
     includeAttachments: options.sourceFilters.attachment,
+    includeReading: sources.reading,
+    includeFlashcards: sources.flashcard,
     searchScope: options.searchScope,
   };
 }
@@ -70,6 +74,8 @@ export function useLocalSearch(options: UseLocalSearchOptions) {
     ready, hasSpaces, syncing, isComposing, normalizeResults,
     publishResults, setError,
   } = options;
+  const sourceTypes=normalizeSourceFilters(options.sourceFilters);
+  const canSearch=hasSpaces||(options.spaceIds===null&&(sourceTypes.reading||sourceTypes.flashcard));
   const publish = useCallback((value: unknown) => {
     const next = normalizeResults(value);
     const keepSelection = publishedKey.current === requestKey;
@@ -79,12 +85,12 @@ export function useLocalSearch(options: UseLocalSearchOptions) {
   }, [normalizeResults, requestKey, publishResults]);
 
   const loadRecent = useCallback(async () => {
-    if (!ready || !hasSpaces) return;
+    if (!ready || !canSearch) return;
     const requestSequence = requestGate.current.begin();
     setSearching(true);
     setError("");
     try {
-      const result = await invoke<unknown>("recent_documents", buildRecentDocumentsRequest(options));
+      const result = hasSpaces?await invoke<unknown>("recent_documents", buildRecentDocumentsRequest(options)):await invoke<unknown>("local_search", buildLocalSearchRequest(options));
       if (!requestGate.current.isCurrent(requestSequence)) return;
       publish(result);
     } catch (reason) {
@@ -92,10 +98,10 @@ export function useLocalSearch(options: UseLocalSearchOptions) {
     } finally {
       if (requestGate.current.isCurrent(requestSequence)) setSearching(false);
     }
-  }, [hasSpaces, options.folderId, options.recentPageLimit, options.recentTaskLimit, options.spaceIds, options.updatedAfter, ready, publish, setError]);
+  }, [hasSpaces, canSearch, options.folderId, options.recentPageLimit, options.recentTaskLimit, options.spaceIds, options.updatedAfter, ready, publish, setError]);
 
   useEffect(() => {
-    if (!ready || !hasSpaces || syncing || isComposing) {
+    if (!ready || !canSearch || syncing || isComposing) {
       requestGate.current.invalidate();
       setSearching(false);
       return;
@@ -124,7 +130,7 @@ export function useLocalSearch(options: UseLocalSearchOptions) {
       setSearching(false);
     };
   }, [
-    hasSpaces, isComposing, loadRecent, normalizeResults, requestKey, options.folderId,
+    hasSpaces, canSearch, isComposing, loadRecent, normalizeResults, requestKey, options.folderId,
     options.query, options.searchScope, options.sourceFilters, options.spaceIds,
     options.updatedAfter, options.refreshRevision, ready, setError, publish, syncing,
   ]);

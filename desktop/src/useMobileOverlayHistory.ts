@@ -20,7 +20,10 @@ export function useMobileOverlayHistory(options: Options) {
     entries.current[kind] = true;
   }, []);
   const openFlashcards = useCallback(() => {
-    push("flashcards", "hubFlashcards");
+    if(latest.current.enabled&&entries.current.preview){
+      entries.current.preview=false;entries.current.flashcards=true;
+      window.history.replaceState({...window.history.state,hubMobilePreview:false,hubFlashcards:true},"");
+    }else push("flashcards", "hubFlashcards");
     latest.current.setFlashcardsOpen(true);
     latest.current.setFiltersOpen(false);
     latest.current.setPreviewOpen(false);
@@ -36,6 +39,11 @@ export function useMobileOverlayHistory(options: Options) {
     if (latest.current.enabled && entries.current.preview) window.history.back();
     else latest.current.setPreviewOpen(false);
   }, []);
+  const openRouteFromPreview=useCallback((value:string)=>{
+    if(!latest.current.enabled||!entries.current.preview)return false;
+    entries.current.preview=false;window.history.replaceState({hubMobileRoute:value},"");
+    latest.current.setPreviewOpen(false);route.current(value);return true;
+  },[]);
   useEffect(() => {
     if (!options.enabled) return;
     if (!window.history.state?.hubMobileRoute) window.history.replaceState({ ...(window.history.state ?? {}), hubMobileRoute: "search" }, "");
@@ -85,5 +93,5 @@ export function useMobileOverlayHistory(options: Options) {
       if (window.history.state?.hubQuickCapture) { state.closingCapture = true; window.history.back(); }
     }
   }, [options.enabled, options.captureOpen]);
-  return { openFlashcards, closeFlashcards, openPreview, closePreview, bindRoute };
+  return { openFlashcards, closeFlashcards, openPreview, closePreview, bindRoute, openRouteFromPreview };
 }

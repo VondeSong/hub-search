@@ -72,10 +72,10 @@ const RecentResultRow = memo(function RecentResultRow({
 
   return (
     <div
-      className={`recent-item ${result.favoriteKind === "snippet" ? "saved-snippet" : ""} ${result.provider} ${onToggleFavorite ? "has-favorite-action" : ""} ${dimEmptyContent ? "empty-content" : ""} ${taskCompleted ? "task-completed" : ""} ${selected ? "selected" : ""}`}
+      className={`recent-item ${result.favoriteKind === "snippet" ? "saved-snippet" : ""} ${result.provider} ${onToggleFavorite && result.provider !== "hub" ? "has-favorite-action" : ""} ${dimEmptyContent ? "empty-content" : ""} ${taskCompleted ? "task-completed" : ""} ${selected ? "selected" : ""}`}
       onMouseEnter={() => {
         if (!isMobileLayout) onHoverResult(index);
-        onPrepareResultLink(result);
+        if (result.provider !== "hub") onPrepareResultLink(result);
       }}
       onContextMenu={(event) => onContextResult(event, result, index)}
     >
@@ -83,9 +83,9 @@ const RecentResultRow = memo(function RecentResultRow({
         className="recent-row"
         role="option"
         aria-selected={selected}
-        draggable={!isMobileLayout}
-        onPointerDown={() => onPrepareResultLink(result)}
-        onDragStart={isMobileLayout ? undefined : (event) => onDragResult(event, result)}
+        draggable={!isMobileLayout && result.provider !== "hub"}
+        onPointerDown={() => { if (result.provider !== "hub") onPrepareResultLink(result); }}
+        onDragStart={isMobileLayout || result.provider === "hub" ? undefined : (event) => onDragResult(event, result)}
         onClick={() => onSelectResult(index)}
         onDoubleClick={isMobileLayout ? undefined : () => onOpenResult(result)}
       >
@@ -114,7 +114,7 @@ const RecentResultRow = memo(function RecentResultRow({
         )}
         {isMobileLayout && <span className="mobile-result-disclosure" aria-hidden="true">›</span>}
       </button>
-      {onToggleFavorite && <button
+      {onToggleFavorite && result.provider !== "hub" && <button
         className={`result-favorite-toggle recent ${favorite ? "active" : ""}`}
         onClick={(event) => { event.stopPropagation(); onToggleFavorite(result); }}
         aria-label={result.favoriteKind === "snippet" ? "取消收藏此片段" : favorite ? "取消收藏页面" : "收藏页面"}

@@ -10,6 +10,7 @@ export function pageFavoriteKey(result: SearchResult): string {
 }
 
 export function asPageFavorite(result: SearchResult): SearchResult {
+  if(result.provider==="hub")return result;
   const key = pageFavoriteKey(result);
   const subpage = result.favoriteKind === "page" && result.provider === "craft" && result.pageId && result.pageId !== result.documentId;
   return {

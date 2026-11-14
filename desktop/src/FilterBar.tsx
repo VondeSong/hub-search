@@ -5,9 +5,10 @@ import { WorkspaceFilterSummary } from "./WorkspaceFilterSummary";
 
 type DateFilter = "any" | "7" | "30" | "90";
 type SearchScope = "all" | "title" | "title_heading";
-type SourceFilters = { craft: boolean; task: boolean; pdf: boolean; media: boolean; attachment: boolean };
+import type { SourceFilters } from "./useLocalSearch";
+import { normalizeSourceFilters } from "./SearchSourceFilters";
 
-const sourceOptions = [["craft", "页面"], ["task", "任务"], ["pdf", "PDF"], ["media", "媒体"], ["attachment", "附件"]] as const;
+const sourceOptions = [["craft", "页面"], ["task", "任务"], ["pdf", "PDF"], ["media", "媒体"], ["attachment", "附件"], ["reading", "阅读"], ["flashcard", "闪卡"]] as const;
 
 type FilterBarProps = {
   mobile?: boolean;
@@ -41,13 +42,14 @@ type FilterBarProps = {
 };
 
 export function SearchFilterSummary(props: FilterBarProps) {
-  const { dateFilter, folderId, selectedFolder, searchScope, sourceFilters, setDateFilter, setFolderId, setSearchScope, setSourceFilters } = props;
+  const { dateFilter, folderId, selectedFolder, searchScope, sourceFilters:storedSources, setDateFilter, setFolderId, setSearchScope, setSourceFilters } = props;
+  const sourceFilters=normalizeSourceFilters(storedSources);
   return <WorkspaceFilterSummary filters={[
     ...(folderId ? [{ label: `文件夹：${selectedFolder?.path ?? "所选文件夹"}`, clear: () => setFolderId("") }] : []),
     ...(dateFilter !== "any" ? [{ label: `最近 ${dateFilter} 天`, clear: () => setDateFilter("any") }] : []),
-    ...(searchScope !== "all" ? [{ label: searchScope === "title" ? "仅页面名称" : "页面名称与章节", clear: () => setSearchScope("all") }] : []),
-    ...([["craft", "页面"], ["task", "任务"], ["pdf", "PDF"], ["media", "媒体"], ["attachment", "附件"]] as const).filter(([key]) => !sourceFilters[key]).map(([key, label]) => ({ label: `排除${label}`, clear: () => setSourceFilters(current => ({ ...current, [key]: true })) })),
-  ]} onReset={() => { setFolderId(""); setDateFilter("any"); setSearchScope("all"); setSourceFilters({ craft: true, task: true, pdf: true, media: true, attachment: true }); }} />;
+    ...(searchScope !== "all" ? [{ label: searchScope === "title" ? "仅名称" : "名称与章节", clear: () => setSearchScope("all") }] : []),
+    ...sourceOptions.filter(([key]) => !sourceFilters[key]).map(([key, label]) => ({ label: `排除${label}`, clear: () => setSourceFilters(current => ({ ...current, [key]: true })) })),
+  ]} onReset={() => { setFolderId(""); setDateFilter("any"); setSearchScope("all"); setSourceFilters({ craft: true, task: true, pdf: true, media: true, attachment: true, reading: true, flashcard: true }); }} />;
 }
 
 export function FilterBar({
@@ -63,7 +65,7 @@ export function FilterBar({
   searchScopeMenuOpen,
   selectedFolder,
   selectedLibraryIds,
-  sourceFilters,
+  sourceFilters:storedSources,
   spaces,
   syncing,
   sourceFacetCounts,
@@ -80,6 +82,7 @@ export function FilterBar({
   setSourceFilters,
   startWindowDrag,
 }: FilterBarProps) {
+  const sourceFilters=normalizeSourceFilters(storedSources);
   const [sourceMenuOpen, setSourceMenuOpen] = useState(false);
   const restorePickerFocus = (event: ReactMouseEvent<HTMLButtonElement>) => {
     if (mobile) event.currentTarget.closest(".scope-picker")?.querySelector<HTMLButtonElement>(".filter-control-button")?.focus();
@@ -106,17 +109,17 @@ export function FilterBar({
       <div className="scope-picker" onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setSearchScopeMenuOpen(false);
       }}>
-        <button className="filter-chip filter-control-button scope-picker-button" aria-label={`搜索范围：${searchScope === "title" ? "页面名称" : searchScope === "title_heading" ? "页面名称与章节" : "全部字段"}`} aria-haspopup="listbox" aria-expanded={searchScopeMenuOpen} onClick={() => { setSourceMenuOpen(false); setFolderMenuOpen(false); setDateMenuOpen(false); setSearchScopeMenuOpen((open) => !open); }}>
+        <button className="filter-chip filter-control-button scope-picker-button" aria-label={`搜索范围：${searchScope === "title" ? "名称" : searchScope === "title_heading" ? "名称与章节" : "全部字段"}`} aria-haspopup="listbox" aria-expanded={searchScopeMenuOpen} onClick={() => { setSourceMenuOpen(false); setFolderMenuOpen(false); setDateMenuOpen(false); setSearchScopeMenuOpen((open) => !open); }}>
           <CaseSensitive size={15} aria-hidden="true" />
           {mobile && <span className="mobile-filter-label">搜索范围</span>}
-          <span className="filter-chip-value">{searchScope === "title" ? "页面名称" : searchScope === "title_heading" ? "页面名称与章节" : "全部字段"}</span>
+          <span className="filter-chip-value">{searchScope === "title" ? "名称" : searchScope === "title_heading" ? "名称与章节" : "全部字段"}</span>
           <ChevronDown className="filter-control-chevron" size={13} aria-hidden="true" />
         </button>
         {searchScopeMenuOpen && <div className="scope-menu" role="listbox" aria-label="搜索范围">
           {([
-            ["all", "全部字段", "页面名称、章节标题、正文、路径等"],
-            ["title", "页面名称", "只匹配页面名称"],
-            ["title_heading", "页面名称与章节", "匹配页面名称或章节标题"],
+            ["all", "全部字段", "名称、章节标题、正文、路径等"],
+            ["title", "名称", "只匹配名称"],
+            ["title_heading", "名称与章节", "匹配名称或章节标题"],
           ] as const).map(([value, label, description]) =>
             <button key={value} role="option" aria-selected={searchScope === value} className={searchScope === value ? "active" : ""} onClick={(event) => { restorePickerFocus(event); setSearchScope(value); setSearchScopeMenuOpen(false); }}>
               <span><strong>{label}</strong><small>{description}</small></span>
@@ -136,7 +139,7 @@ export function FilterBar({
         </button>
         {sourceMenuOpen && <div className="scope-menu compact-filter-menu source-menu" role="listbox" aria-label="内容类型" aria-multiselectable="true">
           {sourceOptions.map(([key, label]) => (
-            <button key={key} role="option" aria-selected={sourceFilters[key]} className={sourceFilters[key] ? "active" : ""} onClick={() => setSourceFilters((current) => ({ ...current, [key]: !current[key] }))}>
+            <button key={key} role="option" aria-selected={sourceFilters[key]} className={sourceFilters[key] ? "active" : ""} onClick={() => setSourceFilters((current) => ({ ...normalizeSourceFilters(current), [key]: !normalizeSourceFilters(current)[key] }))}>
               <span><strong>{label}</strong></span>
               {sourceFacetCounts && <small className="facet-count">{sourceFacetCounts[key] ?? 0}{facetCountsTruncated ? "+" : ""}</small>}
               {sourceFilters[key] && <Check size={15} aria-hidden="true" />}
@@ -188,7 +191,7 @@ export function FilterBar({
           )}
         </div>}
       </div>
-      {hasActiveFilters && <button className="filter-reset" onClick={() => { setFolderId(""); setDateFilter("any"); setSearchScope("all"); setSourceFilters({ craft: true, task: true, pdf: true, media: true, attachment: true }); }}>{mobile ? "重置筛选" : "清除"}</button>}
+      {hasActiveFilters && <button className="filter-reset" onClick={() => { setFolderId(""); setDateFilter("any"); setSearchScope("all"); setSourceFilters({ craft: true, task: true, pdf: true, media: true, attachment: true, reading: true, flashcard: true }); }}>{mobile ? "重置筛选" : "清除"}</button>}
       <button className="sync-button filter-sync-icon" title={syncLabel} aria-label={syncLabel} onClick={refreshIndex} disabled={syncing || !spaces.some((space) => space.connected)}>
         {syncing ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}
         {mobile && <span>{syncLabel}</span>}

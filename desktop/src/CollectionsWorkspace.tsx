@@ -64,16 +64,18 @@ function loadPreviewWidth() {
   } catch { return DEFAULT_PREVIEW_WIDTH; }
 }
 
-export function CollectionsWorkspace({ onToggleDesktopSidebar }: { onToggleDesktopSidebar?: () => void }) {
+export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, onSearchTargetHandled }: { onToggleDesktopSidebar?: () => void; initialItemKey?: string; onSearchTargetHandled?: () => void }) {
   const shellHeader = useContext(WorkspaceHeaderContext);
   const {view, updateView, activeEntry, updateSavedView, setNavigationCounts, settingsRevision, session, updateSession, pageSnapshot, dataRevision} = useCollectionViews();
-  const changeView = (patch: Partial<View>) => {updateView(patch);updateSavedView();updateSession({offset:0,scrollTop:0});};
+  const [searchItemKey,setSearchItemKey]=useState<string|null>(null);
+  const changeView = (patch: Partial<View>) => {setSearchItemKey(null);updateView(patch);updateSavedView();updateSession({offset:0,scrollTop:0});};
   const query=view.query;
   const setQuery=(query:string)=>changeView({query});
   const offset=session.offset;
   const setOffset=(offset:number)=>updateSession({offset});
   const selectedKey=session.selectedKey;
-  const setSelectedKey=(selectedKey:string|null)=>updateSession({selectedKey});
+  const setSelectedKey=(selectedKey:string|null)=>{if(!selectedKey)setSearchItemKey(null);updateSession({selectedKey});};
+  useEffect(()=>{if(initialItemKey){setSearchItemKey(initialItemKey);updateSession({selectedKey:initialItemKey,previewEnabled:true,offset:0});onSearchTargetHandled?.();}},[initialItemKey]);
   const previewEnabled=session.previewEnabled;
   const setPreviewEnabled=(previewEnabled:boolean)=>updateSession({previewEnabled});
   const cards = {...defaultCollectionCards,...view.cards};
@@ -81,7 +83,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar }: { onToggleDeskt
   const sortingKey = JSON.stringify(sorts.map(({field,ascending})=>({field,ascending})));
   const tagsKey=JSON.stringify(view.tags);
   const includeAbandoned = view.layout === "board" && view.status === "all" && !view.attentionOnly;
-  const loadKey = JSON.stringify([query,offset,includeAbandoned,view.source,view.status,view.attentionOnly,view.destinationId,view.dateFilter,view.media,view.sort,view.ascending,sortingKey,tagsKey]);
+  const loadKey = JSON.stringify([query,offset,includeAbandoned,view.source,view.status,view.attentionOnly,view.destinationId,view.dateFilter,view.media,view.sort,view.ascending,sortingKey,tagsKey,searchItemKey]);
   const [libraries,setLibraries]=useState<LibrarySummary[]>([]);
   const [operations,setOperations]=useState<CollectionLibraryOperation[]>([]);
   const [reviewKey,setReviewKey]=useState<string|null>(null);
@@ -214,7 +216,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar }: { onToggleDeskt
     const current=++generation.current;
     const revision = dataRevision.current;
     try {
-      const next = await invoke<CollectionPage>("list_collection_items", {query,unreadOnly:false,offset,source:view.source,status:view.attentionOnly?"needs_attention":view.status,media:view.media,sort:view.sort,ascending:view.ascending,sorts:JSON.parse(sortingKey),filters:{includeAbandoned,tags:JSON.parse(tagsKey),libraryId:view.destinationId||null,collectedWithinDays:view.dateFilter==="any"?null:Number(view.dateFilter)}});
+      const next = await invoke<CollectionPage>("list_collection_items", searchItemKey?{query:"",unreadOnly:false,offset:0,source:"all",status:"all",filters:{itemKey:searchItemKey}}:{query,unreadOnly:false,offset,source:view.source,status:view.attentionOnly?"needs_attention":view.status,media:view.media,sort:view.sort,ascending:view.ascending,sorts:JSON.parse(sortingKey),filters:{includeAbandoned,tags:JSON.parse(tagsKey),libraryId:view.destinationId||null,collectedWithinDays:view.dateFilter==="any"?null:Number(view.dateFilter)}});
       if (!mounted.current || dataRevision.current !== revision || generation.current !== current || location !== loadLocation.current) return;
       if(next.navigationCounts)setNavigationCounts(next.navigationCounts);
       if (offset>0 && offset>=next.matched) setOffset(Math.max(0,Math.floor((next.matched-1)/60)*60));
@@ -224,7 +226,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar }: { onToggleDeskt
     // Auxiliary status must neither delay the rows nor hold up another query.
     void statusRead.catch(e => { if (location === loadLocation.current) setError(String(e)); });
     return pageRead;
-  },[loadKey,query,offset,includeAbandoned,view.source,view.status,view.attentionOnly,view.destinationId,view.dateFilter,view.media,view.sort,view.ascending,sortingKey,tagsKey,setNavigationCounts,pageSnapshot,dataRevision]);
+  },[loadKey,query,offset,includeAbandoned,view.source,view.status,view.attentionOnly,view.destinationId,view.dateFilter,view.media,view.sort,view.ascending,sortingKey,tagsKey,setNavigationCounts,pageSnapshot,dataRevision,searchItemKey]);
   latestLoad.current=load;
   useVisiblePolling(() => load(false), true, 2000, { refreshKey: load, initialDelayMs: 150 });
   useEffect(() => () => { generation.current++; statusGeneration.current++; }, [load]);
@@ -447,6 +449,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar }: { onToggleDeskt
   const setWidths=(patch:Partial<Record<TableColumn,number>>)=>{updateView({widths:{...view.widths,...patch}});updateSavedView();};
   const beginResize=(column:TableColumn)=>{const measured:Partial<Record<TableColumn,number>>={};for(const header of tableRef.current?.querySelectorAll<HTMLTableCellElement>("th[data-column]")||[]){const c=header.dataset.column as TableColumn;measured[c]=Math.round(header.getBoundingClientRect().width)||widths[c];}setWidths(measured);return measured[column]||widths[column];};
   return <section className={`collections-workspace task-workspace${compactControls?" collection-compact-layout":""}${detailOpen?" collection-detail-open":""}`} aria-label="阅读">
+    {searchItemKey&&<div role="status" className="collection-notice">从搜索打开的阅读条目<button type="button" onClick={()=>setSelectedKey(null)}>返回阅读列表</button>{page&&!page.items.length&&<span>条目已变更或移除，请重新搜索。</span>}</div>}
     <div className="collection-browse-controls" hidden={detailOpen}>
     <header className="task-workspace-header collection-header" onMouseDown={e=>{if(!(e.target as HTMLElement).closest("button, input, select, textarea, a, summary, details, [role=button]"))shellHeader?.onMouseDown(e);}}>
       <div className="task-source-chips" role="group" aria-label="阅读来源">

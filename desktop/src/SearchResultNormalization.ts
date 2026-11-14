@@ -35,6 +35,7 @@ export function normalizeResults(result: unknown): SearchResult[] {
   return result.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
     const value = item as Record<string, unknown>;
+    if(value.provider==="hub"&&value.contentType!=="reading"&&value.contentType!=="flashcard")return [];
     const id = typeof value.id === "string" ? value.id : "";
     const spaceId = typeof value.spaceId === "string" ? value.spaceId : "";
     if (!id || !spaceId) return [];
@@ -79,7 +80,7 @@ export function normalizeResults(result: unknown): SearchResult[] {
           ? "dida365"
           : value.provider === "feishu"
             ? "feishu"
-          : "craft",
+          : value.provider === "hub" ? "hub" : "craft",
       libraryId: typeof value.libraryId === "string" ? value.libraryId : spaceId,
       libraryName: typeof value.libraryName === "string" ? value.libraryName : (typeof value.spaceName === "string" ? value.spaceName : "Craft"),
       spaceId,

@@ -33,7 +33,7 @@ it("keeps filter changes and reset as drafts, discards them on cancel, then appl
   await select("日期范围", "90");
   await act(async () => host.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
   expect(props.setDateFilter).toHaveBeenCalledExactlyOnceWith("90");
-  expect(props.setSourceFilters).toHaveBeenCalledWith(props.sourceFilters); expect(applied).toHaveBeenCalledOnce();
+  expect(props.setSourceFilters).toHaveBeenCalledWith({ ...props.sourceFilters, reading: false, flashcard: false }); expect(applied).toHaveBeenCalledOnce();
 });
 
 it("retains an explicitly empty library range instead of broadening to all", async () => {
@@ -48,7 +48,7 @@ it("switches content type without changing query, date or library range; clears 
   const props = filters();
   await act(async () => root.render(<MobileSearchControls filters={props}/>));
   await click("任务");
-  expect(props.setSourceFilters).toHaveBeenCalledWith({ craft: false, task: true, pdf: false, media: false, attachment: false });
+  expect(props.setSourceFilters).toHaveBeenCalledWith({ craft: false, task: true, pdf: false, media: false, attachment: false, reading: false, flashcard: false });
   expect(props.setDateFilter).not.toHaveBeenCalled(); expect(props.setFolderId).not.toHaveBeenCalled();
   await act(async () => host.querySelector<HTMLButtonElement>("[aria-label='移除筛选：近 7 天']")!.click());
   expect(props.setDateFilter).toHaveBeenCalledWith("any");
@@ -76,3 +76,11 @@ it("keeps content synchronization and Agents as distinct connection actions", as
   await act(async () => [...host.querySelectorAll("button")].find(button => button.textContent?.startsWith("Agents 会话"))!.click());
   expect(agents).toHaveBeenCalledOnce();
 });
+
+ it.each([['阅读','reading'],['闪卡','flashcard']])('selects %s without broadening the current library or date range',async(label,key)=>{
+  const props=filters(),scope=vi.fn(); props.selectedLibraryIds=[];
+  await act(async()=>root.render(<MobileSearchControls filters={props} onSelectLibraries={scope}/>));
+  await click(label);
+  expect(props.setSourceFilters).toHaveBeenCalledWith(Object.fromEntries(['craft','task','pdf','media','attachment','reading','flashcard'].map(id=>[id,id===key])));
+  expect(scope).not.toHaveBeenCalled();expect(props.setDateFilter).not.toHaveBeenCalled();
+ });

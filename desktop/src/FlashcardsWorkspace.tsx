@@ -128,6 +128,8 @@ const FlashcardBackup = lazy(() => import("./FlashcardBackup").then(module => ({
 const ImageOcclusionCanvas = lazy(() => import("./ImageOcclusionCanvas").then(module => ({ default: module.ImageOcclusionCanvas })));
 
 type Props = {
+  initialCardId?: string;
+  onSearchTargetHandled?: () => void;
   onClose: () => void;
   onDueCountChange?: (count: number) => void;
   desktopSidebarVisible?: boolean;
@@ -215,7 +217,7 @@ const CARD_TYPE_LABELS: Record<Flashcard["cardType"], string> = {
 };
 const MEDIA_PLACEMENT_LABELS: Record<NonNullable<FlashcardMedia["placement"]>, string> = { question: "问题", answer: "答案", explanation: "解释" };
 
-export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarVisible = false, onToggleDesktopSidebar, sourceOpenMode = "client", onStatusMessage }: Props) {
+export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarVisible = false, onToggleDesktopSidebar, sourceOpenMode = "client", onStatusMessage, initialCardId, onSearchTargetHandled }: Props) {
   const isAndroid = typeof document !== "undefined" && document.documentElement.dataset.runtimePlatform === "android";
   const [decks, setDecks] = useState<FlashcardDeckSummary[]>([]);
   const [deckFolders, setDeckFolders] = useState<FlashcardDeckFolderSummary[]>([]);
@@ -1271,6 +1273,17 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
     setGridModalCardId(card.id);
     return true;
   };
+  useEffect(()=>{
+    if(!initialCardId)return;
+    let live=true;
+    void loadFlashcardsByIds([initialCardId]).then(cards=>{
+      if(!live)return;
+      const card=cards.find(value=>value.id===initialCardId);
+      if(!card)throw new Error("这张闪卡已不存在，请返回搜索更新结果。");
+      if(openGridCard(card)){setActiveView("deck");setSelectedDeckId(card.deckId);if(isAndroid)setMobilePage("deck");onSearchTargetHandled?.();}
+    }).catch(e=>{if(live){setError(String(e));onSearchTargetHandled?.();}});
+    return()=>{live=false;};
+  },[initialCardId]);
 
   const createDeck = async () => {
     const name = newDeckName.trim();

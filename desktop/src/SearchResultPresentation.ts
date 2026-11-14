@@ -47,6 +47,8 @@ export function recentDateGroup(timestamp?: number): { key: string; label: strin
 }
 
 export function sourceTypeLabel(result: SearchResult): string {
+  if (result.contentType === "reading") return "阅读";
+  if (result.contentType === "flashcard") return "闪卡";
   if (result.sourceType === "dida_task" || result.contentType === "dida_task") return "任务";
   if (result.sourceType === "obsidian_page") return "Markdown";
   if (result.sourceType === "feishu_page" || result.contentType === "feishu_document") return "飞书文档";

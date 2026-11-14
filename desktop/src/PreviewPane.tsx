@@ -18,7 +18,7 @@ import {
 import { lazy, memo, Suspense, useCallback, useLayoutEffect, useEffect, useRef, useState, type Dispatch, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject, type SetStateAction } from "react";
 import { SharedTaskPreviewStatus } from "./SharedTaskPreviewStatus";
 import { isTaskPreviewResult } from "./TaskResultIdentity";
-import type { Provider } from "./ProviderLabels";
+import type { SearchProvider } from "./ProviderLabels";
 import { runtimeCapabilities } from "./RuntimePlatform";
 import { HighlightedText } from "./SearchPresentation";
 import { resultDisplayTitle, resultSectionLabel } from "./SearchResultPresentation";
@@ -63,7 +63,7 @@ export type PreviewPaneProps = {
   navigatePreviewMatch: (direction: number) => void;
   copySelectedLink: () => void | Promise<void>;
   openSelectedResult: (result?: SearchResult, source?: "result" | "preview") => void;
-  providerName: (provider: Provider) => string;
+  providerName: (provider: SearchProvider) => string;
   journalDate?: string;
   canNavigateJournalOlder?: boolean;
   canNavigateJournalNewer?: boolean;
@@ -144,8 +144,9 @@ export const PreviewPane = memo(function PreviewPane({
                   <span className="preview-path">{selected.spaceName} / {selected.path}{selected.sourceTitle && <span> / {selected.sourceTitle}</span>}{selected.pageNumber && <span> / 第 {selected.pageNumber} 页</span>}</span>
             </>} actions={<PreviewToolbar
               copied={copiedResultId === selected.id} onCopy={copySelectedLink}
+              copyTitle={selected.provider==="hub"?"复制内容":undefined}
               onClose={onClose}
-              openTitle={runtimeCapabilities.platform === "android" && selected.provider === "craft" ? "在浏览器中打开 Craft" : `在 ${providerName(selected.provider)} 中打开`}
+              openTitle={selected.provider==="hub"?`在${selected.contentType==="reading"?"阅读":"闪卡"}中打开`:runtimeCapabilities.platform === "android" && selected.provider === "craft" ? "在浏览器中打开 Craft" : `在 ${providerName(selected.provider)} 中打开`}
               openDisabled={!canOpenSource} onOpen={() => openSelectedResult(selected, "preview")}
             >
                   <button className="mobile-preview-back" title="返回结果列表" onClick={onCloseMobilePreview}><ChevronLeft size={20} /><span>返回</span></button>
@@ -158,7 +159,7 @@ export const PreviewPane = memo(function PreviewPane({
                   <button title="下一个预览（Alt+→）" aria-label="下一个预览" disabled={!canGoForward} onClick={() => onNavigatePreviewHistory(1)}><ArrowRight size={16} /></button>
                   {onTogglePreviewPinned && <button className={`preview-pin ${previewPinned ? "active" : ""}`} title={previewPinned ? "解除固定预览" : "固定预览"} aria-label={previewPinned ? "解除固定预览" : "固定预览"} aria-pressed={previewPinned} onClick={onTogglePreviewPinned}>{previewPinned ? <PinOff size={16} /> : <Pin size={16} />}</button>}
                   {toolbarActions}
-                  {runtimeCapabilities.desktop && <Suspense fallback={null}><LazyAgentInvestigation result={selected} compact onPreviewCitation={showCitation} /></Suspense>}
+                  {runtimeCapabilities.desktop && selected.provider !== "hub" && <Suspense fallback={null}><LazyAgentInvestigation result={selected} compact onPreviewCitation={showCitation} /></Suspense>}
                   {(journalDate || pdfPreview) && <details className="preview-more-menu" onKeyDown={(event) => {
                     if (event.key === "Escape") {
                       event.stopPropagation();

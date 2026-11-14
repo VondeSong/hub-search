@@ -127,6 +127,7 @@ export function SearchResultsPane({
     event.preventDefault();
     event.stopPropagation();
     onSelectResult(index);
+    if(result.provider==="hub"){setContextMenu(null);return;}
     onPrepareResultLink(result);
     setContextMenu({ result, x: event.clientX, y: event.clientY });
   }, [onPrepareResultLink, onSelectResult]);

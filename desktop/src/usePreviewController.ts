@@ -25,6 +25,9 @@ export function mcpToolText(result: unknown): string {
 }
 
 function requestLocalPreviewDocument(result: SearchResult): Promise<string> {
+  if (result.provider === "hub" && (result.contentType === "reading" || result.contentType === "flashcard")) {
+    return invoke<string>("module_search_document", { kind: result.contentType, id: result.documentId });
+  }
   return invoke<string>("local_document", {
     spaceId: result.spaceId,
     documentId: result.documentId,
@@ -106,7 +109,7 @@ export function usePreviewController({
   const copySelectedLink = useCallback(async () => {
     if (!selected) return;
     try {
-      const link = await invoke<string>("result_link", {
+      const link = selected.provider==="hub"?await requestLocalPreviewDocument(selected):await invoke<string>("result_link", {
         libraryId: selected.libraryId,
         documentId: selected.documentId,
         blockId: selected.blockId ?? selected.documentId,
@@ -116,7 +119,7 @@ export function usePreviewController({
       });
       await writeClipboardText(link);
       setCopiedResultId(selected.id);
-      showOperationStatus(`已复制结果链接 · ${selected.title}`, "success");
+      showOperationStatus(`已复制${selected.provider==="hub"?"内容":"结果链接"} · ${selected.title}`, "success");
       window.setTimeout(() => setCopiedResultId((current) => current === selected.id ? "" : current), 1_800);
     } catch (reason) {
       const message = `复制链接失败：${String(reason)}`;
@@ -178,7 +181,7 @@ export function usePreviewController({
       .catch(async (reason) => {
         if (cancelled) return;
         if (selected.provider !== "craft") {
-          if (!cancelled) setPreview(`无法加载${providerName(selected.provider)}本地预览。`);
+          if (!cancelled) setPreview(`无法加载${providerName(selected.provider)}本地预览：${String(reason)}`);
           return;
         }
         try {

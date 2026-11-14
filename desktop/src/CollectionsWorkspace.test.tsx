@@ -157,6 +157,18 @@ async function input(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelec
   await act(async()=>{ Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element),"value")!.set!.call(element,value);element.dispatchEvent(new Event(element instanceof HTMLSelectElement?"change":"input",{bubbles:true})); });
 }
 const lifecycleItem={key:"x:local",collectedAt:1791165600000,read:false,status:"in_progress",tags:["资料"],lifecycle:"active",post:{id:"1",text:"需要整理的收藏",authorName:"作者",authorHandle:"reader",publishedAt:"2026-10-05",url:"https://x.com/reader/status/1",quotedText:"",contentStatus:"complete",links:[],media:[],source:"bookmarks"}};
+it("opens an exact search target outside the current reading page and restores the list",async()=>{
+ const handled=vi.fn();
+ invoke.mockImplementation(async(command:string,args?:{filters?:{itemKey?:string}})=>command==="list_collection_items"?{...initial,items:args?.filters?.itemKey?[lifecycleItem]:[],total:65,matched:args?.filters?.itemKey?1:65}:command==="get_collection_storage"?storage:[]);
+ await act(async()=>root.render(<CollectionViewsProvider><CollectionsWorkspace initialItemKey={lifecycleItem.key} onSearchTargetHandled={handled}/></CollectionViewsProvider>));
+ await act(async()=>vi.advanceTimersByTimeAsync(160));
+ expect(handled).toHaveBeenCalledOnce();
+ expect(invoke).toHaveBeenCalledWith("list_collection_items",expect.objectContaining({offset:0,filters:{itemKey:lifecycleItem.key}}));
+ expect(container.textContent).toContain(lifecycleItem.post.text);
+ await click("返回阅读列表");await act(async()=>vi.advanceTimersByTimeAsync(160));
+ const calls=invoke.mock.calls.filter(([command])=>command==="list_collection_items");
+ expect(calls[calls.length-1][1].filters.itemKey).toBeUndefined();
+});
 it("separates sync, processing records and advanced settings into visible tabs",async()=>{
  const longStatus="长同步日志 ".repeat(100);
  invoke.mockImplementation(async command=>command==="list_collection_items"?{...initial,sources:initial.sources.map(source=>({...source,status:longStatus}))}:command==="get_collection_storage"?storage:[]);
