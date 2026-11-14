@@ -85,8 +85,7 @@ pub(super) fn snapshot(catalog: &Catalog, name: &str) -> Result<Value, String> {
 }
 
 pub(super) fn restore(catalog: &Catalog, value: &Value) -> Result<Skill, String> {
-    // Same existing record ceiling; never truncate a method into apparent completeness.
-    if value.to_string().len() > 65_536 || value.as_object().is_none_or(|v| v.len() != 2) {
+    if value.as_object().is_none_or(|v| v.len() != 2) {
         return Err("固定方法内容超限或身份无效".into());
     }
     let content = &value["content"];
@@ -96,7 +95,8 @@ pub(super) fn restore(catalog: &Catalog, value: &Value) -> Result<Skill, String>
         }
         return packages::restore(catalog, value);
     }
-    if content.as_object().is_none_or(|v| v.len() != 5)
+    if value.to_string().len() > 65_536
+        || content.as_object().is_none_or(|v| v.len() != 5)
         || content["schemaVersion"] != 1
         || content["origin"] != "builtin"
         || value["id"] != format!("method-{}", hash(&content.to_string()))

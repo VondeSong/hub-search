@@ -2,9 +2,10 @@ import {useEffect,useRef,useState} from "react";
 import {invoke} from "@tauri-apps/api/core";
 import {open} from "@tauri-apps/plugin-dialog";
 
-type Source={packageId:string;revision:number;name:string;directory:string;mode:"copy"|"source";methodVersion:string;sourceFingerprint:string};
+type Source={packageId:string;revision:number;name:string;directory:string;mode:"copy"|"source"|"sync";methodVersion:string;sourceFingerprint:string};
 type Resource={path:string;bytes:number;sha256:string;kind:string;readable:boolean;encoding:string};
-type Inspection={source:Source|null;directory?:string;methodVersion:string;sourceFingerprint:string;skill:{name:string;title:string;available:boolean;unavailableReasons:string[]};files:Resource[];warnings:string[];nameConflict?:string;changed?:boolean;checkedAt?:number;history?:{revision:number;methodVersion:string}[]};
+type CloudCandidate={packageId:string;name:string;fingerprint:string;candidates:{version:string;device:string;paused:boolean}[]};
+type Inspection={source:Source|null;directory?:string;methodVersion:string;sourceFingerprint:string;skill:{name:string;title:string;description?:string;available:boolean;unavailableReasons:string[]};files:Resource[];warnings:string[];nameConflict?:string;changed?:boolean;checkedAt?:number;history?:{revision:number;methodVersion:string}[];recentUses?:{runId:string|null;path:string;at:number}[];paused?:boolean};
 type Removal={packageId:string;revision:number;fingerprint:string;methodVersions:number;readReceipts:number;scope:string};
 type Operation={clientRequestId:string;packageId:string;operation:"delete"|"export";state:string;detail:{methodVersion?:string;target?:string};verificationReason?:string};
 type FileView={packageId:string;methodVersion:string;path:string;sha256:string;content:string;previewOnly:boolean};
@@ -20,12 +21,22 @@ export function AgentSkillPackages({onChanged,initiallyExpanded=false}:{onChange
  const [removal,setRemoval]=useState<Removal|null>(null),[confirmed,setConfirmed]=useState(false),[notice,setNotice]=useState("");
  const [expanded,setExpanded]=useState(initiallyExpanded),[sources,setSources]=useState<Source[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState(""),[uncertain,setUncertain]=useState(false);
  const [preview,setPreview]=useState<Inspection|null>(null),[detail,setDetail]=useState<Inspection|null>(null),[file,setFile]=useState<FileView|null>(null),[mode,setMode]=useState<"copy"|"source">("source"),[version,setVersion]=useState("");
+ const [candidates,setCandidates]=useState<CloudCandidate[]>([]);
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;sequence.current++;};},[]);
  useEffect(()=>{if(file)closeFile.current?.focus();},[file]);
  useEffect(()=>{if(notice&&!detail&&!busy)manager.current?.focus();},[notice,detail,busy]);
  const blocked=busy||uncertain;
  const accept=(value:Inspection)=>{setDetail(value);setVersion(value.methodVersion);setPreview(null);setFile(null);setRemoval(null);setConfirmed(false);};
- async function list(){const result=await call<{sources:Source[]}>({action:"skillPackages"});if(!Array.isArray(result.sources))throw new Error("方法包来源清单无效");if(alive.current)setSources(result.sources);}
+ async function list(){const result=await call<{sources:Source[];cloudCandidates?:CloudCandidate[]}>({action:"skillPackages"});if(!Array.isArray(result.sources))throw new Error("方法包来源清单无效");if(alive.current){setSources(result.sources);setCandidates(result.cloudCandidates||[]);}}
+ async function changeCloudState(args:Record<string,unknown>, version?:string) {
+  if(blocked||writing.current)return;
+  writing.current=true;setBusy(true);setError("");
+  try {
+   const next=validate(await call<Inspection>(args),args.packageId as string,version);
+   if(alive.current){accept(next);onChanged();await list();setNotice(next.paused?"技能已停用。":"已保存采用的技能版本。");}
+  } catch(reason){if(alive.current)setError(String(reason));}
+  finally{writing.current=false;if(alive.current)setBusy(false);}
+ }
  async function read(args:Record<string,unknown>,kind:"detail"|"preview"|"check"|"file"|"delete") {
   const ticket=++sequence.current;setBusy(true);setError("");setFile(null);setRemoval(null);setConfirmed(false);setNotice("");if(kind==="preview"||kind==="check")setPreview(null);
   try {
@@ -71,6 +82,9 @@ export function AgentSkillPackages({onChanged,initiallyExpanded=false}:{onChange
    {notice&&<p role="status">{notice}</p>}{error&&<p role="alert">{error}</p>}{busy&&<p role="status">正在核对方法包…</p>}
    {uncertain&&<div role="status"><strong>结果待核对</strong><button type="button" disabled={busy} onClick={()=>void resolve()}>核对本次保存结果</button><button type="button" disabled={busy} onClick={()=>void mutate({},true)}>以同一请求重试</button></div>}
    <button type="button" disabled={blocked} onClick={()=>void choose()}>检查方法文件夹</button>
+   {candidates.map(item=><details key={item.packageId}><summary>{item.name} · 有多个云端候选版本</summary>
+    <ul>{item.candidates.map((candidate,index)=><li key={index}><span>{candidate.device} · {candidate.paused?"停用":"启用"} · {candidate.version}</span><button type="button" disabled={blocked} onClick={()=>void changeCloudState({action:"skillPackageAdoptCloud",packageId:item.packageId,methodVersion:candidate.version,paused:candidate.paused,expectedFingerprint:item.fingerprint},candidate.version)}>采用此版本</button></li>)}</ul>
+   </details>)}
    {sources.map(src=><button type="button" key={src.packageId} disabled={blocked} onClick={()=>void read({action:"skillPackageDetails",packageId:src.packageId},"detail")}>{src.name} · 登记第{src.revision}版</button>)}
    {preview&&<section aria-label="方法包检查结果">
     <h4>{preview.skill.title}</h4><p>{preview.changed===false?"在本次文件及工具合同检查中未发现变化，无须重新发布或运行模型。":preview.source?"发现可比较的来源版本；发布前仍会核对文件与登记修订。":"检查完成，尚未导入。"}</p>
@@ -81,10 +95,12 @@ export function AgentSkillPackages({onChanged,initiallyExpanded=false}:{onChange
     {!preview.source?<><label>保存方式<select disabled={blocked} value={mode} onChange={e=>setMode(e.target.value as "copy"|"source")}><option value="source">登记主要维护来源</option><option value="copy">导入独立副本</option></select></label><button type="button" disabled={blocked||!!preview.nameConflict} onClick={()=>void mutate({action:"skillPackageImport",directory:preview.directory,mode,expectedFingerprint:preview.sourceFingerprint})}>保存固定方法包</button></>:<button type="button" disabled={blocked||preview.changed!==true} onClick={()=>void mutate({action:"skillPackageUpdate",packageId:preview.source?.packageId,expectedRevision:preview.source?.revision,expectedFingerprint:preview.sourceFingerprint})}>发布检查过的新版本（旧版保留）</button>}
    </section>}
    {detail&&active&&<section aria-label="已保存方法包">
-    <h4>{detail.skill.title}</h4><p>{active.mode==="source"?"主要维护来源":"独立导入副本"}：{active.directory}</p>
+    <h4>{detail.skill.title}</h4><p>{detail.skill.description}</p>
+    <p>{active.mode==="sync"?"OSS 同步副本":`${active.mode==="source"?"主要维护来源":"独立导入副本"}：${active.directory}`}</p>
     <p className="agent-note">当前采用登记第{active.revision}版。源目录改变不会自动替换正在运行的方法或重跑成果；检查更新按明确操作进行。</p><details><summary>核对固定版本身份</summary><p>当前：{active.methodVersion}</p><p>正在查看：{detail.methodVersion}</p><p>来源指纹：{detail.sourceFingerprint}</p></details>
     <p>{detail.skill.available?"可用于已声明文字能力；未据此宣称真实任务已验证。":`暂不可用：${detail.skill.unavailableReasons.join("；")}`}</p>
-    <button type="button" disabled={blocked} onClick={()=>void read({action:"skillPackageCheck",packageId:active.packageId,expectedRevision:active.revision},"check")}>检查原目录变化（不运行）</button>
+    <button type="button" disabled={blocked} onClick={()=>void changeCloudState({action:"skillPackagePause",packageId:active.packageId,expectedRevision:active.revision,paused:!detail.paused})}>{detail.paused?"启用技能":"停用技能"}</button>
+    {active.mode!=="sync"&&<button type="button" disabled={blocked} onClick={()=>void read({action:"skillPackageCheck",packageId:active.packageId,expectedRevision:active.revision},"check")}>检查原目录变化（不运行）</button>}
     <label>已保存方法版本<select value={version} disabled={blocked} onChange={e=>{setVersion(e.target.value);setFile(null);}}>{[...new Set((detail.history||[]).map(h=>h.methodVersion))].map(id=><option key={id} value={id}>{id===active.methodVersion?"当前 · ":"历史 · "}登记第{detail.history?.find(item=>item.methodVersion===id)?.revision}版</option>)}</select></label>
     <button type="button" disabled={blocked||!version} onClick={()=>void read({action:"skillPackageDetails",packageId:active.packageId,methodVersion:version},"detail")}>查看所选版本的清单</button>
     <button type="button" disabled={blocked||!version||version===active.methodVersion} onClick={()=>void mutate({action:"skillPackageSwitch",packageId:active.packageId,expectedRevision:active.revision,methodVersion:version})}>切换未来使用版本（历史与动作保留）</button>
@@ -92,13 +108,17 @@ export function AgentSkillPackages({onChanged,initiallyExpanded=false}:{onChange
     <button type="button" ref={deleteReturn} disabled={blocked} onClick={()=>void read({action:"skillPackageDeletePreview",packageId:active.packageId,expectedRevision:active.revision},"delete")}>核对删除Hub保存副本的范围</button>
     {removal&&<section aria-label="删除方法副本确认"><p>{removal.scope}</p><p>将移除{removal.methodVersions}个方法版本、{removal.readReceipts}条方法读取或回读副本。旧成果保持可访问，旧方法全文不可恢复。</p><label><input type="checkbox" checked={confirmed} disabled={blocked} onChange={e=>setConfirmed(e.target.checked)}/>我已核对删除范围和不可恢复性</label><button type="button" disabled={blocked||!confirmed} onClick={()=>void mutate({action:"skillPackageDelete",packageId:removal.packageId,expectedRevision:removal.revision,expectedFingerprint:removal.fingerprint,confirmed:true})}>确认删除Hub保存副本</button><button type="button" disabled={blocked} onClick={()=>{setRemoval(null);setConfirmed(false);deleteReturn.current?.focus();}}>取消删除</button></section>}
     <p>下列清单属于正在查看的固定版本，预览不等于模型已经读取。</p>
+    <h5>配套文件</h5>
     <ul>{detail.files.map(resource=><li key={resource.path}>{resource.path} · {resource.bytes}字节<details><summary>核对文件指纹</summary>{resource.sha256}</details>{(resource.readable||resource.kind==="instructions"||resource.kind==="policy")?<button type="button" disabled={blocked} onClick={event=>{fileReturn.current=event.currentTarget;void read({action:"skillPackageFile",packageId:active.packageId,methodVersion:detail.methodVersion,path:resource.path},"file");}}>预览 {resource.path}</button>:<span>仅保存，不解析或执行</span>}</li>)}</ul>
     {detail.warnings.map((warning,index)=><p className="agent-note" key={index}>{warning}</p>)}
+    <details><summary>本机运行读取记录</summary>{detail.recentUses?.length
+      ? <ul>{detail.recentUses.map((use,index)=><li key={index}>{use.path} · {new Date(use.at).toLocaleString()} {use.runId&&` · ${use.runId}`}</li>)}</ul>
+      : <p>此版本目前没有本机运行读取记录。</p>}</details>
    </section>}
    {file&&<section aria-label="固定方法文件预览" onKeyDownCapture={event=>{if(event.key==="Escape"){event.preventDefault();event.stopPropagation();dismissFile();}}}>
     <h4>{file.path}</h4><button type="button" ref={closeFile} onClick={dismissFile}>关闭文件预览并返回</button><pre tabIndex={0} aria-label="固定方法文件文字" className="agent-topic-method" style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{file.content}</pre><p className="agent-note">按原样显示文字，不执行 HTML、脚本或外部请求。这里只是方法，不是本次个人事实证据。</p>
    </section>}
-   <details className="agent-menu-advanced"><summary>导入格式与容量</summary><p className="agent-note">每包最多 33 个文件、原始内容 48 KiB、固定记录 64 KiB；文字参考和模板每份 32 KiB。超限时会提示拆分，必要依赖不支持时会显示原因。</p></details>
+   <details className="agent-menu-advanced"><summary>导入格式与容量</summary><p className="agent-note">每包最多 33 个文件、原始内容 128 KiB、固定记录 256 KiB。文字参考和模板每份 32 KiB，助手按需读取。超限时会提示拆分。</p></details>
   </div>}
  </section>;
 }

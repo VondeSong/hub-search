@@ -228,6 +228,16 @@ pub(crate) fn configured_store(
     config: &Configuration,
     secret: Option<String>,
 ) -> Result<Box<dyn Store>, String> {
+    configured_module_store(app, c, config, secret, "reading/")
+}
+
+pub(crate) fn configured_module_store(
+    app: &AppHandle,
+    c: &Connection,
+    config: &Configuration,
+    secret: Option<String>,
+    module: &str,
+) -> Result<Box<dyn Store>, String> {
     let mode = crate::cloud_network::policy(c)?;
     let network_guard = crate::cloud_network::guard(app.clone(), mode);
     let guard: Guard = Arc::new(move || network_guard().map_err(super::media::admission_wait));
@@ -238,7 +248,7 @@ pub(crate) fn configured_store(
                 None => stored_secret_get(app, "hub-flashcard-oss-secret-v1")?.unwrap_or_default(),
             };
             let remote = OssStore::new(config.clone(), secret)?;
-            let prefix = remote.key("reading/");
+            let prefix = remote.key(module);
             Ok(Box::new(remote.with_network_guard(prefix, guard)))
         }
     }

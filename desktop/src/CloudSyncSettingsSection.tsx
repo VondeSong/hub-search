@@ -26,6 +26,7 @@ import type {
 import "./CloudSyncSettingsSection.css";
 
 export type CloudSyncPolicy = {
+  skills?: boolean;
   enabled: boolean;
   autoSync: boolean;
   flashcards: boolean;
@@ -225,11 +226,17 @@ export function CloudSyncSettingsSection({
         [policy?.flashcards, "闪卡", "sync_flashcards"],
         [policy?.reading, "阅读", "sync_reading"],
         [quick?.settings.sync && quick.supported, "速记", "sync_quick_journal"],
+        [policy?.skills, "技能", "syncAgentSkills"],
       ] as const) {
         if (!enabled) continue;
         setBusy(`正在同步${name}…`);
         try {
-          await invoke(command);
+          if (command === "syncAgentSkills") {
+            const report = await invoke<{ uploaded: number; received: number; conflicts: { name: string; candidates: { version: string; device: string }[] }[] }>("agent_investigation", { args: { action: command } });
+            for (const conflict of report.conflicts) {
+              failures.push(`技能「${conflict.name}」有多个候选版本，请在技能包中采用一个版本。候选：${conflict.candidates.map(item => `${item.device} · ${item.version}`).join("、")}`);
+            }
+          } else await invoke(command);
         } catch (e) {
           failures.push(`${name}：${String(e)}`);
         }
@@ -400,6 +407,7 @@ export function CloudSyncSettingsSection({
                 !(
                   policy?.flashcards ||
                   policy?.reading ||
+                  policy?.skills ||
                   (quick?.settings.sync && quick.supported)
                 )
               }
@@ -521,6 +529,12 @@ export function CloudSyncSettingsSection({
                   />
                 </label>
               ))}
+              <label>
+                技能（手动）
+                <input type="checkbox" role="switch" aria-label="同步技能"
+                  checked={Boolean(policy?.skills)} disabled={locked}
+                  onChange={event => updatePolicy({ skills: event.target.checked })}/>
+              </label>
             </div>
           </section>
           {transfers && (

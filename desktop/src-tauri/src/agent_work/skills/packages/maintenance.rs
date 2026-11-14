@@ -148,31 +148,41 @@ pub(super) fn delete(root: &Path, args: &Value) -> Result<Value, String> {
         if args["expectedFingerprint"] != plan.fingerprint {
             return Err("方法或读取记录在确认后发生变化，未删除；请重新核对范围".into());
         }
-        let at = store::stamp();
-        for method in &plan.methods {
-            let tombstone = json!({"id":method,"deleted":true,"packageId":id,"deletedAt":at,"originalContentDigest":method.strip_prefix("method-")});
-            c.execute(
-                "UPDATE agent_method_versions SET content_json=?1 WHERE id=?2",
-                params![tombstone.to_string(), method],
-            )
-            .map_err(|e| e.to_string())?;
-        }
-        for (record, meta, request) in &plan.reads {
-            let mut meta = meta.clone();
-            meta["contentDeleted"] = json!(true);
-            meta["deletedAt"] = json!(at);
-            meta["deletedPackageId"] = json!(id);
-            let body = json!({"status":"unavailable","message":"方法内容已按删除要求移除，旧回执仅保留身份和原计量，不能恢复全文","request":request,"_hubTrace":meta});
-            c.execute(
-                "UPDATE agent_records SET body_json=?1 WHERE id=?2",
-                params![body.to_string(), record],
-            )
-            .map_err(|e| e.to_string())?;
-        }
-        // Keep request identities so an old import retry cannot recreate deleted bytes.
-        c.execute("UPDATE agent_skill_source_revisions SET directory='',mode='deleted' WHERE package_id=?1",[&id]).map_err(|e|e.to_string())?;
+        apply_removal(c, &id, &plan)?;
         let detail = json!({"packageId":id,"deletedMethodVersions":plan.methods.len(),"redactedReadReceipts":plan.reads.len(),"originalFilesChanged":false,"workUsageReset":false,"externalCopiesRecalled":false,"historicalOutcomesKept":true});
         insert_operation(c, &key, &id, "delete", &request_hash, "completed", &detail)?;
         operation(c, &key, Some(&request_hash))?.ok_or("方法删除回执缺失".into())
     })
+}
+
+pub(super) fn delete_synced(c: &Connection, id: &str) -> Result<(), String> {
+    let plan = removal(c, id)?;
+    apply_removal(c, id, &plan)
+}
+
+fn apply_removal(c: &Connection, id: &str, plan: &Removal) -> Result<(), String> {
+    let at = store::stamp();
+    for method in &plan.methods {
+        let tombstone = json!({"id":method,"deleted":true,"packageId":id,"deletedAt":at,"originalContentDigest":method.strip_prefix("method-")});
+        c.execute(
+            "UPDATE agent_method_versions SET content_json=?1 WHERE id=?2",
+            params![tombstone.to_string(), method],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    for (record, meta, request) in &plan.reads {
+        let mut meta = meta.clone();
+        meta["contentDeleted"] = json!(true);
+        meta["deletedAt"] = json!(at);
+        meta["deletedPackageId"] = json!(id);
+        let body = json!({"status":"unavailable","message":"方法内容已按删除要求移除，旧回执仅保留身份和原计量，不能恢复全文","request":request,"_hubTrace":meta});
+        c.execute(
+            "UPDATE agent_records SET body_json=?1 WHERE id=?2",
+            params![body.to_string(), record],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    // Keep request identities so an old import retry cannot recreate deleted bytes.
+    c.execute("UPDATE agent_skill_source_revisions SET directory='',mode='deleted',created_at=?2 WHERE package_id=?1",params![id,at]).map_err(|e|e.to_string())?;
+    Ok(())
 }

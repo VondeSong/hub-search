@@ -584,7 +584,10 @@ pub(crate) fn isolated_oss(module: &str) -> (OssConfig, OssStore, String) {
         "读取并规范既有 OSS 连接配置",
     );
     drop(personal); // No domain schema migration or personal database writer is ever invoked.
-    assert!(matches!(module, "reading" | "flashcards" | "quick"));
+    assert!(matches!(
+        module,
+        "reading" | "flashcards" | "quick" | "skills"
+    ));
     let run = format!("20261112-{module}-{}", random_url_safe(10));
     let mut configuration = base.clone();
     configuration.prefix = format!("{}/_integration/{run}", base.prefix);

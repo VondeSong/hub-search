@@ -5,7 +5,7 @@ use std::{
     io::Read,
 };
 
-const MAX_BYTES: usize = 49_152;
+pub(super) const MAX_BYTES: usize = 128 * 1024;
 
 pub(super) struct Capture {
     pub directory: String,
@@ -101,6 +101,10 @@ fn walk(
         .map_err(|_| "技能包目录项不可读")?;
     entries.sort_by_key(|e| e.file_name());
     for entry in entries {
+        // Repository metadata belongs to the working copy, never to a method version.
+        if depth == 0 && entry.file_name().eq_ignore_ascii_case(".git") {
+            continue;
+        }
         let path = entry.path();
         let rel = path
             .strip_prefix(base)
@@ -133,7 +137,7 @@ fn walk(
             .map_err(|_| "技能文件读取失败")?;
         *total = total.checked_add(bytes.len()).ok_or("技能包大小超限")?;
         if *total > MAX_BYTES {
-            return Err("技能包原始字节超过48KiB，原目录保留；未截断为可用包".into());
+            return Err("技能包原始字节超过128 KiB，原目录保留；未截断为可用包".into());
         }
         let kind = if rel == "SKILL.md" {
             "instructions"
@@ -214,11 +218,23 @@ pub(super) fn assess(files: &Value) -> Result<(Skill, Vec<String>), String> {
             .0,
     )
     .map_err(|_| "方法元信息无效")?;
-    for key in ["allowed-tools", "compatibility"] {
-        if front.get(key).is_some_and(|v| !v.is_null()) {
-            skill
+    if front
+        .get("allowed-tools")
+        .is_some_and(|value| !value.is_null())
+    {
+        warnings.push("保留 allowed-tools 声明；Hub 不采用技能声明的工具预授权。".into());
+    }
+    if let Some(condition) = front.get("compatibility").filter(|value| !value.is_null()) {
+        match condition
+            .as_str()
+            .filter(|text| !text.trim().is_empty() && text.chars().count() <= 500)
+        {
+            Some(text) => skill
                 .unavailable
-                .push(format!("尚未适配必需声明：{key}；保留原字段，不推定允许"));
+                .push(format!("此技能声明了尚未验证的运行环境：{text}")),
+            None => skill
+                .unavailable
+                .push("compatibility 需要不超过 500 字符的环境说明".into()),
         }
     }
     let configuration: Value = if policy.is_empty() {

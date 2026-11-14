@@ -20,7 +20,7 @@ use std::{
 // ignore them when continuing work; existing data and budget roots are retained.
 // Epoch 84 installs memory proposals and provenance for existing epoch 83 databases.
 // Epoch 86 adds durable insight identities, revisions, origins and user events.
-pub(crate) const DATABASE_SCHEMA_VERSION: i64 = 86;
+pub(crate) const DATABASE_SCHEMA_VERSION: i64 = 87;
 #[cfg(test)]
 mod recovery_version_tests;
 static DATABASE_INITIALIZATION_LOCK: Mutex<()> = Mutex::new(());

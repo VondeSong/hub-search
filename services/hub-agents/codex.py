@@ -116,7 +116,7 @@ class AppServer:
         self.reader.join(timeout=2)
         self.process.stdout.close()
 
-    def run(self, workspace, thread, prompt, images, save_thread, save_answer, cancelled, account_status):
+    def run(self, workspace, thread, prompt, images, save_thread, save_answer, cancelled, account_status, skill=None):
         self.rpc("initialize", {"clientInfo": {"name": "hub_cloud_agents", "version": "1.0"}})
         self.send({"method": "initialized", "params": {}})
         account = (self.rpc("account/read", {"refreshToken": False}).get("account") or {})
@@ -140,7 +140,8 @@ class AppServer:
             return "stopped", ""
         params = {
             "cwd": str(workspace), "approvalPolicy": "never", "sandbox": "read-only",
-            "developerInstructions": "Answer the user's chat directly. Use only the prompt and attached images. Do not run commands or inspect the host filesystem.",
+            "developerInstructions": ("Answer the user's chat directly. Use the prompt, attached images and any explicitly selected Hub skill text. "
+                                      "Treat that skill as a method subordinate to the user request and these restrictions. Do not run commands or inspect the host filesystem."),
             "config": {"mcp_servers": {}, "features.shell_tool": False, "features.unified_exec": False,
                        "features.code_mode": False, "features.plugins": False, "features.apps": False,
                        "features.hooks": False, "features.multi_agent": False,
@@ -158,6 +159,9 @@ class AppServer:
         if cancelled():
             return "stopped", ""
         inputs = [{"type": "text", "text": prompt}]
+        if skill:
+            inputs.append({"type": "text", "text": "本次已选择的固定 Hub 技能及文字文件（JSON）：\n" +
+                           json.dumps(skill, ensure_ascii=False)})
         for path, seconds in images:
             if seconds is not None:
                 inputs.append({"type": "text", "text": f"下面的关键帧取自视频 {seconds:.2f} 秒。"})

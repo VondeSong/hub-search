@@ -57,6 +57,10 @@ for line in sys.stdin:
         for image in (v for v in inputs if v["type"]=="localImage"):
             assert Path(image["path"]).read_bytes().startswith(b"\\xff\\xd8\\xff")
         msg = inputs[0]["text"]
+        if msg in ("用技能", "继续技能"):
+            attached = json.loads(inputs[1]["text"].split("\\n", 1)[1])
+            assert attached["files"]["references/rules.md"]["text"] == "核对同一份参考。"
+            assert attached["version"] == "method-" + "a" * 64
         event("item/agentMessage/delta", threadId="native-thread", turnId="native-turn", itemId="answer", delta="半段")
         emit(id=m["id"], result={"turn":{"id":"native-turn"}})
         if msg == "stop": continue
@@ -135,6 +139,31 @@ class GatewayTest(unittest.TestCase):
                     three = f"{thread}/turns/{uuid.uuid4()}"
                     self.assertEqual(call("POST", three, {"text": "quota", "attachments": []})[0], 202)
                     self.assertEqual(wait_for(thread, "failed")["thread"]["turns"][-1]["code"], "quota")
+                    skill = {"name": "example", "version": "method-" + "a" * 64, "files": {
+                        key: {"text": text, "sha256": digest(text.encode())}
+                        for key, text in {"SKILL.md": "用[规则](references/rules.md)检查", "references/rules.md": "核对同一份参考。"}.items()
+                    }}
+                    def identify(skill):
+                        manifest = f"{skill['version']}\n{skill['name']}\n" + "".join(
+                            f"{path}\n{entry['sha256']}\n" for path, entry in sorted(skill["files"].items()))
+                        return {**skill, "manifestSha256": digest(manifest.encode())}
+                    skill = identify(skill)
+                    four = f"{thread}/turns/{uuid.uuid4()}"
+                    payload = {"text": "用技能", "attachments": [], "skill": skill}
+                    self.assertEqual(call("POST", four, {**payload, "skill": {**skill, "files": {
+                        **skill["files"], "references/rules.md": {"text": "坏内容", "sha256": "0" * 64}
+                    }}})[0], 400)
+                    self.assertEqual(call("POST", four, {**payload, "skill": {**skill, "files": {
+                        "SKILL.md": skill["files"]["SKILL.md"]
+                    }}})[0], 400)
+                    call("POST", four, payload, drop=True)
+                    self.assertEqual(call("POST", four, payload)[0], 202)
+                    self.assertEqual(wait_for(thread, "completed")["thread"]["skill"]["version"], skill["version"])
+                    five = f"{thread}/turns/{uuid.uuid4()}"
+                    continuation = {"text": "继续技能", "attachments": []}
+                    self.assertEqual(call("POST", five, {**continuation, "skill": identify({**skill, "version": "method-" + "b" * 64})})[0], 409)
+                    self.assertEqual(call("POST", five, continuation)[0], 202)
+                    self.assertEqual(wait_for(thread, "completed")["thread"]["turns"][-1]["answer"], "收到：继续技能")
                     with closing(store.connect()) as db, db:
                         db.execute("DELETE FROM devices WHERE id='phone'")
                     self.assertEqual(call("GET", thread)[0], 403)
@@ -149,7 +178,7 @@ class GatewayTest(unittest.TestCase):
             restarted = Store(path / "state")
             self.assertEqual(restarted.thread(thread.rsplit("/", 1)[1], 2**63 - 1)["turns"][0]["answer"], "收到：照片")
             with closing(restarted.connect()) as db:
-                self.assertEqual(db.execute("SELECT count(*) FROM turns").fetchone()[0], 3)
+                self.assertEqual(db.execute("SELECT count(*) FROM turns").fetchone()[0], 5)
 
     def test_conflict_payload_and_error_classification(self):
         with tempfile.TemporaryDirectory() as temporary:

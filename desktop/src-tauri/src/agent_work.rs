@@ -460,7 +460,9 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
         | "skillPackageSwitch"
         | "skillPackageDeletePreview"
         | "skillPackageDelete"
-        | "skillPackageExport" => skills::package_ui(root, args),
+        | "skillPackageExport"
+        | "skillPackageAdoptCloud"
+        | "skillPackagePause" => skills::package_ui(root, args),
         // User-facing selection can discover available local notes; only the
         // explicitly submitted locators become the model's host-issued grant.
         "imageMaterials" => images::list(root, args),
@@ -561,6 +563,9 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
 }
 
 pub(crate) async fn ui_app(app: tauri::AppHandle, args: Value) -> Result<Value, String> {
+    if args["action"] == "syncAgentSkills" {
+        return skills::sync_agent_skills(app).await;
+    }
     #[cfg(feature = "integration-agent-acceptance")]
     if matches!(
         args["action"].as_str(),

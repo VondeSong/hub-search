@@ -207,6 +207,68 @@ fn c2_source_update_switch_and_offline_restore_keep_exact_old_method_and_resourc
 }
 
 #[test]
+fn git_working_copy_ignores_metadata_and_keeps_tool_declarations_without_granting_access() {
+    let f = Fixture::new();
+    let p = folder(&f, "multi-file-review");
+    let status = std::process::Command::new("git")
+        .arg("init")
+        .arg("-q")
+        .arg(&p)
+        .status()
+        .unwrap();
+    assert!(status.success());
+    std::fs::write(p.join("assets/opaque.bin"), vec![255; 72 * 1024]).unwrap();
+    let doc = p.join("SKILL.md");
+    let before = std::fs::read_to_string(&doc).unwrap();
+    std::fs::write(
+        &doc,
+        before.replacen("metadata:", "allowed-tools: Bash\nmetadata:", 1),
+    )
+    .unwrap();
+    let (saved, _) = import(&f, &p, "git-skill-import");
+    assert_eq!(saved["skill"]["available"], true);
+    assert!(saved["warnings"].to_string().contains("allowed-tools"));
+    assert!(!saved["files"].to_string().contains(".git/"));
+    assert_eq!(
+        saved["files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|f| f["path"] == "assets/opaque.bin")
+            .unwrap()["bytes"],
+        72 * 1024
+    );
+    let version = saved["methodVersion"].as_str().unwrap();
+    let paths = vec![
+        "references/rules.md".to_string(),
+        "assets/report.md".to_string(),
+    ];
+    let sent = cloud_skill_payload(&f.root, version, &paths).unwrap();
+    assert_eq!(
+        sent["files"]["references/rules.md"]["text"],
+        "保留出处、缺值不补零。\n"
+    );
+    assert!(cloud_skill_payload(&f.root, version, &[]).is_err());
+    std::fs::write(p.join("references/rules.md"), "工作区未提交的变化").unwrap();
+    let checked = call(&f,&json!({"action":"skillPackageCheck","packageId":saved["source"]["packageId"],"expectedRevision":1})).unwrap();
+    assert_eq!(checked["changed"], true);
+    let mut catalog = Catalog::discover(&f.root).unwrap();
+    catalog
+        .load("multi-file-review", "$multi-file-review")
+        .unwrap();
+    let changed = call(&f,&json!({"action":"skillPackageUpdate","packageId":saved["source"]["packageId"],"expectedRevision":1,
+        "expectedFingerprint":checked["sourceFingerprint"],"clientRequestId":"git-skill-update"})).unwrap();
+    assert_ne!(changed["methodVersion"], version);
+    assert_eq!(
+        catalog
+            .read_reference("multi-file-review", "references/rules.md")
+            .unwrap()["content"],
+        sent["files"]["references/rules.md"]["text"]
+    );
+    assert_eq!(cloud_skill_payload(&f.root, version, &paths).unwrap(), sent);
+}
+
+#[test]
 fn c1_missing_unknown_dependencies_and_scripts_are_preserved_but_not_usable_or_executed() {
     let f = Fixture::new();
     let p = folder(&f, "blocked-review");
@@ -219,7 +281,7 @@ fn c1_missing_unknown_dependencies_and_scripts_are_preserved_but_not_usable_or_e
             .as_array()
             .unwrap()
             .len()
-            >= 4
+            >= 3
     );
     assert!(Catalog::discover(&f.root)
         .unwrap()

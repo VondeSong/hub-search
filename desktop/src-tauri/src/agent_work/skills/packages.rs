@@ -1,7 +1,11 @@
 //! Ordinary-folder registration uses the existing immutable method owner.
 use super::*;
+mod distribution;
+pub(in crate::agent_work) const MAX_VERSION_BYTES: usize = 256 * 1024;
 mod inspection;
 mod maintenance;
+pub(crate) use distribution::LOCK as SYNC_LOCK;
+pub(crate) use distribution::{cloud_skill_payload, cloud_skill_versions, sync_agent_skills};
 
 pub(in crate::agent_work) fn migrate(c: &Connection) -> Result<(), rusqlite::Error> {
     c.execute_batch("CREATE TABLE IF NOT EXISTS agent_skill_source_revisions (
@@ -15,7 +19,8 @@ pub(in crate::agent_work) fn migrate(c: &Connection) -> Result<(), rusqlite::Err
     if pk != "package_id,revision" || !unique {
         return Err(rusqlite::Error::InvalidQuery);
     }
-    maintenance::migrate(c)
+    maintenance::migrate(c)?;
+    distribution::migrate(c)
 }
 
 fn sources(c: &Connection) -> Result<Vec<Value>, String> {
@@ -68,7 +73,7 @@ fn duplicate(c: &Connection, key: &str, fingerprint: &str) -> Result<Option<Stri
 
 pub(super) fn validate(value: &Value) -> Result<Skill, String> {
     let content = &value["content"];
-    if value.to_string().len() > 65_536
+    if value.to_string().len() > MAX_VERSION_BYTES
         || value.as_object().is_none_or(|v| v.len() != 2)
         || content.as_object().is_none_or(|v| v.len() != 7)
         || content["schemaVersion"] != 2
@@ -118,6 +123,12 @@ pub(super) fn install(catalog: &mut Catalog, root: &Path) -> Result<HashSet<Stri
             src["methodVersion"].as_str().ok_or("登记方法身份缺失")?,
         )?;
         let mut skill = validate(&value)?;
+        if src["mode"] == "sync" {
+            skill.implicit = false;
+        }
+        if distribution::paused(&c, src["packageId"].as_str().ok_or("登记方法身份缺失")?)? {
+            skill.unavailable.push("技能已停用".into());
+        }
         if !versions::compatible_contract(&value["content"]["toolContractVersion"]) {
             skill
                 .unavailable
@@ -196,10 +207,35 @@ fn detail(root: &Path, id: &str, version: Option<&str>) -> Result<Value, String>
     if value["content"]["packageId"] != id {
         return Err("该方法版本不属于当前技能包".into());
     }
+    let recent = recent_uses(&c, id, method)?;
     let mut report = report(Some(src), &value)?;
     let mut q=c.prepare("SELECT revision,method_version,source_fingerprint,created_at FROM agent_skill_source_revisions WHERE package_id=?1 ORDER BY revision DESC LIMIT 33").map_err(|e|e.to_string())?;
     report["history"]=json!(q.query_map([id],|r|Ok(json!({"revision":r.get::<_,i64>(0)?,"methodVersion":r.get::<_,String>(1)?,"sourceFingerprint":r.get::<_,String>(2)?,"createdAt":r.get::<_,i64>(3)?}))).map_err(|e|e.to_string())?.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())?);
+    report["recentUses"] = json!(recent);
+    report["paused"] = json!(distribution::paused(&c, id)?);
+    if report["paused"] == true {
+        report["skill"]["available"] = json!(false);
+        if let Some(reasons) = report["skill"]["unavailableReasons"].as_array_mut() {
+            reasons.push(json!("技能已停用"));
+        }
+    }
     Ok(report)
+}
+
+fn recent_uses(c: &Connection, package: &str, version: &str) -> Result<Vec<Value>, String> {
+    let mut q = c.prepare("SELECT run_id,created_at,COALESCE(json_extract(body_json,'$.path'),'SKILL.md')
+        FROM agent_records WHERE kind='toolResult' AND json_extract(body_json,'$.skill.packageId')=?1
+        AND json_extract(body_json,'$.skill.methodVersion')=?2
+        AND json_extract(body_json,'$.kind') IN ('skillInstructions','skillReference') ORDER BY rowid DESC LIMIT 32")
+        .map_err(|e|e.to_string())?;
+    let rows = q
+        .query_map(params![package, version], |r| {
+            Ok(json!({"runId":r.get::<_,Option<String>>(0)?,
+        "at":r.get::<_,i64>(1)?,"path":r.get::<_,String>(2)?}))
+        })
+        .map_err(|e| e.to_string())?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
 }
 fn version(capture: &inspection::Capture, id: &str) -> Result<Value, String> {
     let content = json!({"schemaVersion":2,"origin":"registered","packageId":id,"name":capture.skill.name,"toolContractVersion":versions::tool_contract_version(),"files":capture.files,"sourceFingerprint":capture.fingerprint});
@@ -216,7 +252,7 @@ pub(in crate::agent_work) fn ui(root: &Path, args: &Value) -> Result<Value, Stri
     if action == "skillPackages" {
         let c = crate::source_evidence::open_read_database(root)?;
         return Ok(
-            json!({"sources":sources(&c)?,"limits":{"files":33,"rawBytes":49152,"versionBytes":65536,"packages":32,"revisions":32},"scriptExecution":false}),
+            json!({"sources":sources(&c)?,"cloudCandidates":distribution::candidates(&c,None)?,"limits":{"files":33,"rawBytes":inspection::MAX_BYTES,"versionBytes":MAX_VERSION_BYTES,"packages":32,"revisions":32},"scriptExecution":false}),
         );
     }
     if action == "skillPackageDetails" {
@@ -316,6 +352,8 @@ pub(in crate::agent_work) fn ui(root: &Path, args: &Value) -> Result<Value, Stri
         return Ok(value);
     }
     match action {
+        "skillPackageAdoptCloud" => return distribution::adopt_candidate(root, args),
+        "skillPackagePause" => return distribution::change_pause(root, args),
         "skillPackageDeletePreview" => return maintenance::delete_preview(root, args),
         "skillPackageDelete" => return maintenance::delete(root, args),
         "skillPackageExport" => return maintenance::export(root, args),
@@ -396,7 +434,8 @@ pub(in crate::agent_work) fn ui(root: &Path, args: &Value) -> Result<Value, Stri
     } else {
         text(args, "mode", 20)?
     };
-    if !["copy", "source"].contains(&mode.as_str()) {
+    if !["copy", "source", "sync"].contains(&mode.as_str()) || (current.is_none() && mode == "sync")
+    {
         return Err("请选择独立导入副本或登记主要来源".into());
     }
     let directory = capture
@@ -430,30 +469,11 @@ pub(in crate::agent_work) fn ui(root: &Path, args: &Value) -> Result<Value, Stri
         if revision > 32 {
             return Err("方法来源修订已达32版上限，旧版保留".into());
         }
-        let raw = value.to_string();
-        super::super::topics::admit(
+        save_version(
             c,
-            raw.len() + directory.len() + skill.name.len() + key.len() + fingerprint.len() + 512,
+            &value,
+            directory.len() + skill.name.len() + key.len() + fingerprint.len() + 512,
         )?;
-        let old: Option<String> = c
-            .query_row(
-                "SELECT content_json FROM agent_method_versions WHERE id=?1",
-                [value["id"].as_str().unwrap()],
-                |r| r.get(0),
-            )
-            .optional()
-            .map_err(|e| e.to_string())?;
-        if let Some(old) = old {
-            if serde_json::from_str::<Value>(&old).map_err(|_| "旧方法损坏")? != value {
-                return Err("方法内容身份冲突，旧版保留".into());
-            }
-        } else {
-            c.execute(
-                "INSERT INTO agent_method_versions VALUES(?1,?2,?3)",
-                params![value["id"].as_str().unwrap(), raw, store::stamp()],
-            )
-            .map_err(|e| e.to_string())?;
-        }
         c.execute(
             "INSERT INTO agent_skill_source_revisions VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
             params![
@@ -473,6 +493,31 @@ pub(in crate::agent_work) fn ui(root: &Path, args: &Value) -> Result<Value, Stri
         Ok(id.clone())
     })?;
     detail(root, &saved, None)
+}
+
+fn save_version(c: &Connection, value: &Value, extra: usize) -> Result<(), String> {
+    let raw = value.to_string();
+    let old: Option<String> = c
+        .query_row(
+            "SELECT content_json FROM agent_method_versions WHERE id=?1",
+            [value["id"].as_str().unwrap()],
+            |r| r.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+    super::super::topics::admit(c, (if old.is_none() { raw.len() } else { 0 }) + extra)?;
+    if let Some(old) = old {
+        if serde_json::from_str::<Value>(&old).map_err(|_| "旧方法损坏")? != *value {
+            return Err("方法内容身份冲突，旧版保留".into());
+        }
+    } else {
+        c.execute(
+            "INSERT INTO agent_method_versions VALUES(?1,?2,?3)",
+            params![value["id"].as_str().unwrap(), raw, store::stamp()],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

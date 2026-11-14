@@ -3,7 +3,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { ArrowUp, Camera, Cloud, Image, PanelLeft, Plus, Settings2, Square, Video, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import ReactMarkdown from "react-markdown";
-import { imageUpload, outbox, uploadSize, videoUploads, type DraftTurn, type Upload } from "./CloudAgentMedia";
+import { imageUpload, outbox, uploadSize, videoUploads, type CloudSkillPayload, type DraftTurn, type Upload } from "./CloudAgentMedia";
 import "./CloudAgents.css";
 
 type Connection = { endpoint: string; binding: string };
@@ -11,7 +11,8 @@ type Account = { state: "unknown" | "ready" | "login" | "quota"; plan?: string; 
 type Summary = { id: string; title: string; updated: number };
 type Attachment = { id: string; name: string; seconds?: number | null };
 type Turn = { id: string; seq: number; text: string; answer: string; error?: string; status: "queued" | "running" | "stopping" | "completed" | "failed" | "stopped"; attachments: Attachment[] };
-type Thread = Summary & { turns: Turn[]; before: number | null };
+type Thread = Summary & { turns: Turn[]; before: number | null; skill?: { name: string; version: string; paths: string[] } | null };
+type SkillChoice = { name: string; title: string; methodVersion: string; paths: string[] };
 const active = (turn?: Turn) => turn && ["queued", "running", "stopping"].includes(turn.status);
 const statusText = { queued: "VPS 已接收", running: "正在回答", stopping: "正在停止", completed: "", failed: "未完成", stopped: "已停止" };
 const call = <T,>(op: string, fields: Record<string, unknown> = {}) => invoke<T>("cloud_agents", { action: { op, ...fields } });
@@ -53,6 +54,9 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
   const [notice, setNotice] = useState("");
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<Upload[]>([]);
+  const [skills, setSkills] = useState<SkillChoice[]>();
+  const [skillVersion, setSkillVersion] = useState("");
+  const [skillPaths, setSkillPaths] = useState<string[]>([]);
   const [pending, setPending] = useState<DraftTurn>();
   const [busy, setBusy] = useState(false);
   const [preparing, setPreparing] = useState(false);
@@ -65,6 +69,19 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
   const last = current?.turns[current.turns.length - 1];
   const binding = connection?.binding;
   const known = Boolean(selected && catalog.some(item => item.id === selected));
+  const chosenSkill = skills?.find(skill => skill.methodVersion === skillVersion);
+  const boundSkill = current?.skill;
+
+  async function showSkills() {
+    try {
+      const latest = await call<SkillChoice[]>("skillVersions");
+      setSkills(current => {
+        const pinned = current?.find(item => item.methodVersion === skillVersion);
+        return pinned && !latest.some(item => item.methodVersion === pinned.methodVersion) ? [...latest, pinned] : latest;
+      });
+    }
+    catch (error) { setNotice(errorText(error)); }
+  }
 
   useEffect(() => {
     let live = true;
@@ -136,6 +153,8 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
     setBefore(undefined);
     setListOpen(false);
     setNotice("");
+    setSkillVersion("");
+    setSkillPaths([]);
   }
 
   async function connect(event: FormEvent) {
@@ -163,14 +182,17 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
     setBusy(true);
     setNotice("");
     try {
-      const draft = pending ?? { thread: selected ?? crypto.randomUUID(), turn: crypto.randomUUID(), text: text.trim(), attachments };
+      const skill = !pending && chosenSkill && !boundSkill
+        ? await call<CloudSkillPayload>("prepareSkill", { version: chosenSkill.methodVersion, paths: skillPaths })
+        : undefined;
+      const draft = pending ?? { thread: selected ?? crypto.randomUUID(), turn: crypto.randomUUID(), text: text.trim(), attachments, skill };
       if (!pending) {
         await outbox(binding, draft);
         setPending(draft);
         setText(""); setAttachments([]);
       }
       if (selected !== draft.thread) select(draft.thread);
-      await call("send", { thread: draft.thread, turn: draft.turn, message: { text: draft.text, attachments: draft.attachments } });
+      await call("send", { thread: draft.thread, turn: draft.turn, message: { text: draft.text, attachments: draft.attachments, ...(draft.skill && { skill: draft.skill }) } });
       follow.current = true;
       refresh(v => v + 1);
     } catch (error) { setNotice(errorText(error)); refresh(v => v + 1); }
@@ -251,6 +273,17 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
           </article>)}
         </div>
         <form className="cloud-agents-compose" onSubmit={event => void send(event)}>
+          {boundSkill ? <details><summary>本对话固定技能 · {boundSkill.name}</summary><small>{boundSkill.version}</small><ul>{boundSkill.paths.map(path => <li key={path}>{path}</li>)}</ul></details>
+            : !pending && <details onToggle={event => { if (event.currentTarget.open) void showSkills(); }}>
+              <summary>使用固定技能{chosenSkill ? ` · ${chosenSkill.title}` : ""}</summary>
+              {skills?.length ? <><label>技能 <select value={skillVersion} onChange={event => { setSkillVersion(event.target.value); setSkillPaths([]); }}>
+                <option value="">不使用技能</option>
+                {skills.map(item => <option key={item.methodVersion} value={item.methodVersion}>{item.title}</option>)}
+              </select></label>
+              {chosenSkill && <div><small>选入本次需要发送到 VPS 的配套文字文件。该版本将在这段对话中继续使用。</small>
+                {chosenSkill.paths.map(path => <label key={path}><input type="checkbox" checked={skillPaths.includes(path)} onChange={event => setSkillPaths(old => event.target.checked ? [...old, path] : old.filter(value => value !== path))}/>{path}</label>)}</div>}</>
+              : <small>{skills ? "本机暂无适合云端运行的已保存文字技能。" : "正在读取本机技能…"}</small>}
+            </details>}
           {account?.state === "ready" && account.limits?.some(limit => typeof limit.usedPercent === "number") && <small className="cloud-agents-quota">额度已用 {account.limits.filter(limit => typeof limit.usedPercent === "number").map(limit => `${limit.usedPercent}%${limit.windowDurationMins ? `（${limit.windowDurationMins} 分钟）` : ""}`).join(" / ")}</small>}
           {(network || notice) && <p className="cloud-agents-notice" role="status">{notice || network} {network && <button type="button" onClick={() => refresh(v => v + 1)}>重连</button>}</p>}
           {pending ? <div className="cloud-agents-pending">

@@ -6,6 +6,10 @@ use std::collections::{BTreeMap, HashSet};
 use std::path::{Component, PathBuf};
 
 mod packages;
+pub(super) use packages::MAX_VERSION_BYTES as MAX_REGISTERED_VERSION_BYTES;
+pub(crate) use packages::{
+    cloud_skill_payload, cloud_skill_versions, sync_agent_skills, SYNC_LOCK,
+};
 mod versions;
 pub(super) use packages::migrate;
 pub(super) use packages::ui as package_ui;
@@ -558,6 +562,19 @@ impl Catalog {
     pub fn verify(&self) -> Result<(), String> {
         let data_root = self.root.parent().ok_or("技能目录身份无效")?;
         let mut current = Self::discover(data_root)?;
+        // A run already owns its registered versions. Keep them while those exact
+        // bytes still exist, even when the adopted revision changes for future runs.
+        if !self.registered.is_empty() {
+            for (name, saved) in &self.registered {
+                if current.registered.get(name) != Some(saved) {
+                    packages::restore(&current, saved)?;
+                    current.registered.insert(name.clone(), saved.clone());
+                    current
+                        .skills
+                        .insert(name.clone(), self.skills[name].clone());
+                }
+            }
+        }
         if let Some(pin) = &self.pinned {
             current.pin_version(pin)?;
         }

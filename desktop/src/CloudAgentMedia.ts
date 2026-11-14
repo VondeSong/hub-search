@@ -1,5 +1,6 @@
 export type Upload = { name: string; mime: string; data: string; seconds?: number };
-export type DraftTurn = { thread: string; turn: string; text: string; attachments: Upload[] };
+export type CloudSkillPayload = { name: string; version: string; manifestSha256: string; files: Record<string, { text: string; sha256: string }> };
+export type DraftTurn = { thread: string; turn: string; text: string; attachments: Upload[]; skill?: CloudSkillPayload };
 
 function encode(blob: Blob, name: string, seconds?: number): Promise<Upload> {
   return new Promise((resolve, reject) => {

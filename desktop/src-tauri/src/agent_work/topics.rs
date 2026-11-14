@@ -141,7 +141,13 @@ pub(super) fn method_on(c: &Connection, id: &str) -> Result<Value, String> {
             |r| r.get(0),
         )
         .map_err(|_| "固定方法内容缺失，不能只凭引用恢复")?;
-    let value = decode(&raw)?;
+    if raw.len() > skills::MAX_REGISTERED_VERSION_BYTES {
+        return Err("固定方法记录超出容量上限".into());
+    }
+    let value: Value = serde_json::from_str(&raw).map_err(|_| "固定方法记录损坏")?;
+    if raw.len() > 65_536 && value["content"]["schemaVersion"] != 2 {
+        return Err("内置方法记录超出容量上限".into());
+    }
     if value["deleted"] == true {
         return Err(
             "固定方法内容已按明确删除要求移除；历史成果保留，不能恢复旧方法或继续旧运行".into(),

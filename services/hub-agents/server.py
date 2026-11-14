@@ -39,6 +39,46 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def validate_skill(skill):
+    if not isinstance(skill, dict) or set(skill) != {"name", "version", "files", "manifestSha256"}:
+        raise RequestError(400, "技能版本格式无效。")
+    name, version, files = skill["name"], skill["version"], skill["files"]
+    if (not isinstance(name, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name) or len(name) > 64
+            or not isinstance(version, str) or not re.fullmatch(r"method-[0-9a-f]{64}", version)
+            or not isinstance(files, dict) or "SKILL.md" not in files or len(files) > 33):
+        raise RequestError(400, "技能版本身份或文件清单无效。")
+    total = 0
+    for path, entry in files.items():
+        if path != "SKILL.md":
+            parts = path.split("/")
+            if (len(path) > 512 or not 2 <= len(parts) <= 4 or parts[0] not in ("references", "assets")
+                    or any(not part or part in (".", "..") or part.endswith((" ", ".")) for part in parts)
+                    or re.search(r"[\\:%?#\x00-\x1f]", path)
+                    or Path(path).suffix not in (".md", ".txt", ".json", ".yaml", ".yml", ".csv")):
+                raise RequestError(400, "技能资源需为包内文字文件。")
+        if (not isinstance(entry, dict) or set(entry) != {"text", "sha256"}
+                or not isinstance(entry["text"], str)):
+            raise RequestError(400, "技能资源格式无效。")
+        try:
+            raw = entry["text"].encode()
+        except UnicodeError:
+            raise RequestError(400, "技能资源文字编码无效。") from None
+        if digest(raw) != entry["sha256"]:
+            raise RequestError(400, "技能文件哈希不一致。")
+        if len(raw) > 32768 or (path == "SKILL.md" and not raw.strip()):
+            raise RequestError(413, "单份云端技能文字超限或缺少正文。")
+        for named in re.findall(r"\]\(\s*<?((?:references|assets)/[^\s)>#]+)", entry["text"]):
+            if named not in files:
+                raise RequestError(400, f"缺少技能声明的配套文件：{named}")
+        total += len(raw)
+    if total > 49152 or len({path.casefold() for path in files}) != len(files):
+        raise RequestError(413, "技能资源大小超限或路径重复。")
+    manifest = f"{version}\n{name}\n" + "".join(f"{path}\n{files[path]['sha256']}\n" for path in sorted(files))
+    if digest(manifest.encode()) != skill["manifestSha256"]:
+        raise RequestError(400, "技能版本和资源清单的哈希不一致。")
+    return skill
+
+
 def validate_turn(data):
     if not isinstance(data, dict) or not isinstance(data.get("text"), str) or not isinstance(data.get("attachments"), list):
         raise RequestError(400, "消息格式无效。")
@@ -72,8 +112,12 @@ def validate_turn(data):
         attachments.append((name[:160], mime, seconds, raw))
     if not text and not attachments:
         raise RequestError(400, "请输入消息或选择附件。")
-    fingerprint = digest(json.dumps([text, [[name, mime, seconds, digest(raw)] for name, mime, seconds, raw in attachments]], ensure_ascii=False).encode())
-    return text, attachments, fingerprint
+    skill = validate_skill(data["skill"]) if "skill" in data else None
+    identity = [text, [[name, mime, seconds, digest(raw)] for name, mime, seconds, raw in attachments]]
+    if skill is not None:
+        identity.append(skill)
+    fingerprint = digest(json.dumps(identity, ensure_ascii=False, sort_keys=True).encode())
+    return text, attachments, fingerprint, skill
 
 
 class Store:
@@ -99,6 +143,9 @@ class Store:
                     name TEXT NOT NULL, mime TEXT NOT NULL, seconds REAL, data BLOB NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS turn_attachments ON attachments(turn,position);
+                CREATE TABLE IF NOT EXISTS thread_skills (
+                    thread TEXT PRIMARY KEY REFERENCES threads(id), payload TEXT NOT NULL
+                );
             """)
 
     def connect(self):
@@ -112,7 +159,7 @@ class Store:
             return db.execute("SELECT 1 FROM devices WHERE token_hash=?", (digest(token.encode()),)).fetchone() is not None
 
     def submit(self, thread, turn, data):
-        text, attachments, fingerprint = validate_turn(data)
+        text, attachments, fingerprint, skill = validate_turn(data)
         now = int(time.time() * 1000)
         title = " ".join(text.split())[:48] or "附件对话"
         with closing(self.connect()) as db, db:
@@ -127,6 +174,13 @@ class Store:
             if db.execute("SELECT 1 FROM turns WHERE thread=? AND status IN ('queued','running','stopping')", (thread,)).fetchone():
                 raise RequestError(409, "此会话有一条消息正在运行，请等待或停止该轮。")
             db.execute("INSERT INTO threads(id,title,updated) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET updated=excluded.updated", (thread, title, now))
+            if skill is not None:
+                payload = json.dumps(skill, ensure_ascii=False, sort_keys=True)
+                bound = db.execute("SELECT payload FROM thread_skills WHERE thread=?", (thread,)).fetchone()
+                if bound and bound["payload"] != payload:
+                    raise RequestError(409, "此会话已固定一份技能及配套文件。请新建对话使用其他版本。")
+                if bound is None:
+                    db.execute("INSERT INTO thread_skills VALUES(?,?)", (thread, payload))
             db.execute("INSERT INTO turns(id,thread,fingerprint,text,status,created) VALUES(?,?,?,?,'queued',?)", (turn, thread, fingerprint, text, now))
             db.executemany("INSERT INTO attachments VALUES(?,?,?,?,?,?,?)", [
                 (str(uuid.uuid4()), turn, i, name, mime, seconds, raw) for i, (name, mime, seconds, raw) in enumerate(attachments)
@@ -147,7 +201,10 @@ class Store:
             for row in reversed(rows[:30]):
                 attachments = db.execute("SELECT id,name,mime,seconds,length(data) AS bytes FROM attachments WHERE turn=? ORDER BY position", (row["id"],))
                 turns.append({**dict(row), "attachments": [dict(value) for value in attachments]})
-            return {**dict(entry), "turns": turns, "before": turns[0]["seq"] if len(rows) > 30 else None}
+            bound = db.execute("SELECT payload FROM thread_skills WHERE thread=?", (thread,)).fetchone()
+            skill = json.loads(bound["payload"]) if bound else None
+            return {**dict(entry), "turns": turns, "before": turns[0]["seq"] if len(rows) > 30 else None,
+                    "skill": {"name": skill["name"], "version": skill["version"], "paths": list(skill["files"])} if skill else None}
 
     def stop(self, thread, turn):
         with closing(self.connect()) as db, db:
@@ -205,6 +262,7 @@ class Worker:
                 images = []
                 with closing(self.store.connect()) as db:
                     previous = db.execute("SELECT codex_thread FROM threads WHERE id=?", (thread,)).fetchone()[0]
+                    bound = db.execute("SELECT payload FROM thread_skills WHERE thread=?", (thread,)).fetchone()
                     for index, file in enumerate(db.execute("SELECT mime,seconds,data FROM attachments WHERE turn=? ORDER BY position", (turn,))):
                         path = workspace / (str(index) + TYPES[file["mime"]])
                         path.write_bytes(file["data"])
@@ -215,6 +273,7 @@ class Worker:
                         lambda value: self.update("UPDATE threads SET codex_thread=? WHERE id=?", (value, thread)),
                         lambda value: self.update("UPDATE turns SET answer=? WHERE id=?", (value, turn)),
                         stopped, status,
+                        **({"skill": validate_skill(json.loads(bound["payload"]))} if bound else {}),
                     )
                 self.update("UPDATE turns SET status=?,answer=? WHERE id=?", (state, answer, turn))
         except (CodexError, OSError, KeyError, TypeError, ValueError) as error:
@@ -275,7 +334,7 @@ class Handler(BaseHTTPRequestHandler):
         url = urlsplit(self.path)
         parts = url.path.strip("/").split("/")
         if parts == ["v1", "threads"] and not post:
-            self.send(200, {"threads": store.threads(), "account": worker.account})
+            self.send(200, {"threads": store.threads(), "account": worker.account, "skillPackages": True})
             return
         if len(parts) >= 3 and parts[:2] == ["v1", "threads"] and UUID.fullmatch(parts[2]):
             thread = parts[2]

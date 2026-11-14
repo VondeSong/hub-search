@@ -10,6 +10,8 @@ pub(super) struct Policy {
     pub flashcards: bool,
     #[serde(default)]
     pub reading: bool,
+    #[serde(default)]
+    pub skills: bool,
 }
 
 pub(super) fn policy(c: &Connection) -> Policy {
@@ -23,6 +25,7 @@ pub(super) fn policy(c: &Connection) -> Policy {
         ),
         flashcards: metadata_bool(c, "cloud_sync_flashcards", true),
         reading: metadata_bool(c, "cloud_sync_reading", false),
+        skills: metadata_bool(c, "cloud_sync_skills", false),
     }
 }
 
@@ -33,6 +36,7 @@ pub(super) fn initialize(c: &Connection) -> Result<(), String> {
         ("cloud_sync_auto", previous.auto_sync),
         ("cloud_sync_flashcards", previous.flashcards),
         ("cloud_sync_reading", previous.reading),
+        ("cloud_sync_skills", previous.skills),
     ] {
         c.execute(
             "INSERT OR IGNORE INTO metadata(key,value) VALUES(?1,?2)",
@@ -69,6 +73,7 @@ fn save(c: &mut Connection, settings: &Policy) -> Result<(), String> {
         ("cloud_sync_auto", settings.auto_sync),
         ("cloud_sync_flashcards", settings.flashcards),
         ("cloud_sync_reading", settings.reading),
+        ("cloud_sync_skills", settings.skills),
         // Retain the old preference for downgrade compatibility, never read it after migration.
         ("flashcard_sync_auto", settings.auto_sync),
     ] {
@@ -93,6 +98,7 @@ pub(super) async fn update_cloud_sync_policy(
     let _guard = FLASHCARD_SYNC_LOCK.lock().await;
     let _reading_guard = reading_sync::LOCK.lock().await;
     let _quick_guard = quick_journal::LOCK.lock().await;
+    let _skills_guard = agent_work::skills::SYNC_LOCK.lock().await;
     let (mut c, _writer) = open_write_database(&database_path(&app)?)?;
     save(&mut c, &settings)?;
     Ok(policy(&c))
@@ -176,6 +182,7 @@ mod tests {
                         flashcards,
                         auto_sync,
                         reading: false,
+                        skills: false,
                     };
                     save(&mut c, &p).unwrap();
                     assert_eq!(policy(&c), p);
@@ -199,6 +206,7 @@ mod tests {
             auto_sync: true,
             flashcards: true,
             reading: false,
+            skills: false,
         };
         save(&mut c, &old).unwrap();
         c.execute_batch("CREATE TRIGGER reject_policy BEFORE UPDATE ON metadata WHEN NEW.key='cloud_sync_flashcards' BEGIN SELECT RAISE(ABORT,'disk write failure'); END;").unwrap();
@@ -209,6 +217,7 @@ mod tests {
                 auto_sync: false,
                 flashcards: false,
                 reading: false,
+                skills: false,
             }
         )
         .is_err());
@@ -232,6 +241,7 @@ mod tests {
                 auto_sync: false,
                 flashcards: true,
                 reading: false,
+                skills: false,
             }
         );
         assert!(require_flashcards(&c, false).is_ok());
@@ -270,6 +280,7 @@ mod tests {
                             auto_sync,
                             reading,
                             flashcards: false,
+                            skills: false,
                         },
                     )
                     .unwrap();
@@ -292,6 +303,7 @@ mod tests {
             auto_sync: false,
             flashcards: false,
             reading: true,
+            skills: false,
         };
         put(&c, "flashcard_cloud_provider", "webdav");
         save(&mut c, &requested).unwrap();

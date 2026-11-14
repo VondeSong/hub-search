@@ -19,6 +19,11 @@ struct Config {
 #[serde(tag = "op", rename_all = "camelCase")]
 pub(crate) enum Action {
     Config,
+    SkillVersions,
+    PrepareSkill {
+        version: String,
+        paths: Vec<String>,
+    },
     Connect {
         endpoint: String,
         token: String,
@@ -160,6 +165,14 @@ pub(crate) async fn cloud_agents(app: AppHandle, action: Action) -> Result<Value
     };
     match action {
         Action::Config => Ok(current()?.as_ref().map(config_view).unwrap_or(Value::Null)),
+        Action::SkillVersions => {
+            crate::agent_work::skills::cloud_skill_versions(&crate::active_data_root(&app)?)
+        }
+        Action::PrepareSkill { version, paths } => crate::agent_work::skills::cloud_skill_payload(
+            &crate::active_data_root(&app)?,
+            &version,
+            &paths,
+        ),
         Action::Connect {
             endpoint: raw,
             token,
@@ -207,12 +220,21 @@ pub(crate) async fn cloud_agents(app: AppHandle, action: Action) -> Result<Value
                     thread,
                     turn,
                     message,
-                } => (
-                    Method::POST,
-                    format!("/v1/threads/{}/turns/{}", id(&thread)?, id(&turn)?),
-                    Some(message),
-                    false,
-                ),
+                } => {
+                    if message.get("skill").is_some() {
+                        let capabilities =
+                            request(&config, Method::GET, "/v1/threads", None, false).await?;
+                        if capabilities["skillPackages"] != true {
+                            return Err("当前 VPS 网关不支持固定技能，请更新网关后重试。".into());
+                        }
+                    }
+                    (
+                        Method::POST,
+                        format!("/v1/threads/{}/turns/{}", id(&thread)?, id(&turn)?),
+                        Some(message),
+                        false,
+                    )
+                }
                 Action::Stop { thread, turn } => (
                     Method::POST,
                     format!("/v1/threads/{}/turns/{}/stop", id(&thread)?, id(&turn)?),
