@@ -64,11 +64,11 @@ OS 的 2,060 篇 Markdown 与 181 个目录的原始库存核对由同事项的�
 
 真实数据总量、OS 文件哈希和 Private 原始目录的独立核对见 [真实资料验收记录](LIBRARY_REAL_DATA_VALIDATION_20261114.md)，已由 `956484a`、`c798c7b` 保存；不重复累计该记录或其他聊天的测试数量。本文对应本轮功能提交包括 `53e8de4`、`dd18de5`、`efd42f3`、`3d22ed0` 及窄窗修正；合并保留主线任务、洞察等提交。
 
-截图与原始观测保留在本机忽略目录 `desktop/.local/library-real-data-20261114/`：`topic-after-refresh.jpg`、`directory-and-preview-after-refresh.jpg`、`narrow-reading.jpg`、`narrow-list.jpg`、`dida-real-body.jpg`。不提交真实资料正文或截图到仓库。
+截图与原始观测保留在本机忽略目录 `desktop/.local/library-real-data-20261114/`：`topic-after-refresh.jpg`、`directory-and-preview-after-refresh.jpg`、`narrow-reading-fixed.jpg`、`narrow-list.jpg`、`final-desktop-library.jpg`、`dida-real-body.jpg`。不提交真实资料正文或截图到仓库。
 
 ## 性能观测口径
 
-本轮以日常的 6 库、2,775 项可浏览结构进行验证，原生目录读取预算为单库 2 秒，实测 0—103ms。UI 已实际完成目录展开、范围搜索、定位、正文和合集分页，没有用原生查询耗时代替 WebView 首屏耗时。
+本轮使用本地索引显示 2,775 篇的日常六库规模进行验证；根文档与 Craft 子页面投影分别计数，该索引数字不是完整树节点总数。原生目录读取预算为单库 2 秒，实测 0—103ms。UI 已实际完成目录展开、范围搜索、定位、正文和合集分页，没有用原生查询耗时代替 WebView 首屏耗时。
 
 00:54:36 对同一长运行的 PID 9604 及其 WebView 子进程共 8 个进程做只读快照：工作集求和约 899.14 MiB、私有内存求和约 556.38 MiB；Hub 本体分别约 295.93 MiB、116.17 MiB。工作集包含共享页重复计算，且受同会话其他模块操作影响。这不是去重物理占用、冷启动基准或内存泄漏结论；没有事前约定的整进程内存阈值，不补写性能达标声明。旧 PID 40004 的观测没有与本进程拼成前后对照。
 
