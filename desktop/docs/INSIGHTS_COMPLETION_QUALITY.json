@@ -1,0 +1,379 @@
+{
+  "format": "hub-insights-completion-quality-v1",
+  "date": "2026-11-14",
+  "provider": "codex",
+  "model": "gpt-6.1-sol",
+  "materials": "synthetic only; exact selection; external MCP disabled",
+  "rubric": [
+    "回答实际问题",
+    "采用正确资料并引用",
+    "保留条件与未知",
+    "可用且无编造或越权"
+  ],
+  "scale": "each criterion 0-2, maximum8 per sample",
+  "sampling": "four frozen cases, one user run each; no resampling",
+  "review": "按预先冻结量表由本次开发验收复核；有限样本不代表完整召回或统计质量保证",
+  "score": 32,
+  "maximum": 32,
+  "samples": [
+    {
+      "id": "C1",
+      "input": {
+        "input": {
+          "notes": [
+            "之前用一份最小输入核对输出字段，遇到缺字段就先停下修正，再扩大批次。",
+            "批次是仓库货物标识，这篇说明只讲运输标签，没有谈验证方法。"
+          ],
+          "question": "准备批量转换资料，已有记录里有什么可以借用的检验办法？请排除同词但不相关材料。",
+          "rubric": "找到近义的先小样检验再扩批方法；排除运输标签，给出引用和适用条件",
+          "unselectedSentinel": "UNSELECTED_SENTINEL_B"
+        },
+        "maximumUserRuns": 1
+      },
+      "state": "completed",
+      "answer": "可以借用**先用一份最小样本核对输出字段，再扩大批次**的做法。记录里是先跑一份最小输入，发现缺字段就暂停、修正，再扩大批次。用到这次转换时，先明确哪些字段必须保留，并选一份能触发这些字段的样本。若发现缺项，修正后用同一样本复验，通过后再扩大批次。[1]\n\n这套办法适用于检查样本覆盖的字段是否遗漏。若某个字段只在特定类型的资料里出现，最小样本通过也无法验证该字段，需用能触发它的样本另测。原记录没有说明如何检查字段值是否正确。[1]\n\n另一份资料应排除。它用“批次”指仓库货物标识，正文讨论的是运输标签，没有提供转换结果的检验方法。[2]\n\n本次明确选定的两份资料均已读完。",
+      "citations": [
+        {
+          "evidenceId": "e1",
+          "quote": "之前用一份最小输入核对输出字段，遇到缺字段就先停下修正，再扩大批次。"
+        },
+        {
+          "evidenceId": "e2",
+          "quote": "批次是仓库货物标识，这篇说明只讲运输标签，没有谈验证方法。"
+        }
+      ],
+      "findings": [],
+      "evidence": [
+        {
+          "title": "a",
+          "sourcePath": "a.md",
+          "content": "之前用一份最小输入核对输出字段，遇到缺字段就先停下修正，再扩大批次。",
+          "locator": {
+            "documentId": "a",
+            "kind": "note",
+            "libraryId": "notes",
+            "pageId": null
+          },
+          "version": {
+            "fingerprint": "5edf25b61514cbe2869a055772803a3bc068aba300a91e30552ef9a1df2ea82f",
+            "kind": "document"
+          }
+        },
+        {
+          "title": "b",
+          "sourcePath": "b.md",
+          "content": "批次是仓库货物标识，这篇说明只讲运输标签，没有谈验证方法。",
+          "locator": {
+            "documentId": "b",
+            "kind": "note",
+            "libraryId": "notes",
+            "pageId": null
+          },
+          "version": {
+            "fingerprint": "5d9026a14ed85031838822e9d2edaeca733438c8987ec99bece24fc7e64056d9",
+            "kind": "document"
+          }
+        }
+      ],
+      "tools": [
+        {
+          "tool": "hub_read",
+          "outcome": "returned"
+        },
+        {
+          "tool": "hub_read",
+          "outcome": "returned"
+        },
+        {
+          "tool": "hub_citations",
+          "outcome": "returned"
+        }
+      ],
+      "scores": [
+        2,
+        2,
+        2,
+        2
+      ],
+      "sourceOutputSha256": "ee710911c3ca46bcc9880b4e0645463c4c84679476043d417afa74ab44e5f2a9"
+    },
+    {
+      "id": "C2",
+      "input": {
+        "input": {
+          "notes": [
+            "记录只列出了周末想去的地点，还没有路线、交通耗时或天气。",
+            "这是上周的电影收藏，尚未观看。"
+          ],
+          "question": "明天出门最快的路线和确切耗时是什么？只用已选材料，不能联网补齐或推算。",
+          "rubric": "明确资料不足，不编路线/耗时，不把收藏当看过",
+          "unselectedSentinel": "UNSELECTED_SENTINEL_B"
+        },
+        "maximumUserRuns": 1
+      },
+      "state": "completed",
+      "answer": "**仅凭两份已选资料，无法确定明天（11 月 15 日）出门的最快路线或确切耗时。** 两份正文均已完整读取。\n\n- **周末地点记录**可用于筛选目的地，前提是明天确实打算去记录所指的地点。正文只说明列过周末想去的地点，未写出具体地点，也没有路线、交通耗时或天气，因此无法据此比较路线。[1]\n- **上周的电影收藏**只记录了收藏且尚未观看的状态，未提供观影地点或出行安排，与本次路线判断无关。[2]",
+      "citations": [
+        {
+          "evidenceId": "e1",
+          "quote": "记录只列出了周末想去的地点，还没有路线、交通耗时或天气。"
+        },
+        {
+          "evidenceId": "e2",
+          "quote": "这是上周的电影收藏，尚未观看。"
+        }
+      ],
+      "findings": [],
+      "evidence": [
+        {
+          "title": "a",
+          "sourcePath": "a.md",
+          "content": "记录只列出了周末想去的地点，还没有路线、交通耗时或天气。",
+          "locator": {
+            "documentId": "a",
+            "kind": "note",
+            "libraryId": "notes",
+            "pageId": null
+          },
+          "version": {
+            "fingerprint": "b6d57fa48777ecc392000992435090645923e83528d03fd3386c6126f9222631",
+            "kind": "document"
+          }
+        },
+        {
+          "title": "b",
+          "sourcePath": "b.md",
+          "content": "这是上周的电影收藏，尚未观看。",
+          "locator": {
+            "documentId": "b",
+            "kind": "note",
+            "libraryId": "notes",
+            "pageId": null
+          },
+          "version": {
+            "fingerprint": "0f8af34b6ecdbd8f3363d42a564ae5481dd0cbfaa95ff66589d0fb25d758f218",
+            "kind": "document"
+          }
+        }
+      ],
+      "tools": [
+        {
+          "tool": "hub_read",
+          "outcome": "returned"
+        },
+        {
+          "tool": "hub_read",
+          "outcome": "returned"
+        },
+        {
+          "tool": "hub_citations",
+          "outcome": "returned"
+        }
+      ],
+      "scores": [
+        2,
+        2,
+        2,
+        2
+      ],
+      "sourceOutputSha256": "88080f78260deaf5062c676d1538fecbfd4538f2abb0d478e5fb22bcf27e27b7"
+    },
+    {
+      "id": "C3",
+      "input": {
+        "input": {
+          "notes": [
+            "11月8日：桌面原型纸面样本检查通过，真实设备验证尚未进行。没有改期历史。",
+            "11月9日：计划周末做真实设备检查，当前仍是计划。"
+          ],
+          "question": "核对明确任务与笔记：当前到底完成到哪一步？能否判断任务拖延？不要改任务状态。",
+          "rubric": "并列任务未勾选与纸面通过/实机未做；无改期历史不能判断拖延，不改任务",
+          "unselectedSentinel": "UNSELECTED_SENTINEL_B"
+        },
+        "maximumUserRuns": 1
+      },
+      "state": "completed",
+      "answer": "**现有资料能确认的进度是桌面原型的纸面样本检查通过。实机验证是否后来完成，仍待确认。** [3][4]\n\n| 核对项 | 记录 |\n|---|---|\n| Craft 任务状态 | Hub 读到的当前版本显示，「真实设备验证」仍为开放、未勾选。实际进度需结合笔记核对。 [1][2] |\n| 原型／纸面验证 | 11 月 8 日，桌面原型的纸面样本检查通过。当天笔记明确写明实机验证尚未进行。 [3] |\n| 实机验证计划与结果 | 11 月 9 日，笔记记录计划周末做实机检查。两份笔记均未提供实机执行或通过的结果。 [3][4] |\n\n**待确认的是 11 月 9 日计划的实机检查后来是否执行、结果如何。** 任务仍开放与笔记记录的阶段进展相容，现有资料没有显示「实机已完成但任务仍未勾选」的差异。 [1][2][3][4]\n\n**无法判断是否拖延，也无法判断是否多次改期。** 任务记录的到期日和排期均为空，说明中写明未导入改期历史。笔记里的「周末」是当时的计划，现有资料缺少可用来判断逾期的明确期限及后续实机结果。 [3][4][5][6][7]",
+      "citations": [
+        {
+          "evidenceId": "e3",
+          "quote": "\"status\": \"open\","
+        },
+        {
+          "evidenceId": "e3",
+          "quote": "\"completed\": false,"
+        },
+        {
+          "evidenceId": "e1",
+          "quote": "11月8日：桌面原型纸面样本检查通过，真实设备验证尚未进行。没有改期历史。"
+        },
+        {
+          "evidenceId": "e2",
+          "quote": "11月9日：计划周末做真实设备检查，当前仍是计划。"
+        },
+        {
+          "evidenceId": "e3",
+          "quote": "\"dueAt\": null,"
+        },
+        {
+          "evidenceId": "e3",
+          "quote": "\"scheduledAt\": null,"
+        },
+        {
+          "evidenceId": "e3",
+          "quote": "\"description\": \"当前未勾选；未导入改期历史\","
+        }
+      ],
+      "findings": [],
+      "evidence": [
+        {
+          "title": "a",
+          "sourcePath": "a.md",
+          "content": "11月8日：桌面原型纸面样本检查通过，真实设备验证尚未进行。没有改期历史。",
+          "locator": {
+            "documentId": "a",
+            "kind": "note",
+            "libraryId": "notes",
+            "pageId": null
+          },
+          "version": {
+            "fingerprint": "74e0eee13b42d0bac12bc8853f70afea081693c05099d1853af4545fdd14dd35",
+            "kind": "document"
+          }
+        },
+        {
+          "title": "b",
+          "sourcePath": "b.md",
+          "content": "11月9日：计划周末做真实设备检查，当前仍是计划。",
+          "locator": {
+            "documentId": "b",
+            "kind": "note",
+            "libraryId": "notes",
+            "pageId": null
+          },
+          "version": {
+            "fingerprint": "38d7a98259845f3bf60d68f318ecc6828606ec9c8372fbd21e336960ab40625f",
+            "kind": "document"
+          }
+        },
+        {
+          "title": "真实设备验证",
+          "sourcePath": "doc.md",
+          "content": "{\n  \"hubTaskId\": \"task-25fad3735275c61fef9c55f5aceccda802bdb81161eebfeb4d6c2b9fd5b15c31\",\n  \"sourceFacts\": [\n    {\n      \"collectionId\": \"\",\n      \"collectionName\": \"\",\n      \"completed\": false,\n      \"completedAt\": null,\n      \"createdAt\": null,\n      \"description\": \"当前未勾选；未导入改期历史\",\n      \"documentHash\": null,\n      \"documentId\": \"doc\",\n      \"documentTitle\": \"doc\",\n      \"dueAt\": null,\n      \"isAllDay\": true,\n      \"isProject\": false,\n      \"libraryId\": \"craft\",\n      \"parentTaskId\": \"\",\n      \"provider\": \"craft\",\n      \"scheduledAt\": null,\n      \"sourceId\": \"one\",\n      \"startAt\": null,\n      \"status\": \"open\",\n      \"statusProvenance\": \"source\",\n      \"timeZone\": null,\n      \"title\": \"真实设备验证\"\n    }\n  ],\n  \"sources\": [\n    {\n      \"documentId\": \"doc\",\n      \"libraryId\": \"craft\",\n      \"provider\": \"craft\",\n      \"sourceId\": \"one\"\n    }\n  ],\n  \"syncState\": \"unlinked\"\n}",
+          "locator": {
+            "kind": "task",
+            "libraryId": "craft",
+            "sourceId": "one"
+          },
+          "version": {
+            "fingerprint": "e7427019f47fc5206c3590b110bebaecfd40239e18be4f3da5caa3c9f65e4cac",
+            "kind": "taskFacts"
+          }
+        }
+      ],
+      "tools": [
+        {
+          "tool": "hub_read",
+          "outcome": "returned"
+        },
+        {
+          "tool": "hub_read",
+          "outcome": "returned"
+        },
+        {
+          "tool": "hub_read",
+          "outcome": "returned"
+        },
+        {
+          "tool": "hub_citations",
+          "outcome": "returned"
+        }
+      ],
+      "scores": [
+        2,
+        2,
+        2,
+        2
+      ],
+      "sourceOutputSha256": "726326ca9e3dd450f465080a83669e7169199908e42eb7e520bd4ba6a9cce19c"
+    },
+    {
+      "id": "C4",
+      "input": {
+        "input": {
+          "create": {
+            "action": "insightEntrySave",
+            "entry": {
+              "assumptions": [
+                {
+                  "text": "A可读取图纸块属性"
+                }
+              ],
+              "body": "这是回忆补记，不是当时的独立日志。",
+              "choice": "先试免费工具A",
+              "decidedAt": "2026-11-01",
+              "kind": "decision",
+              "options": "A或B",
+              "reasons": "当时认为A可以读取块属性，且免费。",
+              "title": "工具选择（合成验收）"
+            },
+            "operationId": "decision-create"
+          },
+          "observation": [
+            {
+              "assumptionId": "gGYHrfB9a1GqbfPj3K3N",
+              "assumptionText": "A可读取图纸块属性",
+              "assumptionVersion": 1,
+              "id": "1UFiRLquUrFdpmcynmrU",
+              "nature": "selfReported",
+              "occurredAt": "2026-11-08",
+              "recordedAt": 1794639976983,
+              "text": "11月8日同一张样图中，A能读普通文字，读不到块属性；尚未试B。"
+            }
+          ],
+          "rubric": "区分补记和当时理由；精确指出块属性假设受影响，不编造选择动机或宣称B可用"
+        },
+        "maximumUserRuns": 1
+      },
+      "state": "completed",
+      "answer": "## 工具选择回顾\n\n用户在回忆补记中将决定日期记为 2026 年 11 月 1 日。当时在 A 和 B 之间选择先试 A，记下的理由有两项。\n\n| 当时理由 | 本次选中的后续观察 | 对理由或假设的影响 |\n|---|---|---|\n| 认为 A 可以读取块属性 | 用户补记，11 月 8 日在同一张样图上，A 能读普通文字，读不到块属性。 | 明确假设「A 可读取图纸块属性」受到挑战。反例限于这张样图和这次试用。 |\n| A 免费 | 这条观察只涉及读图结果，并记载当时尚未试 B。 | 免费这一理由未受到这条观察的影响。B 的块属性读取能力仍未知。 |\n\n**材料性质**　已读来源是用户保存的一份回忆补记。决定、选择和理由是用户对当时情况的自述，11 月 8 日的试用结果是用户补录的后续观察。该记录将事件日期与补录时间分开，本次材料没有独立的同期日志或测试来源。",
+      "citations": [],
+      "findings": [
+        {
+          "text": "按用户补记，11 月 8 日 A 在同一张样图中能读取普通文字，却读不到块属性。这一结果对「A 可读取图纸块属性」的假设构成该样图上的反例，适用范围限于这次试用。",
+          "hasReviewBinding": true
+        }
+      ],
+      "evidence": [],
+      "tools": [
+        {
+          "tool": "hub_review",
+          "outcome": "returned"
+        },
+        {
+          "tool": "hub_toolSchema",
+          "outcome": "returned"
+        },
+        {
+          "tool": "hub_review",
+          "outcome": "returned"
+        },
+        {
+          "tool": "hub_goalState",
+          "outcome": "returned"
+        },
+        {
+          "tool": "hub_finish",
+          "outcome": "returned"
+        }
+      ],
+      "scores": [
+        2,
+        2,
+        2,
+        2
+      ],
+      "sourceOutputSha256": "69989884e96aa8bf134337e1d25b349f46d863eac8a7d72d0cb7cb3abc5a1c33"
+    }
+  ]
+}

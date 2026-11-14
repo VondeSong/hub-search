@@ -2,6 +2,7 @@
 use super::*;
 #[cfg(test)]
 mod tests;
+mod workspace;
 
 pub(crate) fn migrate(c: &Connection) -> rusqlite::Result<()> {
     let result = (|| {
@@ -171,6 +172,7 @@ fn view(root: &Path, c: &Connection, item: &Value, revision: Option<i64>) -> Res
         "available"
     });
     if allowed {
+        value["workTitle"] = json!(work_on(c, item["workId"].as_str().ok_or("缺少原事项")?)?.goal);
         value["snapshot"] = snap;
     } else {
         value["unavailableReason"] = json!("来源或原事项当前不可访问，正文和引用已隐藏");
@@ -372,6 +374,9 @@ pub(super) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
 
 fn ui_on(root: &Path, c: &Connection, args: &Value, now: i64) -> Result<Value, String> {
     let action = args["action"].as_str().ok_or("洞察操作缺失")?;
+    if workspace::handles(action) {
+        return workspace::ui_on(root, c, args, now);
+    }
     if action == "insightOperation" {
         let op = operation_id(args)?;
         let id: Option<String> = c
@@ -670,6 +675,16 @@ fn ui_on(root: &Path, c: &Connection, args: &Value, now: i64) -> Result<Value, S
         }
         "insightFollow" => {
             current["followed"] = json!(args["followed"].as_bool().ok_or("关注状态无效")?);
+        }
+        "insightStar" => {
+            current["starred"] = json!(args["starred"].as_bool().ok_or("星标状态无效")?);
+        }
+        "insightPerspective" => {
+            let perspective = args["perspective"].as_str().ok_or("视角无效")?;
+            if !["", "knowledge", "life", "decision"].contains(&perspective) {
+                return Err("视角无效".into());
+            }
+            current["perspective"] = json!(perspective);
         }
         "insightFeedback" => {
             let feedback_text = text(args, "text", 3000)?;

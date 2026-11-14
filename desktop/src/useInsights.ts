@@ -37,7 +37,7 @@ export function useInsights(){
  const refreshRef=useRef(refresh);refreshRef.current=refresh;
  useEffect(()=>{
   alive.current=true;void refreshRef.current();let unlisten:(()=>void)[]=[];let disposed=false;let timer:ReturnType<typeof setTimeout>|undefined;
-  const invalidate=()=>{++accessEpoch.current;++sequence.current;++detailSequence.current;setGeneration(n=>n+1);setItems([]);setDetail(old=>old?{...old,snapshot:undefined,events:undefined,reasons:[],validity:"unavailable",checking:true}:null);clearTimeout(timer);timer=setTimeout(()=>void refreshRef.current(),150);};
+  const invalidate=()=>{++accessEpoch.current;++sequence.current;++detailSequence.current;setGeneration(n=>n+1);setItems(old=>old.map(item=>({...item,snapshot:undefined,workTitle:undefined,events:undefined,reasons:[],validity:"unavailable",checking:true})));setDetail(old=>old?{...old,snapshot:undefined,events:undefined,reasons:[],validity:"unavailable",checking:true}:null);clearTimeout(timer);timer=setTimeout(()=>void refreshRef.current(),150);};
   window.addEventListener("focus",invalidate);
   for(const name of ["agent-work-updated","library-registry-updated","library-runtime-updated","task-list-updated","task-sync-updated","data-portability-updated"]){void listen<{eventCategory?:string}>(name,event=>{if(disposed||event.payload?.eventCategory==="publicStream")return;invalidate();}).then(stop=>{if(disposed)stop();else unlisten.push(stop);}).catch(()=>{if(!disposed)setError("无法订阅资料变化；请用核对按钮读取当前依据。");});}
   const onVisible=()=>{if(document.visibilityState==="visible")invalidate();};document.addEventListener("visibilitychange",onVisible);
@@ -65,7 +65,7 @@ export function useInsights(){
   try{const v=await call<{committed:boolean;item?:Insight}>({action:"insightOperation",operationId:unresolved.operationId});if(v.committed&&v.item){if(epoch===accessEpoch.current)accept(v.item);userProfileStorage.removeItem(pendingKey);setUnresolved(null);setError("");}else{setPendingChecked(true);setError("未找到该操作的提交记录；可按原请求重试。");}}
   catch(e){setError(message(e));}finally{setBusy(false);}
  },[unresolved,accept]);
- const selectWorks=(before?:unknown)=>call<{works:WorkSummary[];nextCursor:unknown}>({action:"list",anchor:null,...(before?{before}:{})});
+ const selectWorks=(before?:unknown,query="")=>call<{works:WorkSummary[];nextCursor:unknown}>({action:"list",anchor:null,...(before?{before}:{}),...(query?{query}:{})});
  const deliveries=(id:string,beforeRecordId?:string)=>call<{items:InsightDelivery[];nextBeforeRecordId?:string|null}>({action:"insightDeliveries",id,...(beforeRecordId?{beforeRecordId}:{})});
  const candidates=(id:string,deliveryRecordId:string)=>call<InsightCandidates>({action:"insightCandidates",id,deliveryRecordId});
  const saveCandidate=(origin:InsightOrigin,candidate:InsightCandidate,target?:Insight,feedbackIds:string[]=[],contextEvidenceIds:string[]=[])=>execute({action:target?"insightUpdate":"insightImport",id:origin.workId,...(target?{insightId:target.id,expectedRevision:target.rowRevision}:{}),deliveryRecordId:origin.deliveryRecordId,deliveryHash:origin.deliveryHash,findingPointer:candidate.findingPointer,confirmDependencies:true,feedbackIds,confirmFeedbackHandled:feedbackIds.length>0,contextEvidenceIds});

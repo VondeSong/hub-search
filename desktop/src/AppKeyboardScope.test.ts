@@ -106,7 +106,7 @@ describe("search workspace capture scope", () => {
     document.body.innerHTML = html;
     const target = document.body.firstElementChild!.firstElementChild!;
     expect(isInsideKeyboardDialog(target)).toBe(true);
-    expect(isInsideKeyboardDialog(document.body)).toBe(false);
+    expect(isInsideKeyboardDialog(document.body)).toBe(html.startsWith('<dialog'));
   });
 
   it("does not consume composition or events already handled by another owner", () => {

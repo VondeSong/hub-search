@@ -2,6 +2,7 @@
 use super::*;
 use sha2::{Digest, Sha256};
 
+mod analysis;
 #[cfg(all(test, windows))]
 mod live;
 mod recall;
@@ -31,6 +32,12 @@ fn current_reader(root: &Path, work: &Work) -> Result<EvidenceReader, String> {
 
 /// Both endpoints run in one source snapshot; a candidate has no saved identity yet.
 pub(super) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
+    if matches!(
+        args["action"].as_str(),
+        Some("insightAnalysisScope" | "insightAnalysisPrepare")
+    ) {
+        return analysis::ui(root, args);
+    }
     if args["action"]
         .as_str()
         .is_some_and(|a| a.starts_with("insightReview"))

@@ -9,7 +9,8 @@ const nativeKeyboardControls = [
 export function isInsideKeyboardDialog(target: EventTarget | null): boolean {
   // Explicitly scoped panels, like dialogs, must receive keys before the
   // window capture listener can hide Hub or navigate the cached search result.
-  return target instanceof Element && Boolean(target.closest('dialog[open], [role="dialog"], [role="alertdialog"], [data-hub-keyboard-scope]:not([hidden])'));
+  // WebView can retarget a native popup's Escape to the document body.
+  return Boolean(document.querySelector('dialog[open]')) || target instanceof Element && Boolean(target.closest('dialog[open], [role="dialog"], [role="alertdialog"], [data-hub-keyboard-scope]:not([hidden])'));
 }
 
 // Search selection can remain cached while another workspace owns the screen.

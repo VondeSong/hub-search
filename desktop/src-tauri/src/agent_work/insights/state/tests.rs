@@ -1,6 +1,19 @@
 use super::super::tests::Case;
 use super::*;
 
+#[test]
+fn star_and_perspective_do_not_change_identity_processing_or_content() {
+    let c = Case::new();
+    let item = save(&c, 0);
+    let starred=command(&c,json!({"action":"insightStar","insightId":item["id"],"expectedRevision":item["rowRevision"],"operationId":"star-1","starred":true})).unwrap()["item"].clone();
+    let tagged=command(&c,json!({"action":"insightPerspective","insightId":item["id"],"expectedRevision":starred["rowRevision"],"operationId":"tag-1","perspective":"knowledge"})).unwrap()["item"].clone();
+    assert_eq!(tagged["starred"], true);
+    assert_eq!(tagged["perspective"], "knowledge");
+    assert_eq!(tagged["id"], item["id"]);
+    assert_eq!(tagged["headRevision"], item["headRevision"]);
+    assert_eq!(tagged["processingState"], item["processingState"]);
+}
+
 fn import(c: &Case, index: usize) -> Value {
     json!({"action":"insightImport","id":c.work,"deliveryRecordId":c.record,"deliveryHash":c.read()["origin"]["deliveryHash"],"findingPointer":format!("/report/findings/{index}"),"operationId":crate::random_url_safe(18),"confirmDependencies":true,"contextEvidenceIds":[]})
 }
@@ -876,4 +889,29 @@ fn s08c_source_recheck_and_s09d_access_recovery_preserve_unresolved_user_correct
                 .all(|r| r["kind"] != "sourceUnavailable" || r["active"] == false));
         }
     }
+}
+
+#[test]
+fn global_history_hides_restricted_revision_content() {
+    let c = Case::new();
+    let item = save(&c, 0);
+    let (item, _) = correct(&c, &item, "PRIVATE_CORRECTION");
+    let history = command(&c, json!({"action":"insightHistory"})).unwrap();
+    assert!(history.to_string().contains("PRIVATE_CORRECTION"));
+    c.f.c()
+        .execute(
+            "UPDATE agent_works SET state='revoked' WHERE id=?1",
+            [&c.work],
+        )
+        .unwrap();
+    let hidden = command(&c, json!({"action":"insightHistory"})).unwrap();
+    assert!(!hidden.to_string().contains("PRIVATE_CORRECTION"));
+    assert!(!hidden
+        .to_string()
+        .contains(item["snapshot"]["text"].as_str().unwrap()));
+    assert!(hidden["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|v| v["restricted"] == true));
 }

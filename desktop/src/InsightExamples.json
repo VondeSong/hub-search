@@ -1,0 +1,228 @@
+{
+  "sourceCommit": "7a96dba14cdff9c47dedf069a4d2394737d78e43",
+  "cases": [
+    {
+      "id": "public-case-dxf-text",
+      "workTitle": "线束图纸 · DXF 提取",
+      "checkedAt": "2026-11-08T07:55:21Z",
+      "pointer": "/report/findings/0",
+      "title": "导出线表前，补查块属性与多行文字",
+      "summary": "DXF 中的文字可能保存在块属性或多行文字里。ezdxf 分别提供 ATTRIB 读取与 MTEXT 纯文本提取能力。",
+      "why": "准备提取 CIRCUIT NBR、Cav、wire 时，可先确认样本里的文字存在哪里，再判断每列的含义。",
+      "condition": "这是公开技术文档支持的提取思路，未检查你的实际图纸；实体类型和文字本身不能直接证明回路关系或字段映射正确。",
+      "category": "knowledge",
+      "evidence": [
+        {
+          "sourceId": "public-ezdxf-insert",
+          "sourceItemId": "public-ezdxf-insert",
+          "title": "ezdxf · INSERT 与块属性",
+          "provider": "ezdxf 官方文档",
+          "version": 1,
+          "quote": "INSERT 表示块引用，可以附带 ATTRIB 属性；这些属性可由 attribs 列表读取。",
+          "location": "INSERT / attribs · 中文摘要",
+          "origin": "record",
+          "relationship": "independent",
+          "observedAt": "2026-11-08T07:55:21Z",
+          "citationValid": true,
+          "sourceFingerprint": "demo-fnv1a:88db948e",
+          "externalUrl": "https://ezdxf.readthedocs.io/en/stable/blocks/insert.html",
+          "publisher": "ezdxf 官方文档",
+          "checkedAt": "2026-11-08T07:55:21Z",
+          "excerptKind": "summary"
+        },
+        {
+          "sourceId": "public-ezdxf-mtext",
+          "sourceItemId": "public-ezdxf-mtext",
+          "title": "ezdxf · MTEXT 文字提取",
+          "provider": "ezdxf 官方文档",
+          "version": 1,
+          "quote": "MTEXT 保存多行文字和内联格式；plain_text() 可返回去除内联格式代码的文本。",
+          "location": "MTEXT / plain_text · 中文摘要",
+          "origin": "record",
+          "relationship": "independent",
+          "observedAt": "2026-11-08T07:55:21Z",
+          "citationValid": true,
+          "sourceFingerprint": "demo-fnv1a:951dc246",
+          "externalUrl": "https://ezdxf.readthedocs.io/en/stable/dxfentities/mtext.html",
+          "publisher": "ezdxf 官方文档",
+          "checkedAt": "2026-11-08T07:55:21Z",
+          "excerptKind": "summary"
+        }
+      ],
+      "caseStudy": {
+        "scenario": "准备把一张线束 DXF 转成线表，画面上能看到字段，但尚不清楚它们是普通文字、块属性还是多行文字。",
+        "learning": "先找到数据的实际位置，再确认字段含义。读到了文字与正确还原线表，是两个需要分别核对的步骤。",
+        "actionTitle": "准备 DXF 提取核对清单",
+        "actionSteps": [
+          "在一张授权样图中分别抽查普通文字、块属性和多行文字，记录其字段与位置。",
+          "保留原始文字和清洗后的文字；检查换行、字母与前导零是否被误改。",
+          "人工核对 CIRCUIT NBR、Cav、wire 的对应关系，再决定是否扩大提取范围。"
+        ]
+      }
+    },
+    {
+      "id": "public-case-linked-views",
+      "workTitle": "资料组织 · Notion 视图",
+      "checkedAt": "2026-11-08T07:55:21Z",
+      "pointer": "/report/findings/0",
+      "title": "同一份资料，多种视图；修改会回到源数据库",
+      "summary": "Notion 的关联数据库能在多个页面显示同一份内容。视图筛选彼此独立，数据编辑会同步回源数据库。",
+      "why": "整理工具研究或项目资料时，可以按不同目的浏览同一批条目，并在修改前明确它影响的是视图还是原资料。",
+      "condition": "这是 Notion 官方功能的应用案例；本站未连接或修改你的 Notion 数据库，也未证明当前 Hub 已实现相同同步机制。",
+      "category": "knowledge",
+      "evidence": [
+        {
+          "sourceId": "public-notion-linked",
+          "sourceItemId": "public-notion-linked",
+          "title": "Notion · 关联数据库视图",
+          "provider": "Notion 官方帮助",
+          "version": 1,
+          "quote": "编辑其中的数据会同步到源数据库；筛选和视图设置只作用于当前关联视图。",
+          "location": "Using linked databases · 中文摘要",
+          "origin": "record",
+          "relationship": "independent",
+          "observedAt": "2026-11-08T07:55:21Z",
+          "citationValid": true,
+          "sourceFingerprint": "demo-fnv1a:0dc769e3",
+          "externalUrl": "https://www.notion.com/help/guides/using-linked-databases",
+          "publisher": "Notion 官方帮助",
+          "checkedAt": "2026-11-08T07:55:21Z",
+          "excerptKind": "summary"
+        }
+      ],
+      "caseStudy": {
+        "scenario": "同一个工具研究库需要出现在「待试用」「已经采用」和项目首页中，希望不同页面各有重点。",
+        "learning": "多个入口可以指向同一份资料。洞察与原资料之间也需要清楚的回链，让你知道自己正在改变哪一层。",
+        "actionTitle": "整理资料与视图的核对清单",
+        "actionSteps": [
+          "挑选一个测试数据库，建立两个筛选不同的关联视图。",
+          "修改一条测试记录，确认源数据库和另一个视图中的同一条记录同步变化。",
+          "分别记录筛选设置与资料编辑的作用范围，为条目保留原页面链接。"
+        ]
+      }
+    },
+    {
+      "id": "public-case-github-projects",
+      "workTitle": "开发进度 · GitHub Projects",
+      "checkedAt": "2026-11-08T07:55:21Z",
+      "pointer": "/report/findings/0",
+      "title": "自动入板启用后，已有 Issue 还要补入",
+      "summary": "GitHub Projects 的自动添加工作流不会在启用时补入已有条目。之后符合筛选条件的创建或更新才会触发添加。",
+      "why": "给已有项目建立看板时，应先核对历史 Issue 是否齐全，再用看板判断当前待办和进展。",
+      "condition": "未检查或更改你的 GitHub 仓库、Issue 或看板设置；这里指出的是官方规则及其应用条件，不声称你的看板已经漏项。",
+      "category": "decision",
+      "evidence": [
+        {
+          "sourceId": "public-github-autoadd",
+          "sourceItemId": "public-github-autoadd",
+          "title": "GitHub · 自动添加项目条目",
+          "provider": "GitHub 官方文档",
+          "version": 1,
+          "quote": "启用自动添加工作流时，已经存在且符合条件的条目不会立即补入项目。",
+          "location": "About automatically adding items · 中文摘要",
+          "origin": "record",
+          "relationship": "independent",
+          "observedAt": "2026-11-08T07:55:21Z",
+          "citationValid": true,
+          "sourceFingerprint": "demo-fnv1a:e511dd9c",
+          "externalUrl": "https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/adding-items-automatically",
+          "publisher": "GitHub 官方文档",
+          "checkedAt": "2026-11-08T07:55:21Z",
+          "excerptKind": "summary"
+        }
+      ],
+      "caseStudy": {
+        "scenario": "一个项目已经积累了一批 Issue，现在才建立 Projects 看板并开启自动添加，希望以后统一查看进度。",
+        "learning": "自动化规则需要区分历史覆盖和后续触发。面板没有显示某件事，不能直接说明它不存在或已经完成。",
+        "actionTitle": "准备项目看板完整性核对",
+        "actionSteps": [
+          "将现有 Issue 列表与看板条目逐项对照，标记未纳入且仍需要跟踪的事项。",
+          "为已有事项准备一次补入清单，核对每条是否符合当前项目范围。",
+          "再用一条测试 Issue 验证新建或更新后的自动添加行为，并记录筛选条件。"
+        ]
+      }
+    },
+    {
+      "id": "public-case-backlinks",
+      "workTitle": "阅读应用 · 笔记关联",
+      "checkedAt": "2026-11-08T07:55:21Z",
+      "pointer": "/report/findings/0",
+      "title": "提到了同一个词，先看上下文再建立关联",
+      "summary": "Obsidian 将已建立内部链接的提及，与只出现笔记名称的未链接提及分开展示，并允许展开所在段落。",
+      "why": "从阅读笔记或日志发现重复概念时，可以先核对两段内容讨论的是不是同一件事，再决定是否复用。",
+      "condition": "这是公开产品机制的应用案例，未扫描你的 Obsidian 库。相同名称或重复词语不能单独证明事实关联、因果关系或长期趋势。",
+      "category": "knowledge",
+      "evidence": [
+        {
+          "sourceId": "public-obsidian-backlinks",
+          "sourceItemId": "public-obsidian-backlinks",
+          "title": "Obsidian · 链接与未链接提及",
+          "provider": "Obsidian 官方帮助",
+          "version": 1,
+          "quote": "Backlinks 区分已链接提及与未链接提及：前者来自包含内部链接的笔记，后者来自只出现当前笔记名称、尚未建立链接的位置。",
+          "location": "Show backlinks · 中文摘要",
+          "origin": "record",
+          "relationship": "independent",
+          "observedAt": "2026-11-08T07:55:21Z",
+          "citationValid": true,
+          "sourceFingerprint": "demo-fnv1a:994a7647",
+          "externalUrl": "https://obsidian.md/help/plugins/backlinks",
+          "publisher": "Obsidian 官方帮助",
+          "checkedAt": "2026-11-08T07:55:21Z",
+          "excerptKind": "summary"
+        }
+      ],
+      "caseStudy": {
+        "scenario": "一篇阅读摘录和一则项目日志里都出现同一个概念，希望知道它们能否一起用于解释眼前的问题。",
+        "learning": "共同词语提供查找线索，原段落提供判断条件。关联应该能说明理由，并允许你保留不同语境。",
+        "actionTitle": "准备一次笔记关联核对",
+        "actionSteps": [
+          "选一处未链接提及，打开它所在的完整段落和目标笔记。",
+          "核对名称、对象与使用情境，区分同名词语和同一概念。",
+          "确认可复用后再建立链接，写一句关联理由；不同含义则分别保留。"
+        ]
+      }
+    },
+    {
+      "id": "public-case-tasks-context",
+      "workTitle": "每周回顾 · 任务与笔记",
+      "checkedAt": "2026-11-08T07:55:21Z",
+      "pointer": "/report/findings/0",
+      "title": "回顾一周时，把任务与它的笔记一起看",
+      "summary": "Craft 的 Tasks 视图汇总收件箱、置顶文档和含任务的笔记，让分散在文档中的任务有一个集中入口。",
+      "why": "整理一周进展时，可以从任务回到笔记，核对当时的目标、已有产出和仍未解决的问题。",
+      "condition": "这是基于公开文档的回顾方法示例，未读取你的任务或日志。某条任务完成不等于整个项目完成，计划也不等于已经发生的记录。",
+      "category": "life",
+      "evidence": [
+        {
+          "sourceId": "public-craft-tasks",
+          "sourceItemId": "public-craft-tasks",
+          "title": "Craft · 文档中的任务与集中视图",
+          "provider": "Craft 官方博客",
+          "version": 1,
+          "quote": "Craft 的 Tasks 视图可从侧栏进入，汇总收件箱、置顶文档和包含任务的笔记。",
+          "location": "Stay Organized with Task View · 中文摘要",
+          "origin": "record",
+          "relationship": "independent",
+          "observedAt": "2026-11-08T07:55:21Z",
+          "citationValid": true,
+          "sourceFingerprint": "demo-fnv1a:ed1e3824",
+          "externalUrl": "https://www.craft.do/blog/introducing-tasks",
+          "publisher": "Craft 官方博客",
+          "checkedAt": "2026-11-08T07:55:21Z",
+          "excerptKind": "summary"
+        }
+      ],
+      "caseStudy": {
+        "scenario": "一周的任务散在项目文档、阅读笔记和每日记录中，回顾时只看到任务标题，难以判断实际推进了什么。",
+        "learning": "汇总入口帮助找到事情，原笔记帮助理解事情。洞察可以把状态和上下文一起带回，再由你确认下一步。",
+        "actionTitle": "准备一页周回顾草稿",
+        "actionSteps": [
+          "各选一条已完成与未完成的任务，找到关联的文档或每日记录。",
+          "分别核对原目标、已有产出、剩余问题；没有记录的结果先标为待确认。",
+          "整理「已有成果／仍待核对／下一步」，并为每项保留回到任务与笔记的入口。"
+        ]
+      }
+    }
+  ]
+}

@@ -12,6 +12,7 @@ import {
 import type { AssistantContext } from "./Assistant";
 import type { InsightsProps } from "./Insights";
 import {InsightRecall} from "./InsightRecall";
+import {InsightNotebookDemo} from "./InsightNotebookDemo";
 import {
   getLedger, subscribeLedger, executeLedger, ensureLedgerSeed, ensureInteractionDemo, ensurePublicCaseDemo, ledgerId,
   candidateAvailability, getVisibleFinding, getInsightValidity,
@@ -34,6 +35,7 @@ type Props = InsightsProps & {
 };
 type Modal =
   | { type: "recall" }
+  | { type: "decisions" }
   | { type: "reports"; targetId?: string; baseRevision?: number }
   | { type: "feedback"; insightId: string; baseRevision: number }
   | { type: "snooze"; insightId: string; baseRevision: number }
@@ -145,6 +147,7 @@ export default function InsightPanel(props: Props) {
   const [reportId, setReportId] = useState(REPORT_FIXTURES[0]?.id || "");
   const [reportGroup, setReportGroup] = useState("normal");
   const [reportWork, setReportWork] = useState("all");
+  const [reportQuery, setReportQuery] = useState("");
   const [chosenPointers, setChosenPointers] = useState<string[]>([]);
   const [dependenciesConfirmed, setDependenciesConfirmed] = useState(false);
   const [acknowledgedFeedback, setAcknowledgedFeedback] = useState<string[]>([]);
@@ -291,6 +294,7 @@ export default function InsightPanel(props: Props) {
   const availableReports = REPORT_FIXTURES.filter(report =>
     (!targetInsight || report.workId === targetInsight.ownerWorkId) &&
     (reportWork === "all" || report.workId === reportWork) &&
+    (!reportQuery.trim() || report.workTitle.toLowerCase().includes(reportQuery.trim().toLowerCase())) &&
     (reportGroup === "all" || report.group === reportGroup)
   );
   const chosenFinding = selectedReport?.findings.find(x => chosenPointers.includes(x.pointer));
@@ -471,7 +475,7 @@ export default function InsightPanel(props: Props) {
   }}>
     <header className="ip-page-header">
       <div className="ip-page-title"><div className="ip-title-icon" aria-hidden="true"><Sparkles size={25}/></div><div><span className="ip-overline">让已有的积累，接着发挥作用</span><h1>{!navigationOpen && onOpenNavigation && <button className="ip-nav-toggle" aria-label="展开洞察侧边栏" onClick={onOpenNavigation}><PanelLeft size={21}/></button>}洞察</h1><p>看见资料里的变化与关联，找到可以继续的一步。</p></div></div>
-      <div className="ip-header-actions"><button className="ip-button ip-primary" onClick={() => openReports()}><Plus size={16}/>选择已有成果</button>
+      <div className="ip-header-actions">{scope==="decision"&&<button className="ip-button" onClick={()=>showModal({type:"decisions"})}><GitBranch size={16}/>记录与回顾决定</button>}<button className="ip-button ip-primary" onClick={() => openReports()}><Plus size={16}/>选择已有成果</button>
         <details className="ip-menu ip-page-menu"><summary aria-label="洞察更多操作" title="更多操作"><MoreHorizontal size={21}/></summary><div className="ip-menu-content">
           <button onClick={() => showModal({type:"recall"})}><BookOpen size={15}/>寻找旧知识</button>
           <button onClick={async event => { (event.currentTarget.closest("details") as HTMLDetailsElement).open = false; const result = await act({ type: "check", operationId: ledgerId() }); if (result?.ok) notify(result.message || "已核对已选来源，没有启动模型分析"); }} disabled={busy || initializing}><RefreshCw size={15}/>核对已选来源</button>
@@ -595,10 +599,10 @@ export default function InsightPanel(props: Props) {
       if (result?.ok) { setUndoEvent(null); notify("已撤销处理；当前证据有效性继续保留"); }
     }}>撤销</button><button onClick={() => { openSavedInsight(undoEvent.insightId); setUndoEvent(null); }}>查看<ArrowRight size={12}/></button><button aria-label="关闭撤销提示" onClick={() => setUndoEvent(null)}><X size={13}/></button></div>}
 
-    {modal?.type === "recall" && <Dialog title="寻找旧知识" subtitle="先定位材料，再判断是否适用" onClose={()=>setModal(null)}><InsightRecall state={state} onOpenWork={id=>{const title=REPORT_FIXTURES.find(r=>r.workId===id)?.workTitle||"原事项";setModal(null);onAssistant({id,title,workId:id,workTitle:title,excerpt:"请围绕原事项的问题核对已授权资料。关键词命中只是候选，不代表关联成立；需读取原文、核对适用条件和反例。",evidence:[]});}}/></Dialog>}
+    {modal?.type === "recall" && <Dialog title="寻找旧知识" subtitle="先定位材料，再判断是否适用" onClose={()=>setModal(null)}><InsightRecall state={state} onOpenWork={(id,question)=>{const title=REPORT_FIXTURES.find(r=>r.workId===id)?.workTitle||"原事项";setModal(null);onAssistant({id,title,workId:id,workTitle:title,excerpt:"请围绕原事项的问题核对已授权资料。关键词命中只是候选，不代表关联成立；需读取原文、核对适用条件和反例。",evidence:[]});}}/></Dialog>}
     {modal?.type === "reports" && <Dialog title={targetInsight ? "更新这条发现" : "从已有成果保存发现"} subtitle={targetInsight ? "选择同一工作的新成果，明确对应的发现，再发布一个新修订。" : "只提取已发布成果中有可读引用的发现。打开这份列表不会启动分析。"} wide onClose={() => setModal(null)}>
       <div className="ip-report-browser">
-        <aside className="ip-report-nav"><div className="ip-report-filter"><label><span>{targetInsight ? "当前工作" : "事项范围"}</span>{targetInsight ? <strong>{targetInsight.workTitle}</strong> : <select aria-label="成果事项范围" value={reportWork} onChange={e => { setReportWork(e.target.value); setChosenPointers([]); setDependenciesConfirmed(false); }}><option value="all">全部事项</option>{Array.from(new Map(REPORT_FIXTURES.map(x => [x.workId, x.workTitle]))).map(([id, title]) => <option key={id} value={id}>{title}</option>)}</select>}</label>
+        <aside className="ip-report-nav"><div className="ip-report-filter">{!targetInsight&&<label><span>搜索事项</span><input aria-label="搜索成果事项" placeholder="按事项标题查找…" value={reportQuery} maxLength={200} onChange={e=>{setReportQuery(e.target.value);setReportWork("all");setChosenPointers([]);setDependenciesConfirmed(false);}}/></label>}<label><span>{targetInsight ? "当前工作" : "事项范围"}</span>{targetInsight ? <strong>{targetInsight.workTitle}</strong> : <select aria-label="成果事项范围" value={reportWork} onChange={e => { setReportWork(e.target.value); setChosenPointers([]); setDependenciesConfirmed(false); }}><option value="all">全部事项</option>{Array.from(new Map(REPORT_FIXTURES.map(x => [x.workId, x.workTitle]))).map(([id, title]) => <option key={id} value={id}>{title}</option>)}</select>}</label>
           <label><span>成果类型</span><select aria-label="成果类型" value={reportGroup} onChange={e => { setReportGroup(e.target.value); setChosenPointers([]); setDependenciesConfirmed(false); }}><option value="normal">已发布成果</option><option value="revision">后续核对成果</option><option value="boundary">无发现与异常示例</option><option value="all">所有示例成果</option></select></label></div>
           <div className="ip-report-options">{availableReports.map(report => <button key={report.id} className={reportId === report.id ? "selected" : ""} onClick={() => chooseReport(report)}><FileText size={15}/><span><strong>{report.title}</strong><small>{report.workTitle}</small><small>{dateText(report.publishedAt, true)} · {report.kind === "native" ? "原生正文" : report.findings.length + " 条候选"}</small></span><ChevronRight size={12}/></button>)}
             {!availableReports.length && <p className="ip-report-nav-empty">这个范围暂时没有成果。可以切换成果类型。</p>}</div>
@@ -668,6 +672,7 @@ export default function InsightPanel(props: Props) {
       }}>保存稍后时间<Clock3 size={14}/></button></footer>
     </Dialog>}
 
+    {modal?.type === "decisions" && <Dialog title="决定与条件" subtitle="留下当时的理由和假设，用后来的观察逐项回顾" wide onClose={()=>setModal(null)}><InsightNotebookDemo onAssistant={id=>{setModal(null);onAssistant({id,title:"决定与条件回顾（示例）",workId:id,workTitle:"决定与条件回顾（示例）",excerpt:"请回顾刚保存的决定，区分当时理由、明确假设与后补观察。本原型仅演示交互，不声称已经分析真实资料。",evidence:[]});}}/></Dialog>}
     {modal?.type === "sources" && <Dialog title="来源与演示控制" subtitle="当前发现依赖哪些材料、引用哪个版本，都可以在这里核对。" wide onClose={() => setModal(null)}>
       <div className="ip-source-manager"><div className="ip-demo-caption"><Info size={15}/><p>这里包含公开文档摘要与合成测试资料。演示控制只改变本地快照的访问状态，不修改官方来源。</p></div>
         {SOURCE_FIXTURES.filter(source => source.kind !== "feedback").map(source => {

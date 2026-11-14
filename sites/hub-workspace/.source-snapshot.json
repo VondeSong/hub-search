@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "7a96dba14cdff9c47dedf069a4d2394737d78e43",
-  "published_version": 84,
-  "deployment_id": "appgdep_6af7e949be1c8191a4093ac50c6d24e9",
+  "source_commit": "1c3c1797df5a3907e20bbb9b70bb88a28a49ca0f",
+  "published_version": 90,
+  "deployment_id": "appgdep_6af815ead7f481918c0518ee5f378c73",
   "files": {
     ".gitignore": {
       "sha256": "5ca3c39bdc1288c108a1931b3f6bc5795464b6253e9457390617774259deed0c",
@@ -92,15 +92,25 @@
       "mode": "100644",
       "bytes": 33207
     },
-    "app/InsightPanel.tsx": {
-      "sha256": "334d425df48835fd901886434f2c5d03606e76c7f64641500f269716aefb9011",
+    "app/InsightNotebook.tsx": {
+      "sha256": "398c018993644030241cd86886ed46a3db82b0cba9751d0d769f67f09279f9d9",
       "mode": "100644",
-      "bytes": 82950
+      "bytes": 16904
+    },
+    "app/InsightNotebookDemo.tsx": {
+      "sha256": "98b993da745b737c89e23db6271519b9ef2e7c1041d7dc12702d5aaba6706b95",
+      "mode": "100644",
+      "bytes": 2932
+    },
+    "app/InsightPanel.tsx": {
+      "sha256": "43717cc7667fd2b696986ade5c06448ee0c2653962ab54758f9e7e2fdc2703fb",
+      "mode": "100644",
+      "bytes": 84925
     },
     "app/InsightRecall.tsx": {
-      "sha256": "1c33d39d70fc27a9c3f3d83ae2af1f269ce02f61c10351fbd011839907a5c905",
+      "sha256": "357d344c5e688888446a4e47a1a44cecab1cf064ab0380df4c9bec4aff21b0e6",
       "mode": "100644",
-      "bytes": 2266
+      "bytes": 3595
     },
     "app/Insights.tsx": {
       "sha256": "8637523ff1c13ed23ab6213852d2532df414e6b6be03a9f5871d83d932b6023f",
@@ -373,9 +383,9 @@
       "bytes": 2257
     },
     "app/stage-review.css": {
-      "sha256": "eea141a257d0ff6fc8a17b609f31b83e22de4d107eee7cadccf6fe73390904e1",
+      "sha256": "f36826056147d36b6a617747580b0eab62e17326b3d6955a4f1526c24cdd1909",
       "mode": "100644",
-      "bytes": 4999
+      "bytes": 6092
     },
     "app/tag-assistant.css": {
       "sha256": "a27f54f6170cec692bf9c658954937716452fb18dd2dfad1c28869dbc8bc0148",
@@ -1148,5 +1158,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-14T04:54:14.627947+00:00"
+  "imported_at": "2026-11-14T08:04:54.852633+00:00"
 }

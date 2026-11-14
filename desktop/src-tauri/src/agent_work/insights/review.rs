@@ -355,6 +355,71 @@ pub(super) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
         view(root, c, &store::load(c, &w.id)?)
     })
 }
+pub(super) fn notebook_inputs_on(
+    c: &Connection,
+    w: &Work,
+    texts: &[String],
+    nature: &str,
+    ids: &[String],
+    question: Option<&str>,
+    now: i64,
+) -> Result<Vec<String>, String> {
+    if texts.len() > 16 {
+        return Err("本次回顾材料超过16段，请减少采用的观察记录".into());
+    }
+    let mut current = inputs(c, &w.id)?;
+    let mut result = vec![];
+    for i in 0..texts.len().max(ids.len()) {
+        let old = ids
+            .get(i)
+            .map(|id| {
+                current
+                    .iter()
+                    .find(|v| v["id"] == *id)
+                    .cloned()
+                    .ok_or("决定材料身份已失效")
+            })
+            .transpose()?;
+        let content = texts
+            .get(i)
+            .cloned()
+            .or_else(|| {
+                old.as_ref()
+                    .and_then(|v| v["text"].as_str().map(str::to_owned))
+            })
+            .unwrap_or_default();
+        let withdrawn = i >= texts.len();
+        if let Some(old) = &old {
+            if old["text"] == content
+                && old["nature"] == nature
+                && (old["withdrawn"] == true) == withdrawn
+            {
+                result.push(old["id"].as_str().ok_or("材料身份损坏")?.to_owned());
+                continue;
+            }
+        }
+        add_input(
+            c,
+            w,
+            &json!({"text":content,"nature":nature,"version":old.as_ref().map(|v|v["version"].clone()),"withdrawn":withdrawn}),
+            old.as_ref().and_then(|v| v["id"].as_str()),
+            now,
+        )?;
+        let saved = last(c, &w.id, "reviewInput")?;
+        result.push(text(&saved, "id", 150)?);
+        current = inputs(c, &w.id)?;
+    }
+    if let Some(question) = question {
+        let mut config = plan(
+            json!({"perspective":"open","question":question,"themes":[],"focus":"决定、假设与后续观察","dateOnly":true,"extraDiscoveries":true}),
+            now,
+        )?;
+        config["scope"] = json!(scope(w)?);
+        config["revision"] = json!(records(c, &w.id, "reviewConfig")?.len() + 1);
+        store::insert(c, &w.id, None, "reviewConfig", &config)?;
+    }
+    Ok(result)
+}
 fn add_input(
     c: &Connection,
     w: &Work,

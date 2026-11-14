@@ -1,4 +1,8 @@
 /* The existing Sites InsightPanel and globals.css are the visual source. */
+.insights-workspace .insights-case-intro{max-width:1200px;width:100%;margin:0 auto 20px;display:flex;align-items:center;gap:15px;text-align:left;border-color:color-mix(in srgb,var(--hub-accent) 14%,var(--hub-separator));background:linear-gradient(100deg,color-mix(in srgb,var(--hub-accent) 5%,var(--hub-content-surface)),var(--hub-content-surface));border-radius:12px;padding:18px 20px}
+.insights-case-intro-icon{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:39px;height:39px;border-radius:11px;background:var(--hub-content-surface);color:var(--hub-accent);border:1px solid var(--hub-separator)}
+.insights-case-intro>span:nth-child(2){flex:1;min-width:0}.insights-case-intro strong{display:block;font-size:14px;font-weight:550;line-height:1.6}.insights-case-intro small{display:block;font-size:12px;color:var(--hub-text-secondary);line-height:1.7;margin-top:3px}.insights-case-intro-link{display:flex;align-items:center;gap:7px;font-size:12px;flex-shrink:0;color:var(--hub-accent)}
+@container insights-page (max-width:470px){.insights-workspace .insights-case-intro{padding:14px;gap:10px;flex-wrap:wrap;margin-bottom:16px}.insights-case-intro-link{margin-left:49px}.insights-case-intro strong{font-size:13px}.insights-case-intro small{font-size:11px}}
 html:not([data-runtime-platform="android"]) .desktop-app-shell.unified-shell.module-insights{grid-template-columns:56px minmax(0,1fr)}
 html:not([data-runtime-platform="android"]) .desktop-app-shell.unified-shell.mode-standard.module-insights{grid-template-columns:minmax(0,1fr)}
 .insights-workspace{position:relative;height:100%;min-height:0;min-width:0;display:flex;overflow:hidden;background:var(--hub-content-surface);color:var(--hub-text-primary);container:insights-shell / inline-size;font-size:13px}
@@ -113,3 +117,15 @@ html:not([data-runtime-platform="android"]) .desktop-app-shell.unified-shell.mod
 
 /* Match the existing prototype recall form without changing the workspace shell. */
 .insights-recall label{display:flex;flex-direction:column;gap:8px;margin:14px 0;font-size:12px}.insights-recall :is(input[type="text"],select){background:var(--hub-control-fill);border:1px solid var(--hub-separator);border-radius:7px;padding:10px 12px;font:inherit;line-height:1.8;color:var(--hub-text-primary);width:100%}.insights-recall article{padding:14px 0;border-bottom:1px solid var(--hub-separator);font-size:13px;line-height:1.8}.insights-recall p{line-height:1.8;overflow-wrap:anywhere}.insights-recall article>button{margin:4px 8px 4px 0}
+
+.insights-workspace .insights-star{border:0;background:transparent;color:var(--hub-text-secondary);padding:3px;display:inline-flex;min-height:24px;min-width:24px}.insights-star[aria-pressed="true"]{color:var(--hub-accent)}
+.insights-detail-navigation{display:flex;gap:8px;padding:12px 24px;border-bottom:1px solid var(--hub-separator)}
+.insights-card-menu{margin-left:auto}.insights-card footer{overflow:visible}.insights-card-menu .insights-menu-content{right:0;bottom:100%;top:auto}
+.insights-focus .insights-dialog-wide{width:min(1000px,calc(100vw - 32px));max-height:calc(100vh - 32px)}
+
+.stage-review-article.insights-cases{max-width:1200px;padding:40px 35px}.insights-cases>.insights-grid{margin-top:28px}
+
+/* Keep controls in place while access revalidation hides old evidence. */
+.insights-dialog.insights-result-picker{height:min(820px,calc(100dvh - 48px))}
+
+.insights-candidate-text{font-weight:500}.insights-finding-text{white-space:normal}.insights-finding-text p{margin:0 0 12px}

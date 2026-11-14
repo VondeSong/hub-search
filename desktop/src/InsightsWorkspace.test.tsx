@@ -27,6 +27,11 @@ beforeEach(()=>{
    case "status":return {work:{id:"work-a",revision:2,report:null},lifecycle:{controlRevision:7,workRevision:2,activeRunId:null,requiresExplicitResume:true,canResume:true,executionModes:{quick:true}},assistantOptions:{model:{provider:"codex"}}};
    case "insightList":return structuredClone({items:store.items,hasMore:false,nextBefore:null});
    case "insightDetail":return structuredClone({...current,contentRevision:Number(args.revision??current.headRevision)});
+   case "insightStar":current.starred=!!args.starred;++current.rowRevision;return structuredClone({committed:true,item:current});
+   case "insightPerspective":current.perspective=String(args.perspective);++current.rowRevision;return structuredClone({committed:true,item:current});
+   case "insightHistory":return {items:[{id:"event1",insightId:"one",kind:"insightStar",createdAt:Date.now(),cursor:1,text:"本周已完成原型验证"}],nextBefore:null};
+   case "insightAnalysisScope":return {workRevision:2,sources:[{title:"指定任务",locator:{kind:"task",libraryId:"craft",sourceId:"t1"},sourcePath:"task"},{title:"完成说明",locator:source.excerpt.locator,sourcePath:"progress.md"}]};
+   case "insightAnalysisPrepare":return {prepared:true,modelStarted:false};
    case "insightStatus":current.processingState=args.state as Insight["processingState"];++current.rowRevision;if(store.lostReply){store.lostReply=false;throw new Error("reply lost");}return structuredClone({committed:true,item:current});
    case "insightOperation":return structuredClone({committed:true,item:current});
    case "insightSource":return structuredClone(source);
@@ -91,7 +96,7 @@ it("removes cached sensitive content when source eligibility changes",async()=>{
 });
 
 
-it("ignores an in-flight old detail after access changes and clears the result picker",async()=>{
+it("ignores an old detail and rechecks picker access while preserving the chosen Work",async()=>{
  vi.useFakeTimers();await mount();
  let resolveOld!:(value:Insight)=>void;
  const normal=invoke.getMockImplementation()!;
@@ -107,7 +112,8 @@ it("ignores an in-flight old detail after access changes and clears the result p
  await click("选择已有成果");
  expect(document.querySelector('dialog[aria-label="从已有成果保存发现"]')).not.toBeNull();
  await act(async()=>listeners.get("library-registry-updated")?.({payload:{}}));
- expect(document.querySelector('dialog[aria-label="从已有成果保存发现"]')).toBeNull();
+ expect(document.querySelector('dialog[aria-label="从已有成果保存发现"]')).not.toBeNull();
+ expect(document.querySelector<HTMLSelectElement>('select[aria-label="成果事项"]')!.value).toBe("work-a");
 });
 
 
@@ -232,14 +238,67 @@ it("changing a recall query rejects a late old result",async()=>{
  await act(async()=>resolve({scopeCount:2,candidates:[{title:"STALE_RECALL_SENTINEL",snippet:"old"}],limitReached:false,unavailableCandidates:0}));
  expect(document.body.textContent).not.toContain("STALE_RECALL_SENTINEL");expect(button("在已选资料中查找").disabled).toBe(false);
 });
-it("recall source errors clear candidates, and access invalidation closes the bounded search",async()=>{
+it("recall source errors and access refresh clear excerpts while retaining the question",async()=>{
  await mount();await recallSearchDraft();await click("在已选资料中查找");const original=invoke.getMockImplementation()!;
  invoke.mockImplementation((c,v)=>v.args.action==="insightRecallSource"?Promise.reject(new Error("证据版本已改变")):original(c,v));
  await click("查看原文");expect(document.body.textContent).toContain("原文未显示，请重新查找");expect(document.querySelector('[aria-label="候选资料原文"]')).toBeNull();
  await act(async()=>listeners.get("library-registry-updated")?.({payload:{}}));
- expect(document.querySelector('.insights-recall')).toBeNull();
+ expect(document.querySelector('.insights-recall')).not.toBeNull();
+ expect(document.querySelector<HTMLInputElement>('.insights-recall input')!.value).toBe("验证");
+ expect(document.querySelector('[aria-label="候选资料原文"]')).toBeNull();
 });
 
 it("opens the stage review with one current navigation item and no automatic model run",async()=>{
  await mount();await click("阶段回顾");expect(host.querySelectorAll('nav button[aria-current="page"]')).toHaveLength(1);expect(host.querySelector('nav button[aria-current="page"]')?.textContent).toContain("阶段回顾");expect(host.querySelector('[aria-label="回顾问题"]')).not.toBeNull();expect(invoke.mock.calls.some(([,v])=>["respond","resume","run"].includes(v.args.action))).toBe(false);
+});
+
+it("persists stars separately and enables the real history and public cases",async()=>{
+ await mount();const star=host.querySelector<HTMLButtonElement>('.insights-card button[aria-label="星标发现"]')!;await act(async()=>star.click());expect(store.items[0].starred).toBe(true);expect(store.items[0].followed).toBe(true);expect(store.items[0].processingState).toBe("attention");
+ await click("处理记录");expect(host.textContent).toContain("更新了星标");await click("返回发现");expect(document.body.textContent).toContain("发现与依据");await click("返回列表");
+ await act(async()=>[...host.querySelectorAll<HTMLButtonElement>("nav button")].find(b=>b.textContent?.startsWith("真实案例"))!.click());expect(host.textContent).toContain("五个由公开文档支持");expect(store.items).toHaveLength(1);expect(invoke.mock.calls.some(([,v])=>v.args.action==="run")).toBe(false);
+});
+it("preserves feedback while navigating adjacent findings and changing focus",async()=>{
+ const second=item("two");second.snapshot!.text="第二条不同发现";store.items.push(second);await mount();await click("查看发现");const input=document.querySelector<HTMLTextAreaElement>('[aria-label="你的补充"]')!;await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value")!.set!.call(input,"还没保存的纠正");input.dispatchEvent(new Event("input",{bubbles:true}));});await click("下一条");await click("上一条");expect(document.querySelector<HTMLTextAreaElement>('[aria-label="你的补充"]')!.value).toBe("还没保存的纠正");await click("专注阅读");expect(document.body.textContent).toContain("退出专注");
+});
+it("prepares explicit task comparison without starting a model or changing the task",async()=>{
+ await mount();await click("寻找旧知识");const work=document.querySelector<HTMLSelectElement>('[aria-label="原事项"]')!;await act(async()=>{work.value="work-a";work.dispatchEvent(new Event("change",{bubbles:true}));});const mode=document.querySelector<HTMLSelectElement>('[aria-label="核对方式"]')!;await act(async()=>{mode.value="status";mode.dispatchEvent(new Event("change",{bubbles:true}));});const task=document.querySelector<HTMLSelectElement>('[aria-label="核对的任务"]')!;await act(async()=>{task.selectedIndex=1;task.dispatchEvent(new Event("change",{bubbles:true}));});const question=document.querySelector<HTMLInputElement>('.insights-recall input[type="text"]')!;await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(question,"验证完成了吗？");question.dispatchEvent(new Event("input",{bubbles:true}));});await click("保存问题并打开原事项");expect(invoke.mock.calls.find(([,v])=>v.args.action==="insightAnalysisPrepare")?.[1].args).toMatchObject({mode:"status",task:{kind:"task",sourceId:"t1"},expectedRevision:2});expect(openWork).toHaveBeenCalledWith({workId:"work-a"});expect(invoke.mock.calls.some(([,v])=>["run","respond","resume","updateTask"].includes(v.args.action))).toBe(false);
+});
+
+it("hides old picker candidates when a registry refresh revokes their access, keeping navigation usable",async()=>{await mount();await click("选择已有成果");expect(document.querySelector('.insights-candidate')).not.toBeNull();const normal=invoke.getMockImplementation()!;invoke.mockImplementation(async(c,v)=>v.args.action==="insightCandidates"?{origin:store.items[0].snapshot!.origin,candidates:[],reason:"来源已撤回"}:normal(c,v));await act(async()=>listeners.get("library-registry-updated")?.({payload:{}}));expect(document.querySelector('dialog[aria-label="从已有成果保存发现"]')).not.toBeNull();expect(document.querySelector('.insights-candidate')).toBeNull();expect(document.querySelector<HTMLButtonElement>('dialog footer button.insights-primary')!.disabled).toBe(true);expect(document.body.textContent).toContain("来源已撤回");});
+
+it("searches stored Work titles and keeps paginated navigation across source refreshes",async()=>{
+ const normal=invoke.getMockImplementation()!;
+ invoke.mockImplementation(async(c,v)=>v.args.action==="list"?{works:[{id:v.args.before?"work-older":"work-a",goal:v.args.before?"早期事项":"当前事项",state:"completed"}],nextCursor:v.args.before?null:{id:"work-a"}}:normal(c,v));
+ await mount();await click("选择已有成果");await click("更多事项");
+ expect(document.querySelector<HTMLSelectElement>('[aria-label="成果事项"]')!.options.length).toBe(3);
+ await act(async()=>listeners.get("library-registry-updated")?.({payload:{}}));
+ expect(document.querySelector<HTMLSelectElement>('[aria-label="成果事项"]')!.options.length).toBe(3);
+ const input=document.querySelector<HTMLInputElement>('[aria-label="搜索成果事项"]')!;
+ await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(input,"LiveSync");input.dispatchEvent(new Event("input",{bubbles:true}));});
+ expect(invoke.mock.calls.some(([,v])=>v.args.action==="list"&&v.args.query==="LiveSync"&&!v.args.before)).toBe(true);
+ expect(document.querySelector<HTMLSelectElement>('[aria-label="成果事项"]')!.options.length).toBe(2);
+});
+
+it("hides candidate bodies during revalidation and restores confirmation only for identical evidence",async()=>{
+ await mount();await click("选择已有成果");
+ await act(async()=>document.querySelector<HTMLInputElement>('dialog input[name="insightCandidate"]')!.click());await act(async()=>dependencyConfirm().click());
+ const normal=invoke.getMockImplementation()!;let finish!:(v:unknown)=>void;
+ invoke.mockImplementation((c,v)=>v.args.action==="insightCandidates"?new Promise(resolve=>{finish=resolve;}):normal(c,v));
+ await act(async()=>listeners.get("library-registry-updated")?.({payload:{}}));
+ expect(document.querySelector('.insights-candidate')).toBeNull();expect(button("保存所选发现").disabled).toBe(true);
+ await act(async()=>finish({origin:store.items[0].snapshot!.origin,candidates:[{findingPointer:"/report/findings/0",text:"验证前先固定通过条件。",eligibility:"verifiedSources",sourceCitations:[source]}],contextOptions:[]}));
+ expect(document.querySelector<HTMLInputElement>('dialog input[name="insightCandidate"]')!.checked).toBe(true);expect(dependencyConfirm().checked).toBe(true);expect(button("保存所选发现").disabled).toBe(false);
+});
+
+it("renders native finding emphasis without exposing markdown markers or loading embedded media",async()=>{
+ store.items[0].snapshot!.text="**明确的标题。** 保留条件与原文。 ![远程图片](https://fixture.invalid/track.png)";
+ await mount();expect(host.querySelector('.insights-card h2')!.textContent).toBe("明确的标题。");
+ await click("查看发现");expect(document.querySelector('.insights-finding-text strong')!.textContent).toBe("明确的标题。");expect(document.querySelector('.insights-finding-text img')).toBeNull();expect(document.querySelector('.insights-finding-text')!.textContent).not.toContain("**");
+});
+
+it("preserves card menu identity during focus refresh while hiding stale evidence",async()=>{
+ vi.useFakeTimers();await mount();const menu=document.querySelector<HTMLDetailsElement>('.insights-card-menu')!;menu.open=true;
+ await act(async()=>window.dispatchEvent(new Event("focus")));
+ expect(document.querySelector('.insights-card-menu')).toBe(menu);expect(menu.open).toBe(true);expect(document.body.textContent).not.toContain("本周已完成原型验证。");expect(document.body.textContent).toContain("正在核对依据");
+ await act(async()=>vi.advanceTimersByTimeAsync(160));expect(document.querySelector('.insights-card-menu')).toBe(menu);expect(menu.open).toBe(true);
 });
