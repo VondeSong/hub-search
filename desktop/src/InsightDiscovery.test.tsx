@@ -68,6 +68,22 @@ it('formats Craft source with the shared reader while keeping exact text availab
  expect(invoke.mock.calls.some(([,v])=>v.args.action==='respond')).toBe(false);
 });
 
+it('keeps the original judgment visible when every new candidate needs rechecking',async()=>{
+ finished=true;prepares.push({targetInsightId:saved.id,previousText:saved.snapshot!.text});
+ const current=invoke.getMockImplementation()!;
+ invoke.mockImplementation(async(command,request)=>{
+  const result=await current(command,request);
+  if(request.args.action==='insightDiscoveryRead'&&result.results)result.results.candidates=[{...candidate,eligibility:'unavailable',reason:'资料内容已变化'}];
+  return result;
+ });
+ await act(async()=>root.render(<InsightDiscovery data={data} target={saved} onOpenWork={vi.fn()} onView={vi.fn()}/>));
+ await act(async()=>listeners.get('library-runtime-updated')?.());
+ expect(host.querySelector('.idd-original')?.textContent).toContain(saved.snapshot!.text);
+ expect(host.querySelector('.idd-compare-grid')).toBeNull();
+ expect(host.textContent).toContain('资料内容已变化');
+ expect(invoke.mock.calls.some(([,v])=>v.args.action==='respond')).toBe(false);
+});
+
 it('starts with three results and expands the remainder without another model run',async()=>{
  candidateCount=4;await mount();await act(async()=>host.querySelector<HTMLInputElement>('.agent-material-choice input')!.click());await click('开始发现');
  expect(host.querySelectorAll('.idd-finding')).toHaveLength(3);await click('再看 1 条发现');expect(host.querySelectorAll('.idd-finding')).toHaveLength(4);
