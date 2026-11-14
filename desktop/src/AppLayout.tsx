@@ -60,7 +60,7 @@ function AppLayoutContent({
     <AppEntry filtersOpen={filtersOpen} previewOpen={mobilePreviewOpen} style={style}>
       <div className="drag-strip" onMouseDown={startWindowDrag} />
       {mainContent ? <>{mobile && mobileHeader}<div className="main-content-override">{mainContent}</div><FooterStatus {...footerStatusProps} /></> : <>
-        {mobile ? <div className="mobile-top-area">{mobileHeader}{!workspaceProps.resultsPaneProps.collectionView && <div className="mobile-page-intro"><h1>搜索</h1><p>找回已索引的资料与任务。</p></div>}<SearchHeader {...headerProps} />{!workspaceProps.resultsPaneProps.collectionView && <MobileSearchControls filters={filterBarProps} onSelectLibraries={onSelectMobileLibraries} />}</div> : <SearchHeader {...headerProps} />}
+        {mobile ? <div className="mobile-top-area">{mobileHeader}{!workspaceProps.resultsPaneProps.collectionView && <div className="mobile-page-intro"><h1>搜索</h1><p>在资料、任务、阅读和闪卡中查找。</p></div>}<SearchHeader {...headerProps} />{!workspaceProps.resultsPaneProps.collectionView && <MobileSearchControls filters={filterBarProps} onSelectLibraries={onSelectMobileLibraries} />}</div> : <SearchHeader {...headerProps} />}
         {mobile ? <MobileFilterSheet open={filtersOpen} onClose={() => headerProps.setFiltersOpen(false)} draft>{filtersOpen && <MobileSearchFilterForm filters={filterBarProps} onSelectLibraries={onSelectMobileLibraries} onApply={() => headerProps.setFiltersOpen(false)} />}</MobileFilterSheet> : filtersOpen && <FilterBar {...filterBarProps} />}
         <Workspace {...workspaceProps} />
         <FooterStatus {...footerStatusProps} />

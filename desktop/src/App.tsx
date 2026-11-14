@@ -429,7 +429,7 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
     setSpaceMenuOpen(false);
   }, [isMobileLayout, openMobilePreview, previewPinned, pushPreviewHistory, rememberViewedResult, visibleResults]);
 
-  const [moduleTarget,setModuleTarget]=useState<{kind:"reading"|"flashcard";id:string;query:string}>();
+  const [moduleTarget,setModuleTarget]=useState<{kind:"reading"|"flashcard";id:string}>();
   const moduleOpenSequence=useRef(0);
   const clearModuleTarget=useCallback(()=>setModuleTarget(undefined),[]);
   const openResult = useResultOpener({
@@ -441,12 +441,12 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
     if(result?.provider==="hub"&&(result.contentType==="reading"||result.contentType==="flashcard")){
       const kind=result.contentType,id=result.documentId;
       void invoke<string>("module_search_document",{kind,id}).then(()=>{
-        if(moduleOpenSequence.current===ticket)setModuleTarget({kind,id,query});
+        if(moduleOpenSequence.current===ticket)setModuleTarget({kind,id});
       }).catch(e=>showOperationStatus(String(e),"error"));return;
     }
     if (result) rememberViewedResult(result);
     openResult(result, source);
-  }, [openResult, rememberViewedResult,query,showOperationStatus]);
+  }, [openResult, rememberViewedResult,showOperationStatus]);
 
   const {
     preview,
@@ -943,7 +943,6 @@ useEffect(() => {
       if(isMobileLayout){if(!openRouteFromPreview("collections"))pushMobileRoute("collections");}
       else selectDesktopSidebarView("collections");
     }else openStandaloneFlashcards();
-    setQuery(moduleTarget.query);
   },[moduleTarget,isMobileLayout,openRouteFromPreview,pushMobileRoute,selectDesktopSidebarView,openStandaloneFlashcards]);
 
   const openMobileCollection = useCallback((view: MobileBrowseView) => {

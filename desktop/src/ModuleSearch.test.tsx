@@ -9,9 +9,10 @@ import {asPageFavorite} from './PageFavorites';
 import {QuickSearchResultList} from './QuickSearchResultList';
 import {ResultList} from './ResultList';
 import {RecentResultList} from './RecentResultList';
+import {searchResultSummary} from './QuickSearchGrouping';
 const result=(kind:'reading'|'flashcard')=>normalizeResults([{id:kind+':item:version',entityKey:kind+':item',documentId:'item',spaceId:'@hub:'+kind,provider:'hub',contentType:kind,sourceType:kind,libraryName:kind==='reading'?'阅读':'闪卡',title:'Needle result',snippet:'Needle body',matchTerms:['Needle'],matchField:'body'}])[0];
 it('preserves the native module identity through page grouping and opens it without a source application',()=>{
- for(const kind of ['reading','flashcard'] as const){const item=result(kind);expect(item.provider).toBe('hub');expect(asPageFavorite(item)).toBe(item);expect(canOpenResultSource(item,[],'android')).toBe(true);expect(sourceTypeLabel(item)).toBe(kind==='reading'?'阅读':'闪卡');}
+ for(const kind of ['reading','flashcard'] as const){const item=result(kind);expect(item.provider).toBe('hub');expect(asPageFavorite(item)).toBe(item);expect(canOpenResultSource(item,[],'android')).toBe(true);expect(sourceTypeLabel(item)).toBe(kind==='reading'?'阅读':'闪卡');expect(searchResultSummary([item],'Needle')).toBe('1 项内容 · 1 段正文匹配');}
  expect(normalizeResults([{id:'forged',spaceId:'@hub:other',provider:'hub',contentType:'document'}])).toEqual([]);
 });
 it.each(['results','recent'])('withholds source-page actions in the %s list too',async(kind)=>{
