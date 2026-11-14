@@ -433,6 +433,129 @@ async fn network_receive_budget_stops_chunked_success_and_error_bodies() {
 }
 
 #[tokio::test]
+async fn network_craft_interrupted_reads_recover_without_replaying_creates() {
+    for mode in ["read", "tool-read", "create"] {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let seen = calls.clone();
+        let server = Server::new(move |request| {
+            let payload: Value = serde_json::from_slice(&request.body).unwrap();
+            assert_eq!(
+                payload["params"]["name"],
+                if mode == "create" {
+                    "craft_write"
+                } else {
+                    "craft_read"
+                }
+            );
+            let mut reply = Reply::new(200, json!({"jsonrpc":"2.0","id":payload["id"],"result":{"content":[{"type":"text","text":"complete source"}]}}).to_string());
+            if seen.fetch_add(1, Ordering::SeqCst) == 0 {
+                reply.cut = Some(8);
+            }
+            reply
+        });
+        let session = McpSession {
+            space_id: "body-recovery".into(),
+            space_name: "Fixture".into(),
+            endpoint: server.url.to_string(),
+            access_token: "local-test-token".into(),
+            session_id: None,
+            protocol_version: "2025-03-26".into(),
+            deep_link_template: None,
+            rate_limiter: Arc::new(CraftRateLimiter::default()),
+        };
+        let result = if mode == "read" {
+            call_craft_read_raw(&Server::client(), &session, "blocks get --id fixture", 1).await
+        } else {
+            call_craft_tool_raw(&Server::client(), &session,
+                if mode == "create" { "craft_write" } else { "craft_read" },
+                json!({"command":if mode == "create" { "blocks insert --parent fixture --markdown body" } else { "blocks get --id fixture" }}), 1).await
+        };
+        if mode == "create" {
+            assert_eq!(result.unwrap_err(), "响应读取中断");
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+        } else {
+            assert_eq!(tool_result_text(&result.unwrap()), "complete source");
+            assert_eq!(calls.load(Ordering::SeqCst), 2);
+        }
+    }
+}
+
+#[tokio::test]
+async fn network_craft_body_recovery_is_bounded_and_respects_http_status() {
+    for status in [200, 403] {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let seen = calls.clone();
+        let server = Server::new(move |_| {
+            seen.fetch_add(1, Ordering::SeqCst);
+            let mut reply = Reply::new(status, "响应读取中断 timeout");
+            if status == 200 {
+                reply.cut = Some(8);
+            }
+            reply
+        });
+        let session = McpSession {
+            space_id: "bounded-body-recovery".into(),
+            space_name: "Fixture".into(),
+            endpoint: server.url.to_string(),
+            access_token: "local-test-token".into(),
+            session_id: None,
+            protocol_version: "2025-03-26".into(),
+            deep_link_template: None,
+            rate_limiter: Arc::new(CraftRateLimiter::default()),
+        };
+        let error = call_craft_read_raw(&Server::client(), &session, "blocks get --id fixture", 1)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            if status == 200 {
+                CRAFT_REQUEST_MAX_ATTEMPTS as usize
+            } else {
+                1
+            }
+        );
+        assert_eq!(craft_transport_error_is_transient(&error), status == 200);
+    }
+    assert!(!craft_transport_error_is_transient("响应超过接收上限"));
+}
+
+#[tokio::test]
+async fn network_craft_body_timeout_keeps_its_safe_error_category() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!(
+        "http://{}/private?token=must-not-appear",
+        listener.local_addr().unwrap()
+    );
+    let server = std::thread::spawn(move || {
+        let (mut socket, _) = listener.accept().unwrap();
+        socket
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        let mut input = [0u8; 8192];
+        socket.read(&mut input).unwrap();
+        socket
+            .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 1000000\r\nConnection: close\r\n\r\nx")
+            .unwrap();
+        let _ = socket.read(&mut input);
+    });
+    let client = reqwest::Client::builder()
+        .no_proxy()
+        .timeout(Duration::from_millis(250))
+        .build()
+        .unwrap();
+    let response = client.get(url).send().await.unwrap();
+    let error = http_body::text(response, http_body::MCP_BYTES)
+        .await
+        .unwrap_err();
+    assert_eq!(error, "响应读取超时");
+    assert!(craft_transport_error_is_transient(&error));
+    assert!(!error.contains("token"));
+    tokio::task::spawn_blocking(move || server.join().unwrap())
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
 async fn network_dida_unconfirmed_upload_survives_list_move_without_new_post() {
     let f = Fixture::new(PROVIDER_DIDA365);
     let counts = Arc::new(Mutex::new((0, 0)));
