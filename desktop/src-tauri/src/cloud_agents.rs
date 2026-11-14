@@ -8,6 +8,7 @@ use tauri::AppHandle;
 
 const CREDENTIAL: &str = "hub-cloud-agents-v1";
 const MAX_RESPONSE: usize = 28 * 1024 * 1024;
+mod materials;
 
 #[derive(Deserialize, Serialize)]
 struct Config {
@@ -18,6 +19,19 @@ struct Config {
 #[derive(Deserialize)]
 #[serde(tag = "op", rename_all = "camelCase")]
 pub(crate) enum Action {
+    Materials {
+        kind: String,
+        query: String,
+        offset: u32,
+    },
+    Material {
+        selection: Value,
+    },
+    AnswerNote {
+        thread: String,
+        turn: String,
+        date: String,
+    },
     Config,
     SkillVersions,
     PrepareSkill {
@@ -172,6 +186,14 @@ pub(crate) async fn cloud_agents(app: AppHandle, action: Action) -> Result<Value
             .transpose()
     };
     match action {
+        Action::Materials {
+            kind,
+            query,
+            offset,
+        } => materials::list(&crate::active_data_root(&app)?, &kind, &query, offset),
+        Action::Material { selection } => {
+            materials::prepare(&crate::active_data_root(&app)?, selection)
+        }
         Action::Config => Ok(current()?.as_ref().map(config_view).unwrap_or(Value::Null)),
         Action::SkillVersions => {
             crate::agent_work::skills::cloud_skill_versions(&crate::active_data_root(&app)?)
@@ -211,6 +233,12 @@ pub(crate) async fn cloud_agents(app: AppHandle, action: Action) -> Result<Value
         action => {
             let config = current()?.ok_or("请先连接 VPS。")?;
             let (method, path, body, image) = match action {
+                Action::AnswerNote { thread, turn, date } => (
+                    Method::POST,
+                    format!("/v1/threads/{}/turns/{}/note", id(&thread)?, id(&turn)?),
+                    Some(json!({"date":date})),
+                    false,
+                ),
                 Action::List { query } => {
                     if query.chars().count() > 200 {
                         return Err("搜索内容最多 200 个字符。".into());
@@ -256,6 +284,15 @@ pub(crate) async fn cloud_agents(app: AppHandle, action: Action) -> Result<Value
                     turn,
                     message,
                 } => {
+                    if message.get("material").is_some() {
+                        let capabilities =
+                            request(&config, Method::GET, "/v1/threads", None, false).await?;
+                        if capabilities["materials"] != true {
+                            return Err(
+                                "当前 VPS 尚不支持资料快照，请更新服务后重试；正文未发送。".into(),
+                            );
+                        }
+                    }
                     if message.get("skill").is_some() {
                         let capabilities =
                             request(&config, Method::GET, "/v1/threads", None, false).await?;

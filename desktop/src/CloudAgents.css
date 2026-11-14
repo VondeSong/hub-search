@@ -1,4 +1,5 @@
 .cloud-agents {
+  position: relative;
   --cloud-text: #182138;
   --cloud-muted: #56627b;
   --cloud-line: #dce4f1;
@@ -113,3 +114,10 @@ html[data-runtime-platform="android"] .app-shell.mobile-app-shell .main-content-
 @media (prefers-reduced-transparency: reduce) {
   .cloud-agents-header, .cloud-agents-compose { backdrop-filter: none; background: #f9fbff; }
 }
+.cloud-agents-dialog { position: absolute; inset: 0; z-index: 10; display: flex; flex-direction: column; gap: 12px; overflow: auto; padding: 18px; background: var(--cloud-control); color: var(--cloud-text); }
+.cloud-agents-dialog header,.cloud-agents-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex: none; }
+.cloud-agents-dialog h2 { margin: 0; font-size: 1.15rem; }
+.cloud-agents-dialog pre,.cloud-agents-compose pre,.cloud-agents-user pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.65; max-height: 42vh; overflow-y: auto; background: var(--cloud-control); color: var(--cloud-text); border: 1px solid var(--cloud-line); border-radius: 12px; padding: 12px; }
+.cloud-material-results { display: flex; flex-direction: column; gap: 8px; }
+.cloud-material-results button { flex-direction: column; align-items: stretch; text-align: left; overflow-wrap: anywhere; }
+.cloud-material-results small,.cloud-material-results span { color: var(--cloud-muted); font-size: .86rem; line-height: 1.5; }

@@ -3,9 +3,9 @@
   "site": "mobile",
   "project_id": "appgprj_6af1d2dc12308191acc37e5566699c2d",
   "site_url": "https://hub-mobile-lab-von11.song02211368537057.chatgpt.site",
-  "source_commit": "a95ddbf525c6a4d5c9ac7e0d99bbdde20b7afd70",
-  "published_version": 8,
-  "deployment_id": "appgdep_6af726097e108191b5e883553df91110",
+  "source_commit": "5832222529b286a0db53f1ab03e2984cf080d4e4",
+  "published_version": 10,
+  "deployment_id": "appgdep_6af8928a638c81919956c357e111ea8c",
   "files": {
     ".openai/hosting.json": {
       "sha256": "543a776095c0181cc870f784c075ab4f263fb739e3649cd8db74f493fb5b4ca3",
@@ -28,9 +28,9 @@
       "bytes": 11653
     },
     "checks/agents-enhancements-checks.cjs": {
-      "sha256": "5b16c980f0559db1edf100b56298153d844492b32aaaff8bdfc32a251c589523",
+      "sha256": "163158e85484b74bb6b0798565cd71cfed692ada30485369eaa9dbf7afbd02d5",
       "mode": "100644",
-      "bytes": 15254
+      "bytes": 15424
     },
     "checks/mobile-checks.cjs": {
       "sha256": "d2749a71e062fc22565011d2fad0b776507c3316e06df713a1e56d323778675c",
@@ -58,14 +58,14 @@
       "bytes": 29678
     },
     "dist/agents-ui.js": {
-      "sha256": "d6072181db1c24bb0e4145ca73cd7030401564d38fa1248d9cd1c82967059795",
+      "sha256": "e2e546ee641b8bf61d422b6dc23978bcfacc5f07a069d87ccace29cb614605b4",
       "mode": "100644",
-      "bytes": 63498
+      "bytes": 64903
     },
     "dist/agents.css": {
-      "sha256": "af82735d03f261750305443bc405377da7b4168e1d0d73a3c76e9f472c250efe",
+      "sha256": "42a0a1f6d4884906add3ac2d6238567456410c9865ccdbca29ea276ba9cca675",
       "mode": "100644",
-      "bytes": 32310
+      "bytes": 32526
     },
     "dist/app.js": {
       "sha256": "d0d2e0c143665b19a60650fdacca1f3648df77a78f28247be38a4d9ad496fbd3",
@@ -153,5 +153,5 @@
       "bytes": 6022
     }
   },
-  "imported_at": "2026-11-13T15:00:59.522735+00:00"
+  "imported_at": "2026-11-14T16:56:12.589544+00:00"
 }
