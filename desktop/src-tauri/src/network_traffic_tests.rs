@@ -3,6 +3,51 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 
+#[tokio::test]
+async fn feishu_media_uses_remote_resource_token_contract() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let seen = calls.clone();
+    let png = vec![137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0];
+    let encoded = STANDARD.encode(&png);
+    let server = Server::new(move |request| {
+        assert!(request
+            .headers
+            .to_ascii_lowercase()
+            .contains("x-lark-mcp-uat: local-test-token"));
+        assert!(request
+            .headers
+            .to_ascii_lowercase()
+            .contains("x-lark-mcp-allowed-tools: get-user,list-docs,fetch-doc,fetch-file"));
+        let body: Value = serde_json::from_slice(&request.body).unwrap();
+        assert_eq!(body["method"], "tools/call");
+        assert_eq!(body["params"]["name"], "fetch-file");
+        assert_eq!(
+            body["params"]["arguments"],
+            json!({"resource_token":"image_123"})
+        );
+        seen.fetch_add(1, Ordering::SeqCst);
+        let mut reply = Reply::new(200, json!({"jsonrpc":"2.0","id":body["id"],"result":{"content":[{"type":"image","mimeType":"image/png","data":encoded}]}}).to_string());
+        reply.headers = "Content-Type: application/json\r\n".into();
+        reply
+    });
+    let session = McpSession {
+        space_id: "media-test".into(),
+        space_name: "media-test".into(),
+        endpoint: server.url.to_string(),
+        access_token: "local-test-token".into(),
+        session_id: None,
+        protocol_version: "2025-03-26".into(),
+        deep_link_template: None,
+        rate_limiter: Arc::new(CraftRateLimiter::default()),
+    };
+    let client = reqwest::Client::builder().no_proxy().build().unwrap();
+    let payload = fetch_feishu_media(&client, &session, "image_123")
+        .await
+        .unwrap();
+    assert_eq!(payload, (png, "image/png".into()));
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+}
+
 pub(crate) struct Request {
     pub method: String,
     pub path: String,

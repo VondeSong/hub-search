@@ -1833,12 +1833,13 @@ async fn mcp_post(
 
 async fn feishu_mcp_post(
     client: &reqwest::Client,
+    endpoint: &str,
     access_token: &str,
     session_id: Option<&str>,
     payload: &Value,
 ) -> Result<(Value, Option<String>), String> {
     let mut request = client
-        .post(FEISHU_MCP_URL)
+        .post(endpoint)
         .header("X-Lark-MCP-UAT", access_token)
         .header("X-Lark-MCP-Allowed-Tools", FEISHU_ALLOWED_TOOLS)
         .header("Accept", "application/json, text/event-stream")
@@ -1886,6 +1887,7 @@ async fn initialize_feishu_transport(
 ) -> Result<AuthenticatedConnection, String> {
     let (initialized, session_id) = feishu_mcp_post(
         client,
+        FEISHU_MCP_URL,
         &access_token,
         None,
         &json!({
@@ -1902,6 +1904,7 @@ async fn initialize_feishu_transport(
     .await?;
     let (tool_list, _) = feishu_mcp_post(
         client,
+        FEISHU_MCP_URL,
         &access_token,
         session_id.as_deref(),
         &json!({"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}),
@@ -1960,6 +1963,7 @@ async fn call_feishu_tool_raw(
     }
     let (body, _) = feishu_mcp_post(
         client,
+        &session.endpoint,
         &session.access_token,
         session.session_id.as_deref(),
         &json!({
@@ -31996,6 +32000,7 @@ async fn fetch_feishu_media(
     token: &str,
 ) -> Result<(Vec<u8>, String), String> {
     let variants = [
+        json!({ "resource_token": token }),
         json!({ "fileToken": token }),
         json!({ "file_token": token }),
         json!({ "token": token }),
@@ -33285,7 +33290,7 @@ async fn connect_feishu(
         }))
         .send()
         .await
-        .map_err(|error| format!("飞书 OAuth Token 请求失败：{error}"))?
+        .map_err(|error| format!("飞书 OAuth Token 请求失败：{}", reqwest_error_chain(&error)))?
         .error_for_status()
         .map_err(|error| format!("飞书 OAuth Token 请求被拒绝：{error}"))?
         .json::<Value>()
