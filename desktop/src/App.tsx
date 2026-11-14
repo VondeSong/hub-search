@@ -74,8 +74,8 @@ import { useLibraryManagement } from "./LibraryManagement";
 import { useExternalLinkOpener } from "./useExternalLinkOpener";
 import { usePreviewController } from "./usePreviewController";
 import { useResultOpener } from "./useResultOpener";
-import { browseSubpage, canBrowseLibrary, LibraryBrowse, type LibraryPosition } from "./LibraryBrowse";
-import { DesktopWorkspace } from "./Workspace";
+import { browseSubpage, canBrowseLibrary, LibraryBrowse, useLibraryBrowseNavigation } from "./LibraryBrowse";
+import { PreviewPane } from "./PreviewPane";
 import { journalDataVersion, useJournalData } from "./useJournalData";
 const LazyPreviewRenderer = lazy(() => import("./PreviewRenderer").then((module) => ({ default: module.PreviewRenderer })));
 const LazyMobileQuickCapture = lazy(() => import("./MobileQuickCapture").then(m => ({ default: m.MobileQuickCapture })));
@@ -156,8 +156,7 @@ function AppContent() {
   const isMobileLayout = runtimeCapabilities.mobile;
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [desktopSidebarView, setDesktopSidebarView] = useState<DesktopSidebarView>("home");
-  const [libraryPosition, setLibraryPosition] = useState<LibraryPosition>();
-  const [libraryPreview, setLibraryPreview] = useState<SearchResult>();
+  const { position: libraryPosition, setPosition: setLibraryPosition, preview: libraryPreview, setPreview: setLibraryPreview } = useLibraryBrowseNavigation();
   const [mobileBrowseOpen, setMobileBrowseOpen] = useState(false);
   const [mobileAgentsOpen, setMobileAgentsOpen] = useState(false);
   const [mobileConnectionsOpen, setMobileConnectionsOpen] = useState(false);
@@ -1277,14 +1276,17 @@ useEffect(() => {
       onOpenSettings={() => setShowConnection(true)}
       onOpenSyncHealth={() => pushMobileRoute("connections")}
       syncNeedsAttention={Boolean(indexStatus?.failedJobs)}
-    /> : librariesActive ? <DesktopWorkspace {...workspaceProps} resultsContent={<LibraryBrowse
+    /> : librariesActive ? <LibraryBrowse
       libraries={browseLibraries}
+      favorites={favoriteResults}
       position={libraryPosition}
       onPosition={setLibraryPosition}
       selected={browsingPreview}
       onPreview={previewLibraryResult}
       onClosePreview={() => setLibraryPreview(undefined)}
-    />} /> : insightsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开洞察…</div>}><LazyInsightsWorkspace/></Suspense> : collectionsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开阅读…</div>}><LazyCollectionsWorkspace
+      onExit={() => selectDesktopSidebarView("home")}
+      preview={browsingPreview && <PreviewPane {...workspaceProps.previewPaneProps} label="文档预览" onClose={() => setLibraryPreview(undefined)} />}
+    /> : insightsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开洞察…</div>}><LazyInsightsWorkspace/></Suspense> : collectionsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开阅读…</div>}><LazyCollectionsWorkspace
       onToggleDesktopSidebar={!isMobileLayout ? () => changeDesktopSidebarSetting(!desktopSidebarEnabled) : undefined}
     /></Suspense> : tasksActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开任务…</div>}><LazyTaskWorkspace
       libraries={spaces}

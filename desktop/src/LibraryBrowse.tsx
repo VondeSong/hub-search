@@ -1,9 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
-import { ChevronDown, ChevronRight, FileText, Folder, RotateCw, Search, X } from "lucide-react";
-import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
+import { ArrowLeft, ArrowUp, BookOpen, ChevronDown, ChevronRight, Columns3, FileText, Folder, FolderTree, Layers, PanelLeft, RotateCw, Search, Star, X } from "lucide-react";
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { LibraryIcon } from "./LibraryIcon";
 import { providerName } from "./ProviderLabels";
 import { normalizeResults } from "./SearchResultNormalization";
 import type { LibrarySummary, SearchResult } from "./SearchTypes";
+import { WorkspaceHeaderContext } from "./WorkspaceChrome";
 import "./LibraryBrowse.css";
 
 export function canBrowseLibrary(provider: LibrarySummary["provider"]) {
@@ -25,6 +27,12 @@ type DocumentNode = { id: string; title: string; path: string; folderId?: string
 type LibraryContents = { folders: FolderNode[]; documents: DocumentNode[]; craftLocationsSynced: boolean };
 
 export type LibraryPosition = { libraryId: string; folderId: string; documentId?: string };
+
+export function useLibraryBrowseNavigation() {
+  const [position, setPosition] = useState<LibraryPosition>();
+  const [preview, setPreview] = useState<SearchResult>();
+  return { position, setPosition, preview, setPreview };
+}
 
 export function groupBrowseContents({ folders, documents }: LibraryContents) {
   const nodes = new Map(folders.map(folder => [folder.id, folder]));
@@ -56,6 +64,11 @@ export function groupBrowseContents({ folders, documents }: LibraryContents) {
 }
 
 type BrowseTree = ReturnType<typeof groupBrowseContents>;
+type LoadedLibrary = { version: string; contents?: LibraryContents; tree?: BrowseTree; error?: string };
+
+function libraryVersion(library: LibrarySummary, revision: number) {
+  return JSON.stringify([library.lastSync, library.documentCount, revision]);
+}
 
 export function browseTrail(tree: BrowseTree, folderId: string) {
   const trail: FolderNode[] = [];
@@ -92,177 +105,356 @@ function rootResult(library: LibrarySummary, document: DocumentNode): SearchResu
   };
 }
 
-export function LibraryBrowse({ libraries, position, onPosition, selected, onPreview, onClosePreview }: {
+export function LibraryBrowse({
+  libraries, favorites = [], position, onPosition, selected, onPreview, onClosePreview, onExit, preview,
+}: {
   libraries: LibrarySummary[];
+  favorites?: SearchResult[];
   position?: LibraryPosition;
   onPosition: (position: LibraryPosition) => void;
   selected?: SearchResult;
   onPreview: (result: SearchResult) => void;
   onClosePreview: () => void;
+  onExit?: () => void;
+  preview?: ReactNode;
 }) {
-  const library = libraries.find(item => item.id === position?.libraryId) ?? libraries[0];
-  const [cached, setCached] = useState<{ id: string; value: LibraryContents }>();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [revision, setRevision] = useState(0);
+  const header = useContext(WorkspaceHeaderContext);
+  const library = libraries.find(item => item.id === position?.libraryId);
+  const [cache, setCache] = useState<Record<string, LoadedLibrary>>({});
+  const requested = useRef(new Map<string, string>());
+  const [revision, refresh] = useState(0);
   const [expansion, setExpansion] = useState<Record<string, boolean>>({});
+  const [openRoots, setOpenRoots] = useState<Record<string, boolean>>({});
+  const [navigationOpen, setNavigationOpen] = useState(true);
+  const [mode, setMode] = useState<"tree" | "columns">("tree");
+  const [showFavorites, setShowFavorites] = useState(false);
+  const [folderQuery, setFolderQuery] = useState("");
   const [input, setInput] = useState("");
-  const [search, setSearch] = useState<{ query: string; folders: string[] | null; context: string }>();
-  const [hits, setHits] = useState<{ request: typeof search; results?: SearchResult[]; error?: string }>();
-  const [includeDescendants, setIncludeDescendants] = useState(true);
-  const [limit, setLimit] = useState(100);
-  const libraryId = library?.id;
-  const lastSync = library?.lastSync;
-  const documentCount = library?.documentCount;
-  useEffect(() => {
-    if (!libraryId) return;
-    let current = true;
-    setLoading(true);
-    setError("");
-    void invoke<LibraryContents>("library_contents", { libraryId }).then(value => {
-      if (current) setCached({ id: libraryId, value });
-    }).catch(reason => {
-      if (current) setError(String(reason));
-    }).finally(() => {
-      if (current) setLoading(false);
-    });
-    return () => { current = false; };
-  }, [libraryId, lastSync, documentCount, revision]);
+  const [query, setQuery] = useState("");
+  const [scope, setScope] = useState<"library" | "subtree" | "folder">("subtree");
+  const [hits, setHits] = useState<{ request: object; results?: SearchResult[]; error?: string }>();
+  const [limits, setLimits] = useState<Record<string, number>>({});
+  const columnStrip = useRef<HTMLDivElement>(null);
+  const currentFolders = useRef<Record<string, string>>({});
+  const libraryIds = useMemo(() => libraries.map(item => item.id), [libraries]);
+  const directoryQuery = folderQuery.trim().toLocaleLowerCase();
 
-  const contents = cached?.id === libraryId ? cached?.value : undefined;
-  const tree = useMemo(() => contents ? groupBrowseContents(contents) : undefined, [contents]);
+  useEffect(() => {
+    for (const item of libraries) {
+      const needed = item.id === library?.id || Boolean(directoryQuery && !library) || (!library && openRoots[item.id]);
+      if (!needed) continue;
+      const version = libraryVersion(item, revision);
+      if (requested.current.get(item.id) === version) continue;
+      requested.current.set(item.id, version);
+      void invoke<LibraryContents>("library_contents", { libraryId: item.id }).then(contents => {
+        if (requested.current.get(item.id) === version) {
+          setCache(current => ({ ...current, [item.id]: { version, contents, tree: groupBrowseContents(contents) } }));
+        }
+      }).catch(reason => {
+        if (requested.current.get(item.id) === version) {
+          setCache(current => ({ ...current, [item.id]: { ...current[item.id], version, error: String(reason) } }));
+        }
+      });
+    }
+  }, [libraries, library?.id, directoryQuery, openRoots, revision]);
+
+  const loaded = library ? cache[library.id] : undefined;
+  const tree = loaded?.tree;
   const locatedFolder = position?.documentId ? tree?.documentFolders.get(position.documentId) : undefined;
-  const requestedFolder = position?.libraryId === libraryId ? locatedFolder ?? position?.folderId ?? "" : "";
-  const folderId = requestedFolder && tree?.nodes.has(requestedFolder) ? requestedFolder : "";
-  const trail = tree ? browseTrail(tree, folderId) : [];
+  const requestedFolder = library ? locatedFolder ?? position?.folderId ?? "" : "";
+  const folderId = tree?.nodes.has(requestedFolder) ? requestedFolder : "";
+  const trail = useMemo(() => tree ? browseTrail(tree, folderId) : [], [tree, folderId]);
   const activePath = new Set(trail.map(folder => folder.id));
-  const context = JSON.stringify([libraryId, folderId]);
-  const activeSearch = search?.context === context ? search : undefined;
-  const matching = activeSearch && hits?.request === activeSearch ? hits : undefined;
-
-  useEffect(() => {
-    if (!activeSearch || !libraryId) return;
-    let current = true;
-    void invoke<unknown>("local_search", {
-      query: activeSearch.query,
-      spaceIds: [libraryId],
-      folderIds: activeSearch.folders,
+  const locationName = trail[trail.length - 1]?.name ?? library?.name ?? "全部库";
+  const activeVersion = library ? libraryVersion(library, revision) : "";
+  const searchRequest = useMemo(() => {
+    if (!query || !libraryIds.length || (library && !tree && scope !== "library")) return undefined;
+    return {
+      query,
+      spaceIds: library ? [library.id] : libraryIds,
+      folderIds: tree && scope !== "library" ? browseFolderScope(tree, folderId, scope === "subtree") : null,
       includeDidaTasks: false,
       limit: 100,
-    }).then(value => {
-      if (current) setHits({ request: activeSearch, results: normalizeResults(value) });
+    };
+  }, [query, library?.id, libraryIds, tree, folderId, scope]);
+  const matching = hits?.request === searchRequest ? hits : undefined;
+  const libraryFavorites = favorites.filter(result => libraryIds.includes(result.libraryId) && (!library || library.id === result.libraryId));
+  const inColumns = mode === "columns" && !query && !showFavorites;
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setQuery(input.trim()), 220);
+    return () => window.clearTimeout(timer);
+  }, [input]);
+
+  useEffect(() => {
+    if (!searchRequest) return;
+    let current = true;
+    void invoke<unknown>("local_search", searchRequest).then(value => {
+      if (current) setHits({ request: searchRequest, results: normalizeResults(value) });
     }).catch(reason => {
-      if (current) setHits({ request: activeSearch, error: String(reason) });
+      if (current) setHits({ request: searchRequest, error: String(reason) });
     });
     return () => { current = false; };
-  }, [activeSearch, libraryId]);
+  }, [searchRequest]);
 
-  if (!library) return <div className="library-browser-empty"><h1>资料库</h1><p>在设置中连接 Craft 或添加 Obsidian 库，即可按目录浏览。</p></div>;
-  const move = (nextLibrary: string, nextFolder: string, keepPreview = false) => {
-    onPosition({ libraryId: nextLibrary, folderId: nextFolder });
-    setSearch(undefined);
+  useLayoutEffect(() => {
+    const strip = columnStrip.current;
+    if (strip && inColumns) strip.scrollLeft = strip.scrollWidth;
+  }, [inColumns, library?.id, folderId, trail.length, Boolean(preview)]);
+
+  useEffect(() => {
+    if (library && tree) currentFolders.current[library.id] = folderId;
+  }, [library?.id, tree, folderId]);
+
+  const clearSearch = () => {
     setInput("");
-    setLimit(100);
+    setQuery("");
+  };
+  const move = (libraryId: string, folder: string, keepPreview = false, documentId?: string) => {
+    const destination = cache[libraryId]?.tree;
+    if (destination && folder) {
+      setExpansion(current => {
+        const next = { ...current };
+        for (const node of browseTrail(destination, folder)) next[JSON.stringify([libraryId, node.id])] = true;
+        return next;
+      });
+    }
+    onPosition({ libraryId, folderId: folder, documentId });
+    setShowFavorites(false);
+    clearSearch();
+    if (libraryId !== library?.id) setFolderQuery("");
     if (!keepPreview) onClosePreview();
   };
+  const switchLibrary = (libraryId: string) => move(libraryId, currentFolders.current[libraryId] ?? "");
   const locate = (result: SearchResult) => {
-    const folder = tree?.documentFolders.get(result.documentId);
-    if (folder === undefined) return;
-    move(library.id, folder, true);
+    const actualFolder = cache[result.libraryId]?.tree?.documentFolders.get(result.documentId);
+    move(result.libraryId, actualFolder ?? result.folderId ?? "", true, result.documentId);
     onPreview(result);
   };
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    const query = input.trim();
-    setSearch(query && tree ? { query, folders: browseFolderScope(tree, folderId, includeDescendants), context } : undefined);
-  };
-  function folderTree(parent: string, depth: number, visited = new Set<string>()) {
-    return tree?.children.get(parent)?.map(folder => {
+  const up = () => library && move(trail.length ? library.id : "", trail[trail.length - 2]?.id ?? "");
+
+  function folderTree(item: LibrarySummary, itemTree: BrowseTree, parent: string, depth: number, visited = new Set<string>()) {
+    return itemTree.children.get(parent)?.map(folder => {
       if (visited.has(folder.id)) return null;
-      const children = tree?.children.get(folder.id);
-      const key = JSON.stringify([libraryId, folder.id]);
-      const expanded = activePath.has(folder.id) || expansion[key] === true;
+      const hasChildren = Boolean(itemTree.children.get(folder.id)?.length);
+      const key = JSON.stringify([item.id, folder.id]);
+      const onPath = item.id === library?.id && activePath.has(folder.id);
+      const expanded = (onPath && Boolean(position?.documentId)) || (expansion[key] ?? onPath);
       return <li key={folder.id}>
         <div className="library-browser-tree-row" style={{ "--folder-depth": Math.min(depth, 8) } as CSSProperties}>
-          {children?.length ? <button type="button" className="library-browser-disclosure" aria-label={`${expanded ? "折叠" : "展开"} ${folder.name}`} aria-expanded={expanded}
-            onClick={() => {
-              if (expanded && activePath.has(folder.id)) move(library.id, folder.parentId ?? "");
-              setExpansion(current => ({ ...current, [key]: !expanded }));
-            }}>{expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</button> : <span className="library-browser-disclosure" />}
-          <button className="library-browser-node" aria-current={folderId === folder.id ? "location" : undefined} title={folder.name}
-            onClick={() => { move(library.id, folder.id); setExpansion(current => ({ ...current, [key]: true })); }}>
+          {hasChildren ? <button type="button" className="library-browser-disclosure" aria-label={`${expanded ? "折叠" : "展开"} ${folder.name}`} aria-expanded={expanded}
+            onClick={() => setExpansion(current => ({ ...current, [key]: !expanded }))}>
+            {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          </button> : <span className="library-browser-disclosure" />}
+          <button className="library-browser-row" aria-current={onPath && folderId === folder.id && !showFavorites ? "location" : undefined}
+            title={folder.name} onClick={() => {
+              move(item.id, folder.id);
+            }}>
             <Folder size={15} /><span>{folder.name}</span>
           </button>
         </div>
-        {expanded && !!children?.length && <ul>{folderTree(folder.id, depth + 1, new Set([...visited, folder.id]))}</ul>}
+        {expanded && hasChildren && <ul>{folderTree(item, itemTree, folder.id, depth + 1, new Set([...visited, folder.id]))}</ul>}
       </li>;
     });
   }
-  const folders = tree?.children.get(folderId) ?? [];
-  const documents = [...(tree?.pages.get(folderId) ?? []), ...(!folderId ? tree?.unresolved ?? [] : [])];
-  const selectedId = selected?.libraryId === library.id ? selected.documentId : undefined;
-  const documentsToRender = selectedId && !documents.slice(0, limit).some(document => document.id === selectedId)
-    ? documents.filter((document, index) => index < limit || document.id === selectedId)
-    : documents.slice(0, limit);
+
+  const directoryMatches = directoryQuery ? (library ? [library] : libraries).flatMap(item => {
+    const itemTree = cache[item.id]?.tree;
+    if (!itemTree) return [];
+    return Array.from(itemTree.nodes.values()).flatMap(folder => {
+      const path = browseTrail(itemTree, folder.id).map(node => node.name).join(" / ");
+      const qualifiedPath = `${item.name} / ${path}`;
+      return qualifiedPath.toLocaleLowerCase().includes(directoryQuery) ? [{ item, folder, path: qualifiedPath }] : [];
+    });
+  }) : [];
+  const directorySources = library ? [library] : libraries;
+  const directoryLoading = directorySources.some(item => cache[item.id]?.version !== libraryVersion(item, revision));
+  const directoryFailed = directorySources.some(item => Boolean(cache[item.id]?.error));
+
+  function libraryRows() {
+    return libraries.map(item => <button className="library-browser-row" key={item.id}
+      aria-current={item.id === library?.id ? "location" : undefined} onClick={() => switchLibrary(item.id)}>
+      <LibraryIcon {...item} compact /><span>{item.name}<small>{providerName(item.provider)} · {item.documentCount ?? 0} 篇文档</small></span><ChevronRight size={14} />
+    </button>);
+  }
+
+  function folderRows(parent: string, nextFolder?: string) {
+    if (!tree || !library) return null;
+    const folders = tree.children.get(parent) ?? [];
+    const documents = [...(tree.pages.get(parent) ?? []), ...(!parent ? tree.unresolved : [])];
+    const key = JSON.stringify([library.id, parent]);
+    const limit = limits[key] ?? 100;
+    return <>
+      {folders.map(folder => <button className="library-browser-row" key={folder.id} title={folder.name}
+        aria-current={folder.id === nextFolder ? "location" : undefined} onClick={() => move(library.id, folder.id)}>
+        <Folder size={17} /><span>{folder.name}</span><ChevronRight size={14} />
+      </button>)}
+      {documents.filter((document, index) => index < limit || (selected?.libraryId === library.id && selected.documentId === document.id)).map(document =>
+        <button className="library-browser-row" key={document.id} title={document.path}
+          aria-current={selected?.libraryId === library.id && selected.documentId === document.id ? "true" : undefined}
+          onClick={() => onPreview(rootResult(library, document))}>
+          <FileText size={17} /><span>{document.title}<small>{document.folderId && !tree.nodes.has(document.folderId) ? "目录位置未知" : document.path}</small></span>
+        </button>)}
+      {documents.length > limit && <button className="library-browser-text-button" onClick={() => setLimits(current => ({ ...current, [key]: limit + 100 }))}>显示更多文档</button>}
+      {!folders.length && !documents.length && <p className="library-browser-hint" role="status">此目录暂时没有可浏览的内容。</p>}
+    </>;
+  }
+
+  const resultRows = (results: SearchResult[]) => results.map(result => <div className="library-browser-result" key={result.entityKey}>
+    <button className="library-browser-row" onClick={() => onPreview(result)} title={result.title}
+      aria-current={selected?.entityKey === result.entityKey ? "true" : undefined}>
+      <FileText size={17} /><span>{result.title}<small>{[!library && result.libraryName, result.path].filter(Boolean).join(" · ")}</small></span>
+    </button>
+    {(cache[result.libraryId]?.tree?.documentFolders.has(result.documentId) || !cache[result.libraryId]?.tree) &&
+      <button className="library-browser-text-button" onClick={() => locate(result)}>定位</button>}
+  </div>);
+  const locationStatus = <>
+    {library && loaded?.version !== activeVersion && !tree && <p className="library-browser-hint" role="status">正在读取本地目录…</p>}
+    {loaded?.version === activeVersion && loaded?.error && <p className="library-browser-hint" role="alert">{tree ? "目录刷新失败，正在显示上次读取的数据。" : loaded.error}</p>}
+    {library && !library.connected && <p className="library-browser-hint">来源不可用，正在浏览本地缓存。</p>}
+    {library?.provider === "craft" && loaded?.contents && !loaded.contents.craftLocationsSynced &&
+      <p className="library-browser-hint">当前显示已缓存目录和文档。完成同步后可刷新 Craft 文件夹归属。</p>}
+    {tree && requestedFolder && !folderId && <p className="library-browser-hint">原目录已不可用，当前显示资料库根目录。</p>}
+  </>;
+  const rootDocument = selected?.contentType === "craft_subpage" && loaded?.contents?.documents.find(document => document.id === selected.documentId);
+  const count = query ? matching?.results?.length : showFavorites ? libraryFavorites.length
+    : library && tree ? (tree.children.get(folderId)?.length ?? 0) + (tree.pages.get(folderId)?.length ?? 0) + (!folderId ? tree.unresolved.length : 0)
+      : library ? undefined : libraries.length;
+
   return <div className="library-browser" data-hub-keyboard-scope>
-    <header className="library-browser-header">
-      <h1>资料库</h1>
-      <select aria-label="选择资料库" value={library.id} onChange={event => move(event.target.value, "")}>
-        {libraries.map(item => <option key={item.id} value={item.id}>{item.name} · {providerName(item.provider)}</option>)}
-      </select>
-      <button type="button" className="library-browser-icon" onClick={() => setRevision(value => value + 1)} title="重新读取本地目录" aria-label="重新读取本地目录" disabled={loading}><RotateCw size={16} /></button>
-      {selected && <button type="button" className="library-browser-icon" onClick={onClosePreview} title="收起预览" aria-label="收起预览"><X size={17} /></button>}
-    </header>
-    <div className="library-browser-body">
+    {navigationOpen && <aside className="library-browser-navigation" aria-label="资料库导航">
+      <header><h1>库结构</h1></header>
+      <div className="library-browser-navigation-tools">
+        <label className="library-browser-library-select">浏览范围<select aria-label="选择资料库" value={library?.id ?? ""} onChange={event => switchLibrary(event.target.value)}>
+          <option value="">全部库</option>
+          {libraries.map(item => <option key={item.id} value={item.id}>{item.name} · {providerName(item.provider)}</option>)}
+        </select></label>
+        <div className="library-browser-shortcuts">
+          <button className="library-browser-row" aria-current={!library && !showFavorites ? "page" : undefined} onClick={() => switchLibrary("")}>
+            <Layers size={16} /><span>全部库</span><small>{libraries.length}</small>
+          </button>
+          <button className="library-browser-row" aria-current={showFavorites ? "page" : undefined} onClick={() => {
+            setShowFavorites(true); clearSearch(); onClosePreview();
+          }}>
+            <Star size={16} /><span>收藏</span><small>{libraryFavorites.length}</small>
+          </button>
+        </div>
+        <div className="library-browser-field">
+          <Search size={15} /><input aria-label="快速定位目录" placeholder="快速定位目录…" value={folderQuery}
+            onChange={event => setFolderQuery(event.target.value)} />
+          {folderQuery && <button type="button" className="library-browser-icon" aria-label="清除目录定位" onClick={() => setFolderQuery("")}><X size={14} /></button>}
+        </div>
+      </div>
+      <div className="library-browser-tree-caption"><span>{directoryQuery ? "匹配的目录" : "目录结构"}</span>
+        <button className="library-browser-icon" onClick={() => refresh(value => value + 1)} title="重新读取本地目录" aria-label="重新读取本地目录"><RotateCw size={14} /></button>
+      </div>
       <nav className="library-browser-tree" aria-label="资料库目录">
-        <button className="library-browser-node library-browser-root" aria-current={!folderId ? "location" : undefined} title={library.name} onClick={() => move(library.id, "")}><Folder size={16} /><span>{library.name}</span></button>
-        <ul>{folderTree("", 0)}</ul>
+        {directoryQuery ? <>
+          {directoryMatches.slice(0, 60).map(({item, folder, path}) =>
+            <button className="library-browser-row" key={JSON.stringify([item.id, folder.id])} title={path}
+              onClick={() => { move(item.id, folder.id); setFolderQuery(""); }}>
+              <Folder size={15} /><span>{folder.name}<small>{path}</small></span>
+            </button>)}
+          {directoryLoading && <p className="library-browser-hint" role="status">正在读取目录…</p>}
+          {!directoryLoading && directoryFailed && <p className="library-browser-hint" role="status">部分目录读取失败，可刷新后重试。</p>}
+          {!directoryLoading && !directoryFailed && !directoryMatches.length && <p className="library-browser-hint">没有匹配的目录。</p>}
+          {directoryMatches.length > 60 && <p className="library-browser-hint">显示前 60 个目录，请缩小关键词范围。</p>}
+        </> : (library ? [library] : libraries).map(item => {
+          const itemCache = cache[item.id];
+          const expanded = library?.id === item.id || openRoots[item.id];
+          return <div key={item.id} className="library-browser-tree-root">
+            <div className="library-browser-tree-row">
+              {!library && <button className="library-browser-disclosure" aria-expanded={Boolean(expanded)}
+                aria-label={`${expanded ? "折叠" : "展开"} ${item.name}`} onClick={() => setOpenRoots(current => ({ ...current, [item.id]: !expanded }))}>
+                {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+              </button>}
+              <button className="library-browser-row" aria-current={library?.id === item.id && !folderId && !showFavorites ? "location" : undefined}
+                onClick={() => move(item.id, "")}><LibraryIcon {...item} compact /><span>{item.name}</span></button>
+            </div>
+            {expanded && itemCache?.tree && <ul>{folderTree(item, itemCache.tree, "", library ? 0 : 1)}</ul>}
+            {expanded && !library && !itemCache?.tree && <p className="library-browser-hint" role="status">{itemCache?.error ?? "正在读取目录…"}</p>}
+          </div>;
+        })}
       </nav>
-      <section className="library-browser-list" aria-label="当前目录内容">
+    </aside>}
+    <div className="library-browser-main">
+      <header className="library-browser-header" onMouseDown={header?.onMouseDown}>
+        <button className="library-browser-icon library-browser-nav-toggle" aria-expanded={navigationOpen}
+          aria-label={navigationOpen ? "收起库结构" : "展开库结构"} title={navigationOpen ? "收起库结构" : "展开库结构"}
+          onClick={() => setNavigationOpen(value => !value)}><PanelLeft size={17} /></button>
+        <div className="library-browser-title"><strong>资料库</strong><ChevronRight size={13} /><span title={library?.name}>{library?.name ?? "全部库"}</span></div>
+        <form className="library-browser-field library-browser-search" onSubmit={event => {
+          event.preventDefault(); setQuery(input.trim());
+        }}>
+          <Search size={16} /><input aria-label={library ? "在当前目录搜索" : "搜索全部库"} placeholder={library ? "搜索当前范围…" : "搜索全部库…"}
+            value={input} onChange={event => {
+              setShowFavorites(false);
+              setInput(event.target.value);
+              if (!event.target.value.trim()) setQuery("");
+            }} />
+          {input && <button type="button" className="library-browser-icon" aria-label="清除目录搜索" onClick={clearSearch}><X size={15} /></button>}
+        </form>
+        {onExit && <button className="library-browser-exit" onClick={onExit} aria-label="返回全部内容" title="返回全部内容"><ArrowLeft size={15} /><span>返回全部内容</span></button>}
+        {header?.actions}
+      </header>
+      <div className="library-browser-scope">
         <nav className="library-browser-trail" aria-label="当前位置">
-          <button onClick={() => move(library.id, "")}>{library.name}</button>
-          {trail.map(folder => <span key={folder.id}><ChevronRight size={13} /><button title={folder.name} onClick={() => move(library.id, folder.id)}>{folder.name}</button></span>)}
+          <button onClick={() => switchLibrary("")}><Layers size={14} />全部库</button>
+          {library && <><ChevronRight size={13} /><button onClick={() => move(library.id, "")}>{library.name}</button></>}
+          {trail.map(folder => <span key={folder.id}><ChevronRight size={13} />
+            <button title={folder.name} onClick={() => library && move(library.id, folder.id)}>{folder.name}</button>
+          </span>)}
         </nav>
-        {selected?.contentType === "craft_subpage" && tree?.documentFolders.has(selected.documentId) && <button
-          className="library-browser-more" onClick={() => {
-            const root = contents?.documents.find(document => document.id === selected.documentId);
-            if (root) onPreview(rootResult(library, root));
-          }}>返回文档首页</button>}
-        {tree && <form className="library-browser-search" onSubmit={submit}>
-          <Search size={16} />
-          <input aria-label="在当前目录搜索" placeholder="在当前目录搜索" value={input} onChange={event => {
-            setInput(event.target.value);
-            if (!event.target.value) setSearch(undefined);
-          }} />
-          <label><input type="checkbox" checked={includeDescendants} onChange={event => {
-            setIncludeDescendants(event.target.checked);
-            if (activeSearch) setSearch({ ...activeSearch, folders: browseFolderScope(tree, folderId, event.target.checked) });
-          }} />包含下级</label>
-          <button type="submit" className="library-browser-more">搜索</button>
-          {activeSearch && <button type="button" aria-label="清除目录搜索" onClick={() => { setInput(""); setSearch(undefined); }}><X size={15} /></button>}
-        </form>}
-        {loading && !tree && <p role="status">正在读取本地目录…</p>}
-        {error && <p role="alert">{tree ? "目录刷新失败，正在显示上次读取的内容。" : error}</p>}
-        {!library.connected && <p className="library-browser-hint">来源不可用，正在浏览本地缓存。</p>}
-        {contents && library.provider === "craft" && !contents.craftLocationsSynced && <p className="library-browser-hint">当前显示已缓存的目录与文档。完整同步后可刷新 Craft 文件夹归属。</p>}
-        {tree && requestedFolder && !folderId && <p className="library-browser-hint">原目录已不可用，已显示资料库根目录。</p>}
-        {activeSearch ? <>
-          {!matching && <p role="status">正在搜索…</p>}
-          {matching?.error && <p role="alert">{matching.error}</p>}
-          {matching?.results?.length === 0 && <p role="status">当前范围没有找到匹配内容。</p>}
-          {matching?.results?.length === 100 && <p role="status">显示前 100 条匹配结果。</p>}
-          {matching?.results?.map(result => <div className="library-browser-search-result" key={result.entityKey}>
-            <button className="library-browser-node" onClick={() => onPreview(result)} title={result.title}><FileText size={16} /><span>{result.title}<small>{result.path}</small></span></button>
-            {tree?.documentFolders.has(result.documentId) && <button onClick={() => locate(result)}>定位</button>}
-          </div>)}
-        </> : tree && <>
-          {folders.map(folder => <button className="library-browser-node" key={folder.id} title={folder.name} onClick={() => move(library.id, folder.id)}><Folder size={16} /><span>{folder.name}</span><ChevronRight size={14} /></button>)}
-          {documentsToRender.map(document => <button className="library-browser-node" key={document.id} aria-current={selectedId === document.id ? "true" : undefined}
-            title={document.path} onClick={() => onPreview(rootResult(library, document))}><FileText size={16} /><span>{document.title}<small>{document.folderId && !tree.nodes.has(document.folderId) ? "目录位置未知" : document.path}</small></span></button>)}
-          {documents.length > limit && <button className="library-browser-more" onClick={() => setLimit(value => value + 100)}>显示更多文档</button>}
-          {!folders.length && !documents.length && <p role="status">此目录暂无已索引内容。</p>}
-        </>}
-      </section>
+        {library && <label>搜索范围<select aria-label="搜索范围" value={scope}
+          onChange={event => setScope(event.target.value as typeof scope)}>
+          <option value="library">当前库</option>
+          <option value="subtree">当前位置及下级</option>
+          <option value="folder">仅当前位置</option>
+        </select></label>}
+      </div>
+      <div className="library-browser-toolbar">
+        <div role="group" aria-label="浏览方式">
+          <button aria-pressed={mode === "tree"} onClick={() => setMode("tree")}><FolderTree size={15} />目录树</button>
+          <button aria-pressed={mode === "columns"} onClick={() => setMode("columns")}><Columns3 size={15} />分栏浏览</button>
+        </div>
+        {rootDocument && library && <button className="library-browser-text-button" onClick={() => onPreview(rootResult(library, rootDocument))}>返回文档首页</button>}
+      </div>
+      <div className={`library-browser-body${inColumns ? " library-browser-column-mode" : ""}${preview ? " library-browser-reading" : ""}`}>
+        {inColumns ? <div className="library-browser-columns" ref={columnStrip} aria-label="目录分栏">
+          <section className="library-browser-column"><h2>全部库</h2>{libraryRows()}
+            {!libraries.length && <p className="library-browser-hint">接入 Craft 空间或 Obsidian 库后，即可在这里浏览。</p>}
+          </section>
+          {library && [{ id: "", name: library.name }, ...trail].map((folder, index) =>
+            <section className="library-browser-column" key={folder.id}>
+              <h2 title={folder.name}>{folder.name}</h2>
+              {!index && locationStatus}
+              {folderRows(folder.id, trail[index]?.id)}
+            </section>)}
+        </div> : <section className="library-browser-list" aria-label="当前目录内容">
+          <header><h2 title={locationName}>{query ? "搜索结果" : showFavorites ? "收藏" : locationName}</h2>
+            {count !== undefined && <p>{count}{query && count === 100 ? "+" : ""} {library || query || showFavorites ? "项" : "个资料库"}</p>}
+          </header>
+          {library && !query && !showFavorites && <button className="library-browser-up" onClick={up}><ArrowUp size={14} />返回上级</button>}
+          {locationStatus}
+          <div className="library-browser-list-items">
+            {query ? <>
+              {!matching && <p className="library-browser-hint" role="status">{loaded?.error && !tree ? "目录读取失败，请刷新目录或将搜索范围设为当前库。" : libraries.length ? "正在搜索…" : "暂无可搜索的资料库。"}</p>}
+              {matching?.error && <p className="library-browser-hint" role="alert">{matching.error}</p>}
+              {matching?.results?.length === 0 && <p className="library-browser-hint" role="status">当前范围没有找到匹配内容。</p>}
+              {matching?.results && resultRows(matching.results)}
+            </> : showFavorites ? libraryFavorites.length ? resultRows(libraryFavorites)
+              : <p className="library-browser-hint">当前范围内没有收藏。</p>
+              : library ? folderRows(folderId) : libraryRows()}
+            {!libraries.length && !query && !showFavorites && <p className="library-browser-hint">接入 Craft 空间或 Obsidian 库后，即可在这里浏览。</p>}
+          </div>
+        </section>}
+        <section className="library-browser-reader desktop-workspace" aria-label="阅读区">
+          <div className="library-browser-reader-toolbar"><BookOpen size={15} /><span>{selected?.title || "文档预览"}</span></div>
+          {preview ?? <div className="library-browser-reader-empty">
+            <BookOpen size={25} /><h2>尚未选择文档</h2><p>从{inColumns ? "分栏" : "列表"}中选一篇文档，在这里预览。</p>
+          </div>}
+        </section>
+      </div>
     </div>
   </div>;
 }
