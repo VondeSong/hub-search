@@ -36,6 +36,7 @@ export function CraftConnectionSection({
   return (
     <>
       <h3 className="connection-section-title">连接 Craft 空间</h3>
+      {mobile && <p className="security-note">直接从 Craft 下载正文，保存在本机后可离线搜索和阅读。图片与附件原件也会下载，请首次连接时使用 Wi-Fi；部分附件失败不影响已经保存的正文。</p>}
       <label className="url-field"><span>MCP 地址</span><input value={mcpUrl} onChange={(event) => setMcpUrl(event.target.value)} placeholder="https://mcp.craft.do/links/…/mcp" spellCheck={false} /></label>
       {connectionError && <div className="connection-error">{connectionError}</div>}
       <LibraryAddActions busy={connectingAction !== null} contentPolicy={contentPolicy} onAdd={connect} label="授权并添加" busyLabel="等待 Craft 授权…" />

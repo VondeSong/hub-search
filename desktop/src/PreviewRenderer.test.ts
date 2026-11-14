@@ -39,6 +39,17 @@ function result(overrides: Partial<SearchResult> = {}): SearchResult {
   };
 }
 
+it("hides Obsidian journal metadata comments while keeping code examples visible", () => {
+  const html = renderToStaticMarkup(createElement(PreviewRenderer, {
+    selected: result({ provider: "obsidian" }),
+    markdown: "<!-- hub-journal:v1 begin hidden-record-id -->\n\n正文保留\n\n<!-- hub-journal:v1 end hidden-record-id -->\n\n```html\n<!-- visible-code-example -->\n```",
+    matchTerms: [], hasSectionContext: false, onOpenLink: () => {},
+  }));
+  expect(html).toContain("正文保留");
+  expect(html).not.toContain("hidden-record-id");
+  expect(html).toContain("visible-code-example");
+});
+
 describe("preview markdown conversion", () => {
   it.each(["craft", "obsidian"] as const)("hides block metadata while preserving navigation and code for %s", (provider) => {
     const html = renderToStaticMarkup(createElement(PreviewRenderer, {

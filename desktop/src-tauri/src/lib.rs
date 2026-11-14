@@ -129,6 +129,8 @@ mod library_runtime;
 mod library_sync_schedule;
 mod local_database_maintenance;
 #[cfg(any(mobile, test))]
+mod mobile_oauth;
+#[cfg(any(mobile, test))]
 mod mobile_secrets;
 #[cfg(test)]
 mod network_traffic_tests;
@@ -228,8 +230,6 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_deep_link::DeepLinkExt;
 #[cfg(mobile)]
 use tauri_plugin_opener::OpenerExt;
-#[cfg(mobile)]
-use tokio::sync::oneshot;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpListener,
@@ -325,10 +325,6 @@ const HUB_MCP_LAUNCHER_VERSION_FILE: &str = "version.txt";
 const HUB_MCP_DATA_ROOT_FILE: &str = "data-root.txt";
 static FLASHCARD_SYNC_LOCK: AsyncMutex<()> = AsyncMutex::const_new(());
 static CRAFT_BRIDGE_CLIENT: OnceLock<Result<reqwest::Client, String>> = OnceLock::new();
-#[cfg(mobile)]
-static MOBILE_OAUTH_WAITERS: OnceLock<
-    Mutex<HashMap<String, oneshot::Sender<Result<String, String>>>>,
-> = OnceLock::new();
 static DIDA_ATTACHMENT_AUTH_WINDOW_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Default)]
@@ -1700,56 +1696,6 @@ async fn wait_for_oauth_callback(
 <main><h1>资料库授权完成</h1><p>可以关闭此页面并返回 Hub。</p></main>"#;
         write_callback_response(&mut stream, "200 OK", html).await?;
         return Ok(code);
-    }
-}
-
-#[cfg(mobile)]
-fn mobile_oauth_waiters() -> &'static Mutex<HashMap<String, oneshot::Sender<Result<String, String>>>>
-{
-    MOBILE_OAUTH_WAITERS.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
-#[cfg(mobile)]
-async fn wait_for_mobile_oauth_callback(expected_state: &str) -> Result<String, String> {
-    let (sender, receiver) = oneshot::channel();
-    mobile_oauth_waiters()
-        .lock()
-        .map_err(|_| "移动端 OAuth 回调状态不可用".to_string())?
-        .insert(expected_state.to_string(), sender);
-    receiver
-        .await
-        .map_err(|_| "移动端 OAuth 回调已取消".to_string())?
-}
-
-#[cfg(mobile)]
-fn handle_mobile_oauth_deep_link(url: &Url) {
-    if url.scheme() != "hub-craft-search" {
-        return;
-    }
-    let host = url.host_str().unwrap_or_default();
-    let path = url.path();
-    if !(host == "oauth" && path == "/callback") && path != "/oauth/callback" {
-        return;
-    }
-    let params = url
-        .query_pairs()
-        .collect::<std::collections::HashMap<_, _>>();
-    let Some(state) = params.get("state").map(|value| value.to_string()) else {
-        return;
-    };
-    let result = if let Some(error) = params.get("error") {
-        Err(format!("资料库授权失败：{error}"))
-    } else if let Some(code) = params.get("code") {
-        Ok(code.to_string())
-    } else {
-        Err("OAuth 回调没有 authorization code".to_string())
-    };
-    let sender = mobile_oauth_waiters()
-        .lock()
-        .ok()
-        .and_then(|mut waiters| waiters.remove(&state));
-    if let Some(sender) = sender {
-        let _ = sender.send(result);
     }
 }
 
@@ -13230,9 +13176,9 @@ fn backfill_ocr_pipeline(path: &PathBuf, limit: i64) -> Result<usize, String> {
         list_title_bold: metadata_bool(&connection, "list_title_bold", true),
         preview_title_bold: metadata_bool(&connection, "preview_title_bold", true),
         task_status_style: task_status_appearance::read(&connection),
-        image_ocr_enabled: metadata_bool(&connection, "image_ocr_enabled", true),
+        image_ocr_enabled: cfg!(windows) && metadata_bool(&connection, "image_ocr_enabled", true),
         pdf_enabled: metadata_bool(&connection, "pdf_enabled", true),
-        pdf_ocr_enabled: metadata_bool(&connection, "pdf_ocr_enabled", true),
+        pdf_ocr_enabled: cfg!(windows) && metadata_bool(&connection, "pdf_ocr_enabled", true),
         group_recent_by_date_when_unlimited: metadata_bool(
             &connection,
             "group_recent_by_date_when_unlimited",
@@ -16354,6 +16300,22 @@ async fn call_feishu_list_docs(
     Err(format!("飞书知识库目录读取失败：{}", errors.join("；")))
 }
 
+fn feishu_next_page(data: &Value, previous: &str, page: usize) -> Result<Option<String>, String> {
+    if !data["has_more"]
+        .as_bool()
+        .ok_or("飞书目录缺少分页完成标记，已保留本机文档")?
+    {
+        return Ok(None);
+    }
+    let next = data["page_token"]
+        .as_str()
+        .filter(|next| !next.is_empty() && *next != previous);
+    if page >= 199 || next.is_none() {
+        return Err("飞书目录分页尚未完成，已保留本机文档，请稍后重试".into());
+    }
+    Ok(next.map(str::to_string))
+}
+
 async fn list_feishu_space_document_refs(
     client: &reqwest::Client,
     session: &McpSession,
@@ -16368,7 +16330,7 @@ async fn list_feishu_space_document_refs(
             continue;
         }
         let mut page_token = String::new();
-        for _ in 0..200 {
+        for page in 0..200 {
             let endpoint =
                 format!("https://open.feishu.cn/open-apis/wiki/v2/spaces/{space_id}/nodes");
             let mut request = client
@@ -16437,14 +16399,15 @@ async fn list_feishu_space_document_refs(
                     }
                 }
             }
-            if refs.len() >= 5_000 || !value["data"]["has_more"].as_bool().unwrap_or(false) {
-                break;
+            if refs.len() >= 5_000 {
+                return Err(
+                    "飞书目录超过本轮读取上限，已保留原有本机文档，请选择较小的来源范围".into(),
+                );
             }
-            let next = value["data"]["page_token"].as_str().unwrap_or_default();
-            if next.is_empty() || next == page_token {
-                break;
+            match feishu_next_page(&value["data"], &page_token, page)? {
+                Some(next) => page_token = next,
+                None => break,
             }
-            page_token = next.to_string();
         }
         if refs.len() >= 5_000 {
             break;
@@ -17024,7 +16987,9 @@ async fn sync_feishu_library(
     operation.checkpoint()?;
     let mut seen_refs = HashSet::new();
     refs.retain(|(_, _, reference, _, _)| seen_refs.insert(reference.clone()));
-    refs.truncate(5_000);
+    if refs.len() > 5_000 {
+        return Err("飞书目录超过本轮读取上限，已保留原有本机文档，请选择较小的来源范围".into());
+    }
     let mut documents = Vec::new();
     if refs.is_empty() {
         return Err(
@@ -17278,6 +17243,16 @@ async fn sync_library_inner(
     .await
     .map_err(|error| format!("资料库查询任务失败：{error}"))??;
     operation.checkpoint()?;
+    if matches!(provider.as_str(), PROVIDER_CRAFT | PROVIDER_FEISHU)
+        && session_for_space(&state, &library_id).is_err()
+    {
+        restore_connections(app.clone(), state.clone()).await?;
+        operation.checkpoint()?;
+        if session_for_space(&state, &library_id).is_err() {
+            return Err("资料库授权尚未恢复，请检查网络或重新连接；本机内容仍可搜索".into());
+        }
+        let _ = app.emit("library-registry-updated", ());
+    }
     match provider.as_str() {
         PROVIDER_CRAFT => {
             let full_reconcile = force_full_reconcile
@@ -32778,6 +32753,8 @@ async fn connect_mcp(
         .append_pair("state", &state_token)
         .append_pair("resource", &protected.resource);
 
+    #[cfg(mobile)]
+    let mut callback = mobile_oauth::callbacks().begin(&state_token)?;
     open_external(&app, authorization_url.as_str())
         .map_err(|error| format!("无法打开 Craft 授权页面：{error}"))?;
     #[cfg(not(mobile))]
@@ -32788,12 +32765,9 @@ async fn connect_mcp(
     .await
     .map_err(|_| "Craft 授权等待超时，请重新连接".to_string())??;
     #[cfg(mobile)]
-    let code = tokio::time::timeout(
-        Duration::from_secs(600),
-        wait_for_mobile_oauth_callback(&state_token),
-    )
-    .await
-    .map_err(|_| "Craft 授权等待超时，请重新连接".to_string())??;
+    let code = tokio::time::timeout(Duration::from_secs(600), callback.wait())
+        .await
+        .map_err(|_| "Craft 授权等待超时，请重新连接".to_string())??;
     let token = exchange_code(
         &client,
         &authorization,
@@ -34662,7 +34636,7 @@ pub fn run() {
             #[cfg(mobile)]
             app.deep_link().on_open_url(|event| {
                 for url in event.urls() {
-                    handle_mobile_oauth_deep_link(&url);
+                    mobile_oauth::callbacks().receive(&url);
                 }
             });
             data_portability::initialize_session(app.handle())?;
@@ -39938,6 +39912,28 @@ mod tests {
         );
         assert_eq!(tasks[1].parent_guid, "parent");
         assert_eq!(tasks[1].subtask_count, 1);
+    }
+
+    #[test]
+    fn incomplete_feishu_pagination_never_looks_like_a_complete_snapshot() {
+        assert_eq!(
+            feishu_next_page(&json!({"has_more":false}), "", 0).unwrap(),
+            None
+        );
+        assert_eq!(
+            feishu_next_page(&json!({"has_more":true,"page_token":"next"}), "old", 0).unwrap(),
+            Some("next".into())
+        );
+        for data in [
+            json!({}),
+            json!({"has_more":true}),
+            json!({"has_more":true,"page_token":"old"}),
+        ] {
+            assert!(feishu_next_page(&data, "old", 0).is_err());
+        }
+        assert!(
+            feishu_next_page(&json!({"has_more":true,"page_token":"next"}), "old", 199).is_err()
+        );
     }
 
     #[test]

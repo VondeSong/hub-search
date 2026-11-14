@@ -71,6 +71,15 @@ it("allows choosing a location during initial setup only", async () => {
   await more(); await click("备份与恢复"); await click("设置并开始首次备份");
   expect(props.exportCraftVault).toHaveBeenCalledWith(props.spaces[0], expect.objectContaining({ destination: "D:/initial", vaultName: "Main - Craft", backupIntervalMinutes: 1440 }));
 });
+it("allows a disconnected library to retry saved authorization without removing cached documents", async () => {
+  props.spaces = [{ ...props.spaces[0], connected: false }]; props.controlLibrary = vi.fn();
+  await act(async () => root.render(<ManagedSpacesSection {...props} />));
+  const sync = [...container.querySelectorAll("button")].find(button => button.textContent === "同步一次")!;
+  expect(sync.disabled).toBe(false);
+  await act(async () => sync.click());
+  expect(props.controlLibrary).toHaveBeenCalledWith(props.spaces[0], "sync");
+  expect(props.removeSpace).not.toHaveBeenCalled();
+});
 it("keeps paused libraries paused when the manual sync button is used", async () => {
   props.controlLibrary = vi.fn();
   props.libraryRuntime = { space: { libraryId: "space", state: "paused", phase: "paused", detail: "", activeOperations: 0, pending: 3, updatedAt: 1 } };

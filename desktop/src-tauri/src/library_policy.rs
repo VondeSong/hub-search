@@ -66,14 +66,17 @@ pub(crate) fn global(connection: &Connection) -> Policy {
     }
 }
 pub(crate) fn capabilities(provider: &str) -> Policy {
+    capabilities_for(provider, cfg!(windows))
+}
+fn capabilities_for(provider: &str, native_ocr: bool) -> Policy {
     let incoming = matches!(provider, "craft" | "obsidian" | "dida365" | "global");
     Policy {
         image_download: incoming,
-        image_ocr: incoming,
+        image_ocr: incoming && native_ocr,
         pdf_download: incoming,
         other_download: matches!(provider, "craft" | "dida365" | "global"),
         pdf_text: incoming,
-        pdf_ocr: incoming,
+        pdf_ocr: incoming && native_ocr,
         outgoing_attachments: matches!(provider, "craft" | "obsidian" | "dida365" | "global"),
     }
 }
@@ -321,6 +324,9 @@ pub(crate) fn outgoing_enabled(
 /// Fixed SQL over the existing j/s/l aliases. Filtering happens before ranking,
 /// so disabled images cannot starve enabled PDFs in the same library.
 pub(crate) fn eligible_sql(connection: &Connection, job_type: &str) -> String {
+    if job_type == "ocr_page" && !cfg!(windows) {
+        return "0".into();
+    }
     let global = global(connection);
     let field = |name: &str, fallback: bool| {
         let setting = format!(
@@ -371,6 +377,14 @@ pub(crate) fn eligible_sql(connection: &Connection, job_type: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn mobile_keeps_originals_and_pdf_text_without_scheduling_desktop_ocr() {
+        let policy = super::capabilities_for("craft", false);
+        assert!(policy.image_download && policy.pdf_download && policy.pdf_text);
+        assert!(!policy.image_ocr && !policy.pdf_ocr);
+        assert!(super::capabilities_for("craft", true).image_ocr);
+        assert!(!super::capabilities_for("feishu", true).image_download);
+    }
     use super::*;
     use crate::{blob_store::BlobStore, library_runtime};
     use std::path::PathBuf;

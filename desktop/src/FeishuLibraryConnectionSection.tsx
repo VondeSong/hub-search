@@ -54,10 +54,11 @@ export function FeishuLibraryConnectionSection({
     <>
       <h3 className="connection-section-title">连接飞书资料库</h3>
       <p className="provider-connect-description">登录后可选择“我的文档”或一个或多个知识库，并同步其中的文档与多维表格记录。</p>
+      {mobile && <p className="security-note">正文下载后可离线搜索和阅读。图片首次打开时下载，已缓存的图片可离线查看；未下载的内容及打开原文需要联网。授权完成后请返回 Hub 选择文档来源。</p>}
       {!feishuAuthorization ? <>
         <label className="url-field"><span>App ID</span><input value={feishuAppId} onChange={(event) => setFeishuAppId(event.target.value)} placeholder="cli_xxxxxxxxxxxxxxxx" spellCheck={false} /></label>
         <label className="url-field"><span>App Secret</span><input type="password" value={feishuAppSecret} onChange={(event) => setFeishuAppSecret(event.target.value)} placeholder="飞书开放平台应用密钥" spellCheck={false} autoComplete="off" /></label>
-        <div className="security-note">请先在飞书开放平台把重定向 URL 登记为 <code>http://127.0.0.1:17653/oauth/callback</code>。Hub 会同时兼容浏览器的 IPv4/IPv6 本机回调。{!mobile && "App Secret 与刷新令牌只保存在 Windows 凭据管理器。"}</div>
+        <div className="security-note">请先在飞书开放平台把重定向 URL 登记为 <code>http://127.0.0.1:17653/oauth/callback</code>。{mobile ? "请在这台手机的浏览器中完成授权，随后返回 Hub；应用密钥与登录凭据加密保存在本机。" : "Hub 会同时兼容浏览器的 IPv4/IPv6 本机回调。App Secret 与刷新令牌只保存在 Windows 凭据管理器。"}</div>
         <button className="connect-button feishu-connect" onClick={() => void connectFeishu()} disabled={connectingAction !== null}>{connectingAction === "feishu" ? <><LoaderCircle className="spin" size={18} />等待飞书授权…</> : "登录并读取文档来源"}</button>
       </> : <div className="feishu-space-picker">
         <div className="feishu-space-picker-head">

@@ -5,7 +5,11 @@ use crate::{
 use rusqlite::{params, Connection};
 use sha2::{Digest, Sha256};
 use std::{io::Read, path::PathBuf};
-const UNSUPPORTED_OCR_SOURCE: &str = "s.source_type IN ('craft_attachment','dida_attachment','obsidian_attachment') AND COALESCE(s.mime_type,'') NOT IN ('','application/octet-stream','application/pdf') AND s.mime_type NOT LIKE 'image/%'";
+const UNSUPPORTED_OCR_SOURCE: &str = if cfg!(windows) {
+    "s.source_type IN ('craft_attachment','dida_attachment','obsidian_attachment') AND COALESCE(s.mime_type,'') NOT IN ('','application/octet-stream','application/pdf') AND s.mime_type NOT LIKE 'image/%'"
+} else {
+    "s.source_type IN ('craft_attachment','dida_attachment','obsidian_attachment')"
+};
 pub(crate) fn retryable_ocr_sql(job_alias: &str) -> String {
     format!("({job_alias}.job_type!='ocr_page' OR NOT EXISTS(SELECT 1 FROM source_items s WHERE s.id={job_alias}.source_id AND s.space_id={job_alias}.space_id AND {UNSUPPORTED_OCR_SOURCE}))")
 }
@@ -31,7 +35,7 @@ pub(crate) fn retire_unsupported_ocr(c: &Connection, scope: Option<&str>) -> Res
     let now = now_timestamp();
     for (id, source) in &rows {
         tx.execute("UPDATE index_jobs SET status='not_applicable',updated_at=?1,next_attempt_at=0,worker_id=NULL,locked_at=NULL,lease_until=NULL,
-          last_error=COALESCE(NULLIF(last_error,''),'当前附件类型不适用文字识别；原件保留') WHERE id=?2",params![now,id]).map_err(|e|e.to_string())?;
+          last_error=COALESCE(NULLIF(last_error,''),'当前设备或附件类型不适用文字识别；原件保留') WHERE id=?2",params![now,id]).map_err(|e|e.to_string())?;
         tx.execute("UPDATE ocr_pages SET status='not_applicable',updated_at=?1 WHERE source_item_id=?2 AND status IN ('failed','pending')",params![now,source]).map_err(|e|e.to_string())?;
         tx.execute("UPDATE extractions SET status='not_applicable',updated_at=?1 WHERE source_item_id=?2 AND extractor='windows_ocr' AND status IN ('failed','pending')",params![now,source]).map_err(|e|e.to_string())?;
         tx.execute("UPDATE source_items SET status='stored',updated_at=?1 WHERE id=?2 AND blob_hash IS NOT NULL AND status IN ('ocr_pending','ocr_failed','failed')",params![now,source]).map_err(|e|e.to_string())?;

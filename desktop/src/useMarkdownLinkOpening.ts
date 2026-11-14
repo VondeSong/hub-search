@@ -4,8 +4,8 @@ import type { SearchResult } from "./SearchTypes";
 import type { useResultOpener } from "./useResultOpener";
 import type { showOperationStatus as OperationNotifier } from "./useOperationStatus";
 
-export function useMarkdownLinkOpening({ previewSelected, openResult, openExternalLink, showOperationStatus }: { previewSelected: SearchResult | undefined; openResult: ReturnType<typeof useResultOpener>; openExternalLink: (url: string) => Promise<unknown>; showOperationStatus: typeof OperationNotifier }) {
-const openMarkdownLink = useCallback((href?: string) => {
+export function useMarkdownLinkOpening({ previewSelected, openResult, openExternalLink, showOperationStatus, previewInApp }: { previewSelected: SearchResult | undefined; openResult: ReturnType<typeof useResultOpener>; openExternalLink: (url: string) => Promise<unknown>; showOperationStatus: typeof OperationNotifier; previewInApp?: (result: SearchResult) => void }) {
+const openMarkdownLink = useCallback((href?: string, title?: string) => {
     if (!href) return;
     const marker = "#obsidian-wikilink=";
     if (href.startsWith(marker) && previewSelected?.provider === "obsidian") {
@@ -20,7 +20,10 @@ const openMarkdownLink = useCallback((href?: string) => {
     const craftPageMarker = "#craft-subpage=";
     if (href.startsWith(craftPageMarker) && previewSelected?.provider === "craft") {
       const blockId = decodeURIComponent(href.slice(craftPageMarker.length));
-      openResult({ ...previewSelected, id: "", blockId, pageId: blockId }, "preview");
+      if (previewInApp) {
+        const id = `craft-subpage:${previewSelected.spaceId}:${previewSelected.documentId}:${blockId}`;
+        previewInApp({ ...previewSelected, id, entityKey: id, blockId, pageId: blockId, title: title || previewSelected.title, documentTitle: title || previewSelected.documentTitle });
+      } else openResult({ ...previewSelected, id: "", blockId, pageId: blockId }, "preview");
       return;
     }
     if (previewSelected?.provider === "dida365" && !/^https?:\/\//i.test(href)) {
@@ -32,6 +35,6 @@ const openMarkdownLink = useCallback((href?: string) => {
       return;
     }
     if (/^https?:\/\//i.test(href)) void openExternalLink(href);
-  }, [openExternalLink, openResult, previewSelected, showOperationStatus]);
+  }, [openExternalLink, openResult, previewSelected, showOperationStatus, previewInApp]);
 return openMarkdownLink;
 }

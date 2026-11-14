@@ -18,6 +18,20 @@ beforeEach(() => {
   props = { runtimeCapabilities: { ...runtimeCapabilities, nativeOcr: true, localVault: true }, spaces: [], feishuAuthorization: null, feishuAppId: "", feishuAppSecret: "", selectedFeishuSpaceIds: [], feishuBitableSourceId: "", feishuBitableUrl: "", obsidianPath: "", mcpUrl: "", craftApiUrl: "", craftApiKey: "", connectingAction: null, connectionError: "", connectionErrorProvider: "general", setFeishuAuthorization: vi.fn(), setFeishuAppId: vi.fn(), setFeishuAppSecret: vi.fn(), setSelectedFeishuSpaceIds: vi.fn(), setFeishuBitableSourceId: vi.fn(), setFeishuBitableUrl: vi.fn(), setObsidianPath: vi.fn(), setMcpUrl: vi.fn(), setCraftApiUrl: vi.fn(), setCraftApiKey: vi.fn(), connectFeishu: vi.fn(), addSelectedFeishuSpaces: vi.fn(), addFeishuBitable: vi.fn(), connectDida365: vi.fn(), addObsidian: vi.fn(), connect: vi.fn(), saveCraftApiConnection: vi.fn() };
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
+it("explains mobile offline availability and keeps the two real authorization actions separate", async () => {
+  props.runtimeCapabilities = { ...runtimeCapabilities, mobile: true, nativeOcr: false, localVault: false };
+  await act(async () => root.render(<SettingsConnectionsSection {...props} />));
+  const craft = container.querySelector('[data-provider="craft"]')!;
+  const feishu = container.querySelector('[data-provider="feishu"]')!;
+  expect(craft.textContent).toContain("保存在本机后可离线搜索和阅读");
+  expect(feishu.textContent).toContain("已缓存的图片可离线查看");
+  expect(feishu.textContent).toContain("这台手机的浏览器");
+  expect(feishu.textContent).not.toContain("Windows 凭据管理器");
+  await act(async () => [...feishu.querySelectorAll("button")].find(button => button.textContent === "登录并读取文档来源")!.click());
+  expect(props.connectFeishu).toHaveBeenCalledOnce();
+  expect(props.connect).not.toHaveBeenCalled();
+  expect(invoke.mock.calls.some(([command]) => command.includes("sync"))).toBe(false);
+});
 it("passes staged independent policies and start-later intent through the Craft connection", async () => {
   await act(async () => root.render(<SettingsConnectionsSection {...props} />));
   const card = container.querySelector('[data-provider="craft"]')!;

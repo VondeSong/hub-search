@@ -20,7 +20,7 @@ import { cleanCraftDisplayTitle } from "./SearchResultPresentation";
 import { formatDidaPreviewDate } from "./DidaPreviewDate";
 
 const REMARK_PLUGINS = [remarkGfm, remarkMath, remarkBlockAnchors];
-const OBSIDIAN_REMARK_PLUGINS = [remarkGfm, remarkMath, remarkInlineTags, remarkBlockAnchors];
+const OBSIDIAN_REMARK_PLUGINS = [remarkGfm, remarkMath, remarkInlineTags, remarkBlockAnchors, remarkObsidianHtmlComments];
 const REHYPE_PLUGINS = [rehypeKatex];
 const previewUrlTransform = (url: string) => url.startsWith("feishu-media://") ? url : defaultUrlTransform(url);
 
@@ -34,6 +34,17 @@ type MarkdownAstNode = {
     hProperties?: Record<string, unknown>;
   };
 };
+
+function remarkObsidianHtmlComments() {
+  return (tree: MarkdownAstNode) => {
+    const visit = (node: MarkdownAstNode) => {
+      if (!node.children) return;
+      node.children = node.children.filter(child => child.type !== "html" || !/^<!--[\s\S]*-->\s*$/.test(child.value || ""));
+      node.children.forEach(visit);
+    };
+    visit(tree);
+  };
+}
 
 // Operate on parsed text so code, link destinations and HTML stay untouched.
 // Obsidian block IDs are navigation metadata, never visible reading content.
@@ -403,7 +414,7 @@ export type PreviewRendererProps = {
   markdown: string;
   matchTerms: string[];
   hasSectionContext: boolean;
-  onOpenLink: (href?: string) => void;
+  onOpenLink: (href?: string, title?: string) => void;
 };
 
 function sameMatchTerms(left: string[], right: string[]): boolean {
@@ -626,7 +637,7 @@ function PreviewRendererComponent({ selected, markdown, matchTerms, hasSectionCo
         </a>;
       }
       if (href?.startsWith("#craft-subpage=")) {
-        return <a className="preview-subpage-card" href={href} onClick={(event) => { event.preventDefault(); onOpenLink(href); }}>
+        return <a className="preview-subpage-card" href={href} onClick={(event) => { event.preventDefault(); onOpenLink(href, label); }}>
           <CraftPageIcon size={22} /><strong>{children}</strong>
         </a>;
       }

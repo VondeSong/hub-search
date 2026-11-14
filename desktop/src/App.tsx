@@ -452,7 +452,12 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
     showPreviewPane,
     showOperationStatus,
   });
-  const openMarkdownLink = useMarkdownLinkOpening({ previewSelected, openResult, openExternalLink, showOperationStatus });
+  const previewInlinePage = useCallback((result: SearchResult) => {
+    pushPreviewHistory(result);
+    setPreviewHistoryActive(true);
+    setPreviewOpen(true);
+  }, [pushPreviewHistory]);
+  const openMarkdownLink = useMarkdownLinkOpening({ previewSelected, openResult, openExternalLink, showOperationStatus, previewInApp: isMobileLayout ? previewInlinePage : undefined });
 
 
 useEffect(() => {

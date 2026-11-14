@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useRef, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { publishCodexNotice } from "./CodexSuite";
+import type { LibraryRuntime } from "./LibraryManagement";
 
 type Plan = { libraryId: string; minutes: number | null; globalMinutes: number; effectiveMinutes: number; nextSyncAt?: number; stoppedAfterFailures: boolean };
 const intervals = [5, 15, 30, 60, 180, 360, 720, 1440];
@@ -12,16 +14,24 @@ export function LibrarySyncSchedule({ libraryId, name, disabled = false }: { lib
   const [error, setError] = useState("");
   const generation = useRef(0);
   const inFlight = useRef(false);
-  const read = async () => {
+  const read = useCallback(async (background = false) => {
     const token = ++generation.current;
-    setBusy(true);
+    if (!background) setBusy(true);
     try {
       const value = await invoke<Plan>("library_sync_schedule", { args: { action: "get", libraryId } });
-      if (token === generation.current) { setPlan(value); setMinutes((value.minutes ?? value.globalMinutes) || 15); setError(""); }
+      if (token === generation.current) { setPlan(value); if (!background) setMinutes((value.minutes ?? value.globalMinutes) || 15); setError(""); }
     } catch (reason) { if (token === generation.current) setError(String(reason)); }
     finally { if (token === generation.current) setBusy(false); }
-  };
-  useEffect(() => { setPlan(undefined); setCustom(false); void read(); return () => { ++generation.current; }; }, [libraryId]);
+  }, [libraryId]);
+  useEffect(() => {
+    setPlan(undefined); setCustom(false); void read();
+    let stopped = false;
+    let unlisten: (() => void) | undefined;
+    void listen<LibraryRuntime>("library-runtime-updated", event => {
+      if (!stopped && event.payload.libraryId === libraryId && event.payload.activeOperations === 0 && !inFlight.current) void read(true);
+    }).then(stop => { if (stopped) stop(); else unlisten = stop; }).catch(() => undefined);
+    return () => { stopped = true; ++generation.current; unlisten?.(); };
+  }, [libraryId, read]);
   const save = async (value: number | null) => {
     if (inFlight.current) return;
     inFlight.current = true; setBusy(true); setError("");
