@@ -379,7 +379,7 @@ it("persists a real topic reference and view state without writing to any source
   const container=document.createElement("div"), root=createRoot(container);
   const button=(label:string)=>Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(item=>item.getAttribute("aria-label")===label || item.textContent===label)!;
   try {
-    await act(async()=>root.render(<LibraryBrowse libraries={[library]} onPosition={vi.fn()} onPreview={vi.fn()} onClosePreview={vi.fn()}/>));
+    await act(async()=>root.render(<LibraryBrowse libraries={[library]} position={{libraryId:"vault",folderId:""}} onPosition={vi.fn()} onPreview={vi.fn()} onClosePreview={vi.fn()}/>));
     await act(async()=>button("新建专题").click());
     const input=container.querySelector<HTMLInputElement>('[aria-label="专题名称"]')!;
     await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(input,"验收资料");input.dispatchEvent(new Event("input",{bubbles:true}));});
