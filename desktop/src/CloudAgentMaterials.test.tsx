@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import {act,useState} from 'react';
+import {act,useState,StrictMode} from 'react';
 import {createRoot,type Root} from 'react-dom/client';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {CloudAnswerNote,CloudMaterialPicker} from './CloudAgentMaterials';
@@ -41,7 +41,9 @@ it('Android Back dismisses the material dialog before the underlying conversatio
  function Screen(){const[open,setOpen]=useState(true);return open?<CloudMaterialPicker onClose={()=>setOpen(false)} onConfirm={()=>{}}/>:<p>Conversation remains</p>;}
  const parent=vi.fn();window.addEventListener('popstate',parent);
  try{
-  await act(async()=>root.render(<Screen/>));
+  await act(async()=>{root.render(<StrictMode><Screen/></StrictMode>);});
+  await act(async()=>{await new Promise(r=>setTimeout(r,30));});
+  expect(host.querySelector('[role="dialog"]')).not.toBeNull();
   expect(window.history.state.hubCloudDialog).toBeTruthy();
   await act(async()=>{window.history.back();await new Promise(r=>setTimeout(r,30));});
   expect(host.textContent).toBe('Conversation remains');expect(parent).not.toHaveBeenCalled();

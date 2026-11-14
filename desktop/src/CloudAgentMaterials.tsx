@@ -12,19 +12,24 @@ type Candidate={key:Key;title:string;source:string;chars:number;preview:string};
 function Dialog({title,onClose,children,busy=false}:{title:string;onClose:()=>void;children:React.ReactNode;busy?:boolean}){
  const ref=useRef<HTMLElement>(null);
  const dismiss=useRef(onClose),locked=useRef(busy);dismiss.current=onClose;locked.current=busy;
+ const mounted=useRef(false),entry=useRef<{id:string;parent:Record<string,unknown>|null}|null>(null);
  useEffect(()=>{
   if(!runtimeCapabilities.mobile)return;
-  const parent=window.history.state;
-  const id=crypto.randomUUID();
+  mounted.current=true;
+  const {id,parent}=entry.current??(entry.current={id:crypto.randomUUID(),parent:window.history.state});
   const push=()=>window.history.pushState({...parent,hubCloudDialog:id},'');
-  push();
+  if(window.history.state?.hubCloudDialog!==id)push();
   const back=(event:PopStateEvent)=>{
    if(event.state?.hubCloudDialog===id)return;
    if(event.state?.hubMobileRoute===parent?.hubMobileRoute&&event.state?.hubCloudAgentChat===parent?.hubCloudAgentChat)event.stopImmediatePropagation();
    if(locked.current)push();else dismiss.current();
   };
   window.addEventListener('popstate',back,true);
-  return()=>{window.removeEventListener('popstate',back,true);if(window.history.state?.hubCloudDialog===id)window.history.back();};
+  return()=>{
+   window.removeEventListener('popstate',back,true);mounted.current=false;
+   // StrictMode replays effects before this microtask; only a real unmount releases the entry.
+   queueMicrotask(()=>{if(!mounted.current&&window.history.state?.hubCloudDialog===id)window.history.back();});
+  };
  },[]);
  useModalFocus({active:true,containerRef:ref,onDismiss:onClose});
  return <section className="cloud-agents-sheet" role="dialog" aria-modal="true" aria-label={title} ref={ref} tabIndex={-1}><header><h2>{title}</h2><button type="button" onClick={onClose} disabled={busy}>关闭</button></header>{children}</section>;
