@@ -425,6 +425,16 @@ export function LibraryBrowse({
     </button>);
   }
 
+  const documentActions = (result: SearchResult) => <div className="library-browser-result-actions">
+    {onToggleFavorite && <button className="library-browser-text-button" aria-label={`收藏 ${result.title}`}
+      aria-pressed={favorites.some(item => item.favoriteKind !== "snippet" && pageFavoriteKey(item) === pageFavoriteKey({...result, favoriteKind: "page"}))}
+      onClick={() => onToggleFavorite({...result, favoriteKind: "page"})}><Star size={13} />收藏</button>}
+    {(cache[result.libraryId]?.tree?.documentFolders.has(resultLocationKey(result)) || !cache[result.libraryId]?.tree) &&
+      <button className="library-browser-text-button" onClick={() => locate(result)}>定位</button>}
+    {activeTopic ? <button className="library-browser-text-button" onClick={() => toggleTopic(activeTopic.id, { kind: "document", result })}>移出专题</button>
+      : topicActions({ kind: "document", result })}
+    </div>;
+
   function folderRows(parent: string, nextFolder?: string) {
     if (!tree || !library) return null;
     const folders = tree.children.get(parent) ?? [];
@@ -440,11 +450,12 @@ export function LibraryBrowse({
       </button>{!inColumns && folderActions(library, folder)}</div>)}
       {folders.length > folderLimit && <button className="library-browser-text-button" onClick={() => setLimits(current => ({ ...current, [folderKey]: folderLimit + 100 }))}>显示更多目录</button>}
       {documents.filter((document, index) => index < limit || (selected?.libraryId === library.id && resultLocationKey(selected) === document.id)).map(document =>
-        <button className="library-browser-row" key={JSON.stringify([document.nodeId, document.id])} title={document.path}
+        <div className={inColumns ? undefined : "library-browser-result"} key={JSON.stringify([document.nodeId, document.id])}>
+        <button className="library-browser-row" title={document.path}
           aria-current={selected?.libraryId === library.id && resultLocationKey(selected) === document.id && (!document.nodeId || selected.entityKey === rootResult(library, document).entityKey) ? "true" : undefined}
           onClick={() => openPreview(rootResult(library, document))}>
           <FileText size={17} /><span>{document.title}<small>{document.folderId && !tree.nodes.has(document.folderId) ? "目录位置未知" : document.path}</small></span>
-        </button>)}
+        </button>{!inColumns && documentActions(rootResult(library, document))}</div>)}
       {documents.length > limit && <button className="library-browser-text-button" onClick={() => setLimits(current => ({ ...current, [key]: limit + 100 }))}>显示更多文档</button>}
       {!folders.length && !documents.length && !loaded?.contents?.folderNotices?.[parent] && <p className="library-browser-hint" role="status">此目录暂时没有可浏览的内容。</p>}
       {loaded?.contents?.folderNotices?.[parent] && <p className="library-browser-hint" role="status">{loaded.contents.folderNotices[parent]}</p>}
@@ -456,15 +467,7 @@ export function LibraryBrowse({
       aria-current={selected?.entityKey === result.entityKey ? "true" : undefined}>
       <FileText size={17} /><span>{result.title}{result.snippet && <small className="library-browser-excerpt">{result.snippet}</small>}<small>{[!library && providerName(result.provider), !library && result.libraryName, result.path].filter(Boolean).join(" · ")}</small></span>
     </button>
-    <div className="library-browser-result-actions">
-    {onToggleFavorite && <button className="library-browser-text-button" aria-label={`收藏 ${result.title}`}
-      aria-pressed={favorites.some(item => item.favoriteKind !== "snippet" && pageFavoriteKey(item) === pageFavoriteKey({...result, favoriteKind: "page"}))}
-      onClick={() => onToggleFavorite({...result, favoriteKind: "page"})}><Star size={13} />收藏</button>}
-    {(cache[result.libraryId]?.tree?.documentFolders.has(resultLocationKey(result)) || !cache[result.libraryId]?.tree) &&
-      <button className="library-browser-text-button" onClick={() => locate(result)}>定位</button>}
-    {activeTopic ? <button className="library-browser-text-button" onClick={() => toggleTopic(activeTopic.id, { kind: "document", result })}>移出专题</button>
-      : topicActions({ kind: "document", result })}
-    </div>
+    {documentActions(result)}
   </div>);
   const locationStatus = <>
     {library && loaded?.version !== activeVersion && !tree && <p className="library-browser-hint" role="status">正在读取本地目录…</p>}
