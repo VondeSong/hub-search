@@ -15,7 +15,7 @@ it("collects interleaved and nested matches without losing block targets or comb
   expect(results.map(result => result.id)).toEqual(["a1", "a2", "b", "c"]);
   expect(results[1].blockId).toBe("block-a2");
   expect(groupQuickSearchResults(results)).toHaveLength(3);
-  expect(searchResultSummary(results, "match")).toBe("3 个页面 · 4 段正文匹配");
+  expect(searchResultSummary(results, "match")).toBe("3 项内容 · 4 段正文匹配");
 });
 
 it("removes inherited page metadata from body results but retains the page evidence", () => {
@@ -44,7 +44,7 @@ it("merges overlapping contexts only at a known shared anchor and keeps PDF page
   expect(results.map(result => result.id)).toEqual(["a", "p1", "p2"]);
   expect(results[0].snippet).toBe("前文" + overlap + "后文");
   expect(results[0].blockId).toBe("same");
-  expect(searchResultSummary(results, "历史")).toBe("1 个页面 · 3 段正文匹配");
+  expect(searchResultSummary(results, "历史")).toBe("1 项内容 · 3 段正文匹配");
 });
 
 it("does not turn title-only evidence into body evidence or count a heading as a paragraph", () => {

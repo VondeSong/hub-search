@@ -42,7 +42,7 @@ export function resultPassage(result: SearchResult, query: string): { text: stri
 export function searchResultSummary(results: SearchResult[], query: string): string {
   const pages = groupQuickSearchResults(results).length;
   const passages = results.filter(result => resultPassage(result, query)?.body).length;
-  return `${pages} ${results.some(result => result.provider === "hub") ? "项内容" : "个页面"} · ${passages} 段正文匹配`;
+  return `${pages} 项内容 · ${passages} 段正文匹配`;
 }
 
 export function groupQuickSearchResults(results: SearchResult[]) {

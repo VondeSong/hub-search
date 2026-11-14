@@ -108,7 +108,7 @@ it("shows two passages, expands locally, reveals keyboard selection, and safely 
     await act(async () => node.querySelector<HTMLButtonElement>(".grouped-excerpt-toggle")!.click());
     expect(node.querySelectorAll(".grouped-search-hit")).toHaveLength(2);
     expect(node.querySelector("[aria-current=true]")?.textContent).toContain("片段 0");
-    expect(searchResultSummary(results, "历史")).toBe("1 个页面 · 4 段正文匹配");
+    expect(searchResultSummary(results, "历史")).toBe("1 项内容 · 4 段正文匹配");
   } finally { await act(async () => root.unmount()); }
 });
 
@@ -116,7 +116,7 @@ it("renders title/path-only evidence once without leaking unrelated body text", 
   const raw = normalizeQuickSearchResults([0, 1, 2].map(i => ({ id: `a${i}`, documentId: "a", spaceId: "s", title: "使用AI", path: "Main / 使用AI", snippet: "不相关正文及元数据", matchTerms: ["使用AI"], matchField: "title,path" })));
   const results = prepareQuickSearchResults(raw, "使用AI");
   expect(results).toHaveLength(1);
-  expect(searchResultSummary(results, "使用AI")).toBe("1 个页面 · 0 段正文匹配");
+  expect(searchResultSummary(results, "使用AI")).toBe("1 项内容 · 0 段正文匹配");
   const node = document.createElement("div"); const root = createRoot(node); const open = vi.fn();
   try {
     await act(async () => root.render(<QuickSearchResultList query="使用AI" results={results} selectedIndex={0} renderLibraryIcon={() => null} onSelectResult={() => {}} onOpenResult={open} />));
