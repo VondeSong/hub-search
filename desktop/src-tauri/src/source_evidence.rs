@@ -7,6 +7,7 @@ use sha2::{Digest, Sha256};
 pub(crate) mod analysis;
 mod attachment;
 mod change_hints;
+mod craft_text;
 mod links;
 pub(crate) mod local_text;
 mod task_hints;
@@ -812,7 +813,12 @@ impl EvidenceReader {
                 page_id,
             } => {
                 let record = document_record(c, library_id, document_id)?;
-                let full_body = record.body(&self.root)?;
+                let raw_body = record.body(&self.root)?;
+                let (full_body, unread_images) = if record.provider == PROVIDER_CRAFT {
+                    craft_text::project(&raw_body)
+                } else {
+                    (raw_body, 0)
+                };
                 let mut body = full_body.clone();
                 if let Some(page) = page_id {
                     if record.provider != PROVIDER_CRAFT {
@@ -822,7 +828,7 @@ impl EvidenceReader {
                         .ok_or("Craft 页面已不存在或无法精确定位")?;
                 }
                 let version = EvidenceVersion::Document(fingerprint(
-                    &json!({"locator":locator,"hash":record.content_hash,
+                    &json!({"locator":locator,"hash":if unread_images > 0 { format!("{:x}", Sha256::digest(full_body.as_bytes())) } else {record.content_hash.clone()},
                     "body":full_body,"title":record.title,"path":record.path}),
                 ));
                 Ok(Snapshot {
@@ -831,7 +837,7 @@ impl EvidenceReader {
                     title: record.title,
                     path: record.path,
                     body,
-                    facts: json!({"sourceHash":record.content_hash,"provider":record.provider}),
+                    facts: json!({"sourceHash":record.content_hash,"provider":record.provider,"unreadImageCount":unread_images}),
                 })
             }
             EvidenceLocator::Attachment { .. } => self.attachment_snapshot(c, locator),

@@ -1,6 +1,6 @@
 export type InsightMethodDependency={kind:string;title:string};
 import type { Evidence } from "./AgentDelivery";
-export type InsightSource={ evidenceId:string;quote?:string;excerpt:Evidence & {locator:unknown;version:unknown;facts?:{provider?:string}} };
+export type InsightSource={ evidenceId:string;quote?:string;excerpt:Evidence & {locator:unknown;version:unknown;facts?:{provider?:string;unreadImageCount?:number}} };
 export type InsightOrigin={workId:string;runId:string;deliveryRecordId:string;deliveryHash:string;generatedAt:number};
 export type InsightSnapshot={text:string;methodDependencies?:InsightMethodDependency[];reviewOutcome?:{kind:"maintain"|"revise";comparison:string;previousRevision:number;origin:InsightOrigin};reviewDependency?:{nature:"fact"|"selfReported"|"coOccurrence"|"inference";dependencies:{kind:string;quote:string;nature?:string;version?:number}[]};origin:InsightOrigin;sourceCitations:InsightSource[];contextDependencies:InsightSource[];userContextRefs:{feedbackId:string;text:string;nature:string}[]};
 export type InsightReason={id:string;kind:string;active:boolean;reference?:{feedbackId?:string}};
