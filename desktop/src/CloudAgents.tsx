@@ -3,15 +3,16 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { Archive, ArrowUp, Camera, ChevronRight, Cloud, Image, MessageSquare, MoreHorizontal, PanelLeft, Plus, Search, Settings2, Square, Video, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import ReactMarkdown from "react-markdown";
-import { imageUpload, outbox, uploadSize, videoUploads, type CloudSkillPayload, type DraftTurn, type Upload } from "./CloudAgentMedia";
+import { imageUpload, outbox, uploadSize, videoUploads, type CloudSkillPayload, type DraftTurn, type Upload, type MaterialSnapshot } from "./CloudAgentMedia";
 import "./CloudAgents.css";
+import {CloudMaterialPicker,CloudAnswerNote} from "./CloudAgentMaterials";
 import { runtimeCapabilities } from "./RuntimePlatform";
 
 type Connection = { endpoint: string; binding: string };
 type Account = { state: "unknown" | "ready" | "login" | "quota"; plan?: string; model?: string; limits?: { usedPercent?: number; windowDurationMins?: number }[] };
 type Summary = { id: string; title: string; updated: number; archived?: boolean; preview?: string; status?: Turn["status"]; matches?: boolean };
 type Attachment = { id: string; name: string; seconds?: number | null };
-type Turn = { id: string; seq: number; text: string; answer: string; error?: string; status: "queued" | "running" | "stopping" | "completed" | "failed" | "stopped"; attachments: Attachment[] };
+type Turn = { id: string; seq: number; text: string; answer: string; error?: string; status: "queued" | "running" | "stopping" | "completed" | "failed" | "stopped"; attachments: Attachment[]; material?:MaterialSnapshot };
 type Thread = Summary & { turns: Turn[]; before: number | null; skill?: { name: string; version: string; paths: string[] } | null };
 type SkillChoice = { name: string; title: string; methodVersion: string; paths: string[] };
 const active = (turn?: Pick<Turn, "status">) => turn && ["queued", "running", "stopping"].includes(turn.status);
@@ -62,6 +63,9 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
   const [notice, setNotice] = useState("");
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<Upload[]>([]);
+  const [material,setMaterial]=useState<MaterialSnapshot>();
+  const [materialPicker,setMaterialPicker]=useState(false);
+  const [checkedAt,setCheckedAt]=useState<number>();
   const [skills, setSkills] = useState<SkillChoice[]>();
   const [skillVersion, setSkillVersion] = useState("");
   const [skillPaths, setSkillPaths] = useState<string[]>([]);
@@ -75,7 +79,7 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
   const sending = useRef(false);
   const listScroll = useRef(0);
   const list = useRef<HTMLDivElement>(null);
-  const drafts = useRef(new Map<string, { text: string; attachments: Upload[]; skillVersion: string; skillPaths: string[] }>());
+  const drafts = useRef(new Map<string, { text: string; attachments: Upload[]; material?:MaterialSnapshot; skillVersion: string; skillPaths: string[] }>());
   const current = snapshot?.id === selected ? snapshot : undefined;
   const last = current?.turns[current.turns.length - 1];
   const binding = connection?.binding;
@@ -150,7 +154,7 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
           setAccount(data.account);
           if (active(data.thread.turns[data.thread.turns.length - 1])) delay = 700;
         }
-        if (live) setNetwork("");
+        if (live) { setNetwork(""); setCheckedAt(Date.now()); }
       } catch (error) {
         if (live) setNetwork(errorText(error));
       } finally {
@@ -175,9 +179,9 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
   }, [binding, current, pending]);
 
   function select(id?: string, sent = false) {
-    drafts.current.set(selected ?? "new", sent ? { text: "", attachments: [], skillVersion: "", skillPaths: [] } : { text, attachments, skillVersion, skillPaths });
+    drafts.current.set(selected ?? "new", sent ? { text: "", attachments: [], skillVersion: "", skillPaths: [] } : { text, attachments, material, skillVersion, skillPaths });
     const draft = sent ? undefined : drafts.current.get(id ?? "new");
-    setText(draft?.text ?? ""); setAttachments(draft?.attachments ?? []);
+    setText(draft?.text ?? ""); setAttachments(draft?.attachments ?? []); setMaterial(draft?.material); setMaterialPicker(false);
     setSkillVersion(draft?.skillVersion ?? ""); setSkillPaths(draft?.skillPaths ?? []);
     follow.current = true;
     setSelected(id);
@@ -217,7 +221,7 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
     try {
       const value = await call<Connection>("connect", { endpoint, token });
       if (value.binding !== binding) {
-        setCatalog([]); setCatalogQuery(undefined); setSnapshot(undefined); setAccount(undefined); setPending(undefined); setText(""); setAttachments([]); setSelected(undefined); drafts.current.clear(); showList();
+        setCatalog([]); setCatalogQuery(undefined); setSnapshot(undefined); setAccount(undefined); setPending(undefined); setText(""); setAttachments([]); setMaterial(undefined); setSelected(undefined); drafts.current.clear(); showList();
       }
       setConnection(value);
       setEndpoint(value.endpoint);
@@ -230,7 +234,7 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
 
   async function send(event?: FormEvent) {
     event?.preventDefault();
-    if (!binding || sending.current || preparing || archived || (pending && pending.thread !== selected) || (!pending && (!text.trim() && !attachments.length || active(last)))) return;
+    if (!binding || sending.current || preparing || archived || (pending && pending.thread !== selected) || (!pending && (!text.trim() && !attachments.length && !material || active(last)))) return;
     sending.current = true;
     setBusy(true);
     setNotice("");
@@ -238,15 +242,15 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
       const skill = !pending && chosenSkill && !boundSkill
         ? await call<CloudSkillPayload>("prepareSkill", { version: chosenSkill.methodVersion, paths: skillPaths })
         : undefined;
-      const draft = pending ?? { thread: selected ?? crypto.randomUUID(), turn: crypto.randomUUID(), text: text.trim(), attachments, skill };
+      const draft = pending ?? { thread: selected ?? crypto.randomUUID(), turn: crypto.randomUUID(), text: text.trim(), attachments, skill, material };
       if (!pending) {
         await outbox(binding, draft);
         setPending(draft);
-        setText(""); setAttachments([]);
+        setText(""); setAttachments([]); setMaterial(undefined);
       }
       if (selected !== draft.thread) select(draft.thread, true);
       drafts.current.delete(draft.thread);
-      await call("send", { thread: draft.thread, turn: draft.turn, message: { text: draft.text, attachments: draft.attachments, ...(draft.skill && { skill: draft.skill }) } });
+      await call("send", { thread: draft.thread, turn: draft.turn, message: { text: draft.text, attachments: draft.attachments, ...(draft.skill && { skill: draft.skill }), ...(draft.material && {material:draft.material}) } });
       follow.current = true;
       refresh(v => v + 1);
     } catch (error) { setNotice(errorText(error)); refresh(v => v + 1); }
@@ -298,6 +302,7 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
   const stamp = (value: number) => new Date(value).toLocaleString("zh-CN", new Date(value).toDateString() === new Date().toDateString() ? { hour: "2-digit", minute: "2-digit" } : { month: "numeric", day: "numeric" });
 
   return <section className="cloud-agents" aria-label="云端 Agents">
+    {materialPicker&&<CloudMaterialPicker onClose={()=>setMaterialPicker(false)} onConfirm={value=>{setMaterial(value);setMaterialPicker(false);}}/>}
     <header className="cloud-agents-header">
       {connection && <button type="button" onClick={showList} aria-label="对话列表"><PanelLeft size={20} /></button>}
       <div><h1>{chatOpen ? selected ? current?.title || catalog.find(item => item.id === selected)?.title || "Agents" : "新对话" : "Agents"}</h1><span>{connectionLabel}</span></div>
@@ -310,7 +315,8 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
       {onClose && <button type="button" onClick={runtimeCapabilities.mobile && chatOpen ? showList : onClose} aria-label={runtimeCapabilities.mobile && chatOpen ? "返回会话列表" : "关闭云端 Agents"}><X size={21} /></button>}
     </header>
     {connection === undefined ? <p className="cloud-agents-empty" role="status">正在读取连接…</p> : !connection || settings ? <form className="cloud-agents-connect" onSubmit={event => void connect(event)}>
-      <h2><Cloud size={22} /> 连接 VPS</h2>
+      <h2><Cloud size={22} /> 连接与设备</h2>
+      {connection&&<><p role="status">{connectionLabel}</p><p>{connection.endpoint}</p>{network&&<p role="alert">{network}</p>}<small>{checkedAt?`最近成功读取：${new Date(checkedAt).toLocaleString()}`:'尚未取得本次连接状态'}</small>{pending&&<p>有一条待确认消息，已保存在此设备；云端是否接收仍待核对。返回原会话后可用原编号重试。</p>}<p>断线不会自动取消已被云端接收的任务。恢复后核对原请求，不自动创建另一轮；订阅登录或额度异常不会切换付费 API。</p><button type="button" onClick={()=>{setSettings(false);refresh(v=>v+1);}}>返回并重新读取</button></>}
       <label>服务地址<input type="url" value={endpoint} onChange={event => setEndpoint(event.target.value)} placeholder="https://agents.example.com" required autoCapitalize="none" /></label>
       <label>设备密钥<input type="password" value={token} onChange={event => setToken(event.target.value)} autoComplete="off" required /></label>
       <button className="cloud-agents-primary" disabled={busy}>{busy ? "正在连接…" : "连接"}</button>
@@ -336,10 +342,11 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
           {(before === undefined ? current?.before : before) && <button type="button" disabled={loadingEarlier} onClick={() => void loadEarlier()}>查看更早消息</button>}
           {turns.length === 0 && <div className="cloud-agents-empty"><h2>{selected && known ? "正在读取对话…" : "新对话"}</h2></div>}
           {turns.map(turn => <article key={turn.id} className="cloud-agents-turn">
-            <div className="cloud-agents-user">{turn.text}{turn.attachments.map(file => <AttachmentPreview key={file.id} file={file} />)}</div>
+            <div className="cloud-agents-user">{turn.text}{turn.material&&<details><summary>资料 · {turn.material.title}</summary><small>{turn.material.source} · 本轮发送的正文快照</small><pre>{turn.material.text}</pre></details>}{turn.attachments.map(file => <AttachmentPreview key={file.id} file={file} />)}</div>
             <div className="cloud-agents-answer">
               {turn.answer && <ReactMarkdown skipHtml components={{ img: () => null, a: ({ href, children }) => <a href={href} onClick={event => { event.preventDefault(); if (href?.startsWith("https://")) void openUrl(href).catch(() => setNotice("无法打开链接。")); }}>{children}</a> }}>{turn.answer}</ReactMarkdown>}
               {turn.status !== "completed" && <small>{turn.error || statusText[turn.status]}</small>}
+              {turn.status==="completed"&&turn.answer&&current&&<CloudAnswerNote key={(binding||"")+turn.id} thread={current.id} turn={turn.id}/>}
             </div>
           </article>)}
         </div>
@@ -362,15 +369,17 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
             <button type="button" onClick={() => void send()} disabled={busy}>用原编号重试</button>
             <button type="button" disabled={busy} onClick={() => { if (binding) void outbox(binding, null).then(() => setPending(undefined)).catch(error => setNotice(errorText(error))); }}>移除本机重试</button>
           </div> : <>
+            {material&&<details><summary>本次正文 · {material.title}</summary><small>{material.source} · 仅用于下一次发送</small><pre>{material.text}</pre><button type="button" onClick={()=>setMaterial(undefined)}>移除本次资料</button></details>}
             {!!attachments.length && <div className="cloud-agents-files">{attachments.map((file, index) => <button type="button" key={index} disabled={preparing} onClick={() => setAttachments(list => list.filter((_, i) => i !== index))} aria-label={`移除 ${attachmentLabel(file)}`}>{attachmentLabel(file)} <X size={14} /></button>)}</div>}
             {attachments.some(file => file.seconds != null) && <small>将发送带时间戳的关键帧，短暂变化可能漏掉。</small>}
           <textarea value={text} onChange={event => setText(event.target.value)} disabled={archived} maxLength={20000} placeholder={archived ? "恢复会话后可继续提问" : "给 Agents 发消息"} aria-label="消息" rows={2} />
             <div className="cloud-agents-tools">
+              <button type="button" disabled={busy||preparing||archived} onClick={()=>setMaterialPicker(true)}>资料</button>
               <label title="拍照"><Camera size={19} /><input type="file" aria-label="拍照" accept="image/*" capture="environment" disabled={busy || preparing} onChange={event => { void add(event.currentTarget.files); event.currentTarget.value = ""; }} /></label>
               <label title="选择图片"><Image size={19} /><input type="file" aria-label="选择图片" accept="image/jpeg,image/png,image/webp" multiple disabled={busy || preparing} onChange={event => { void add(event.currentTarget.files); event.currentTarget.value = ""; }} /></label>
               <label title="选择短视频"><Video size={19} /><input type="file" aria-label="选择短视频" accept="video/*" disabled={busy || preparing} onChange={event => { void add(event.currentTarget.files, true); event.currentTarget.value = ""; }} /></label>
               {preparing && <span role="status">正在处理附件…</span>}
-              {active(last) ? <button type="button" className="cloud-agents-primary" aria-label="停止生成" disabled={last?.status === "stopping"} onClick={() => void stop()}><Square size={18} /></button> : <button type="submit" className="cloud-agents-primary" aria-label="发送" disabled={archived || busy || preparing || (!text.trim() && !attachments.length)}><ArrowUp size={20} /></button>}
+              {active(last) ? <button type="button" className="cloud-agents-primary" aria-label="停止生成" disabled={last?.status === "stopping"} onClick={() => void stop()}><Square size={18} /></button> : <button type="submit" className="cloud-agents-primary" aria-label="发送" disabled={archived || busy || preparing || (!text.trim() && !attachments.length && !material)}><ArrowUp size={20} /></button>}
             </div>
           </>}
         </form>

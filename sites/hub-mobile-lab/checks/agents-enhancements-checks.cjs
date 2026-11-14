@@ -124,6 +124,8 @@ async function check() {
   assert.ok(elements['#agent-material-selected'].textContent.includes('已选 2 项'));
   assert.equal(elements['#agent-material-apply'].disabled, false);
   context.handleAgentAction('agent-material-apply', materialId);
+  assert.equal(thread(materialId).attachments.length, 1, 'Preview must not attach any selected text');
+  context.handleAgentAction('agent-material-confirm', materialId);
   assert.equal(thread(materialId).attachments.length, 3);
   assert.ok(thread(materialId).attachments.some(item => item.id === 'keep-image'));
   assert.ok(thread(materialId).attachments.some(item => item.recordId === 'note-7'));
