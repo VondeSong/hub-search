@@ -390,6 +390,10 @@ it("persists a real topic reference and view state without writing to any source
     expect(saved[0].items[0]).toEqual(expect.objectContaining({kind:"document",result:expect.objectContaining({libraryId:"vault"})}));
     expect(invoke.mock.calls.every(([command])=>command==="library_contents")).toBe(true);
     expect(JSON.parse(profile.get(LIBRARY_BROWSE_STATE_KEY)!)).toEqual(expect.objectContaining({mode:"tree",readerOpen:true}));
+    const other={...library,id:"other",name:"其他库"};
+    await act(async()=>root.render(<LibraryBrowse libraries={[library,other]} position={{libraryId:"other",folderId:""}}
+      onPosition={vi.fn()} onPreview={vi.fn()} onClosePreview={vi.fn()}/>));
+    expect(container.querySelector(".library-browser-shortcuts")?.textContent).toContain("验收资料1");
     await act(async()=>root.unmount());
     const restored=createRoot(container);
     try {

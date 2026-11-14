@@ -528,7 +528,7 @@ export function LibraryBrowse({
           </button>
           {topics.map(topic => <button key={topic.id} className="library-browser-row" aria-current={topic.id === activeTopicId ? "page" : undefined}
             onClick={() => { onPosition({libraryId: "", folderId: ""}); setActiveTopicId(topic.id); setShowFavorites(false); clearSearch(); onClosePreview(); }}>
-            <Layers size={16} /><span>{topic.name}</span><small>{visibleReferences(topic.items).length}</small></button>)}
+            <Layers size={16} /><span>{topic.name}</span><small>{topic.items.filter(item => libraryIds.includes(referenceLibrary(item))).length}</small></button>)}
         </div>
         <div className="library-browser-topic-heading"><span>专题</span><button className="library-browser-icon" aria-label="新建专题"
           onClick={() => { setTopicEditor({name: ""}); setTopicError(""); }}><Plus size={14} /></button></div>
