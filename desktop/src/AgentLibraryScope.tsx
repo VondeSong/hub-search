@@ -13,11 +13,12 @@ export function readLibraryDrop(raw:string):AgentLibrary[] {
   if(!Array.isArray(values)||!values.length||values.length>256||values.some(v=>!v||typeof v.id!=="string"||!v.id.trim()||v.id!==v.id.trim()||v.id.length>1024||typeof v.name!=="string"||v.name.length>200))throw Error("无法识别资料库范围");
   return [...new Map(values.map(v=>[v.id,{id:v.id,name:v.name}])).values()];
 }
-export function AgentLibraryScope({ selected, disabled, onChange, registry: suppliedRegistry }: {
+export function AgentLibraryScope({ selected, disabled, onChange, registry: suppliedRegistry, description }: {
   selected: AgentLibrary[];
   disabled: boolean;
   onChange: (items: AgentLibrary[]) => void;
   registry?: AgentLibraryRegistry;
+  description?: string;
 }) {
   const localRegistry = useAgentLibraryRegistry(!suppliedRegistry);
   const registry = suppliedRegistry || localRegistry;
@@ -44,7 +45,7 @@ export function AgentLibraryScope({ selected, disabled, onChange, registry: supp
       <strong>允许查找的资料库</strong>
       <button type="button" className="agent-library-refresh" aria-label="刷新资料库" title="刷新资料库" disabled={loading} onClick={() => void reload()}><RefreshCw size={15} className={loading ? "spin" : undefined} aria-hidden="true" /></button>
     </div>
-    <p className="agent-library-hint">随下一条消息生效；单独添加的页面继续保留。</p>
+    <p className="agent-library-hint">{description ?? "随下一条消息生效；单独添加的页面继续保留。"}</p>
     <label className="agent-library-search">
       <Search size={16} aria-hidden="true" />
       <input type="search" aria-label="搜索资料库" placeholder="搜索资料库" value={query} onChange={event => setQuery(event.target.value)} />
