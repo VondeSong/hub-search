@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "29ed068217aebecbba4ae83a249b3058d38fe88d",
-  "published_version": 80,
-  "deployment_id": "appgdep_6af4828e1fdc8191a923e63ae24e034b",
+  "source_commit": "f1b88180c62b436a7f8b3c51f1f6d3ad0b2e27ed",
+  "published_version": 81,
+  "deployment_id": "appgdep_6af7cd2def3481919c7661aa121fb55e",
   "files": {
     ".gitignore": {
       "sha256": "5ca3c39bdc1288c108a1931b3f6bc5795464b6253e9457390617774259deed0c",
@@ -23,9 +23,9 @@
       "bytes": 91
     },
     "README.md": {
-      "sha256": "9c616ce45e5662914f2cf924e8e9e1390ddda966fe4038ee2404d265231b40a2",
+      "sha256": "ead1abc4b88c0c1186ae8cfd7ef15b2d2faba95ba8fd1349e92d987f3a793063",
       "mode": "100644",
-      "bytes": 30010
+      "bytes": 30551
     },
     "app/Assistant.tsx": {
       "sha256": "3fb7f08721d88bb6ebcd5422b0d5e9497af569439d62ddfe87cbb6b27484a3cc",
@@ -83,9 +83,9 @@
       "bytes": 11680
     },
     "app/CloudSyncCenter.tsx": {
-      "sha256": "04bef05cd61cb90b0fd4513f1b445f8409c4f42efd5dcbd46ad43e4a84fa3ee4",
+      "sha256": "f2c6ec6f27c805b73b16fd16bfe9c4463ca63e7b64357c1776e37ee6889ed860",
       "mode": "100644",
-      "bytes": 32418
+      "bytes": 31103
     },
     "app/FlashcardsSite.tsx": {
       "sha256": "9c3f605a3c51523958a0a394222ffef6369afe98ad2312dcbc831146686d8098",
@@ -93,9 +93,14 @@
       "bytes": 33207
     },
     "app/InsightPanel.tsx": {
-      "sha256": "5f525d388707b5defc64c12029ab10a294ce970b032bb0572e3714a8083fab18",
+      "sha256": "334d425df48835fd901886434f2c5d03606e76c7f64641500f269716aefb9011",
       "mode": "100644",
-      "bytes": 79084
+      "bytes": 82950
+    },
+    "app/InsightRecall.tsx": {
+      "sha256": "1c33d39d70fc27a9c3f3d83ae2af1f269ce02f61c10351fbd011839907a5c905",
+      "mode": "100644",
+      "bytes": 2266
     },
     "app/Insights.tsx": {
       "sha256": "59671a31decb5dedc64c7dc9fb205622e7e7e9f8e4207322fc5fab643a16628c",
@@ -178,9 +183,9 @@
       "bytes": 2550
     },
     "app/cloud-demo.ts": {
-      "sha256": "dc46d4e23c346c86ed7599945d987760def2d50c5c86dab7be44e8eddc633835",
+      "sha256": "2e8cf7f131b08d7282f290d9930bdf7aa09cc451cf17e6e941f2f34e63830502",
       "mode": "100644",
-      "bytes": 15542
+      "bytes": 15595
     },
     "app/cloud-sync.css": {
       "sha256": "b4078097157275dbaa1c13a395cfee60795c73d57b7b2eb92e0a7473d7705736",
@@ -223,9 +228,9 @@
       "bytes": 49141
     },
     "app/insight-ledger.ts": {
-      "sha256": "c7fc17ffe8022b18cf69541bf7ca0b45c7fb44140a0265f110250157858bf8f7",
+      "sha256": "b535d73f2ff55282980bec038d33bb9fb9c91187fc3428eeb624512f0cf38628",
       "mode": "100644",
-      "bytes": 55009
+      "bytes": 56382
     },
     "app/insight-migration.ts": {
       "sha256": "dbf982c968f675e2addd989f92b58b6e3cd35d45ff45f238df21c51cfb7b4109",
@@ -233,9 +238,14 @@
       "bytes": 35435
     },
     "app/insight-panel.css": {
-      "sha256": "08335094c27a608842fd4007571d6bdefe9a581d091c094ba3f52d8a01555ca4",
+      "sha256": "5b64cae855fccf76adfb19a755e19ac47f851ae461249bc11409776c18e65857",
       "mode": "100644",
-      "bytes": 73596
+      "bytes": 74296
+    },
+    "app/insight-recall.ts": {
+      "sha256": "eea19b98bfdf710a74373e8a01ef2ddafeea92ca658ea8da9df3643c56d15d0b",
+      "mode": "100644",
+      "bytes": 771
     },
     "app/insight-reports.ts": {
       "sha256": "863919b5f582532ae3279980a12c0231af2c83b67d8a950d20d9c622a2f26113",
@@ -777,6 +787,11 @@
       "mode": "100644",
       "bytes": 1832
     },
+    "docs/insights-dependency-confirmation.md": {
+      "sha256": "11dcb57069925bca0be5c85813b9ea08ac3c5da59ac061635e9c0b6e3658fdee",
+      "mode": "100644",
+      "bytes": 1764
+    },
     "docs/journal-controls-prototype.md": {
       "sha256": "e8ee0b8d0211fc44942fb5252a4f4b9314b82db2b80648f88fd831e0991a4d63",
       "mode": "100644",
@@ -958,9 +973,9 @@
       "bytes": 1397
     },
     "scripts/cloud-check.mjs": {
-      "sha256": "1daf46c2cf32716364387fe221e6cf3015f8d99419bd1e6faf4abadc8fa1f38e",
+      "sha256": "1c3647e1678ff6a10568739d495622819b06c63b765b6cbe7b70508c2ae6be1a",
       "mode": "100644",
-      "bytes": 10435
+      "bytes": 10645
     },
     "scripts/connector-preview/connector-preview-session.mjs": {
       "sha256": "57224ad185a25115a14fccc68d3217e55b199260c3dd98a2c807beffec1a0a9b",
@@ -1003,9 +1018,9 @@
       "bytes": 11446
     },
     "scripts/insight-ledger-check.ts": {
-      "sha256": "0e83cd7fd7564e5a336b58fbd76b5ce544ba39f42c63e189642f37e0b80a05ed",
+      "sha256": "5e2a3742f92542de5a512b040847470d73d920fbbafbdbe3105e36d3d4cb632e",
       "mode": "100644",
-      "bytes": 18130
+      "bytes": 19836
     },
     "scripts/install-ci.mjs": {
       "sha256": "4a5a92d60a08d0ba54effd8373da2da06284312c55b767287c68a0bec7200da7",
@@ -1118,5 +1133,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-12T10:52:08.111248+00:00"
+  "imported_at": "2026-11-14T02:54:30.092564+00:00"
 }
