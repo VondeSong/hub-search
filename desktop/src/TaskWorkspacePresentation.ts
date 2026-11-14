@@ -32,6 +32,10 @@ export type UnifiedTask = {
   statusMutation?: { operationId: number; state: "pending" | "failed" | "confirmed"; targetStatus: "open" | "completed"; error?: string };
   statusWriteBlockedReason?: string;
   modifiedAt?: number;
+  contentRevision?: string;
+  indexedAt?: number;
+  priority?: number;
+  tags?: string[];
   path: string;
   depth: number;
   isProject: boolean;
@@ -116,7 +120,8 @@ export function filterAndSortTasks(
   const needle = options.query.trim().toLocaleLowerCase();
   const filtered = tasks.filter((task) => {
     if (options.status !== "all" && task.status !== options.status) return false;
-    if (options.source !== "all" && task.provider !== options.source) return false;
+    if (options.source !== "all" && task.provider !== options.source
+      && !task.sourceRefs?.some(ref => ref.provider === options.source)) return false;
     if (!needle) return true;
     return `${task.title} ${task.documentTitle} ${task.libraryName}`.toLocaleLowerCase().includes(needle);
   });
@@ -140,12 +145,13 @@ export function filterAndSortTasks(
 }
 
 export function summarizeTasks(tasks: UnifiedTask[]) {
-  const summary = { total: 0, open: 0, completed: 0, abandoned: 0, linked: 0, craft: 0, dida365: 0, obsidian: 0 };
+  const summary = { total: 0, projects: 0, open: 0, completed: 0, abandoned: 0, linked: 0, craft: 0, dida365: 0, obsidian: 0 };
   for (const task of tasks) {
+    if (task.isProject) { summary.projects += 1; continue; }
     summary.total += 1;
     summary[task.status] += 1;
     if (task.syncState === "linked") summary.linked += 1;
-    summary[task.provider] += 1;
+    for (const provider of new Set([task.provider, ...(task.sourceRefs || []).map(ref => ref.provider)])) summary[provider] += 1;
   }
   return summary;
 }

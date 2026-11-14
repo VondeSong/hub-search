@@ -19,8 +19,9 @@ it("keeps cyclic and missing-parent directories reachable without changing sourc
   const folders = [{id:"a",name:"甲",parentId:"b"},{id:"b",name:"乙",parentId:"a"},{id:"c",name:"丙",parentId:"unknown"}];
   const before = JSON.stringify(folders);
   const tree = groupBrowseContents({folders,documents:[],craftLocationsSynced:true});
-  expect(tree.children.get("")?.map(item => item.id).sort()).toEqual(["a","b","c"]);
-  expect(tree.brokenParents.size).toBe(3);
+  expect(tree.children.get("")?.map(item => item.id).sort()).toEqual(["a","c"]);
+  expect(browseTrail(tree,"b").map(item=>item.id)).toEqual(["a","b"]);
+  expect(tree.detached.size).toBe(2);
   expect(JSON.stringify(folders)).toBe(before);
 });
 
@@ -51,6 +52,125 @@ it("keeps duplicate names distinct and scopes results by identity", () => {
   expect(tree.unresolved.map(node => node.id)).toEqual(["unresolved"]);
 });
 
+it("keeps folders reachable when cached parents are missing or cyclic", () => {
+  const tree = groupBrowseContents({ ...contents, folders: [
+    { id: "a", name: "目录 A", parentId: "b" },
+    { id: "b", name: "目录 B", parentId: "a" },
+    { id: "self", name: "自身循环", parentId: "self" },
+    { id: "orphan", name: "缺少上级", parentId: "missing" },
+    { id: "child", name: "正常下级", parentId: "b" },
+  ] });
+  const reachable = new Set<string>();
+  const visit = (parent: string) => {
+    for (const folder of tree.children.get(parent) ?? []) {
+      expect(reachable.has(folder.id)).toBe(false);
+      reachable.add(folder.id); visit(folder.id);
+    }
+  };
+  visit("");
+  expect(reachable.size).toBe(5);
+  expect(browseTrail(tree, "child").map(node => node.id)).toEqual(["a", "b", "child"]);
+  expect(browseFolderScope(tree, "a", true)).toEqual(["a", "b", "child"]);
+  expect(tree.detached).toEqual(new Set(["a", "self", "orphan"]));
+  expect(tree.nodes.get("a")?.parentId).toBe("b");
+});
+
+it("groups a deep cache iteratively and retains every document in its folder scope", () => {
+  const folders = Array.from({ length: 10000 }, (_, index) => ({
+    id: `folder-${index}`, name: `目录 ${index}`, parentId: index < 9999 ? `folder-${index + 1}` : undefined,
+  }));
+  const documents = Array.from({ length: 10000 }, (_, index) => ({
+    id: `doc-${index}`, title: `文档 ${index}`, path: `${index}.md`, folderId: `folder-${index}`,
+  }));
+  const tree = groupBrowseContents({ folders, documents, craftLocationsSynced: false });
+  expect(tree.detached.size).toBe(0);
+  expect(browseTrail(tree, "folder-0")).toHaveLength(10000);
+  expect(browseFolderScope(tree, "folder-9999", true)).toHaveLength(10000);
+  expect(tree.pages.get("folder-0")?.[0].id).toBe("doc-0");
+  expect(tree.documentFolders.size).toBe(10000);
+});
+
+it("locates each Feishu shortcut in its own folder while preserving one document identity", async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  const library: LibrarySummary = { id: "wiki", provider: "feishu", name: "知识空间", connected: true, documentCount: 1, excludedPaths: [] };
+  invoke.mockResolvedValue({
+    folders: [{ id: "original", name: "原位置" }, { id: "shortcut", name: "快捷方式位置" }],
+    documents: [
+      { id: "shared", nodeId: "original-node", title: "接口说明", path: "原位置/接口说明", folderId: "original" },
+      { id: "shared", nodeId: "shortcut-node", title: "接口说明", path: "快捷方式位置/接口说明", folderId: "shortcut" },
+    ], craftLocationsSynced: false,
+  });
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  const onPosition = vi.fn(), onPreview = vi.fn();
+  try {
+    await act(async () => root.render(<LibraryBrowse libraries={[library]} onPosition={onPosition}
+      onPreview={onPreview} onClosePreview={vi.fn()} />));
+    const rows = Array.from(container.querySelectorAll(".library-browser-result"));
+    expect(rows).toHaveLength(2);
+    const locate = rows[1].querySelector<HTMLButtonElement>(".library-browser-result-actions button")!;
+    await act(async () => locate.click());
+    expect(onPosition).toHaveBeenCalledWith({ libraryId: "wiki", folderId: "shortcut", documentId: "shared" });
+    expect(onPreview).toHaveBeenCalledWith(expect.objectContaining({
+      documentId: "shared", entityKey: "wiki:wiki:shortcut-node:shared", folderId: "shortcut",
+    }));
+    await act(async () => root.render(<LibraryBrowse libraries={[library]} position={{ libraryId: "wiki", folderId: "shortcut" }}
+      onPosition={onPosition} onPreview={onPreview} onClosePreview={vi.fn()} />));
+    invoke.mockResolvedValueOnce([{
+      id: "shared", documentId: "shared", spaceId: "wiki", provider: "feishu", title: "接口说明", folderId: "original",
+    }]);
+    const input = container.querySelector<HTMLInputElement>('input[aria-label="在当前目录搜索"]')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "接口");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(invoke).toHaveBeenCalledWith("local_search", expect.objectContaining({ documentIds: ["shared"], folderIds: null }));
+    const scopedLocate = Array.from(container.querySelectorAll("button")).find(button => button.textContent === "定位")!;
+    await act(async () => scopedLocate.click());
+    expect(onPosition).toHaveBeenLastCalledWith({ libraryId: "wiki", folderId: "shortcut", documentId: "shared" });
+  } finally {
+    await act(async () => root.unmount()); invoke.mockReset();
+  }
+});
+
+it("bounds initial folder rendering and can reveal a selected path beyond the first page", async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  const previousScroll = Element.prototype.scrollIntoView;
+  let scrolled: Element | undefined;
+  Element.prototype.scrollIntoView = function () { scrolled = this; };
+  const library: LibrarySummary = { id: "large", provider: "obsidian", name: "大库", connected: true, documentCount: 10000, excludedPaths: [] };
+  const folders = Array.from({ length: 1000 }, (_, index) => ({ id: `folder-${index}`, name: `目录 ${String(index).padStart(4, "0")}` }));
+  invoke.mockResolvedValue({ folders, documents: [], craftLocationsSynced: false });
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  const onPosition = vi.fn();
+  const render = (position: LibraryPosition) => root.render(<LibraryBrowse libraries={[library]} position={position}
+    onPosition={onPosition} onPreview={vi.fn()} onClosePreview={vi.fn()} />);
+  try {
+    await act(async () => render({ libraryId: library.id, folderId: "" }));
+    const list = container.querySelector('[aria-label="当前目录内容"]')!;
+    expect(list.querySelectorAll(".library-browser-row").length).toBe(100);
+    const more = Array.from(list.querySelectorAll("button")).find(button => button.textContent === "显示更多目录")!;
+    expect(more).toBeDefined();
+    await act(async () => more.click());
+    expect(list.querySelectorAll(".library-browser-row").length).toBe(200);
+    await act(async () => render({ libraryId: library.id, folderId: "folder-999" }));
+    const tree = container.querySelector('[aria-label="资料库目录"]')!;
+    expect(tree.querySelector('[aria-current="location"]')?.textContent).toContain("目录 0999");
+    expect(scrolled).toBe(tree.querySelector('[aria-current="location"]'));
+    expect(tree.querySelectorAll("ul .library-browser-row").length).toBeLessThanOrEqual(201);
+    const columnsButton = Array.from(container.querySelectorAll("button")).find(button => button.textContent === "分栏浏览")!;
+    await act(async () => columnsButton.click());
+    const rootColumn = container.querySelectorAll(".library-browser-column")[1];
+    expect(rootColumn.querySelector('[aria-current="location"]')?.textContent).toBe("目录 0999");
+    expect(rootColumn.querySelectorAll(".library-browser-row")).toHaveLength(201);
+  } finally {
+    await act(async () => root.unmount()); invoke.mockReset();
+    Element.prototype.scrollIntoView = previousScroll;
+  }
+});
+
 it("loads a cached library, searches descendants and locates a preview inside its actual folder", async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   const library: LibrarySummary = { id: "vault", provider: "obsidian", name: "本地库", connected: false, documentCount: 3, excludedPaths: [] };
@@ -60,7 +180,7 @@ it("loads a cached library, searches descendants and locates a preview inside it
   let position: LibraryPosition = { libraryId: library.id, folderId: "a" };
   let selected: SearchResult | undefined;
   invoke.mockImplementation(async command => command === "library_contents" ? contents : [{
-    id: "nested", documentId: "nested", spaceId: library.id, provider: "obsidian", title: "搜索命中", path: "a/b/nested.md",
+    id: "nested", documentId: "nested", spaceId: library.id, provider: "obsidian", title: "搜索命中", path: "a/b/nested.md", folderId: "c",
   }]);
   const render = () => root.render(<LibraryBrowse
     libraries={[library]} position={position} selected={selected}

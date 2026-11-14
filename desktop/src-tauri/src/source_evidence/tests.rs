@@ -1,6 +1,48 @@
 use super::*;
 
 #[test]
+fn craft_text_proof_survives_image_access_renewal_but_not_text_or_caption_changes() {
+    let f = Fixture::new();
+    let body = "<content>\n  先做小样验证。\n  ![示意图](https://r.craft.do/original)\n</content>";
+    let persist = |value: &str| {
+        f.note("craft", "picture", value);
+        f.c()
+            .execute(
+                "UPDATE documents SET provider='craft' WHERE space_id='craft' AND id='picture'",
+                [],
+            )
+            .unwrap();
+    };
+    persist(body);
+    let locator = EvidenceLocator::Note {
+        library_id: "craft".into(),
+        document_id: "picture".into(),
+        page_id: None,
+    };
+    let reader = f.reader(&["craft"], &[]);
+    let excerpt = reader.read(&locator, 0, 20000, None).unwrap();
+    assert_eq!(excerpt.facts["unreadImageCount"], 1);
+    assert!(!excerpt.content.contains("https://r.craft.do/"));
+    let partial = reader.read(&locator, 2, 17, None).unwrap();
+    persist(&body.replace("/original", "/a-new-and-longer-access-address"));
+    reader.verify(&excerpt).unwrap();
+    reader.verify(&partial).unwrap();
+    assert_eq!(
+        reader
+            .read(&locator, 0, 20000, Some(&excerpt.version))
+            .unwrap()
+            .content,
+        excerpt.content
+    );
+    persist(&body.replace("小样", "批量"));
+    assert!(reader.verify(&excerpt).is_err());
+    persist(&body.replace("示意图", "新说明"));
+    assert!(reader.verify(&excerpt).is_err());
+    persist(&body.replace("![示意图]", "[示意图]"));
+    assert!(reader.verify(&excerpt).is_err());
+}
+
+#[test]
 fn exact_task_projection_and_metadata_hints_keep_unrelated_bodies_out() {
     use rusqlite::hooks::{AuthAction, AuthContext, Authorization};
     let f = Fixture::new();

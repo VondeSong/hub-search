@@ -27,6 +27,7 @@ export type TaskSyncReview = {
 export type UnifiedTaskDashboard = {
   tasks: UnifiedTask[];
   total: number;
+  projects?: number;
   open: number;
   completed: number;
   craft: number;
@@ -62,8 +63,8 @@ function sameIdentity(left: UnifiedTask, right: UnifiedTask): boolean {
 }
 
 function countedDashboard(dashboard: UnifiedTaskDashboard, tasks: UnifiedTask[]): UnifiedTaskDashboard {
-  const { total, open, completed, craft, dida365, obsidian, linked } = summarizeTasks(tasks);
-  return { ...dashboard, tasks, total, open, completed, craft, dida365, obsidian, linked };
+  const { total, projects, open, completed, craft, dida365, obsidian, linked } = summarizeTasks(tasks);
+  return { ...dashboard, tasks, total, projects, open, completed, craft, dida365, obsidian, linked };
 }
 
 /** One unfiltered local dashboard for every task consumer in this application session. */

@@ -67,7 +67,8 @@ fn load_impl(
                         ),d.title),
                         d.path,b.block_id,b.parent_task_id,
                         b.title,b.completed,b.depth,b.modified_at,b.parent_page_id,
-                        NULLIF(b.schedule_date,''),NULLIF(b.deadline_date,''),b.created_at
+                        NULLIF(b.schedule_date,''),NULLIF(b.deadline_date,''),b.created_at,
+                        b.source_hash,b.evidence_revision,d.content_hash,d.indexed_at
                  FROM craft_task_blocks b
                  JOIN libraries l ON l.id=b.space_id
                  JOIN documents d ON d.space_id=b.space_id AND d.id=b.document_id
@@ -108,6 +109,13 @@ fn load_impl(
                         created_at,
                         created_time_source,
                         modified_at: row.get(10)?,
+                        content_revision: format!(
+                            "{}:{}:{}",
+                            row.get::<_, String>(15)?,
+                            row.get::<_, i64>(16)?,
+                            row.get::<_, String>(17)?
+                        ),
+                        indexed_at: row.get(18)?,
                         path: row.get(4)?,
                         depth: row.get::<_, i64>(9)?.max(0) as usize,
                         is_project: false,
@@ -167,7 +175,8 @@ fn load_impl(
                 markdown,
                 modified_at,
             ) = row.map_err(|error| format!("无法读取 Craft/Obsidian 任务：{error}"))?;
-            tasks.extend(markdown_tasks(
+            let revision = format!("{:x}", Sha256::digest(markdown.as_bytes()));
+            let mut projected = markdown_tasks(
                 &provider,
                 &library_id,
                 &library_name,
@@ -176,7 +185,11 @@ fn load_impl(
                 &path,
                 &markdown,
                 modified_at,
-            ));
+            );
+            for task in &mut projected {
+                task.content_revision = revision.clone();
+            }
+            tasks.extend(projected);
         }
     }
     {
@@ -261,12 +274,13 @@ fn load_impl(
             .prepare(
                 "SELECT t.library_id,l.name,t.task_id,t.title,t.status,t.start_at,t.due_at,
                         d.modified_at,d.path,t.raw_json,
-                        COALESCE(NULLIF(p.name,''),t.project_id),t.project_id,t.completed_at
+                        COALESCE(NULLIF(p.name,''),t.project_id),t.project_id,t.completed_at,d.indexed_at
                  FROM dida_tasks t
                  JOIN libraries l ON l.id=t.library_id
                  LEFT JOIN documents d ON d.space_id=t.library_id AND d.id=t.task_id
                  LEFT JOIN dida_projects p ON p.library_id=t.library_id AND p.project_id=t.project_id
                  WHERE l.enabled=1 AND (?1 IS NULL OR l.id IN (SELECT value FROM json_each(?1)))
+                   AND UPPER(COALESCE(json_extract(CASE WHEN json_valid(t.raw_json) THEN t.raw_json ELSE '{}' END,'$.kind'),'TEXT')) <> 'NOTE'
                    AND (?2 IS NULL OR EXISTS(SELECT 1 FROM json_each(?2) s WHERE json_extract(s.value,'$[0]')=t.library_id AND json_extract(s.value,'$[1]')=t.task_id))
                  ORDER BY COALESCE(t.due_at,''),t.title",
             )
@@ -308,6 +322,22 @@ fn load_impl(
                         start_at: row.get(5)?,
                         due_at: row.get(6)?,
                         modified_at: row.get(7)?,
+                        content_revision: format!(
+                            "{:x}",
+                            Sha256::digest(raw.to_string().as_bytes())
+                        ),
+                        indexed_at: row.get(13)?,
+                        priority: raw.get("priority").and_then(Value::as_i64),
+                        tags: raw
+                            .get("tags")
+                            .and_then(Value::as_array)
+                            .map(|tags| {
+                                tags.iter()
+                                    .filter_map(Value::as_str)
+                                    .map(str::to_owned)
+                                    .collect()
+                            })
+                            .unwrap_or_default(),
                         path: row.get::<_, Option<String>>(8)?.unwrap_or_default(),
                         depth: 0,
                         is_project: false,
