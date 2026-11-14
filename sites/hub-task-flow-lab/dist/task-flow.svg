@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1290" viewBox="0 0 1000 1290" role="img" aria-labelledby="title desc">
+  <title id="title">Hub 任务闭环：从资料线索到可追溯的结果</title>
+  <desc id="desc">已有或明确新建任务直接进入。资料与 AI 建议先经过待整理，选择关联已有、确认新建或只留资料。现在分别显示硬截止、今日计划和最多五项的可选行动池。同一个任务执行或等待后恢复，完成后模拟来源同步。成功进入日志与回顾；失败重试同一操作，或先取消本次完成再编辑；待确认或结果未知时先核对，不盲目重试。全部外部能力为演示。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 1 1 L 8 5 L 1 9" fill="none" stroke="#89958d" stroke-width="1.7" stroke-linejoin="round"/></marker>
+    <marker id="arrow-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 1 1 L 8 5 L 1 9" fill="none" stroke="#527464" stroke-width="1.7" stroke-linejoin="round"/></marker>
+    <style>
+      text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;fill:#303a35}
+      .eyebrow{font-size:13px;letter-spacing:2px;fill:#718076}.title{font-size:27px;font-weight:600}.sub{font-size:15px;fill:#6b766e}.label{font-size:17px;font-weight:600}.body{font-size:14px;fill:#65726a}.small{font-size:12px;fill:#718076}.edge-label{font-size:12px;fill:#64756b}.node{fill:#fff;stroke:#e0e6e1;stroke-width:1.3}.soft{fill:#f3f6f1;stroke:#dbe4dc;stroke-width:1.3}.accent{fill:#eef4ef;stroke:#9db4a4;stroke-width:1.5}.quiet{fill:#f8f8f5;stroke:#e4e5de;stroke-width:1.2}.wait{fill:#fbf7ed;stroke:#e8d9b5;stroke-width:1.3}.error{fill:#fbf2ef;stroke:#e7cfc6;stroke-width:1.3}.line{fill:none;stroke:#89958d;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;marker-end:url(#arrow)}.accent-line{fill:none;stroke:#527464;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;marker-end:url(#arrow-accent)}.rule{stroke:#e2e7e1;stroke-width:1}.pill{fill:#e6eee8}.pill-text{fill:#526c5d;font-size:12px;font-weight:500}
+    </style>
+  </defs>
+  <rect width="1000" height="1290" rx="24" fill="#fcfdfb"/>
+  <text class="eyebrow" x="44" y="39">HUB · TASK FLOW</text>
+  <text class="title" x="44" y="77">少一份清单，多一个行动闭环。</text>
+  <text class="sub" x="44" y="103">滴答保留任务主档；Hub 连接依据、选择下一步、协助推进。</text>
+
+  <rect class="node" x="40" y="140" width="270" height="87" rx="15"/>
+  <text class="label" x="60" y="170">已有任务 / 明确新建</text>
+  <text class="body" x="60" y="195">直接使用，不再经过候选确认</text>
+  <text class="small" x="60" y="214">新建前清楚显示目标清单</text>
+
+  <rect class="node" x="365" y="140" width="270" height="87" rx="15"/>
+  <text class="label" x="385" y="170">资料与新线索</text>
+  <text class="body" x="385" y="195">Craft · 飞书 · AI 建议</text>
+  <text class="small" x="385" y="214">有依据，但尚未成为任务</text>
+
+  <rect class="quiet" x="690" y="140" width="270" height="87" rx="15"/>
+  <text class="label" x="710" y="170">先问一句</text>
+  <text class="body" x="710" y="195">它要服务于什么结果？</text>
+  <text class="small" x="710" y="214">不是每条信息都需要行动</text>
+
+  <path class="line" d="M500 227 V259"/>
+  <rect class="soft" x="365" y="260" width="270" height="77" rx="15"/>
+  <text class="label" x="385" y="290">待整理：做一次判断</text>
+  <text class="body" x="385" y="315">已有任务？值得行动？只是资料？</text>
+
+  <path class="line" d="M365 298 H175 V373"/>
+  <path class="line" d="M500 337 V373"/>
+  <path class="line" d="M635 298 H825 V373"/>
+  <rect class="node" x="40" y="375" width="270" height="78" rx="15"/>
+  <text class="label" x="60" y="405">关联 / 更新已有任务</text>
+  <text class="body" x="60" y="432">新增依据，不新增任务</text>
+  <rect class="node" x="365" y="375" width="270" height="78" rx="15"/>
+  <text class="label" x="385" y="405">确认新建任务</text>
+  <text class="body" x="385" y="432">先看变更，再写入目标清单</text>
+  <rect class="quiet" x="690" y="375" width="270" height="78" rx="15"/>
+  <text class="label" x="710" y="405">只留资料 / 稍后 / 忽略</text>
+  <text class="body" x="710" y="432">不占用行动池，不增加任务</text>
+
+  <path class="line" d="M40 184 H20 V553 H248"/>
+  <path class="line" d="M175 453 V525 H248"/>
+  <path class="line" d="M500 453 V498"/>
+  <rect class="accent" x="250" y="500" width="500" height="104" rx="18"/>
+  <text class="label" x="273" y="531">同一件事，始终是同一个任务</text>
+  <text class="body" x="273" y="557">目的 · 下一步 · 关联资料 · 完成标准</text>
+  <rect class="pill" x="273" y="572" width="147" height="21" rx="10"/>
+  <text class="pill-text" x="285" y="587">默认主档：滴答 · 演示</text>
+  <text class="small" x="434" y="587">材料、助手和日志引用同一 ID</text>
+
+  <path class="accent-line" d="M500 604 V629 H175 V658"/>
+  <rect class="node" x="40" y="660" width="270" height="102" rx="15"/>
+  <text class="label" x="60" y="690">现在：选下一步</text>
+  <text class="body" x="60" y="715">硬截止 · 今日计划 · 可选行动池</text>
+  <text class="small" x="60" y="739">仅行动池最多 5 项；不复制原任务</text>
+  <path class="accent-line" d="M310 711 H363"/>
+  <rect class="soft" x="365" y="660" width="270" height="102" rx="15"/>
+  <text class="label" x="385" y="690">执行：人 + AI 协作</text>
+  <text class="body" x="385" y="715">看依据，产出草稿，核对结果</text>
+  <text class="small" x="385" y="739">AI 生成不自动标记完成</text>
+  <rect class="wait" x="690" y="660" width="270" height="102" rx="15"/>
+  <text class="label" x="710" y="690">等待条件</text>
+  <text class="body" x="710" y="715">等谁 · 等什么 · 何时回看</text>
+  <text class="small" x="710" y="739">满足条件后恢复，不自动完成</text>
+  <path class="line" d="M635 687 H688"/>
+  <text class="edge-label" x="646" y="677">等待</text>
+  <path class="line" d="M690 738 H637"/>
+  <text class="edge-label" x="646" y="727">恢复</text>
+
+  <path class="accent-line" d="M500 762 V813"/>
+  <rect class="node" x="365" y="815" width="270" height="92" rx="15"/>
+  <text class="label" x="385" y="845">确认完成</text>
+  <text class="body" x="385" y="870">普通任务一键，交付任务核对结果</text>
+  <text class="small" x="385" y="891">保留证据；支持撤销与重新打开</text>
+
+  <path class="accent-line" d="M500 907 V958"/>
+  <rect class="soft" x="365" y="960" width="270" height="80" rx="15"/>
+  <text class="label" x="385" y="990">提交 / 等待来源确认</text>
+  <text class="body" x="385" y="1017">状态未知先核对，不盲目重试</text>
+  <path class="line" d="M635 985 H688"/>
+  <rect class="error" x="690" y="960" width="270" height="80" rx="15"/>
+  <text class="label" x="710" y="984">失败：保留原操作</text>
+  <text class="body" x="710" y="1008">重试，或取消本次完成</text>
+  <text class="small" x="710" y="1028">先取消再继续编辑，不假报成功</text>
+  <path class="line" d="M690 1025 H637"/>
+  <text class="edge-label" x="644" y="973">失败</text>
+  <text class="edge-label" x="644" y="1015">重试</text>
+
+  <path class="accent-line" d="M500 1040 V1113"/>
+  <text class="edge-label" x="516" y="1078">模拟来源确认成功</text>
+  <rect class="accent" x="365" y="1115" width="270" height="87" rx="15"/>
+  <text class="label" x="385" y="1145">日志与回顾</text>
+  <text class="body" x="385" y="1170">记录实际完成时间、结果与证据</text>
+  <text class="small" x="385" y="1190">重新打开：恢复原任务并保留历史</text>
+
+  <line class="rule" x1="44" y1="1230" x2="956" y2="1230"/>
+  <text class="small" x="44" y="1255">所有外部同步和 AI 输出均为演示。任务状态、AI 产出状态、同步状态分别呈现。</text>
+  <text class="small" x="44" y="1276">洞察可以发现问题、帮助复盘；处理一条洞察，不会替你完成它关联的任务。</text>
+</svg>
