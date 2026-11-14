@@ -145,6 +145,7 @@ pub struct BackupHistory {
     pub backup_root: Option<String>,
     pub snapshots: Vec<Snapshot>,
     pub warnings: Vec<String>,
+    pub reading: crate::craft_reading::ReadingHistory,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1629,7 +1630,7 @@ pub fn snapshot_source(
     saved_source(store, snapshot)
 }
 
-fn saved_source(
+pub(crate) fn saved_source(
     store: BlobStore,
     snapshot: &Snapshot,
 ) -> Result<(BlobStore, Vec<ExportDocument>, Vec<ExportAttachment>), String> {
@@ -1769,7 +1770,9 @@ pub fn export_supplements(
                     &format!("{stem}.excalidraw"),
                     &serde_json::to_vec(&drawing).map_err(|e| e.to_string())?,
                 )?;
-                index.push_str(&format!(" / [可编辑白板]({stem}.excalidraw)"));
+                index.push_str(&format!(
+                    " / [白板原始文件（需 Excalidraw）]({stem}.excalidraw)"
+                ));
             }
         }
         index.push('\n');

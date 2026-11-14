@@ -21,6 +21,29 @@ async function click(label: string) {
   const button = [...container.querySelectorAll("button")].find(b => b.textContent === label)!;
   await act(async () => { button.click(); });
 }
+
+it("keeps incomplete reading export separate from restore and automatic backup", async () => {
+  const value = { ...history, snapshots: [], reading: { vaultPath:"D:/normal/Main", vaultExists:false, generatedAt:null,
+    attempts:[{id:"attempt-1",libraryId:"space",libraryName:"Main",startedAt:1,documents:2,issues:3}] } };
+  mocks.open.mockResolvedValue("E:/reading");
+  mocks.invoke.mockImplementation(async (command:string) => {
+    if(command==="craft_backup_history") return value;
+    if(command==="export_craft_reading_copy") return {destination:"E:/reading/独立副本",backupComplete:false,exportedDocuments:2,skippedDocuments:0,failedAttachments:1,conflicts:0};
+    if(command==="open_craft_export_in_obsidian") return undefined;
+    throw new Error(`unexpected command: ${command}`);
+  });
+  await act(async () => root.render(<CraftBackupHistory libraryId="space"/>));
+  expect(container.textContent).toContain("当前配置路径未找到");
+  const normal = [...container.querySelectorAll("button")].find(b=>b.textContent==="打开正常阅读库")!;
+  expect(normal.disabled).toBe(true);
+  await click("生成阅读副本（有缺项）…");
+  expect(mocks.invoke).toHaveBeenCalledWith("export_craft_reading_copy",{root:"D:/backup",attemptId:"attempt-1",libraryId:"space",destination:"E:/reading"});
+  expect(container.textContent).toContain("这不是完整恢复点");
+  expect(container.textContent).toContain("1 件附件不可用");
+  await click("打开阅读副本（有缺项）");
+  expect(mocks.invoke).toHaveBeenCalledWith("open_craft_export_in_obsidian",{path:"E:/reading/独立副本"});
+  expect(mocks.invoke.mock.calls.map(c=>c[0])).not.toContain("restore_craft_backup");
+});
 it("restores a selected external archive without any Craft connection or sync call", async () => {
   mocks.open.mockResolvedValueOnce("D:/backup").mockResolvedValueOnce("E:/restore");
   mocks.invoke.mockImplementation(async (command: string) => {

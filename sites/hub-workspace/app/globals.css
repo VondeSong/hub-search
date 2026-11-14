@@ -73,3 +73,7 @@
 @media(prefers-reduced-motion:reduce){.insight-sidebar-nav .sidebar-item,.hub-app[data-view="insights"] .global-search{transition:none}}
 
 .hub-app{--on-accent:#fff}.hub-app[data-theme="black"],.hub-app[data-theme="sage"]{--on-accent:#17251d}.hub-app .primary-button,.hub-app .insight-primary,.hub-app .ha-send,.hub-app .ha-primary-button,.hub-app .calendar-grid>button.selected{color:var(--on-accent)!important}.hub-app .calendar-grid>button.selected:after{background:var(--on-accent)}.hub-app .about-logo{color:var(--on-accent)}.modal-backdrop{z-index:160}.toast{z-index:250}
+
+/* Expanded Craft reading details remain in the modal scroll flow. */
+.modal>.settings-content:has(.craft-reading-export){flex:0 0 auto}
+.craft-reading-export .setting-row{padding:12px 0}

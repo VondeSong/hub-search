@@ -41,6 +41,8 @@ mod craft_backup_migration;
 mod craft_backup_resources;
 mod craft_cache_probe;
 mod craft_export;
+mod craft_export_audit;
+mod craft_reading;
 #[cfg(all(windows, feature = "integration-dida-source"))]
 mod dida_oauth_integration;
 mod dida_reading_login;
@@ -11781,7 +11783,7 @@ async fn run_craft_backup(
         let resource_index = craft_backup_resources::register(&database, &root, &snapshot);
         if snapshot.status != "complete" {
             return Err(format!(
-                "备份未完成，共 {} 项待处理。原有恢复点和 Vault 保持可用。报告：{}",
+                "备份未完成，共 {} 项待处理。未更新正常阅读库，也未发布新恢复点；已有文件未改动。实际副本状态请在恢复点面板核对。报告：{}",
                 snapshot.issues.len(),
                 root.join("attempts")
                     .join(format!("{}.report.md", snapshot.id))
@@ -11879,6 +11881,7 @@ fn craft_backup_history(
         None => Vec::new(),
     };
     Ok(craft_backup::BackupHistory {
+        reading: craft_reading::history(root.as_deref(), &library_id, config.as_ref()),
         config,
         warnings: root
             .as_ref()
@@ -11900,11 +11903,34 @@ fn inspect_craft_backup(root: String) -> Result<craft_backup::BackupHistory, Str
     .map_err(|_| "备份标识损坏".to_string())?;
     let library_id = marker["libraryId"].as_str().ok_or("备份资料库身份缺失")?;
     Ok(craft_backup::BackupHistory {
+        reading: craft_reading::history(Some(&path), library_id, None),
         config: None,
         warnings: craft_backup::history_issues(&path, library_id),
         backup_root: Some(path.to_string_lossy().into()),
         snapshots: craft_backup::history(&path, library_id)?,
     })
+}
+
+#[tauri::command]
+async fn export_craft_reading_copy(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    root: String,
+    attempt_id: String,
+    library_id: String,
+    destination: String,
+) -> Result<CraftVaultExportSummary, String> {
+    let _guard = state.sync_guard.lock().await;
+    let destination = PathBuf::from(destination)
+        .canonicalize()
+        .map_err(|e| e.to_string())?;
+    let data_root = active_data_root(&app)?
+        .canonicalize()
+        .map_err(|e| e.to_string())?;
+    if destination.starts_with(&data_root) || data_root.starts_with(&destination) {
+        return Err("请选择 Hub 数据目录之外的阅读副本位置".into());
+    }
+    craft_reading::export_attempt(Path::new(&root), &attempt_id, &library_id, &destination).await
 }
 
 #[tauri::command]
@@ -35033,6 +35059,7 @@ pub fn run() {
                 get_craft_backup_destination,
                 craft_backup_history,
                 inspect_craft_backup,
+                export_craft_reading_copy,
                 verify_craft_backup,
                 restore_craft_backup,
                 set_craft_backup_interval,

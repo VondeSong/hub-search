@@ -13,7 +13,7 @@ use std::{
 use tauri::{AppHandle, Emitter};
 use url::Url;
 
-const MANIFEST_VERSION: u32 = 6;
+const MANIFEST_VERSION: u32 = 7;
 const MARKDOWN_PATH_ENCODE_SET: &AsciiSet = &CONTROLS
     .add(b' ')
     .add(b'"')
@@ -118,6 +118,8 @@ struct ManifestDocument {
     rendered_hash: String,
     exported_hash: String,
     modified_at: Option<i64>,
+    #[serde(default)]
+    raw_document_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -136,6 +138,7 @@ struct ExportManifest {
     source_library_name: String,
     documents: HashMap<String, ManifestDocument>,
     attachments: HashMap<String, ManifestAttachment>,
+    generated_at: Option<i64>,
 }
 
 impl Default for ExportManifest {
@@ -146,6 +149,7 @@ impl Default for ExportManifest {
             source_library_name: String::new(),
             documents: HashMap::new(),
             attachments: HashMap::new(),
+            generated_at: None,
         }
     }
 }
@@ -547,21 +551,45 @@ fn rewrite_local_attachment_references(
         let image_reference = markdown[..start].rfind('[').is_some_and(|label_open| {
             label_open > 0 && markdown.as_bytes()[label_open - 1] == b'!'
         });
-        let candidate = candidates.iter().find(|(attachment, path)| {
-            if used.contains(&attachment.id) {
-                return false;
-            }
-            let target_extension = path
-                .and_then(|path| path.extension())
-                .and_then(|value| value.to_str())
-                .map(str::to_string)
-                .unwrap_or_else(|| extension_for_attachment(attachment));
-            let target_is_image =
-                attachment.mime_type.starts_with("image/") || attachment.link_kind == "image";
-            target_is_image == image_reference
-                && (original_extension.is_empty()
-                    || original_extension.eq_ignore_ascii_case(&target_extension))
-        });
+        let decoded = percent_encoding::percent_decode_str(original).decode_utf8_lossy();
+        let filename = Path::new(decoded.as_ref())
+            .file_name()
+            .and_then(|v| v.to_str())
+            .unwrap_or_default();
+        let matches = candidates
+            .iter()
+            .filter(|(attachment, path)| {
+                if used.contains(&attachment.id) {
+                    return false;
+                }
+                let target_extension = path
+                    .and_then(|path| path.extension())
+                    .and_then(|value| value.to_str())
+                    .map(str::to_string)
+                    .unwrap_or_else(|| extension_for_attachment(attachment));
+                let target_is_image =
+                    attachment.mime_type.starts_with("image/") || attachment.link_kind == "image";
+                let known_name = Path::new(&attachment.title)
+                    .file_name()
+                    .and_then(|v| v.to_str())
+                    .unwrap_or_default();
+                let planned_name = path
+                    .and_then(|p| p.file_name())
+                    .and_then(|v| v.to_str())
+                    .unwrap_or_default();
+                let identity_matches = filename.eq_ignore_ascii_case(known_name)
+                    || (!planned_name.is_empty() && filename.eq_ignore_ascii_case(planned_name))
+                    || (attachment.id.len() >= 8
+                        && filename
+                            .to_lowercase()
+                            .contains(&attachment.id.to_lowercase()));
+                identity_matches
+                    && target_is_image == image_reference
+                    && (original_extension.is_empty()
+                        || original_extension.eq_ignore_ascii_case(&target_extension))
+            })
+            .collect::<Vec<_>>();
+        let candidate = (matches.len() == 1).then(|| matches[0]);
         result.push_str(&markdown[cursor..path_start]);
         if let Some((attachment, target)) = candidate {
             used.insert(attachment.id.clone());
@@ -580,6 +608,42 @@ fn rewrite_local_attachment_references(
     }
     result.push_str(&markdown[cursor..]);
     result
+}
+
+fn mark_unavailable_attachments(
+    markdown: &str,
+    attachments: &[&ExportAttachment],
+    available: &HashMap<String, PathBuf>,
+) -> String {
+    use pulldown_cmark::{Event, Parser, Tag};
+    let missing = attachments
+        .iter()
+        .filter(|a| !available.contains_key(&a.id))
+        .collect::<Vec<_>>();
+    let mut positions = Vec::new();
+    for (event, range) in Parser::new(markdown).into_offset_iter() {
+        if let Event::Start(Tag::Link { dest_url, .. } | Tag::Image { dest_url, .. }) = event {
+            if missing
+                .iter()
+                .any(|a| a.remote_url.as_deref() == Some(dest_url.as_ref()))
+            {
+                positions.push(range.end);
+            }
+        }
+    }
+    positions.sort_unstable();
+    positions.dedup();
+    let mut body = markdown.to_string();
+    for end in positions.iter().rev() {
+        body.insert_str(
+            *end,
+            " <small>（附件未保存本地原件，离线不可用；原地址保留）</small>",
+        );
+    }
+    if !missing.is_empty() && positions.is_empty() {
+        body.push_str("\n\n> [!warning] 附件有缺项\n> 本页关联的部分原件未通过保存校验，离线不可用；请查看阅读导出报告。\n");
+    }
+    body
 }
 
 fn clean_craft_markdown(markdown: &str) -> String {
@@ -866,17 +930,15 @@ fn rewrite_craft_links(
 }
 
 fn frontmatter(document: &ExportDocument, library_name: &str, daily: Option<NaiveDate>) -> String {
-    let title = serde_json::to_string(&document.title).unwrap_or_else(|_| "\"\"".to_string());
     let library = serde_json::to_string(library_name).unwrap_or_else(|_| "\"\"".to_string());
-    let mut result = format!(
-        "---\ntitle: {title}\ncraft_id: {}\nsource: Craft\ncraft_space: {library}\n",
-        document.id
-    );
-    if let Some(raw_document_id) = &document.raw_document_id {
-        result.push_str(&format!("craft_raw_document_id: {raw_document_id}\n"));
-    }
-    if let Some(modified_at) = document.modified_at {
-        result.push_str(&format!("modified: {modified_at}\n"));
+    // Stable IDs remain in the export manifest; avoid exposing machine fields
+    // and a duplicate title in Obsidian's reading properties.
+    let mut result = format!("---\nsource: Craft\ncraft_space: {library}\n");
+    if let Some(date) = document
+        .modified_at
+        .and_then(|t| chrono::DateTime::from_timestamp(t, 0))
+    {
+        result.push_str(&format!("modified: {}\n", date.to_rfc3339()));
     }
     if let Some(date) = daily {
         result.push_str(&format!(
@@ -938,6 +1000,7 @@ fn load_manifest(root: &Path) -> ExportManifest {
 }
 
 fn write_json_file(path: &Path, value: &impl Serialize) -> Result<(), String> {
+    crate::craft_backup::reject_links(path)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .map_err(|error| format!("无法创建导出配置目录 {}：{error}", parent.display()))?;
@@ -948,19 +1011,33 @@ fn write_json_file(path: &Path, value: &impl Serialize) -> Result<(), String> {
 }
 
 fn merge_json_object_file(path: &Path, defaults: Value) -> Result<(), String> {
-    let mut current = fs::read(path)
-        .ok()
-        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
-        .unwrap_or_else(|| serde_json::json!({}));
+    crate::craft_backup::reject_links(path)?;
+    let mut current = if path.exists() {
+        serde_json::from_slice::<Value>(&fs::read(path).map_err(|e| e.to_string())?).map_err(
+            |_| {
+                format!(
+                    "Obsidian 配置 {} 无法解析，未覆盖；请先修复或另存为",
+                    path.display()
+                )
+            },
+        )?
+    } else {
+        serde_json::json!({})
+    };
     let Some(current_object) = current.as_object_mut() else {
         return Ok(());
     };
+    let mut changed = !path.exists();
     if let Some(defaults) = defaults.as_object() {
         for (key, value) in defaults {
-            current_object
-                .entry(key.clone())
-                .or_insert_with(|| value.clone());
+            if !current_object.contains_key(key) {
+                current_object.insert(key.clone(), value.clone());
+                changed = true;
+            }
         }
+    }
+    if !changed {
+        return Ok(());
     }
     write_json_file(path, &current)
 }
@@ -1141,6 +1218,7 @@ pub async fn export_craft_vault(
         } else {
             previous_manifest.attachments.clone()
         },
+        generated_at: Some(chrono::Utc::now().timestamp()),
     };
     let mut summary = CraftVaultExportSummary {
         destination: destination.to_string_lossy().to_string(),
@@ -1334,6 +1412,8 @@ pub async fn export_craft_vault(
             &available_attachment_paths,
         );
         let body = rewrite_craft_links(&body, relative, &document_paths, &raw_document_ids);
+        let body =
+            mark_unavailable_attachments(&body, document_attachments, &available_attachment_paths);
         if body.contains("](craftdocs://") || body.contains("](https://docs.craft.do/") {
             summary.issues.push(crate::craft_backup::BackupIssue {
                 object_id: document.id.clone(),
@@ -1386,15 +1466,21 @@ pub async fn export_craft_vault(
                 rendered_hash,
                 exported_hash,
                 modified_at: document.modified_at,
+                raw_document_id: document.raw_document_id.clone(),
             },
         );
         summary.exported_documents += 1;
     }
 
     if options.create_obsidian_config {
+        let new_config = !destination.join(".obsidian/app.json").exists();
         merge_json_object_file(
             &destination.join(".obsidian").join("app.json"),
-            serde_json::json!({ "attachmentFolderPath": "attachments" }),
+            if new_config {
+                serde_json::json!({ "attachmentFolderPath": "attachments", "showInlineTitle":false })
+            } else {
+                serde_json::json!({})
+            },
         )?;
         if options.export_daily_notes {
             merge_json_object_file(
@@ -1409,6 +1495,21 @@ pub async fn export_craft_vault(
     write_json_file(
         &destination.join(".hub-export").join("manifest.json"),
         &manifest,
+    )?;
+    for (id, entry) in &manifest.documents {
+        summary.issues.extend(crate::craft_export_audit::audit_page(
+            &destination,
+            id,
+            Path::new(&entry.path),
+        )?);
+    }
+    write_json_file(
+        &destination.join(".hub-export/export-report.json"),
+        &serde_json::json!({
+            "kind":"reading-export-validation", "generatedAt":manifest.generated_at,
+            "issues":summary.issues,"failedAttachments":summary.failed_attachments,
+            "note":"此报告核对阅读产物，不确认原始备份完整性"
+        }),
     )?;
     if !documents.is_empty()
         && (!destination.join(".obsidian").is_dir()
