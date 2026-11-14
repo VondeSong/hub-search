@@ -308,6 +308,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     });
   },[view]);
   const [busy, setBusy] = useState(false);
+  const [loadingConversation, setLoadingConversation] = useState(false);
   const [filePreparing,setFilePreparing]=useState(false);
   const [pendingRun, setPendingRun] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -480,17 +481,18 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     void reloadWorks();
   };
   const load = async () => {
-    setError(""); setBusy(true);
+    setError("");
+    const history = reloadWorks();
+    if (startNew && !initialWorkId) return;
+    setBusy(true); setLoadingConversation(true);
     try {
-      const value=await reloadWorks();
-      if(!value || !alive.current)return;
       if(initialWorkId) await refresh(initialWorkId);
-      else if(!startNew){
-        const contextual=pageAnchor?await call<WorkListPage>({action:"list",anchor:pageAnchor}):value;
-        if(alive.current && contextual.works[0])await refresh(contextual.works[0].id);
+      else {
+        const contextual=pageAnchor?await call<WorkListPage>({action:"list",anchor:pageAnchor}):await history;
+        if(alive.current && contextual?.works[0])await refresh(contextual.works[0].id);
       }
     } catch (reason) { if (alive.current) setError(String(reason)); }
-    finally { if (alive.current) setBusy(false); }
+    finally { if (alive.current) { setBusy(false); setLoadingConversation(false); } }
   };
   useEffect(() => { if (initialOpen) void load(); }, []);
   const loadEarlierWorks = async () => {
@@ -1099,7 +1101,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         {hasDraftSources && <div className="agent-suggestions">{suggestions.map(({ label, icon: Icon, prompt }) => <button key={label} type="button" disabled={busy} onClick={() => { setGoal(prompt); goalInput.current?.focus(); }}><Icon size={18} aria-hidden="true" /><span>{label}</span></button>)}</div>}
       </div>}
       {!view && canEditNote && <button type="button" disabled={busy || !!active} onClick={() => void openNoteEditor()}>修改这篇 Obsidian 笔记</button>}
-      <p ref={statusElement} tabIndex={-1} role="status" className="agent-status" hidden={!!view && (view.work.state === "completed" || (view.work.state === "investigating" && !!view.activity?.length && !stopping)) && !businessCheck?.uncertain && !acting && !latestAction}>{view ? (businessCheck?.uncertain ? "结果待核对，已暂停再次提交" : stopping && active ? "正在停止，已有进展会保留" : acting ? pendingLabel : `${states[view.work.state] || view.work.state}${latestAction?.state === "prepared" ? ` · ${actionLabel}草稿已准备，待你确认` : latestAction?.state === "verified" ? ` · ${actionLabel}结果已核验` : latestAction?.state === "unknown" || latestAction?.state === "partial" ? ` · ${actionLabel}结果待核对` : ""}`) : busy ? "正在读取调查记录…" : ""}</p>
+      <p ref={statusElement} tabIndex={-1} role="status" className="agent-status" hidden={!!view && (view.work.state === "completed" || (view.work.state === "investigating" && !!view.activity?.length && !stopping)) && !businessCheck?.uncertain && !acting && !latestAction}>{view ? (businessCheck?.uncertain ? "结果待核对，已暂停再次提交" : stopping && active ? "正在停止，已有进展会保留" : acting ? pendingLabel : `${states[view.work.state] || view.work.state}${latestAction?.state === "prepared" ? ` · ${actionLabel}草稿已准备，待你确认` : latestAction?.state === "verified" ? ` · ${actionLabel}结果已核验` : latestAction?.state === "unknown" || latestAction?.state === "partial" ? ` · ${actionLabel}结果待核对` : ""}`) : loadingConversation ? "正在恢复对话…" : busy ? "正在发送…" : ""}</p>
       {view && !businessCheck?.scopeChanging && <>
         {!view.conversation && <p className="agent-goal">{view.work.goal}</p>}
         {(view.validity || view.run?.error) && <p className="agent-notice">{view.validity || view.run?.error}</p>}

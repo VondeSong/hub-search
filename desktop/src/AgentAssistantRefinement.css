@@ -17,7 +17,7 @@
 .agent-tag-picker header,.agent-tag-picker > div > div { display:flex; align-items:center; gap:6px; }
 .agent-tag-picker header > label,.agent-tag-picker > div > div > button:first-child { flex:1; min-width:0; }
 .agent-tag-result { margin:10px 0; font-size:12px; }
-.agent-answer-save { position:fixed; z-index:60; top:50%; left:50%; transform:translate(-50%,-50%); width:min(620px,calc(100vw - 32px)); max-height:calc(100dvh - 48px); overflow:auto; padding:18px; box-sizing:border-box; background:var(--hub-content-surface); border:1px solid var(--hub-separator); border-radius:18px; color:var(--hub-text-primary); box-shadow:0 12px 48px color-mix(in srgb,var(--hub-text-primary) 18%,transparent); font-size:13px; }
+.agent-answer-save { position:fixed; z-index:220; top:50%; left:50%; transform:translate(-50%,-50%); width:min(620px,calc(100vw - 32px)); max-height:calc(100dvh - 48px); overflow:auto; padding:18px; box-sizing:border-box; background:var(--hub-content-surface); border:1px solid var(--hub-separator); border-radius:18px; color:var(--hub-text-primary); box-shadow:0 12px 48px color-mix(in srgb,var(--hub-text-primary) 18%,transparent); font-size:13px; }
 .agent-answer-save label { display:grid; gap:6px; margin:12px 0; }
 .agent-answer-save :is(input,select,textarea) { width:100%; box-sizing:border-box; font:inherit; color:inherit; background:var(--hub-content-surface); border:1px solid var(--hub-separator); border-radius:8px; padding:8px 10px; }
 .agent-answer-save textarea { min-height:180px; resize:vertical; line-height:1.7; }
