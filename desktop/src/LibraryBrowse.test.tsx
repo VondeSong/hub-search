@@ -75,3 +75,52 @@ it("loads a cached library, searches descendants and locates a preview inside it
     invoke.mockReset();
   }
 });
+
+it("shows all libraries, opens real folder levels in column mode and restores the last folder when switching back", async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  const obsidian: LibrarySummary = { id: "vault", provider: "obsidian", name: "Obsidian 测试库", connected: true, documentCount: 3, excludedPaths: [] };
+  const craft: LibrarySummary = { ...obsidian, id: "craft", provider: "craft", name: "Craft 测试库", documentCount: 0 };
+  const libraries = [obsidian, craft];
+  invoke.mockImplementation(async (_, args) => args.libraryId === obsidian.id ? contents : {
+    folders: [], documents: [], craftLocationsSynced: true,
+  });
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  let position: LibraryPosition | undefined;
+  let selected: SearchResult | undefined;
+  const render = () => root.render(<LibraryBrowse libraries={libraries} position={position} selected={selected}
+    onPosition={next => { position = next; render(); }} onPreview={next => { selected = next; render(); }}
+    onClosePreview={() => { selected = undefined; render(); }} preview={selected && <article>原文预览</article>} />);
+  const click = async (parent: ParentNode, label: string) => {
+    const button = Array.from(parent.querySelectorAll("button")).find(item => item.textContent?.startsWith(label));
+    expect(button).toBeDefined();
+    await act(async () => button!.click());
+  };
+  const columns = () => Array.from(container.querySelectorAll(".library-browser-column"));
+  try {
+    await act(async () => render());
+    expect(container.textContent).toContain("尚未选择文档");
+    expect(invoke).not.toHaveBeenCalled();
+    await click(container, "分栏浏览");
+    expect(columns()).toHaveLength(1);
+    await click(columns()[0], obsidian.name);
+    const input = container.querySelector<HTMLInputElement>('input[aria-label="快速定位目录"]')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "同名 / 同名");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await click(container.querySelector(".library-browser-tree")!, "同名");
+    expect(position?.folderId).toBe("b");
+    expect(columns()).toHaveLength(4);
+    await click(columns()[3], "子目录文档");
+    expect(container.querySelector('[aria-label="阅读区"]')?.textContent).toContain("原文预览");
+    await click(columns()[0], craft.name);
+    expect(columns()).toHaveLength(2);
+    await click(columns()[0], obsidian.name);
+    expect(position?.folderId).toBe("b");
+    expect(invoke.mock.calls.filter(([command]) => command === "library_contents")).toHaveLength(2);
+  } finally {
+    await act(async () => root.unmount());
+    invoke.mockReset();
+  }
+});

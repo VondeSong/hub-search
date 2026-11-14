@@ -86,7 +86,7 @@ export function WorkspaceRail({
 
   return (
     <nav className="workspace-rail" aria-label="全局导航" onContextMenu={(event) => event.preventDefault()}>
-      <button
+      {onTogglePanel && <><button
         className="workspace-panel-toggle"
         onClick={onTogglePanel}
         title={panelExpanded ? "收起模块侧栏" : "展开模块侧栏"}
@@ -96,7 +96,7 @@ export function WorkspaceRail({
         <PanelLeft size={17} />
       </button>
 
-      <div className="workspace-rail-divider" aria-hidden="true" />
+      <div className="workspace-rail-divider" aria-hidden="true" /></>}
 
       <div className="workspace-rail-navigation" aria-label="浏览视图">
         <StandaloneAgentLauncher />
