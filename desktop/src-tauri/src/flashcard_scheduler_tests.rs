@@ -3,6 +3,79 @@ use crate::flashcard_store::flashcard_by_id;
 use crate::flashcard_study::legacy_scheduled_flashcard_values;
 use std::ops::{Deref, DerefMut};
 
+#[test]
+#[ignore = "需要显式指定日常真实库，仅只读核对当前排程"]
+fn real_schedules_match_production_replay_readonly() {
+    let path = std::env::var("HUB_FLASHCARD_ACCEPTANCE_DB").expect("缺少只读验收库");
+    let c = Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .expect("无法只读打开日常库");
+    c.execute_batch("PRAGMA query_only=ON; BEGIN;").unwrap();
+    let ids = c
+        .prepare("SELECT id FROM flashcards ORDER BY id")
+        .unwrap()
+        .query_map([], |row| row.get::<_, String>(0))
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    assert!(!ids.is_empty(), "真实库没有卡片，不能算作排程验收");
+    let mut replayed = 0;
+    let mut fsrs = 0;
+    let mut previews = 0;
+    let mut mismatches = Vec::new();
+    for id in &ids {
+        let card = flashcard_by_id(&c, id).unwrap();
+        if let Some(expected) = derived(&c, id).unwrap() {
+            replayed += 1;
+            fsrs += usize::from(expected.adopted);
+            let raw: String = c
+                .query_row(
+                    "SELECT fsrs_state_json FROM flashcards WHERE id=?1",
+                    [id],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            let state = if raw.is_empty() {
+                Value::Null
+            } else {
+                serde_json::from_str(&raw).unwrap()
+            };
+            let expected_state = if expected.adopted {
+                serde_json::from_str::<Value>(&encode(&expected.state).unwrap()).unwrap()
+            } else {
+                Value::Null
+            };
+            let same = [
+                card.due_at == expected.due,
+                card.interval_days == expected.interval,
+                card.ease == expected.ease,
+                card.repetitions == expected.repetitions,
+                card.lapses == expected.lapses,
+                state == expected_state,
+            ];
+            if same.iter().any(|equal| !equal) {
+                // Report only identity hashes and fields, never personal card text.
+                mismatches.push(json!({"cardSha256": format!("{:x}", Sha256::digest(id.as_bytes())), "equal": same}));
+            }
+        }
+        if card.status == "active" {
+            let result = preview(&c, id, now_timestamp()).unwrap();
+            assert_eq!(result.choices.len(), 4);
+            previews += 1;
+        }
+    }
+    let changes: i64 = c
+        .query_row("SELECT total_changes()", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(changes, 0, "只读核对不应写入真实卡片或评分");
+    assert!(fsrs > 0, "没有可重算的真实FSRS卡片");
+    println!(
+        "readonly_schedule_audit={}",
+        json!({"cards": ids.len(), "replayed": replayed, "fsrsCards": fsrs, "activePreviews": previews, "writes": changes, "mismatches": mismatches})
+    );
+    assert!(mismatches.is_empty(), "当前缓存排程与生产重算不一致");
+    c.execute_batch("ROLLBACK;").unwrap();
+}
+
 struct Db {
     connection: Option<Connection>,
     path: PathBuf,
