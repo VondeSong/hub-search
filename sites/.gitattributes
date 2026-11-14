@@ -1,0 +1,2 @@
+# Preserve the deployed source bytes checked by .source-snapshot.json.
+hub-workspace/** -text
