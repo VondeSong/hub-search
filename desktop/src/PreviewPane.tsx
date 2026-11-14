@@ -20,6 +20,7 @@ import { SharedTaskPreviewStatus } from "./SharedTaskPreviewStatus";
 import { isTaskPreviewResult } from "./TaskResultIdentity";
 import type { SearchProvider } from "./ProviderLabels";
 import { runtimeCapabilities } from "./RuntimePlatform";
+import { PreviewThemePicker, usePreviewTheme } from "./PreviewTheme";
 import { PdfPreviewPanel } from "./PdfPreviewPanel";
 import { isPdfContent } from "./PdfPreviewModel";
 import { HighlightedText } from "./SearchPresentation";
@@ -114,6 +115,7 @@ export const PreviewPane = memo(function PreviewPane({
   onNavigateJournalDate,
 }: PreviewPaneProps) {
   const contentRef = useRef<HTMLDivElement>(null);
+  const previewTheme = usePreviewTheme(contentRef);
   const [citation, setCitation] = useState<CitationLocation | null>(null);
   const previousScroll = useRef<number | null>(null);
   const showCitation = useCallback((value: CitationLocation | null) => {
@@ -138,9 +140,10 @@ export const PreviewPane = memo(function PreviewPane({
     : undefined;
   const didaTitle = selected?.documentTitle?.trim() || selected?.title || "";
   const taskPreview = isTaskPreviewResult(selected);
+  const themedDocument = runtimeCapabilities.platform !== "android" && !isPdfContent(selected?.contentType) && !pdfPreview && !ocrImagePreview && !taskPreview && !!renderedPreviewMarkdown;
   const canOpenSource = canOpenResultSource(selected, spaces, runtimeCapabilities.platform);
   return (
-    <PreviewFrame className={`${className || ""}${citation ? " preview-citation-active" : ""}`} label={label} cardRef={previewCard} empty={!selected ? <div className="preview-placeholder">选择一个结果以预览完整页面</div> : undefined} onMouseDown={(event) => {
+    <PreviewFrame className={`${className || ""}${citation ? " preview-citation-active" : ""}${themedDocument && previewTheme.theme === "craft" ? " preview-theme-craft" : ""}`} label={label} cardRef={previewCard} empty={!selected ? <div className="preview-placeholder">选择一个结果以预览完整页面</div> : undefined} onMouseDown={(event) => {
       if (event.target === event.currentTarget) startWindowDrag(event);
     }}>
       {selected && (
@@ -198,6 +201,7 @@ export const PreviewPane = memo(function PreviewPane({
                 </div>
               )}
             </PreviewHeading>
+            {themedDocument && !citation && <PreviewThemePicker {...previewTheme} sourceLayout={selected.provider === "craft"} />}
             <div className="preview-content" ref={contentRef} onScroll={(event) => {
               const content = event.currentTarget;
               setShowScrollTop(content.scrollTop > content.clientHeight / 2 && content.scrollHeight > content.clientHeight);

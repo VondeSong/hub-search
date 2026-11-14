@@ -26,6 +26,7 @@
 - Obsidian 只登记 Markdown 实际引用的 PDF 与图片；附件以只读方式流式复制到本地 Blob 仓库，未引用文件不会扫描、复制或索引
 - Obsidian PDF 复用原生文字提取与按页 OCR，图片复用 Windows OCR；相同内容跨笔记、Vault 或 Craft 空间时按 Blob 哈希共享提取缓存
 - Obsidian 结果通过 `obsidian://` 深层链接打开，预览直接渲染本地完整 Markdown
+- 桌面 Markdown 预览可显式选择“当前／Craft 风格”，默认保持当前。样式偏好使用个人资料存储；仅调整阅读排版，保留目录、命中、折叠与来源入口，不修改正文或套用 PDF。实现、真实文档对照和日常窗口待验证项见 [Craft 阅读主题](docs/PREVIEW_CRAFT_THEME_20261115.md)。
 - Obsidian 深层链接对 Vault 与文件路径中的空格使用 `%20` 编码，避免被 Obsidian 误识别为文件名中的 `+`
 - Obsidian 预览双链通过后端校验资料库后打开，不受前端 URL 白名单限制；`[[页面#章节]]` 会保留章节目标
 - Obsidian 双链支持当前页章节、相对路径、当前文件夹同名笔记优先和 YAML Frontmatter `alias` / `aliases` 别名解析

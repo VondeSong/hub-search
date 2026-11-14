@@ -12,7 +12,7 @@ export function CraftCollectionView({ collection, renderValue }: { collection: C
       <div role="group" aria-label="合集视图"><button aria-pressed={mode === "table"} onClick={() => setMode("table")}><Table2 size={14} />表格</button>
         <button aria-pressed={mode === "gallery"} onClick={() => setMode("gallery")}><Columns3 size={14} />画廊</button></div>
     </header>
-    {!rows.length ? <p>此合集暂无已缓存记录。</p> : mode === "table" ? <div className="preview-table-scroll"><table>
+    {!rows.length ? <p>此合集暂无已缓存记录。</p> : mode === "table" ? <div className="preview-table-scroll" role="region" aria-label="合集表格，可横向滚动" tabIndex={0}><table>
       <thead><tr><th>名称</th>{collection.columns.map(name => <th key={name}>{name}</th>)}{hasBody && <th>内容</th>}</tr></thead>
       <tbody>{rows.map((row,index) => <tr key={index}><td>{renderValue(row.title)}</td>{collection.columns.map(name => <td key={name}>{renderValue(row.values[name] || "")}</td>)}
         {hasBody && <td>{renderValue(row.body)}</td>}</tr>)}</tbody>

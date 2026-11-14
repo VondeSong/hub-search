@@ -464,7 +464,7 @@ function PreviewCodeBlock({ children, terms, renderCollectionValue }: { children
       <button type="button" aria-pressed={wrap} aria-label={wrap ? "保持原始行宽" : "自动换行"} title={wrap ? "保持原始行宽" : "自动换行"} onClick={() => setWrap((value) => !value)}><WrapText size={14} /></button>
       <button type="button" aria-label={copied ? "已复制" : "复制代码"} title={copied ? "已复制" : "复制代码"} onClick={() => void copy()}>{copied ? <Check size={14} /> : <Copy size={14} />}</button>
     </div>
-    <pre aria-label={`${language}代码`}><code>{lines.map((line, index) => <span className="preview-code-line" key={`${index}:${line}`}>
+    <pre tabIndex={0} aria-label={`${language}代码`}><code>{lines.map((line, index) => <span className="preview-code-line" key={`${index}:${line}`}>
         <span className="preview-code-line-number" aria-hidden="true">{index + 1}</span>
         <span className="preview-code-line-content"><HighlightedChildren terms={terms}>{line || " "}</HighlightedChildren></span>
       </span>)}</code></pre>
@@ -544,7 +544,7 @@ function PreviewRendererComponent({ selected, markdown, matchTerms, hasSectionCo
     h6: ({ children, node }) => <h6 id={node?.position?.start.line ? `preview-heading-${node.position.start.line}` : undefined}><HighlightedChildren terms={matchTerms}>{children}</HighlightedChildren></h6>,
     td: ({ children }) => <td><HighlightedChildren terms={matchTerms}>{children}</HighlightedChildren></td>,
     th: ({ children }) => <th><HighlightedChildren terms={matchTerms}>{children}</HighlightedChildren></th>,
-    table: ({ children }) => <div className="preview-table-scroll"><table>{children}</table></div>,
+    table: ({ children }) => <div className="preview-table-scroll" role="region" aria-label="表格，可横向滚动" tabIndex={0}><table>{children}</table></div>,
     pre: ({ children }) => <PreviewCodeBlock terms={matchTerms} renderCollectionValue={selectedProvider === "craft" ? value =>
       <ReactMarkdown components={components} remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS} urlTransform={previewUrlTransform}>{renderableCraftMarkdown(value)}</ReactMarkdown> : undefined}>{children}</PreviewCodeBlock>,
     code: ({ children, className }) => <code className={className}><HighlightedChildren terms={matchTerms}>{children}</HighlightedChildren></code>,
