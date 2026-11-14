@@ -1,0 +1,8 @@
+{
+  "name": "hub-task-flow-lab",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hub 桌面任务闭环交互原型，仅使用本机示例数据",
+  "scripts": {"test": "node --test tests/*.test.mjs", "check": "node --check dist/app.mjs && node --check dist/model.mjs && node --test tests/*.test.mjs"}
+}

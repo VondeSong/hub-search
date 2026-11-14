@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "site": "taskflow",
+  "project_id": "appgprj_6af7b8ca80448191ac76b1a03eaa73dd",
+  "site_url": "https://hub-task-flow-lab-von11.song02211368537057.chatgpt.site",
+  "source_commit": "2a99c02d3923b7e04751adcdaa383d19b305431a",
+  "published_version": 1,
+  "deployment_id": "appgdep_6af7bf19374881919fc091d15066b42c",
+  "files": {
+    ".gitignore": {
+      "sha256": "6abf77b64244ac341eeb9255fa8d6010176cab42d92372d9f028c4e5272b904c",
+      "mode": "100644",
+      "bytes": 62
+    },
+    ".openai/hosting.json": {
+      "sha256": "b5bf69af35d52e10c3ea9d6389e6155dd89eb8037bbb1fe5eba1071422d08068",
+      "mode": "100644",
+      "bytes": 106
+    },
+    "AGENTS.md": {
+      "sha256": "ef2adb6ccaf21796cd83d2a67adcafe78571dec8f8cf867930b6bcfa33e16ba1",
+      "mode": "100644",
+      "bytes": 5358
+    },
+    "README.md": {
+      "sha256": "0c7d98f7d519d16e20c2e16dae3e79858e94f5afc56a9f55736425a64cf5eeba",
+      "mode": "100644",
+      "bytes": 5192
+    },
+    "dist/app.mjs": {
+      "sha256": "f9e93e9cc365d8778e3203d3189df427505ff84b628eb08dfa0e6bad7cf70469",
+      "mode": "100644",
+      "bytes": 66441
+    },
+    "dist/favicon.svg": {
+      "sha256": "95c69e5ac5156bfe828733b7310630e88502f66350ac99a0ba72faaad6412cd6",
+      "mode": "100644",
+      "bytes": 259
+    },
+    "dist/flow.mjs": {
+      "sha256": "c50020800dd7eccc652349e27a250b7b39cdea76d7b75a53995987f4bab6f546",
+      "mode": "100644",
+      "bytes": 5773
+    },
+    "dist/index.html": {
+      "sha256": "4cfbff7eee236f3fc7d6107a67b40932d73820f55b84910e8845cff13c7a6df1",
+      "mode": "100644",
+      "bytes": 1026
+    },
+    "dist/model.mjs": {
+      "sha256": "3e00cd47cecf579180031ad55b32324240730b003a0124810b45511e44b0c9ff",
+      "mode": "100644",
+      "bytes": 34146
+    },
+    "dist/styles.css": {
+      "sha256": "627a812a9f68d813793a2920e5f503d282711e4176de99c1401933eabe171783",
+      "mode": "100644",
+      "bytes": 34340
+    },
+    "dist/task-flow.svg": {
+      "sha256": "d2adece9929a337017856e3a4b4a925ad8989b1dad4fbbb15c89b5ae08d21c64",
+      "mode": "100644",
+      "bytes": 8358
+    },
+    "docs/preview.jpg": {
+      "sha256": "2339bd6c3bf0be9efa49b744e86742740590a9fc8da4b74aa1e3a8a87f325d20",
+      "mode": "100644",
+      "bytes": 92787
+    },
+    "docs/task-flow.md": {
+      "sha256": "d2f8ebd74c5beef7790b8e5a8c1fedc840d5749a380cde2eba219f6bbede5b71",
+      "mode": "100644",
+      "bytes": 5007
+    },
+    "docs/verification.md": {
+      "sha256": "22c34180e34917fa567029df6da5ac4aacc39dacb10d3a8f267221be2dd66aa6",
+      "mode": "100644",
+      "bytes": 6873
+    },
+    "package.json": {
+      "sha256": "ffdaf3a753a7f8d3ed81e72e5f81c21e8c268551d54f9566584080c00879efaf",
+      "mode": "100644",
+      "bytes": 336
+    },
+    "tests/model.test.mjs": {
+      "sha256": "3bd8507601d0d2b9462bb02ea6e47dbc00a96b40d8ecb57e5c57ca4134a687fc",
+      "mode": "100644",
+      "bytes": 22554
+    },
+    "tests/ui-contract.test.mjs": {
+      "sha256": "f88e24f10c50df1ea1ccb5056417c3c2c5dfed93d712179b830f4ccc0c45e2ec",
+      "mode": "100644",
+      "bytes": 9494
+    }
+  },
+  "imported_at": "2026-11-14T01:55:36.853128+00:00"
+}

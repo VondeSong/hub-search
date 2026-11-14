@@ -35,7 +35,7 @@ let readingQuery='', starQuery='', tagQuery='', taskDate='所有日期', searchD
 let query='', source='全部资料库', readingSource='全部来源', readingFilter='全部', taskFilter='待办', filter='待关注', face=false, cardIndex=0, compare='month', toastTimer;
 const save=()=>{try{localStorage.setItem('hub-mobile-v1',JSON.stringify(st));return true}catch{tell('浏览器暂时无法保存。请保留当前页面并重试。');return false}};
 function tell(t){const el=$('#toast');el.textContent=t;el.hidden=false;const feedback=$('#sheet-feedback');if($('#sheet').open&&feedback){feedback.textContent=t;feedback.hidden=false}clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.hidden=true,3800)}
-const navs=[['search','搜索','search'],['browse','浏览','folder'],['tasks','任务','task'],['review','复习','cards']];
+const navs=[['search','搜索','search'],['browse','浏览','folder'],['agents','Agents','chat'],['tasks','任务','task'],['review','复习','cards']];
 const docs={
  d1:{t:'11 月 7 日 · 日志',s:'Obsidian',date:'11 月 7 日',tag:'生活日志',k:'日记 加班 作息 运动',body:'晚上加班到 21:20，原定的跑步没有去。回家后看了两集《漫长的季节》，大约 00:40 睡。'},
  d2:{t:'11 月 8 日 · 日志',s:'Obsidian',date:'11 月 8 日',tag:'生活日志',k:'日记 加班 作息 运动',body:'补完项目材料后取消了夜跑。晚饭后看了一集《漫长的季节》，过了午夜才睡。'},
@@ -76,6 +76,8 @@ const detail=(t,badge,body)=>'<article class="detail">'+badge+'<h1>'+esc(t)+'</h
 const sourceRow=(id)=>row(docs[id].t,docs[id].s+' · '+docs[id].tag,'note','go:doc/'+id);
 const routes={future:'后续功能',deck:'牌组', 'collab-sync':'协作同步演示',search:'搜索',browse:'浏览',tasks:'任务',review:'复习',insights:'洞察',reading:'阅读',favorites:'收藏',recent:'最近浏览',logs:'日志',tags:'标签',libraries:'资料库',settings:'设置',sync:'同步状态',agent:'Agents',agents:'Agents','agent-chat':'Agents 对话','agent-connection':'云端连接',requests:'更新请求',request:'请求详情',guide:'功能梳理',doc:'资料详情',article:'阅读详情',task:'任务详情',finding:'发现详情',capture:'快速记录',recap:'阶段回顾',works:'工作与专题',work:'工作详情',saved:'日志',label:'标签详情',study:'牌组复习',appearance:'外观与阅读'};
 const parent={future:'settings',deck:'review','collab-sync':'future',reading:'browse',favorites:'browse',recent:'browse',logs:'browse',tags:'browse',libraries:'browse',settings:'browse',sync:'browse',agent:'browse',agents:'browse','agent-chat':'agents','agent-connection':'agents',requests:'insights',request:'insights',guide:'browse',doc:'browse',article:'browse',task:'tasks',finding:'insights',recap:'insights',capture:'browse',works:'browse',work:'browse',saved:'browse',label:'browse',study:'review',appearance:'browse'};
+Object.assign(routes,{connections:'连接总览',note:'本地笔记',card:'闪卡详情'});
+Object.assign(parent,{insights:'browse',connections:'browse',note:'browse',card:'review',agent:'agents'});
 let activeRoute='', scrolls={}, sheets=new Map(), sheetSerial=0;
 const tabFor=p=>{let cursor=p;for(let i=0;i<5;i++){if(navs.some(x=>x[0]===cursor))return cursor;cursor=parent[cursor]}return 'browse'};
 history.scrollRestoration='manual';
@@ -99,16 +101,9 @@ function hero(t,desc,label,act,more=''){return '<div class="hero"><svg class="pa
 const match=(value,q)=>value.toLowerCase().includes(q.toLowerCase());
 function marked(text,q){const i=q?text.toLowerCase().indexOf(q.toLowerCase()):-1;return i<0?esc(text):esc(text.slice(0,i))+'<mark>'+esc(text.slice(i,i+q.length))+'</mark>'+esc(text.slice(i+q.length))}
 function searchInput(id,label,value=''){return '<div class="field"><label for="'+id+'">'+esc(label)+'</label><input type="search" id="'+id+'" value="'+esc(value)+'" placeholder="'+esc(label)+'"></div>'}
-function searchableDocuments(){return {...docs,...Object.fromEntries(st.notes.map(n=>{const day=recordDay(n);return [n.id,{t:n.title||n.text?.split('\n')[0].slice(0,40)||'附件记录',s:'本地记录',date:day?Number(day.slice(5,7))+' 月 '+Number(day.slice(8))+' 日':'日期未记录',tags:journalTags(n.text),tag:journalTags(n.text)[0]||(n.kind==='link'?'链接':'随手记录'),type:n.kind==='link'?'链接':'笔记',k:'本地 记录 '+(n.url||'')+' '+recordAttachments(n).map(a=>a.name).join(' '),body:n.text||''}]}))}}
-const searches=()=>{const data=searchableDocuments();return Object.keys(data).filter(id=>{const d=data[id];return (source==='全部资料库'||d.s===source)&&(searchDate==='不限日期'||d.date.startsWith(searchDate))&&(searchFolder==='全部分组'||(d.tag===searchFolder||d.tags?.includes(searchFolder)))&&(searchType==='全部类型'||(d.type||'笔记')===searchType)&&(!query||query.split(/\s+/).every(q=>match(d.t+' '+d.k+' '+d.body,q)))})};
-function searchPage(){const facets=[source,searchFolder,searchDate,searchType].filter(x=>!['全部资料库','全部分组','不限日期','全部类型'].includes(x));return intro('搜索','找回一个想法，接着往下走。')+
- '<form class="searchbox" id="search-form" role="search"><div class="search-input-wrap"><span class="search-icon">'+ico('search',20)+'</span><input type="search" id="query" aria-label="搜索资料" placeholder="搜索笔记、日志、附件" autocomplete="off" enterkeyhint="search" value="'+esc(query)+'"><button type="button" class="search-clear icon-btn" data-act="clear-query" aria-label="清除搜索" '+(!query?'hidden':'')+'>'+ico('close',16)+'</button></div>'+iconBtn('筛选搜索'+(facets.length?'，已启用 '+facets.length+' 项':''),'search-scope','tune')+'</form>'+
- '<div class="filter search-scopes">'+chip(facets.join(' · ')||'全部资料库','search-scope',facets.length)+['复盘','项目','作息'].map(t=>chip(t,'query:'+t,query===t)).join('')+'</div><div id="results" aria-live="polite" aria-atomic="false">'+searchResults()+'</div><div id="search-extra" '+(query||facets.length?'hidden':'')+'>'+section('接着看',group(row('留出可回看的记录','上次的想法，值得再读一遍','book','go:doc/d3','purple')))+'<button class="continue-card" type="button" data-act="go:logs"><span class="tile">'+ico('calendar',21)+'</span><span class="copy"><strong>回看日志与随手记录</strong><small>按天浏览，继续上次的想法</small></span>'+ico('chev',18)+'</button></div>'}
-function searchResults(){const data=searchableDocuments(),ids=searches(),filtered=source!=='全部资料库'||searchFolder!=='全部分组'||searchDate!=='不限日期'||searchType!=='全部类型';const term=query.split(/\s+/).find(q=>q)||'';const matches=query||filtered?ids:ids.slice(0,3);
- if(!ids.length)return '<section class="empty-state">'+ico('search',30)+'<h2>还没有找到</h2><p>试着换个关键词，或放宽搜索范围。</p>'+btn('清除搜索与筛选','clear-search','secondary')+'</section>';
- return section(query||filtered?'搜索结果 · '+ids.length:'最近资料',group(matches.map(id=>{const d=data[id];const hit=query.split(/\s+/).find(q=>q&&match(d.body,q));const loc=hit?d.body.toLowerCase().indexOf(hit.toLowerCase()):-1;const excerpt=loc>=0?(loc>16?'…':'')+d.body.slice(Math.max(0,loc-16),loc+52):d.body.slice(0,55);return '<button type="button" class="row search-result" data-act="go:doc/'+id+'"><span class="tile">'+ico(d.type==='PDF'?'note':d.tag==='生活日志'?'calendar':'note',18)+'</span><span class="copy"><strong>'+marked(d.t,term)+'</strong>'+(query?'<small class="result-excerpt">'+marked(excerpt,hit)+'</small>':'')+'<small>'+esc(d.s+' · '+d.date+' · '+(d.type||d.tag))+'</small></span><span class="tail">'+ico('chev',16)+'</span></button>'}).join('')))
-}
-function refreshSearch(){ $('#results').innerHTML=searchResults();$('#search-extra').hidden=Boolean(query||source!=='全部资料库'||searchFolder!=='全部分组'||searchDate!=='不限日期'||searchType!=='全部类型');const clear=$('.search-clear');if(clear)clear.hidden=!query;mobileRememberView() }
+function searchPage(){return workspaceSearchPage()}
+function searchResults(){return workspaceSearchResults()}
+function refreshSearch(){ $('#results').innerHTML=searchResults();const active=Boolean(query||workspaceFacets().length);$('#search-extra').hidden=active;const suggestions=$('#workspace-suggestions');if(suggestions)suggestions.hidden=active;const clear=$('.search-clear');if(clear)clear.hidden=!query;mobileRememberView() }
 
 function selectField(id,label,items,current){return '<div class="field"><label for="'+id+'">'+esc(label)+'</label><select id="'+id+'">'+items.map(x=>'<option '+(x===current?'selected':'')+'>'+esc(x)+'</option>').join('')+'</select></div>'}
 
@@ -234,9 +229,9 @@ function syncPage(){
 const missing=()=>intro('找不到该项目','返回列表，选择一条有效的示例记录。');
 function notesPage(){return journalPage()}
 function readerBody(text,highlight=''){return text.split(/\n\s*\n/).map(paragraph=>'<p>'+marked(paragraph,highlight)+'</p>').join('')}
-function docPage(id){const local=st.notes.find(n=>n.id===id);const d=docs[id]||(local?{t:local.title||'快速记录',s:'本地记录',date:local.date,tag:local.kind==='link'?'链接':'随手记录',body:local.text}:null);if(!d)return missing();
- const starred=st.stars[id]??id==='d3';const related=Object.keys(findings).filter(k=>findings[k].docs.includes(id));const body=d.body+(id==='d4'&&(st.sourceChanged||st.revised)?'\n\n补录记录：11 月 9 日就诊 ¥150，更新后示例净支出 ¥850。':'');
- return '<article class="reader"><p class="eyebrow">'+esc(d.s)+' · '+esc(d.tag)+'</p><h1>'+esc(d.t)+'</h1><div class="reader-meta"><span>'+esc(d.date)+'</span><span>'+(d.type?esc(d.type)+' · 文字摘录':'约 1 分钟阅读')+'</span></div><div class="reader-body">'+(local?.kind==='note'?captureNoteBody(body):readerBody(body,history.state?.tab==='search'?query.split(/\s+/).find(q=>q&&match(d.body,q)):''))+((local?.photos||local?.attachments)?'<div class="saved-capture-photos">'+attachmentMarkup(local)+'</div><div class="journal-file-links">'+recordAttachments(local).map(a=>plain('保存 '+a.name,'download-attachment:'+a.id,'note')).join('')+'</div>':'')+'</div>'+(local?.url?'<div class="actions">'+btn('查看链接出处','doc-source:'+id,'outline','link')+'</div>':'')+'<div class="reader-toolbar">'+plain(starred?'已收藏':'收藏','star:'+id,'star')+plain('带着资料提问','ask:'+id,'chat')+'</div>'+(related.length?section('由此发现',group(related.map(k=>row(findData(k).t,findData(k).kind+' · '+findData(k).docs.length+' 条依据','spark','go:finding/'+k,'purple')).join(''))):'')+'</article>'
+function docPage(id,localOnly=false){const local=localOnly||!docs[id]?st.notes.find(n=>n.id===id):null;const localDoc=local?{t:local.title||'快速记录',s:'本地记录',date:local.date,tag:local.kind==='link'?'链接':'随手记录',body:local.text||''}:null;const d=localOnly?localDoc:docs[id]||localDoc;if(!d)return missing();
+ const starKey=local?'note/'+id:id,starred=st.stars[starKey]??(local&&!docs[id]?st.stars[id]:undefined)??(!local&&id==='d3');const related=local?[]:Object.keys(findings).filter(k=>findings[k].docs.includes(id));const body=d.body+(!local&&id==='d4'&&(st.sourceChanged||st.revised)?'\n\n补录记录：11 月 9 日就诊 ¥150，更新后示例净支出 ¥850。':'');
+ return '<article class="reader"><p class="eyebrow">'+esc(d.s)+' · '+esc(d.tag)+'</p><h1>'+esc(d.t)+'</h1><div class="reader-meta"><span>'+esc(d.date)+'</span><span>'+(d.type?esc(d.type)+' · 文字摘录':'约 1 分钟阅读')+'</span></div><div class="reader-body">'+(local?.kind==='note'?captureNoteBody(body):readerBody(body,history.state?.tab==='search'?query.split(/\s+/).find(q=>q&&match(d.body,q)):''))+((local?.photos||local?.attachments)?'<div class="saved-capture-photos">'+attachmentMarkup(local)+'</div><div class="journal-file-links">'+recordAttachments(local).map(a=>plain('保存 '+a.name,'download-attachment:'+a.id,'note')).join('')+'</div>':'')+'</div>'+(local?.url?'<div class="actions">'+btn('查看链接出处','doc-source:'+id,'outline','link')+'</div>':'')+'<div class="reader-toolbar">'+plain(starred?'已收藏':'收藏','star:'+starKey,'star')+plain('带着资料提问','ask:'+id,'chat')+'</div>'+(related.length?section('由此发现',group(related.map(k=>row(findData(k).t,findData(k).kind+' · '+findData(k).docs.length+' 条依据','spark','go:finding/'+k,'purple')).join(''))):'')+'</article>'
 }
 
 const rstatus=(x)=>st.reading[x.id]||x.status;
@@ -246,11 +241,14 @@ function readingPage(){return intro('阅读','在碎片时间接着读，返回�
  '<div class="filter">'+['全部内容','继续阅读','离线内容'].map(t=>chip(t,'readview:'+t,readingView===t)).join('')+'</div>'+
  '<div class="filter">'+['全部','未读','阅读中','已读'].map(t=>chip(t,'readfilter:'+t,readingFilter===t)).join('')+'</div>'+
  group(row(readingSource,'切换阅读来源','tune','read-source'))+'<div id="reading-results" class="result-gap">'+readingRows()+'</div>'}
-function article(id){const r=reading.find(x=>x.id===id);if(!r)return missing();const starred=Boolean(st.stars['article/'+id]);return '<article class="reader"><p class="eyebrow">'+esc(r.src)+'</p><h1>'+esc(r.t)+'</h1><div class="reader-meta"><span>'+esc(rstatus(r))+'</span><span>'+(st.cache[id]?'已加入离线示例':'阅读笔记')+'</span></div><p class="reader-intro">'+esc(r.blurb)+'</p><div class="reader-body">'+readerBody(r.body)+'</div><div class="reader-toolbar">'+plain(starred?'已收藏':'收藏','star:article/'+id,'star')+plain('原文出处','reading-original:'+id,'link')+plain('更多','reading-manage:'+id,'settings')+'</div><div class="actions">'+btn(rstatus(r)==='已读'?'恢复未读':'标记已读','read:'+id+':'+(rstatus(r)==='已读'?'未读':'已读'),'','check')+btn('稍后接着读','read:'+id+':阅读中','outline')+'</div></article>'}
+function article(id){
+ const r=reading.find(x=>x.id===id);if(!r)return missing();const starred=Boolean(st.stars['article/'+id]);
+ return '<article class="reader"><p class="eyebrow">'+esc(r.src)+'</p><h1>'+esc(r.t)+'</h1><div class="reader-meta"><span>'+esc(rstatus(r))+'</span><span>'+(st.cache[id]?'已加入离线示例':'示例正文')+'</span></div><p class="reader-intro">'+esc(r.blurb)+'</p><div class="reader-body">'+readerBody(r.body)+'</div><div class="reader-toolbar">'+plain(starred?'已收藏':'收藏','star:article/'+id,'star')+plain('原文出处','reading-original:'+id,'link')+plain('更多','reading-manage:'+id,'settings')+'</div><div class="actions workspace-reading-actions">'+btn('记下想法','workspace-note:reading:'+id,'secondary','note')+btn('带进 Agents','workspace-agent:reading:'+id,'outline','chat')+plain('转成任务','workspace-task:reading:'+id,'task')+'</div><div class="actions">'+btn(rstatus(r)==='已读'?'恢复未读':'标记已读','read:'+id+':'+(rstatus(r)==='已读'?'未读':'已读'),'','check')+btn('稍后接着读','read:'+id+':阅读中','outline')+'</div></article>';
+}
 
 function articleRow(id){const r=reading.find(x=>x.id===id);return r?row(r.t,r.src+' · '+rstatus(r),'book','go:article/'+id,'purple'):''}
-function itemRow(k){if(k.startsWith('article/'))return articleRow(k.split('/')[1]);if(docs[k])return sourceRow(k);const n=st.notes.find(x=>x.id===k);return n?row(n.text.slice(0,45),'本地记录','note','go:doc/'+k):''}
-function favoriteRows(){const keys=[...Object.keys(docs),...reading.map(x=>'article/'+x.id),...st.notes.map(n=>n.id)];return group(keys.filter(k=>(st.stars[k]??k==='d3')&&match(docs[k]?.t||reading.find(r=>'article/'+r.id===k)?.t||st.notes.find(n=>n.id===k)?.text||'',starQuery)).map(itemRow).join(''),'没有符合条件的收藏。')}
+function itemRow(k){if(k.startsWith('article/'))return articleRow(k.split('/')[1]);if(!k.startsWith('note/')&&docs[k])return sourceRow(k);const id=k.startsWith('note/')?k.slice(5):k,n=st.notes.find(x=>x.id===id);return n?row(n.title||n.text.slice(0,45),'本地记录','note','go:note/'+id):''}
+function favoriteRows(){const items=[...Object.entries(docs).map(([id,d])=>({key:id,title:d.t,star:st.stars[id]??id==='d3'})),...reading.map(r=>({key:'article/'+r.id,title:r.t,star:st.stars['article/'+r.id]})),...st.notes.map(n=>({key:'note/'+n.id,title:n.title||n.text||'',star:st.stars['note/'+n.id]??(!docs[n.id]?st.stars[n.id]:false)}))];return group(items.filter(item=>item.star&&match(item.title,starQuery)).map(item=>itemRow(item.key)).join(''),'没有符合条件的收藏。')}
 const labels=['生活日志','阅读笔记','账目','项目'];
 function tagRows(){return mobileTagRows()}
 
@@ -276,13 +274,13 @@ function work(id){
 }
 
 const guideRows=[
- ['搜索与资料库','现有：多库搜索、筛选和详情。','手机：关键词、范围和单页预览。桌面：并排核对多个命中、管理索引。'],
+ ['搜索与资料库','原型：笔记、日志、任务、阅读、对话、洞察和闪卡统一检索。','可多选资料库、空间分组，按类型、日期筛选；仅搜索示例与本机内容，不读取真实账号。'],
  ['阅读、收藏、最近浏览','现有：多来源阅读及状态、收藏与访问历史。','手机：单页接着读、快速更新状态。桌面：看板、表格、附件与批量归档。'],
  ['日志与标签','现有：按日期浏览日志、按标签定位资料。','手机：按天浏览、快速记录。支持文字、照片与文件草稿；上传和电脑写入在原型中显式演示，语音转写留待后续。'],
- ['任务','现有：任务列表及受控同步。','手机：看今天、勾选和恢复。桌面：项目编排、跨来源核对与批处理。'],
+ ['任务','原型：创建、编辑、日期、优先级、筛选与完成撤销。','阅读、资料、洞察和 Agent 回答可以转任务并保留来源；都是本地演示，不写回 Craft / 滴答。'],
  ['闪卡','现有：牌组与移动复习。','手机：翻卡和评分；桌面：编辑牌组、质量检查和批量导入。'],
- ['Agents 云端会话','方案 #32：手机连接个人 VPS 的 Hub 服务，Codex 使用 ChatGPT 订阅登录。','手机原型：文字、图片、多轮、流式、停止和断线恢复。仅使用对话与明确选定的材料；Windows 关机不影响云会话。真实 Android 接入仍待验收。'],
- ['洞察与阶段回顾','规划：Issue #2 首批为结构化成果→发现，阶段回顾在后续。','手机：查看依据、补充纠正、请求桌面更新和确认新版本；不在手机运行 AI。'],
+ ['Agents 云端会话','主仓方案 #32：Android 连接个人 VPS 与 Codex app-server，已有基础接入。','此站只演示会话、材料、重命名、归档、停止与恢复，不连接 VPS、不调用模型。此站新增材料与成果操作不代表真实 Android / 服务已具备。'],
+ ['洞察与阶段回顾','原型：浏览中直达洞察，搜索首页有轻量提醒。','查看依据、补充纠正、安排下一步；桌面更新与阶段回顾仍为历史演示，不在手机运行真实分析。'],
  ['同步与设置','现有：资料库和同步诊断。','手机：查看缓存、恢复连接、选择同步范围和重试；备份恢复与批量维护在桌面完成。']
 ];
 function guide(){return intro('功能梳理','手机优先做短、频繁、可中断的操作。')+
@@ -293,15 +291,15 @@ function content(p,id){
  switch(p){
  case 'search':return searchPage();case 'browse':return mobileBrowsePage();case 'insights':return mobileInsights();case 'finding':return finding(id);case 'recap':return recap();
  case 'capture':return capturePage();
- case 'saved':return notesPage();case 'doc':return docPage(id);case 'reading':return readingPage();case 'article':return article(id);
- case 'tasks':return mobileTaskPage();case 'task':return mobileTaskDetail(id);case 'review':return review();case 'study':return study();case 'agent':case 'agents':return agentsPage();case 'agent-chat':return agentChatPage(id);case 'agent-connection':return agentConnectionPage();case 'request':return requestDetail(id);case 'requests':return intro('更新请求','查看待同步、桌面处理和已确认的请求。')+section('请求记录',group(st.jobs.slice().reverse().map(requestRow).join(''),'还没有更新请求。'),plain('同步与离线','go:collab-sync'));case 'works':return works();case 'work':return work(id);case 'guide':return guide();
+ case 'saved':return notesPage();case 'doc':return docPage(id)+workspaceOriginMarkup(st.notes.find(n=>n.id===id)?.origin);case 'note':return docPage(id,true)+workspaceOriginMarkup(st.notes.find(n=>n.id===id)?.origin);case 'reading':return readingPage();case 'article':return article(id);
+ case 'tasks':return taskToolsPage();case 'task':return taskToolsDetail(id);case 'review':return review();case 'card':return workspaceCardPage(id);case 'study':return study();case 'agent':case 'agents':return agentsPage();case 'agent-chat':return agentChatPage(id);case 'agent-connection':return agentConnectionPage();case 'request':return requestDetail(id);case 'requests':return intro('更新请求','查看待同步、桌面处理和已确认的请求。')+section('请求记录',group(st.jobs.slice().reverse().map(requestRow).join(''),'还没有更新请求。'),plain('同步与离线','go:collab-sync'));case 'works':return works();case 'work':return work(id);case 'guide':return guide();
  case 'favorites':return intro('收藏','回看已收藏的笔记与阅读内容。')+searchInput('star-query','搜索收藏',starQuery)+'<div id="star-results">'+favoriteRows()+'</div>';
  case 'recent':return intro('最近浏览','回到最近打开的资料与文章。')+section('访问历史',group(st.history.map(itemRow).join(''),'还没有浏览记录。'),st.history.length?plain('清除','clear-history'):'');
  case 'logs':return journalPage();
  case 'tags':return intro('标签','按标签搜索示例资料。')+searchInput('tag-query','搜索标签',tagQuery)+'<div id="tag-results">'+tagRows()+'</div>';
  case 'label':{const t=labelFromRoute(id);return t?intro(t,'具有此标签的资料与速记。')+section('资料',group(mobileTagItems(t))):missing()}
 
- case 'libraries':return intro('资料库','选择搜索范围，或查看本设备的连接与缓存。')+section('示例来源',group(['Craft','Obsidian','全部资料库'].map(t=>row(t,source===t?'当前搜索范围':'点按后按此范围搜索','folder','library:'+t)).join('')));
+ case 'libraries':return workspaceLibrariesPage();case 'connections':return workspaceConnectionsPage();
  case 'sync':return deviceSyncPage();case 'collab-sync':return syncPage();case 'future':return futurePage();case 'deck':return deckPage(id);
  case 'settings':return settingsPage();case 'appearance':return appearancePage();
  default:return missing();
@@ -309,30 +307,31 @@ function content(p,id){
 function render(restore=false){
  const demoControls=document.querySelector('.demo-controls');if(demoControls)syncControlsOpen=demoControls.open;
  const [p,id]=route(),key=p+(id?'/'+id:'');const isTab=navs.some(x=>x[0]===p);
- if(((p==='doc'&&(docs[id]||st.notes.some(n=>n.id===id)))||p==='article')&&activeRoute!==key){const item=p==='article'?'article/'+id:id;st.history=[item,...st.history.filter(x=>x!==item)].slice(0,12);save()}
+ if((((p==='doc'||p==='note')&&(docs[id]||st.notes.some(n=>n.id===id)))||p==='article')&&activeRoute!==key){const item=p==='article'?'article/'+id:p==='note'||!docs[id]?'note/'+id:id;st.history=[item,...st.history.filter(x=>x!==item)].slice(0,12);save()}
  activeRoute=key;document.body.dataset.view=p;
  const isStudy=p==='study'&&allReviewCards().some(c=>(st.studyDeck==='全部'||c.deck===st.studyDeck)&&!st.reviewed.includes(c.id));
  document.body.classList.toggle('focus-session',isStudy);$('#tabs').hidden=isStudy||p==='agent-chat';
  const brand='<span class="brand"><img src="hub.svg" alt="">Hub <span class="sample-label">示例资料</span></span>';
  if(['agent','agents','agent-chat','agent-connection'].includes(p))$('#header').innerHTML=agentsHeader(p==='agent'?'agents':p,id);
- else if(isTab)$('#header').innerHTML=brand+'<div class="top-actions">'+iconBtn('外观与设置','go:settings','settings')+iconBtn('打开 Agents','go:agents','chat')+iconBtn('快速新建','quick-capture:note','plus')+'</div>';
+ else if(isTab)$('#header').innerHTML=brand+'<div class="top-actions">'+iconBtn('外观与设置','go:settings','settings')+iconBtn('快速速记','quick-capture:note','plus')+'</div>';
  else if(p==='study')$('#header').innerHTML=plain('退出复习','exit-study','back')+'<span class="top-title">'+esc(st.studyDeck==='全部'?'专注复习':st.studyDeck)+'</span>';
- else if(p==='doc')$('#header').innerHTML=iconBtn('返回','back','back')+'<span class="top-title">资料</span><div class="top-actions">'+iconBtn('资料出处','doc-source:'+id,'link')+iconBtn('更多操作','doc-tools:'+id,'more')+'</div>';
+ else if(p==='doc'||p==='note')$('#header').innerHTML=iconBtn('返回','back','back')+'<span class="top-title">'+(p==='note'?'本地笔记':'资料')+'</span><div class="top-actions">'+iconBtn('资料出处','doc-source:'+id,'link')+iconBtn('更多操作','doc-tools:'+id,'more')+'</div>';
  else $('#header').innerHTML=iconBtn('返回','back','back')+'<span class="top-title">'+routes[p]+'</span>'+iconBtn('快速新建','quick-capture:note','plus');
- const selected=['agent','agents','agent-chat','agent-connection'].includes(p)?null:isTab?p:history.state?.tab||tabFor(p);
+ const selected=['agent','agents','agent-chat','agent-connection'].includes(p)?'agents':isTab?p:history.state?.tab||tabFor(p);
  $('#tabs').innerHTML=navs.map(([k,t,i])=>'<button type="button" class="tab" data-act="tab:'+k+'" '+(k===selected?'aria-current="page"':'')+'><span class="tab-icon">'+ico(i,21)+'</span><span>'+t+'</span></button>').join('');
- $('#content').innerHTML=(['insights','works','work','recap','requests','request','finding','collab-sync'].includes(p)?'<div class="future-banner">后续功能演示 · 尚未接入安卓 '+plain('返回后续功能','go:future')+'</div>':'')+content(p,id);
+ $('#content').innerHTML=(['insights','works','work','recap','requests','request','finding','collab-sync'].includes(p)?'<div class="future-banner">示例交互 · 未连接真实分析或桌面服务 '+plain('功能边界','go:guide')+'</div>':'')+content(p,id);
  void hydrateAttachmentImages();
  document.title=(p==='search'?'Hub':routes[p]+' · Hub')+' · 手机原型';
  if(restore){window.scrollTo(0,scrolls[key]||0);$('#content').focus({preventScroll:true})}
  mobileUpdateViewport();
+ if(p==='search')workspaceRevealActiveType();
  if(typeof agentUIAfterRender==='function')agentUIAfterRender();
 }
 function showSheet(t,html){
  const d=$('#sheet'),opened=d.open;
  if(!opened){mobileSheetFocus=document.activeElement?.closest('[data-act]')?.dataset.act||null;lockMobilePage()}
  d.innerHTML='<div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h2 id="sheet-title">'+esc(t)+'</h2>'+iconBtn('关闭','close','close')+'</div><div class="sheet-body">'+html+'</div><p id="sheet-feedback" class="info" role="status" hidden></p>';
- if(!opened)d.showModal();mobileUpdateViewport();
+ if(!opened)d.showModal();if(d.querySelector('#workspace-scope-form'))workspaceSyncScopeParents();mobileUpdateViewport();
 }
 function sheet(t,html){
  if(mobileClosingSheet)return;const state=history.state||{},id=state.sheet||++sheetSerial;
@@ -345,11 +344,11 @@ $('#sheet').addEventListener('cancel',e=>{e.preventDefault();close()});
 
 
 function changed(msg){const persisted=save();render();if(persisted)tell(msg);return persisted}
-document.addEventListener('input',e=>{if(handleAgentInput(e))return;handleWorkflowInput(e);const el=e.target;if(el.id==='query'&&!e.isComposing){query=el.value.trim();refreshSearch()}if(el.id==='capture-text'){st.draft=el.value;save()}if(el.id==='reading-query'){readingQuery=el.value.trim();$('#reading-results').innerHTML=readingRows()}if(el.id==='star-query'){starQuery=el.value.trim();$('#star-results').innerHTML=favoriteRows()}if(el.id==='tag-query'){tagQuery=el.value.trim();$('#tag-results').innerHTML=tagRows()}if(el.id==='correction'){st.drafts['feedback-'+el.form.dataset.id]=el.value;save()}if(el.form?.id==='request-form'){st.drafts[el.form.dataset.target]=readRequest(el.form);save()}});
-document.addEventListener('compositionend',e=>{if(e.target.id==='query'){query=e.target.value.trim();refreshSearch()}});
-document.addEventListener('change',e=>{if(handleAgentChange(e))return;handleWorkflowInput(e);const f=e.target.form;if(f?.id==='request-form'){st.drafts[f.dataset.target]=readRequest(f);save()}});
+document.addEventListener('input',e=>{if(workspaceInput(e)||taskToolsInput(e)||handleAgentInput(e))return;handleWorkflowInput(e);const el=e.target;if(el.id==='query'&&!e.isComposing){query=el.value.trim();refreshSearch()}if(el.id==='capture-text'){st.draft=el.value;save()}if(el.id==='reading-query'){readingQuery=el.value.trim();$('#reading-results').innerHTML=readingRows()}if(el.id==='star-query'){starQuery=el.value.trim();$('#star-results').innerHTML=favoriteRows()}if(el.id==='tag-query'){tagQuery=el.value.trim();$('#tag-results').innerHTML=tagRows()}if(el.id==='correction'){st.drafts['feedback-'+el.form.dataset.id]=el.value;save()}if(el.form?.id==='request-form'){st.drafts[el.form.dataset.target]=readRequest(el.form);save()}});
+document.addEventListener('compositionend',e=>{if(taskToolsInput(e))return;if(e.target.id==='query'){query=e.target.value.trim();refreshSearch()}});
+document.addEventListener('change',e=>{if(workspaceInput(e)||taskToolsInput(e)||handleAgentChange(e))return;handleWorkflowInput(e);const f=e.target.form;if(f?.id==='request-form'){st.drafts[f.dataset.target]=readRequest(f);save()}});
 document.addEventListener('submit',e=>{
- const f=e.target;if(handleAgentSubmit(f)){e.preventDefault();return}if(f.id==='quick-capture-form'){e.preventDefault();handleWorkflowSubmit(f);return}if(!['search-form','capture-form','correction-form','request-form','search-scope-form','sync-settings-form'].includes(f.id))return;e.preventDefault();
+ const f=e.target;if(workspaceSubmit(f)||taskToolsSubmit(f)||handleAgentSubmit(f)){e.preventDefault();return}if(f.id==='quick-capture-form'){e.preventDefault();handleWorkflowSubmit(f);return}if(!['search-form','capture-form','correction-form','request-form','search-scope-form','sync-settings-form'].includes(f.id))return;e.preventDefault();
  if(f.id==='search-form'){query=$('#query').value.trim();refreshSearch();$('#query').blur();return}
  if(f.id==='capture-form'){const val=$('#capture-text').value.trim();if(!val){tell('请输入记录内容。');return}st.notes.unshift({id:'n'+Date.now(),text:val,date:new Date().toLocaleDateString('zh-CN')});const draft=st.draft;st.draft='';if(!save()){st.notes.shift();st.draft=draft;return}go('saved');tell('已保存到此浏览器');return}
  if(f.id==='request-form'){submitRequest(f);return}
@@ -361,7 +360,7 @@ document.addEventListener('submit',e=>{
 document.addEventListener('click',e=>{
  const el=e.target.closest('[data-act]');if(!el)return;
  const [a,k,v]=el.dataset.act.split(':');
- if(handleAgentAction(a,k,v)||mobileHandleAction(a,k,v)||handleWorkflowAction(a,k,v))return;
+ if(workspaceAction(a,k,v)||taskToolsAction(a,k,v)||handleAgentAction(a,k,v)||mobileHandleAction(a,k,v)||handleWorkflowAction(a,k,v))return;
  if(a==='go'){go(k);return}
  if(a==='back'){back();return}
  if(a==='close'){close();return}

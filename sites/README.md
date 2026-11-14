@@ -1,6 +1,6 @@
 # Hub 站点原型源码
 
-这里保存两个现有 ChatGPT Sites 的完整可运行源码，供 Claude Code、Codex 和 ChatGPT 接续编辑。它们是 Hub 的浏览器交互原型；正式桌面产品仍在 `desktop/`，VPS Agents 服务仍在 `services/hub-agents/`。
+这里保存两个既有 ChatGPT Sites，以及用户于 2026-11-14 明确要求新建的独立任务流程实验室的完整可运行源码，供 Claude Code、Codex 和 ChatGPT 接续编辑。它们是 Hub 的浏览器交互原型；正式桌面产品仍在 `desktop/`，VPS Agents 服务仍在 `services/hub-agents/`。
 
 ## 站点与目录
 
@@ -8,15 +8,20 @@
 | --- | --- | --- | --- |
 | Hub 手机端原型 | [hub-mobile-lab](hub-mobile-lab) | [浏览](https://hub-mobile-lab-von11.song02211368537057.chatgpt.site/#browse) | v6 |
 | Hub · 工作与生活工作台 | [hub-workspace](hub-workspace) | [全部内容](https://hub-workspace-von11.song02211368537057.chatgpt.site/?view=all) | v80 |
+| Hub · 任务流程实验室（独立评估） | [hub-task-flow-lab](hub-task-flow-lab) | [任务工作台](https://hub-task-flow-lab-von11.song02211368537057.chatgpt.site) | v1 |
 
 首次同步日期：2026-11-12（北京时间）。两个来源版本均已核验发布成功。
 
+任务流程实验室于 2026-11-14 独立发布 v1（私有预览），没有修改原两个站点或正式桌面程序。全部数据、AI 与来源同步都是本机模拟。发布回执已成功；本地浏览器完成流程验收，发布后的云浏览器访问停在 ChatGPT 登录页，未把登录门禁当作线上内容验收通过。使用站点所属 ChatGPT 账号打开；详情与图解见该目录 README 和 `docs/task-flow.md`。
+
 2026-11-14 工作台已沿用原项目发布 **v81**，包含此前保留的云同步调整，以及洞察依据确认、替代关系和限定事项的旧知识查找。原型使用示例资料，桌面真实接入另行验收。此前 Sites 编辑连接阻碍已解除；源码提交 `f1b88180c62b436a7f8b3c51f1f6d3ad0b2e27ed`、部署 `appgdep_6af7cd2def3481919c7661aa121fb55e` 成功，225 个来源文件已导回并核验，`.source-snapshot.json` 记录实际来源。类型、相关原型状态检查和生产构建通过；保留原地址与访问范围，没有新建替代站点。
+
 
 | 来源 | 原始源码 Git commit | 原始文件数 |
 | --- | --- | ---: |
 | 手机端 v6 | `46d6fc81061a00a2abbdb564f7aa0bb06f247e81` | 20 |
 | 工作台 v80 | `29ed068217aebecbba4ae83a249b3058d38fe88d` | 222 |
+| 任务流程实验室 v1 | `2a99c02d3923b7e04751adcdaa383d19b305431a` | 17 |
 
 这些 SHA 是各自 Sites 源码仓库的提交，与 `hub-search` 的提交编号不同。每个目录的 `.source-snapshot.json` 保存当前导入来源、发布版本、部署 ID，以及所有原始文件的 SHA256、模式和大小；本表的 v6/v80 保留为首次导入记录，后续状态以快照为准。
 
@@ -26,6 +31,7 @@
 
 - 调整工作台界面、助手、洞察、阅读、任务等：进入 `sites/hub-workspace/`。
 - 调整手机浏览、搜索、日志、复习或 Agents 演示：进入 `sites/hub-mobile-lab/`。
+- 评估新的桌面任务闭环、候选整理、行动池、等待与完成日志：进入独立的 `sites/hub-task-flow-lab/`，不要覆盖原工作台。
 - 任务指向网站原型时，保持在该目录内修改；不要因此直接改动桌面业务源码。
 
 ### 手机端：静态源码，直接预览
@@ -44,6 +50,10 @@ python3 -m http.server 5174 --bind 127.0.0.1 --directory dist
 ```bash
 node checks/mobile-checks.cjs
 ```
+
+### 任务流程实验室：独立静态源码
+
+进入 `sites/hub-task-flow-lab/` 运行 `npm run check`（38 项模型与静态 UI 检查），再通过 HTTP 服务预览 `dist/`。不需要安装依赖或构建；`dist/` 是手写源码。顶部的“体验完整案例”和“流程图”可以演示完整闭环，详细验证边界见 [验证记录](hub-task-flow-lab/docs/verification.md)。
 
 ### 工作台：React / TypeScript / Vinext
 
@@ -100,7 +110,7 @@ python3 scripts/sync-site-sources.py import \
   --deployment-id VERIFIED_DEPLOYMENT_ID
 ```
 
-工作台使用 `--site workspace` 和其自己的来源参数。在仓库根目录统一核验：
+工作台使用 `--site workspace` 和其自己的来源参数；独立任务流程实验室使用 `--site taskflow`。在仓库根目录统一核验：
 
 ```bash
 python3 scripts/sync-site-sources.py verify

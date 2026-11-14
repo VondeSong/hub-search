@@ -19,6 +19,8 @@ SITES = {
                "https://hub-mobile-lab-von11.song02211368537057.chatgpt.site"),
     "workspace": ("hub-workspace", "appgprj_6aeffedbff408191858a4bbb6643e4f6",
                   "https://hub-workspace-von11.song02211368537057.chatgpt.site"),
+    "taskflow": ("hub-task-flow-lab", "appgprj_6af7b8ca80448191ac76b1a03eaa73dd",
+                 "https://hub-task-flow-lab-von11.song02211368537057.chatgpt.site"),
 }
 CACHES = {".git", "node_modules", "__pycache__", ".next", ".vinext",
           ".wrangler", ".sites-runtime", ".pnpm-store", ".cache", ".venv"}
@@ -269,7 +271,7 @@ def import_locked(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__, epilog="No credentials, network calls or Git pushes. Mobile dist/ contains authored source and is preserved.")
+    parser = argparse.ArgumentParser(description=__doc__, epilog="No credentials, network calls or Git pushes. Mobile and taskflow dist/ contain authored source and are preserved.")
     actions = parser.add_subparsers(dest="action", required=True)
     importer = actions.add_parser("import", help="Copy one published Git commit into its managed snapshot")
     importer.add_argument("--site", choices=SITES, required=True)
@@ -280,7 +282,7 @@ def main():
     importer.add_argument("--accept-matching-changes", action="store_true",
                           help="Accept local edits, additions or deletions only when they already match the requested source commit")
     verifier = actions.add_parser("verify", help="Verify mirrored content and executable modes against saved hashes")
-    verifier.add_argument("--site", choices=SITES, help="Omit to verify both sites")
+    verifier.add_argument("--site", choices=SITES, help="Omit to verify all registered sites")
     args = parser.parse_args()
     try:
         if args.action == "import":

@@ -92,4 +92,7 @@ secrets.*.json
 # Keep this exception scoped; framework build output remains ignored elsewhere.
 !/sites/hub-mobile-lab/dist/
 !/sites/hub-mobile-lab/dist/**
+# The independent task-flow lab is also buildless; keep its authored source.
+!/sites/hub-task-flow-lab/dist/
+!/sites/hub-task-flow-lab/dist/**
 /sites/.sync-site-sources-*.lock
