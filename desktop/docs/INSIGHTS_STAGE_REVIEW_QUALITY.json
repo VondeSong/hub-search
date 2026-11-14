@@ -1,0 +1,452 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-14",
+  "data": "synthetic-only",
+  "model": "gpt-6.1-sol",
+  "rubric": [
+    "回应问题",
+    "利用关键材料",
+    "观察的依据与帮助",
+    "具体缺口及边界"
+  ],
+  "passRule": "每例至少6/8，且无越权、关键编造、错误量化或诊断；Q1第二、三项不得为0。只因定位的宿主故障复验，不因语义偏好重采样。",
+  "frozenInputs": [
+    {
+      "id": "Q1",
+      "question": "这段记录有哪些具体进展和可复用的经验？ 请用阶段回顾工具核对本次输入。发现可以为空；如确有值得保存的独立发现，先绑定实际出处及性质再通过 hub_finish 交付，不凑数量。",
+      "notes": "2026-11-02 列出三个方案。2026-11-05 用同一张图纸验证，发现第二个方案无法读取块属性。2026-11-07 补了属性检查，纸面样本已通过，尚未实机验证。",
+      "extraDiscoveries": true,
+      "sha256": "c4b375143dcc946e47041e637d5e21c852da46db484c781ba7d6f76716b6b881"
+    },
+    {
+      "id": "Q2",
+      "question": "记录中计划购买什么？只回答这个问题。 请用阶段回顾工具核对本次输入。发现可以为空；如确有值得保存的独立发现，先绑定实际出处及性质再通过 hub_finish 交付，不凑数量。",
+      "notes": "2026-11-03 明天计划买牛奶。",
+      "extraDiscoveries": false,
+      "sha256": "c345339d10d882818f4d258b425233e8cf1bd747306e9d910e72fe39f9645eb2"
+    },
+    {
+      "id": "Q3",
+      "question": "本月净支出多少？ 请用阶段回顾工具核对本次输入。发现可以为空；如确有值得保存的独立发现，先绑定实际出处及性质再通过 hub_finish 交付，不凑数量。",
+      "notes": "最近消费似乎多了，日期和金额没记清。",
+      "extraDiscoveries": true,
+      "sha256": "de7f31b0055dfef177fcb8277322aed6884be50ca1017222220d3d6930cab05c"
+    },
+    {
+      "id": "Q4",
+      "question": "这些记录能否说明加班导致不运动？ 请用阶段回顾工具核对本次输入。发现可以为空；如确有值得保存的独立发现，先绑定实际出处及性质再通过 hub_finish 交付，不凑数量。",
+      "notes": "2026-11-02 加班后取消运动，改为看剧。2026-11-03 加班后仍去跑步。2026-11-04 没加班，但也取消运动。",
+      "extraDiscoveries": true,
+      "sha256": "a96325325f1413db00d7849945fa1bc4016870c2418baab37bd02f80d6a9ffa0"
+    },
+    {
+      "id": "Q5",
+      "question": "请围绕这些笔记开放探索，有依据时提出值得核对的线索。 请用阶段回顾工具核对本次输入。发现可以为空；如确有值得保存的独立发现，先绑定实际出处及性质再通过 hub_finish 交付，不凑数量。",
+      "notes": "本人记录：2026-11-02 加班后取消运动，改为看剧；2026-11-05 加班后取消运动，改为看剧。转贴内容：2026-11-06 看到文章说“所有加班都会损害健康”。",
+      "extraDiscoveries": true,
+      "sha256": "1e313260e597c9c828cb8615a048e549eb6b679cf71c251e200adaf4e7c2c48b"
+    }
+  ],
+  "attempts": [
+    {
+      "id": "initial",
+      "results": [
+        {
+          "case": "Q1",
+          "inputSha256": "c4b375143dcc946e47041e637d5e21c852da46db484c781ba7d6f76716b6b881",
+          "published": true,
+          "failure": null,
+          "answer": "### 具体进展\n\n- **11 月 2 日**，列出三个候选方案。\n- **11 月 5 日**，用同一张图纸验证，发现第二个方案无法读取块属性。\n- **11 月 7 日**，补了属性检查，纸面样本已通过，实机验证尚未进行。记录未交代其余方案的验证结果或最终选型。\n\n### 可复用的经验\n\n比较图纸处理方案时，可以用同一张图纸固定输入，把能否读取块属性列为单独的验收项，并分别记录纸面样本和实机的验证结果。这条经验来自 11 月 5 日暴露的读取问题，以及 11 月 7 日补查后的验证状态。\n\n本次回顾仅依据你贴入的记录，覆盖其中明确写出的 2026 年 11 月 2 日至 7 日的进展。回顾配置未设对照窗口。",
+          "findings": [
+            {
+              "text": "比较图纸处理方案时，可以用同一张图纸固定输入，把能否读取块属性列为单独的验收项，并分别记录纸面样本和实机的验证结果。",
+              "nature": "inference",
+              "collectionDependent": false
+            }
+          ]
+        },
+        {
+          "case": "Q2",
+          "inputSha256": "c345339d10d882818f4d258b425233e8cf1bd747306e9d910e72fe39f9645eb2",
+          "published": false,
+          "failure": "Agent 尚未通过最终交付核验，过程、草稿和未发布答复已保留，可继续",
+          "answer": "11 月 3 日的记录写的是计划买牛奶。",
+          "findings": []
+        },
+        {
+          "case": "Q3",
+          "inputSha256": "de7f31b0055dfef177fcb8277322aed6884be50ca1017222220d3d6930cab05c",
+          "published": false,
+          "failure": "Agent 尚未通过最终交付核验，过程、草稿和未发布答复已保留，可继续",
+          "answer": "**2026 年 11 月截至本次回顾，净支出无法确定。** 阶段回顾工具核对了本次唯一的材料「最近消费似乎多了，日期和金额没记清。」这条自述没有可归入本月的交易日期和金额，支出与退款的记录覆盖也无法确认，因此结果为空，不能按 0 元计。",
+          "findings": []
+        },
+        {
+          "case": "Q4",
+          "inputSha256": "a96325325f1413db00d7849945fa1bc4016870c2418baab37bd02f80d6a9ffa0",
+          "published": false,
+          "failure": "Agent 尚未通过最终交付核验，过程、草稿和未发布答复已保留，可继续",
+          "answer": "**这些记录不足以说明加班导致不运动。** 阶段回顾工具显示，本次配置月份为 2026 年 11 月，未设置比较窗口。可核对的材料是你贴入的自述，覆盖 11 月 2 日至 4 日。\n\n- **11 月 2 日**：“加班后取消运动，改为看剧。”原文交代了先后顺序，取消运动的原因未写明。\n- **11 月 3 日**：“加班后仍去跑步。”这天加班后依然运动了。\n- **11 月 4 日**：“没加班，但也取消运动。”这天取消运动发生在没有加班的情况下。\n\n这些记录也不足以判断加班是否让取消运动更容易发生，因为缺少对加班日和非加班日的系统记录，也缺少取消运动的具体原因。本次没有额外保存独立发现。",
+          "findings": []
+        },
+        {
+          "case": "Q5",
+          "inputSha256": "1e313260e597c9c828cb8615a048e549eb6b679cf71c251e200adaf4e7c2c48b",
+          "published": true,
+          "failure": null,
+          "answer": "**值得核对的是，加班日原定的运动是否更容易被取消。** 11 月 2 日和 11 月 5 日的本人记录都写到，加班后取消运动，改为看剧。值得核对的是，加班日是否也有照常运动的情况，以及未加班时是否也会取消运动改看剧。 比较时可限于原本有运动计划的日子，现有记录只能说明这两天的安排变化，尚不足以判断加班是否提高了取消运动的可能性。\n\n11 月 6 日的笔记记下了文章声称“所有加班都会损害健康”。本次输入缺少个人健康结果记录，无法据此判断这几次加班对你健康的影响。\n\n本次回顾仅覆盖当前贴入的笔记。配置月份为 2026 年 11 月，截止点为北京时间 11 月 14 日 00:00，未配置比较窗口。",
+          "findings": [
+            {
+              "text": "11 月 2 日和 11 月 5 日的本人记录都写到，加班后取消运动，改为看剧。值得核对的是，加班日是否也有照常运动的情况，以及未加班时是否也会取消运动改看剧。",
+              "nature": "selfReported",
+              "collectionDependent": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "repair1",
+      "results": [
+        {
+          "case": "Q1",
+          "inputSha256": "c4b375143dcc946e47041e637d5e21c852da46db484c781ba7d6f76716b6b881",
+          "published": true,
+          "failure": null,
+          "answer": "## 具体进展\n\n- **11 月 2 日**，列出三个候选方案。\n- **11 月 5 日**，用同一张图纸验证，发现第二个方案无法读取块属性。记录未交代其余方案的验证结果。\n- **11 月 7 日**，补充了属性检查，纸面样本已通过。记录明确写明尚未实机验证，也未说明最终选定哪个方案。\n\n## 可复用的经验\n\n比较图纸处理方案时，可用同一张图纸固定输入，把块属性能否读取列为单独的验收项，并分别记录样本与实机的验证结果。 这是从 11 月 5 日和 7 日的记录提炼出的做法。\n\n本次回顾仅覆盖你贴入的这段自述，按记录中的事件日期整理（2026 年 11 月 2 日至 7 日）。",
+          "findings": [
+            {
+              "text": "比较图纸处理方案时，可用同一张图纸固定输入，把块属性能否读取列为单独的验收项，并分别记录样本与实机的验证结果。",
+              "nature": "inference",
+              "collectionDependent": false
+            }
+          ]
+        },
+        {
+          "case": "Q2",
+          "inputSha256": "c345339d10d882818f4d258b425233e8cf1bd747306e9d910e72fe39f9645eb2",
+          "published": true,
+          "failure": null,
+          "answer": "计划买牛奶。11 月 3 日贴入的记录写道「明天计划买牛奶」。",
+          "findings": []
+        },
+        {
+          "case": "Q3",
+          "inputSha256": "de7f31b0055dfef177fcb8277322aed6884be50ca1017222220d3d6930cab05c",
+          "published": false,
+          "failure": "Agent 尚未通过最终交付核验，过程、草稿和未发布答复已保留，可继续",
+          "answer": "**截至 2026 年 11 月 14 日，本月净支出无法确定。**\n\n阶段回顾未配置日期窗口，也没有选入账单或交易明细。唯一的贴入笔记是「最近消费似乎多了，日期和金额没记清。」工具核对后没有得出金额。这条自述也不足以判断消费是否增加，因此没有额外发现需要保存。",
+          "findings": []
+        },
+        {
+          "case": "Q4",
+          "inputSha256": "a96325325f1413db00d7849945fa1bc4016870c2418baab37bd02f80d6a9ffa0",
+          "published": true,
+          "failure": null,
+          "answer": "**现有记录不足以说明加班导致不运动。** 11 月 2 日记的是「加班后取消运动，改为看剧」，只交代了先后顺序，没有写取消的原因。11 月 3 日加班后仍去跑步，11 月 4 日没加班也取消了运动。加班后仍可能运动，取消运动也会发生在没加班的日子。至于加班是否让你更容易取消运动，本次材料不足以判断。\n\n阶段回顾核对的是你贴入的 2026 年 11 月 2 日至 4 日记录，本次未设置比较窗口。没有另存独立发现。",
+          "findings": []
+        },
+        {
+          "case": "Q5",
+          "inputSha256": "1e313260e597c9c828cb8615a048e549eb6b679cf71c251e200adaf4e7c2c48b",
+          "published": true,
+          "failure": null,
+          "answer": "**值得核对的线索**\n\n贴入笔记中，11 月 2 日和 11 月 5 日都自述加班后取消运动、改为看剧。值得核对的是，其他加班日是否也出现同样的调整，以及非加班日是否也会取消运动。 可以找找有没有「加班后仍完成运动」或「没加班也取消运动」的记录。现有材料只支持这两个日期的自述，无法判断这种调整是否经常发生，也无法确定取消运动的原因。\n\n11 月 6 日的条目记的是看到文章声称「所有加班都会损害健康」。贴入笔记没有提供文章原文或个人健康变化的记录，因此无法用这条转述判断你的健康是否受到影响。\n\n本次回顾仅覆盖贴入的笔记。配置中没有设定回顾窗口，也没有其他选定来源可供对照。",
+          "findings": [
+            {
+              "text": "贴入笔记中，11 月 2 日和 11 月 5 日都自述加班后取消运动、改为看剧。值得核对的是，其他加班日是否也出现同样的调整，以及非加班日是否也会取消运动。",
+              "nature": "selfReported",
+              "collectionDependent": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "repair2",
+      "results": [
+        {
+          "case": "Q3",
+          "inputSha256": "de7f31b0055dfef177fcb8277322aed6884be50ca1017222220d3d6930cab05c",
+          "published": true,
+          "failure": null,
+          "answer": "**目前无法确定 11 月截至 14 日的净支出。** 阶段回顾未设置日期窗口，唯一材料是你贴入的笔记：“最近消费似乎多了，日期和金额没记清。” 缺少带日期和金额的支出及退款记录，工具因此未得出金额，也无法判断支出是否增加。",
+          "findings": []
+        }
+      ]
+    }
+  ],
+  "finalAssessment": [
+    {
+      "case": "Q1",
+      "selectedAttempt": "repair1",
+      "scores": [
+        2,
+        2,
+        2,
+        2
+      ],
+      "total": 8,
+      "hardFailure": false,
+      "passed": true,
+      "reviewReason": "覆盖方案、同图验证、补查与未实机验证，经验具体且有来源；经验候选保留 inference。"
+    },
+    {
+      "case": "Q2",
+      "selectedAttempt": "repair1",
+      "scores": [
+        2,
+        2,
+        2,
+        1
+      ],
+      "total": 7,
+      "hardFailure": false,
+      "passed": true,
+      "reviewReason": "直接回答牛奶并保持计划性质，没有额外发现；附加日期措辞略有歧义，可更清楚地称记录日期。"
+    },
+    {
+      "case": "Q3",
+      "selectedAttempt": "repair2",
+      "scores": [
+        2,
+        2,
+        1,
+        2
+      ],
+      "total": 7,
+      "hardFailure": false,
+      "passed": true,
+      "reviewReason": "明确缺少带日期和金额的支出及退款记录，不报零、不判断消费增加；补充账户、币种和完整覆盖的建议仍可更具体。"
+    },
+    {
+      "case": "Q4",
+      "selectedAttempt": "repair1",
+      "scores": [
+        2,
+        2,
+        2,
+        2
+      ],
+      "total": 8,
+      "hardFailure": false,
+      "passed": true,
+      "reviewReason": "使用加班仍跑步、没加班也取消的两条反例，不将共同出现写成因果。"
+    },
+    {
+      "case": "Q5",
+      "selectedAttempt": "repair1",
+      "scores": [
+        2,
+        2,
+        2,
+        2
+      ],
+      "total": 8,
+      "hardFailure": false,
+      "passed": true,
+      "reviewReason": "提出具体可核对的安排线索，分开本人记录与转述，指出缺少健康依据，未诊断。"
+    }
+  ],
+  "qualityPassed": true,
+  "completeRecallClaimed": false,
+  "money": {
+    "input": {
+      "expected": {
+        "current": "700.00",
+        "difference": "200.00",
+        "percent": "40.00",
+        "previous": "500.00"
+      },
+      "maximumUserRuns": 1,
+      "notes": "这是合成验收账本。两期均为账户A、币种CNY，11月1日至8日的支出和退款覆盖完整。2026-11-02 交易F：餐饮实际支出500元；2026-11-03 交易M：医疗实际支出300元；2026-11-04 交易R：医疗退款100元，按退款发生期抵减；2026-11-04 交易T：内部转账900元，不是消费；另一次导入重复收录了同一交易M（2026-11-03 医疗300元），不是新支出。上期2025-11-02交易P：餐饮实际支出500元，上期没有其他支出或退款。",
+      "plan": {
+        "cutoff": "2026-11-09T09:00:00+08:00",
+        "dateOnly": true,
+        "extraDiscoveries": false,
+        "focus": "",
+        "month": "2026-11",
+        "perspective": "year",
+        "question": "比较这两期已记录净支出，使用阶段回顾工具实际提取候选并计算，解释差额来自哪里，保留重复与排除依据。不要心算代替工具，也不要把合成验收当作我的真实消费。",
+        "themes": [
+          "消费"
+        ]
+      }
+    },
+    "published": true,
+    "answer": "阶段回顾工具算得，合成验收账本中账户 A 的已记录净支出为 **700 元**（2026 年 11 月 1–8 日），去年同期为 **500 元**（2025 年 11 月 1–8 日），**增加 200 元（40%）**。账本明确说明两期的支出和退款均完整覆盖，币种均为人民币。结果仅用于合成验收。\n\n**200 元差额全部来自医疗。** 两期餐饮各 500 元，分别是本期交易 F 和去年同期交易 P。本期交易 M 计入医疗支出 300 元，交易 R 的医疗退款 100 元按 2026 年 11 月 4 日的发生日期抵减。账本注明去年同期除餐饮外没有其他支出或退款。\n\n工具保留了两条排除记录及其依据：\n\n| 排除记录 | 账本原文 | 处理 |\n|---|---|---|\n| 交易 M 的重复导入 | “另一次导入重复收录了同一交易M（2026-11-03 医疗300元），不是新支出。” | 原交易 M 计入一次，重复行排除 |\n| 交易 T | “2026-11-04 交易T：内部转账900元，不是消费” | 900 元内部转账排除于净支出 |",
+    "metrics": [
+      {
+        "contributions": [
+          {
+            "category": "餐饮",
+            "period": 0,
+            "rowId": "F",
+            "value": "500.00"
+          },
+          {
+            "category": "医疗",
+            "period": 0,
+            "rowId": "M",
+            "value": "300.00"
+          },
+          {
+            "category": "医疗",
+            "period": 0,
+            "rowId": "R",
+            "value": "-100.00"
+          },
+          {
+            "category": "餐饮",
+            "period": 1,
+            "rowId": "P",
+            "value": "500.00"
+          }
+        ],
+        "coverage": {
+          "account": "账户A",
+          "comparable": true,
+          "currency": "CNY",
+          "current": "verified",
+          "metric": "expense",
+          "previous": "verified",
+          "reason": "合成账本明示同一账户、币种、两期同日历窗口且支出和退款均完整，上期无其他支出或退款。",
+          "refs": [
+            {
+              "quote": "两期均为账户A、币种CNY，11月1日至8日的支出和退款覆盖完整。",
+              "refId": "input-CZanqWkAJ67wJWF8secW:v1"
+            },
+            {
+              "quote": "2025-11-02交易P：餐饮实际支出500元，上期没有其他支出或退款。",
+              "refId": "input-CZanqWkAJ67wJWF8secW:v1"
+            }
+          ]
+        },
+        "current": "700.00",
+        "difference": "200.00",
+        "id": "expense|账户A|CNY|false",
+        "label": "已记录净支出 · 账户A",
+        "percent": "40.00",
+        "previous": "500.00",
+        "status": "同口径已记录内容",
+        "unit": "CNY"
+      }
+    ],
+    "rows": [
+      {
+        "account": "账户A",
+        "amount": "500",
+        "category": "餐饮",
+        "currency": "CNY",
+        "duplicateOf": null,
+        "entity": "交易F",
+        "eventDate": "2026-11-02",
+        "eventId": "F",
+        "id": "F",
+        "included": true,
+        "kind": "expense",
+        "minorUnits": 50000,
+        "period": 0,
+        "reason": "实际餐饮支出",
+        "reread": false,
+        "reviewer": "modelReview",
+        "valueKind": "exact"
+      },
+      {
+        "account": "账户A",
+        "amount": "300",
+        "category": "医疗",
+        "currency": "CNY",
+        "duplicateOf": null,
+        "entity": "交易M",
+        "eventDate": "2026-11-03",
+        "eventId": "M",
+        "id": "M",
+        "included": true,
+        "kind": "expense",
+        "minorUnits": 30000,
+        "period": 0,
+        "reason": "实际医疗支出",
+        "reread": false,
+        "reviewer": "modelReview",
+        "valueKind": "exact"
+      },
+      {
+        "account": "账户A",
+        "amount": "100",
+        "category": "医疗",
+        "currency": "CNY",
+        "duplicateOf": null,
+        "entity": "交易R",
+        "eventDate": "2026-11-04",
+        "eventId": "R",
+        "id": "R",
+        "included": true,
+        "kind": "refund",
+        "minorUnits": -10000,
+        "period": 0,
+        "reason": "按退款发生期抵减医疗支出",
+        "reread": false,
+        "reviewer": "modelReview",
+        "valueKind": "exact"
+      },
+      {
+        "account": "账户A",
+        "amount": "900",
+        "category": "内部转账",
+        "currency": "CNY",
+        "duplicateOf": null,
+        "entity": "交易T",
+        "eventDate": "2026-11-04",
+        "eventId": "T",
+        "exclusionReason": "非实际可计量事件：转账、还款、计划、收藏与在读不计入这些指标",
+        "id": "T",
+        "included": false,
+        "kind": "transfer",
+        "reason": "内部转账，排除于消费",
+        "reread": false,
+        "reviewer": "modelReview",
+        "valueKind": "exact"
+      },
+      {
+        "account": "账户A",
+        "amount": "300",
+        "category": "医疗",
+        "currency": "CNY",
+        "duplicateOf": "M",
+        "entity": "交易M",
+        "eventDate": "2026-11-03",
+        "eventId": "M",
+        "exclusionReason": "重复导入，已排除；原行 M",
+        "id": "M-copy",
+        "included": false,
+        "kind": "expense",
+        "reason": "重复导入同一交易M，排除重复金额",
+        "reread": false,
+        "reviewer": "modelReview",
+        "valueKind": "exact"
+      },
+      {
+        "account": "账户A",
+        "amount": "500",
+        "category": "餐饮",
+        "currency": "CNY",
+        "duplicateOf": null,
+        "entity": "交易P",
+        "eventDate": "2025-11-02",
+        "eventId": "P",
+        "id": "P",
+        "included": true,
+        "kind": "expense",
+        "minorUnits": 50000,
+        "period": 1,
+        "reason": "去年同期实际餐饮支出",
+        "reread": false,
+        "reviewer": "modelReview",
+        "valueKind": "exact"
+      }
+    ],
+    "excluded": 2,
+    "methodVersion": "stage-review-v1"
+  }
+}

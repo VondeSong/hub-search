@@ -528,6 +528,8 @@ fn publish_on(
     if super::actions::receipts_on(c, &work.id)? != *action_receipts {
         return Err("业务回执或审核状态已改变，结果未发布".into());
     }
+    super::insights::review::publication(root, c, &current, report)?;
+    let review_context = super::insights::review::delivery_context(root, c, &current, run)?;
     let artifact_refs = super::artifacts::run_references(c, &current, run)?;
     let assessment = goal::assessment_on(root, c, &current, run, report, &artifact_refs)?;
     insert(
@@ -535,7 +537,7 @@ fn publish_on(
         &work.id,
         Some(run),
         "delivery",
-        &json!({"report":report,"evidence":excerpts,"candidates":candidates,"actionReceipts":action_receipts,"materialReads":material_reads,"artifactRefs":artifact_refs,"goalBinding":assessment["goalBinding"],"deliveryAssessment":assessment}),
+        &json!({"report":report,"evidence":excerpts,"candidates":candidates,"actionReceipts":action_receipts,"materialReads":material_reads,"artifactRefs":artifact_refs,"goalBinding":assessment["goalBinding"],"deliveryAssessment":assessment,"reviewContext":review_context}),
     )?;
     if !recovering {
         c.execute(

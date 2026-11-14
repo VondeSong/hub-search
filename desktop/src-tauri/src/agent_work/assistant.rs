@@ -102,6 +102,7 @@ pub(super) fn schema(mut base: Value) -> Value {
     requests.push(object(
         json!({"operation":{"type":"string","enum":["chart"]},"request":artifacts::schema()}),
     ));
+    requests.push(object(json!({"operation":{"type":"string","enum":["review"]},"request":insights::review::schema()})));
     requests.push(object(json!({"operation":{"type":"string","enum":["sleepDataset"]},"request":artifacts::sleep::schema()})));
     requests.push(object(
         json!({"operation":{"type":"string","enum":["task"]},"request":store::tasks::schema()}),
@@ -115,6 +116,9 @@ pub(super) fn schema(mut base: Value) -> Value {
         "completion":store::goal::completion::schema(),"markdown":{"type":"string","minLength":1,"maxLength":runner::ANSWER_CHARS},"citations":{"type":"array","items":object(json!({"quoteId":string}))},
         "findings":{"type":"array","maxItems":12,"description":"仅在用户要求结构化发现时交付有精确引用的独立结论；普通问答为空，不从正文自动拆段。","items":object(json!({"text":{"type":"string","minLength":1,"maxLength":6000},"citations":{"type":"array","minItems":1,"maxItems":40,"items":object(json!({"quoteId":string}))}}))},
         "questions":strings,"limitations":strings,"waitCondition":string})),{"type":"null"}]});
+    let finding = &mut base["properties"]["report"]["anyOf"][0]["properties"]["findings"]["items"];
+    finding["properties"]["citations"]["minItems"] = json!(0);
+    finding["properties"]["reviewRef"] = json!({"type":"string","minLength":1,"maxLength":180});
     // Existing ordinary-answer callers may omit structured findings.
     base["properties"]["report"]["anyOf"][0]["required"]
         .as_array_mut()
@@ -133,6 +137,8 @@ pub(super) fn normalize(mut value: Value, quote_catalog: &Value) -> Result<Value
     struct PendingFinding {
         text: String,
         citations: Vec<Value>,
+        #[serde(default, rename = "reviewRef")]
+        review_ref: Option<String>,
     }
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -177,7 +183,7 @@ pub(super) fn normalize(mut value: Value, quote_catalog: &Value) -> Result<Value
     for finding in answer.findings {
         if finding.text.trim().is_empty()
             || finding.text.chars().count() > 6000
-            || finding.citations.is_empty()
+            || (finding.citations.is_empty() && finding.review_ref.is_none())
             || finding.citations.len() > 40
         {
             return Err("结构化发现正文或引用不符合合同".into());
@@ -194,7 +200,11 @@ pub(super) fn normalize(mut value: Value, quote_catalog: &Value) -> Result<Value
                 .ok_or("发现引用不属于本轮已读原文")?;
             citations.push(json!({"evidenceId":chosen["evidenceId"],"quote":chosen["text"]}));
         }
-        findings.push(json!({"text":finding.text,"citations":citations}));
+        let mut value = json!({"text":finding.text,"citations":citations});
+        if let Some(id) = finding.review_ref {
+            value["reviewRef"] = json!(id);
+        }
+        findings.push(value);
     }
     for marker in markers.captures_iter(&answer.markdown) {
         let index = marker[1].parse::<usize>().map_err(|_| "正文引用编号无效")?;

@@ -5,6 +5,7 @@ use sha2::{Digest, Sha256};
 #[cfg(all(test, windows))]
 mod live;
 mod recall;
+pub(super) mod review;
 mod state;
 #[cfg(test)]
 mod tests;
@@ -30,6 +31,12 @@ fn current_reader(root: &Path, work: &Work) -> Result<EvidenceReader, String> {
 
 /// Both endpoints run in one source snapshot; a candidate has no saved identity yet.
 pub(super) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
+    if args["action"]
+        .as_str()
+        .is_some_and(|a| a.starts_with("insightReview"))
+    {
+        return review::ui(root, args);
+    }
     if matches!(
         args["action"].as_str(),
         Some("insightRecall" | "insightRecallSource")
@@ -147,9 +154,19 @@ fn candidates_on(root: &Path, c: &Connection, work: &Work, record: &str) -> Resu
                 .as_str()
                 .filter(|s| !s.trim().is_empty() && s.chars().count() <= 6000)
                 .ok_or("发现正文为空或超出容量")?;
+            let review = if let Some(id) = finding["reviewRef"].as_str() {
+                let v = review::binding(c, work, id)?;
+                review::verify_dependencies(root, c, work, &v)?;
+                if v["text"] != text {
+                    return Err("发现文字与回顾依赖不符".into());
+                }
+                Some(v)
+            } else {
+                None
+            };
             let citations = finding["citations"]
                 .as_array()
-                .filter(|v| !v.is_empty() && v.len() <= 40)
+                .filter(|v| (review.is_some() || !v.is_empty()) && v.len() <= 40)
                 .ok_or("发现缺少可核对的直接依据")?;
             let mut sources = Vec::new();
             for citation in citations {
@@ -179,8 +196,20 @@ fn candidates_on(root: &Path, c: &Connection, work: &Work, record: &str) -> Resu
                     json!({"evidenceId":citation["evidenceId"],"quote":quote,"excerpt":excerpt}),
                 );
             }
+            if let Some(v) = &review {
+                for d in v["dependencies"]
+                    .as_array()
+                    .ok_or("回顾依赖损坏")?
+                    .iter()
+                    .filter(|d| d["kind"] == "source")
+                {
+                    if !sources.contains(d) {
+                        sources.push(d.clone());
+                    }
+                }
+            }
             Ok::<_, String>(
-                json!({"findingPointer":pointer,"text":text,"sourceCitations":sources,"eligibility":"verifiedSources","requiresDependencyConfirmation":true}),
+                json!({"findingPointer":pointer,"text":text,"sourceCitations":sources,"reviewDependency":review,"eligibility":"verifiedSources","requiresDependencyConfirmation":true}),
             )
         })();
         candidates.push(match checked {

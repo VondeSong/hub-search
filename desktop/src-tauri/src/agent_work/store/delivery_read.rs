@@ -80,6 +80,9 @@ impl<'a> DeliveryRead<'a> {
                 self.c,
                 &body["materialReads"],
             )?;
+            let report: runner::Report =
+                serde_json::from_value(body["report"].clone()).map_err(|_| "交付损坏")?;
+            super::super::insights::review::publication(self.root, self.c, work, &report)?;
             let projection =
                 super::super::artifacts::delivery_projection(self.root, self.c, work, run, body)?;
             Ok((excerpts, projection))

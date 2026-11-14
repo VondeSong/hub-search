@@ -3,6 +3,11 @@ use super::*;
 
 // Only positively identified observation tools can use plain native delivery.
 pub(super) fn requires_structured_delivery(tool: &Tool) -> bool {
+    if let Tool::Review { request } = tool {
+        if matches!(request["action"].as_str(), Some("read" | "calculate")) {
+            return false;
+        }
+    }
     // These host-owned capabilities use the same scoped evidence reader as Read/Search.
     // Remote annotations and unknown capabilities are not authority to bypass delivery checks.
     if let Tool::Capability { name, .. } = tool {
@@ -27,6 +32,20 @@ pub(super) fn requires_structured_delivery(tool: &Tool) -> bool {
             | Tool::GoalState { .. }
             | Tool::ConversationHistory { .. }
     )
+}
+
+#[cfg(test)]
+#[test]
+fn review_observation_and_calculation_allow_answers_but_binding_requires_finish() {
+    assert!(!requires_structured_delivery(&Tool::Review {
+        request: json!({"action":"read"})
+    }));
+    assert!(!requires_structured_delivery(&Tool::Review {
+        request: json!({"action":"calculate"})
+    }));
+    assert!(requires_structured_delivery(&Tool::Review {
+        request: json!({"action":"bind"})
+    }));
 }
 
 #[derive(Default)]

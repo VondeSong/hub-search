@@ -257,6 +257,9 @@ fn page_on_cached(
     for (id, kind, raw, created_at, run_id, authorization, revision) in rows {
         let body: Value = serde_json::from_str(&raw).map_err(|_| "对话记录损坏")?;
         if kind != "delivery" {
+            if !super::super::insights::review::material_message_visible(c, work, &body)? {
+                continue;
+            }
             if kind == "steering" && authorization != Some(work.authorization_version) {
                 continue;
             }

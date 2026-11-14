@@ -115,6 +115,15 @@ fn dependencies(snap: &Value) -> Result<Vec<EvidenceExcerpt>, String> {
             }
         }
     }
+    if let Some(deps) = snap["reviewDependency"]["dependencies"].as_array() {
+        for v in deps.iter().filter(|v| v["kind"] == "source") {
+            let e: EvidenceExcerpt =
+                serde_json::from_value(v["excerpt"].clone()).map_err(|_| "回顾资料依赖损坏")?;
+            if !values.contains(&e) {
+                values.push(e);
+            }
+        }
+    }
     Ok(values)
 }
 
@@ -131,6 +140,9 @@ fn access(root: &Path, c: &Connection, item: &Value, snap: &Value) -> bool {
                     .is_none_or(|version| work.authorization_version <= version)
         })
     }) {
+        return false;
+    }
+    if !review::accessible(c, &work, &snap["reviewDependency"]) {
         return false;
     }
     let Ok(reader) = current_reader(root, &work) else {
@@ -193,6 +205,20 @@ fn reconcile(root: &Path, c: &Connection, mut item: Value, now: i64) -> Result<V
     let operation = format!("check-{}", crate::random_url_safe(18));
     let mut active = reasons(&item)?;
     if let Ok(work) = work_on(c, item["workId"].as_str().unwrap()) {
+        if !snap["reviewDependency"].is_null() {
+            if review::verify_dependencies(root, c, &work, &snap["reviewDependency"]).is_err() {
+                open_reason(
+                    &mut active,
+                    "reviewDependency",
+                    "reviewDependencyChanged",
+                    json!({}),
+                    item["headRevision"].as_i64().unwrap(),
+                    &operation,
+                );
+            } else {
+                close_reason(&mut active, "reviewDependency", &operation);
+            }
+        }
         if let Ok(reader) = current_reader(root, &work) {
             for e in dependencies(&snap)? {
                 let key = digest(&serde_json::to_string(&e.locator).map_err(|e| e.to_string())?);

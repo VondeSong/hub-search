@@ -67,6 +67,7 @@ fn tools(environment: Option<&crate::hub_capabilities::Session>) -> Result<Value
         ("inspectDraft", "只读指定真实草稿及其当前状态、回执。需要检查内容、恢复上下文或核对未知结果时使用；不会重发写入，也不代表来源仍新鲜。"),
         ("importFlashcards", "将指定的本轮闪卡草稿导入收件箱；必须已有对话授权且符合当前用户意图。仅预览或不要导入时不可调用。返回实际回执，重复同一草稿不重复写入。"),
         ("chart", "在当前事项创建、读取、修订或核对图表。先固定分析输入；数值由宿主统计，不能手填。修改同一 artifactId，expectedRevision 冲突时重读。新版本需 validate；数值核对不代表视觉检查或外部发布。"),
+        ("review", super::super::insights::review::GUIDE),
         ("sleepDataset", "在当前事项读取、提交或纠正主睡眠时长数据集。先读固定原文，候选已完整时首次优先直接 create 全部 rows，无需为取得 ID 先空建。每个 rows 条目都须是 schema 定义的完整行；不接受 date/hours/rowId 简写，revise 也不是按 rowId 合并字段的局部补丁。注明小时数、日期及归日规则、Unicode scalar 出处、歧义和评审依据。午睡不算主睡眠，在床时间不能冒充实际睡眠，未知不补零。随后使用现有 chart 工具绑定精确数据修订，按月平均；纠正后重算同一图表。"),
         ("prepareArchive", "需要归档已授权阅读材料时，通过实际连接和原归档服务准备方案，可能调用模型并消耗额度。只生成绑定来源版本和目标的草稿，不执行远程保存；已有动作或未知回执先核对，不重复准备来绕过保护。"),
     ];
@@ -598,6 +599,7 @@ pub(super) fn investigate(
                     else {match tool {
                         Tool::Search{..}|Tool::Read{..}|Tool::LoadSkill{..}|Tool::ReadSkillReference{..}|Tool::Capability{..}=>context.dispatch(tool),
                         Tool::ToolSchema{name}=>{context.usage.tool_steps+=1;input::tool_schema(&tool_specs,&name)},
+                        Tool::Review{request}=>{context.usage.tool_steps+=1;super::super::insights::review::execute(root,work,run,&request,&context.excerpts)},
                         Tool::Compute{script}=>{
                             context.usage.tool_steps+=1;
                             if context.excerpts.is_empty(){Err("先读取获准材料，再执行计算".into())}

@@ -90,6 +90,10 @@ pub(in crate::agent_work) fn sources_on(c: &Connection, work: &Work) -> Result<V
     for row in rows {
         let (id, raw) = row.map_err(|e| e.to_string())?;
         let body: Value = serde_json::from_str(&raw).map_err(|_| "用户要求记录损坏")?;
+        // User-supplied material remains attributable without becoming a new command.
+        if body["materialOnly"] == true {
+            continue;
+        }
         items.push(json!({"requirementId":id,"origin":"user","text":body["text"]}));
     }
     // Never truncate away an obligation to make a completion claim fit.

@@ -1,0 +1,53 @@
+import {useEffect,useState,type ReactNode} from "react";
+import {ArrowUpRight,CalendarDays,ChevronDown,FileText,MessageSquare,RefreshCw} from "lucide-react";
+
+export type ReviewPlan={perspective:"open"|"month"|"year";question:string;themes:string[];focus:string;month:string;cutoff:string;dateOnly:boolean;extraDiscoveries:boolean};
+export type ReviewInput={id?:string;version?:number;text:string;nature:"selfReport"|"repost"|"quotation"|"unknown";withdrawn?:boolean};
+export type ReviewView={answer?:{markdown:string;createdAt:number};workId:string;revision:number;config:Omit<ReviewPlan,"month"|"cutoff"> & Partial<Pick<ReviewPlan,"month"|"cutoff">> & {windows:{label:string;start:string;end:string}[];methodVersion:string;asOf:string};inputs:ReviewInput[];scope:{description:string;count:number};calculations?:{id:string;current?:boolean;metrics:{label:string;unit:string;current:string|null;previous:string|null;difference:string|null;percent:string|null;status:string}[];excluded:number;createdAt:number}[]};
+export type ReviewWork={id:string;goal:string};
+type ScopePreview={description:string;count:number;items:{title:string;path:string}[]};
+type Props={renderAnswer?:(markdown:string)=>ReactNode;preview?:(id:string)=>Promise<ScopePreview>;demo?:boolean;loadWorks:()=>Promise<ReviewWork[]>;read:(id:string)=>Promise<ReviewView|null>;prepare:(plan:ReviewPlan,input:ReviewInput,workId:string)=>Promise<ReviewView>;onOpenWork:(id:string)=>void;revise?:(workId:string,input:ReviewInput,revision:number)=>Promise<ReviewView>};
+const displayTime=(value:string,dateOnly=false)=>{const date=new Date(value);return Number.isFinite(date.getTime())?new Intl.DateTimeFormat("zh-CN",{timeZone:"Asia/Shanghai",year:"numeric",month:"2-digit",day:"2-digit",...(!dateOnly?{hour:"2-digit",minute:"2-digit",hour12:false}:{})}).format(date):value;};
+const natureNames={selfReport:"本人记录",repost:"转贴材料",quotation:"引用他人",unknown:"性质未明确"};
+export function initialReviewPlan(now=new Date()):ReviewPlan{
+ const shanghai=new Date(now.getTime()+8*3600000).toISOString();
+ return {perspective:"open",question:"",themes:[],focus:"",month:shanghai.slice(0,7),cutoff:shanghai.slice(0,19)+"+08:00",dateOnly:true,extraDiscoveries:true};
+}
+export function StageReviewForm({renderAnswer,preview,demo,loadWorks,read,prepare,onOpenWork,revise}:Props){
+ const [plan,setPlan]=useState(initialReviewPlan),[input,setInput]=useState<ReviewInput>({text:"",nature:"unknown"});
+ const [works,setWorks]=useState<ReviewWork[]>([]),[workId,setWorkId]=useState(""),[view,setView]=useState<ReviewView|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState("");
+ const [scopePreview,setScopePreview]=useState<ScopePreview|null>(null);
+ const [editing,setEditing]=useState<ReviewInput|null>(null);
+ useEffect(()=>{let alive=true;void loadWorks().then(v=>{if(alive)setWorks(v);}).catch(e=>alive&&setError(String(e)));return()=>{alive=false;};},[loadWorks]);
+ const update=<K extends keyof ReviewPlan>(key:K,value:ReviewPlan[K])=>setPlan(p=>({...p,[key]:value}));
+ const select=async(id:string)=>{setWorkId(id);setView(null);setScopePreview(null);setEditing(null);setError("");if(!id)return;setBusy(true);try{const value=await read(id);setView(value);if(preview)setScopePreview(await preview(id));}catch(e){setError(String(e));}finally{setBusy(false);}};
+ const submit=async()=>{if(busy)return;setBusy(true);setError("");try{const value=await prepare(plan,input,workId);setView(value);setWorkId(value.workId);setInput({text:"",nature:"unknown"});setWorks(old=>old.some(w=>w.id===value.workId)?old:[{id:value.workId,goal:plan.question||"阶段回顾"},...old]);}catch(e){setError(String(e));}finally{setBusy(false);}};
+ const edit=async(value:ReviewInput)=>{if(!view||!revise)return;setBusy(true);setError("");try{setView(await revise(view.workId,value,view.revision));setEditing(null);}catch(e){setError(String(e));}finally{setBusy(false);}};
+ const preset=plan.perspective!=="open";
+ return <div className="stage-review-scroll"><article className="stage-review-article">
+  <div className="stage-review-eyebrow"><CalendarDays size={19}/><span>阶段回顾</span></div>
+  <h1>回看经历，找到新的理解</h1><p className="stage-review-deck">从一个问题开始，让这段时间的记录慢慢连起来。</p>
+  {demo&&<p className="stage-review-demo">交互演示 · 使用示例资料，未接入你的真实资料或模型</p>}
+  <section className="stage-review-section" aria-label="回顾范围">
+   <div className="stage-review-modes" aria-label="回顾入口">{([["open","直接提问／开放探索"],["month","本月回顾"],["year","对比去年同期"]] as const).map(([key,label])=><button type="button" key={key} aria-pressed={plan.perspective===key} onClick={()=>update("perspective",key)}>{label}</button>)}</div>
+   <label>想理解什么<textarea aria-label="回顾问题" maxLength={1200} rows={3} value={plan.question} placeholder={preset?"可以补充你关心的问题，也可以直接使用这个回顾视角。":"直接提出问题，或贴入笔记后开放探索。不必先选择主题或月份。"} onChange={e=>update("question",e.target.value)}/></label>
+   <fieldset><legend>关注主题 <span>可多选，也可以留空</span></legend><div className="stage-review-themes">{["消费","健康","阅读","影视娱乐"].map(theme=><button type="button" key={theme} aria-pressed={plan.themes.includes(theme)} onClick={()=>update("themes",plan.themes.includes(theme)?plan.themes.filter(t=>t!==theme):[...plan.themes,theme])}>{theme}</button>)}</div><input aria-label="其他关注点" maxLength={200} value={plan.focus} onChange={e=>update("focus",e.target.value)} placeholder="其他关注点，例如工作安排与休息"/></fieldset>
+   <label className="stage-review-check"><input type="checkbox" checked={plan.extraDiscoveries} onChange={e=>update("extraDiscoveries",e.target.checked)}/><span>回答问题后，也看看是否有值得补充的线索</span></label>
+   {preset&&<div className="stage-review-period"><label>回顾月份<input type="month" aria-label="回顾月份" value={plan.month} onChange={e=>update("month",e.target.value)}/></label><label>数据截止（上海时间）<input type="datetime-local" aria-label="回顾截止时间" value={plan.cutoff.slice(0,19)} onChange={e=>update("cutoff",e.target.value.length===16?e.target.value+":00+08:00":e.target.value+"+08:00")}/></label><label className="stage-review-check"><input type="checkbox" checked={plan.dateOnly} onChange={e=>update("dateOnly",e.target.checked)}/>记录只有日期，按共同完整日期比较</label><p>按事件发生日期归期；补录和修改时间另存。同比对齐相同日期与截止，缺失不填零。</p></div>}
+  </section>
+  <section className="stage-review-section"><h2><FileText size={17}/>这次使用哪些资料</h2><label>接续已有事项<select aria-label="回顾资料事项" value={workId} disabled={busy} onChange={e=>void select(e.target.value)}><option value="">只使用本次贴入的笔记</option>{works.map(w=><option key={w.id} value={w.id}>{w.goal}</option>)}</select></label><p className="stage-review-muted">沿用所选事项的当前授权和预算。选择主题或切换视角不会开放其他资料；需要更多来源时，在原事项中调整。</p>
+   {scopePreview&&<details className="stage-review-sources"><summary>本次可用的 {scopePreview.count} 份资料<ChevronDown size={14}/></summary><p>{scopePreview.description}</p>{scopePreview.items.map((item,i)=><p key={i}>{item.title}<small> · {item.path}</small></p>)}</details>}
+   <label>贴入笔记 <span>不需要先填表格</span><textarea aria-label="回顾笔记" maxLength={3000} rows={5} value={input.text} onChange={e=>setInput({...input,text:e.target.value})} placeholder="保留事件日期与原始记述。有金额或观看记录时，照原样贴入即可。"/></label><label>这段材料的性质<select aria-label="笔记性质" value={input.nature} onChange={e=>setInput({...input,nature:e.target.value as ReviewInput["nature"]})}>{Object.entries(natureNames).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
+   <p className="stage-review-muted">本人记录、转贴与引用分开保留。发送材料不等于确认亲历；日期、金额有歧义时先保留未知。</p>
+   <button type="button" className="stage-review-primary" disabled={busy||(!workId&&!input.text.trim())} onClick={()=>void submit()}>{busy?"正在核对…":"保存范围，准备回顾"}<ArrowUpRight size={15}/></button><p className="stage-review-muted">这一步保存问题和资料，不启动模型。在助手里确认后开始分析。</p>
+  </section>
+  {error&&<p className="stage-review-error" role="alert">{error}</p>}
+  {view&&<section className="stage-review-section" aria-label="已保存回顾"><div className="stage-review-section-heading"><h2>本次回顾</h2><button type="button" disabled={busy} onClick={()=>void select(view.workId)}><RefreshCw size={14}/>核对更新</button></div><p>{view.config.question}</p><p className="stage-review-muted">{view.scope.description} · {view.scope.count} 份资料 · 截至 {displayTime(view.config.asOf)} · {view.config.methodVersion==="stage-review-v1"?"阶段回顾方法 · 第1版":view.config.methodVersion}</p>{view.config.windows.map(w=><p key={w.label} className="stage-review-window"><strong>{w.label}</strong>{displayTime(w.start,view.config.dateOnly)} 至 {displayTime(w.end,view.config.dateOnly)}（不含截止）</p>)}
+   {view.answer&&<section className="stage-review-answer"><h2>{demo?"示例回顾":"回顾正文"}</h2><p className="stage-review-muted">生成于 {displayTime(new Date(view.answer.createdAt).toISOString())} · 仅覆盖本次资料</p>{renderAnswer?renderAnswer(view.answer.markdown):<p style={{whiteSpace:"pre-wrap"}}>{view.answer.markdown}</p>}<button type="button" onClick={()=>onOpenWork(view.workId)}>查看原回答及引用<ArrowUpRight size={14}/></button></section>}
+   {!!view.calculations?.length&&view.calculations.map(calc=><div key={calc.id} className="stage-review-calculation"><h3>已核对字段的计算{calc.current===false?" · 待复核":""}</h3><div className="stage-review-table"><table><thead><tr><th>指标</th><th>本期</th><th>上期</th><th>差额</th><th>同比</th></tr></thead><tbody>{calc.metrics.map((m,index)=><tr key={index}><th>{m.label}<small>{m.unit} · {m.status}</small></th><td>{m.current??"资料不足"}</td><td>{m.previous??"资料不足"}</td><td>{m.difference??"不可比"}</td><td>{m.percent===null?"—":m.percent+"%"}</td></tr>)}</tbody></table></div><p className="stage-review-muted">排除或待核对 {calc.excluded} 条。抽取仍需核对原文，结果只代表所示覆盖。</p></div>)}
+   <details className="stage-review-sources"><summary><FileText size={14}/>查看贴入的原文与版本<ChevronDown size={14}/></summary>{view.inputs.map(item=><div className="stage-review-input" key={item.id}><span>{natureNames[item.nature]} · 版本 {item.version}{item.withdrawn?" · 已撤回":""}</span>{!item.withdrawn&&<blockquote>{item.text}</blockquote>}{revise&&!item.withdrawn&&<div><button type="button" disabled={busy} onClick={()=>setEditing({...item})}>更正原文</button><button type="button" disabled={busy} onClick={()=>void edit({...item,withdrawn:true})}>撤回这段材料</button></div>}</div>)}</details>
+   {editing&&<div className="stage-review-edit"><label>更正原文<textarea aria-label="更正回顾笔记" rows={5} value={editing.text} onChange={e=>setEditing({...editing,text:e.target.value})}/></label><button type="button" disabled={busy} onClick={()=>void edit(editing)}>保存新版本</button><button type="button" onClick={()=>setEditing(null)}>取消</button><p>原版本保留；实际依赖这段材料的内容将待复核。</p></div>}
+   <footer className="stage-review-footer"><span>保留经历，也保留不确定的地方。</span><button type="button" className="stage-review-primary" onClick={()=>onOpenWork(view.workId)}><MessageSquare size={14}/>在助手中开始回顾</button></footer>
+  </section>}
+ </article></div>;
+}

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import {StageReviewDemo} from "./StageReviewDemo";
 import type { AssistantContext } from "./Assistant";
 import type { HubItem } from "./data";
 import { MIGRATED_DISCOVERIES, MIGRATED_CHECKLIST_STEPS, SOURCE_COMPARISONS, SOURCE_VERSION_EXCERPTS, SOURCE_SIMULATION_NOTE } from "./insight-migration";
@@ -531,7 +532,7 @@ export default function Insights({ onOpenSource, onAssistant, onCreateDraft, onS
   return <section className={`insight-workspace ${review ? "insight-review-mode" : ""}`} aria-label="Hub 洞察">
     <header className="insight-toolbar">
       <div className="insight-section-context">{review ? <Clock3 size={15}/> : filter === "topics" ? <Flag size={15}/> : filter === "drafts" ? <FileText size={15}/> : filter === "history" ? <History size={15}/> : <Sparkles size={15}/>}<span>{review ? "阶段回顾" : filter === "topics" ? "关注主题" : filter === "drafts" ? "工作草稿" : filter === "history" ? "示例处理记录" : "更多发现示例"}</span><small>示例</small></div>
-      {!auxiliary || review ? <div className="insight-toolbar-actions">
+      {!auxiliary && !review ? <div className="insight-toolbar-actions">
         {!review && <button type="button" className="insight-scope-button" onClick={openScope}><SlidersHorizontal size={14} /><span>资料范围</span><b>{scope.length}/{SCOPE_OPTIONS.length}</b></button>}
         <label className="insight-period-select"><select aria-label="洞察时间范围" value={period} onChange={event => setPeriod(event.target.value as typeof period)}><option value="week">最近 7 天</option><option value="month">本月</option><option value="all">全部时间</option></select><ChevronDown size={12} /></label>
         {!review && <button type="button" className="insight-refresh" onClick={refreshStage >= 0 ? stopRefresh : refresh} disabled={!scope.length} title={refreshStage >= 0 ? "停止演示更新" : `上次更新 ${lastUpdated}；演示更新不调用真实来源`}><RefreshCw size={14} className={refreshStage >= 0 ? "insight-spinning" : ""} /><span>{refreshStage >= 0 ? "停止更新" : "更新"}</span></button>}
@@ -539,57 +540,7 @@ export default function Insights({ onOpenSource, onAssistant, onCreateDraft, onS
     </header>
     {refreshStage >= 0 && <div className="insight-update-progress" role="status"><LoaderCircle size={13} className="insight-spinning" />{["正在核对所选范围…", "正在比对示例记录…", "正在合并已有发现…"][refreshStage]}<span>演示更新</span></div>}
     {review ? (
-        <div className="insight-review-scroll">
-          <article className="insight-review-article">
-            <div className="insight-review-eyebrow"><span className="insight-glyph"><Clock3 size={19} /></span><span>阶段回顾 <span className="insight-dot">·</span> {period === "week" ? "这一周" : "11月，到现在"}</span></div>
-            <h1>事情，开始连起来了</h1>
-            <p className="insight-review-deck">从收集资料，到用一个具体场景验证想法。</p>
-            <div className="insight-demo-note"><span />基于 {reviewSources.length} 条示例记录 · 仅用于交互演示</div>
-            <p className="insight-review-intro">这组记录围绕两条线展开：把线束知识用到具体的验证中，以及让 Hub 更顺手地承接工作。关注点正从“还能增加什么功能”，推进到“这一条流程能不能用起来”。</p>
-
-            <section className="insight-review-section">
-              <h2><Lightbulb size={17} />值得留下的进展</h2>
-              <div className="insight-progress-block">
-                <div className="insight-progress-icon"><ArrowUpRight size={20} /></div>
-                <div><h3>把问题变小，反而更容易验证</h3><p>一张图纸、一条资料归档流程、一个原型场景，让模糊的设想有了可以核对的结果。</p><button type="button" className="insight-text-button" onClick={() => onOpenSource("journal-week")}>回到这条记录 <ArrowUpRight size={13} /></button></div>
-              </div>
-            </section>
-
-            <section className="insight-review-section">
-              <div className="insight-section-title"><h2>这段时间的几个片段</h2><span>按示例事件日期</span></div>
-              <div className="insight-timeline">
-                {events.map((event) => <div className="insight-event" key={event.date}>
-                  <div className="insight-event-date"><strong>{event.day}</strong><span>11月 · {event.weekday}</span></div>
-                  <div className="insight-event-line"><span /></div>
-                  <div className="insight-event-content"><h3>{event.title}</h3><p>{event.body}</p><button type="button" className="insight-event-source" onClick={() => onOpenSource(event.source)}><FileText size={12} />{event.sourceName}<ArrowUpRight size={12} /></button></div>
-                </div>)}
-              </div>
-            </section>
-
-            <section className="insight-review-section">
-              <h2><GitBranch size={17} />值得再看一眼的决定</h2>
-              <h3 className="insight-decision-heading">云端归档，先从哪一步开始？</h3>
-              <div className="insight-decision-compare">
-                <div><span className="insight-comparison-label">当时的记录 · 11月1日</span><p>希望减少资料在设备之间的搬运，先用一个来源验证读取、整理和保存。</p><button type="button" className="insight-text-button" onClick={() => onOpenSource("decision-cloud")}>查看当时的理由 <ArrowUpRight size={12} /></button></div>
-                <div><span className="insight-comparison-label">后续的观察 · 11月8日</span><p>部分资料仍在本地；原型可以验证交互，真实访问能力仍需逐项核对。</p><button type="button" className="insight-text-button" onClick={() => onOpenSource("journal-today")}>查看新记录 <ArrowUpRight size={12} /></button></div>
-              </div>
-              <p className="insight-decision-note"><span>可回看的问题</span> 先接入哪个来源，最能证明这条流程确实减少了搬运？</p>
-            </section>
-
-            <section className="insight-review-section insight-experience">
-              <h2>一个可以继续尝试的做法</h2>
-              <p>先把已有资料放到一个具体问题里。验证过一次，再决定要不要扩大范围。</p>
-              <span>这是这组记录给出的经验候选，可以补充或纠正。</span>
-            </section>
-
-            <details className="insight-review-sources">
-              <summary><FileText size={14} />查看本次回顾的 {reviewSources.length} 条依据<ChevronDown size={14} /></summary>
-              <div>{reviewSources.map((source) => <button type="button" key={source.id} onClick={() => onOpenSource(source.id)}><span>{source.title}</span><ArrowUpRight size={13} /></button>)}</div>
-              <p>仅覆盖当前示例记录。缺少记录不代表没有发生；记录条数也不代表时间投入。</p>
-            </details>
-            <footer className="insight-review-footer"><span>保留经历，也保留不确定的地方。</span><button type="button" className="insight-primary" onClick={() => onAssistant(`请根据 ${dateRange} 的示例记录整理一段阶段回顾草稿，包含关键事件、积极进展、有效经验与值得回看的决定。重要判断保留来源，不为缺失的生活记录作推断。`)}><MessageSquare size={14} />在助手中整理回顾</button></footer>
-          </article>
-        </div>
+        <StageReviewDemo onAssistant={onAssistant}/>
     ) : auxiliary ? (
       <div className="insight-management-scroll">
         <div className="insight-management-header"><span className="insight-eyebrow">从发现，接着做下去</span><h1>{filter === "topics" ? "关注主题" : filter === "drafts" ? "工作草稿" : "示例处理记录"}</h1><p>{filter === "topics" ? "围绕一个具体问题，约定资料范围、触发条件和有限复查轮次。" : filter === "drafts" ? "先改好一份草稿，再决定采用。已经保存的笔记与任务也可以从这里继续。" : "查看范围调整、资料版本、发现处理与草稿去向。"}</p></div>

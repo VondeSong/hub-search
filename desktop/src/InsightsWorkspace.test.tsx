@@ -151,7 +151,7 @@ it("keeps prototype navigation honest and filters review findings without a mode
  await mount();expect(host.querySelector('aside[aria-label="洞察导航"]')).not.toBeNull();
  const navOpen=host.querySelector<HTMLButtonElement>('button[aria-label="展开洞察侧边栏"]')!;await act(async()=>navOpen.click());expect(document.activeElement?.getAttribute("aria-label")).toBe("收起洞察侧边栏");
  await act(async()=>document.activeElement!.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true})));expect(document.activeElement).toBe(navOpen);
- expect(button("阶段回顾").disabled).toBe(true);expect(host.querySelectorAll('.insights-card')).toHaveLength(2);
+ expect(button("阶段回顾").disabled).toBe(false);expect(host.querySelectorAll('.insights-card')).toHaveLength(2);
  await act(async()=>host.querySelector<HTMLButtonElement>('nav button[aria-current="page"]')!.click());
  const review=[...host.querySelectorAll<HTMLButtonElement>('nav button')].find(node=>node.textContent?.startsWith("待复核"))!;await act(async()=>review.click());
  expect(host.querySelectorAll('.insights-card')).toHaveLength(1);expect(host.querySelector('.insights-card')?.textContent).toContain("来源变化");
@@ -238,4 +238,8 @@ it("recall source errors clear candidates, and access invalidation closes the bo
  await click("查看原文");expect(document.body.textContent).toContain("原文未显示，请重新查找");expect(document.querySelector('[aria-label="候选资料原文"]')).toBeNull();
  await act(async()=>listeners.get("library-registry-updated")?.({payload:{}}));
  expect(document.querySelector('.insights-recall')).toBeNull();
+});
+
+it("opens the stage review with one current navigation item and no automatic model run",async()=>{
+ await mount();await click("阶段回顾");expect(host.querySelectorAll('nav button[aria-current="page"]')).toHaveLength(1);expect(host.querySelector('nav button[aria-current="page"]')?.textContent).toContain("阶段回顾");expect(host.querySelector('[aria-label="回顾问题"]')).not.toBeNull();expect(invoke.mock.calls.some(([,v])=>["respond","resume","run"].includes(v.args.action))).toBe(false);
 });

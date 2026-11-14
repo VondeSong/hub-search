@@ -26,8 +26,10 @@ pub(super) struct Citation {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Finding {
-    text: String,
+    pub(super) text: String,
     citations: Vec<Citation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) review_ref: Option<String>,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -41,7 +43,7 @@ pub(super) struct NextStep {
 pub(super) struct Report {
     pub(super) status: String,
     summary: String,
-    findings: Vec<Finding>,
+    pub(super) findings: Vec<Finding>,
     next_steps: Vec<NextStep>,
     questions: Vec<String>,
     limitations: Vec<String>,
@@ -108,6 +110,9 @@ pub(super) enum Tool {
         arguments: Value,
     },
     Chart {
+        request: Value,
+    },
+    Review {
         request: Value,
     },
     SleepDataset {
@@ -631,7 +636,9 @@ pub(super) fn validate(report: &Report, excerpts: &[EvidenceExcerpt]) -> Result<
         }
     }
     for (i, finding) in report.findings.iter().enumerate() {
-        if finding.text.trim().is_empty() || finding.citations.is_empty() {
+        if finding.text.trim().is_empty()
+            || (finding.citations.is_empty() && finding.review_ref.is_none())
+        {
             return Err("事实发现缺少实际取证引用".into());
         }
         for (j, citation) in finding.citations.iter().enumerate() {
@@ -1205,6 +1212,18 @@ fn investigate_loop(
                         | Tool::LoadSkill { .. }
                         | Tool::Capability { .. }
                         | Tool::ReadSkillReference { .. } => context.dispatch(tool),
+                        Tool::Review { request }
+                            if context.usage.tool_steps < budget.tool_steps =>
+                        {
+                            context.usage.tool_steps += 1;
+                            super::insights::review::execute(
+                                root,
+                                work,
+                                run,
+                                &request,
+                                &context.excerpts,
+                            )
+                        }
                         tool => match session {
                             Some(session) if context.usage.tool_steps < budget.tool_steps => {
                                 context.usage.tool_steps += 1;
