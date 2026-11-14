@@ -121,3 +121,24 @@ it("ignores an older initial settings reply after StrictMode remounts the effect
   await act(async () => first({ ...stored, configured: false, provider: "none", oss: undefined }));
   expect(host.textContent).toContain("管理云空间");
 });
+
+it("reflects the first OSS save without activating a second migration or starting content sync", async () => {
+  stored = { ...stored, provider: "none", configured: false, oss: undefined, hasSecret: false };
+  await mount(true);
+  await click("连接阿里云 OSS");
+  await enter("Bucket 名称", config.bucket);
+  await enter("地域", config.region);
+  await enter("目录前缀", config.prefix);
+  await click("下一步");
+  await enter("AccessKey ID", config.accessKeyId);
+  await enter("AccessKey Secret", "synthetic-test-secret");
+  await click("检查并保存连接");
+  expect(host.textContent).toContain("管理云空间");
+  expect(host.textContent).toContain("当前连接");
+  expect(host.querySelector("form")).toBeNull();
+  expect(host.querySelector('input[type="password"]')).toBeNull();
+  expect(saves()).toHaveLength(1);
+  expect(saves()[0][1].change).toBe("connect");
+  expect(changed).toHaveBeenCalledOnce();
+  expect(invoke.mock.calls.map(([command]) => command)).not.toContain("activate_flashcard_cloud_sync");
+});

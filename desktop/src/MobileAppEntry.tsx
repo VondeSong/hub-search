@@ -1,8 +1,10 @@
 import type { CSSProperties } from "react";
 import { useMobileViewport } from "./useMobileViewport";
+import { useMobileAppearance } from "./MobileAppearance";
 import type { AppEntryProps } from "./AppEntryTypes";
 
 export function MobileAppEntry({ children, filtersOpen, previewOpen, style }: AppEntryProps) {
+  useMobileAppearance();
   const { height, keyboardOpen } = useMobileViewport();
   return (
     <main

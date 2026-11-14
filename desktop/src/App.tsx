@@ -1,3 +1,6 @@
+import { MobileHeader } from "./MobileHeader";
+import { OPEN_QUICK_JOURNAL } from "./QuickJournalEvents";
+import type { QuickJournalSaved } from "./QuickJournal";
 import { AgentPanelProvider } from "./StandaloneAgentLauncher";
 import { useMobileOverlayHistory } from "./useMobileOverlayHistory";
 import { useAgentConditionNotices } from "./useAgentConditionNotices";
@@ -32,6 +35,7 @@ import "./MobileExperience.css";
 import "./MobileDesign.css";
 import "./MobileGlass.css";
 import "./MobileNavigationDesign.css";
+import "./MobilePrototype.css";
 import { GlobalExclusionReviewProvider } from "./GlobalExclusionReviewReminder";
 import { CollectionViewsProvider } from "./CollectionViews";
 import { JournalViewsContext, useJournalViewStore } from "./JournalViews";
@@ -72,6 +76,7 @@ import { usePreviewController } from "./usePreviewController";
 import { useResultOpener } from "./useResultOpener";
 import { journalDataVersion, useJournalData } from "./useJournalData";
 const LazyPreviewRenderer = lazy(() => import("./PreviewRenderer").then((module) => ({ default: module.PreviewRenderer })));
+const LazyMobileQuickCapture = lazy(() => import("./MobileQuickCapture").then(m => ({ default: m.MobileQuickCapture })));
 const LazySettingsDialog = lazy(() => import("./SettingsDialog").then((module) => ({ default: module.SettingsDialog })));
 const LazySettingsContent = lazy(() => import("./SettingsContent").then((module) => ({ default: module.SettingsContent })));
 const LazyInsightsWorkspace = lazy(() => import("./InsightsWorkspace").then((module) => ({ default: module.InsightsWorkspace })));
@@ -151,6 +156,13 @@ function AppContent() {
   const [desktopSidebarView, setDesktopSidebarView] = useState<DesktopSidebarView>("home");
   const [mobileBrowseOpen, setMobileBrowseOpen] = useState(false);
   const [mobileAgentsOpen, setMobileAgentsOpen] = useState(false);
+  const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
+  useEffect(() => {
+    if (!runtimeCapabilities.mobile) return;
+    const open = () => setQuickCaptureOpen(true);
+    window.addEventListener(OPEN_QUICK_JOURNAL, open);
+    return () => window.removeEventListener(OPEN_QUICK_JOURNAL, open);
+  }, []);
   const [flashcardsStandaloneOpen, setFlashcardsStandaloneOpen] = useState(false);
   const [tagOverviewMode, setTagOverviewMode] = useState<"all" | "cleanup">("all");
   const [selectedJournalDate, setSelectedJournalDate] = useState("");
@@ -257,7 +269,7 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
   const { editingExclusions,setEditingExclusions,exclusionDraft,setExclusionDraft,savingExclusions,renamingLibraryId,setRenamingLibraryId,libraryNameDraft,setLibraryNameDraft,iconCrop,setIconCrop,relocatingLibraryId,relocateObsidian,removeSpace,editExclusions,saveExclusions,updateLibraryIcon,resetLibraryIcon,beginRenameLibrary,saveLibraryName,commitLibraryIcon } = useManagedLibraryOperations({ libraryManagement, reloadSpaces, refreshStatus, removeLibrarySelection, setConnectionError, setConnectionErrorProvider, setMaintenanceMessage });
   useEffect(() => { if (connectionError) showOperationStatus(connectionError, "error", 10000); }, [connectionError, showOperationStatus]);
   const { openFlashcards: openStandaloneFlashcards, closeFlashcards: closeStandaloneFlashcards, openPreview: openMobilePreview, closePreview: closeMobilePreview, bindRoute: bindMobileRoute } = useMobileOverlayHistory({
-    enabled: isMobileLayout, filtersOpen, settingsOpen: showConnection,
+    enabled: isMobileLayout, filtersOpen, settingsOpen: showConnection, captureOpen: quickCaptureOpen, setCaptureOpen: setQuickCaptureOpen,
     setFiltersOpen, setSettingsOpen: setShowConnection, setPreviewOpen: setMobilePreviewOpen,
     setFlashcardsOpen: setFlashcardsStandaloneOpen, setSelectedTag: setSelectedSidebarTag,
     consumeSearchBack: mobileSearch.consumeBack,
@@ -870,7 +882,7 @@ useEffect(() => {
 
   const pushMobileRoute = useCallback((route: string) => {
     if (window.history.state?.hubMobileRoute !== route) {
-      if (window.history.state?.hubReadingPreview) {
+      if (window.history.state?.hubReadingPreview || window.history.state?.hubQuickCapture) {
         window.history.replaceState({ hubMobileRoute: route }, "");
       } else {
         window.history.pushState({ hubMobileRoute: route }, "");
@@ -1208,20 +1220,32 @@ useEffect(() => {
     },
   };
   const AppLayout = isMobileLayout ? MobileAppLayout : DesktopAppLayout;
+  const savedMobileCapture = (record: QuickJournalSaved) => {
+    selectAllLibraries(); setQuery("");
+    journalViewStore.update({ layout: "records", period: "day", day: record.date, month: record.date.slice(0, 7), libraries: null, query: "" });
+    pushMobileRoute("journals"); setQuickCaptureOpen(false);
+    showOperationStatus(record.notice, "success", 5000);
+  };
+  const openCaptureSyncSettings = () => {
+    if (window.history.state?.hubQuickCapture) window.history.replaceState({ hubMobileRoute: window.history.state.hubMobileRoute || "browse", hubSettings: true }, "");
+    setQuickCaptureOpen(false); setSettingsCategory("cloud"); setShowConnection(true);
+  };
   const appLayoutProps: AppLayoutProps = {
     filtersOpen,
     mobilePreviewOpen,
+    mobileHeader: isMobileLayout && !mobilePreviewOpen && !mobileAgentsOpen ? <MobileHeader onAgents={() => navigateMobile("agents")} onBack={!["home", "tasks"].includes(desktopSidebarView) && !mobileBrowseOpen ? () => navigateMobile("browse") : undefined} onSettings={() => setShowConnection(true)} /> : undefined,
     style: shellStyle,
     startWindowDrag,
-    mainContent: isMobileLayout && mobileAgentsOpen && !flashcardsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开 Agents…</div>}><LazyCloudAgents /></Suspense> : isMobileLayout && mobileBrowseOpen && !flashcardsActive ? <MobileBrowse
+    mainContent: isMobileLayout && mobileAgentsOpen && !flashcardsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开 Agents…</div>}><LazyCloudAgents onClose={() => window.history.back()} /></Suspense> : isMobileLayout && mobileBrowseOpen && !flashcardsActive ? <MobileBrowse
       favoriteCount={favoriteResults.length}
       historyCount={viewHistory.length}
       journalCount={journalDates.length}
       tagCount={sidebarTags.length}
       onOpen={openMobileCollection}
+      onOpenAgents={() => navigateMobile("agents")}
       onOpenLibraries={() => { navigateMobile("search"); setSpaceMenuOpen(true); }}
       onOpenSettings={() => setShowConnection(true)}
-      onOpenSyncHealth={() => setIndexDetailsOpen(true)}
+      onOpenSyncHealth={() => { setSettingsCategory("cloud"); setShowConnection(true); }}
       syncNeedsAttention={Boolean(indexStatus?.failedJobs)}
     /> : insightsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开洞察…</div>}><LazyInsightsWorkspace/></Suspense> : collectionsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开阅读…</div>}><LazyCollectionsWorkspace
       onToggleDesktopSidebar={!isMobileLayout ? () => changeDesktopSidebarSetting(!desktopSidebarEnabled) : undefined}
@@ -1351,6 +1375,7 @@ useEffect(() => {
       /> : undefined,
     },
     settingsDialog: <>
+      {isMobileLayout && quickCaptureOpen && <Suspense fallback={null}><LazyMobileQuickCapture onClose={() => setQuickCaptureOpen(false)} onSaved={savedMobileCapture} onSyncSettings={openCaptureSyncSettings} /></Suspense>}
       {showConnection ? (
       <Suspense fallback={<div className="connection-overlay"><div className="settings-lazy-loading">正在打开设置…</div></div>}>
         <LazySettingsDialog

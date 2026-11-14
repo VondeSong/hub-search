@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 
 type Options = {
   enabled: boolean; filtersOpen: boolean; settingsOpen: boolean;
+  captureOpen?: boolean; setCaptureOpen?: (open: boolean) => void;
   setFiltersOpen: (open: boolean) => void; setSettingsOpen: (open: boolean) => void;
   setPreviewOpen: (open: boolean) => void; setFlashcardsOpen: (open: boolean) => void;
   setSelectedTag: (tag: string) => void; consumeSearchBack: () => boolean;
@@ -10,7 +11,7 @@ type Options = {
 /** One owner for temporary mobile history entries and their exit/popstate rules. */
 export function useMobileOverlayHistory(options: Options) {
   const latest = useRef(options); latest.current = options;
-  const entries = useRef({ flashcards: false, preview: false, filters: false, settings: false, closingFilters: false, closingSettings: false });
+  const entries = useRef({ flashcards: false, preview: false, filters: false, settings: false, closingFilters: false, closingSettings: false, capture: false, closingCapture: false });
   const route = useRef<(value: string) => void>(() => undefined);
   const bindRoute = useCallback((handler: (value: string) => void) => { route.current = handler; }, []);
   const push = useCallback((kind: "flashcards" | "preview", key: string) => {
@@ -40,9 +41,11 @@ export function useMobileOverlayHistory(options: Options) {
     if (!window.history.state?.hubMobileRoute) window.history.replaceState({ ...(window.history.state ?? {}), hubMobileRoute: "search" }, "");
     const pop = (event: PopStateEvent) => {
       const state = entries.current, current = latest.current;
+      if (state.closingCapture) { state.closingCapture = false; return; }
       if (state.closingFilters) { state.closingFilters = false; return; }
       if (state.closingSettings) { state.closingSettings = false; return; }
       if (state.settings) { state.settings = false; current.setSettingsOpen(false); return; }
+      if (state.capture) { state.capture = false; current.setCaptureOpen?.(false); return; }
       if (state.flashcards) { state.flashcards = false; current.setFlashcardsOpen(false); return; }
       if (state.preview) { state.preview = false; current.setPreviewOpen(false); return; }
       if (state.filters) { state.filters = false; current.setFiltersOpen(false); return; }
@@ -67,10 +70,20 @@ export function useMobileOverlayHistory(options: Options) {
     if (!options.enabled) return;
     const state = entries.current;
     if (options.settingsOpen && !state.settings) {
-      window.history.pushState({ ...(window.history.state ?? {}), hubSettings: true }, ""); state.settings = true;
+      if (!window.history.state?.hubSettings) window.history.pushState({ ...(window.history.state ?? {}), hubSettings: true }, ""); state.settings = true;
     } else if (!options.settingsOpen && state.settings) {
       state.settings = false; state.closingSettings = true; window.history.back();
     }
   }, [options.enabled, options.settingsOpen]);
+  useEffect(() => {
+    if (!options.enabled) return;
+    const state = entries.current;
+    if (options.captureOpen && !state.capture) {
+      window.history.pushState({ ...(window.history.state ?? {}), hubQuickCapture: true }, ""); state.capture = true;
+    } else if (!options.captureOpen && state.capture) {
+      state.capture = false;
+      if (window.history.state?.hubQuickCapture) { state.closingCapture = true; window.history.back(); }
+    }
+  }, [options.enabled, options.captureOpen]);
   return { openFlashcards, closeFlashcards, openPreview, closePreview, bindRoute };
 }
