@@ -148,11 +148,11 @@ mod user_profile;
 mod window_lifecycle;
 use window_lifecycle::configured_toggle_shortcut;
 mod module_search;
+#[cfg(test)]
+mod performance_baseline;
 mod reading_sync;
 mod search_index;
 mod search_index_runtime;
-#[cfg(test)]
-mod performance_baseline;
 #[cfg(test)]
 use search_index_runtime::{
     build_and_activate_search_generation, claim_index_batch, collect_index_records,

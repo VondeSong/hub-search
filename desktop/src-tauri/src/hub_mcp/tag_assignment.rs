@@ -889,6 +889,13 @@ mod tests {
         assert_eq!(first["remainingCount"], 2);
         let restored = discover::status(&f.root, &json!({"tag":"focus"})).unwrap();
         assert_eq!(restored["nextOffset"], 5);
+        let checkpoint_args = json!({"tag":"focus","expectedVersion":1,"libraryIds":saved["definition"]["definition"]["libraryIds"]});
+        let checkpoint =
+            crate::hub_mcp::agent_tags::discovery_checkpoint(&f.root, &checkpoint_args).unwrap();
+        assert_eq!(checkpoint["nextOffset"], 5);
+        let mut wrong_scope = checkpoint_args.clone();
+        wrong_scope["libraryIds"] = json!(["unselected-library"]);
+        assert!(crate::hub_mcp::agent_tags::discovery_checkpoint(&f.root, &wrong_scope).is_err());
         args["resume"] = json!(true);
         let second = discover::run_with(&f.root, &args, |_, schema, _, _, _| {
             assert!(schema["properties"].get("queries").is_none());
@@ -900,6 +907,9 @@ mod tests {
         assert_eq!(second["remainingCount"], 0);
         assert_eq!(second["submitted"].as_array().unwrap().len(), 7);
         f.define(1);
+        assert!(
+            crate::hub_mcp::agent_tags::discovery_checkpoint(&f.root, &checkpoint_args).is_err()
+        );
         args["expectedVersion"] = json!(2);
         assert!(
             discover::status(&f.root, &json!({"tag":"focus"})).unwrap()["stale"]

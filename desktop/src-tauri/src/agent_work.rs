@@ -10,6 +10,8 @@ mod artifacts;
 mod assistant;
 #[cfg(test)]
 mod conversation_tests;
+#[cfg(all(test, windows))]
+mod daily_tag_acceptance;
 #[cfg(test)]
 mod delivery_tests;
 mod images;
@@ -664,7 +666,7 @@ fn status(root: &Path, id: &str) -> Result<Value, String> {
     view["runActive"] = json!(run_active);
     view["answerSaves"] = answer_save::records(root, id)?;
     if view["work"]["state"] != "revoked" {
-        view["tagTasks"] = json!(store::records(root, id, "tagTaskResult", 32)?
+        view["tagTasks"] = json!(tag_tasks::records(root, id)?
             .into_iter()
             .filter(|r| r["authorizationVersion"] == view["work"]["authorizationVersion"])
             .collect::<Vec<_>>());

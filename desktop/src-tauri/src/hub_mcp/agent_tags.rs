@@ -47,8 +47,53 @@ pub(crate) fn run(
 pub(crate) fn definition(root: &Path, args: &Value) -> Result<Value, String> {
     tag_assignment::definition(root, args)
 }
+
+pub(crate) fn discovery_checkpoint(root: &Path, args: &Value) -> Result<Value, String> {
+    let current = definition(root, args)?;
+    let saved = &current["definition"];
+    let checkpoint = tag_assignment::discover::status(root, args)?;
+    let allowed = saved["definition"]["libraryIds"]
+        .as_array()
+        .ok_or("定义范围无效")?;
+    let selected = args["libraryIds"].as_array().ok_or("本轮资料库范围无效")?;
+    let scope: Vec<_> = selected
+        .iter()
+        .filter(|id| allowed.contains(id))
+        .cloned()
+        .collect();
+    if checkpoint.is_null()
+        || checkpoint["stale"] == true
+        || scope.is_empty()
+        || saved["version"] != args["expectedVersion"]
+        || checkpoint["definitionVersion"] != args["expectedVersion"]
+        || checkpoint["libraryIds"] != json!(scope)
+    {
+        return Err("没有可继续的清单，或定义及资料范围已改变".into());
+    }
+    Ok(checkpoint)
+}
 pub(crate) fn catalog(root: &Path, args: &Value) -> Result<Value, String> {
     hub_tag_catalog(root, args)
+}
+
+pub(crate) fn saved_relation_proposals(root: &Path, result: &Value) -> Result<Value, String> {
+    let ids: Vec<_> = result["submitted"]
+        .as_array()
+        .ok_or("关系任务结果缺失")?
+        .iter()
+        .map(|p| p["proposalId"].as_str().ok_or("关系建议身份缺失"))
+        .collect::<Result<_, _>>()?;
+    if ids.is_empty() {
+        return Ok(json!({"proposals":[]}));
+    }
+    if ids.len() > 2 {
+        return Err("关系任务超出原批次容量".into());
+    }
+    let saved = hub_list_tag_governance_proposals(root, &json!({"proposalIds":ids,"limit":2}))?;
+    if saved["count"].as_u64() != Some(ids.len() as u64) {
+        return Err("任务关联的关系建议已不可完整回读".into());
+    }
+    Ok(saved)
 }
 pub(crate) fn materials(
     root: &Path,

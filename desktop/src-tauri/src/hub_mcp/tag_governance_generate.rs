@@ -404,6 +404,23 @@ mod tests {
         assert_eq!(calls, 1);
         assert_eq!(result["errors"], json!([]));
         assert_eq!(result["submitted"].as_array().unwrap().len(), 1);
+        let read = crate::hub_mcp::agent_tags::saved_relation_proposals(&f.0, &result).unwrap();
+        assert_eq!(
+            read["proposals"][0]["proposalId"],
+            result["submitted"][0]["proposalId"]
+        );
+        assert!(read["proposals"][0]["proposal"]["recommendations"].is_array());
+        assert!(!read.to_string().contains("PRIVATE_SENTINEL"));
+        assert_eq!(
+            crate::hub_mcp::agent_tags::saved_relation_proposals(&f.0, &json!({"submitted":[]}))
+                .unwrap()["proposals"],
+            json!([])
+        );
+        assert!(crate::hub_mcp::agent_tags::saved_relation_proposals(
+            &f.0,
+            &json!({"submitted":[{"proposalId":"missing"}]})
+        )
+        .is_err());
     }
     #[test]
     fn governance_codex_restarts_after_index_only_change_without_key_collision() {

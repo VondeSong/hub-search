@@ -1,4 +1,17 @@
 use super::*;
+mod results;
+
+pub(super) fn records(root: &Path, work: &str) -> Result<Vec<Value>, String> {
+    results::records(root, work, "tagTaskResult")
+}
+fn model_context(root: &Path, body: &Value) -> Result<Value, String> {
+    let mut value = results::model_view(body);
+    if body["intent"]["task"] == "relations" {
+        value["storedProposals"] =
+            crate::hub_mcp::agent_tags::saved_relation_proposals(root, &body["result"])?;
+    }
+    Ok(value)
+}
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Intent {
@@ -105,12 +118,19 @@ pub(super) fn prepare(
     if w.grant.library_ids.is_empty() {
         return Err("请选择可检索资料库后再执行标签任务；不会自动开放核心页面所在库".into());
     }
-    let old = store::records(root, &w.id, "tagTaskResult", 32)?
+    let current = crate::hub_mcp::agent_tags::definition(root, &json!({"tag":intent.tag}))?;
+    if current["definition"]["version"].as_i64().unwrap_or(0)
+        != intent.expected_version.unwrap_or(0)
+    {
+        return Err("标签定义已变化，请查看最新定义后重新发送".into());
+    }
+    let old = records(root, &w.id)?
         .into_iter()
         .find(|v| v["revision"] == w.revision && v["intent"] == saved["intent"]);
     if let Some(v) = old {
+        let result = model_context(root, &v)?;
         return Ok(Some(
-            json!({"tagTaskResult":v,"tagReferences":references,"instruction":"结果已保存，不要重复生成或自动批准；按真实结果回答"}),
+            json!({"tagTaskResult":result,"tagReferences":references,"instruction":"结果已保存，不要重复生成或自动批准；按真实结果回答"}),
         ));
     }
     if used.body_chars.saturating_add(15_000) > budget.body_chars {
@@ -121,6 +141,15 @@ pub(super) fn prepare(
         for key in ["provider", "model", "reasoningEffort", "fast"] {
             args[key] = selection[key].clone();
         }
+    }
+    let mut prior_chars = 0;
+    let mut prior_entities = 0;
+    if intent.task.as_deref() == Some("missing") && intent.resume {
+        let checkpoint = crate::hub_mcp::agent_tags::discovery_checkpoint(root, &args)?;
+        prior_chars = checkpoint["charsRead"].as_u64().unwrap_or(0) as usize;
+        prior_entities = checkpoint["readEntities"].as_u64().unwrap_or(0) as usize;
+        let body = json!({"revision":w.revision,"authorizationVersion":w.authorization_version,"libraryIds":w.grant.library_ids,"intent":intent,"result":checkpoint,"runId":run});
+        results::save(root, w, run, &body, "tagTaskCheckpoint")?;
     }
     let result = crate::hub_mcp::agent_tags::run(root, &args, &mut |p, s| {
         guard()?;
@@ -137,12 +166,15 @@ pub(super) fn prepare(
         Ok(value)
     })?;
     guard()?;
-    used.body_chars += result["charsRead"].as_u64().unwrap_or(0) as usize;
-    used.entities_read += result["readEntities"].as_u64().unwrap_or(0) as usize;
-    let body = json!({"revision":w.revision,"authorizationVersion":w.authorization_version,"libraryIds":w.grant.library_ids,"intent":intent,"result":result,"runId":run});
-    store::record(root, run, "tagTaskResult", &body)?;
+    used.body_chars +=
+        (result["charsRead"].as_u64().unwrap_or(0) as usize).saturating_sub(prior_chars);
+    used.entities_read +=
+        (result["readEntities"].as_u64().unwrap_or(0) as usize).saturating_sub(prior_entities);
+    let mut body = json!({"revision":w.revision,"authorizationVersion":w.authorization_version,"libraryIds":w.grant.library_ids,"intent":intent,"result":result,"runId":run});
+    body["resultSnapshot"] = results::save(root, w, run, &body, "tagTaskResult")?;
+    let result = model_context(root, &body)?;
     Ok(Some(
-        json!({"tagTaskResult":body,"tagReferences":references,"instruction":"标签任务已通过真实服务保存待审核结果。只能说明实际结论和覆盖限制，不要重复生成、不批准、不写回。"}),
+        json!({"tagTaskResult":result,"tagReferences":references,"instruction":"标签任务已通过真实服务保存待审核结果。只能说明实际结论和覆盖限制，不要重复生成、不批准、不写回。"}),
     ))
 }
 

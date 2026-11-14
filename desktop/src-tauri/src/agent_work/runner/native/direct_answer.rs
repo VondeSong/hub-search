@@ -8,7 +8,7 @@ pub(super) fn requires_structured_delivery(tool: &Tool) -> bool {
             return false;
         }
     }
-    // These host-owned capabilities use the same scoped evidence reader as Read/Search.
+    // These host-owned reads retain their existing scope validation.
     // Remote annotations and unknown capabilities are not authority to bypass delivery checks.
     if let Tool::Capability { name, .. } = tool {
         if matches!(
@@ -17,6 +17,11 @@ pub(super) fn requires_structured_delivery(tool: &Tool) -> bool {
                 | "hub_search_notes"
                 | "hub_list_note_sources"
                 | "hub_read_analysis_snapshot"
+                | "hub_tag_catalog"
+                | "hub_tag_profile"
+                | "hub_tag_compare"
+                | "hub_tag_evidence"
+                | "hub_tag_taxonomy"
         ) {
             return false;
         }
@@ -191,6 +196,11 @@ mod tests {
             "hub_search_notes",
             "hub_list_note_sources",
             "hub_read_analysis_snapshot",
+            "hub_tag_catalog",
+            "hub_tag_profile",
+            "hub_tag_compare",
+            "hub_tag_evidence",
+            "hub_tag_taxonomy",
         ] {
             assert!(!requires_structured_delivery(&Tool::Capability {
                 name: name.into(),
@@ -201,6 +211,18 @@ mod tests {
             name: "hub_create_analysis_snapshot".into(),
             arguments: json!({})
         }));
+        for name in [
+            "hub_submit_tag_governance_proposal",
+            "hub_resolve_tag_governance_proposal",
+            "hub_submit_tag_assignment_proposal",
+            "hub_apply_tag_taxonomy_repair",
+            "unknown_tag_tool",
+        ] {
+            assert!(requires_structured_delivery(&Tool::Capability {
+                name: name.into(),
+                arguments: json!({})
+            }));
+        }
         assert!(!requires_structured_delivery(&Tool::GoalState {}));
         assert!(!requires_structured_delivery(&Tool::Search {
             source_kind: "note".into(),

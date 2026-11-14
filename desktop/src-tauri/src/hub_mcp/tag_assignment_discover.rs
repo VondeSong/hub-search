@@ -232,7 +232,7 @@ fn persist(root: &Path, tag: &str, report: &Value) -> Result<(), String> {
     std::fs::write(&temp, report.to_string()).map_err(|e| e.to_string())?;
     std::fs::rename(temp, path).map_err(|e| format!("无法保存续查位置：{e}"))
 }
-pub(super) fn status(root: &Path, args: &Value) -> Result<Value, String> {
+pub(in crate::hub_mcp) fn status(root: &Path, args: &Value) -> Result<Value, String> {
     let tag = normalized_tag_argument(args, "tag")?;
     let path = cache_path(root, &tag);
     if !path.exists() {
