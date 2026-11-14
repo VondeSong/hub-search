@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "204f8f29ec5027a38b2285df78bc0db017b48382",
-  "published_version": 92,
-  "deployment_id": "appgdep_6af835725b1881918e0751d593c0db43",
+  "source_commit": "244b615b4565b600cdba7e3e5d2f8526c5959e2a",
+  "published_version": 93,
+  "deployment_id": "appgdep_6af84037a1bc81919ac619ce69c5438d",
   "files": {
     ".gitignore": {
       "sha256": "5ca3c39bdc1288c108a1931b3f6bc5795464b6253e9457390617774259deed0c",
@@ -23,9 +23,9 @@
       "bytes": 91
     },
     "README.md": {
-      "sha256": "ead1abc4b88c0c1186ae8cfd7ef15b2d2faba95ba8fd1349e92d987f3a793063",
+      "sha256": "3ef9dd504fb504b20a4629c3bf701790836c2178b895cb1197010edfe6164821",
       "mode": "100644",
-      "bytes": 30551
+      "bytes": 31055
     },
     "app/Assistant.tsx": {
       "sha256": "3fb7f08721d88bb6ebcd5422b0d5e9497af569439d62ddfe87cbb6b27484a3cc",
@@ -177,10 +177,15 @@
       "mode": "100644",
       "bytes": 26798
     },
-    "app/TaskWorkspace.tsx": {
-      "sha256": "552ed99efe379f082ef5ddc83a3af391822eb39c85c96592978c6e02476c3f8b",
+    "app/TaskAnalysis.tsx": {
+      "sha256": "ac2426b9f56904356c1386b48f8e60db4024368b4e3040c1bd645e9cff6be39e",
       "mode": "100644",
-      "bytes": 20847
+      "bytes": 11638
+    },
+    "app/TaskWorkspace.tsx": {
+      "sha256": "5546109cd40844caf28f380590273f7acfef1a14bcfb02e85a6bbf5322499148",
+      "mode": "100644",
+      "bytes": 26161
     },
     "app/assistant-insert.ts": {
       "sha256": "d25ffd4aaf17fb7fcb2de8bd5ceca7c77c06ea17d23b7eeee0ffaa1ca110b403",
@@ -417,6 +422,16 @@
       "mode": "100644",
       "bytes": 1121
     },
+    "app/task-analysis-model.ts": {
+      "sha256": "22bd27bd98c23aaa3b9ee26706cee41e1c6b1be3067b2c8292f672ed49a7771b",
+      "mode": "100644",
+      "bytes": 5280
+    },
+    "app/task-analysis.css": {
+      "sha256": "28e191de27aa622ceaac3fcc86bdd29ca086347810378dab49b8890b28557c5e",
+      "mode": "100644",
+      "bytes": 8371
+    },
     "app/task-data.ts": {
       "sha256": "89774044dac6d00619e2029d44fd252b795b5da0db24a9dede10256177d8b592",
       "mode": "100644",
@@ -433,9 +448,9 @@
       "bytes": 7858
     },
     "app/useDidaTasks.ts": {
-      "sha256": "cbd730b1e3de8847a593c815467f839a924c04a362a0aa60b776ae8ce57207a8",
+      "sha256": "c80544070f3841168d2aa1edfa72221e0e6cad47ea093390d7a84119845edf8d",
       "mode": "100644",
-      "bytes": 2054
+      "bytes": 2613
     },
     "cloudflare-env.d.ts": {
       "sha256": "8b0eca84aa3364cc7ccc43cc3af6beb88dd34ebd410de08690bf094ce39fbcb0",
@@ -862,6 +877,16 @@
       "mode": "100644",
       "bytes": 2555
     },
+    "docs/task-analysis-workspace.jpg": {
+      "sha256": "c6065f68a033d4f9b340e8ed18fab9418c8270baf2053b6b413ed3961d459a9f",
+      "mode": "100644",
+      "bytes": 68421
+    },
+    "docs/task-analysis-workspace.md": {
+      "sha256": "286c2878d060dca4d14bc2731258322e86bf709d6ce51265f6b52dc07fcd6f98",
+      "mode": "100644",
+      "bytes": 3846
+    },
     "docs/task-journal-prototype.md": {
       "sha256": "3f9a10ba2e688506039a01011db473fb52b32f59bc29c5e6dbf3301bbf847450",
       "mode": "100644",
@@ -1132,6 +1157,11 @@
       "mode": "100755",
       "bytes": 1600
     },
+    "scripts/task-analysis-check.mjs": {
+      "sha256": "f5198b4cccb3e116b80b2bc28ec6db5f82135d105edde3a50167e216d40ef295",
+      "mode": "100644",
+      "bytes": 5730
+    },
     "scripts/task-journal-check.mjs": {
       "sha256": "08e5f1f5644fdecbd0e26a4123480a6ea8c4713529d118970c1a6f1825f64f1a",
       "mode": "100644",
@@ -1183,5 +1213,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-14T10:19:05.795693+00:00"
+  "imported_at": "2026-11-14T11:05:58.591296+00:00"
 }
