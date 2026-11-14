@@ -1,11 +1,14 @@
 use std::collections::{HashMap, HashSet};
 
 use rusqlite::{params, Connection};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::AppHandle;
 
-use crate::{database_path, hidden_library_ids, open_database, parse_named_listing};
+use crate::{
+    database_path, hidden_library_ids, is_dida_default_column_name, open_database,
+    parse_named_listing,
+};
 
 pub(crate) fn save_obsidian_folders(
     connection: &Connection,
@@ -195,7 +198,7 @@ pub(crate) fn resolve_craft_location(
         .cloned()
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct BrowseDocument {
     id: String,
@@ -203,6 +206,250 @@ struct BrowseDocument {
     path: String,
     folder_id: Option<String>,
     modified_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    content_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    node_id: Option<String>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub(crate) struct FeishuBrowseNode {
+    pub id: String,
+    pub parent_id: Option<String>,
+    pub title: String,
+    pub object_id: String,
+    pub document_ids: Vec<String>,
+}
+
+fn feishu_key(library_id: &str) -> String {
+    format!("feishu_browse_nodes:{library_id}")
+}
+
+pub(crate) fn save_feishu_nodes(
+    connection: &Connection,
+    library_id: &str,
+    mut nodes: Vec<FeishuBrowseNode>,
+) -> Result<(), String> {
+    let tree = nodes
+        .iter()
+        .map(|node| (node.id.as_str(), node.parent_id.as_deref()))
+        .collect::<HashMap<_, _>>();
+    if tree.len() != nodes.len() {
+        return Err("飞书目录节点重复，已保留原目录".into());
+    }
+    for id in tree.keys() {
+        let mut seen = HashSet::from([*id]);
+        let mut parent = tree[id];
+        while let Some(id) = parent {
+            if !seen.insert(id) || !tree.contains_key(id) {
+                return Err("飞书目录节点存在循环或缺少父节点，已保留原目录".into());
+            }
+            parent = tree[id];
+        }
+    }
+    // Keep the last usable preview mapping when a known object could not be fetched this time.
+    let previous = read_feishu_nodes(connection, library_id)?.unwrap_or_default();
+    let previous = previous
+        .iter()
+        .map(|node| (node.id.as_str(), node))
+        .collect::<HashMap<_, _>>();
+    for node in &mut nodes {
+        if node.document_ids.is_empty() {
+            if let Some(old) = previous
+                .get(node.id.as_str())
+                .filter(|old| old.object_id == node.object_id)
+            {
+                node.document_ids.clone_from(&old.document_ids);
+            }
+        }
+    }
+    let value = serde_json::to_string(&nodes).map_err(|error| error.to_string())?;
+    connection.execute(
+        "INSERT INTO metadata(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        params![feishu_key(library_id), value],
+    ).map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+fn read_feishu_nodes(
+    connection: &Connection,
+    library_id: &str,
+) -> Result<Option<Vec<FeishuBrowseNode>>, String> {
+    match connection.query_row(
+        "SELECT value FROM metadata WHERE key=?1",
+        [feishu_key(library_id)],
+        |row| row.get::<_, String>(0),
+    ) {
+        Ok(value) => serde_json::from_str(&value)
+            .map(Some)
+            .map_err(|error| error.to_string()),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+fn feishu_contents(
+    nodes: Vec<FeishuBrowseNode>,
+    documents: Vec<BrowseDocument>,
+) -> (Vec<BrowseFolder>, Vec<BrowseDocument>) {
+    let parents = nodes
+        .iter()
+        .filter_map(|node| node.parent_id.as_deref())
+        .collect::<HashSet<_>>();
+    let by_id = documents
+        .iter()
+        .map(|document| (document.id.as_str(), document))
+        .collect::<HashMap<_, _>>();
+    let mut folders = Vec::new();
+    let mut pages = Vec::new();
+    for node in &nodes {
+        let previews = node
+            .document_ids
+            .iter()
+            .filter_map(|id| by_id.get(id.as_str()))
+            .copied()
+            .collect::<Vec<_>>();
+        let is_folder = parents.contains(node.id.as_str()) || previews.len() != 1;
+        if is_folder {
+            folders.push(BrowseFolder {
+                id: node.id.clone(),
+                name: node.title.clone(),
+                parent_id: node.parent_id.clone(),
+            });
+        }
+        for preview in previews {
+            let mut document = preview.clone();
+            document.node_id = Some(node.id.clone());
+            document.folder_id = if is_folder {
+                Some(node.id.clone())
+            } else {
+                node.parent_id.clone()
+            };
+            if document.content_type.is_none() {
+                document.title = node.title.clone();
+            }
+            pages.push(document);
+        }
+    }
+    (folders, pages)
+}
+
+fn dida_contents(
+    connection: &Connection,
+    library_id: &str,
+    documents: Vec<BrowseDocument>,
+) -> Result<(Vec<BrowseFolder>, Vec<BrowseDocument>), String> {
+    let mut folders = connection.prepare(
+        "SELECT project_id,name FROM dida_projects WHERE library_id=?1 AND closed=0 ORDER BY sort_order,project_id",
+    ).and_then(|mut statement| {
+        statement.query_map([library_id], |row| {
+            Ok(BrowseFolder { id: row.get(0)?, name: row.get(1)?, parent_id: None })
+        })?.collect::<Result<Vec<_>, _>>()
+    }).map_err(|error| error.to_string())?;
+    let projects = folders
+        .iter()
+        .map(|folder| folder.id.clone())
+        .collect::<HashSet<_>>();
+    let mut statement = connection
+        .prepare(
+            "SELECT task_id,project_id,parent_id,column_id,column_name
+         FROM dida_tasks WHERE library_id=?1 ORDER BY last_seen_at DESC,task_id",
+        )
+        .map_err(|error| error.to_string())?;
+    let rows = statement
+        .query_map([library_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, Option<String>>(3)?,
+                row.get::<_, Option<String>>(4)?,
+            ))
+        })
+        .map_err(|error| error.to_string())?;
+    let mut metadata = HashMap::new();
+    let mut groups = HashMap::new();
+    for row in rows {
+        let (id, project, parent, column, name) = row.map_err(|error| error.to_string())?;
+        if !projects.contains(&project) {
+            continue;
+        }
+        if let (Some(column), Some(name)) = (&column, name) {
+            if !column.is_empty() && !name.trim().is_empty() && !is_dida_default_column_name(&name)
+            {
+                groups
+                    .entry((project.clone(), column.clone()))
+                    .or_insert(name);
+            }
+        }
+        metadata.insert(id, (project, parent, column));
+    }
+    let group_id =
+        |project: &str, column: &str| format!("dida-group:{}:{project}:{column}", project.len());
+    let task_id = |task: &str| format!("dida-parent:{task}");
+    folders.extend(groups.iter().map(|((project, column), name)| BrowseFolder {
+        id: group_id(project, column),
+        name: name.clone(),
+        parent_id: Some(project.clone()),
+    }));
+    let indexed = documents
+        .iter()
+        .map(|document| document.id.as_str())
+        .collect::<HashSet<_>>();
+    let parent_of = |id: &str| {
+        let (project, parent, _) = metadata.get(id)?;
+        let parent = parent.as_deref()?;
+        (indexed.contains(parent)
+            && metadata
+                .get(parent)
+                .is_some_and(|(owner, _, _)| owner == project))
+        .then_some(parent)
+    };
+    let mut parents = HashMap::new();
+    for id in metadata.keys() {
+        let mut seen = HashSet::from([id.as_str()]);
+        let mut ancestor = parent_of(id);
+        while let Some(node) = ancestor {
+            if !seen.insert(node) {
+                break;
+            }
+            ancestor = parent_of(node);
+        }
+        if ancestor.is_none() {
+            if let Some(parent) = parent_of(id) {
+                parents.insert(id.clone(), parent.to_string());
+            }
+        }
+    }
+    let with_children = parents.values().collect::<HashSet<_>>();
+    let mut pages = Vec::new();
+    for mut document in documents {
+        let Some((project, _, column)) = metadata.get(&document.id) else {
+            continue;
+        };
+        let parent = parents
+            .get(&document.id)
+            .map(|parent| task_id(parent))
+            .unwrap_or_else(|| {
+                column
+                    .as_ref()
+                    .filter(|column| groups.contains_key(&(project.clone(), (*column).clone())))
+                    .map_or_else(|| project.clone(), |column| group_id(project, column))
+            });
+        document.folder_id = Some(if with_children.contains(&document.id) {
+            let id = task_id(&document.id);
+            folders.push(BrowseFolder {
+                id: id.clone(),
+                name: document.title.clone(),
+                parent_id: Some(parent),
+            });
+            id
+        } else {
+            parent
+        });
+        pages.push(document);
+    }
+    Ok((folders, pages))
 }
 
 #[derive(Serialize)]
@@ -211,6 +458,8 @@ pub(crate) struct LibraryContents {
     folders: Vec<BrowseFolder>,
     documents: Vec<BrowseDocument>,
     craft_locations_synced: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    notice: Option<&'static str>,
 }
 
 #[tauri::command]
@@ -235,7 +484,7 @@ pub(crate) async fn library_contents(
 
 fn read_contents(connection: &Connection, library_id: &str) -> Result<LibraryContents, String> {
     let provider: String = connection.query_row(
-        "SELECT provider FROM libraries WHERE id=?1 AND enabled=1 AND provider IN ('craft','obsidian')",
+        "SELECT provider FROM libraries WHERE id=?1 AND enabled=1 AND provider IN ('craft','obsidian','feishu','dida365')",
         [library_id],
         |row| row.get(0),
     ).map_err(|_| "此资料库不可浏览")?;
@@ -262,7 +511,7 @@ fn read_contents(connection: &Connection, library_id: &str) -> Result<LibraryCon
                 name,
                 parent_id,
             });
-        } else {
+        } else if provider == "obsidian" {
             for (position, _) in path.match_indices('/') {
                 paths.insert(path[..position].to_string());
             }
@@ -273,8 +522,9 @@ fn read_contents(connection: &Connection, library_id: &str) -> Result<LibraryCon
     }
     let mut document_query = connection
         .prepare(
-            "SELECT id, title, path, folder_id, modified_at FROM documents
-         WHERE space_id=?1 AND provider=?2 ORDER BY lower(title), id",
+            "SELECT id, title, path, folder_id, modified_at,
+                    CASE WHEN ?2='feishu' AND id LIKE 'bitable-table:%' THEN 'feishu_bitable_table' END
+             FROM documents WHERE space_id=?1 AND provider=?2 ORDER BY lower(title), id",
         )
         .map_err(|error| error.to_string())?;
     let documents = document_query
@@ -285,12 +535,28 @@ fn read_contents(connection: &Connection, library_id: &str) -> Result<LibraryCon
                 path: row.get(2)?,
                 folder_id: row.get(3)?,
                 modified_at: row.get(4)?,
+                content_type: row.get(5)?,
+                node_id: None,
             })
         })
         .map_err(|error| error.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|error| error.to_string())?;
-    if provider == "obsidian" {
+    let mut documents = documents;
+    let mut notice = None;
+    if provider == "feishu" {
+        if let Some(nodes) = read_feishu_nodes(connection, library_id)? {
+            (folders, documents) = feishu_contents(nodes, documents);
+        } else {
+            for document in &mut documents {
+                document.folder_id = None;
+            }
+            notice = Some("当前显示已缓存的文档。知识空间同步后可浏览 Wiki 目录。");
+        }
+    } else if provider == "dida365" {
+        (folders, documents) = dida_contents(connection, library_id, documents)?;
+        notice = Some("显示已同步的清单、分组和子任务。");
+    } else if provider == "obsidian" {
         let excluded = crate::library_excluded_paths(connection, library_id)?;
         let snapshot = connection.query_row(
             "SELECT value FROM metadata WHERE key=?1",
@@ -328,6 +594,7 @@ fn read_contents(connection: &Connection, library_id: &str) -> Result<LibraryCon
         folders,
         documents,
         craft_locations_synced,
+        notice,
     })
 }
 
@@ -416,5 +683,135 @@ mod tests {
         );
         drop(connection);
         std::fs::remove_dir_all(&scratch).unwrap();
+    }
+
+    #[test]
+    fn feishu_wiki_keeps_aliases_distinct_and_preserves_cached_previews() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection
+            .execute_batch("CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT)")
+            .unwrap();
+        let node = |id: &str, parent: Option<&str>, ids: Vec<String>| FeishuBrowseNode {
+            id: id.into(),
+            parent_id: parent.map(str::to_string),
+            title: id.into(),
+            object_id: "object".into(),
+            document_ids: ids,
+        };
+        save_feishu_nodes(
+            &connection,
+            "wiki",
+            vec![
+                node("root", None, vec![]),
+                node("alias-a", Some("root"), vec!["doc".into()]),
+                node("alias-b", None, vec!["doc".into()]),
+            ],
+        )
+        .unwrap();
+        assert!(save_feishu_nodes(
+            &connection,
+            "wiki",
+            vec![node("root", Some("root"), vec![])]
+        )
+        .is_err());
+        save_feishu_nodes(
+            &connection,
+            "wiki",
+            vec![
+                node("root", None, vec![]),
+                node("alias-a", Some("root"), vec![]),
+                node("alias-b", None, vec![]),
+            ],
+        )
+        .unwrap();
+        let (folders, pages) = feishu_contents(
+            read_feishu_nodes(&connection, "wiki").unwrap().unwrap(),
+            vec![test_document("doc")],
+        );
+        assert_eq!(
+            folders
+                .iter()
+                .map(|folder| folder.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["root"]
+        );
+        assert_eq!(
+            pages
+                .iter()
+                .map(|page| (
+                    page.id.as_str(),
+                    page.node_id.as_deref(),
+                    page.folder_id.as_deref()
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                ("doc", Some("alias-a"), Some("root")),
+                ("doc", Some("alias-b"), None)
+            ]
+        );
+    }
+
+    #[test]
+    fn dida_projects_show_groups_parent_tasks_children_and_empty_lists() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection.execute_batch("
+            CREATE TABLE dida_projects(library_id,project_id,name,closed,sort_order);
+            CREATE TABLE dida_tasks(library_id,task_id,project_id,parent_id,column_id,column_name,last_seen_at);
+            INSERT INTO dida_projects VALUES ('dida','list','List',0,0),('dida','empty','Empty',0,1),('dida','closed','Closed',1,2);
+            INSERT INTO dida_tasks VALUES
+              ('dida','parent','list',NULL,'todo','To Do',1),
+              ('dida','child','list','parent',NULL,NULL,1),
+              ('dida','default','list',NULL,'default','未分组',1),
+              ('dida','closed-task','closed',NULL,NULL,NULL,1);
+        ").unwrap();
+        let (folders, pages) = dida_contents(
+            &connection,
+            "dida",
+            ["parent", "child", "default", "closed-task"]
+                .map(test_document)
+                .to_vec(),
+        )
+        .unwrap();
+        let group = folders
+            .iter()
+            .find(|folder| folder.name == "To Do")
+            .unwrap();
+        assert_eq!(group.parent_id.as_deref(), Some("list"));
+        assert!(folders.iter().any(|folder| folder.id == "empty"));
+        assert!(!folders
+            .iter()
+            .any(|folder| folder.id == "closed" || folder.name == "未分组"));
+        assert_eq!(
+            folders
+                .iter()
+                .find(|folder| folder.id == "dida-parent:parent")
+                .unwrap()
+                .parent_id
+                .as_deref(),
+            Some(group.id.as_str())
+        );
+        assert_eq!(
+            pages
+                .iter()
+                .map(|page| (page.id.as_str(), page.folder_id.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("parent", Some("dida-parent:parent")),
+                ("child", Some("dida-parent:parent")),
+                ("default", Some("list"))
+            ]
+        );
+    }
+
+    fn test_document(id: &str) -> BrowseDocument {
+        BrowseDocument {
+            id: id.into(),
+            title: id.into(),
+            path: String::new(),
+            folder_id: None,
+            modified_at: None,
+            content_type: None,
+            node_id: None,
+        }
     }
 }

@@ -825,6 +825,7 @@ impl SearchIndex {
                 .filter(|value| !value.is_empty())
                 .map(|value| vec![value.to_string()])
                 .as_deref(),
+            None,
             updated_after,
             include_craft_pages,
             include_image_ocr,
@@ -841,6 +842,7 @@ impl SearchIndex {
         limit: usize,
         space_ids: Option<&[String]>,
         folder_ids: Option<&[String]>,
+        document_ids: Option<&[String]>,
         updated_after: Option<i64>,
         include_craft_pages: bool,
         include_image_ocr: bool,
@@ -854,6 +856,7 @@ impl SearchIndex {
         }
         if space_ids.is_some_and(|values| values.is_empty())
             || folder_ids.is_some_and(|values| values.is_empty())
+            || document_ids.is_some_and(|values| values.is_empty())
         {
             return Ok(Vec::new());
         }
@@ -992,6 +995,14 @@ impl SearchIndex {
                 Occur::Must,
                 Box::new(TermSetQuery::new(folder_ids.iter().map(|folder_id| {
                     Term::from_field_text(self.fields.folder_id, folder_id)
+                }))),
+            ));
+        }
+        if let Some(document_ids) = document_ids {
+            clauses.push((
+                Occur::Must,
+                Box::new(TermSetQuery::new(document_ids.iter().map(|document_id| {
+                    Term::from_field_text(self.fields.document_id, document_id)
                 }))),
             ));
         }

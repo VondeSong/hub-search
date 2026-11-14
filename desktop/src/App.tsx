@@ -74,7 +74,7 @@ import { useLibraryManagement } from "./LibraryManagement";
 import { useExternalLinkOpener } from "./useExternalLinkOpener";
 import { usePreviewController } from "./usePreviewController";
 import { useResultOpener } from "./useResultOpener";
-import { browseSubpage, canBrowseLibrary, LibraryBrowse, useLibraryBrowseNavigation } from "./LibraryBrowse";
+import { browseSubpage, LibraryBrowse, useLibraryBrowseNavigation } from "./LibraryBrowse";
 import { PreviewPane } from "./PreviewPane";
 import { journalDataVersion, useJournalData } from "./useJournalData";
 const LazyPreviewRenderer = lazy(() => import("./PreviewRenderer").then((module) => ({ default: module.PreviewRenderer })));
@@ -315,7 +315,7 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
   const tasksActive = desktopSidebarView === "tasks" && !flashcardsStandaloneOpen;
   const collectionsActive = desktopSidebarView === "collections" && !flashcardsStandaloneOpen;
   const librariesActive = !isMobileLayout && desktopSidebarView === "libraries" && !flashcardsStandaloneOpen;
-  const browseLibraries = useMemo(() => spaces.filter(space => canBrowseLibrary(space.provider)), [spaces]);
+  const browseLibraries = spaces;
   const browsingPreview = browseLibraries.some(space => space.id === libraryPreview?.libraryId) ? libraryPreview : undefined;
   const sharedTasks = useUnifiedTasks({ enabled: ready && !flashcardsStandaloneOpen && (tasksActive || desktopSidebarView === "journals") });
   useEffect(() => { if (sharedTasks.ready && !sharedTasks.loading) updateTaskOpenCount(sharedTasks.dashboard.open); }, [sharedTasks.dashboard.open, sharedTasks.ready, sharedTasks.loading, updateTaskOpenCount]);

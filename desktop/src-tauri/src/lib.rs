@@ -16360,10 +16360,11 @@ async fn list_feishu_space_document_refs(
     client: &reqwest::Client,
     session: &McpSession,
     space_id: &str,
-) -> Result<Vec<FeishuDocumentRef>, String> {
+) -> Result<(Vec<FeishuDocumentRef>, Vec<library_browse::FeishuBrowseNode>), String> {
     let mut parents = VecDeque::from([None::<String>]);
     let mut visited_parents = HashSet::new();
     let mut refs = Vec::new();
+    let mut nodes = Vec::new();
     while let Some(parent) = parents.pop_front() {
         let parent_key = parent.clone().unwrap_or_default();
         if !visited_parents.insert(parent_key) {
@@ -16415,6 +16416,20 @@ async fn list_feishu_space_document_refs(
                     if item["has_child"].as_bool().unwrap_or(false) && !node_token.is_empty() {
                         parents.push_back(Some(node_token.to_string()));
                     }
+                    if !node_token.is_empty() {
+                        nodes.push(library_browse::FeishuBrowseNode {
+                            id: node_token.to_string(),
+                            parent_id: parent.clone(),
+                            title: title.to_string(),
+                            object_id: if object_token.is_empty() {
+                                node_token
+                            } else {
+                                object_token
+                            }
+                            .to_string(),
+                            document_ids: Vec::new(),
+                        });
+                    }
                     // Wiki nodes have two different identifiers: node_token identifies the
                     // knowledge-base node while obj_token identifies the underlying cloud
                     // document.  Keep both.  The Feishu MCP fetch tool accepts Wiki nodes in
@@ -16455,7 +16470,7 @@ async fn list_feishu_space_document_refs(
     }
     let mut seen = HashSet::new();
     refs.retain(|(_, _, reference, _, _)| seen.insert(reference.clone()));
-    Ok(refs)
+    Ok((refs, nodes))
 }
 
 async fn fetch_feishu_legacy_document(
@@ -17001,6 +17016,7 @@ async fn sync_feishu_library(
         .build()
         .map_err(|error| format!("飞书 HTTP 客户端初始化失败：{error}"))?;
     let direct_bitable = parse_feishu_bitable_link(location).ok();
+    let mut wiki_nodes = None;
     let mut refs = if let Some(link) = direct_bitable.as_ref() {
         vec![(
             link.app_token.clone(),
@@ -17010,7 +17026,9 @@ async fn sync_feishu_library(
             None,
         )]
     } else if let Some(space_id) = location.strip_prefix("space:") {
-        list_feishu_space_document_refs(&client, &session, space_id).await?
+        let (references, nodes) = list_feishu_space_document_refs(&client, &session, space_id).await?;
+        wiki_nodes = Some(nodes);
+        references
     } else {
         let list_result = call_feishu_list_docs(&client, &session, location).await?;
         let mut refs = Vec::new();
@@ -17024,6 +17042,7 @@ async fn sync_feishu_library(
         ));
         refs
     };
+    let mut document_ids_by_node = HashMap::new();
     operation.checkpoint()?;
     let mut seen_refs = HashSet::new();
     refs.retain(|(_, _, reference, _, _)| seen_refs.insert(reference.clone()));
@@ -17066,6 +17085,12 @@ async fn sync_feishu_library(
             {
                 Ok(mut records) => {
                     completed_sources += 1;
+                    if wiki_nodes.is_some() {
+                        document_ids_by_node.insert(
+                            reference.as_str(),
+                            records.iter().map(|item| item.id.clone()).collect::<Vec<_>>(),
+                        );
+                    }
                     for document in &mut records {
                         if document.modified_at.is_none() {
                             document.modified_at = *modified_at;
@@ -17097,6 +17122,9 @@ async fn sync_feishu_library(
         {
             Ok(mut document) if !document.markdown.trim().is_empty() => {
                 completed_sources += 1;
+                if wiki_nodes.is_some() {
+                    document_ids_by_node.insert(reference.as_str(), vec![document.id.clone()]);
+                }
                 if document.modified_at.is_none() {
                     document.modified_at = *modified_at;
                 }
@@ -17126,6 +17154,11 @@ async fn sync_feishu_library(
             "飞书知识空间发现 {discovered} 个节点，但全部读取失败：{details}"
         ));
     }
+    if let Some(nodes) = &mut wiki_nodes {
+        for node in nodes {
+            node.document_ids = document_ids_by_node.remove(node.id.as_str()).unwrap_or_default();
+        }
+    }
     let path = database_path(app)?;
     let saved_library_id = library_id.to_string();
     let saved_library_name = session.space_name.clone();
@@ -17154,6 +17187,9 @@ async fn sync_feishu_library(
             .collect::<HashSet<_>>();
         for document in &documents {
             upsert_feishu_document(&transaction, &saved_library_id, document, now)?;
+        }
+        if let Some(nodes) = wiki_nodes {
+            library_browse::save_feishu_nodes(&transaction, &saved_library_id, nodes)?;
         }
         let existing = {
             let mut statement = transaction
@@ -17802,6 +17838,7 @@ async fn local_search(
     space_ids: Option<Vec<String>>,
     folder_id: Option<String>,
     folder_ids: Option<Vec<String>>,
+    document_ids: Option<Vec<String>>,
     updated_after: Option<i64>,
     include_craft_pages: Option<bool>,
     include_dida_tasks: Option<bool>,
@@ -17837,6 +17874,7 @@ async fn local_search(
                 limit,
                 Some(selected_space_ids.as_slice()),
                 folder_ids.as_deref().or(legacy_folder),
+                document_ids.as_deref(),
                 updated_after,
                 include_pages || include_tasks,
                 include_image_ocr.unwrap_or(true),

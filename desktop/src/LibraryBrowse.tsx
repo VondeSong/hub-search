@@ -8,10 +8,6 @@ import type { LibrarySummary, SearchResult } from "./SearchTypes";
 import { WorkspaceHeaderContext } from "./WorkspaceChrome";
 import "./LibraryBrowse.css";
 
-export function canBrowseLibrary(provider: LibrarySummary["provider"]) {
-  return provider === "craft" || provider === "obsidian";
-}
-
 export function browseSubpage(result: SearchResult | undefined, href?: string, title?: string) {
   const marker = "#craft-subpage=";
   if (result?.provider !== "craft" || !href?.startsWith(marker)) return undefined;
@@ -23,8 +19,8 @@ export function browseSubpage(result: SearchResult | undefined, href?: string, t
 }
 
 type FolderNode = { id: string; name: string; parentId?: string };
-type DocumentNode = { id: string; title: string; path: string; folderId?: string; modifiedAt?: number };
-type LibraryContents = { folders: FolderNode[]; documents: DocumentNode[]; craftLocationsSynced: boolean };
+type DocumentNode = { id: string; title: string; path: string; folderId?: string; modifiedAt?: number; contentType?: string; nodeId?: string };
+type LibraryContents = { folders: FolderNode[]; documents: DocumentNode[]; craftLocationsSynced: boolean; notice?: string };
 
 export type LibraryPosition = { libraryId: string; folderId: string; documentId?: string };
 
@@ -55,7 +51,7 @@ export function groupBrowseContents({ folders, documents }: LibraryContents) {
       unresolved.push(document);
       continue;
     }
-    documentFolders.set(document.id, folder);
+    if (!documentFolders.has(document.id)) documentFolders.set(document.id, folder);
     const entries = pages.get(folder) ?? [];
     entries.push(document);
     pages.set(folder, entries);
@@ -92,13 +88,17 @@ export function browseFolderScope(tree: BrowseTree, folderId: string, includeDes
 }
 
 function rootResult(library: LibrarySummary, document: DocumentNode): SearchResult {
-  const craft = library.provider === "craft";
+  const contentType = document.contentType ?? {
+    craft: "document", obsidian: "obsidian_markdown", feishu: "feishu_document", dida365: "dida_task",
+  }[library.provider];
   return {
-    id: document.id, entityKey: `document:${library.id}:${document.id}`,
+    id: document.id, entityKey: document.nodeId
+      ? `wiki:${library.id}:${document.nodeId}:${document.id}`
+      : `document:${library.id}:${document.id}`,
     documentId: document.id, blockId: document.id, provider: library.provider,
     libraryId: library.id, libraryName: library.name, spaceId: library.id, spaceName: library.name,
-    contentType: craft ? "document" : "obsidian_markdown",
-    sourceType: craft ? "craft_page" : "obsidian_page",
+    contentType,
+    sourceType: library.provider === "craft" ? "craft_page" : library.provider === "obsidian" ? "obsidian_page" : contentType,
     title: document.title, documentTitle: document.title, path: document.path,
     folderId: document.folderId, modifiedAt: document.modifiedAt ?? undefined,
     snippet: "", matchTerms: [], matchField: "", matchCount: 0, subMatches: [],
@@ -160,7 +160,8 @@ export function LibraryBrowse({
 
   const loaded = library ? cache[library.id] : undefined;
   const tree = loaded?.tree;
-  const locatedFolder = position?.documentId ? tree?.documentFolders.get(position.documentId) : undefined;
+  const alreadyLocated = position?.documentId && tree?.pages.get(position.folderId)?.some(page => page.id === position.documentId);
+  const locatedFolder = position?.documentId && !alreadyLocated ? tree?.documentFolders.get(position.documentId) : undefined;
   const requestedFolder = library ? locatedFolder ?? position?.folderId ?? "" : "";
   const folderId = tree?.nodes.has(requestedFolder) ? requestedFolder : "";
   const trail = useMemo(() => tree ? browseTrail(tree, folderId) : [], [tree, folderId]);
@@ -169,14 +170,17 @@ export function LibraryBrowse({
   const activeVersion = library ? libraryVersion(library, revision) : "";
   const searchRequest = useMemo(() => {
     if (!query || !libraryIds.length || (library && !tree && scope !== "library")) return undefined;
+    const folders = tree && scope !== "library" ? browseFolderScope(tree, folderId, scope === "subtree") : null;
+    const usesSourceStructure = library?.provider === "feishu" || library?.provider === "dida365";
     return {
       query,
       spaceIds: library ? [library.id] : libraryIds,
-      folderIds: tree && scope !== "library" ? browseFolderScope(tree, folderId, scope === "subtree") : null,
-      includeDidaTasks: false,
+      folderIds: usesSourceStructure ? null : folders,
+      documentIds: usesSourceStructure && folders ? [...new Set(folders.flatMap(id => tree?.pages.get(id)?.map(page => page.id) ?? []))] : null,
+      includeDidaTasks: !library || library.provider === "dida365",
       limit: 100,
     };
-  }, [query, library?.id, libraryIds, tree, folderId, scope]);
+  }, [query, library?.id, library?.provider, libraryIds, tree, folderId, scope]);
   const matching = hits?.request === searchRequest ? hits : undefined;
   const libraryFavorites = favorites.filter(result => libraryIds.includes(result.libraryId) && (!library || library.id === result.libraryId));
   const inColumns = mode === "columns" && !query && !showFavorites;
@@ -227,7 +231,11 @@ export function LibraryBrowse({
   };
   const switchLibrary = (libraryId: string) => move(libraryId, currentFolders.current[libraryId] ?? "");
   const locate = (result: SearchResult) => {
-    const actualFolder = cache[result.libraryId]?.tree?.documentFolders.get(result.documentId);
+    const resultTree = cache[result.libraryId]?.tree;
+    const scopedFolder = result.libraryId === library?.id && searchRequest?.documentIds && resultTree
+      ? browseFolderScope(resultTree, folderId, scope === "subtree")?.find(id => resultTree.pages.get(id)?.some(page => page.id === result.documentId))
+      : undefined;
+    const actualFolder = scopedFolder ?? resultTree?.documentFolders.get(result.documentId);
     move(result.libraryId, actualFolder ?? result.folderId ?? "", true, result.documentId);
     onPreview(result);
   };
@@ -290,8 +298,8 @@ export function LibraryBrowse({
         <Folder size={17} /><span>{folder.name}</span><ChevronRight size={14} />
       </button>)}
       {documents.filter((document, index) => index < limit || (selected?.libraryId === library.id && selected.documentId === document.id)).map(document =>
-        <button className="library-browser-row" key={document.id} title={document.path}
-          aria-current={selected?.libraryId === library.id && selected.documentId === document.id ? "true" : undefined}
+        <button className="library-browser-row" key={JSON.stringify([document.nodeId, document.id])} title={document.path}
+          aria-current={selected?.libraryId === library.id && selected.documentId === document.id && (!document.nodeId || selected.entityKey === rootResult(library, document).entityKey) ? "true" : undefined}
           onClick={() => onPreview(rootResult(library, document))}>
           <FileText size={17} /><span>{document.title}<small>{document.folderId && !tree.nodes.has(document.folderId) ? "目录位置未知" : document.path}</small></span>
         </button>)}
@@ -312,6 +320,7 @@ export function LibraryBrowse({
     {library && loaded?.version !== activeVersion && !tree && <p className="library-browser-hint" role="status">正在读取本地目录…</p>}
     {loaded?.version === activeVersion && loaded?.error && <p className="library-browser-hint" role="alert">{tree ? "目录刷新失败，正在显示上次读取的数据。" : loaded.error}</p>}
     {library && !library.connected && <p className="library-browser-hint">来源不可用，正在浏览本地缓存。</p>}
+    {loaded?.contents?.notice && <p className="library-browser-hint">{loaded.contents.notice}</p>}
     {library?.provider === "craft" && loaded?.contents && !loaded.contents.craftLocationsSynced &&
       <p className="library-browser-hint">当前显示已缓存目录和文档。完成同步后可刷新 Craft 文件夹归属。</p>}
     {tree && requestedFolder && !folderId && <p className="library-browser-hint">原目录已不可用，当前显示资料库根目录。</p>}
@@ -422,7 +431,7 @@ export function LibraryBrowse({
       <div className={`library-browser-body${inColumns ? " library-browser-column-mode" : ""}${preview ? " library-browser-reading" : ""}`}>
         {inColumns ? <div className="library-browser-columns" ref={columnStrip} aria-label="目录分栏">
           <section className="library-browser-column"><h2>全部库</h2>{libraryRows()}
-            {!libraries.length && <p className="library-browser-hint">接入 Craft 空间或 Obsidian 库后，即可在这里浏览。</p>}
+            {!libraries.length && <p className="library-browser-hint">在设置中接入资料库后，即可在这里浏览。</p>}
           </section>
           {library && [{ id: "", name: library.name }, ...trail].map((folder, index) =>
             <section className="library-browser-column" key={folder.id}>
@@ -445,7 +454,7 @@ export function LibraryBrowse({
             </> : showFavorites ? libraryFavorites.length ? resultRows(libraryFavorites)
               : <p className="library-browser-hint">当前范围内没有收藏。</p>
               : library ? folderRows(folderId) : libraryRows()}
-            {!libraries.length && !query && !showFavorites && <p className="library-browser-hint">接入 Craft 空间或 Obsidian 库后，即可在这里浏览。</p>}
+            {!libraries.length && !query && !showFavorites && <p className="library-browser-hint">在设置中接入资料库后，即可在这里浏览。</p>}
           </div>
         </section>}
         <section className="library-browser-reader desktop-workspace" aria-label="阅读区">
