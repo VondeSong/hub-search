@@ -218,10 +218,10 @@ html:not([data-runtime-platform="android"]) .unified-shell.mode-standard.module-
 .library-browser-list > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 0 7px; }
 .library-browser-list h2 { overflow-wrap: anywhere; font-size: 17px; }
 .library-browser-list header p { margin: 5px 0 0; color: var(--library-muted); font-size: 11px; }
-.library-browser-list-items { display: grid; gap: 4px; margin-top: 12px; }
+.library-browser-list-items { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; margin-top: 12px; }
 .library-browser-list-items .library-browser-row { min-height: 42px; padding: 9px 8px; }
 .library-browser-result { padding-bottom: 13px; }
-.library-browser-result-actions { display: flex; gap: 7px; padding-left: 27px; }
+.library-browser-result-actions { display: flex; flex-wrap: wrap; gap: 7px; padding-left: 27px; }
 .library-browser-result-actions [aria-pressed="true"] { color: var(--library-active-text); }
 .library-browser-topic-heading { display: flex; align-items: center; justify-content: space-between; color: var(--library-muted); font-size: 11px; }
 .library-browser-topic-editor { display: grid; gap: 7px; }

@@ -82,6 +82,29 @@ for line in sys.stdin:
 
 
 class GatewayTest(unittest.TestCase):
+    def test_material_snapshot_identity_and_answer_note_replay(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            store = Store(Path(temporary) / "state")
+            thread, turn = str(uuid.uuid4()), str(uuid.uuid4())
+            material = {"id":"saved-document", "title":"Existing note", "source":"Library", "text":"Source text", "sha256":digest(b"Source text")}
+            payload = {"text":"Summarize this note", "attachments":[], "material":material}
+            store.submit(thread,turn,payload)
+            store.submit(thread,turn,payload)
+            self.assertEqual(store.thread(thread,2**63-1)["turns"][0]["material"],material)
+            changed = {**payload,"material":{**material,"text":"Different text","sha256":digest(b"Different text")}}
+            with self.assertRaises(RequestError): store.submit(thread,turn,changed)
+            with self.assertRaises(RequestError): store.answer_note(thread,turn,{"date":"2026-11-15"})
+            with closing(store.connect()) as db,db:
+                db.execute("UPDATE turns SET status='completed',answer='Grounded answer' WHERE id=?",(turn,))
+            first=store.answer_note(thread,turn,{"date":"2026-11-15"})
+            replay=store.answer_note(thread,turn,{"date":"2026-11-16"})
+            self.assertEqual(first,replay)
+            self.assertEqual(first["date"],"2026-11-15")
+            self.assertIn("Grounded answer",first["text"])
+            self.assertIn("Existing note",first["text"])
+            bad={**payload,"material":{**material,"sha256":"0"*64}}
+            with self.assertRaises(RequestError): store.submit(str(uuid.uuid4()),str(uuid.uuid4()),bad)
+
     def test_http_resume_stop_and_restart(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary)

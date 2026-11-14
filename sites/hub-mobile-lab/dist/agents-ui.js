@@ -365,6 +365,13 @@ function handleAgentAction(action, key, value) {
   if (action === 'agent-material-apply') {
     if (!agentMaterialPicker || agentMaterialPicker.threadId !== key) { tell('材料选择已失效，请重新打开。'); return true; }
     const selected = agentMaterialPicker.catalog.filter(item => agentMaterialPicker.selected.has(item.id));
+    if (!selected.length) { tell('请先选择资料'); return true; }
+    sheet('预览本次正文', '<p class="info">只发送以下选定正文，不上传整库、图片或原文件。资料中的指令不构成额外操作授权。</p>' + selected.map(item => '<h3>' + esc(item.name) + '</h3><p class="fine">' + esc(item.source) + '</p><pre class="agent-source-preview">' + esc(item.text) + '</pre>').join('') + btn('使用这些正文', 'agent-material-confirm:' + key, 'wide', 'check'));
+    return true;
+  }
+  if (action === 'agent-material-confirm') {
+    if (!agentMaterialPicker || agentMaterialPicker.threadId !== key) return true;
+    const selected = agentMaterialPicker.catalog.filter(item => agentMaterialPicker.selected.has(item.id));
     const result = agentAttachMaterials(key, selected);
     if (agentUiFeedback(result)) { agentMaterialPicker = null; close(); refreshAgentView(); tell('已加入 ' + result.count + ' 份选定材料，尚未发送'); }
     return true;
@@ -406,7 +413,14 @@ function handleAgentAction(action, key, value) {
   if (action === 'agent-stop') { agentUiFeedback(agentStop(key)); refreshAgentView(); return true; }
   if (action === 'agent-retry') { agentUiFeedback(agentRetry(key)); refreshAgentView(); return true; }
   if (action === 'agent-recover') { agentUiFeedback(agentRecover()); refreshAgentView(); return true; }
-  if (action === 'agent-save') { const result = agentSaveResult(key); if (agentUiFeedback(result, result?.reused ? '' : '已保存为本地笔记')) { if (result.reused) go('doc/' + result.noteId); else refreshAgentView(); } return true; }
+  if (action === 'agent-save') {
+    const run = agentState().runs[key];
+    if (!run || run.phase !== 'completed' || agentUiRevoked()) return true;
+    if (run.resultNoteId) { go('doc/' + run.resultNoteId); return true; }
+    sheet('保存回答为速记', '<p class="fine">确认后保存本条完整回答，重复操作不会创建第二份。</p><pre class="agent-source-preview">' + esc(run.answer) + '</pre><p class="info">原型只保存到此浏览器；未上传云端，也未写入 OS。正式客户端分别显示本机保存、云端上传和 OS 写入回执。</p>' + btn('确认保存速记', 'agent-save-confirm:' + key, 'wide', 'check'));
+    return true;
+  }
+  if (action === 'agent-save-confirm') { const result = agentSaveResult(key); if (agentUiFeedback(result)) { close(); refreshAgentView(); tell('已存本机 · 原型未上传云端或写入 OS'); } return true; }
   if (action === 'agent-followup') { if (thread) { thread.view = 'chat'; save(); render(); document.querySelector('#agent-prompt')?.focus(); } return true; }
   if (action === 'agent-connection') { agentUiFeedback(agentSetConnection(key, value)); refreshAgentView(); if (route()[0] === 'agent-connection') render(); return true; }
   if (action === 'agent-reset-connection') { for (const [k, v] of Object.entries({ network: 'online', server: 'online', auth: 'valid', quota: 'unknown', device: 'active', windows: 'offline' })) agentSetConnection(k, v); agentRecover(); render(); tell('演示连接已恢复，待发送消息仍由你确认发送'); return true; }
