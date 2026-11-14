@@ -114,7 +114,7 @@ html[data-runtime-platform="android"] .app-shell.mobile-app-shell .main-content-
 @media (prefers-reduced-transparency: reduce) {
   .cloud-agents-header, .cloud-agents-compose { backdrop-filter: none; background: #f9fbff; }
 }
-.cloud-agents-sheet { position: absolute; inset: 10px; z-index: 10; display: flex; flex-direction: column; gap: 12px; overflow: auto; padding: 16px; border: 1px solid var(--cloud-line); border-radius: 18px; background: var(--cloud-control); color: var(--cloud-text); box-shadow: 0 12px 40px #18213826; }
+.cloud-agents-sheet { position: fixed; inset: max(12px,env(safe-area-inset-top,0px)) 12px max(12px,env(safe-area-inset-bottom,0px)); z-index: 10; display: flex; flex-direction: column; gap: 12px; overflow: auto; padding: 16px; border: 1px solid var(--cloud-line); border-radius: 18px; background: var(--cloud-control); color: var(--cloud-text); box-shadow: 0 12px 40px #18213826; }
 .cloud-agents-sheet header,.cloud-agents-sheet footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex: none; }
 .cloud-agents-sheet h2 { margin: 0; font-size: 1.15rem; }
 .cloud-agents-sheet > p { margin-block: 0; font-size: .88rem; line-height: 1.5; flex: none; }
