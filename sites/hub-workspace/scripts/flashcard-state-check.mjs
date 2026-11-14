@@ -1,178 +1,39 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import ts from 'typescript';
-
-function compiledModule(path, dependencies = {}) {
-  const source = readFileSync(new URL(path, import.meta.url), 'utf8');
-  let js = ts.transpileModule(source, {compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext}}).outputText;
-  for (const [name, url] of Object.entries(dependencies)) js = js.replaceAll(`'${name}'`, `'${url}'`).replaceAll(`"${name}"`, `"${url}"`);
-  return `data:text/javascript;base64,${Buffer.from(js).toString('base64')}`;
-}
-
-const demoUrl = compiledModule('../app/flashcard-demo.ts');
-const {demoCards} = await import(demoUrl);
-const {
-  FLASH_STORAGE_KEY, makeFlashState, loadFlashState, reconcileFlashDay, buildFlashSession,
-  reconcileFlashSession, applyFlashRating, restoreFlashRating, getFlashCardStatus,
-} = await import(compiledModule('../app/flashcard-state.ts', {'./flashcard-demo': demoUrl}));
-const now = new Date('2026-11-08T08:00:00Z');
-const ids = demoCards.map(card => card.id);
-const fresh = (overrides = {}) => ({...makeFlashState(now), ...overrides});
-const withSession = (state, deck = '') => ({...state, session: buildFlashSession(state, deck)});
-const reveal = state => ({...state, session: {...state.session, revealed: true}});
-const newCard = demoCards.find(card => card.id === 'engineering');
-let checks = 0;
-function check(name, run) { run(); checks += 1; console.log(`✓ ${name}`); }
-
-check('旧存储兼容、首次演示统计与卡片 ID 去重', () => {
-  assert.equal(FLASH_STORAGE_KEY, 'hub-flashcard-prototype-v1');
-  assert.equal(fresh().reviewed, 16);
-  assert.equal(fresh().newToday, 1);
-  const legacy = {...fresh(), due: [...ids, 'knowledge'], studied: ['engineering', 'engineering'], dailyLimit: 5, newToday: 4};
-  delete legacy.session;
-  const loaded = loadFlashState(JSON.stringify(legacy), now);
-  assert.deepEqual(loaded.due, ids);
-  assert.deepEqual(loaded.studied, ['engineering']);
-  assert.equal(loaded.session, null);
-  assert.equal(loaded.dailyLimit, 5);
-  assert.equal(loaded.newToday, 4);
-});
-
-check('损坏字段安全回退，损坏会话保留有效的当日进度', () => {
-  const invalid = [null, [], {...fresh(), date: '2026-02-30'}, {...fresh(), due: ['missing']},
-    {...fresh(), studied: 'knowledge'}, {...fresh(), reviewed: '16'}, {...fresh(), newToday: 1.5},
-    {...fresh(), dailyLimit: 1}, {...fresh(), sessionLimit: -1}];
-  for (const value of invalid) assert.deepEqual(loadFlashState(JSON.stringify(value), now), fresh());
-  assert.deepEqual(loadFlashState('{broken', now), fresh());
-  const valid = withSession(fresh({reviewed: 23, newToday: 4}));
-  for (const session of [{...valid.session, ratings: [5]}, {...valid.session, queue: ['missing']},
-    {...valid.session, revealed: 'true'}, {...valid.session, initialIds: ['knowledge']}]) {
-    const loaded = loadFlashState(JSON.stringify({...valid, session}), now);
-    assert.equal(loaded.reviewed, 23);
-    assert.equal(loaded.newToday, 4);
-    assert.equal(loaded.session, null);
-  }
-});
-
-check('剩余一个新卡额度、不限额、空队列与牌组范围', () => {
-  assert.deepEqual(buildFlashSession(fresh({dailyLimit: 5, newToday: 4})).queue, ['knowledge', 'hub', 'engineering']);
-  assert.deepEqual(buildFlashSession(fresh({dailyLimit: 5, newToday: 5})).queue, ['knowledge', 'hub']);
-  assert.deepEqual(buildFlashSession(fresh({dailyLimit: 0, newToday: 100, sessionLimit: 0})).queue, ids);
-  assert.deepEqual(buildFlashSession(fresh(), '工程知识').queue, ['engineering']);
-  assert.deepEqual(buildFlashSession(fresh(), '学习笔记').queue, ['knowledge', 'hub', 'decision']);
-  assert.equal(buildFlashSession(fresh(), '不存在的牌组'), null);
-  assert.equal(buildFlashSession(fresh({due: []})), null);
-});
-
-check('调低每日额度延后未学卡，保留重来卡与准确进度', () => {
-  const state = reveal(withSession(fresh({newToday: 4})));
-  const limited = reconcileFlashSession({...state, dailyLimit: 5});
-  assert.deepEqual(limited.session.queue, ['knowledge', 'hub', 'engineering']);
-  assert.deepEqual(limited.session.initialIds, ['knowledge', 'hub', 'engineering']);
-  assert.equal(limited.session.revealed, true);
-  assert.equal(limited.reviewed, state.reviewed);
-  assert.equal(limited.newToday, state.newToday);
-  const repeating = {...state, studied: ['engineering'], dailyLimit: 5, newToday: 5};
-  assert.deepEqual(reconcileFlashSession(repeating).session.queue, ['knowledge', 'hub', 'engineering']);
-  const oneNew = reveal(withSession(fresh({dailyLimit: 10, newToday: 5}), '工程知识'));
-  assert.equal(reconcileFlashSession({...oneNew, dailyLimit: 5}).session, null);
-  const nextRoundSetting = reconcileFlashSession({...state, sessionLimit: 100});
-  assert.deepEqual(nextRoundSetting.session, state.session);
-});
-
-check('只有揭示后的有效评分生效，重来回队且只占一次新卡额度', () => {
-  let state = withSession(fresh({dailyLimit: 5, newToday: 4}), '工程知识');
-  assert.strictEqual(applyFlashRating(state, 3), state);
-  state = reveal(state);
-  for (const rating of [0, 5, 1.5, NaN]) assert.strictEqual(applyFlashRating(state, rating), state);
-  assert.equal(getFlashCardStatus(newCard, state), 'new');
-  state = applyFlashRating(state, 1);
-  assert.deepEqual(state.session.queue, ['engineering']);
-  assert.equal(state.newToday, 5);
-  assert.equal(state.reviewed, 17);
-  assert.equal(getFlashCardStatus(newCard, state), 'due');
-  assert.strictEqual(applyFlashRating(state, 1), state, '重复事件不能在未揭示下一面时评分');
-  state = applyFlashRating(reveal(state), 1);
-  assert.equal(state.newToday, 5);
-  assert.equal(state.reviewed, 18);
-  state = applyFlashRating(reveal(state), 3);
-  assert.deepEqual(state.session.queue, []);
-  assert.deepEqual(state.session.ratings, [1, 1, 3]);
-  assert.equal(state.newToday, 5);
-  assert.equal(getFlashCardStatus(newCard, state), 'done');
-  let mixed = withSession(fresh());
-  mixed = reveal({...mixed, session: {...mixed.session, queue: ['engineering', 'knowledge', 'hub', 'decision']}});
-  assert.deepEqual(applyFlashRating(mixed, 1).session.queue, ['knowledge', 'hub', 'decision', 'engineering']);
-});
-
-check('撤销恢复卡片和计数，保留最新设置，并可重新评分', () => {
-  const before = reveal(withSession(fresh({dailyLimit: 5, newToday: 4}), '工程知识'));
-  const after = applyFlashRating(before, 3);
-  const current = {...after, dailyLimit: 0, sessionLimit: 50};
-  const restored = restoreFlashRating(current, before);
-  assert.deepEqual(restored, {...before, dailyLimit: 0, sessionLimit: 50});
-  assert.equal(restored.session.revealed, true);
-  const ratedAgain = applyFlashRating(restored, 3);
-  assert.equal(ratedAgain.newToday, 5);
-  assert.equal(ratedAgain.reviewed, 17);
-  assert.deepEqual(ratedAgain.session.ratings, [3]);
-  const blocked = restoreFlashRating({...after, dailyLimit: 5, newToday: 6}, {...before, newToday: 5});
-  assert.equal(blocked.session, null, '撤销后仍须遵守当前每日额度');
-});
-
-check('刷新保留正面、答案面、重来顺序与完成会话', () => {
-  const front = withSession(fresh());
-  const back = reveal(front);
-  const repeat = applyFlashRating(back, 1);
-  const completed = applyFlashRating(reveal(withSession(fresh(), '工程知识')), 4);
-  for (const state of [front, back, repeat, completed]) {
-    assert.deepEqual(loadFlashState(JSON.stringify(state), now), state);
-  }
-  const duplicated = {...front, session: {...front.session, queue: [...front.session.queue, 'knowledge'], initialIds: [...ids, 'knowledge']}};
-  assert.deepEqual(loadFlashState(JSON.stringify(duplicated), now), front);
-});
-
-check('北京时间跨日清零并保留偏好，旧日撤销不能恢复旧进度', () => {
-  const beforeMidnight = new Date('2026-11-08T15:59:59Z');
-  const afterMidnight = new Date('2026-11-08T16:00:00Z');
-  const state = applyFlashRating(reveal(withSession(fresh({dailyLimit: 5, sessionLimit: 50}))), 3);
-  assert.strictEqual(reconcileFlashDay(state, beforeMidnight), state);
-  const next = reconcileFlashDay(state, afterMidnight);
-  assert.equal(next.date, '2026-11-09');
-  assert.deepEqual(next.due, ids);
-  assert.deepEqual(next.studied, []);
-  assert.equal(next.reviewed, 0);
-  assert.equal(next.newToday, 0);
-  assert.equal(next.session, null);
-  assert.equal(next.dailyLimit, 5);
-  assert.equal(next.sessionLimit, 50);
-  assert.deepEqual(loadFlashState(JSON.stringify(state), afterMidnight), next);
-  assert.strictEqual(restoreFlashRating(next, state), next);
-});
-
-check('会话固定牌组范围，移除已完成卡后隐藏不对应的答案', () => {
-  const deck = reveal(withSession(fresh(), '工程知识'));
-  assert.equal(reconcileFlashSession({...deck, dailyLimit: 0}).session.label, '工程知识');
-  const crossDeck = {...deck, session: {...deck.session, queue: ['engineering', 'knowledge'], initialIds: ['engineering', 'knowledge']}};
-  assert.equal(loadFlashState(JSON.stringify(crossDeck), now).session, null);
-  const state = reveal(withSession(fresh()));
-  const completedElsewhere = {...state, due: ids.filter(id => id !== 'knowledge'), studied: ['knowledge']};
-  const cleaned = reconcileFlashSession(completedElsewhere);
-  assert.deepEqual(cleaned.session.queue, ['hub', 'engineering', 'decision']);
-  assert.equal(cleaned.session.revealed, false);
-  assert.deepEqual(cleaned.session.initialIds, ids);
-  assert.equal(cleaned.session.label, state.session.label);
-});
-
-check('评分、额度调整与撤销不修改输入快照', () => {
-  const state = reveal(withSession(fresh()));
-  const snapshot = JSON.stringify(state);
-  const freeze = value => { if (value && typeof value === 'object') { Object.values(value).forEach(freeze); Object.freeze(value); } return value; };
-  freeze(state);
-  const after = applyFlashRating(state, 3);
-  reconcileFlashSession({...state, dailyLimit: 5, newToday: 5});
-  restoreFlashRating(after, state);
-  assert.equal(JSON.stringify(state), snapshot);
-});
-
-console.log(`通过 ${checks} 组闪卡状态检查。`);
+function moduleUrl(path,deps={}){let js=ts.transpileModule(readFileSync(new URL(path,import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;for(const[name,url]of Object.entries(deps))js=js.replaceAll(`'${name}'`,`'${url}'`).replaceAll(`"${name}"`,`"${url}"`);return 'data:text/javascript;base64,'+Buffer.from(js).toString('base64');}
+const demoUrl=moduleUrl('../app/flashcard-demo.ts');const{demoCards}=await import(demoUrl);
+const m=await import(moduleUrl('../app/flashcard-state.ts',{'./flashcard-demo':demoUrl}));
+const now=new Date('2026-11-08T08:00:00Z'),ids=demoCards.map(c=>c.id);
+const fresh=(change={})=>({...m.makeFlashState(now),...change});
+const session=state=>({...state,session:m.buildFlashSession(state)});
+const reveal=state=>({...state,session:{...state.session,revealed:true}});
+let checks=0;function check(name,run){run();checks++;console.log('✓ '+name);}
+check('storage identity, generated dates and zero current-day progress',()=>{const s=fresh();assert.equal(m.FLASH_STORAGE_KEY,'hub-flashcard-prototype-v1');assert.equal(s.date,'2026-11-08');assert.equal(s.reviewed,0);assert.equal(m.activityDays(s).length,7);assert.equal(m.activityDays(s)[0].date,'2026-11-02');assert.deepEqual(m.loadFlashState(JSON.stringify(s),now),s);});
+check('legacy saves retain valid progress and preferences',()=>{const s={date:'2026-11-08',due:['knowledge','hub'],studied:['engineering'],reviewed:16,newToday:1,dailyLimit:5,sessionLimit:20};const loaded=m.loadFlashState(JSON.stringify(s),now);assert.equal(loaded.reviewed,16);assert.equal(loaded.dailyLimit,5);assert.deepEqual(loaded.learned,['engineering']);assert.equal(loaded.extraNew,0);assert.equal(loaded.activity[loaded.date].reviews,16);});
+check('malformed state falls back and invalid sessions do not erase progress',()=>{for(const value of [null,[],{...fresh(),date:'2026-02-30'},{...fresh(),due:['missing']},{...fresh(),newToday:1.5},{...fresh(),dailyLimit:1}])assert.deepEqual(m.loadFlashState(JSON.stringify(value),now),fresh());const s={...fresh(),reviewed:8,session:{queue:['missing']}};assert.equal(m.loadFlashState(JSON.stringify(s),now).reviewed,8);assert.equal(m.loadFlashState(JSON.stringify(s),now).session,null);});
+check('today 12 and round 10 are distinct without mutating the plan',()=>{const s=m.makeScenario('limit','2026-11-08');assert.equal(m.planForState(s,0).eligible.length,12);assert.equal(m.buildFlashSession(s).queue.length,10);assert.equal(s.due.length,12);});
+check('quota blocks only unseen new cards and supports unlimited settings',()=>{assert.equal(m.planForState(fresh({dailyLimit:5,newToday:5})).eligible.length,6);assert.equal(m.planForState(fresh({dailyLimit:0,newToday:100,sessionLimit:0})).session.length,12);assert.equal(m.buildFlashSession(fresh(),'工程知识').queue.length,5);assert.equal(m.buildFlashSession(fresh({due:[]})),null);});
+check('extra new allowance counts study, preserves preference and expires next day',()=>{let s=m.addExtraNew(m.makeScenario('quota','2026-11-08'),1);assert.equal(s.dailyLimit,5);assert.equal(s.extraNew,1);assert.equal(m.planForState(s).session.length,1);s=m.applyFlashRating(reveal(session(s)),3);assert.equal(s.newToday,6);assert.equal(s.dailyLimit,5);const next=m.reconcileFlashDay(s,new Date('2026-11-09T04:00:00Z'),true);assert.equal(next.extraNew,0);assert.equal(next.newToday,0);assert.equal(next.dailyLimit,5);});
+check('only revealed valid ratings apply; retry consumes new quota once',()=>{let s=session(fresh({due:['engineering'],dailyLimit:5,newToday:4}));assert.strictEqual(m.applyFlashRating(s,3),s);s=reveal(s);for(const rating of[0,5,NaN,1.5])assert.strictEqual(m.applyFlashRating(s,rating),s);s=m.applyFlashRating(s,1);assert.deepEqual(s.session.queue,['engineering']);assert.equal(s.newToday,5);s=m.applyFlashRating(reveal(s),1);assert.equal(s.newToday,5);s=m.applyFlashRating(reveal(s),3);assert.equal(s.reviewed,3);assert.deepEqual(s.session.queue,[]);assert.equal(s.activity[s.date].reviews,3);});
+check('lower quota postpones unseen cards without inflating completed counts',()=>{const s=reveal(session(fresh()));const lower=m.reconcileFlashSession({...s,dailyLimit:5,newToday:5});assert.equal(lower.session.queue.length,6);assert.equal(lower.session.initialIds.length,6);assert.equal(lower.reviewed,0);assert.equal(lower.session.revealed,true);});
+check('current round limit is fixed until another round begins',()=>{const s=session(m.makeScenario('limit','2026-11-08'));const next=m.reconcileFlashSession({...s,sessionLimit:100});assert.equal(next.session.queue.length,10);assert.equal(m.buildFlashSession(next).queue.length,12);});
+check('undo restores counts and due times while retaining later local edits',()=>{const before=reveal(session(fresh()));const rated=m.applyFlashRating(before,3);const current={...rated,dailyLimit:0,edits:{hub:{question:'edited',answer:'reference'}},feedback:[{cardId:'hub',note:'feedback'}]};const restored=m.restoreFlashRating(current,before);assert.equal(restored.reviewed,0);assert.equal(restored.dailyLimit,0);assert.deepEqual(restored.dueAt,before.dueAt);assert.equal(restored.edits.hub.question,'edited');assert.equal(restored.feedback.length,1);});
+check('reload retains front, reveal, retry and completed rounds',()=>{const front=session(fresh()),back=reveal(front),retry=m.applyFlashRating(back,1),done=m.applyFlashRating(reveal(session(fresh({due:['knowledge']}))),3);for(const s of[front,back,retry,done])assert.deepEqual(m.loadFlashState(JSON.stringify(s),now),s);});
+check('Beijing midnight expires daily state and prevents old-day undo',()=>{const s=m.applyFlashRating(reveal(session(fresh())),3);assert.strictEqual(m.reconcileFlashDay(s,new Date('2026-11-08T15:59:59Z')),s);const next=m.reconcileFlashDay(s,new Date('2026-11-08T16:00:00Z'));assert.equal(next.date,'2026-11-09');assert.equal(next.session,null);assert.equal(next.reviewed,0);assert.equal(next.newToday,0);assert.ok(next.learned.includes('knowledge'));assert.strictEqual(m.restoreFlashRating(next,s),next);});
+check('simulated date survives focus and reload until explicitly advanced',()=>{const s=m.makeScenario('gap','2026-10-01');assert.strictEqual(m.reconcileFlashDay(s,now),s);assert.equal(m.loadFlashState(JSON.stringify(s),now).date,'2026-10-01');const next=m.reconcileFlashDay(s,new Date('2026-10-02T04:00Z'),true);assert.equal(next.date,'2026-10-02');});
+check('historical date statistics agree with the generated activity',()=>{const s=m.reconcileFlashDay({...fresh(),simulated:true},new Date('2026-11-07T04:00:00Z'),true);assert.equal(s.reviewed,s.activity[s.date].reviews);assert.equal(s.newToday,s.activity[s.date].newCards);});
+check('break, empty and sparse scenarios use actual date records',()=>{assert.equal(m.studyStreak(m.makeScenario('gap','2026-11-08')).days,0);assert.equal(m.activityDays(m.makeScenario('gap','2026-11-08')).find(d=>d.date==='2026-11-05').reviews,320);assert.equal(m.cardsForState(m.makeScenario('empty','2026-11-08')).length,0);assert.equal(m.estimateMinutes(m.makeScenario('sparse','2026-11-08'),12),null);assert.ok(m.estimateMinutes(fresh(),12)>0);});
+check('inbox admission is durable, editable and idempotent',()=>{const s=fresh();s.drafts[0]={...s.drafts[0],question:'checked question'};const moved=m.moveDraft(s,'draft-reading');assert.equal(m.cardsForState(moved).length,13);assert.equal(moved.drafts.length,1);assert.strictEqual(m.moveDraft(moved,'draft-reading'),moved);assert.equal(m.loadFlashState(JSON.stringify(moved),now).acceptedCards[0].question,'checked question');assert.equal(m.planForState(moved).eligible.length,13);});
+check('suspend persists, leaves this round and is distinct from skip',()=>{const s=reveal(session(fresh()));const paused=m.reconcileFlashSession({...s,suspended:['knowledge']});assert.ok(!paused.session.queue.includes('knowledge'));assert.equal(paused.session.initialIds.length,11);assert.equal(paused.session.revealed,false);assert.equal(m.getFlashCardStatus(demoCards[0],paused),'suspended');assert.equal(m.loadFlashState(JSON.stringify(paused),now).suspended[0],'knowledge');const next=m.reconcileFlashDay(paused,new Date('2026-11-09T04:00Z'));assert.ok(!m.planForState(next).eligible.some(c=>c.id==='knowledge'));});
+check('completed elsewhere is removed from pending but remains completed in denominator',()=>{const s=reveal(session(fresh()));const next=m.reconcileFlashSession({...s,due:ids.filter(id=>id!=='knowledge'),studied:['knowledge']});assert.equal(next.session.queue.length,11);assert.equal(next.session.initialIds.length,12);assert.equal(next.session.revealed,false);});
+check('future counts exclude unseen new cards and paused cards',()=>{const s=m.makeScenario('future','2026-11-08');assert.equal(m.futureDue(s).reduce((n,d)=>n+d.count,0),6);s.suspended=[s.learned[0]];assert.equal(m.futureDue(s).reduce((n,d)=>n+d.count,0),5);const rated=m.applyFlashRating(reveal(session(fresh({due:['knowledge']}))),4);assert.equal(m.futureDue(rated)[3].count,1);});
+check('next due compares timestamps across offsets and undo restores it',()=>{const s=fresh({due:[],dueAt:{knowledge:'2026-11-09T12:00:00+08:00',hub:'2026-11-09T05:00:00Z'}});assert.equal(m.nextDue(s),'2026-11-09T12:00:00+08:00');});
+check('session cannot cross deck scope or display another card answer',()=>{const s=session(fresh());const bad={...s,session:{...s.session,label:'工程知识'}};assert.equal(m.loadFlashState(JSON.stringify(bad),now).session,null);const revealed=reveal(s);assert.equal(m.reconcileFlashSession({...revealed,suspended:[revealed.session.queue[0]]}).session.revealed,false);});
+check('operations do not mutate frozen snapshots',()=>{const s=reveal(session(fresh()));const before=JSON.stringify(s);function freeze(v){if(v&&typeof v==='object'){Object.values(v).forEach(freeze);Object.freeze(v);}return v;}freeze(s);m.applyFlashRating(s,3,18000);m.addExtraNew(s,2);m.reconcileFlashSession({...s,newToday:10});assert.equal(JSON.stringify(s),before);});
+check('objective responses survive reload and undo without rating automatically',()=>{let s=session(fresh({due:['choice']}));s={...s,session:{...s.session,responses:{choice:{choice:0,typed:''}}}};assert.equal(s.reviewed,0);const before=reveal(s);const loaded=m.loadFlashState(JSON.stringify(before),now);assert.equal(loaded.session.responses.choice.choice,0);const rated=m.applyFlashRating(loaded,3);assert.equal(rated.reviewed,1);assert.equal(m.restoreFlashRating(rated,before).session.responses.choice.choice,0);});
+check('imported drafts are deduplicated and retain fixed prototype identity',()=>{const s=m.moveDraft(fresh(),'draft-reading');s.acceptedCards=[{...s.acceptedCards[0],isNew:false,source:'untrusted identity'},s.acceptedCards[0]];const loaded=m.loadFlashState(JSON.stringify(s),now);assert.equal(loaded.acceptedCards.length,1);assert.equal(loaded.acceptedCards[0].isNew,true);assert.equal(loaded.acceptedCards[0].source,'收件箱 · 阅读摘录示例');});
+check('scenario selector identity survives generation and reload',()=>{for(const name of Object.keys(m.scenarios)){const s=m.makeScenario(name,'2026-11-08');assert.equal(s.scenario,name);assert.equal(m.loadFlashState(JSON.stringify(s),now).scenario,name);}});
+check('legacy four-card progress admits added examples without marking them studied',()=>{const old={date:'2026-11-08',due:['hub'],studied:['knowledge'],reviewed:1,newToday:0,dailyLimit:10,sessionLimit:20};const s=m.loadFlashState(JSON.stringify(old),now);assert.ok(!s.due.includes('knowledge'));assert.ok(s.due.includes('choice'));assert.equal(m.getFlashCardStatus(demoCards.find(c=>c.id==='choice'),s),'due');assert.equal(s.reviewed,1);assert.deepEqual(m.loadFlashState(JSON.stringify({...fresh(),schemaVersion:999}),now),fresh());});
+check('empty and sparse histories remain empty after reload',()=>{for(const name of ['empty','sparse']){const s=m.makeScenario(name,'2026-11-08'),loaded=m.loadFlashState(JSON.stringify(s),now);assert.equal(m.studyStreak(loaded).days,0);assert.equal(m.estimateMinutes(loaded,12),null);assert.deepEqual(loaded.activity,{});}});
+console.log(`Passed ${checks} flashcard state checks.`);

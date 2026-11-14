@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "e7c931a452f88f75cf28c7206a2525e1c9a703b2",
-  "published_version": 98,
-  "deployment_id": "appgdep_6af8c14c74188191a1b9e35c78c00ca9",
+  "source_commit": "c3d6468ae85fff412f2b048254c04c9ec7587726",
+  "published_version": 100,
+  "deployment_id": "appgdep_6af8d91a83f48191a2ae3b708b2f4adc",
   "files": {
     ".gitignore": {
       "sha256": "5ca3c39bdc1288c108a1931b3f6bc5795464b6253e9457390617774259deed0c",
@@ -97,10 +97,15 @@
       "mode": "100644",
       "bytes": 2318
     },
-    "app/FlashcardsSite.tsx": {
-      "sha256": "9c3f605a3c51523958a0a394222ffef6369afe98ad2312dcbc831146686d8098",
+    "app/FlashcardPrototypeExtras.tsx": {
+      "sha256": "f08b3895d585224b3e10254970afa8ff601aa14a6e95f8e612b7cdbe7f2a9d6e",
       "mode": "100644",
-      "bytes": 33207
+      "bytes": 5116
+    },
+    "app/FlashcardsSite.tsx": {
+      "sha256": "4ef0c5eb3016ff7b30eb77e7582f206f849dea31364a56c05e5b061e79b97a11",
+      "mode": "100644",
+      "bytes": 40354
     },
     "app/InsightDiscovery.tsx": {
       "sha256": "581dcf2d9cce64515d93848db655af6df1a37d3bedc060113fe511afb29c0497",
@@ -243,9 +248,14 @@
       "bytes": 31996
     },
     "app/flashcard-demo.ts": {
-      "sha256": "f3d2586570ec2ab543f200eed174270ab026c6668a5602f8105987207cd218ec",
+      "sha256": "c258092e52d0fbd423dd2daf791ff74921b049b365f7e1ca1d787dc32d101b25",
       "mode": "100644",
-      "bytes": 1757
+      "bytes": 4334
+    },
+    "app/flashcard-experience.css": {
+      "sha256": "34515274c39338b8bff1cc761d621199cc167a7da3103847ef2cdb74c4c6afe0",
+      "mode": "100644",
+      "bytes": 4230
     },
     "app/flashcard-local.css": {
       "sha256": "721476acb2ef990b5f7bad76394e0e14e30d8714f017bd3628f2a6bca1837736",
@@ -253,9 +263,9 @@
       "bytes": 17924
     },
     "app/flashcard-state.ts": {
-      "sha256": "11bb382d48610c1b3ac9668e7ec0afed14ea29c54c5bd4d434af65dc86b4bff2",
+      "sha256": "9117f71ceb6cb40a0fa72fa0788dfed5449272fa2e70eae2c926afca76b21a64",
       "mode": "100644",
-      "bytes": 7456
+      "bytes": 14508
     },
     "app/flashcard-today.css": {
       "sha256": "0f2ccb0cc2908886c672b29b4735ca43558140e43d7b6445ec73f0b3e023a5d5",
@@ -862,10 +872,15 @@
       "mode": "100644",
       "bytes": 73172
     },
-    "docs/flashcards-local-alignment.md": {
-      "sha256": "e98aebc6d618385f6040e7a9d37045a04f42e091f3ccbb5ac44b8ff061eeb3dc",
+    "docs/flashcards-experience.md": {
+      "sha256": "5a81223b2909f4dbd053de17dc8295b2bad02bee8da85a42dbae0b9683ceb0a4",
       "mode": "100644",
-      "bytes": 1832
+      "bytes": 4157
+    },
+    "docs/flashcards-local-alignment.md": {
+      "sha256": "66c78bac3c7d265fad6edbcb013cde3577eebbefa66a64abd47ddc944009e742",
+      "mode": "100644",
+      "bytes": 2047
     },
     "docs/insights-dependency-confirmation.md": {
       "sha256": "11dcb57069925bca0be5c85813b9ea08ac3c5da59ac061635e9c0b6e3658fdee",
@@ -1098,14 +1113,14 @@
       "bytes": 624
     },
     "scripts/flashcard-check.mjs": {
-      "sha256": "a3c2e41ea66e036ef151c5042a023d98940e499cbdac2dca44d4678da427d300",
+      "sha256": "6b118a389fc72c14cb4b9e77373c1c403bec9396b05da76c0900472e2392ac00",
       "mode": "100644",
-      "bytes": 1289
+      "bytes": 1328
     },
     "scripts/flashcard-state-check.mjs": {
-      "sha256": "8680d6bfc7f18a21be262aeed4018864867e813eef203b48ef4e3a81daffd2be",
+      "sha256": "0dce681bc9baaa6e160770e292033d03d3e07506b2012067255c7a0a42995282",
       "mode": "100644",
-      "bytes": 10080
+      "bytes": 12236
     },
     "scripts/insight-demo-check.ts": {
       "sha256": "f2bf5bb0c0a938520dc8341fa24dfb263d761764b12b4324d206031716ae88fc",
@@ -1238,5 +1253,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-14T20:25:43.186441+00:00"
+  "imported_at": "2026-11-14T21:58:13.538533+00:00"
 }
