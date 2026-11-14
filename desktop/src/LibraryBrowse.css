@@ -330,7 +330,7 @@ html:not([data-runtime-platform="android"]) .unified-shell.mode-standard.module-
   .library-browser-list { flex-basis: 208px; padding-inline: 8px; }
   .library-browser-column-mode .library-browser-reader { flex-basis: 245px; }
 }
-@container library-workspace (max-width: 710px) {
+@container library-workspace (max-width: 960px) {
   .library-browser-title :is(svg, span) { display: none; }
   .library-browser-list { flex: 1; }
   .library-browser-body:not(.library-browser-reading) .library-browser-reader,
