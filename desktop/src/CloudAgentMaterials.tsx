@@ -4,14 +4,35 @@ import type {MaterialSnapshot} from './CloudAgentMedia';
 import {localJournalDate} from './JournalViews';
 import {useModalFocus} from './useModalFocus';
 import {QUICK_JOURNAL_UPDATED} from './QuickJournalEvents';
+import {runtimeCapabilities} from './RuntimePlatform';
 
 const call=<T,>(op:string,fields:Record<string,unknown>={})=>invoke<T>('cloud_agents',{action:{op,...fields}});
 type Key={kind:string;id:string;libraryId:string|null};
 type Candidate={key:Key;title:string;source:string;chars:number;preview:string};
-function Dialog({title,onClose,children}:{title:string;onClose:()=>void;children:React.ReactNode}){
+function Dialog({title,onClose,children,busy=false}:{title:string;onClose:()=>void;children:React.ReactNode;busy?:boolean}){
  const ref=useRef<HTMLElement>(null);
+ const dismiss=useRef(onClose),locked=useRef(busy);dismiss.current=onClose;locked.current=busy;
+ const mounted=useRef(false),entry=useRef<{id:string;parent:Record<string,unknown>|null}|null>(null);
+ useEffect(()=>{
+  if(!runtimeCapabilities.mobile)return;
+  mounted.current=true;
+  const {id,parent}=entry.current??(entry.current={id:crypto.randomUUID(),parent:window.history.state});
+  const push=()=>window.history.pushState({...parent,hubCloudDialog:id},'');
+  if(window.history.state?.hubCloudDialog!==id)push();
+  const back=(event:PopStateEvent)=>{
+   if(event.state?.hubCloudDialog===id)return;
+   if(event.state?.hubMobileRoute===parent?.hubMobileRoute&&event.state?.hubCloudAgentChat===parent?.hubCloudAgentChat)event.stopImmediatePropagation();
+   if(locked.current)push();else dismiss.current();
+  };
+  window.addEventListener('popstate',back,true);
+  return()=>{
+   window.removeEventListener('popstate',back,true);mounted.current=false;
+   // StrictMode replays effects before this microtask; only a real unmount releases the entry.
+   queueMicrotask(()=>{if(!mounted.current&&window.history.state?.hubCloudDialog===id)window.history.back();});
+  };
+ },[]);
  useModalFocus({active:true,containerRef:ref,onDismiss:onClose});
- return <section className="cloud-agents-dialog" role="dialog" aria-modal="true" aria-label={title} ref={ref} tabIndex={-1}><header><h2>{title}</h2><button type="button" onClick={onClose}>关闭</button></header>{children}</section>;
+ return <section className="cloud-agents-sheet" role="dialog" aria-modal="true" aria-label={title} ref={ref} tabIndex={-1}><header><h2>{title}</h2><button type="button" onClick={onClose} disabled={busy}>关闭</button></header>{children}</section>;
 }
 export function CloudMaterialPicker({onClose,onConfirm}:{onClose:()=>void;onConfirm:(value:MaterialSnapshot)=>void}){
  const [kind,setKind]=useState('document'),[query,setQuery]=useState(''),[offset,setOffset]=useState(0),[rows,setRows]=useState<Candidate[]>([]),[more,setMore]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[preview,setPreview]=useState<MaterialSnapshot>();
@@ -38,7 +59,7 @@ export function CloudAnswerNote({thread,turn}:{thread:string;turn:string}){
  async function preview(){const ticket=++epoch.current;setBusy(true);setError('');try{const value=await call<{record:JournalRecord}>('answerNote',{thread,turn,date});const saved=await readReceipt(value.record);if(epoch.current===ticket){setRecord(value.record);setReceipt(saved);}}catch(e){if(epoch.current===ticket)setError(String(e));}finally{if(epoch.current===ticket)setBusy(false);}}
  async function save(){if(!record)return;setBusy(true);setError('');try{const result=await invoke<{warning:string|null}>('capture_quick_journal',{record});window.dispatchEvent(new CustomEvent(QUICK_JOURNAL_UPDATED));setReceipt({uploaded:false,applied:false});if(result.warning)setError(result.warning);const saved=await readReceipt(record);if(saved)setReceipt(saved);}catch(e){setError(String(e));}finally{setBusy(false);}}
  async function sync(){setBusy(true);setError('');try{await invoke('sync_quick_journal');if(record){const saved=await readReceipt(record);if(saved)setReceipt(saved);else setError('没有找到本机回执，请到速记中核对。');}}catch(e){setError(String(e));}finally{setBusy(false);}}
- return <><button type="button" onClick={()=>setOpen(true)}>保存为速记</button>{open&&<Dialog title="保存回答为速记" onClose={()=>{if(!busy)setOpen(false);}}>
+ return <><button type="button" onClick={()=>setOpen(true)}>保存为速记</button>{open&&<Dialog title="保存回答为速记" busy={busy} onClose={()=>{if(!busy)setOpen(false);}}>
   {error&&<p role="alert">{error}</p>}
   {!record?<><label>保存日期<input type="date" aria-label="速记日期" value={date} disabled={busy} onChange={e=>setDate(e.target.value)}/></label><p>先预览本条完整回答，再确认保存；不会修改原会话或资料。</p><button type="button" disabled={busy||!date} onClick={()=>void preview()}>预览保存</button></>:<><p>{record.date}</p><pre>{record.text}</pre>{receipt?<><p role="status">{receipt.applied?'OS 已确认写入':receipt.uploaded?'已上传云端 · 等待 OS 回执':'已存本机 · 尚未确认上传云端'}</p>{receipt.sourceError&&<p role="alert">{receipt.sourceError}</p>}<button type="button" disabled={busy} onClick={()=>void sync()}>同步并核对回执</button></>:<><p>确认后进入现有速记与 OS 归档流程。重复保存本条回答使用相同记录身份。</p><button type="button" disabled={busy} onClick={()=>void save()}>确认保存速记</button></>}</>}
  </Dialog>}</>;
