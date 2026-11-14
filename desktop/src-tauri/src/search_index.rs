@@ -853,6 +853,68 @@ impl SearchIndex {
         include_attachments: bool,
         field_scope: &str,
     ) -> Result<Vec<SearchHit>, String> {
+        self.search_scoped(
+            query_text,
+            limit,
+            space_ids,
+            folder_ids,
+            document_ids,
+            item_ids,
+            updated_after,
+            include_craft_pages,
+            include_image_ocr,
+            include_pdf,
+            include_pdf_ocr,
+            include_attachments,
+            field_scope,
+            false,
+        )
+    }
+
+    pub(crate) fn search_pdf_pages(
+        &self,
+        query: &str,
+        item_ids: &[String],
+        limit: usize,
+    ) -> Result<Vec<SearchHit>, String> {
+        if query.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+        self.search_scoped(
+            query,
+            limit,
+            None,
+            None,
+            None,
+            Some(item_ids),
+            None,
+            false,
+            false,
+            true,
+            true,
+            false,
+            "all",
+            true,
+        )
+    }
+
+    fn search_scoped(
+        &self,
+        query_text: &str,
+        limit: usize,
+        space_ids: Option<&[String]>,
+        folder_ids: Option<&[String]>,
+        document_ids: Option<&[String]>,
+        item_ids: Option<&[String]>,
+        updated_after: Option<i64>,
+        include_craft_pages: bool,
+        include_image_ocr: bool,
+        include_pdf: bool,
+        include_pdf_ocr: bool,
+        include_attachments: bool,
+        field_scope: &str,
+        pdf_pages: bool,
+    ) -> Result<Vec<SearchHit>, String> {
         if !include_craft_pages && !include_image_ocr && !include_pdf && !include_attachments {
             return Ok(Vec::new());
         }
@@ -869,18 +931,22 @@ impl SearchIndex {
             "tag" => "tag",
             _ => "all",
         };
-        let default_fields = match field_scope {
-            "title" => vec![self.fields.title],
-            "title_heading" => vec![self.fields.title, self.fields.heading],
-            "tag" => vec![self.fields.tags],
-            _ => vec![
-                self.fields.title,
-                self.fields.heading,
-                self.fields.aliases,
-                self.fields.tags,
-                self.fields.body,
-                self.fields.source_title,
-            ],
+        let default_fields = if pdf_pages {
+            vec![self.fields.body]
+        } else {
+            match field_scope {
+                "title" => vec![self.fields.title],
+                "title_heading" => vec![self.fields.title, self.fields.heading],
+                "tag" => vec![self.fields.tags],
+                _ => vec![
+                    self.fields.title,
+                    self.fields.heading,
+                    self.fields.aliases,
+                    self.fields.tags,
+                    self.fields.body,
+                    self.fields.source_title,
+                ],
+            }
         };
         let mut parser = QueryParser::for_index(&self.index, default_fields);
         parser.set_field_boost(self.fields.title, 8.0);
@@ -907,6 +973,42 @@ impl SearchIndex {
             .parse_query(parser_query)
             .or_else(|_| parser.parse_query(&format!("\"{escaped_query}\"")))
             .map_err(|error| format!("无法解析搜索关键词：{error}"))?;
+        if pdf_pages {
+            // Field-qualified metadata searches do not establish page-body hits.
+            let mut quoted = false;
+            let mut escaped = false;
+            let mut token = String::new();
+            for c in query_text.chars() {
+                if escaped {
+                    escaped = false;
+                    continue;
+                }
+                if c == '\\' {
+                    escaped = true;
+                    continue;
+                }
+                if c == '"' {
+                    quoted = !quoted;
+                    token.clear();
+                    continue;
+                }
+                if !quoted && c == ':' && token != "body" {
+                    return Err("当前查询包含非正文条件，请使用 PDF 正文关键词检索".into());
+                }
+                if c.is_alphanumeric() || c == '_' {
+                    token.push(c);
+                } else {
+                    token.clear();
+                }
+            }
+            let mut non_body = false;
+            exact_query.query_terms(&mut |term, _| {
+                non_body |= term.field() != self.fields.body;
+            });
+            if non_body {
+                return Err("当前查询不是 PDF 正文检索".into());
+            }
+        }
         let phrase_query = (!query_is_empty)
             .then(|| {
                 explicit_path_query
@@ -920,7 +1022,7 @@ impl SearchIndex {
         if let Some(phrase_query) = phrase_query {
             recall_clauses.push((Occur::Should, Box::new(BoostQuery::new(phrase_query, 7.0))));
         }
-        if intent.single_term {
+        if intent.single_term && !pdf_pages {
             if let Some(compact) = intent.compact_ascii.as_deref() {
                 if compact.len() >= 3 {
                     let distance = if compact.len() >= 7 { 2 } else { 1 };
@@ -1091,7 +1193,7 @@ impl SearchIndex {
                     .map_err(|error| format!("无法读取 Tantivy 结果：{error}"))?;
                 let space_id = stored_text(&document, self.fields.space_id);
                 let document_id = stored_text(&document, self.fields.document_id);
-                let entity_key = stored_text(&document, self.fields.entity_key);
+                let mut entity_key = stored_text(&document, self.fields.entity_key);
                 let folder = stored_text(&document, self.fields.folder_id);
                 let provider = stored_text(&document, self.fields.provider);
                 let content_type = stored_text(&document, self.fields.content_type);
@@ -1123,6 +1225,18 @@ impl SearchIndex {
                         &path,
                     ),
                 };
+                if pdf_pages {
+                    let page = document
+                        .get_first(self.fields.page_number)
+                        .and_then(|v| v.as_i64())
+                        .filter(|p| *p > 0);
+                    if !matches!(content_type.as_str(), "pdf_page" | "pdf_ocr") || page.is_none() {
+                        continue;
+                    }
+                    entity_key = format!("pdf-page:{}:{}", source_item_id, page.unwrap());
+                    (match_terms, match_field, evidence_bonus) =
+                        match_evidence(&intent, "", "", "", "", "", &body, "");
+                }
                 let path_only_match = match_field
                     .split(',')
                     .map(str::trim)
@@ -1286,6 +1400,83 @@ fn stored_text(document: &TantivyDocument, field: Field) -> String {
 mod tests {
     use super::*;
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn pdf_page_search_keeps_all_original_pages_and_excludes_metadata_matches() {
+        let path =
+            std::env::temp_dir().join(format!("hub-pdf-pages-{}", crate::random_url_safe(10)));
+        let index = SearchIndex::open(&path).unwrap();
+        let mut records = Vec::new();
+        for page in 1..=8 {
+            for chunk in 0..3 {
+                let mut value =
+                    record(&format!("pdf-{page}-{chunk}"), "attachment:one", "pdf_page");
+                value.source_item_id = "one".into();
+                value.page_number = page;
+                value.source_title = "filenameonly.pdf".into();
+                value.body = "signalneedle current".into();
+                records.push(value);
+            }
+        }
+        let mut other = records[0].clone();
+        other.item_id = "other-pdf".into();
+        other.source_item_id = "other".into();
+        other.entity_key = "attachment:other".into();
+        let ids = records
+            .iter()
+            .map(|r| r.item_id.clone())
+            .collect::<Vec<_>>();
+        records.push(other);
+        index.apply_changes(&[], &records).unwrap();
+        let hits = index.search_pdf_pages("signalneedle", &ids, 100).unwrap();
+        assert_eq!(hits.len(), 8);
+        assert_eq!(
+            hits.iter()
+                .filter_map(|h| h.page_number)
+                .collect::<std::collections::BTreeSet<_>>(),
+            (1..=8).collect()
+        );
+        assert!(hits.iter().all(|h| h.source_item_id == "one"));
+        assert_eq!(
+            index
+                .search_pdf_pages("body:signalneedle", &ids, 100)
+                .unwrap()
+                .len(),
+            8
+        );
+        assert!(index
+            .search_pdf_pages("filenameonly", &ids, 100)
+            .unwrap()
+            .is_empty());
+        assert!(index
+            .search_pdf_pages("title:filenameonly", &ids, 100)
+            .is_err());
+        assert!(index.search_pdf_pages("title:*", &ids, 100).is_err());
+        assert!(index
+            .search_pdf_pages("signalneedle", &[], 100)
+            .unwrap()
+            .is_empty());
+        let global = index
+            .search(
+                "signalneedle",
+                100,
+                None,
+                None,
+                None,
+                false,
+                false,
+                true,
+                true,
+            )
+            .unwrap();
+        assert_eq!(
+            global.len(),
+            2,
+            "the default global search still groups each PDF as one result"
+        );
+        drop(index);
+        std::fs::remove_dir_all(path).unwrap();
+    }
 
     #[test]
     fn exact_page_chunks_are_filtered_before_the_result_limit() {

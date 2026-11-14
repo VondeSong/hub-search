@@ -83,5 +83,6 @@ export type PdfPagePreview = {
   pageNumber: number;
   pageCount: number;
   sourceType: "pdf_native" | "pdf_ocr";
+  textStatus?: "indexed" | "empty" | "not_extracted" | "failed" | "stale";
   note?: string;
 };

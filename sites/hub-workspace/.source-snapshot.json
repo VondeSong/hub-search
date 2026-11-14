@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "5bb4c62604d0197c7fd626270f83d73405b67a52",
-  "published_version": 97,
-  "deployment_id": "appgdep_6af8b5df5500819187c4264ef0cf372d",
+  "source_commit": "e7c931a452f88f75cf28c7206a2525e1c9a703b2",
+  "published_version": 98,
+  "deployment_id": "appgdep_6af8c14c74188191a1b9e35c78c00ca9",
   "files": {
     ".gitignore": {
       "sha256": "5ca3c39bdc1288c108a1931b3f6bc5795464b6253e9457390617774259deed0c",
@@ -138,9 +138,14 @@
       "bytes": 25893
     },
     "app/LibraryBrowser.tsx": {
-      "sha256": "e699a78095577ccf21063309e25ebc05eeb05d9ca67f9c8cce3106aeee5d2667",
+      "sha256": "f00538db810752dfc4cbc0c7442500d3c80d58aeffbf00588c1c730c14394672",
       "mode": "100644",
-      "bytes": 35869
+      "bytes": 35788
+    },
+    "app/PdfPreviewDemo.tsx": {
+      "sha256": "44fc9e80c23290bd1303faf5f73ca3d56f8769c784f66291d05a3d6670870f98",
+      "mode": "100644",
+      "bytes": 5909
     },
     "app/PreviewTheme.tsx": {
       "sha256": "bac617a8f1f00ad0f41e3405d4944f958967bd3e3aef4bd9f2d52cef8deab3af",
@@ -396,6 +401,16 @@
       "sha256": "cba693b97080019d763ab2c9a9e90eb672261ea2e8569e9529a2908b13883968",
       "mode": "100644",
       "bytes": 74038
+    },
+    "app/pdf-preview-model.ts": {
+      "sha256": "e1f72df40daff0d29d0c63cd3552edbfc47d851a2a5d0bbe3184e0371f178970",
+      "mode": "100644",
+      "bytes": 1198
+    },
+    "app/pdf-preview.css": {
+      "sha256": "e0ea5428976be62cf576990b284c50c90a7dfa0042be09539078f70a5d717e84",
+      "mode": "100644",
+      "bytes": 2054
     },
     "app/preview-theme.css": {
       "sha256": "ec63207ec95cba72d4c3e49f266d0f007bbf7692ca5c6d83266c0e3be694b215",
@@ -1223,5 +1238,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-14T19:27:28.160601+00:00"
+  "imported_at": "2026-11-14T20:25:43.186441+00:00"
 }

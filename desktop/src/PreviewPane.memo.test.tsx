@@ -88,9 +88,9 @@ describe("PreviewPane memoization", () => {
     expect(container.querySelector('.preview-actions > button[aria-label="固定预览"]')).not.toBeNull();
     expect(container.querySelector(".preview-more-menu")).toBeNull();
 
-    await act(async () => root.render(<PreviewPane {...props} previewMatchCount={2} pdfPreview={{ text: "PDF", pageNumber: 1, pageCount: 2, sourceType: "pdf_native" }} />));
-    expect(container.querySelector(".preview-more-menu")?.textContent).toContain("下一页");
-    expect(container.querySelector(".preview-more-menu")?.textContent).not.toContain("上一个命中");
+    await act(async () => root.render(<PreviewPane {...props} selected={{...props.selected!,contentType:"pdf_page"}} previewMatchCount={2} pdfPreview={{ text: "PDF", pageNumber: 1, pageCount: 2, sourceType: "pdf_native" }} />));
+    expect(container.querySelector('.pdf-controls button[aria-label="下一页"]')).not.toBeNull();
+    expect(container.querySelector(".pdf-controls")?.textContent).not.toContain("上一个命中");
     expect(container.querySelector<HTMLButtonElement>(".preview-open-action")?.disabled).toBe(false);
     const desktopOpen = vi.fn();
     await act(async () => root.render(<PreviewPane {...props} openSelectedResult={desktopOpen} />));

@@ -20,6 +20,8 @@ import { SharedTaskPreviewStatus } from "./SharedTaskPreviewStatus";
 import { isTaskPreviewResult } from "./TaskResultIdentity";
 import type { SearchProvider } from "./ProviderLabels";
 import { runtimeCapabilities } from "./RuntimePlatform";
+import { PdfPreviewPanel } from "./PdfPreviewPanel";
+import { isPdfContent } from "./PdfPreviewModel";
 import { HighlightedText } from "./SearchPresentation";
 import { resultDisplayTitle, resultSectionLabel } from "./SearchResultPresentation";
 import type {
@@ -51,6 +53,8 @@ export type PreviewPaneProps = {
   copiedResultId: string;
   spaces: LibrarySummary[];
   pdfPreview: PdfPagePreview | null;
+  pdfPreviewPage?: number;
+  pdfQuery?: string;
   ocrImagePreview: OcrImagePreview | null;
   previewLoading: boolean;
   previewMarkdown?: string | null;
@@ -89,6 +93,8 @@ export const PreviewPane = memo(function PreviewPane({
   copiedResultId,
   spaces,
   pdfPreview,
+  pdfPreviewPage,
+  pdfQuery = "",
   ocrImagePreview,
   previewLoading,
   previewMarkdown,
@@ -141,10 +147,10 @@ export const PreviewPane = memo(function PreviewPane({
         <>
             <PreviewHeading provider={selected.provider} source={<>
                   <span className={`provider-badge ${selected.provider}`}>{providerName(selected.provider)}</span>
-                  <span className="preview-path">{selected.spaceName} / {selected.path}{selected.sourceTitle && <span> / {selected.sourceTitle}</span>}{selected.pageNumber && <span> / 第 {selected.pageNumber} 页</span>}</span>
+                  <span className="preview-path">{selected.spaceName} / {selected.path}{selected.sourceTitle && <span> / {selected.sourceTitle}</span>}{(isPdfContent(selected.contentType)?pdfPreviewPage??pdfPreview?.pageNumber??selected.pageNumber:selected.pageNumber) && <span> / 第 {isPdfContent(selected.contentType)?pdfPreviewPage??pdfPreview?.pageNumber??selected.pageNumber:selected.pageNumber} 页</span>}</span>
             </>} actions={<PreviewToolbar
               copied={copiedResultId === selected.id} onCopy={copySelectedLink}
-              copyTitle={selected.provider==="hub"?"复制内容":undefined}
+              copyTitle={isPdfContent(selected.contentType)?"复制本机 PDF 当前页链接":selected.provider==="hub"?"复制内容":undefined}
               onClose={onClose}
               openTitle={selected.provider==="hub"?`在${selected.contentType==="reading"?"阅读":"闪卡"}中打开`:runtimeCapabilities.platform === "android" && selected.provider === "craft" ? "在浏览器中打开 Craft" : `在 ${providerName(selected.provider)} 中打开`}
               openDisabled={!canOpenSource} onOpen={() => openSelectedResult(selected, "preview")}
@@ -160,7 +166,7 @@ export const PreviewPane = memo(function PreviewPane({
                   {onTogglePreviewPinned && <button className={`preview-pin ${previewPinned ? "active" : ""}`} title={previewPinned ? "解除固定预览" : "固定预览"} aria-label={previewPinned ? "解除固定预览" : "固定预览"} aria-pressed={previewPinned} onClick={onTogglePreviewPinned}>{previewPinned ? <PinOff size={16} /> : <Pin size={16} />}</button>}
                   {toolbarActions}
                   {runtimeCapabilities.desktop && selected.provider !== "hub" && <Suspense fallback={null}><LazyAgentInvestigation result={selected} compact onPreviewCitation={showCitation} /></Suspense>}
-                  {(journalDate || pdfPreview) && <details className="preview-more-menu" onKeyDown={(event) => {
+                  {journalDate && <details className="preview-more-menu" onKeyDown={(event) => {
                     if (event.key === "Escape") {
                       event.stopPropagation();
                       event.currentTarget.open = false;
@@ -173,10 +179,7 @@ export const PreviewPane = memo(function PreviewPane({
                         <button disabled={!canNavigateJournalOlder} onClick={() => onNavigateJournalDate?.(1)}><ChevronLeft size={16} /><span>较早的日志</span></button>
                         <button disabled={!canNavigateJournalNewer} onClick={() => onNavigateJournalDate?.(-1)}><ChevronRight size={16} /><span>较新的日志</span><small>{journalDate}</small></button>
                       </>}
-                      {pdfPreview && <>
-                        <button disabled={pdfPreview.pageNumber <= 1} onClick={() => setPdfPreviewPage((page) => Math.max(1, page - 1))}><ChevronLeft size={16} /><span>上一页</span></button>
-                        <button disabled={pdfPreview.pageNumber >= pdfPreview.pageCount} onClick={() => setPdfPreviewPage((page) => Math.min(pdfPreview.pageCount, page + 1))}><ChevronRight size={16} /><span>下一页</span><small>{pdfPreview.pageNumber}/{pdfPreview.pageCount}</small></button>
-                      </>}
+
                     </div>
                   </details>}
             </PreviewToolbar>}>
@@ -202,7 +205,7 @@ export const PreviewPane = memo(function PreviewPane({
               {citation && <AgentCitationPreview value={{...citation,onReturn:()=>{showCitation(null);citation.onReturn();}}}/> }
               <div hidden={!!citation}>
               {contentBefore}
-              {previewLoading ? (
+              {isPdfContent(selected.contentType) ? <PdfPreviewPanel key={selected.sourceItemId ?? selected.id} selected={selected} query={pdfQuery} page={pdfPreviewPage ?? pdfPreview?.pageNumber ?? selected.pageNumber ?? 1} preview={pdfPreview} loading={previewLoading} error={previewMarkdown} terms={selectedMatchTerms} onPageChange={setPdfPreviewPage}/> : previewLoading ? (
                 <div className="preview-loading"><LoaderCircle className="spin" />正在加载预览…</div>
               ) : ocrImagePreview ? (
                 <div className="ocr-image-preview">
@@ -211,28 +214,15 @@ export const PreviewPane = memo(function PreviewPane({
                   <h2>识别文字</h2>
                   <div className="ocr-text"><HighlightedText text={ocrImagePreview.ocrText} terms={selectedMatchTerms} navigable /></div>
                 </div>
-              ) : pdfPreview ? (
-                <div className="pdf-page-preview">
-                  {pdfPreview.imageDataUrl && <img src={pdfPreview.imageDataUrl} alt={`${selected.sourceTitle ?? selected.title} 第 ${pdfPreview.pageNumber} 页`} />}
-                  {pdfPreview.note && <p className="preview-note">{pdfPreview.note}</p>}
-                  <h2>{pdfPreview.sourceType === "pdf_ocr" ? "OCR 识别文字" : "PDF 原生文字"}</h2>
-                  <div className="ocr-text"><HighlightedText text={pdfPreview.text || "本页没有提取到文字。"} terms={selectedMatchTerms} navigable /></div>
-                </div>
               ) : renderedPreviewMarkdown ?? (
                 <div className="preview-unavailable"><strong>暂无本地预览</strong><p>可在来源应用中查看完整内容。</p><button disabled={!canOpenSource} onClick={() => openSelectedResult(selected, "preview")}>在 {providerName(selected.provider)} 中打开 <ArrowUpRight size={15} /></button></div>
               )}
               </div>
             </div>
-            {!citation && (pdfPreview || previewMatchCount > 0) && <nav className="mobile-preview-navigation" aria-label={pdfPreview ? "PDF 翻页" : "搜索命中导航"}>
-              {pdfPreview ? <>
-                <button type="button" disabled={pdfPreview.pageNumber <= 1} onClick={() => setPdfPreviewPage((page) => Math.max(1, page - 1))}><ChevronLeft size={18} />上一页</button>
-                <span>第 {pdfPreview.pageNumber} / {pdfPreview.pageCount} 页</span>
-                <button type="button" disabled={pdfPreview.pageNumber >= pdfPreview.pageCount} onClick={() => setPdfPreviewPage((page) => Math.min(pdfPreview.pageCount, page + 1))}>下一页<ChevronRight size={18} /></button>
-              </> : <>
+            {!citation && !isPdfContent(selected.contentType) && previewMatchCount > 0 && <nav className="mobile-preview-navigation" aria-label="搜索命中导航">
                 <button type="button" onClick={() => navigatePreviewMatch(-1)}><ChevronUp size={18} />上一处</button>
                 <span>{Math.max(0, previewMatchIndex + 1)} / {previewMatchCount}</span>
                 <button type="button" onClick={() => navigatePreviewMatch(1)}>下一处<ChevronDown size={18} /></button>
-              </>}
             </nav>}
             {!citation && showScrollTop && <button type="button" className="preview-scroll-top" aria-label="回到预览顶部" title="回到顶部" onClick={() => {
               const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;

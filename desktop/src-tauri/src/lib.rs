@@ -56,6 +56,7 @@ mod flashcard_object_store;
 mod flashcard_profiles;
 mod http_body;
 mod partial_download;
+mod pdf_preview;
 mod upload_intents;
 use flashcard_models::{
     Flashcard, FlashcardDraft, FlashcardReviewResult, FlashcardSnapshotCard,
@@ -981,6 +982,7 @@ struct PdfPagePreview {
     page_number: u32,
     page_count: u32,
     source_type: String,
+    text_status: String,
     note: Option<String>,
 }
 
@@ -32744,57 +32746,14 @@ fn pdf_page_preview_from_database(
     requested_page: u32,
 ) -> Result<PdfPagePreview, String> {
     let connection = open_database(path)?;
-    let (source_item_id, blob_hash): (String, String) = connection
-        .query_row(
-            "SELECT s.id,s.blob_hash
-             FROM content_items hit
-             JOIN source_items s ON s.id=hit.source_item_id
-             WHERE hit.id=?1 AND hit.content_type IN ('pdf_page','pdf_ocr')
-               AND s.mime_type='application/pdf' AND s.blob_hash IS NOT NULL",
-            params![result_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .map_err(|error| format!("无法读取 PDF 预览来源：{error}"))?;
-    let page_count: i64 = connection
-        .query_row(
-            "SELECT MAX(
-               COALESCE((SELECT MAX(page_count) FROM extractions WHERE source_item_id=?1),0),
-               COALESCE((SELECT MAX(page_number) FROM content_items WHERE source_item_id=?1),1)
-             )",
-            params![source_item_id],
-            |row| row.get(0),
-        )
-        .map_err(|error| format!("无法读取 PDF 预览页数：{error}"))?;
-    let page_count = u32::try_from(page_count.max(1)).unwrap_or(u32::MAX);
-    let page_number = requested_page.clamp(1, page_count);
-    let (chunks, source_type) = {
-        let mut statement = connection
-            .prepare(
-                "SELECT body,content_type FROM content_items
-                 WHERE source_item_id=?1 AND page_number=?2
-                   AND content_type IN ('pdf_page','pdf_ocr')
-                 ORDER BY ordinal,id",
-            )
-            .map_err(|error| format!("无法准备 PDF 页面文字预览：{error}"))?;
-        let rows = statement
-            .query_map(params![source_item_id, page_number], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-            })
-            .map_err(|error| format!("无法查询 PDF 页面文字预览：{error}"))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|error| format!("无法读取 PDF 页面文字预览：{error}"))?;
-        let source_type = if rows.iter().any(|(_, kind)| kind == "pdf_ocr") {
-            "pdf_ocr"
-        } else {
-            "pdf_native"
-        };
-        (
-            rows.into_iter().map(|(body, _)| body).collect::<Vec<_>>(),
-            source_type.to_string(),
-        )
-    };
+    let source = pdf_preview::source_on(&connection, blob_store, result_id)?;
+    let page_count = source.page_count;
+    let page_number = pdf_preview::validate_page(requested_page, page_count)?;
+    let (text, source_type, text_status) =
+        pdf_preview::page_text_on(&connection, &source, page_number)?;
+    let blob_hash = source.hash;
     let rendered = ocr::render_pdf_page_png(&blob_store.path_for(&blob_hash)?, page_number, 1_600);
-    let (image_data_url, note) = match rendered {
+    let (image_data_url, render_note) = match rendered {
         Ok(bytes) => (
             Some(format!(
                 "data:image/png;base64,{}",
@@ -32802,11 +32761,28 @@ fn pdf_page_preview_from_database(
             )),
             None,
         ),
-        Err(error) => (None, Some(format!("{error}；已显示提取文字。"))),
+        Err(error) => (
+            None,
+            Some(format!(
+                "{error}；{}",
+                if text.trim().is_empty() {
+                    "暂无可用的本页提取文字。"
+                } else {
+                    "可继续查看本页提取文字。"
+                }
+            )),
+        ),
     };
+    let notes = source
+        .page_count_note
+        .into_iter()
+        .chain(render_note)
+        .collect::<Vec<_>>();
+    let note = (!notes.is_empty()).then(|| notes.join("\n"));
     Ok(PdfPagePreview {
         image_data_url,
-        text: merge_preview_chunks(&chunks),
+        text,
+        text_status,
         page_number,
         page_count,
         source_type,
@@ -32828,6 +32804,50 @@ async fn local_pdf_page_preview(
     })
     .await
     .map_err(|error| format!("PDF 页面预览任务失败：{error}"))?
+}
+
+#[tauri::command]
+async fn local_pdf_search_pages(
+    app: AppHandle,
+    result_id: String,
+    query: String,
+    state: State<'_, AppState>,
+) -> Result<pdf_preview::PdfSearchPages, String> {
+    let path = database_path(&app)?;
+    let store = blob_store_for(&app, &state)?;
+    let index = search_index_for(&app, &state)?;
+    tokio::task::spawn_blocking(move || {
+        pdf_preview::search_pages_on(&open_database(&path)?, &store, &index, &result_id, &query)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn local_pdf_page_link(
+    app: AppHandle,
+    result_id: String,
+    page_number: u32,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let path = database_path(&app)?;
+    let store = blob_store_for(&app, &state)?;
+    tokio::task::spawn_blocking(move || {
+        pdf_preview::page_link_on(&open_database(&path)?, &store, &result_id, page_number)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn open_pdf_page(
+    app: AppHandle,
+    result_id: String,
+    page_number: u32,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let target = local_pdf_page_link(app.clone(), result_id, page_number, state).await?;
+    open_external(&app, &target)
 }
 
 #[tauri::command]
@@ -35115,7 +35135,10 @@ pub fn run() {
                 open_craft_attachment,
                 local_markdown_image,
                 local_ocr_image_preview,
-                local_pdf_page_preview
+                local_pdf_page_preview,
+                local_pdf_search_pages,
+                local_pdf_page_link,
+                open_pdf_page
             ]);
             #[cfg(all(windows, feature = "integration-dida-source"))]
             let integration_handler: Box<

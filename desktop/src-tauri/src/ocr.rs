@@ -432,6 +432,23 @@ pub fn render_pdf_page_png(
     Ok(bytes)
 }
 
+#[cfg(windows)]
+pub fn pdf_page_count(path: &Path) -> Result<u32, String> {
+    let file = storage_file(path)?;
+    let document = windows::Data::Pdf::PdfDocument::LoadFromFileAsync(&file)
+        .map_err(|e| windows_error("无法打开 PDF", e))?
+        .get()
+        .map_err(|e| windows_error("无法读取 PDF", e))?;
+    document
+        .PageCount()
+        .map_err(|e| windows_error("无法读取 PDF 页数", e))
+}
+
+#[cfg(not(windows))]
+pub fn pdf_page_count(_path: &Path) -> Result<u32, String> {
+    Err("PDF 页面预览当前仅支持 Windows".into())
+}
+
 #[cfg(not(windows))]
 pub fn recognize_image(_path: &Path) -> Result<String, String> {
     Err("OCR 当前仅支持 Windows".to_string())

@@ -129,3 +129,21 @@ it("does not let a late image response replace another attachment on the same pa
   await act(async () => finishOld({ ocrText: "stale image" }));
   expect(container.textContent).toBe("current image");
 });
+
+it("queues only the latest PDF page and starts a new result at its own search page",async()=>{
+  let finishOld!:(value:unknown)=>void;
+  vi.mocked(invoke).mockImplementation((command,args)=>{
+    if(command!=="local_pdf_page_preview")throw new Error(`Unexpected command ${command}`);
+    if(args?.resultId==="old-pdf")return new Promise(yes=>{finishOld=yes;})as never;
+    return Promise.resolve({text:"current PDF page 57",pageNumber:args?.pageNumber,pageCount:131,sourceType:"pdf_native"})as never;
+  });
+  await act(async()=>root.render(<MediaProbe result={media("old-pdf","pdf_page")}/>));
+  await act(async()=>api.setPdfPreviewPage(2));
+  await act(async()=>api.setPdfPreviewPage(110));
+  expect(vi.mocked(invoke).mock.calls.filter(c=>c[0]==="local_pdf_page_preview")).toHaveLength(1);
+  await act(async()=>root.render(<MediaProbe result={{...media("current-pdf","pdf_page"),pageNumber:57}}/>));
+  expect(api.pdfPreviewPage).toBe(57);expect(api.pdfPreview).toBeNull();
+  await act(async()=>finishOld({text:"stale PDF page 1",pageNumber:1,pageCount:120,sourceType:"pdf_native"}));
+  expect(vi.mocked(invoke).mock.calls.filter(c=>c[0]==="local_pdf_page_preview").map(c=>c[1])).toEqual([{resultId:"old-pdf",pageNumber:1},{resultId:"current-pdf",pageNumber:57}]);
+  expect(container.textContent).toBe("current PDF page 57");expect(api.pdfPreviewPage).toBe(57);
+});

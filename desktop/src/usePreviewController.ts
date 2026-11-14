@@ -8,6 +8,8 @@ import { cleanSearchSnippet } from "./ResultExcerpt";
 import { useUnifiedTasks } from "./UnifiedTaskData";
 import { findTaskForResult, isTaskPreviewResult } from "./TaskResultIdentity";
 import { isWindowVisible, useDocumentVisible } from "./WindowVisibility";
+import { PdfPreviewRequests } from "./PdfPreviewRequests";
+import { isPdfContent } from "./PdfPreviewModel";
 
 export function previewDocumentKey(result: SearchResult): string {
   const taskStatus = result.provider === "dida365" ? `\u0000${result.taskStatus ?? "unknown"}` : "";
@@ -80,7 +82,15 @@ export function usePreviewController({
   const [preview, setPreview] = useState("");
   const [ocrImagePreview, setOcrImagePreview] = useState<OcrImagePreview | null>(null);
   const [pdfPreview, setPdfPreview] = useState<PdfPagePreview | null>(null);
-  const [pdfPreviewPage, setPdfPreviewPage] = useState(1);
+  const [pdfRequests] = useState(() => new PdfPreviewRequests<PdfPagePreview>());
+  const pageKey=JSON.stringify([selected?.id,selected?.pageNumber??1]);
+  const [pdfPageState,setPdfPageState]=useState({key:pageKey,page:selected?.pageNumber??1});
+  const pdfPreviewPage=pdfPageState.key===pageKey?pdfPageState.page:selected?.pageNumber??1;
+  const setPdfPreviewPage=useCallback((change:number|((page:number)=>number))=>{
+    setPdfPageState(previous=>{const current=previous.key===pageKey?previous.page:selected?.pageNumber??1;return {key:pageKey,page:typeof change==="function"?change(current):change};});
+  },[pageKey,selected?.pageNumber]);
+  const identity=selected?JSON.stringify([selected.spaceId,selected.documentId,selected.blockId??null,selected.sourceItemId??null,selected.contentType,pdfPreviewPage,selected.modifiedAt??0]):"";
+
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewMatchCount, setPreviewMatchCount] = useState(0);
   const [previewMatchIndex, setPreviewMatchIndex] = useState(0);
@@ -109,7 +119,8 @@ export function usePreviewController({
   const copySelectedLink = useCallback(async () => {
     if (!selected) return;
     try {
-      const link = selected.provider==="hub"?await requestLocalPreviewDocument(selected):await invoke<string>("result_link", {
+      const pdf=isPdfContent(selected.contentType);
+      const link = pdf?await invoke<string>("local_pdf_page_link",{resultId:selected.id,pageNumber:pdfPreviewPage}):selected.provider==="hub"?await requestLocalPreviewDocument(selected):await invoke<string>("result_link", {
         libraryId: selected.libraryId,
         documentId: selected.documentId,
         blockId: selected.blockId ?? selected.documentId,
@@ -119,17 +130,17 @@ export function usePreviewController({
       });
       await writeClipboardText(link);
       setCopiedResultId(selected.id);
-      showOperationStatus(`已复制${selected.provider==="hub"?"内容":"结果链接"} · ${selected.title}`, "success");
+      showOperationStatus(`已复制${pdf?`本机 PDF 第 ${pdfPreviewPage} 页链接`:selected.provider==="hub"?"内容":"结果链接"} · ${selected.title}`, "success");
       window.setTimeout(() => setCopiedResultId((current) => current === selected.id ? "" : current), 1_800);
     } catch (reason) {
       const message = `复制链接失败：${String(reason)}`;
       showOperationStatus(message, "error", 6_000);
     }
-  }, [selected, showOperationStatus]);
+  }, [selected, pdfPreviewPage, showOperationStatus]);
 
   useEffect(() => {
-    setPdfPreviewPage(selected?.pageNumber ?? 1);
-  }, [selected?.id, selected?.pageNumber]);
+    setCopiedResultId("");
+  }, [selected?.id, selected?.pageNumber, pdfPreviewPage]);
 
   useEffect(() => {
     if (!showPreviewPane || !selected) {
@@ -143,8 +154,7 @@ export function usePreviewController({
     const requestAbort = new AbortController();
     // A page can contain several attachments. Their preview bodies and render
     // kinds must never survive a switch merely because the parent page matches.
-    const identity = JSON.stringify([selected.spaceId, selected.documentId,
-      selected.blockId ?? null, selected.sourceItemId ?? null, selected.contentType, pdfPreviewPage]);
+
     const sameDocument = shownDocument.current === identity;
     shownDocument.current = identity;
     if (!sameDocument) {
@@ -160,12 +170,12 @@ export function usePreviewController({
         .finally(() => { if (!cancelled) setPreviewLoading(false); });
       return () => { cancelled = true; };
     }
-    if (selected.contentType === "pdf_page" || selected.contentType === "pdf_ocr") {
-      void invoke<PdfPagePreview>("local_pdf_page_preview", { resultId: selected.id, pageNumber: pdfPreviewPage })
+    if (isPdfContent(selected.contentType)) {
+      void pdfRequests.request(JSON.stringify([identity,selected.id,selected.modifiedAt]),() => invoke<PdfPagePreview>("local_pdf_page_preview", { resultId: selected.id, pageNumber: pdfPreviewPage }))
         .then((result) => { if (!cancelled) setPdfPreview(result); })
         .catch((reason) => { if (!cancelled) setPreview(`无法加载 PDF 页面预览：${String(reason)}`); })
         .finally(() => { if (!cancelled) setPreviewLoading(false); });
-      return () => { cancelled = true; };
+      return () => { cancelled = true; pdfRequests.cancelPending(); };
     }
     const cacheKey = previewDocumentKey(selected) + (taskVersion ? `\u0000task:${taskVersion}` : "");
     const cached = previewDocumentCache.current.get(cacheKey);
@@ -248,13 +258,15 @@ export function usePreviewController({
     return () => window.cancelAnimationFrame(frame);
   }, [ocrImagePreview, pdfPreview, preview, previewLoading, selected?.id, selected?.favoriteKind, selected?.snippet, selectedMatchTerms.join("\u0000")]);
 
+  const currentPdf=isPdfContent(selected?.contentType);
+  const belongs=shownDocument.current===identity;
   return {
-    preview,
+    preview:currentPdf&&!belongs?"":preview,
     ocrImagePreview,
-    pdfPreview,
+    pdfPreview:belongs?pdfPreview:null,
     pdfPreviewPage,
     setPdfPreviewPage,
-    previewLoading,
+    previewLoading:previewLoading||(currentPdf&&!belongs),
     previewMatchCount,
     previewMatchIndex,
     copiedResultId,
