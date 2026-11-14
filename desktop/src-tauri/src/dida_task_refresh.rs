@@ -44,20 +44,36 @@ pub(super) fn persist_changed(
 ) -> Result<usize, String> {
     let (mut c, _writer) = open_write_database(path)?;
     let tx = c.transaction().map_err(|e| e.to_string())?;
+    let inbox_project = {
+        let mut projects = tx
+            .prepare("SELECT project_id FROM dida_projects WHERE library_id=?1 ORDER BY length(project_id),project_id")
+            .map_err(|e| e.to_string())?;
+        let ids = projects
+            .query_map([library], |r| r.get::<_, String>(0))
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?;
+        ids.into_iter().find(|id| is_dida_inbox_project_id(id))
+    };
     let mut changed = 0;
     operation.commit(|| {
         for mut task in tasks {
-            let previous: Option<String> = tx
+            // Task details use an account inbox alias; keep the library's list identity.
+            if is_dida_inbox_project_id(&task.project_id) {
+                if let Some(project) = &inbox_project {
+                    task.project_id = project.clone();
+                }
+            }
+            let previous: Option<(String, String)> = tx
                 .query_row(
-                    "SELECT raw_json FROM dida_tasks WHERE library_id=?1 AND task_id=?2",
+                    "SELECT raw_json,project_id FROM dida_tasks WHERE library_id=?1 AND task_id=?2",
                     params![library, task.id],
-                    |r| r.get(0),
+                    |r| Ok((r.get(0)?, r.get(1)?)),
                 )
                 .optional()
                 .map_err(|e| e.to_string())?;
-            if let Some(raw) = previous
-                .as_deref()
-                .and_then(|raw| serde_json::from_str::<Value>(raw).ok())
+            let previous_raw = previous.as_ref().map(|(raw, _)| raw.as_str());
+            if let Some(raw) = previous_raw.and_then(|raw| serde_json::from_str::<Value>(raw).ok())
             {
                 // Preserve omitted immutable/source fields, but explicit nulls
                 // remain authoritative. Reparse through the normal adapter.
@@ -81,11 +97,13 @@ pub(super) fn persist_changed(
                     continue;
                 }
             }
-            if previous
-                .as_deref()
+            if previous_raw
                 .and_then(|s| serde_json::from_str::<Value>(s).ok())
                 .as_ref()
                 == Some(&task.raw)
+                && previous
+                    .as_ref()
+                    .is_some_and(|(_, project)| project == &task.project_id)
             {
                 changed += dida_task_status::enqueue_observed(&tx, library, &task)? as usize;
                 continue;

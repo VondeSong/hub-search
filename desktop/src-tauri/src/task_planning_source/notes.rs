@@ -89,6 +89,23 @@ fn source_snapshot(task: &DidaTask) -> Value {
     }
     raw
 }
+fn validate_note_source(task: &DidaTask) -> Result<(), String> {
+    if task.status != 0
+        || !task.kind.eq_ignore_ascii_case("TEXT")
+        || dida_task_status::blocked_reason(&task.raw).is_some()
+    {
+        return Err("仅支持未完成的普通文字任务；清单、循环或已完成任务请在滴答中修改".into());
+    }
+    if !task.raw["etag"]
+        .as_str()
+        .is_some_and(|v| !v.trim().is_empty())
+    {
+        return Err(
+            "滴答未提供有效版本标识，无法保护并发修改；请保留 Hub 建议或在原应用修改".into(),
+        );
+    }
+    Ok(())
+}
 fn target(path: &PathBuf, task: &UnifiedTaskItem) -> Result<(String, String, String), String> {
     let c = open_database(path)?;
     let refs = serde_json::to_value(&task.source_refs).map_err(|e| e.to_string())?;
@@ -158,12 +175,7 @@ async fn prepare(
     if source_revision(&cached) != source_revision(&before) {
         return Err("分析后滴答原任务已变化；请先核对来源并重新分析，未准备覆盖旧记录".into());
     }
-    if before.status != 0
-        || !before.kind.eq_ignore_ascii_case("TEXT")
-        || dida_task_status::blocked_reason(&before.raw).is_some()
-    {
-        return Err("仅支持未完成的普通文字任务；清单、循环或已完成任务请在滴答中修改".into());
-    }
+    validate_note_source(&before)?;
     let after = append(&before.content, note)?;
     let raw = source_snapshot(&before);
     let value = json!({"id":id,"taskId":task_id,"libraryId":library,"libraryName":name,"sourceId":source,"before":raw,"after":after,"workId":work});
@@ -289,9 +301,7 @@ async fn submit(
                 Some("原任务在预览后已变化；未覆盖来源，请重新读取并分析"),
             )?));
         }
-        if remote.status != 0 || dida_task_status::blocked_reason(&remote.raw).is_some() {
-            return Err("来源任务已不可编辑，未执行写入".into());
-        }
+        validate_note_source(&remote)?;
         op.checkpoint()?;
         let claimed = {
             let (c, _writer) = open_write_database(&path)?;
@@ -403,6 +413,25 @@ pub(super) async fn dispatch(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn note_writes_require_an_editable_task_and_a_source_version() {
+        let mut raw = json!({"id":"versioned","projectId":"inbox","title":"Action","content":"Preserve","kind":"TEXT","status":0});
+        for etag in [Value::Null, json!(""), json!(" ")] {
+            raw["etag"] = etag;
+            assert!(
+                validate_note_source(&parse_dida(&raw, "inbox", "versioned").unwrap()).is_err()
+            );
+        }
+        raw["etag"] = json!("source-version");
+        assert!(validate_note_source(&parse_dida(&raw, "inbox", "versioned").unwrap()).is_ok());
+        for (field, value) in [("kind", json!("CHECKLIST")), ("status", json!(2))] {
+            let mut changed = raw.clone();
+            changed[field] = value;
+            assert!(
+                validate_note_source(&parse_dida(&changed, "inbox", "versioned").unwrap()).is_err()
+            );
+        }
+    }
     #[tokio::test]
     #[ignore = "requires an explicitly owned temporary task and saved native authorization"]
     async fn live_owned_planning_note_roundtrip() {
