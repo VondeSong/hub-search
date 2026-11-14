@@ -95,6 +95,16 @@
 
 ## 开发
 
+### 安卓模拟器热更新
+
+在当前主工作区的 `desktop/` 中运行 `npm run android:dev`，默认连接已启动的 `emulator-5564`；其它模拟器用 `npm run android:dev -- -Device emulator-端口号` 指定。入口会启动或复用本目录的 Vite 服务，通过 ADB 将设备的 1422 端口连接到电脑，并覆盖安装开发版，保留应用数据。日志在 `.local/android-dev/`。
+
+安卓前端固定使用 `http://127.0.0.1:1422`，不占用桌面的 1420。修改本目录 `src/` 的界面会自动更新；其它工作树的修改先合并到此目录。Rust、权限、插件及原生配置修改后重新运行 `npm run android:dev`；若只重启界面服务，运行 `npm run dev:android`，无需重装。
+
+开发版依赖电脑服务及端口映射，适合界面联调；独立 APK 的锁屏上传与正式打包验收另行执行。入口沿用现有 SDK/NDK 和 Java 21；Windows 无符号链接权限时，使用 Tauri 已编译的同一原生库组装 Debug 包，不更改系统权限或卸载数据。
+
+### 桌面开发
+
 要求：Node.js 20+、Rust stable、Visual C++ Build Tools、WebView2 Runtime。
 
 ```powershell

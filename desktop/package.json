@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:android": "vite --config vite.android.config.ts",
+    "android:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android-dev.ps1",
     "build": "tsc && vite build",
     "test": "vitest run --dir src",
     "test:ci": "vitest run --dir src --pool=forks --maxWorkers=1",
