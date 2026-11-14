@@ -37,7 +37,16 @@ it('discards a late lookup after the scope changes',async()=>{
 it('hides stale candidates on source invalidation and refuses an addition with changed version',async()=>{
  await mount();await search();invoke.mockRejectedValueOnce(Error('资料版本已变化'));await act(async()=>button('加入本次资料').click());
  expect(add).not.toHaveBeenCalled();expect(host.textContent).not.toContain('旧方法');expect(host.textContent).toContain('资料版本已变化');
- await act(async()=>listeners.get('library-runtime-updated')?.());expect(host.querySelectorAll('fieldset input')).toHaveLength(0);
+ await act(async()=>listeners.get('library-runtime-updated')?.());expect(host.querySelector<HTMLInputElement>('fieldset input')?.checked).toBe(true);
+ expect(host.textContent).not.toContain('旧方法');
+});
+it('revalidates the library catalog on refresh without expanding the explicit scope',async()=>{
+ await mount();await search();const original=invoke.getMockImplementation()!;
+ invoke.mockImplementation((command,request)=>request.args.action==='insightHistoryLibraries'?Promise.resolve({libraries:[{libraryId:'new',name:'新库'}]}):original(command,request));
+ await act(async()=>listeners.get('library-registry-updated')?.());
+ expect(host.textContent).not.toContain('旧方法');expect(host.querySelector<HTMLInputElement>('fieldset input')?.checked).toBe(false);
+ expect(button('查找可能相关的旧资料').disabled).toBe(true);expect(add).not.toHaveBeenCalled();
+ expect(invoke.mock.calls.some(([,v])=>['respond','create','insightDiscoveryPrepare'].includes(v.args.action))).toBe(false);
 });
 it('keeps no-result honest and does not auto-select candidates',async()=>{
  await mount();await open();await act(async()=>host.querySelector<HTMLInputElement>('fieldset input')!.click());
