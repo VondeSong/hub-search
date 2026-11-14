@@ -817,10 +817,44 @@ impl SearchIndex {
         include_attachments: bool,
         field_scope: &str,
     ) -> Result<Vec<SearchHit>, String> {
+        self.search_in_folders(
+            query_text,
+            limit,
+            space_ids,
+            folder_id
+                .filter(|value| !value.is_empty())
+                .map(|value| vec![value.to_string()])
+                .as_deref(),
+            updated_after,
+            include_craft_pages,
+            include_image_ocr,
+            include_pdf,
+            include_pdf_ocr,
+            include_attachments,
+            field_scope,
+        )
+    }
+
+    pub(crate) fn search_in_folders(
+        &self,
+        query_text: &str,
+        limit: usize,
+        space_ids: Option<&[String]>,
+        folder_ids: Option<&[String]>,
+        updated_after: Option<i64>,
+        include_craft_pages: bool,
+        include_image_ocr: bool,
+        include_pdf: bool,
+        include_pdf_ocr: bool,
+        include_attachments: bool,
+        field_scope: &str,
+    ) -> Result<Vec<SearchHit>, String> {
         if !include_craft_pages && !include_image_ocr && !include_pdf && !include_attachments {
             return Ok(Vec::new());
         }
-        if space_ids.is_some_and(|values| values.is_empty()) {
+        if space_ids.is_some_and(|values| values.is_empty())
+            || folder_ids.is_some_and(|values| values.is_empty())
+        {
             return Ok(Vec::new());
         }
         let field_scope = match field_scope {
@@ -953,13 +987,12 @@ impl SearchIndex {
                 )),
             ));
         }
-        if let Some(folder_id) = folder_id.filter(|value| !value.is_empty()) {
+        if let Some(folder_ids) = folder_ids {
             clauses.push((
                 Occur::Must,
-                Box::new(TermQuery::new(
-                    Term::from_field_text(self.fields.folder_id, folder_id),
-                    IndexRecordOption::Basic,
-                )),
+                Box::new(TermSetQuery::new(folder_ids.iter().map(|folder_id| {
+                    Term::from_field_text(self.fields.folder_id, folder_id)
+                }))),
             ));
         }
         if let Some(updated_after) = updated_after {

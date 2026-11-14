@@ -8,6 +8,7 @@ import {
   Bookmark,
   CalendarDays,
   Clock3,
+  FolderTree,
   ListTodo,
   Settings,
   Search,
@@ -72,6 +73,7 @@ export function WorkspaceRail({
   const selectedCount = spaces.filter(space => allSelected || selectedLibraryIds?.includes(space.id)).length;
   const navigation: Array<{ view: DesktopSidebarView; label: string; icon: ReactNode; count: number }> = [
     { view: "home", label: "全部内容", icon: <Search size={17} />, count: 0 },
+    { view: "libraries", label: "资料库", icon: <FolderTree size={17} />, count: 0 },
     { view: "collections", label: "阅读", icon: <Bookmark size={17} />, count: 0 },
     { view: "tasks", label: "任务", icon: <ListTodo size={17} />, count: taskOpenCount },
     { view: "journals", label: "日志", icon: <CalendarDays size={17} />, count: journalCount },

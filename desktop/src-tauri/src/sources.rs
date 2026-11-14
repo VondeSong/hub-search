@@ -97,6 +97,15 @@ pub(crate) fn scan_obsidian_vault_controlled(
     excluded_paths: &[String],
     checkpoint: &impl Fn() -> Result<(), String>,
 ) -> Result<Vec<LocalMarkdownDocument>, String> {
+    scan_obsidian_vault_with_folders(root, excluded_paths, checkpoint)
+        .map(|(documents, _)| documents)
+}
+
+pub(crate) fn scan_obsidian_vault_with_folders(
+    root: &Path,
+    excluded_paths: &[String],
+    checkpoint: &impl Fn() -> Result<(), String>,
+) -> Result<(Vec<LocalMarkdownDocument>, Vec<String>), String> {
     checkpoint()?;
     let canonical = root
         .canonicalize()
@@ -106,12 +115,14 @@ pub(crate) fn scan_obsidian_vault_controlled(
     }
     let mut markdown_paths = Vec::new();
     let mut attachment_paths = Vec::new();
+    let mut folders = Vec::new();
     scan_directory(
         &canonical,
         &canonical,
         excluded_paths,
         &mut markdown_paths,
         &mut attachment_paths,
+        &mut folders,
         checkpoint,
     )?;
     let mut attachment_lookup: HashMap<String, Vec<PathBuf>> = HashMap::new();
@@ -131,7 +142,7 @@ pub(crate) fn scan_obsidian_vault_controlled(
         })
         .collect::<Result<Vec<_>, _>>()?;
     documents.sort_by(|left, right| left.relative_path.cmp(&right.relative_path));
-    Ok(documents)
+    Ok((documents, folders))
 }
 
 fn scan_directory(
@@ -140,6 +151,7 @@ fn scan_directory(
     excluded_paths: &[String],
     markdown_paths: &mut Vec<PathBuf>,
     attachment_paths: &mut Vec<PathBuf>,
+    folders: &mut Vec<String>,
     checkpoint: &impl Fn() -> Result<(), String>,
 ) -> Result<(), String> {
     let entries = fs::read_dir(directory)
@@ -166,12 +178,14 @@ fn scan_directory(
             if should_ignore_directory(&entry.file_name().to_string_lossy()) {
                 continue;
             }
+            folders.push(relative_path);
             scan_directory(
                 root,
                 &path,
                 excluded_paths,
                 markdown_paths,
                 attachment_paths,
+                folders,
                 checkpoint,
             )?;
             continue;

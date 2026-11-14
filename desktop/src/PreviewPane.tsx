@@ -43,7 +43,7 @@ export type PreviewPaneProps = {
   canGoForward: boolean;
   previewPinned: boolean;
   onNavigatePreviewHistory: (direction: -1 | 1) => void;
-  onTogglePreviewPinned: () => void;
+  onTogglePreviewPinned?: () => void;
   selectedMatchTerms: string[];
   selectedSectionTitle?: string;
   previewMatchCount: number;
@@ -156,7 +156,7 @@ export const PreviewPane = memo(function PreviewPane({
                   </>}
                   <button title="上一个预览（Alt+←）" aria-label="上一个预览" disabled={!canGoBack} onClick={() => onNavigatePreviewHistory(-1)}><ArrowLeft size={16} /></button>
                   <button title="下一个预览（Alt+→）" aria-label="下一个预览" disabled={!canGoForward} onClick={() => onNavigatePreviewHistory(1)}><ArrowRight size={16} /></button>
-                  <button className={`preview-pin ${previewPinned ? "active" : ""}`} title={previewPinned ? "解除固定预览" : "固定预览"} aria-label={previewPinned ? "解除固定预览" : "固定预览"} aria-pressed={previewPinned} onClick={onTogglePreviewPinned}>{previewPinned ? <PinOff size={16} /> : <Pin size={16} />}</button>
+                  {onTogglePreviewPinned && <button className={`preview-pin ${previewPinned ? "active" : ""}`} title={previewPinned ? "解除固定预览" : "固定预览"} aria-label={previewPinned ? "解除固定预览" : "固定预览"} aria-pressed={previewPinned} onClick={onTogglePreviewPinned}>{previewPinned ? <PinOff size={16} /> : <Pin size={16} />}</button>}
                   {toolbarActions}
                   {runtimeCapabilities.desktop && <Suspense fallback={null}><LazyAgentInvestigation result={selected} compact onPreviewCitation={showCitation} /></Suspense>}
                   {(journalDate || pdfPreview) && <details className="preview-more-menu" onKeyDown={(event) => {

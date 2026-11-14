@@ -74,6 +74,8 @@ import { useLibraryManagement } from "./LibraryManagement";
 import { useExternalLinkOpener } from "./useExternalLinkOpener";
 import { usePreviewController } from "./usePreviewController";
 import { useResultOpener } from "./useResultOpener";
+import { browseSubpage, canBrowseLibrary, LibraryBrowse, type LibraryPosition } from "./LibraryBrowse";
+import { DesktopWorkspace } from "./Workspace";
 import { journalDataVersion, useJournalData } from "./useJournalData";
 const LazyPreviewRenderer = lazy(() => import("./PreviewRenderer").then((module) => ({ default: module.PreviewRenderer })));
 const LazyMobileQuickCapture = lazy(() => import("./MobileQuickCapture").then(m => ({ default: m.MobileQuickCapture })));
@@ -154,6 +156,8 @@ function AppContent() {
   const isMobileLayout = runtimeCapabilities.mobile;
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [desktopSidebarView, setDesktopSidebarView] = useState<DesktopSidebarView>("home");
+  const [libraryPosition, setLibraryPosition] = useState<LibraryPosition>();
+  const [libraryPreview, setLibraryPreview] = useState<SearchResult>();
   const [mobileBrowseOpen, setMobileBrowseOpen] = useState(false);
   const [mobileAgentsOpen, setMobileAgentsOpen] = useState(false);
   const [mobileConnectionsOpen, setMobileConnectionsOpen] = useState(false);
@@ -292,7 +296,7 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
     desktopSidebarEnabled,
     isMobileLayout,
     query,
-    view: desktopSidebarView === "collections" || desktopSidebarView === "insights" ? "home" : desktopSidebarView,
+    view: desktopSidebarView === "collections" || desktopSidebarView === "insights" || desktopSidebarView === "libraries" ? "home" : desktopSidebarView,
     results,
     journalResults,
     favoriteResults: filteredFavorites,
@@ -311,6 +315,9 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
   const insightsActive = desktopSidebarView === "insights" && !flashcardsStandaloneOpen;
   const tasksActive = desktopSidebarView === "tasks" && !flashcardsStandaloneOpen;
   const collectionsActive = desktopSidebarView === "collections" && !flashcardsStandaloneOpen;
+  const librariesActive = !isMobileLayout && desktopSidebarView === "libraries" && !flashcardsStandaloneOpen;
+  const browseLibraries = useMemo(() => spaces.filter(space => canBrowseLibrary(space.provider)), [spaces]);
+  const browsingPreview = browseLibraries.some(space => space.id === libraryPreview?.libraryId) ? libraryPreview : undefined;
   const sharedTasks = useUnifiedTasks({ enabled: ready && !flashcardsStandaloneOpen && (tasksActive || desktopSidebarView === "journals") });
   useEffect(() => { if (sharedTasks.ready && !sharedTasks.loading) updateTaskOpenCount(sharedTasks.dashboard.open); }, [sharedTasks.dashboard.open, sharedTasks.ready, sharedTasks.loading, updateTaskOpenCount]);
   const taskRegistryKey = JSON.stringify(spaces.map(space => [space.id, space.name, space.provider, space.connected]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
@@ -323,7 +330,7 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
   }, [ready, taskRegistryKey, sharedTasks.ready, sharedTasks.refresh]);
 
   const previewHistoryResult = previewNavigation.index >= 0 ? previewNavigation.entries[previewNavigation.index] : undefined;
-  const previewSelected = (previewPinned || previewHistoryActive) && previewHistoryResult ? previewHistoryResult : selected;
+  const previewSelected = librariesActive ? browsingPreview : (previewPinned || previewHistoryActive) && previewHistoryResult ? previewHistoryResult : selected;
   const pushPreviewHistory = useCallback((result: SearchResult) => {
     setPreviewNavigation((current) => pushPreviewNavigation(current, result));
   }, []);
@@ -354,7 +361,7 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
       setPreviewOpen(false);
     }
   }, [desktopSidebarEnabled, desktopSidebarView, query]);
-  const showPreviewPane = previewOpen && (!isMobileLayout || mobilePreviewOpen) && (!showingTagOverview || previewHistoryActive) && (!!previewSelected || visibleResults.length > 0);
+  const showPreviewPane = librariesActive ? Boolean(browsingPreview) : previewOpen && (!isMobileLayout || mobilePreviewOpen) && (!showingTagOverview || previewHistoryActive) && (!!previewSelected || visibleResults.length > 0);
   const selectedMatchTerms = useMemo(
     () => previewSelected ? resultMatchTerms(previewSelected, query) : queryTerms(query),
     [previewSelected, query],
@@ -458,6 +465,15 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
     setPreviewOpen(true);
   }, [pushPreviewHistory]);
   const openMarkdownLink = useMarkdownLinkOpening({ previewSelected, openResult, openExternalLink, showOperationStatus, previewInApp: isMobileLayout ? previewInlinePage : undefined });
+  const previewLibraryResult = useCallback((result: SearchResult) => {
+    rememberViewedResult(result);
+    setLibraryPreview(result);
+  }, [rememberViewedResult]);
+  const openLibraryPreviewLink = (href?: string, title?: string) => {
+    const subpage = browseSubpage(browsingPreview, href, title);
+    if (subpage) previewLibraryResult(subpage);
+    else openMarkdownLink(href, title);
+  };
 
 
 useEffect(() => {
@@ -527,7 +543,7 @@ useEffect(() => {
         return;
       }
       if (showConnection) return;
-      const searchWorkspaceActive = !insightsActive && !collectionsActive && !tasksActive && !flashcardsActive
+      const searchWorkspaceActive = !insightsActive && !collectionsActive && !tasksActive && !flashcardsActive && !librariesActive
         && !(isMobileLayout && mobileBrowseOpen) && !showingTagOverview;
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "f") {
         if (searchWorkspaceActive) {
@@ -591,7 +607,7 @@ useEffect(() => {
     }
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [insightsActive, collectionsActive, commandPaletteOpen, dateMenuOpen, filtersOpen, flashcardsActive, folderMenuOpen, isMobileLayout, mobileBrowseOpen, mobilePreviewOpen, navigatePreviewHistory, navigatePreviewMatch, openHubSearch, openSelectedResult, previewMatchCount, previewNavigation.entries.length, previewNavigation.index, previewOpen, query, rememberQuery, searchFocused, searchScopeMenuOpen, selected, showConnection, showingTagOverview, spaceMenuOpen, spaces.length, tasksActive, visibleResults.length]);
+  }, [insightsActive, collectionsActive, commandPaletteOpen, dateMenuOpen, filtersOpen, flashcardsActive, folderMenuOpen, isMobileLayout, librariesActive, mobileBrowseOpen, mobilePreviewOpen, navigatePreviewHistory, navigatePreviewMatch, openHubSearch, openSelectedResult, previewMatchCount, previewNavigation.entries.length, previewNavigation.index, previewOpen, query, rememberQuery, searchFocused, searchScopeMenuOpen, selected, showConnection, showingTagOverview, spaceMenuOpen, spaces.length, tasksActive, visibleResults.length]);
 
   const restoredResultIndex = useRef<number | null>(null);
   const restoreResultSelection = useCallback((index: number) => {
@@ -868,6 +884,11 @@ useEffect(() => {
     setSelectedIndex(0);
     setSpaceMenuOpen(false);
   }, [desktopSidebarView, query]);
+  const locateInLibrary = (result: SearchResult) => {
+    setLibraryPosition({ libraryId: result.libraryId, folderId: result.folderId ?? "", documentId: result.documentId });
+    previewLibraryResult(result);
+    selectDesktopSidebarView("libraries");
+  };
 
   const applyMobileRoute = useCallback((route: string) => {
     setFiltersOpen(false);
@@ -1005,8 +1026,9 @@ useEffect(() => {
       onCopyResultSummary: (result) => copyResultValue(result, "summary"),
       onRevealResult: revealResult,
       canRevealResult: (result) => result.provider === "obsidian" && Boolean(libraryById.get(result.libraryId)?.location),
+      onLocateInLibrary: !isMobileLayout && desktopSidebarEnabled ? locateInLibrary : undefined,
       renderLibraryIcon: renderResultLibraryIcon,
-      collectionView: (desktopSidebarEnabled || isMobileLayout) && desktopSidebarView !== "home" && desktopSidebarView !== "flashcards" && desktopSidebarView !== "tasks" && desktopSidebarView !== "collections" && desktopSidebarView !== "insights" && !query.trim() ? desktopSidebarView : undefined,
+      collectionView: (desktopSidebarEnabled || isMobileLayout) && desktopSidebarView !== "home" && desktopSidebarView !== "flashcards" && desktopSidebarView !== "tasks" && desktopSidebarView !== "collections" && desktopSidebarView !== "insights" && desktopSidebarView !== "libraries" && !query.trim() ? desktopSidebarView : undefined,
       selectedCollectionTag: desktopSidebarView === "tags" ? selectedSidebarTagSummary : undefined,
       selectedTagColor: selectedSidebarTagSummary
         ? resolveTagColor(tagProperties, selectedSidebarTagSummary.normalizedName)
@@ -1071,11 +1093,11 @@ useEffect(() => {
     },
     previewPaneProps: {
       selected: previewSelected,
-      canGoBack: previewNavigation.index > 0,
-      canGoForward: previewNavigation.index >= 0 && previewNavigation.index < previewNavigation.entries.length - 1,
-      previewPinned,
+      canGoBack: !librariesActive && previewNavigation.index > 0,
+      canGoForward: !librariesActive && previewNavigation.index >= 0 && previewNavigation.index < previewNavigation.entries.length - 1,
+      previewPinned: !librariesActive && previewPinned,
       onNavigatePreviewHistory: navigatePreviewHistory,
-      onTogglePreviewPinned: togglePreviewPinned,
+      onTogglePreviewPinned: librariesActive ? undefined : togglePreviewPinned,
       selectedMatchTerms,
       selectedSectionTitle,
       previewMatchCount,
@@ -1087,7 +1109,7 @@ useEffect(() => {
       previewLoading,
       previewMarkdown: preview,
       renderedPreviewMarkdown,
-      onOpenLink: openMarkdownLink,
+      onOpenLink: librariesActive ? openLibraryPreviewLink : openMarkdownLink,
       previewCard,
       startWindowDrag,
       onCloseMobilePreview: closeMobilePreview,
@@ -1255,7 +1277,14 @@ useEffect(() => {
       onOpenSettings={() => setShowConnection(true)}
       onOpenSyncHealth={() => pushMobileRoute("connections")}
       syncNeedsAttention={Boolean(indexStatus?.failedJobs)}
-    /> : insightsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开洞察…</div>}><LazyInsightsWorkspace/></Suspense> : collectionsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开阅读…</div>}><LazyCollectionsWorkspace
+    /> : librariesActive ? <DesktopWorkspace {...workspaceProps} resultsContent={<LibraryBrowse
+      libraries={browseLibraries}
+      position={libraryPosition}
+      onPosition={setLibraryPosition}
+      selected={browsingPreview}
+      onPreview={previewLibraryResult}
+      onClosePreview={() => setLibraryPreview(undefined)}
+    />} /> : insightsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开洞察…</div>}><LazyInsightsWorkspace/></Suspense> : collectionsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开阅读…</div>}><LazyCollectionsWorkspace
       onToggleDesktopSidebar={!isMobileLayout ? () => changeDesktopSidebarSetting(!desktopSidebarEnabled) : undefined}
     /></Suspense> : tasksActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开任务…</div>}><LazyTaskWorkspace
       libraries={spaces}

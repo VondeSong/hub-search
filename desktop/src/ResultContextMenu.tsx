@@ -19,11 +19,12 @@ type Props = {
   onCopyTitle: (result: SearchResult) => void | Promise<void>;
   onCopySummary: (result: SearchResult) => void | Promise<void>;
   onReveal: (result: SearchResult) => void | Promise<void>;
+  onLocateInLibrary?: (result: SearchResult) => void;
   snippetSaved?: boolean;
   onToggleSnippetFavorite?: (result: SearchResult) => void;
 };
 
-export function ResultContextMenu({ state, canReveal, onClose, onOpen, onCopyLink, onCopyMarkdown, onCopyTitle, onCopySummary, onReveal, snippetSaved, onToggleSnippetFavorite }: Props) {
+export function ResultContextMenu({ state, canReveal, onClose, onOpen, onCopyLink, onCopyMarkdown, onCopyTitle, onCopySummary, onReveal, onLocateInLibrary, snippetSaved, onToggleSnippetFavorite }: Props) {
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const close = (event: Event) => {
@@ -51,6 +52,7 @@ export function ResultContextMenu({ state, canReveal, onClose, onOpen, onCopyLin
   return createPortal(<div ref={menuRef} className="result-context-menu" role="menu" style={style} onContextMenu={(event) => event.preventDefault()}>
     <div className="result-context-heading"><strong>{state.result.title}</strong><small>{providerName(state.result.provider)}</small></div>
     <button role="menuitem" onClick={() => run(() => onOpen(state.result))}><ArrowUpRight size={15} /><span>在来源中打开</span></button>
+    {onLocateInLibrary && (state.result.provider === "craft" || state.result.provider === "obsidian") && <button role="menuitem" onClick={() => run(() => onLocateInLibrary(state.result))}><FolderSearch size={15} /><span>在资料库中定位</span></button>}
     {onToggleSnippetFavorite && state.result.snippet.trim() && <button role="menuitem" onClick={() => run(() => onToggleSnippetFavorite(state.result))}><Quote size={15} /><span>{snippetSaved ? "取消收藏此片段" : "收藏此片段"}</span></button>}
     <button role="menuitem" onClick={() => run(() => onCopyLink(state.result))}><Link2 size={15} /><span>复制深链接</span></button>
     <button role="menuitem" onClick={() => run(() => onCopyMarkdown(state.result))}><FileText size={15} /><span>复制为 Markdown 链接</span></button>

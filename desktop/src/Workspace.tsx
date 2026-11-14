@@ -14,6 +14,7 @@ type PreviewPaneProps = ComponentProps<typeof PreviewPane>;
 
 export type WorkspaceProps = {
   searchHeader?: ReactNode;
+  resultsContent?: ReactNode;
   workspaceRef: RefObject<HTMLElement | null>;
   showPreviewPane: boolean;
   resultsPanePercent: number;
@@ -37,25 +38,26 @@ function WorkspaceContent({
   onResetPreviewSplit,
   layout,
   searchHeader,
+  resultsContent,
 }: WorkspaceContentProps) {
   const context = `${resultsPaneProps.collectionView}:${resultsPaneProps.selectedCollectionTag?.normalizedName}:${resultsPaneProps.tagOverviewMode}:${resultsPaneProps.query}`;
   const [view, setView] = useState({ context, management: false, evidence: false });
   const current = view.context === context ? view : { context, management: false, evidence: false };
-  const previewVisible = showPreviewPane && (current.evidence || !current.management);
+  const previewVisible = showPreviewPane && (Boolean(resultsContent) || current.evidence || !current.management);
   return (
     <section
       ref={workspaceRef}
-      className={`workspace ${layout}-workspace ${previewVisible ? "with-preview" : ""}`}
+      className={`workspace ${layout}-workspace ${resultsContent ? "library-browse-workspace" : ""} ${previewVisible ? "with-preview" : ""}`}
       style={{ "--results-pane-percent": `${resultsPanePercent}%` } as CSSProperties}
     >
-      {searchHeader ? <div className="search-results-column">
+      {resultsContent ?? (searchHeader ? <div className="search-results-column">
         {searchHeader}
         <SearchResultsPane {...resultsPaneProps}
           onTagTabChange={management => setView({ context, management, evidence: false })}
           onPreviewEvidence={result => { setView({ ...current, context, evidence: true }); (resultsPaneProps.onPreviewEvidence ?? resultsPaneProps.onOpenResult)(result); }} />
       </div> : <SearchResultsPane {...resultsPaneProps}
         onTagTabChange={management => setView({ context, management, evidence: false })}
-        onPreviewEvidence={result => { setView({ ...current, context, evidence: true }); (resultsPaneProps.onPreviewEvidence ?? resultsPaneProps.onOpenResult)(result); }} />}
+        onPreviewEvidence={result => { setView({ ...current, context, evidence: true }); (resultsPaneProps.onPreviewEvidence ?? resultsPaneProps.onOpenResult)(result); }} />)}
 
       {previewVisible && <div
         className="pane-resizer"

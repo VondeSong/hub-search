@@ -52,6 +52,7 @@ type SearchResultsPaneProps = {
   onCopyResultSummary: (result: SearchResult) => void | Promise<void>;
   onRevealResult: (result: SearchResult) => void | Promise<void>;
   canRevealResult: (result: SearchResult) => boolean;
+  onLocateInLibrary?: (result: SearchResult) => void;
   renderLibraryIcon: (result: SearchResult, name: string) => ReactNode;
   collectionView?: "journals" | "favorites" | "history" | "tags";
   selectedCollectionTag?: SidebarTagSummary;
@@ -99,7 +100,7 @@ export function SearchResultsPane({
   resultLabel, error, searching, query, results, recentGroups, selectedIndex, showSelection = true,
   isMobileLayout, semanticRecentDates, onHoverResult, onSelectResult,
   onOpenResult, onPrepareResultLink, onDragResult, onCopyResultLink, onCopyResultMarkdown,
-  onCopyResultTitle, onCopyResultSummary, onRevealResult, canRevealResult, renderLibraryIcon, collectionView, selectedCollectionTag,
+  onCopyResultTitle, onCopyResultSummary, onRevealResult, canRevealResult, onLocateInLibrary, renderLibraryIcon, collectionView, selectedCollectionTag,
   collectionTags, onSelectCollectionTag, tagOverviewMode = "all", favoriteIds, onToggleFavorite,
   collectionTagColors = {},
   tagLibraries = [], tagsLoading = false, selectedTagLibraryIds = null, onChangeTagLibraries,
@@ -316,6 +317,7 @@ export function SearchResultsPane({
         onCopyTitle={onCopyResultTitle}
         onCopySummary={onCopyResultSummary}
         onReveal={onRevealResult}
+        onLocateInLibrary={onLocateInLibrary}
       />}
     </div>
   );
