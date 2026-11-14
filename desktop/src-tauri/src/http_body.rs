@@ -13,7 +13,13 @@ pub(crate) async fn bytes(
         return Err("响应超过接收上限".into());
     }
     let mut body = Vec::new();
-    while let Some(chunk) = response.chunk().await.map_err(|_| "响应读取中断")? {
+    while let Some(chunk) = response.chunk().await.map_err(|error| {
+        if error.is_timeout() {
+            "响应读取超时"
+        } else {
+            "响应读取中断"
+        }
+    })? {
         if chunk.len() > maximum.saturating_sub(body.len()) {
             return Err("响应超过接收上限".into());
         }

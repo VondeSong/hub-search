@@ -2138,6 +2138,9 @@ fn craft_transport_error_is_transient(error: &str) -> bool {
     {
         return matches!(status, 502 | 503 | 504);
     }
+    if matches!(error, "响应读取中断" | "响应读取超时") {
+        return true;
+    }
     let lower = error.to_ascii_lowercase();
     lower.contains("error sending request")
         || lower.contains("timed out")
