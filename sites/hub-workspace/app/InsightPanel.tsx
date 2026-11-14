@@ -12,6 +12,7 @@ import {
 import type { AssistantContext } from "./Assistant";
 import type { InsightsProps } from "./Insights";
 import {InsightRecall} from "./InsightRecall";
+import {InsightDiscovery,InsightDiscoveryResume} from "./InsightDiscovery";
 import {InsightNotebookDemo} from "./InsightNotebookDemo";
 import {
   getLedger, subscribeLedger, executeLedger, ensureLedgerSeed, ensureInteractionDemo, ensurePublicCaseDemo, ledgerId,
@@ -34,6 +35,7 @@ type Props = InsightsProps & {
   onQueryChange?: (value: string) => void;
 };
 type Modal =
+  | { type: "discovery" }
   | { type: "recall" }
   | { type: "decisions" }
   | { type: "reports"; targetId?: string; baseRevision?: number }
@@ -475,8 +477,9 @@ export default function InsightPanel(props: Props) {
   }}>
     <header className="ip-page-header">
       <div className="ip-page-title"><div className="ip-title-icon" aria-hidden="true"><Sparkles size={25}/></div><div><span className="ip-overline">让已有的积累，接着发挥作用</span><h1>{!navigationOpen && onOpenNavigation && <button className="ip-nav-toggle" aria-label="展开洞察侧边栏" onClick={onOpenNavigation}><PanelLeft size={21}/></button>}洞察</h1><p>看见资料里的变化与关联，找到可以继续的一步。</p></div></div>
-      <div className="ip-header-actions">{scope==="decision"&&<button className="ip-button" onClick={()=>showModal({type:"decisions"})}><GitBranch size={16}/>记录与回顾决定</button>}<button className="ip-button ip-primary" onClick={() => openReports()}><Plus size={16}/>选择已有成果</button>
+      <div className="ip-header-actions">{scope==="decision"&&<button className="ip-button" onClick={()=>showModal({type:"decisions"})}><GitBranch size={16}/>记录与回顾决定</button>}<button className="ip-button ip-primary" onClick={() => showModal({type:"discovery"})}><Sparkles size={16}/>开始发现</button>
         <details className="ip-menu ip-page-menu"><summary aria-label="洞察更多操作" title="更多操作"><MoreHorizontal size={21}/></summary><div className="ip-menu-content">
+          <button onClick={() => openReports()}><Plus size={15}/>从已有分析导入</button>
           <button onClick={() => showModal({type:"recall"})}><BookOpen size={15}/>寻找旧知识</button>
           <button onClick={async event => { (event.currentTarget.closest("details") as HTMLDetailsElement).open = false; const result = await act({ type: "check", operationId: ledgerId() }); if (result?.ok) notify(result.message || "已核对已选来源，没有启动模型分析"); }} disabled={busy || initializing}><RefreshCw size={15}/>核对已选来源</button>
           <button onClick={() => showModal({ type: "sources" })}><SlidersHorizontal size={15}/>来源与演示控制</button>
@@ -484,6 +487,7 @@ export default function InsightPanel(props: Props) {
         </div></details>
       </div>
     </header>
+    {!isHistory && <InsightDiscoveryResume onOpen={()=>showModal({type:"discovery"})}/>}
     {!isHistory && <div className="ip-tab-bar"><div className="ip-status-tabs" role="tablist" aria-label="发现处理状态">
       {([{ id: "all", label: "待关注" }, { id: "later", label: "稍后" }, { id: "done", label: "已处理" }, { id: "everything", label: "全部" }] as const).map((tab, index, tabs) => <button key={tab.id} id={"ip-tab-" + tab.id} role="tab" aria-selected={activeTab === tab.id} aria-controls="ip-findings-content" tabIndex={activeTab === tab.id ? 0 : -1} className={activeTab === tab.id ? "selected" : ""} onClick={() => switchTab(tab.id)} onKeyDown={event => {
         const offset = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
@@ -599,6 +603,7 @@ export default function InsightPanel(props: Props) {
       if (result?.ok) { setUndoEvent(null); notify("已撤销处理；当前证据有效性继续保留"); }
     }}>撤销</button><button onClick={() => { openSavedInsight(undoEvent.insightId); setUndoEvent(null); }}>查看<ArrowRight size={12}/></button><button aria-label="关闭撤销提示" onClick={() => setUndoEvent(null)}><X size={13}/></button></div>}
 
+    {modal?.type === "discovery" && <Dialog title="从当前事情，发现联系与变化" subtitle="找回旧经验，核对新记录，让判断接着更新。" wide onClose={()=>setModal(null)}><InsightDiscovery/></Dialog>}
     {modal?.type === "recall" && <Dialog title="寻找旧知识" subtitle="先定位材料，再判断是否适用" onClose={()=>setModal(null)}><InsightRecall state={state} onOpenWork={(id,question)=>{const title=REPORT_FIXTURES.find(r=>r.workId===id)?.workTitle||"原事项";setModal(null);onAssistant({id,title,workId:id,workTitle:title,excerpt:"请围绕原事项的问题核对已授权资料。关键词命中只是候选，不代表关联成立；需读取原文、核对适用条件和反例。",evidence:[]});}}/></Dialog>}
     {modal?.type === "reports" && <Dialog title={targetInsight ? "更新这条发现" : "从已有成果保存发现"} subtitle={targetInsight ? "选择同一工作的新成果，明确对应的发现，再发布一个新修订。" : "只提取已发布成果中有可读引用的发现。打开这份列表不会启动分析。"} wide onClose={() => setModal(null)}>
       <div className="ip-report-browser">
