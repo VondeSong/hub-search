@@ -27,6 +27,7 @@ export type AppLayoutProps = {
   footerStatusProps: ComponentProps<typeof FooterStatus>;
   settingsDialog: ReactNode;
   mainContent?: ReactNode;
+  mobileHeader?: ReactNode;
   desktopSidebarProps?: ComponentProps<typeof DesktopSidebar>;
 };
 
@@ -47,6 +48,7 @@ function AppLayoutContent({
   footerStatusProps,
   settingsDialog,
   mainContent,
+  mobileHeader,
   AppEntry,
   Workspace,
   mobile = false,
@@ -54,8 +56,8 @@ function AppLayoutContent({
   return (
     <AppEntry filtersOpen={filtersOpen} previewOpen={mobilePreviewOpen} style={style}>
       <div className="drag-strip" onMouseDown={startWindowDrag} />
-      {mainContent ? <><div className="main-content-override">{mainContent}</div><FooterStatus {...footerStatusProps} /></> : <>
-        <SearchHeader {...headerProps} />
+      {mainContent ? <>{mobile && mobileHeader}<div className="main-content-override">{mainContent}</div><FooterStatus {...footerStatusProps} /></> : <>
+        {mobile ? <div className="mobile-top-area">{mobileHeader}<SearchHeader {...headerProps} /></div> : <SearchHeader {...headerProps} />}
         {mobile ? <MobileFilterSheet open={filtersOpen} onClose={() => headerProps.setFiltersOpen(false)}><FilterBar {...filterBarProps} visible={filtersOpen} mobile /></MobileFilterSheet> : filtersOpen && <FilterBar {...filterBarProps} />}
         <Workspace {...workspaceProps} />
         <FooterStatus {...footerStatusProps} />

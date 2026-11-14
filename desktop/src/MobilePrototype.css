@@ -1,0 +1,155 @@
+/* The approved phone prototype, backed by native data and queues. */
+html[data-runtime-platform="android"] {
+  --mobile-canvas: #fff; --mobile-surface: #fff; --mobile-fill: #f5f6f8;
+  --mobile-ink: #24262a; --mobile-secondary: #656b74; --mobile-accent: #2863b8;
+  --mobile-selected: #eaf1fc; --mobile-separator: #e2e5ea; --mobile-press: #edf0f4;
+  --hub-content-surface: var(--mobile-surface); --hub-text-primary: var(--mobile-ink);
+  --hub-text-secondary: var(--mobile-secondary); --hub-accent: var(--mobile-accent);
+  --hub-separator: var(--mobile-separator);
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell { background: var(--mobile-canvas); color: var(--mobile-ink); }
+.mobile-hub-header { display: flex; align-items: center; gap: 8px; padding: calc(8px + env(safe-area-inset-top,0px)) 14px 8px; min-height: 60px; background: var(--mobile-surface); color: var(--mobile-ink); }
+.mobile-hub-brand { display: inline-flex; gap: 8px; align-items: center; font-size: 19px; font-weight: 700; }
+.mobile-hub-brand > span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: #fff; background: var(--mobile-accent); font-size: 18px; }
+.mobile-hub-page-title { font-size: 15px; font-weight: 600; }
+.mobile-hub-actions { display: flex; align-items: center; margin-left: auto; gap: 2px; }
+.mobile-hub-header button { display: grid; place-items: center; min-width: 44px; height: 44px; padding: 8px; border: 0; border-radius: 12px; background: transparent; color: var(--mobile-secondary); }
+.mobile-hub-header button:active { background: var(--mobile-press); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area { min-width: 0; background: var(--mobile-surface); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-header { display: flex; align-items: center; gap: 8px; padding: 6px 20px 16px; min-height: 0; height: auto; background: var(--mobile-surface); border: 0; box-shadow: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-header .mobile-search-controls { position: static; flex: 1; min-width: 0; width: auto; min-height: 48px; padding: 0; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-header .search-box { position: relative; inset: auto; width: 100%; height: 48px; min-height: 48px; margin: 0; border-radius: 16px; background: var(--mobile-fill); box-shadow: none; backdrop-filter: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-header input { color: var(--mobile-ink); font-size: 16px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-header .mobile-search-cancel { display: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-header.mobile-search-expanded .mobile-search-cancel { display: block; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-header .search-header-actions { position: static; display: flex; width: auto; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-header .filter-toggle { min-width: 44px; height: 44px; border-radius: 12px; background: transparent; box-shadow: none; color: var(--mobile-secondary); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-header .search-suggestions { top: calc(100% + 8px); bottom: auto; max-height: min(45dvh,320px); background: var(--mobile-surface); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.mobile-top-area .mobile-search-expanded) > .mobile-navigation-footer { display: block; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell.mobile-keyboard-open > .mobile-navigation-footer { display: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-browse-screen { display: flex; flex-direction: column; background: var(--mobile-surface); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-browse-screen > header { display: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-browse-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px 32px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-browse-scroll h1 { margin: 0 0 8px; font-size: 30px; line-height: 1.4; }
+.mobile-browse-intro { margin: 0 0 30px; color: var(--mobile-secondary); font-size: 15px; line-height: 1.7; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-browse-group { border: 0; border-radius: 16px; background: var(--mobile-fill); box-shadow: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-browse-group button { min-height: 72px; color: var(--mobile-ink); border-color: var(--mobile-separator); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-browse-group small { color: var(--mobile-secondary); }
+html[data-runtime-platform="android"] .mobile-navigation-footer { margin: 0 12px 12px; padding: 0 6px env(safe-area-inset-bottom,0px); border: 1px solid var(--mobile-separator); border-radius: 24px; background: var(--mobile-surface); box-shadow: 0 6px 22px rgb(30 40 60 / .06); }
+html[data-runtime-platform="android"] .mobile-primary-navigation button { color: var(--mobile-secondary); }
+html[data-runtime-platform="android"] .mobile-primary-navigation button[aria-current="page"] { color: var(--mobile-accent); background: var(--mobile-selected); }
+html[data-runtime-platform="android"] .mobile-primary-navigation .mobile-primary-icon { background: transparent; box-shadow: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-pane { padding-bottom: 16px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .journal-db-toolbar { display: none; }
+html[data-runtime-platform="android"] .quick-journal { --journal-db-surface: var(--mobile-surface); --journal-db-line: var(--mobile-separator); --journal-db-muted: var(--mobile-fill); --journal-db-accent: var(--mobile-accent); color: var(--mobile-ink); }
+html[data-runtime-platform="android"] .quick-journal-feed { width: 100%; padding: 16px 20px 32px; gap: 18px; }
+.quick-journal-mobile-heading h1 { font-size: 30px; line-height: 1.4; margin: 0 0 8px; }
+.quick-journal-mobile-heading > p { color: var(--mobile-secondary); font-size: 15px; line-height: 1.7; margin: 0 0 20px; }
+.quick-journal .quick-journal-mobile-heading > button { display: flex; justify-content: space-between; width: 100%; padding-inline: 0; border: 0; color: var(--mobile-secondary); font-size: 13px; }
+.quick-journal-mobile-filters { display: flex; flex-direction: column; gap: 12px; }
+.quick-journal-mobile-filters > label { display: grid; gap: 8px; font-size: 13px; }
+.quick-journal-mobile-filters input { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid var(--mobile-separator); border-radius: 14px; background: var(--mobile-surface); font: inherit; }
+.quick-journal-mobile-filters > div { display: flex; flex-wrap: wrap; gap: 4px; }
+.quick-journal-mobile-filters > div button { border: 0; border-radius: 20px; background: transparent; font-size: 14px; }
+.quick-journal-mobile-filters button[aria-pressed="true"] { background: var(--mobile-selected); color: var(--mobile-accent); }
+html[data-runtime-platform="android"] .quick-journal-feed .quick-journal-controls > button { display: none; }
+html[data-runtime-platform="android"] .quick-journal-card { padding: 20px 18px; border-radius: 14px; }
+html[data-runtime-platform="android"] .quick-journal-card > header { gap: 8px; font-size: 12px; }
+html[data-runtime-platform="android"] .quick-journal-card > header span:nth-child(2) { flex: 1; text-align: right; }
+html[data-runtime-platform="android"] .quick-journal-prose { font-size: 16px; line-height: 1.8; }
+.quick-journal-card-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.quick-journal-card-tags button { border: 0; color: var(--mobile-accent); background: var(--mobile-selected); font-size: 13px; }
+.quick-journal-queue { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.quick-journal-queue span { display: grid; gap: 6px; font-size: 12px; color: var(--mobile-secondary); }
+.quick-journal-queue strong { color: var(--mobile-ink); font-size: 20px; font-variant-numeric: tabular-nums; }
+.mobile-quick-capture { position: fixed; inset: auto 0 0; margin: 0 auto; width: min(100%,480px); max-width: 100%; max-height: calc(var(--capture-viewport-height,100dvh) - 16px); overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px calc(12px + env(safe-area-inset-bottom,0px)); border: 0; border-radius: 28px 28px 0 0; background: var(--mobile-surface); color: var(--mobile-ink); box-shadow: 0 -12px 48px rgb(20 30 50 / .12); }
+.mobile-quick-capture::backdrop { background: rgb(24 30 42 / .26); }
+.mobile-capture-grabber { width: 34px; height: 4px; margin: 0 auto 10px; border-radius: 4px; background: var(--mobile-separator); }
+.mobile-capture-heading { display: flex; justify-content: flex-end; }
+.mobile-capture-heading > button { display: grid; place-items: center; min-width: 44px; min-height: 44px; padding: 8px; border: 0; border-radius: 12px; background: transparent; color: var(--mobile-secondary); }
+.mobile-quick-capture .quick-journal { padding: 0; gap: 10px; }
+.mobile-quick-capture .quick-journal-compose { padding: 0; border: 0; border-radius: 0; }
+.mobile-quick-capture .quick-journal-compose textarea { height: clamp(180px,28dvh,260px); min-height: 76px; padding: 12px 6px; resize: none; color: var(--mobile-ink); font-size: 18px; line-height: 1.75; background: transparent; }
+.mobile-quick-capture .quick-journal-compose textarea:focus-visible { outline: 1px solid var(--mobile-separator); outline-offset: -1px; }
+.mobile-quick-capture .quick-journal-compose footer { display: flex; flex-wrap: nowrap; justify-content: space-between; margin-top: 10px; }
+.mobile-quick-capture .quick-journal-compose-tools { display: flex; gap: 0; }
+.mobile-quick-capture .quick-journal-compose-tools button { width: 44px; height: 48px; padding: 10px; border: 0; background: transparent; color: var(--mobile-secondary); }
+.mobile-quick-capture .quick-journal-compose button[type="submit"] { min-height: 44px; padding: 10px 16px; border-radius: 24px; background: var(--mobile-accent); }
+.mobile-quick-capture .quick-journal-more { padding: 12px 4px; border-top: 1px solid var(--mobile-separator); font-size: 13px; }
+.quick-journal-more > div { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.quick-journal-more > div button { border: 0; color: var(--mobile-accent); background: var(--mobile-selected); }
+.quick-journal-more small { color: var(--mobile-secondary); }
+.quick-journal-draft-status { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--mobile-secondary); font-size: 12px; }
+.quick-journal-draft-status > button { border: 0; background: transparent; font-size: inherit; }
+.mobile-quick-capture .quick-journal-capture-help { margin: 0; color: var(--mobile-secondary); font-size: 12px; line-height: 1.7; }
+.mobile-quick-capture .quick-journal-capture-help button { min-height: 40px; padding: 2px 6px; border: 0; background: transparent; color: var(--mobile-accent); font-size: inherit; }
+.mobile-quick-capture .quick-journal-draft-files { display: flex; gap: 12px; margin: 8px 0; overflow-x: auto; }
+.mobile-quick-capture .quick-journal-draft-files li { position: relative; flex: 0 0 88px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 4px 0; }
+.mobile-quick-capture .quick-journal-draft-files li > img { width: 80px; height: 80px; border-radius: 10px; object-fit: cover; }
+.mobile-quick-capture .quick-journal-draft-files li > span { width: 80px; max-height: 36px; overflow: hidden; overflow-wrap: anywhere; color: var(--mobile-secondary); font-size: 11px; line-height: 1.6; }
+.mobile-quick-capture .quick-journal-draft-files li > button { position: absolute; top: 0; right: 0; width: 32px; height: 32px; min-height: 32px; padding: 6px; border-radius: 50%; background: var(--mobile-surface); }
+.mobile-quick-capture.keyboard-open .quick-journal-compose textarea { height: clamp(76px,calc(var(--capture-viewport-height,100dvh) - 360px),160px); }
+@media (max-height: 600px) { .mobile-quick-capture .quick-journal-compose textarea { height: 76px; min-height: 72px; } }
+@media (prefers-color-scheme: dark) {
+  html[data-runtime-platform="android"]:is(:not([data-mobile-theme]),[data-mobile-theme="system"]) { --mobile-canvas: #090a0b; --mobile-surface: #181a1e; --mobile-fill: #22252b; --mobile-ink: #eceef2; --mobile-secondary: #a2a8b1; --mobile-accent: #8ab9fa; --mobile-selected: #25354a; --mobile-separator: #33373e; --mobile-press: #292e35; color-scheme: dark; }
+}
+
+html[data-runtime-platform="android"][data-mobile-theme="white"] { color-scheme: light; }
+html[data-runtime-platform="android"][data-mobile-theme="black"] { --mobile-canvas:#090a0b; --mobile-surface:#181a1e; --mobile-fill:#22252b; --mobile-ink:#eceef2; --mobile-secondary:#a2a8b1; --mobile-accent:#8ab9fa; --mobile-selected:#25354a; --mobile-separator:#33373e; --mobile-press:#292e35; color-scheme:dark; }
+html[data-runtime-platform="android"][data-mobile-theme="paper"] { --mobile-canvas:#faf7ef; --mobile-surface:#faf7ef; --mobile-fill:#f0ebdf; --mobile-ink:#37332e; --mobile-secondary:#71695f; --mobile-separator:#e0d8ca; --mobile-press:#ebe4d7; color-scheme:light; }
+html[data-runtime-platform="android"][data-mobile-accent="sage"] { --mobile-accent:#47735b; --mobile-selected:#e8f1e9; }
+html[data-runtime-platform="android"][data-mobile-accent="iris"] { --mobile-accent:#6c55aa; --mobile-selected:#f0eafa; }
+html[data-runtime-platform="android"][data-mobile-theme="black"][data-mobile-accent="sage"] { --mobile-accent:#9bcdab; --mobile-selected:#26392d; }
+html[data-runtime-platform="android"][data-mobile-theme="black"][data-mobile-accent="iris"] { --mobile-accent:#c8b3f5; --mobile-selected:#352a47; }
+@media (prefers-color-scheme:dark) {
+ html[data-runtime-platform="android"][data-mobile-theme="system"][data-mobile-accent="sage"] { --mobile-accent:#9bcdab; --mobile-selected:#26392d; }
+ html[data-runtime-platform="android"][data-mobile-theme="system"][data-mobile-accent="iris"] { --mobile-accent:#c8b3f5; --mobile-selected:#352a47; }
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell :is(.preview-pane,.preview-content,.task-workspace,.flashcards-workspace,.reading-workspace,.settings-dialog,.settings-content) { color:var(--mobile-ink); background:var(--mobile-surface); }
+html[data-runtime-platform="android"] .settings-overlay :is(.settings-dialog,.settings-content,.settings-navigation) { color:var(--mobile-ink); background:var(--mobile-surface); }
+html[data-runtime-platform="android"] :is(.mobile-app-shell,.settings-overlay,.mobile-quick-capture) :is(input,textarea,select) { color:var(--mobile-ink); background-color:var(--mobile-surface); }
+html[data-runtime-platform="android"] .quick-journal button { min-height:44px; }
+html[data-runtime-platform="android"] .quick-journal-card { background:var(--mobile-surface); border-color:var(--mobile-separator); }
+@media (forced-colors: active) { .mobile-quick-capture,.mobile-navigation-footer,.quick-journal-card { border:1px solid CanvasText; } }
+
+/* Older mobile layouts let full-page workspaces span the header row. */
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(> .mobile-hub-header),
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(> .mobile-top-area) { grid-template-rows:auto minmax(0,1fr) auto; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell > :is(.mobile-hub-header,.mobile-top-area) { grid-row:1; min-height:0; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell > .main-content-override { grid-row:2; height:auto; min-height:0; padding-bottom:84px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell > .mobile-navigation-footer { inset-inline:12px; bottom:calc(10px + env(safe-area-inset-bottom,0px)); margin:0; background:var(--mobile-surface); border-color:var(--mobile-separator); }
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.flashcards-workspace.flashcards-android) .mobile-tab-bar button { font-size:12px; color:var(--mobile-secondary); }
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.flashcards-workspace.flashcards-android) .mobile-tab-bar button[aria-current="page"] { background:var(--mobile-selected); color:var(--mobile-accent); box-shadow:none; }
+html[data-runtime-platform="android"] .mobile-browse-group { background:var(--mobile-fill); }
+.mobile-quick-capture .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
+.mobile-quick-capture .quick-journal-draft-status > button { min-height:40px; padding:2px 6px; border:0; background:transparent; }
+.mobile-quick-capture .quick-journal-compose textarea:focus-visible { outline:0; }
+.mobile-quick-capture .quick-journal-capture-help { padding:0 4px; }
+
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell { background:var(--mobile-canvas); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-header .mobile-search-controls { display:flex; align-items:center; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .journal-db { background:var(--mobile-canvas); }
+.quick-journal .quick-journal-mobile-heading > button { background:transparent; }
+
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell { --mobile-canvas:inherit; --mobile-secondary:inherit; --mobile-separator:inherit; }
+.mobile-quick-capture { bottom:var(--capture-keyboard-inset,0px); }
+
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .search-header .search-box input { background:transparent; border:0; }
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.settings-overlay) :is(.background-setting-row strong,.settings-section-label) { color:var(--mobile-ink); }
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.settings-overlay) .background-setting-row small { color:var(--mobile-secondary); }
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.settings-overlay) .background-setting-row { border-color:var(--mobile-separator); }
+
+/* The browse entry opens the existing native library sheet. */
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-header .space-switcher { display:contents; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-header .space-switcher > .space-button { display:none; }
+
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.cloud-agents) > .mobile-navigation-footer { display:none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .main-content-override:has(.cloud-agents) { padding-bottom:0; }
+html[data-runtime-platform="android"] .cloud-agents { --cloud-text:var(--mobile-ink); --cloud-muted:var(--mobile-secondary); --cloud-line:var(--mobile-separator); --cloud-accent:var(--mobile-accent); --cloud-control:var(--mobile-surface); background:var(--mobile-surface); }
+html[data-runtime-platform="android"] .cloud-agents :is(.cloud-agents-header,.cloud-agents-compose) { background:var(--mobile-surface); }
+html[data-runtime-platform="android"] .cloud-agents .cloud-agents-list { background:var(--mobile-fill); }
+html[data-runtime-platform="android"] .cloud-agents :is(.cloud-agents-user,.cloud-agents-list button[aria-current]) { background:var(--mobile-selected); }
+html[data-runtime-platform="android"] .cloud-agents .cloud-agents-answer { font-size:17px; line-height:1.75; }
+
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.journal-mobile) .mobile-top-area .search-header { display:none; }
+html[data-runtime-platform="android"] .journal-mobile .journal-db-body { padding:0 0 calc(84px + env(safe-area-inset-bottom,0px)); }

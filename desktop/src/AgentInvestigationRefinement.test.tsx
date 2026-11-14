@@ -2,7 +2,7 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PersistentSourceInvestigation, StandaloneInvestigation } from "./AgentInvestigation";
+import { ExistingWorkInvestigation, PersistentSourceInvestigation, StandaloneInvestigation } from "./AgentInvestigation";
 import { resetCodexAccountsForTests } from "./CodexAccounts";
 import type { LibrarySummary, SearchResult } from "./SearchTypes";
 import type { WorkSummary } from "./AgentConversationHistory";
@@ -173,6 +173,52 @@ function deferred<T>() {
 }
 
 describe("assistant refinement integration", () => {
+  it.each([false, true])("lets a fresh chat send while history is pending and ignores late restoration (contextual=%s)", async contextual => {
+    const history = deferred<Page>();
+    list = () => history.promise;
+    await render(contextual ? <PersistentSourceInvestigation result={source} initiallyOpen startFresh/> : <StandaloneInvestigation initiallyOpen startFresh/>);
+    const input = select<HTMLTextAreaElement>('[name="investigationGoal"]');
+    expect(input.disabled).toBe(false);
+    expect(document.body.textContent).not.toContain("正在恢复对话");
+    await submit("历史没返回也能发送");
+    expect(calls("create")).toHaveLength(1);
+    expect(calls("respond")).toHaveLength(1);
+    await type(input, "保留下一条草稿");
+    await act(async () => history.resolve({works:[{id:"old-work",goal:"不应自动恢复的旧对话",state:"completed"}],nextCursor:null}));
+    expect(current.work.goal).toBe("历史没返回也能发送");
+    expect(input.value).toBe("保留下一条草稿");
+    expect(invoke.mock.calls.some(([,payload])=>payload?.args?.action==="status" && payload.args.id==="old-work")).toBe(false);
+  });
+  it("keeps history errors in the history menu without blocking a fresh chat", async () => {
+    list = async () => { throw new Error("历史列表暂时不可用"); };
+    await render(<StandaloneInvestigation initiallyOpen startFresh/>);
+    expect(select<HTMLTextAreaElement>('[name="investigationGoal"]').disabled).toBe(false);
+    expect(select(".agent-status").textContent).toBe("");
+    await submit("列表失败仍可提问");
+    expect(calls("create")).toHaveLength(1);
+    await openHistory();
+    expect(select(".agent-conversations").textContent).toContain("历史列表暂时不可用");
+  });
+  it("opens an explicitly chosen conversation without waiting for the history list", async () => {
+    const history = deferred<Page>();
+    list = () => history.promise;
+    current = makeView("明确选中的对话");
+    await render(<ExistingWorkInvestigation workId="new-work"/>);
+    expect(calls("status").length).toBeGreaterThanOrEqual(2);
+    expect(select<HTMLTextAreaElement>('[name="investigationGoal"]').disabled).toBe(false);
+    expect(document.body.textContent).toContain("明确选中的对话");
+    await act(async () => history.resolve({works:[],nextCursor:null}));
+  });
+  it("restores the current page conversation independently of the global history list", async () => {
+    const history = deferred<Page>();
+    list = args => args.anchor ? Promise.resolve({works:[{id:"new-work",goal:"当前页的对话",state:"ready"}],nextCursor:null}) : history.promise;
+    current = makeView("当前页的对话", {libraryIds:[],notes:[],readingItemKeys:[]}, {kind:"note",libraryId:"library-a",documentId:"note-a",pageId:null});
+    await render(<PersistentSourceInvestigation result={source} initiallyOpen/>);
+    expect(calls("status")).toHaveLength(1);
+    expect(select<HTMLTextAreaElement>('[name="investigationGoal"]').disabled).toBe(false);
+    expect(document.body.textContent).toContain("当前页的对话");
+    await act(async () => history.resolve({works:[],nextCursor:null}));
+  });
   it.each([false, true])("keeps library checkboxes, the inline scope and sent IDs consistent when legacy current-library selection is removed=%s", async removeCurrent => {
     await render(<PersistentSourceInvestigation result={source} initiallyOpen startFresh />);
     await activate(select<HTMLButtonElement>(".agent-scope-trigger"));

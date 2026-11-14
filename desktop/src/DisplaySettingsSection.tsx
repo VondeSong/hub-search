@@ -1,5 +1,6 @@
 import type { AppSettings } from "./AppSettings";
 import { CompletedStatusIcon } from "./CompletedStatusIcon";
+import { MobileAppearanceSettings } from "./MobileAppearance";
 
 type DisplaySettingsSectionProps = {
   mobile?: boolean;
@@ -44,6 +45,7 @@ export function DisplaySettingsSection({
 }: DisplaySettingsSectionProps) {
   return (
     <>
+      {mobile && <MobileAppearanceSettings />}
       {!mobile && <div className="background-setting-row settings-category display desktop-only-setting">
         <span><strong>桌面左侧边栏</strong><small>在桌面端显示收藏、最近浏览、标签和资料库多选；关闭后保留当前顶部资料库菜单</small></span>
         <ToggleButton

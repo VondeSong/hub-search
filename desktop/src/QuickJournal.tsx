@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ExternalLink, Paperclip, RefreshCw, Send, X } from "lucide-react";
+import { Bold, CalendarDays, ExternalLink, Hash, ImagePlus, List, MoreHorizontal, Paperclip, Plus, RefreshCw, Send, X } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -8,6 +8,8 @@ import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { localJournalDate, type JournalViewConfig } from "./JournalViews";
 import type { LibrarySummary } from "./SearchTypes";
 import "./QuickJournal.css";
+import { runtimeCapabilities } from "./RuntimePlatform";
+import { QUICK_JOURNAL_UPDATED, openQuickJournalCapture } from "./QuickJournalEvents";
 import { openCloudSyncSettings } from "./CloudSyncEvents";
 
 type Attachment = { hash: string; name: string; size: number; image: boolean };
@@ -18,12 +20,15 @@ type SyncReport = { pendingUpload: number; awaitingOs: number; written: number }
 type SettingsResult = { settings: Settings; mobile: boolean; error: string; cloudEnabled?: boolean; autoSync?: boolean };
 const blank = (): Record => ({ version: 1, id: crypto.randomUUID().replace(/-/g, ""), date: localJournalDate(), text: "", attachments: [] });
 const message = (e: unknown) => String(e);
+// Survive sheet unmounts so a reopened composer waits for earlier native writes.
+let draftWrites: Promise<void> = Promise.resolve();
+let attachmentWrites: Promise<void> = Promise.resolve();
 function Image({ hash, name }: { hash: string; name: string }) {
   const [url, setUrl] = useState("");
   useEffect(() => { let live = true; void invoke<string>("quick_journal_image", { hash }).then(v => { if (live) setUrl(v); }).catch(() => {}); return () => { live = false; }; }, [hash]);
   return url ? <img src={url} alt={name} loading="lazy" /> : <span>{name} · 图片暂不可用</span>;
 }
-function Card({ item, mobile }: { item: Item; mobile: boolean }) {
+function Card({ item, mobile, onTag }: { item: Item; mobile: boolean; onTag?: (tag: string) => void }) {
   const [expanded, setExpanded] = useState(false), [error, setError] = useState("");
   // Refreshes must preserve the renderer identities and loaded image state.
   const markdownComponents = useMemo<Components>(() => ({
@@ -50,29 +55,42 @@ function Card({ item, mobile }: { item: Item; mobile: boolean }) {
     {collapsible && <button className="quick-journal-expand" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? "收起" : "展开全文"}</button>}
     {error && <p role="alert">{error}</p>}
     {item.sourceError && <p role="status">{item.sourceError}</p>}
+    {mobile && !!tagsFor(item.body).length && <footer className="quick-journal-card-tags">{[...new Set(tagsFor(item.body))].map(t => <button key={t} onClick={() => onTag?.(t)}>#{t}</button>)}</footer>}
   </article>;
 }
-export function QuickJournal({ libraries, scope, view, dataVersion }: { libraries: LibrarySummary[]; scope: string[] | null; view: JournalViewConfig; dataVersion: string }) {
+export type QuickJournalSaved = { id: string; date: string; notice: string };
+export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all", onSaved, onSyncSettings, onViewChange }: {
+  libraries: LibrarySummary[]; scope: string[] | null; view: JournalViewConfig; dataVersion: string;
+  mode?: "all" | "compose" | "feed" | "settings";
+  onSaved?: (record: QuickJournalSaved) => void;
+  onSyncSettings?: () => void;
+  onViewChange?: (change: Partial<JournalViewConfig>) => void;
+}) {
   const [draft, setDraft] = useState<Record>(blank), [ready, setReady] = useState(false), [saving, setSaving] = useState(false), [uploading, setUploading] = useState(false);
   const [items, setItems] = useState<Item[]>([]), [error, setError] = useState(""), [notice, setNotice] = useState(""), [busy, setBusy] = useState(false);
-  const [mobile, setMobile] = useState(false), [settings, setSettings] = useState<Settings>({ libraryId: "", folder: "Journals", sync: false, dateFolders: true }), [settingsReady, setSettingsReady] = useState(false);
+  const [listError, setListError] = useState("");
+  const [mobile, setMobile] = useState(mode === "compose" || runtimeCapabilities.mobile), [settings, setSettings] = useState<Settings>({ libraryId: "", folder: "Journals", sync: false, dateFolders: true }), [settingsReady, setSettingsReady] = useState(false);
   const [savedSettings, setSavedSettings] = useState<Settings | null>(null), [settingsOpen, setSettingsOpen] = useState(false);
   const [cloud, setCloud] = useState<{ enabled?: boolean; auto?: boolean }>({});
   const settingsDirty = savedSettings !== null && (settings.libraryId !== savedSettings.libraryId || settings.folder !== savedSettings.folder || settings.sync !== savedSettings.sync || settings.dateFolders !== savedSettings.dateFolders);
   const [limit, setLimit] = useState(50), [tag, setTag] = useState("");
-  const draftWrites = useRef(Promise.resolve()), draftLatest = useRef(draft), fileInput = useRef<HTMLInputElement>(null), mounted = useRef(true);
+  const [moreOpen, setMoreOpen] = useState(false), [pendingOnly, setPendingOnly] = useState(false), [draftStatus, setDraftStatus] = useState(""), [loadRevision, setLoadRevision] = useState(0);
+  const textInput = useRef<HTMLTextAreaElement>(null), photoInput = useRef<HTMLInputElement>(null), draftSequence = useRef(0);
+  const openSyncSettings = onSyncSettings || openCloudSyncSettings;
+  const draftLatest = useRef(draft), fileInput = useRef<HTMLInputElement>(null), mounted = useRef(true);
   const persist = (value: Record) => {
     draftLatest.current = value; setDraft(value);
-    draftWrites.current = draftWrites.current.catch(() => {}).then(() => invoke<void>("save_quick_journal_draft", { draft: JSON.stringify(value) }));
-    void draftWrites.current.catch(e => { if (mounted.current) setError(`草稿保存失败：${message(e)}`); });
+    const sequence = ++draftSequence.current; setDraftStatus("正在保存草稿…");
+    draftWrites = draftWrites.catch(() => {}).then(() => invoke<void>("save_quick_journal_draft", { draft: JSON.stringify(value) }));
+    void draftWrites.then(() => { if (mounted.current && sequence === draftSequence.current) setDraftStatus("草稿已保存"); }).catch(e => { if (mounted.current) setError(`草稿保存失败：${message(e)}`); });
   };
   async function refresh() {
     const result = await invoke<{ items: Item[]; error: string }>("list_quick_journal");
-    if (mounted.current) { setItems(result.items); if (result.error) setError(result.error); }
+    if (mounted.current) { setItems(result.items); setListError(result.error || ""); }
   }
   useEffect(() => {
     mounted.current = true;
-    void invoke<string>("get_quick_journal_draft").then(raw => { if (!mounted.current) return; if (raw) { const saved = JSON.parse(raw) as Record; if (saved.version !== 1 || !Array.isArray(saved.attachments)) throw new Error("草稿格式无法识别"); setDraft(saved); draftLatest.current = saved; } setReady(true); }).catch(e => setError(message(e)));
+    if (mode === "all" || mode === "compose") void attachmentWrites.catch(() => {}).then(() => draftWrites.catch(() => {})).then(() => invoke<string>("get_quick_journal_draft")).then(raw => { if (!mounted.current) return; if (raw) { const saved = JSON.parse(raw) as Record; if (saved.version !== 1 || !Array.isArray(saved.attachments)) throw new Error("草稿格式无法识别"); if (!saved.text.trim() && !saved.attachments.length) saved.date = localJournalDate(); setDraft(saved); draftLatest.current = saved; } setReady(true); }).catch(e => { if (mounted.current) setError(message(e)); });
     void invoke<SettingsResult>("get_quick_journal_settings").then(v => { if (mounted.current) {
       const value = { ...v.settings, dateFolders: v.settings.dateFolders ?? false };
       setSettings(value); setSavedSettings(value); setMobile(v.mobile); setSettingsReady(true);
@@ -80,8 +98,15 @@ export function QuickJournal({ libraries, scope, view, dataVersion }: { librarie
       if (!value.sync || (!v.mobile && !value.libraryId)) setSettingsOpen(true);
     } }).catch(e => setError(message(e)));
     return () => { mounted.current = false; };
-  }, []);
-  useEffect(() => { void refresh().catch(e => setError(message(e))); const timer = setInterval(() => { void refresh().catch(e => setError(message(e))); }, 15000); return () => clearInterval(timer); }, [dataVersion]);
+  }, [loadRevision, mode]);
+  useEffect(() => { if (mode === "compose" && ready) textInput.current?.focus({ preventScroll: true }); }, [mode, ready]);
+  useEffect(() => {
+    if (mode === "compose") return;
+    const reload = () => { void refresh().catch(e => setListError(message(e))); };
+    reload(); const timer = setInterval(reload, 15000);
+    window.addEventListener(QUICK_JOURNAL_UPDATED, reload);
+    return () => { clearInterval(timer); window.removeEventListener(QUICK_JOURNAL_UPDATED, reload); };
+  }, [dataVersion, mode]);
   useEffect(() => { setLimit(50); }, [view.query, view.period, view.day, view.month, tag, scope, view.libraries]);
   async function sync(manual = true) {
     if (busy || !settingsReady) return;
@@ -94,7 +119,7 @@ export function QuickJournal({ libraries, scope, view, dataVersion }: { librarie
       if (manual) setNotice(report ? `本轮同步已结束。本机队列：待上传 ${report.pendingUpload} 条，等待电脑写入 ${report.awaitingOs} 条，已确认写入 OS ${report.written} 条。` : "同步请求已结束，请查看卡片状态。");
     } catch (e) { setError(message(e)); setSettingsOpen(true); }
     finally {
-      await refresh().catch(e => setError(message(e)));
+      await refresh().catch(e => setListError(message(e)));
       await invoke<SettingsResult>("get_quick_journal_settings").then(v => setCloud({ enabled: v.cloudEnabled, auto: v.autoSync })).catch(() => {});
       setBusy(false);
     }
@@ -111,22 +136,31 @@ export function QuickJournal({ libraries, scope, view, dataVersion }: { librarie
     if (saving || uploading || !ready) return;
     setSaving(true); setError(""); setNotice("");
     try {
-      await draftWrites.current;
-      const result = await invoke<{ warning: string | null }>("capture_quick_journal", { record: draftLatest.current });
+      draftWrites = draftWrites.catch(() => invoke<void>("save_quick_journal_draft", { draft: JSON.stringify(draftLatest.current) }));
+      await draftWrites;
+      const captured = draftLatest.current;
+      const result = await invoke<{ warning: string | null }>("capture_quick_journal", { record: captured });
       persist(blank());
-      setNotice(result.warning || `已保存到本机，可以锁屏。${settings.sync ? "" : "云同步尚未开启。"}`);
-      await refresh();
+      // A clear failure must not turn an already durable record into a failed save.
+      const clearWarning = await draftWrites.then(() => "", () => "草稿清理失败；重新打开时可能仍显示刚保存的内容。");
+      const savedNotice = [result.warning || `已保存到本机，可以锁屏。${!settingsReady ? "请检查同步设置。" : !settings.sync ? "速记云同步尚未开启。" : cloud.enabled === false ? "云同步总开关尚未开启。" : ""}`, clearWarning].filter(Boolean).join(" ");
+      setNotice(savedNotice);
+      window.dispatchEvent(new CustomEvent(QUICK_JOURNAL_UPDATED));
+      if (mode !== "compose") await refresh();
+      onSaved?.({ id: captured.id, date: captured.date, notice: savedNotice });
       // Persisted WorkManager handles Android; this also makes desktop captures immediately visible in OS.
-      void sync(false);
+      if (!mobile) void sync(false);
     } catch (e) { setError(message(e)); } finally { setSaving(false); }
   }
   async function attach(files: FileList | null) {
     if (!files?.length) return;
+    const selectedFiles = Array.from(files);
     setUploading(true); setError("");
+    attachmentWrites = attachmentWrites.catch(() => {}).then(async () => {
     try {
-      if (files.length + draftLatest.current.attachments.length > 9) throw new Error("每条最多 9 个附件");
-      for (const file of Array.from(files)) {
-        if (file.size > 20 * 1024 * 1024) throw new Error(`${file.name} 超过 20 MB`);
+      if (selectedFiles.length + draftLatest.current.attachments.length > 9) throw new Error("每条最多 9 个附件");
+      for (const file of selectedFiles) if (file.size > 20 * 1024 * 1024) throw new Error(`${file.name} 超过 20 MB`);
+      for (const file of selectedFiles) {
         const content = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(String(reader.result).split(",", 2)[1]);
@@ -136,24 +170,54 @@ export function QuickJournal({ libraries, scope, view, dataVersion }: { librarie
         const a = await invoke<Attachment>("stage_quick_journal_attachment", { name: file.name, content });
         persist({ ...draftLatest.current, attachments: [...draftLatest.current.attachments, a] });
       }
-    } catch (e) { setError(message(e)); } finally { setUploading(false); if (fileInput.current) fileInput.current.value = ""; }
+    } catch (e) { setError(message(e)); } finally { setUploading(false); if (fileInput.current) fileInput.current.value = ""; if (photoInput.current) photoInput.current.value = ""; }
+    });
+    await attachmentWrites;
   }
   const filtered = useMemo(() => items.filter(i => {
+    if (pendingOnly && i.applied) return false;
     const date = i.record.date;
     if (view.period === "month" && !date.startsWith(view.month)) return false;
     if (view.period === "day" && date !== view.day) return false;
     const library = i.libraryId || settings.libraryId;
-    if (scope !== null && !scope.includes(library)) return false;
-    if (view.libraries !== null && !view.libraries.includes(library)) return false;
-    const text = `${i.body}\n${i.record.attachments.map(a => a.name).join(" ")}`;
+    if (!(mobile && !library)) {
+      if (scope !== null && !scope.includes(library)) return false;
+      if (view.libraries !== null && !view.libraries.includes(library)) return false;
+    }
+    const text = `${date}\n${i.body}\n${i.record.attachments.map(a => a.name).join(" ")}`;
     return text.toLocaleLowerCase().includes(view.query.toLocaleLowerCase()) && (!tag || tagsFor(i.body).includes(tag));
-  }).sort((a, b) => view.ascending ? a.record.date.localeCompare(b.record.date) : b.record.date.localeCompare(a.record.date)), [items, view, scope, settings.libraryId, tag]);
+  }).sort((a, b) => view.ascending ? a.record.date.localeCompare(b.record.date) : b.record.date.localeCompare(a.record.date)), [items, view, scope, settings.libraryId, tag, pendingOnly, mobile]);
   const tags = [...new Set(items.flatMap(i => tagsFor(i.body)))].sort();
-  return <section className="quick-journal" aria-label="速记卡片流">
+  const queue = { pending: items.filter(i => !i.uploaded).length, awaiting: items.filter(i => i.uploaded && !i.applied).length, written: items.filter(i => i.applied).length };
+  function insert(kind: "tag" | "bold" | "list") {
+    const input = textInput.current; if (!input || saving || uploading) return;
+    const start = input.selectionStart, end = input.selectionEnd, selected = draftLatest.current.text.slice(start, end);
+    const value = kind === "bold" ? `**${selected || "文字"}**` : kind === "list" ? `${start && draftLatest.current.text[start - 1] !== "\n" ? "\n" : ""}- ${selected}` : `${start && !/\s/.test(draftLatest.current.text[start - 1]) ? " " : ""}#`;
+    persist({ ...draftLatest.current, text: draftLatest.current.text.slice(0, start) + value + draftLatest.current.text.slice(end) });
+    requestAnimationFrame(() => { input.focus({ preventScroll: true }); input.setSelectionRange(start + (kind === "bold" ? 2 : value.length), start + value.length - (kind === "bold" ? 2 : 0)); });
+  }
+  const compose = <form className={`quick-journal-compose ${mobile ? "is-mobile" : ""}`} onSubmit={e => { e.preventDefault(); void save(); }}>
+    <label className="sr-only" htmlFor="quick-journal-text">此刻的想法</label>
+    <textarea ref={textInput} id="quick-journal-text" placeholder="现在的想法是…" value={draft.text} disabled={!ready || saving} maxLength={100000} onChange={e => persist({ ...draftLatest.current, text: e.target.value })} onKeyDown={e => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); void save(); } }} />
+    {!!draft.attachments.length && <ul className="quick-journal-draft-files">{draft.attachments.map((a, i) => <li key={`${a.hash}-${i}`}>{a.image ? <Image hash={a.hash} name={a.name} /> : <Paperclip size={24} />}<span>{a.name}</span><button type="button" aria-label={`移除附件 ${a.name}`} disabled={saving || uploading} onClick={() => persist({ ...draftLatest.current, attachments: draftLatest.current.attachments.filter((_, n) => i !== n) })}><X size={14} /></button></li>)}</ul>}
+    <footer>
+      {mobile ? <div className="quick-journal-compose-tools"><button type="button" aria-label="插入标签" disabled={!ready || saving} onClick={() => insert("tag")}><Hash size={22} /></button><button type="button" aria-label="添加照片" disabled={!ready || saving || uploading} onClick={() => photoInput.current?.click()}><ImagePlus size={22} /></button><button type="button" aria-label="更多记录选项" aria-expanded={moreOpen} onClick={() => setMoreOpen(!moreOpen)}><MoreHorizontal size={22} /></button></div> : <label>日期<input type="date" value={draft.date} disabled={!ready || saving} onChange={e => persist({ ...draftLatest.current, date: e.target.value })} /></label>}
+      <input ref={fileInput} className="sr-only" type="file" multiple tabIndex={-1} onChange={e => { void attach(e.target.files); }} />
+      <input ref={photoInput} className="sr-only" type="file" accept="image/*" multiple tabIndex={-1} onChange={e => { void attach(e.target.files); }} />
+      {!mobile && <button type="button" disabled={!ready || saving || uploading} onClick={() => fileInput.current?.click()}><Paperclip size={16} />{uploading ? "保存附件…" : "照片 / 附件"}</button>}
+      <button type="submit" disabled={!ready || saving || uploading || (!draft.text.trim() && !draft.attachments.length)}><Send size={17} />{saving ? "保存中…" : "记下"}</button>
+    </footer>
+    {mobile && moreOpen && <div className="quick-journal-more"><label>记录日期<input type="date" aria-label="记录日期" value={draft.date} disabled={!ready || saving} onChange={e => persist({ ...draftLatest.current, date: e.target.value })} /></label><div><button type="button" disabled={!ready || saving || uploading} onClick={() => fileInput.current?.click()}><Paperclip size={17} />添加文件</button><button type="button" disabled={!ready || saving} onClick={() => insert("bold")}><Bold size={17} />加粗</button><button type="button" disabled={!ready || saving} onClick={() => insert("list")}><List size={17} />列表</button></div><small>每条最多 9 个附件，单个 20 MB。</small></div>}
+    {mobile && <div className="quick-journal-draft-status"><span role="status">{uploading ? "正在保存附件…" : draftStatus}</span><button type="button" onClick={() => setMoreOpen(!moreOpen)}><CalendarDays size={13} />{draft.date === localJournalDate() ? "今天" : draft.date}</button></div>}
+  </form>;
+  return <section className={`quick-journal quick-journal-${mode}`} aria-label={mode === "compose" ? "速记录入" : mode === "settings" ? "速记同步" : "速记卡片流"}>
+    {mobile && mode !== "compose" && mode !== "settings" && <header className="quick-journal-mobile-heading"><h1>日志</h1><p>按天留下想法，随时回来接着看。</p><button onClick={openSyncSettings}>{queue.pending + queue.awaiting ? `${queue.pending + queue.awaiting} 条记录等待同步或写入` : "查看同步状态"}<RefreshCw size={15} /></button></header>}
+    {mode === "settings" && <div className="quick-journal-queue"><span><strong>{queue.pending}</strong>待上传</span><span><strong>{queue.awaiting}</strong>等待电脑</span><span><strong>{queue.written}</strong>已写入 OS</span></div>}
+    {(mode === "settings" || (!mobile && mode === "all")) &&
     <details className="quick-journal-settings" open={settingsOpen} onToggle={e => setSettingsOpen(e.currentTarget.open)}><summary>速记保存与同步设置</summary>
       <p>记录按所选日期写入日记。电脑作为唯一写入端；手机保留本机副本。云同步复用设置中的 OSS 连接及总开关。</p>
       <p role="status">已保存的速记同步：{savedSettings?.sync ? "开启" : "关闭"}；云同步总开关：{cloud.enabled === undefined ? "待检查" : cloud.enabled ? "开启" : "关闭"}；自动同步：{cloud.auto === undefined ? "待检查" : cloud.auto ? "开启" : "关闭"}</p>
-      <button onClick={openCloudSyncSettings}>打开云同步设置</button>
+      <button onClick={openSyncSettings}>打开云同步设置</button>
       {!mobile && <label>OS 资料库<select aria-label="速记 OS 资料库" value={settings.libraryId} disabled={!settingsReady || busy} onChange={e => setSettings({ ...settings, libraryId: e.target.value })}><option value="">请选择</option>{libraries.filter(l => l.provider === "obsidian").map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>}
       {!mobile && <><label>{settings.dateFolders ? "日记根目录" : "日记固定目录"}<input aria-label="速记日记目录" disabled={!settingsReady || busy} value={settings.folder} onChange={e => setSettings({ ...settings, folder: e.target.value })} placeholder="Journals" /></label>
         <label><input type="checkbox" disabled={!settingsReady || busy} checked={settings.dateFolders} onChange={e => setSettings({ ...settings, dateFolders: e.target.checked })} />按记录日期分年/月目录</label>
@@ -163,23 +227,18 @@ export function QuickJournal({ libraries, scope, view, dataVersion }: { librarie
       <label><input type="checkbox" disabled={!settingsReady || busy} checked={settings.sync} onChange={e => setSettings({ ...settings, sync: e.target.checked })} />开启本设备速记云同步</label>
       {settingsDirty && <p role="status">设置尚未保存，当前同步仍使用已保存的配置。</p>}
       <button disabled={!settingsReady || busy} onClick={() => { void saveSettings(); }}>保存设置</button>
-    </details>
-    <form className="quick-journal-compose" onSubmit={e => { e.preventDefault(); void save(); }}>
-      <label className="sr-only" htmlFor="quick-journal-text">此刻的想法</label>
-      <textarea id="quick-journal-text" placeholder="此刻的想法… 支持 #标签" value={draft.text} disabled={!ready || saving} maxLength={100000} onChange={e => persist({ ...draftLatest.current, text: e.target.value })} />
-      {!!draft.attachments.length && <ul>{draft.attachments.map((a, i) => <li key={`${a.hash}-${i}`}><Paperclip size={14} /><span>{a.name}</span><button type="button" aria-label={`移除附件 ${a.name}`} disabled={saving || uploading} onClick={() => persist({ ...draftLatest.current, attachments: draft.attachments.filter((_, n) => i !== n) })}><X size={14} /></button></li>)}</ul>}
-      <footer><label>日期<input type="date" value={draft.date} disabled={!ready || saving} onChange={e => persist({ ...draftLatest.current, date: e.target.value })} /></label>
-        <input ref={fileInput} className="sr-only" type="file" multiple tabIndex={-1} onChange={e => { void attach(e.target.files); }} />
-        <button type="button" disabled={!ready || saving || uploading} onClick={() => fileInput.current?.click()}><Paperclip size={16} />{uploading ? "保存附件…" : "照片 / 附件"}</button>
-        <button type="submit" disabled={!ready || saving || uploading || (!draft.text.trim() && !draft.attachments.length)}><Send size={16} />{saving ? "保存中…" : "记下"}</button>
-      </footer>
-    </form>
+    </details>}
+    {mode !== "settings" && mode !== "feed" && compose}
     {notice && <p className="quick-journal-notice" role="status">{notice}</p>}
-    {error && <div className="quick-journal-error" role="alert">{error}<button onClick={() => { setError(""); void refresh().catch(e => setError(message(e))); }}>重新读取</button></div>}
-    <div className="quick-journal-controls"><span>{filtered.length} 条记录</span><button disabled={busy || !settingsReady} onClick={() => { void sync(); }}><RefreshCw size={15} />{busy ? "处理中…" : "同步 / 重试"}</button>{!!tags.length && <label>标签<select aria-label="速记标签" value={tag} onChange={e => setTag(e.target.value)}><option value="">全部</option>{tags.map(t => <option key={t} value={t}>#{t}</option>)}</select></label>}</div>
-    {filtered.slice(0, limit).map(i => <Card key={i.record.id} item={i} mobile={mobile} />)}
-    {!filtered.length && <p className="quick-journal-empty">还没有符合筛选的记录。写下一个想法，或调整日期和资料库。</p>}
-    {filtered.length > limit && <button onClick={() => setLimit(limit + 50)}>加载更多记录</button>}
+    {(error || listError) && <div className="quick-journal-error" role="alert">{error || listError}<button onClick={() => { setError(""); setListError(""); if (!ready || !settingsReady) setLoadRevision(v => v + 1); if (mode !== "compose") void refresh().catch(e => setListError(message(e))); }}>重新读取</button></div>}
+    {mode === "compose" && <p className="quick-journal-capture-help">保存到本机后可锁屏。{!settingsReady ? "正在读取同步设置。" : !settings.sync ? "速记云同步尚未开启。" : cloud.enabled === false ? "云同步总开关尚未开启。" : "后台会继续上传。"}<button onClick={openSyncSettings}>同步设置</button></p>}
+    {mode !== "compose" && <>
+    {mobile && mode === "feed" && <div className="quick-journal-mobile-filters"><label>搜索记录或附件<input type="search" aria-label="搜索记录或附件" placeholder="搜索记录或附件" value={view.query} onChange={e => onViewChange?.({ query: e.target.value })} /></label><div><button aria-pressed={!pendingOnly && view.period === "all"} onClick={() => { setPendingOnly(false); onViewChange?.({ period: "all" }); }}>全部</button><button aria-pressed={!pendingOnly && view.period === "day" && view.day === localJournalDate()} onClick={() => { setPendingOnly(false); onViewChange?.({ period: "day", day: localJournalDate() }); }}>今天</button><button aria-pressed={pendingOnly} onClick={() => { setPendingOnly(true); onViewChange?.({ period: "all" }); }}>待同步</button><button onClick={openQuickJournalCapture}><Plus size={16} />记一条</button></div></div>}
+    <div className="quick-journal-controls">{mode !== "settings" && <span>{filtered.length} 条记录</span>}<button disabled={busy || !settingsReady} onClick={() => { void sync(); }}><RefreshCw size={15} />{busy ? "处理中…" : "同步 / 重试"}</button>{mode !== "settings" && !!tags.length && <label>标签<select aria-label="速记标签" value={tag} onChange={e => setTag(e.target.value)}><option value="">全部</option>{tags.map(t => <option key={t} value={t}>#{t}</option>)}</select></label>}</div>
+    {mode !== "settings" && filtered.slice(0, limit).map(i => <Card key={i.record.id} item={i} mobile={mobile} onTag={setTag} />)}
+    {mode !== "settings" && !filtered.length && <p className="quick-journal-empty">还没有符合筛选的记录。写下一个想法，或调整日期和资料库。</p>}
+    {mode !== "settings" && filtered.length > limit && <button onClick={() => setLimit(limit + 50)}>加载更多记录</button>}
+    </>}
   </section>;
 }
 export function tagsFor(text: string) { return [...text.matchAll(/(?:^|\s)#([^\s#.,，。!?！？\[\]<>]+)/gu)].map(m => m[1]); }

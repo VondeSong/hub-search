@@ -54,6 +54,37 @@ pub(super) fn config(c: &Connection) -> Result<OssConfig, String> {
     serde_json::from_str(&metadata_string(c, "flashcard_oss_config"))
         .map_err(|_| "尚未配置阿里云 OSS".into())
 }
+fn first_connection(c: &Connection) -> bool {
+    [
+        "flashcard_cloud_provider",
+        "flashcard_webdav_url",
+        "flashcard_oss_config",
+    ]
+    .iter()
+    .all(|key| metadata_string(c, key).is_empty())
+}
+
+#[cfg(test)]
+#[test]
+fn only_fresh_devices_select_oss_without_migration() {
+    let c = Connection::open_in_memory().unwrap();
+    c.execute_batch("CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);")
+        .unwrap();
+    assert!(first_connection(&c));
+    for (key, value) in [
+        ("flashcard_cloud_provider", "webdav"),
+        ("flashcard_cloud_provider", "oss"),
+        ("flashcard_webdav_url", "https://example.invalid/existing"),
+        ("flashcard_oss_config", "existing or damaged configuration"),
+    ] {
+        c.execute("DELETE FROM metadata", []).unwrap();
+        meta(&c, key, value).unwrap();
+        assert!(
+            !first_connection(&c),
+            "Existing {key} must keep migration protection"
+        );
+    }
+}
 fn meta(c: &Connection, key: &str, value: &str) -> Result<(), String> {
     c.execute("INSERT INTO metadata(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",params![key,value])
         .map_err(|e| e.to_string())?;
@@ -201,6 +232,7 @@ async fn save_configuration(
     {
         return Err("连接名称需为 1–60 个字符，不能包含换行或控制字符".into());
     }
+    let initial_connection = first_connection(&c);
     let active_change =
         provider(&c) == "oss" && config(&c)?.normalized()?.namespace() != oss.namespace();
     let secret = secret.filter(|s| !s.is_empty());
@@ -257,7 +289,7 @@ async fn save_configuration(
         if let Some(name) = &name {
             meta(&tx, "cloud_connection_name", name)?;
         }
-        if change == Some(ConnectionChange::Connect) {
+        if change == Some(ConnectionChange::Connect) || initial_connection {
             meta(&tx, "flashcard_cloud_provider", "oss")?;
             meta(&tx, "flashcard_sync_last_error", "")?;
             meta(&tx, "flashcard_sync_last_success", "0")?;
