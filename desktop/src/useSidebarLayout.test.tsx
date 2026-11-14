@@ -4,8 +4,8 @@ import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { useSidebarLayout } from "./useSidebarLayout";
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); });
-function Sample() {
-  const layout = useSidebarLayout("tasks");
+function Sample({view = "tasks"}: {view?: string}) {
+  const layout = useSidebarLayout(view);
   return <div className="unified-shell"><button className="workspace-panel-toggle" onClick={layout.togglePanel}>toggle</button><output>{layout.mode}:{String(layout.panelExpanded)}:{layout.sidebarWidth}</output><div className="context-sidebar-resizer" role="separator" tabIndex={0} onPointerDown={layout.resizeSidebar} onKeyDown={layout.resizeSidebarWithKeyboard} onDoubleClick={layout.resetSidebarWidth}/><aside className="task-module-sidebar"><button>view</button></aside></div>;
 }
 function pointerEvent(type: string, clientX: number) {
@@ -29,6 +29,27 @@ it("returns to the user's expanded layout after leaving focus", async () => {
     await act(async()=>toggle.click()); expect(host.querySelector("output")!.textContent).toBe("focus:false:240");
     await act(async()=>toggle.click()); expect(host.querySelector("output")!.textContent).toBe("standard:true:240");
   } finally { await act(async()=>root.unmount()); host.remove(); }
+});
+
+it("keeps the library navigation width separate from other workspaces", async () => {
+  localStorage.setItem("hub.sidebar.context-width-v1", "362");
+  const {host,root}=await exercise(false);
+  try {
+    expect(host.querySelector("output")!.textContent).toBe("standard:true:362");
+    await act(async()=>root.render(<Sample view="libraries"/>));
+    expect(host.querySelector("output")!.textContent).toBe("standard:true:248");
+    const separator=host.querySelector<HTMLElement>(".context-sidebar-resizer")!;
+    await act(async()=>separator.dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowRight",bubbles:true,cancelable:true})));
+    expect(localStorage.getItem("hub.library-browse.navigation-width-v1")).toBe("256");
+    expect(localStorage.getItem("hub.sidebar.context-width-v1")).toBe("362");
+    await act(async()=>root.render(<Sample view="tasks"/>));
+    expect(host.querySelector("output")!.textContent).toBe("standard:true:362");
+    await act(async()=>root.render(<Sample view="libraries"/>));
+    expect(host.querySelector("output")!.textContent).toBe("standard:true:256");
+    await act(async()=>separator.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true,cancelable:true})));
+    expect(host.querySelector("output")!.textContent).toBe("standard:true:248");
+    expect(localStorage.getItem("hub.sidebar.context-width-v1")).toBe("362");
+  } finally {await act(async()=>root.unmount());host.remove();}
 });
 it("opens a narrow panel without changing the saved mode and returns focus on Escape", async () => {
   const {host,root,toggle}=await exercise(true);
