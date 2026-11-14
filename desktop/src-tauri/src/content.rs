@@ -1,6 +1,6 @@
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use url::Url;
 
 const TARGET_CHARS: usize = 1_000;
@@ -107,6 +107,95 @@ pub fn craft_page_preview(
     craft_page_evidence(markdown, root_document_id, requested_page_id)
         .filter(|body| !body.is_empty())
         .unwrap_or_else(|| markdown.to_string())
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct CraftPageNode {
+    pub id: String,
+    pub title: String,
+    pub parent_id: String,
+}
+
+pub(crate) fn craft_page_nodes(markdown: &str, root: &str) -> Result<Vec<CraftPageNode>, String> {
+    let mut stack = Vec::<String>::new();
+    let mut pages = Vec::<CraftPageNode>::new();
+    let mut seen = HashMap::<String, String>::new();
+    let mut page_indices = HashMap::<String, usize>::new();
+    let mut fence = None;
+    let mut content_indents = Vec::new();
+    for raw in markdown.lines() {
+        let line = raw.trim();
+        let indent = raw.len() - raw.trim_start().len();
+        // Craft's content boundary ends an unterminated Markdown code fence.
+        if line == "</content>" && content_indents.last() == Some(&indent) {
+            content_indents.pop();
+            fence = None;
+            continue;
+        }
+        if line.starts_with("```") || line.starts_with("~~~") {
+            let marker = &line[..3];
+            if fence == Some(marker) {
+                fence = None;
+            } else if fence.is_none() {
+                fence = Some(marker);
+            }
+            continue;
+        }
+        if fence.is_some() {
+            continue;
+        }
+        if line == "<content>" {
+            content_indents.push(indent);
+            continue;
+        }
+        if line.starts_with("<page ") {
+            let id = attribute_value(line, "id")
+                .filter(|id| !id.is_empty())
+                .ok_or("页面缺少身份")?;
+            let parent = if id == root && stack.is_empty() {
+                String::new()
+            } else {
+                stack.last().cloned().unwrap_or_else(|| root.to_string())
+            };
+            if stack.contains(&id) || seen.get(&id).is_some_and(|old| old != &parent) {
+                return Err("页面身份或父级冲突".into());
+            }
+            let first = seen.insert(id.clone(), parent.clone()).is_none();
+            if id != root && first {
+                page_indices.insert(id.clone(), pages.len());
+                pages.push(CraftPageNode {
+                    id: id.clone(),
+                    title: attribute_value(line, "title").unwrap_or_default(),
+                    parent_id: parent,
+                });
+            }
+            stack.push(id);
+        } else if line == "</page>" {
+            if stack.pop().is_none() {
+                return Err("页面结构不完整".into());
+            }
+        } else if let Some(title) = tag_text(line, "pageTitle") {
+            if let Some(page) = stack
+                .last()
+                .and_then(|id| page_indices.get(id))
+                .and_then(|index| pages.get_mut(*index))
+            {
+                if !page.title.is_empty() && page.title != title {
+                    return Err("页面标题快照冲突".into());
+                }
+                page.title = title;
+            }
+        }
+    }
+    if !stack.is_empty() {
+        return Err("页面结构不完整".into());
+    }
+    for page in &mut pages {
+        if page.title.trim().is_empty() {
+            page.title = "未命名页面".into();
+        }
+    }
+    Ok(pages)
 }
 
 /// Exact page projection. Missing pages and empty pages must not fall back to

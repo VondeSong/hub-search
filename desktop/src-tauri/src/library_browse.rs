@@ -210,6 +210,10 @@ struct BrowseDocument {
     content_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     node_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    document_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    page_id: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -460,6 +464,102 @@ pub(crate) struct LibraryContents {
     craft_locations_synced: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     notice: Option<&'static str>,
+    page_folders: HashMap<String, String>,
+    folder_notices: HashMap<String, &'static str>,
+}
+
+fn craft_contents(
+    connection: &Connection,
+    library: &str,
+    folders: &mut Vec<BrowseFolder>,
+    documents: &mut Vec<BrowseDocument>,
+) -> Result<(HashMap<String, String>, bool), String> {
+    let mut page_folders = HashMap::new();
+    let mut incomplete = false;
+    let folder_id = |root: &str, page: &str| format!("craft-page:{}:{root}:{page}", root.len());
+    let mut added = Vec::new();
+    for document in documents.iter_mut() {
+        let markdown: String = connection
+            .query_row(
+                "SELECT markdown FROM documents WHERE space_id=?1 AND id=?2",
+                params![library, document.id],
+                |row| row.get(0),
+            )
+            .map_err(|error| error.to_string())?;
+        let pages = match crate::content::craft_page_nodes(&markdown, &document.id) {
+            Ok(pages) => pages,
+            Err(_) => {
+                incomplete = true;
+                continue;
+            }
+        };
+        if pages.is_empty() {
+            continue;
+        }
+        let parent_pages = pages
+            .iter()
+            .map(|page| page.parent_id.as_str())
+            .collect::<HashSet<_>>();
+        let root_folder = folder_id(&document.id, &document.id);
+        folders.push(BrowseFolder {
+            id: root_folder.clone(),
+            name: document.title.clone(),
+            parent_id: document.folder_id.clone(),
+        });
+        page_folders.insert(root_folder.clone(), document.id.clone());
+        document.folder_id = Some(root_folder);
+        for page in &pages {
+            let id = format!("craft-subpage:{}:{}", document.id, page.id);
+            let parent = folder_id(&document.id, &page.parent_id);
+            let own_folder = folder_id(&document.id, &page.id);
+            let has_children = parent_pages.contains(page.id.as_str());
+            if has_children {
+                folders.push(BrowseFolder {
+                    id: own_folder.clone(),
+                    name: page.title.clone(),
+                    parent_id: Some(parent.clone()),
+                });
+                page_folders.insert(own_folder.clone(), id.clone());
+            }
+            added.push(BrowseDocument {
+                id,
+                title: page.title.clone(),
+                path: document.path.clone(),
+                folder_id: Some(if has_children { own_folder } else { parent }),
+                modified_at: document.modified_at,
+                content_type: Some("craft_subpage".into()),
+                node_id: None,
+                document_id: Some(document.id.clone()),
+                page_id: Some(page.id.clone()),
+            });
+        }
+    }
+    documents.extend(added);
+    Ok((page_folders, incomplete))
+}
+
+pub(crate) fn page_content_ids(
+    connection: &Connection,
+    libraries: &[String],
+    pages: &[String],
+) -> Result<Vec<String>, String> {
+    let pages = pages.iter().map(String::as_str).collect::<HashSet<_>>();
+    let mut ids = Vec::new();
+    let mut query = connection.prepare("SELECT id,COALESCE(NULLIF(page_id,''),document_id) FROM content_items WHERE space_id=?1").map_err(|error| error.to_string())?;
+    for library in libraries {
+        let rows = query
+            .query_map([library], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(|error| error.to_string())?;
+        for row in rows {
+            let (id, page) = row.map_err(|error| error.to_string())?;
+            if pages.contains(page.as_str()) {
+                ids.push(id);
+            }
+        }
+    }
+    Ok(ids)
 }
 
 #[tauri::command]
@@ -483,10 +583,10 @@ pub(crate) async fn library_contents(
 }
 
 fn read_contents(connection: &Connection, library_id: &str) -> Result<LibraryContents, String> {
-    let provider: String = connection.query_row(
-        "SELECT provider FROM libraries WHERE id=?1 AND enabled=1 AND provider IN ('craft','obsidian','feishu','dida365')",
+    let (provider, location): (String, String) = connection.query_row(
+        "SELECT provider,COALESCE(location,'') FROM libraries WHERE id=?1 AND enabled=1 AND provider IN ('craft','obsidian','feishu','dida365')",
         [library_id],
-        |row| row.get(0),
+        |row| Ok((row.get(0)?, row.get(1)?)),
     ).map_err(|_| "此资料库不可浏览")?;
     let mut folder_query = connection.prepare(
         "SELECT id, name, path, parent_id FROM folders WHERE space_id=?1 ORDER BY lower(name), id",
@@ -537,6 +637,8 @@ fn read_contents(connection: &Connection, library_id: &str) -> Result<LibraryCon
                 modified_at: row.get(4)?,
                 content_type: row.get(5)?,
                 node_id: None,
+                document_id: None,
+                page_id: None,
             })
         })
         .map_err(|error| error.to_string())?
@@ -544,20 +646,63 @@ fn read_contents(connection: &Connection, library_id: &str) -> Result<LibraryCon
         .map_err(|error| error.to_string())?;
     let mut documents = documents;
     let mut notice = None;
+    let mut page_folders = HashMap::new();
+    let mut folder_notices = HashMap::new();
     if provider == "feishu" {
         if let Some(nodes) = read_feishu_nodes(connection, library_id)? {
+            for node in &nodes {
+                if !documents
+                    .iter()
+                    .any(|document| node.document_ids.contains(&document.id))
+                {
+                    folder_notices.insert(
+                        node.id.clone(),
+                        "目录节点可见，但正文尚未缓存或当前授权无法读取；这不表示空目录。",
+                    );
+                }
+            }
             (folders, documents) = feishu_contents(nodes, documents);
+            for document in &documents {
+                if let Some(node) = &document.node_id {
+                    if document.folder_id.as_deref() == Some(node) {
+                        page_folders
+                            .entry(node.clone())
+                            .or_insert_with(|| document.id.clone());
+                    }
+                }
+            }
         } else {
             for document in &mut documents {
                 document.folder_id = None;
             }
-            notice = Some("当前显示已缓存的文档。知识空间同步后可浏览 Wiki 目录。");
+            notice = Some(if location.starts_with("space:") {
+                "尚未缓存 Wiki 目录，请同步；当前显示已缓存文档。"
+            } else {
+                "当前来源未提供 Wiki 层级，按已缓存文档浏览。"
+            });
         }
     } else if provider == "dida365" {
         (folders, documents) = dida_contents(connection, library_id, documents)?;
+        for document in &documents {
+            if document.folder_id.as_deref()
+                == Some(format!("dida-parent:{}", document.id).as_str())
+            {
+                page_folders.insert(document.folder_id.clone().unwrap(), document.id.clone());
+            }
+        }
         notice = Some("显示已同步的清单、分组和子任务。");
+    } else if provider == "craft" {
+        let (mapping, incomplete) =
+            craft_contents(connection, library_id, &mut folders, &mut documents)?;
+        page_folders = mapping;
+        if incomplete {
+            notice = Some("部分页面结构不完整，已保留文档入口；同步后可重试。");
+        }
     } else if provider == "obsidian" {
         let excluded = crate::library_excluded_paths(connection, library_id)?;
+        documents.retain(|document| {
+            !crate::sources::obsidian_path_is_excluded(&document.path, &excluded)
+        });
         let snapshot = connection.query_row(
             "SELECT value FROM metadata WHERE key=?1",
             [format!("obsidian_browse_folders:{library_id}")],
@@ -595,6 +740,8 @@ fn read_contents(connection: &Connection, library_id: &str) -> Result<LibraryCon
         documents,
         craft_locations_synced,
         notice,
+        page_folders,
+        folder_notices,
     })
 }
 
@@ -602,6 +749,121 @@ fn read_contents(connection: &Connection, library_id: &str) -> Result<LibraryCon
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn craft_page_navigation_preserves_real_hierarchy_and_rejects_partial_input() {
+        let markdown = "<page id=\"root\">\n<pageTitle>根</pageTitle>\n<page id=\"child\">\n<pageTitle>同名</pageTitle>\n<page id=\"nested\">\n<pageTitle>同名</pageTitle>\n</page>\n</page>\n</page>";
+        let pages = crate::content::craft_page_nodes(markdown, "root").unwrap();
+        assert_eq!(pages.len(), 2);
+        assert_eq!(pages[0].parent_id, "root");
+        assert_eq!(pages[1].parent_id, "child");
+        assert_eq!(pages[0].title, pages[1].title);
+        let repeated = format!("{markdown}\n{markdown}");
+        assert_eq!(
+            crate::content::craft_page_nodes(&repeated, "root").unwrap(),
+            pages
+        );
+        let code = "<page id=\"root\">\n<content>\n<page id=\"a\">\n<content>\n```xml\n<page id=\"example\">\n</content>\n</page>\n<page id=\"b\">\n</page>\n</content>\n</page>";
+        assert_eq!(
+            crate::content::craft_page_nodes(code, "root")
+                .unwrap()
+                .iter()
+                .map(|page| page.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["a", "b"]
+        );
+        assert!(crate::content::craft_page_nodes("<page id=\"a\">", "root").is_err());
+        assert!(crate::content::craft_page_nodes(
+            "<page id=\"a\">\n<page id=\"a\">\n</page>\n</page>",
+            "root"
+        )
+        .is_err());
+        assert!(
+            crate::content::craft_page_nodes("```xml\n<page id=\"example\">\n```", "root")
+                .unwrap()
+                .is_empty()
+        );
+        let connection = Connection::open_in_memory().unwrap();
+        connection
+            .execute_batch("CREATE TABLE documents(space_id TEXT,id TEXT,markdown TEXT);")
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO documents VALUES('craft','root',?1)",
+                [markdown],
+            )
+            .unwrap();
+        let mut documents = vec![test_document("root")];
+        let mut folders = Vec::new();
+        let (mapping, incomplete) =
+            craft_contents(&connection, "craft", &mut folders, &mut documents).unwrap();
+        assert!(!incomplete);
+        assert_eq!(documents.len(), 3);
+        assert_eq!(mapping.len(), 2);
+        assert_eq!(documents[2].document_id.as_deref(), Some("root"));
+        assert_eq!(documents[2].page_id.as_deref(), Some("nested"));
+        assert_eq!(
+            documents[2].folder_id.as_deref(),
+            Some("craft-page:4:root:child")
+        );
+    }
+
+    #[test]
+    fn page_scope_includes_only_selected_page_chunks_in_visible_libraries() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection.execute_batch("CREATE TABLE content_items(id TEXT,space_id TEXT,document_id TEXT,page_id TEXT);
+            INSERT INTO content_items VALUES('a','visible','root','child'),('b','visible','root','sibling'),('c','hidden','root','child'),('d','visible','root','');").unwrap();
+        assert_eq!(
+            page_content_ids(&connection, &["visible".into()], &["child".into()]).unwrap(),
+            vec!["a"]
+        );
+        assert_eq!(
+            page_content_ids(&connection, &["visible".into()], &["root".into()]).unwrap(),
+            vec!["d"]
+        );
+        assert!(page_content_ids(&connection, &["visible".into()], &[])
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    #[ignore = "需要显式指定本机只读验收数据库"]
+    fn real_cached_libraries_readonly_acceptance() {
+        let path = std::env::var("HUB_LIBRARY_ACCEPTANCE_DB").expect("缺少只读验收库");
+        let connection =
+            Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        let libraries = connection.prepare("SELECT id,provider FROM libraries WHERE enabled=1 AND provider IN ('craft','obsidian','feishu','dida365')").unwrap()
+            .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))).unwrap().collect::<Result<Vec<_>,_>>().unwrap();
+        let mut providers = HashSet::new();
+        for (library, provider) in libraries {
+            providers.insert(provider.clone());
+            let start = std::time::Instant::now();
+            let contents = read_contents(&connection, &library).unwrap();
+            let elapsed = start.elapsed();
+            let ids = contents
+                .folders
+                .iter()
+                .map(|folder| folder.id.as_str())
+                .collect::<HashSet<_>>();
+            assert_eq!(ids.len(), contents.folders.len());
+            assert!(contents
+                .documents
+                .iter()
+                .all(|document| document.document_id.is_none()
+                    || document.content_type.as_deref() == Some("craft_subpage")));
+            println!(
+                "provider={provider} folders={} documents={} elapsed_ms={}",
+                contents.folders.len(),
+                contents.documents.len(),
+                elapsed.as_millis()
+            );
+            assert!(
+                elapsed < std::time::Duration::from_secs(2),
+                "本机真实规模目录读取超过2秒预算"
+            );
+        }
+        assert_eq!(providers.len(), 4, "必须覆盖四类真实缓存");
+    }
 
     #[test]
     fn craft_folder_inventory_preserves_identity_and_rejects_bad_snapshots() {
@@ -664,7 +926,15 @@ mod tests {
             crate::sources::scan_obsidian_vault_with_folders(&vault, &["忽略".into()], &|| Ok(()))
                 .unwrap();
         save_obsidian_folders(&connection, "vault", &dirs).unwrap();
+        connection
+            .execute(
+                "UPDATE libraries SET metadata_json=?1 WHERE id='vault'",
+                [r#"{"excludedPaths":["忽略"]}"#],
+            )
+            .unwrap();
+        connection.execute("INSERT INTO documents(space_id,id,title,path,markdown,indexed_at,content_hash,provider) VALUES('vault','excluded','不应显示','忽略/笔记.md','原文',0,'hash','obsidian')", []).unwrap();
         let contents = read_contents(&connection, "vault").unwrap();
+        assert!(contents.documents.is_empty());
         let names = contents
             .folders
             .iter()
@@ -812,6 +1082,8 @@ mod tests {
             modified_at: None,
             content_type: None,
             node_id: None,
+            document_id: None,
+            page_id: None,
         }
     }
 }

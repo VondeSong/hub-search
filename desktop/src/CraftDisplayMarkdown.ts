@@ -1,3 +1,5 @@
+import { collectionMarkdown } from "./CraftCollectionData";
+
 function normalizeCraftContentIndentation(markdown: string): string {
   const contentIndentStack: number[] = [];
   let sawContentContainer = false;
@@ -21,11 +23,17 @@ function normalizeCraftContentIndentation(markdown: string): string {
 }
 
 export function renderableCraftMarkdown(markdown: string): string {
-  const normalizedSubpageLinks = markdown.replace(
+  const collections = collectionMarkdown(normalizeCraftContentIndentation(markdown));
+  let codePrefix = "\uE000hub-code:";
+  while (collections.includes(codePrefix)) codePrefix += "x";
+  const code = new Map<string, string>();
+  const normalizedSubpageLinks = collections.replace(/(`+)[\s\S]*?\1(?!`)|^(~{3,})[^\n]*\n[\s\S]*?^\2[ \t]*$/gm, value => {
+    const key = `${codePrefix}${code.size}\uE001`; code.set(key, value); return key;
+  }).replace(
     /\[([^\]\r\n]+)]\(\s*#craft-subpage=([A-Za-z0-9_-]+(?:[ \t]*\r?\n[ \t]*[A-Za-z0-9_-]+)*)\s*\)/g,
     (_match, label: string, documentId: string) => `[${label}](#craft-subpage=${documentId.replace(/\s+/g, "")})`,
   );
-  return normalizeCraftContentIndentation(normalizedSubpageLinks)
+  return normalizedSubpageLinks
     .replace(/!\[([^\]\r\n]*)\][ \t]*(?:\r?\n[ \t]*)+\((https?:\/\/[^)\r\n]+)\)/g, "![$1]($2)")
     .replace(/(?:<callout\b[^>]*>[\s\S]*?<\/callout>\s*)+/gi, (group: string) => {
       const bodies = Array.from(group.matchAll(/<callout\b[^>]*>([\s\S]*?)<\/callout>/gi), (match) => match[1].trim());
@@ -55,5 +63,6 @@ export function renderableCraftMarkdown(markdown: string): string {
     })
     .replace(/<\/?content(?:\s[^>]*)?>/gi, "")
     .replace(/<br\s*\/?>/gi, "  \n")
-    .replace(/<\/?[a-z][^>\r\n]*>/gi, "");
+    .replace(/<\/?[a-z][^>\r\n]*>/gi, "")
+    .replace(new RegExp(`${codePrefix}\\d+\uE001`, "g"), value => code.get(value) ?? value);
 }

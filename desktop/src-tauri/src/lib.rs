@@ -17862,6 +17862,7 @@ async fn local_search(
     folder_id: Option<String>,
     folder_ids: Option<Vec<String>>,
     document_ids: Option<Vec<String>>,
+    page_ids: Option<Vec<String>>,
     updated_after: Option<i64>,
     include_craft_pages: Option<bool>,
     include_dida_tasks: Option<bool>,
@@ -17881,6 +17882,7 @@ async fn local_search(
         let selected_space_ids = space_ids.or_else(|| space_id.map(|id| vec![id]))
             .map(|ids|ids.into_iter().filter(|id|visible.contains(id)).collect::<Vec<_>>()).unwrap_or(visible);
         if selected_space_ids.is_empty() {return Ok(Vec::new());}
+        let page_items = page_ids.as_ref().map(|pages| library_browse::page_content_ids(&connection, &selected_space_ids, pages)).transpose()?;
         let include_pages = include_craft_pages.unwrap_or(true);
         let include_tasks = include_dida_tasks.unwrap_or(true);
         let field_scope = search_scope.as_deref().unwrap_or("all");
@@ -17898,6 +17900,7 @@ async fn local_search(
                 Some(selected_space_ids.as_slice()),
                 folder_ids.as_deref().or(legacy_folder),
                 document_ids.as_deref(),
+                page_items.as_deref(),
                 updated_after,
                 include_pages || include_tasks,
                 include_image_ocr.unwrap_or(true),
@@ -31324,6 +31327,9 @@ fn local_document(
 ) -> Result<String, String> {
     let path = database_path(&app)?;
     let connection = open_database(&path)?;
+    if hidden_library_ids(&path, &connection)?.contains(&space_id) {
+        return Err("资料库已移除或停用".into());
+    }
     let (markdown, blob_hash, provider): (String, Option<String>, String) = connection
         .query_row(
             "SELECT markdown, blob_hash, provider FROM documents

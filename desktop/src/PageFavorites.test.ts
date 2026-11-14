@@ -11,6 +11,18 @@ const hit: SearchResult = {
 };
 
 describe("page favorites", () => {
+  it("keeps explicitly saved Craft subpages distinct through persistence and removal", () => {
+    const child = {...hit, favoriteKind: "page" as const, pageId: "child", blockId: "child", contentType: "craft_subpage", sourceType: "craft_page", documentTitle: "子页面"};
+    const other = {...child,pageId:"sibling",blockId:"sibling"};
+    const saved = togglePageFavorite(togglePageFavorite([], child), other);
+    expect(saved).toHaveLength(2);
+    expect(new Set(saved.map(item=>item.pageId))).toEqual(new Set(["child","sibling"]));
+    expect(saved.every(item=>item.contentType==="craft_subpage")).toBe(true);
+    const restored=normalizePageFavorites(JSON.parse(JSON.stringify(saved)));
+    expect(restored).toEqual(saved);
+    expect(togglePageFavorite(restored,child)).toHaveLength(1);
+    expect(pageFavoriteKey({...child,favoriteKind:undefined})).toBe(pageFavoriteKey(hit));
+  });
   it("keeps page and snippet favorites independent through save, reload and removal", () => {
     const page = togglePageFavorite([], hit);
     const both = toggleSnippetFavorite(page, hit);

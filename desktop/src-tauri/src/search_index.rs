@@ -826,6 +826,7 @@ impl SearchIndex {
                 .map(|value| vec![value.to_string()])
                 .as_deref(),
             None,
+            None,
             updated_after,
             include_craft_pages,
             include_image_ocr,
@@ -843,6 +844,7 @@ impl SearchIndex {
         space_ids: Option<&[String]>,
         folder_ids: Option<&[String]>,
         document_ids: Option<&[String]>,
+        item_ids: Option<&[String]>,
         updated_after: Option<i64>,
         include_craft_pages: bool,
         include_image_ocr: bool,
@@ -857,6 +859,7 @@ impl SearchIndex {
         if space_ids.is_some_and(|values| values.is_empty())
             || folder_ids.is_some_and(|values| values.is_empty())
             || document_ids.is_some_and(|values| values.is_empty())
+            || item_ids.is_some_and(|values| values.is_empty())
         {
             return Ok(Vec::new());
         }
@@ -1004,6 +1007,16 @@ impl SearchIndex {
                 Box::new(TermSetQuery::new(document_ids.iter().map(|document_id| {
                     Term::from_field_text(self.fields.document_id, document_id)
                 }))),
+            ));
+        }
+        if let Some(item_ids) = item_ids {
+            clauses.push((
+                Occur::Must,
+                Box::new(TermSetQuery::new(
+                    item_ids
+                        .iter()
+                        .map(|id| Term::from_field_text(self.fields.item_id, id)),
+                )),
             ));
         }
         if let Some(updated_after) = updated_after {
@@ -1273,6 +1286,60 @@ fn stored_text(document: &TantivyDocument, field: Field) -> String {
 mod tests {
     use super::*;
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn exact_page_chunks_are_filtered_before_the_result_limit() {
+        let path =
+            std::env::temp_dir().join(format!("hub-page-scope-{}", crate::random_url_safe(10)));
+        let index = SearchIndex::open(&path).unwrap();
+        let mut records = Vec::new();
+        for id in ["parent-chunk", "sibling-chunk", "leaf-chunk"] {
+            let mut item = record(id, "document:root", "craft_subpage");
+            item.body = "pagescopeneedle".into();
+            records.push(item);
+        }
+        index.apply_changes(&[], &records).unwrap();
+        let items = vec!["leaf-chunk".to_string()];
+        let hits = index
+            .search_in_folders(
+                "pagescopeneedle",
+                1,
+                None,
+                None,
+                None,
+                Some(&items),
+                None,
+                true,
+                false,
+                false,
+                false,
+                false,
+                "all",
+            )
+            .unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].item_id, "leaf-chunk");
+        assert!(index
+            .search_in_folders(
+                "pagescopeneedle",
+                1,
+                None,
+                None,
+                None,
+                Some(&[]),
+                None,
+                true,
+                false,
+                false,
+                false,
+                false,
+                "all"
+            )
+            .unwrap()
+            .is_empty());
+        drop(index);
+        std::fs::remove_dir_all(path).unwrap();
+    }
 
     #[test]
     fn grouped_search_recalls_distinct_documents_after_repeated_chunks_fill_the_first_window() {
