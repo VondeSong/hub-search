@@ -7,6 +7,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}) }));
+import { runtimeCapabilities } from "./RuntimePlatform";
 import { TaskWorkspace } from "./TaskWorkspace";
 
 let root: Root;
@@ -91,4 +92,20 @@ it("explains inbox creation and continued sync after moving a task", async () =>
   expect(settings.textContent).toContain("新任务默认进入收件箱");
   expect(settings.textContent).toContain("移动到任意清单后保持关联");
   expect(settings.textContent).toContain("新增子任务跟随父任务所在清单");
+});
+
+it("exposes mobile search and advanced filters without enabling task synchronization", async () => {
+  const mobile = runtimeCapabilities.mobile;
+  try {
+    Object.assign(runtimeCapabilities, { mobile: true });
+    await act(async () => root.render(<TaskWorkspace desktopSidebarVisible onStatusMessage={onStatusMessage}/>));
+    expect(container.querySelector('input[aria-label="搜索任务"]')).not.toBeNull();
+    const trigger = container.querySelector<HTMLButtonElement>('button[aria-label="筛选与视图"]')!;
+    await act(async () => trigger.click());
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(container.querySelector(".task-query-tools")?.textContent).toContain("全部状态");
+    await act(async () => container.querySelector(".task-view-toolbar")!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })));
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(invokeMock).not.toHaveBeenCalledWith("run_task_sync");
+  } finally { Object.assign(runtimeCapabilities, { mobile }); }
 });

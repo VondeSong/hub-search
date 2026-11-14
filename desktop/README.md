@@ -97,7 +97,7 @@
 
 ### 安卓模拟器热更新
 
-在当前主工作区的 `desktop/` 中运行 `npm run android:dev`，默认连接已启动的 `emulator-5564`；其它模拟器用 `npm run android:dev -- -Device emulator-端口号` 指定。入口会启动或复用本目录的 Vite 服务，通过 ADB 将设备的 1422 端口连接到电脑，并覆盖安装开发版，保留应用数据。日志在 `.local/android-dev/`。
+在当前主工作区的 `desktop/` 中运行 `npm run android:dev`，默认连接已启动的 `emulator-5564`；其它模拟器用 `npm run android:dev -- -Device emulator-端口号` 指定。入口会启动或复用本目录的 Vite 服务，通过 ADB 将设备的 1422 端口连接到电脑，并覆盖安装开发版，保留应用数据。日志在 `.local/android-dev/`。安卓开发服务不会继承桌面的自动 Craft 连接开关，页面重载不会自行发起登录；需要时在资料库设置中主动连接。
 
 安卓前端固定使用 `http://127.0.0.1:1422`，不占用桌面的 1420。修改本目录 `src/` 的界面会自动更新；其它工作树的修改先合并到此目录。Rust、权限、插件及原生配置修改后重新运行 `npm run android:dev`；若只重启界面服务，运行 `npm run dev:android`，无需重装。
 

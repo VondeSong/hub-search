@@ -52,7 +52,7 @@ import { useMobileSearch } from "./useMobileSearch";
 import type { ObsidianWatchStatus } from "./IndexStatusTypes";
 import { LibraryIcon } from "./LibraryIcon";
 import { LibraryIconCrop } from "./LibraryIconCrop";
-import { MobileBrowse, MobileNavigation, type MobileBrowseView, type MobileDestination } from "./MobileNavigation";
+import { MobileBrowse, MobileConnections, MobileNavigation, type MobileBrowseView, type MobileDestination } from "./MobileNavigation";
 import { providerName, providerUnavailableLabel } from "./ProviderLabels";
 import { EMPTY_PREVIEW_NAVIGATION, movePreviewNavigation, pushPreviewNavigation } from "./PreviewNavigation";
 import { runtimeCapabilities } from "./RuntimePlatform";
@@ -156,6 +156,7 @@ function AppContent() {
   const [desktopSidebarView, setDesktopSidebarView] = useState<DesktopSidebarView>("home");
   const [mobileBrowseOpen, setMobileBrowseOpen] = useState(false);
   const [mobileAgentsOpen, setMobileAgentsOpen] = useState(false);
+  const [mobileConnectionsOpen, setMobileConnectionsOpen] = useState(false);
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
   useEffect(() => {
     if (!runtimeCapabilities.mobile) return;
@@ -868,8 +869,9 @@ useEffect(() => {
     setSpaceMenuOpen(false);
     setMobileBrowseOpen(route === "browse");
     setMobileAgentsOpen(route === "agents");
+    setMobileConnectionsOpen(route === "connections");
     if (route === "search" || route === "browse") selectDesktopSidebarView("home");
-    else if (route === "tasks" || route === "favorites" || route === "history" || route === "journals" || route === "tags" || route === "collections") {
+    else if (route === "tasks" || route === "favorites" || route === "history" || route === "journals" || route === "tags" || route === "collections" || route === "insights") {
       selectDesktopSidebarView(route);
       if (route !== "tasks") setQuery("");
       if (route === "tags") {
@@ -1233,19 +1235,20 @@ useEffect(() => {
   const appLayoutProps: AppLayoutProps = {
     filtersOpen,
     mobilePreviewOpen,
-    mobileHeader: isMobileLayout && !mobilePreviewOpen && !mobileAgentsOpen ? <MobileHeader onAgents={() => navigateMobile("agents")} onBack={!["home", "tasks"].includes(desktopSidebarView) && !mobileBrowseOpen ? () => navigateMobile("browse") : undefined} onSettings={() => setShowConnection(true)} /> : undefined,
+    onSelectMobileLibraries: selectLibraries,
+    mobileHeader: isMobileLayout && !mobilePreviewOpen && !mobileAgentsOpen ? <MobileHeader onBack={((!["home", "tasks"].includes(desktopSidebarView) && !mobileBrowseOpen) || mobileConnectionsOpen) ? () => navigateMobile("browse") : undefined} onSettings={() => setShowConnection(true)} /> : undefined,
     style: shellStyle,
     startWindowDrag,
-    mainContent: isMobileLayout && mobileAgentsOpen && !flashcardsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开 Agents…</div>}><LazyCloudAgents onClose={() => window.history.back()} /></Suspense> : isMobileLayout && mobileBrowseOpen && !flashcardsActive ? <MobileBrowse
+    mainContent: isMobileLayout && mobileAgentsOpen && !flashcardsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开 Agents…</div>}><LazyCloudAgents onClose={() => window.history.back()} /></Suspense> : isMobileLayout && mobileConnectionsOpen && !flashcardsActive ? <MobileConnections onContent={() => { setSettingsCategory("cloud"); setShowConnection(true); }} onAgents={() => navigateMobile("agents")} /> : isMobileLayout && mobileBrowseOpen && !flashcardsActive ? <MobileBrowse
       favoriteCount={favoriteResults.length}
       historyCount={viewHistory.length}
       journalCount={journalDates.length}
       tagCount={sidebarTags.length}
       onOpen={openMobileCollection}
-      onOpenAgents={() => navigateMobile("agents")}
+      onOpenInsights={() => pushMobileRoute("insights")}
       onOpenLibraries={() => { navigateMobile("search"); setSpaceMenuOpen(true); }}
       onOpenSettings={() => setShowConnection(true)}
-      onOpenSyncHealth={() => { setSettingsCategory("cloud"); setShowConnection(true); }}
+      onOpenSyncHealth={() => pushMobileRoute("connections")}
       syncNeedsAttention={Boolean(indexStatus?.failedJobs)}
     /> : insightsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开洞察…</div>}><LazyInsightsWorkspace/></Suspense> : collectionsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开阅读…</div>}><LazyCollectionsWorkspace
       onToggleDesktopSidebar={!isMobileLayout ? () => changeDesktopSidebarSetting(!desktopSidebarEnabled) : undefined}
@@ -1369,7 +1372,7 @@ useEffect(() => {
       versionLabel: "v85",
       flashcardsActive,
       mobileNavigation: isMobileLayout ? <MobileNavigation
-        active={mobileAgentsOpen ? "agents" : mobileBrowseOpen || (["favorites", "history", "journals", "tags", "collections"] as DesktopSidebarView[]).includes(desktopSidebarView) ? "browse" : tasksActive ? "tasks" : "search"}
+        active={mobileAgentsOpen ? "agents" : mobileBrowseOpen || mobileConnectionsOpen || (["favorites", "history", "journals", "tags", "collections", "insights"] as DesktopSidebarView[]).includes(desktopSidebarView) ? "browse" : tasksActive ? "tasks" : "search"}
         onSelect={navigateMobile}
         dueCount={flashcardDueCount}
       /> : undefined,

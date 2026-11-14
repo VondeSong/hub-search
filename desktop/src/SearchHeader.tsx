@@ -177,7 +177,7 @@ export function SearchHeader({
         setQuery={setQuery}
         setSearchFocused={setSearchFocused}
       />
-      {isMobileLayout && <button className="mobile-search-cancel" type="button" onClick={onCancelMobileSearch}>取消</button>}
+      {isMobileLayout && searchFocused && <button className="mobile-search-cancel" type="button" onClick={onCancelMobileSearch}>取消</button>}
       </div>
       <SearchHeaderActions
         showAgent={!isMobileLayout && !hideLibrarySwitcher}
@@ -195,9 +195,7 @@ export function SearchHeader({
         setMobilePreviewOpen={setMobilePreviewOpen}
         setPreviewOpen={setPreviewOpen}
       />
-      {isMobileLayout && activeFilterCount > 0 && <button type="button" className="mobile-active-filters" onClick={() => setFiltersOpen(true)}>
-        <span>{activeFilterCount} 项筛选已生效</span><small>{filterSummary}</small>
-      </button>}
+
     </header>
   );
 }

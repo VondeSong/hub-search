@@ -445,7 +445,7 @@ export function TaskWorkspace({
     // can unmount the filter before its change event is committed.
     const closeTransientTaskMenus = (event: MouseEvent) => {
       const target = event.target as Node;
-      if (!queryToolsRef.current?.contains(target) && !queryToolsButtonRef.current?.contains(target)) setQueryToolsOpen(false);
+      if (!queryToolsRef.current?.contains(target) && !queryToolsButtonRef.current?.contains(target) && !(runtimeCapabilities.mobile && target instanceof Element && target.closest(".task-view-toolbar"))) setQueryToolsOpen(false);
       if (propertyMenuRef.current?.open && !propertyMenuRef.current.contains(target)) propertyMenuRef.current.open = false;
       if (!syncMenuRef.current?.contains(target)) setSyncMenuOpen(false);
     };
@@ -1019,6 +1019,8 @@ export function TaskWorkspace({
         {!loading && !collections.length && <p>当前资料库没有任务</p>}
       </aside>
     <section className="task-workspace">
+      {runtimeCapabilities.mobile && <div className="mobile-page-intro"><h1>任务</h1><p>查看行动，接着往下做。</p></div>}
+      {runtimeCapabilities.mobile && <div className="mobile-task-controls"><label><Search size={18} aria-hidden="true"/><input aria-label="搜索任务" placeholder="搜索任务" value={query} onChange={event => setQuery(event.target.value)}/></label><button type="button" ref={queryToolsButtonRef} aria-label="筛选与视图" aria-expanded={queryToolsOpen} onClick={() => setQueryToolsOpen(open => !open)}><ListFilter size={20}/></button></div>}
       <header className="task-workspace-header">
         <div className="task-source-chips">
           {!desktopSidebarVisible && onToggleDesktopSidebar && (
@@ -1253,7 +1255,7 @@ export function TaskWorkspace({
             {taskStatsOpen && <div className="task-stats-popover"><header><strong>任务统计</strong><small>当前筛选结果</small></header><div><article><strong>{visibleTaskStats.total}</strong><span>任务</span></article><article><strong>{visibleTaskStats.open}</strong><span>待完成</span></article><article><strong>{visibleTaskStats.completed}</strong><span>已完成</span></article><article><strong>{visibleTaskStats.abandoned}</strong><span>已放弃</span></article><article><strong>{visibleTaskStats.linked}</strong><span>已关联</span></article></div><footer>Craft {visibleTaskStats.craft} · 滴答 {visibleTaskStats.dida365} · Obsidian {visibleTaskStats.obsidian}</footer></div>}
           </div>
           <button onClick={() => void load()} disabled={loading} title="刷新本地任务数据" aria-label="刷新"><RefreshCw className={loading ? "spin" : ""} size={17} /></button>
-          <button ref={queryToolsButtonRef} className={queryToolsOpen || statusFilter !== "all" || sourceFilter !== "all" ? "active" : ""} onClick={() => setQueryToolsOpen((open) => !open)} title={queryToolsOpen ? "隐藏排序和筛选" : "显示排序和筛选"} aria-label="排序和筛选" aria-pressed={statusFilter !== "all" || sourceFilter !== "all"}><ListFilter size={18} /></button>
+          <button ref={runtimeCapabilities.mobile ? undefined : queryToolsButtonRef} className={queryToolsOpen || statusFilter !== "all" || sourceFilter !== "all" ? "active" : ""} onClick={() => setQueryToolsOpen((open) => !open)} title={queryToolsOpen ? "隐藏排序和筛选" : "显示排序和筛选"} aria-label="排序和筛选" aria-pressed={statusFilter !== "all" || sourceFilter !== "all"}><ListFilter size={18} /></button>
           {databaseSearchOpen ? <label className="task-toolbar-search"><Search size={14} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索任务" /><button onClick={() => { setDatabaseSearchOpen(false); setQuery(""); }} title="关闭搜索" aria-label="关闭搜索"><X size={13} /></button></label> : <button onClick={() => setDatabaseSearchOpen(true)} title="搜索任务" aria-label="搜索任务"><Search size={17} /></button>}
           <details className="workspace-secondary-menu" onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); } }}><summary aria-label="更多同步工具" title="更多同步工具">•••</summary><div>
             <button onClick={() => void inspectCapabilities()} disabled={checkingCapabilities}><ShieldCheck size={16} />检查同步能力</button>
