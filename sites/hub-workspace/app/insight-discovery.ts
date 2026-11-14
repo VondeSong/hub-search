@@ -36,7 +36,14 @@ export const discoveryExamples = {
 } satisfies Record<DiscoveryScope,{title:string;question:string;records:DiscoveryRecord[];finding:string;why:string;conditions:string;exceptions:string;observation:DiscoveryRecord;affected:string;revised:string;rationale:string}>;
 
 export type DiscoverySession={scope:DiscoveryScope; selected:string[]; started:boolean; saved:boolean; added:boolean; compared:boolean; correction:string; history:{outcome:"maintain"|"revise";text:string;reason:string}[]};
-export function newDiscovery(scope:DiscoveryScope="work"):DiscoverySession{return {scope,selected:discoveryExamples[scope].records.slice(0,2).map(r=>r.id),started:false,saved:false,added:false,compared:false,correction:"",history:[]};}
+export function newDiscovery(scope:DiscoveryScope="work"):DiscoverySession{return {scope,selected:discoveryExamples[scope].records.slice(0,1).map(r=>r.id),started:false,saved:false,added:false,compared:false,correction:"",history:[]};}
+export function historyCandidates(s:DiscoverySession,libraries:string[],query=""){
+ const records=discoveryExamples[s.scope].records;
+ const context=query.trim()||records.filter(r=>s.selected.includes(r.id)).map(r=>r.text).join(" ");
+ const grams=(text:string)=>new Set((text.toLowerCase().match(/[\p{L}\p{N}]+/gu)??[]).flatMap(word=>Array.from(word).slice(1).map((_,i)=>Array.from(word).slice(i,i+2).join(""))));
+ const terms=grams(context);
+ return records.filter(r=>!s.selected.includes(r.id)&&libraries.includes(r.library)&&[...grams(r.text)].filter(term=>terms.has(term)).length>=2);
+}
 export function hasDiscovery(s:DiscoverySession){return discoveryExamples[s.scope].records.slice(0,2).every(r=>s.selected.includes(r.id));}
 export type DiscoveryAction={type:"select";id:string}|{type:"start"}|{type:"save"}|{type:"add"}|{type:"compare"}|{type:"confirm";outcome:"maintain"|"revise"}|{type:"correct";reason:string};
 export function transitionDiscovery(s:DiscoverySession,a:DiscoveryAction):DiscoverySession{

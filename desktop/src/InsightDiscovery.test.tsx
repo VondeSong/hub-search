@@ -5,9 +5,9 @@ import {afterEach,beforeEach,expect,it,vi} from "vitest";
 import {InsightDiscovery} from "./InsightDiscovery";
 import type {useInsights} from "./useInsights";
 import type {Insight} from "./InsightTypes";
-const {invoke,listeners}=vi.hoisted(()=>({invoke:vi.fn(),listeners:new Map<string,()=>void>()}));
+const {invoke,listeners,handlers}=vi.hoisted(()=>({invoke:vi.fn(),listeners:new Map<string,()=>void>(),handlers:new Map<string,Set<()=>void>>()}));
 vi.mock("@tauri-apps/api/core",()=>({invoke}));
-vi.mock("@tauri-apps/api/event",()=>({listen:vi.fn(async(name:string,fn:()=>void)=>{listeners.set(name,fn);return()=>listeners.delete(name);})}));
+vi.mock("@tauri-apps/api/event",()=>({listen:vi.fn(async(name:string,fn:()=>void)=>{const set=handlers.get(name)??new Set<()=>void>();set.add(fn);handlers.set(name,set);listeners.set(name,()=>set.forEach(handler=>handler()));return()=>{set.delete(fn);if(!set.size){handlers.delete(name);listeners.delete(name);}};})}));
 let host:HTMLDivElement,root:Root,finished:boolean,revoked:boolean,prepares:Record<string,unknown>[];let candidateCount=1;
 const source={title:"旧复盘",sourcePath:"旧复盘.md",content:"先做小样验证。",startChar:0,endChar:8,totalChars:8,truncated:false,locator:{kind:"note",libraryId:"notes",documentId:"one",pageId:null},version:{kind:"document",fingerprint:"v1"}};
 const origin={workId:"work",runId:"run",deliveryRecordId:"delivery",deliveryHash:"hash",generatedAt:1};
@@ -19,11 +19,13 @@ function button(label:string){const b=[...host.querySelectorAll<HTMLButtonElemen
 async function click(label:string){await act(async()=>button(label).click());}
 async function mount(){await act(async()=>root.render(<InsightDiscovery data={data} onOpenWork={vi.fn()} onView={vi.fn()}/>));}
 beforeEach(()=>{
- Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});localStorage.clear();finished=false;revoked=false;prepares=[];candidateCount=1;listeners.clear();saveCandidate.mockClear();invoke.mockReset();host=document.createElement('div');document.body.append(host);root=createRoot(host);
+ Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});localStorage.clear();finished=false;revoked=false;prepares=[];candidateCount=1;listeners.clear();handlers.clear();saveCandidate.mockClear();invoke.mockReset();host=document.createElement('div');document.body.append(host);root=createRoot(host);
  invoke.mockImplementation(async(_command:string,{args}:{args:Record<string,unknown>})=>{
   const config={question:"找联系",previousText:"",...prepares[prepares.length-1]};
   switch(args.action){
    case 'materials':return {notes:[{locator:source.locator,title:source.title,path:source.sourcePath,libraryName:"本地笔记"}],total:1,nextOffset:null,snapshot:"notes-v1"};
+   case 'insightHistoryLibraries':return {libraries:[{libraryId:'old',name:'历史库'}]};
+   case 'insightHistorySearch':return {candidates:[{...source,locator:{...source.locator,libraryId:'old',documentId:'old'},title:'找回的旧资料',path:'old.md',libraryName:'历史库',snippet:'小样经验',matchedTerms:['小样']}],queries:['小样'],limitReached:false,unavailableCandidates:0};
    case 'insightDiscoveryPrepare':prepares.push(args);return {workId:"work",workRevision:2,config,sources:[{title:source.title,path:source.sourcePath,locator:source.locator,version:source.version}],results:null};
    case 'status':return {work:{id:"work",revision:2,state:finished?"completed":"ready",report:finished?{summary:"完整答复"}:null},runActive:false,lifecycle:{requiresExplicitResume:false,executionModes:{quick:true}},assistantOptions:{model:{provider:"test"}}};
    case 'respond':finished=true;return {};
@@ -65,6 +67,19 @@ it('formats Craft source with the shared reader while keeping exact text availab
  expect(host.querySelector('.idd-source-text strong')?.textContent).toBe('先做小样验证。');
  expect(host.querySelector('.idd-source-text')?.textContent).not.toContain('<page');
  expect(host.querySelector('blockquote')?.textContent).toBe(raw);
+ expect(invoke.mock.calls.some(([,v])=>v.args.action==='respond')).toBe(false);
+});
+
+it('keeps the current lookup when previewing a historical candidate and returning',async()=>{
+ await mount();await act(async()=>host.querySelector<HTMLInputElement>('.agent-material-choice input')!.click());
+ await act(async()=>{const details=host.querySelector<HTMLDetailsElement>('.idd-history-lookup')!;details.open=true;details.dispatchEvent(new Event('toggle'));});
+ await act(async()=>host.querySelector<HTMLInputElement>('.idd-history-lookup fieldset input')!.click());await click('查找可能相关的旧资料');
+ await act(async()=>host.querySelector<HTMLButtonElement>('.idd-history-lookup article button')!.click());
+ expect(host.querySelector<HTMLElement>('.idd-history-lookup')?.closest('[hidden]')).not.toBeNull();
+ await click('返回发现');expect(host.querySelector('[aria-label="历史资料候选"]')?.textContent).toContain('找回的旧资料');
+ expect(host.querySelector<HTMLInputElement>('.idd-history-lookup fieldset input')!.checked).toBe(true);
+ await click('加入本次资料');expect(host.textContent).toContain('待添加 · 2');
+ expect(invoke.mock.calls.filter(([,v])=>v.args.action==='insightHistorySearch')).toHaveLength(1);
  expect(invoke.mock.calls.some(([,v])=>v.args.action==='respond')).toBe(false);
 });
 

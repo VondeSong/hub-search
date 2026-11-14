@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "dd296f0e33648ac7fddf73609fc0abd40ee60405",
-  "published_version": 94,
-  "deployment_id": "appgdep_6af8448abcbc819183f04a1473a5258d",
+  "source_commit": "6cba2c9eaf654804abe83d3ff24edda4a4fb9e79",
+  "published_version": 95,
+  "deployment_id": "appgdep_6af889e0efbc81919bbe40203c2dcf11",
   "files": {
     ".gitignore": {
       "sha256": "5ca3c39bdc1288c108a1931b3f6bc5795464b6253e9457390617774259deed0c",
@@ -87,15 +87,20 @@
       "mode": "100644",
       "bytes": 31103
     },
+    "app/DiscoveryHistoryDemo.tsx": {
+      "sha256": "dcfedf6e4f357fab9f557807beff09ef5c8434eb57c01f89fc8f4d7812ac60cf",
+      "mode": "100644",
+      "bytes": 2318
+    },
     "app/FlashcardsSite.tsx": {
       "sha256": "9c3f605a3c51523958a0a394222ffef6369afe98ad2312dcbc831146686d8098",
       "mode": "100644",
       "bytes": 33207
     },
     "app/InsightDiscovery.tsx": {
-      "sha256": "5757247827f56c41959fc8b44990eac9d1494c5aca95710029a89d4a4ca0ba89",
+      "sha256": "581dcf2d9cce64515d93848db655af6df1a37d3bedc060113fe511afb29c0497",
       "mode": "100644",
-      "bytes": 10042
+      "bytes": 10249
     },
     "app/InsightNotebook.tsx": {
       "sha256": "398c018993644030241cd86886ed46a3db82b0cba9751d0d769f67f09279f9d9",
@@ -258,14 +263,14 @@
       "bytes": 49141
     },
     "app/insight-discovery.css": {
-      "sha256": "dc1a7dfcc60b1c2b68ba6f5558fb5929565162ba3c3ccc5d8ed72e98d9beb166",
+      "sha256": "13a4af11aaa1077229eb61319a7b844509fa2d1f26411e7337e8a549dcd50fdb",
       "mode": "100644",
-      "bytes": 5235
+      "bytes": 6360
     },
     "app/insight-discovery.ts": {
-      "sha256": "c0f877491df917d7d0d4bfb2f19b533280aefec1ed048208976bff21af1e1112",
+      "sha256": "0ebfff29a253e77c3376c0ece9ad526dc05cdb9c060e202f8109fbfa8db2ba85",
       "mode": "100644",
-      "bytes": 7518
+      "bytes": 8116
     },
     "app/insight-ledger.ts": {
       "sha256": "b535d73f2ff55282980bec038d33bb9fb9c91187fc3428eeb624512f0cf38628",
@@ -1088,9 +1093,9 @@
       "bytes": 11446
     },
     "scripts/insight-discovery-check.mjs": {
-      "sha256": "c373fad811a0eb736c7bf0aacc023133099d7ddbea1ca8670b5e09cd035f14e0",
+      "sha256": "fd073b6492b1f8b3ebeb5af0c47c58f62797e85c4ce58f9c6857f6a2f8a7bdc0",
       "mode": "100644",
-      "bytes": 2057
+      "bytes": 2486
     },
     "scripts/insight-ledger-check.ts": {
       "sha256": "5e2a3742f92542de5a512b040847470d73d920fbbafbdbe3105e36d3d4cb632e",
@@ -1213,5 +1218,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-14T11:24:43.723954+00:00"
+  "imported_at": "2026-11-14T16:20:12.664010+00:00"
 }

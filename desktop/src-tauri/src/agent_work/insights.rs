@@ -4,6 +4,7 @@ use sha2::{Digest, Sha256};
 
 mod analysis;
 mod discovery;
+mod history;
 #[cfg(all(test, windows))]
 mod live;
 mod methods;
@@ -34,6 +35,12 @@ fn current_reader(root: &Path, work: &Work) -> Result<EvidenceReader, String> {
 
 /// Both endpoints run in one source snapshot; a candidate has no saved identity yet.
 pub(super) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
+    if matches!(
+        args["action"].as_str(),
+        Some("insightHistoryLibraries" | "insightHistorySearch")
+    ) {
+        return history::ui(root, args);
+    }
     if matches!(
         args["action"].as_str(),
         Some(

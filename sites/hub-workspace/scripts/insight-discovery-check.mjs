@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
-import {decodeDiscovery,discoveryExamples,hasDiscovery,newDiscovery,transitionDiscovery as step} from "../app/insight-discovery.ts";
+import {decodeDiscovery,discoveryExamples,hasDiscovery,historyCandidates,newDiscovery,transitionDiscovery as step} from "../app/insight-discovery.ts";
 let checks=0;
 const check=(value,label)=>{assert.ok(value,label);checks++;};
 for(const scope of ["work","life"]){
  let s=newDiscovery(scope);
  check(!step(s,{type:"save"}).saved,"未开始不能保存");
  check(!step(s,{type:"add"}).added,"未保留不能添加后续");
+ check(s.selected.length===1,"只带当前资料，不预选旧经验");
+ check(historyCandidates(s,[]).length===0,"未允许历史范围不返回候选");
+ const old=discoveryExamples[scope].records[1];
+ check(historyCandidates(s,[old.library]).some(r=>r.id===old.id),"从已允许范围找回未手选旧经验");
+ check(historyCandidates(s,[old.library],"不存在的火星航线").length===0,"没有文字关联可以没有候选");
+ s=step(s,{type:"select",id:old.id});
  s=step(s,{type:"start"});check(hasDiscovery(s),"两侧资料形成候选");
  s=step(s,{type:"save"});s=step(s,{type:"add"});
  check(!step(s,{type:"confirm",outcome:"revise"}).history.length,"新增记录不自动改判");
@@ -18,7 +24,7 @@ for(const scope of ["work","life"]){
  assert.deepEqual(decodeDiscovery(JSON.stringify(revised)),revised);checks++;
  const corrected=step(s,{type:"correct",reason:"输入条件不同"});
  check(!step(corrected,{type:"confirm",outcome:"revise"}).history.length,"纠正后停止旧关系");
- let missing=step(newDiscovery(scope),{type:"select",id:discoveryExamples[scope].records[1].id});
+ let missing=newDiscovery(scope);
  missing=step(missing,{type:"select",id:discoveryExamples[scope].records[2].id});
  missing=step(missing,{type:"start"});
  check(!hasDiscovery(missing)&&!step(missing,{type:"save"}).saved,"同词干扰不代替必要证据");
