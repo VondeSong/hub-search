@@ -14,7 +14,7 @@ export type ArtifactReference = { artifactId: string; revision: number; currentR
 type Reopening = { workId?: string; recordVersion?: number };
 type ArtifactBinding = { artifactRefs?: ArtifactReference[]; artifactState?: "current" | "stale" | "unavailable" };
 export type HistoricalDelivery = ArtifactBinding & { runId: string; createdAt: number; report: Report | null; evidence: Evidence[]; validity: string };
-export type ConversationMessage = ArtifactBinding & { revision?: number; id: string; role: "user" | "assistant"; text?: string; kind?: "request" | "decision"; runId?: string; report?: Report | null; evidence?: Evidence[]; validity?: string; createdAt: number };
+export type ConversationMessage = ArtifactBinding & { revision?: number; id: string; role: "user" | "assistant"; text?: string; kind?: "request" | "decision" | "scope"; runId?: string; report?: Report | null; evidence?: Evidence[]; validity?: string; createdAt: number };
 export type Conversation = { messages: ConversationMessage[]; hasEarlier: boolean; nextCursor?: string | null };
 export function prependConversation(current: Conversation, older: Conversation): Conversation {
   const known = new Set(current.messages.map(message => message.id));

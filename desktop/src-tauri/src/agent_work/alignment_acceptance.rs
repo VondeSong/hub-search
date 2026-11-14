@@ -231,8 +231,10 @@ fn live_daily_material_policies() {
     );
     let goal = config["goal"].as_str().unwrap();
     assert!(!goal.trim().is_empty());
+    let cases = config["cases"].as_array().unwrap();
+    assert!(!cases.is_empty(), "acceptance must execute a declared case");
     let mut failures = Vec::new();
-    for case in config["cases"].as_array().unwrap() {
+    for case in cases {
         let name = case["id"].as_str().unwrap();
         assert!(name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'));
         let created = ui(&root, &json!({"action":"create","goal":goal,"successCriteria":config["successCriteria"],"anchor":null,"grant":Grant::default()})).unwrap();
@@ -240,6 +242,16 @@ fn live_daily_material_policies() {
         ui(&root, &json!({"action":"replaceResearchScope","id":id,"expectedRevision":created["work"]["revision"],"expectedAuthorizationVersion":created["work"]["authorizationVersion"],"grant":{"libraryIds":[],"notes":notes,"readingItemKeys":[]}})).unwrap();
         options::configure(&root, &json!({"id":id,"options":{"model":case["model"],"researchPolicy":case["policy"],"webSearch":"disabled"}})).unwrap();
         let admission = store::view(&root, id).unwrap();
+        let work = store::load(
+            &crate::source_evidence::open_read_database(&root).unwrap(),
+            id,
+        )
+        .unwrap();
+        assert_eq!(
+            store::conversation::context(&root, &work).unwrap()["currentRequest"],
+            goal,
+            "scope confirmation must not replace the user's question"
+        );
         let mode = if admission["lifecycle"]["executionModes"]["deep"] == true {
             "deep"
         } else {
@@ -248,6 +260,28 @@ fn live_daily_material_policies() {
         let started = std::time::Instant::now();
         let result = ui(&root, &json!({"action":"respond","id":id,"mode":mode}));
         let value = capture(&root, id, name, &out, started, &result);
+        if let Some(expected) = case["expectedError"].as_str() {
+            assert!(!expected.trim().is_empty());
+            assert!(
+                result
+                    .as_ref()
+                    .err()
+                    .is_some_and(|error| error.contains(expected)),
+                "{name}: expected a specific rejection, got {result:?}"
+            );
+            assert_eq!(value["view"]["run"]["usage"]["modelCalls"], 0);
+            assert!(value["view"]["modelExecutions"]
+                .as_array()
+                .unwrap()
+                .is_empty());
+            assert!(value["view"]["run"]["usage"]["bodyChars"].as_u64().unwrap() > 0);
+            assert_eq!(value["view"]["work"]["state"], "interrupted");
+            assert!(!store::records(&root, id, "evidence", 100)
+                .unwrap()
+                .is_empty());
+            assert_eq!(value["view"]["lifecycle"]["canResume"], false);
+            continue;
+        }
         if let Err(error) = result {
             failures.push(format!("{name}: {error}"));
             continue;
@@ -269,6 +303,22 @@ fn live_daily_material_policies() {
                 .is_empty(),
             "research must not create source-write actions"
         );
+        let citations = value["view"]["work"]["report"]["prose"]["citations"]
+            .as_array()
+            .unwrap();
+        for note in notes {
+            assert!(
+                citations.iter().any(|citation| {
+                    citation["evidenceId"]
+                        .as_str()
+                        .and_then(|id| id.strip_prefix('e'))
+                        .and_then(|id| id.parse::<usize>().ok())
+                        .and_then(|n| n.checked_sub(1))
+                        .is_some_and(|n| value["view"]["evidence"][n]["locator"] == *note)
+                }),
+                "{name}: selected source was not cited: {note}"
+            );
+        }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }

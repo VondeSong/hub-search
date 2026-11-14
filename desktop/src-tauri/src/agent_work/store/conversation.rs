@@ -220,6 +220,17 @@ pub(in crate::agent_work) fn page(root: &Path, args: &Value) -> Result<Value, St
     )
 }
 
+pub(in crate::agent_work) fn is_scope_confirmation(kind: &str, body: &Value) -> bool {
+    kind == "userMessage"
+        && (body["scopeOnly"] == true
+            || (body["clientMessageId"]
+                .as_str()
+                .is_some_and(|id| id.starts_with("scope-"))
+                && body["text"] == "已明确更新下一轮资料范围，历史与累计用量保留。"
+                && body["scopeBefore"].is_object()
+                && body["scopeAfter"].is_object()))
+}
+
 fn page_on_cached(
     c: &Connection,
     work: &Work,
@@ -263,7 +274,8 @@ fn page_on_cached(
             if kind == "steering" && authorization != Some(work.authorization_version) {
                 continue;
             }
-            messages.push(json!({"id":id,"role":"user","text":body["text"],"createdAt":created_at,"revision":body["revision"],"kind":if kind=="userDecision" {"decision"} else {"request"}}));
+            let scope_only = is_scope_confirmation(&kind, &body);
+            messages.push(json!({"id":id,"role":"user","text":body["text"],"createdAt":created_at,"revision":body["revision"],"kind":if scope_only {"scope"} else if kind=="userDecision" {"decision"} else {"request"}}));
             continue;
         }
         let verified = (|| {
@@ -403,6 +415,9 @@ pub(in crate::agent_work) fn context(root: &Path, work: &Work) -> Result<Value, 
         .flatten()
         .rev()
     {
+        if message["kind"] == "scope" {
+            continue;
+        }
         if materials_only && message["role"] != "user" {
             continue;
         }
@@ -452,7 +467,7 @@ pub(in crate::agent_work) fn context(root: &Path, work: &Work) -> Result<Value, 
         .into_iter()
         .flatten()
         .rev()
-        .find(|m| m["role"] == "user")
+        .find(|m| m["role"] == "user" && m["kind"] != "scope")
         .and_then(|m| m["text"].as_str())
         .unwrap_or(&work.goal);
     let mut context = json!({"currentRequest":request,"goalState":super::goal::completion::context_on(root,&c,&current)?,"goalBinding":super::goal::binding_on(&c, &current)?,"messages":messages,"earlierMessagesOmitted":omitted,"historyCursor":conversation["nextCursor"],"handoffPolicy":"当前目标和最新修订以goalState为准；进度与问题见capabilities.workingState，保存以businessActionRecords为准。历史不完整时可调用conversationHistory按页或recordId补读；不得把摘要、助手旧回答或准备中的草稿当作完成事实。","policy":"普通用户消息是本轮要求，不自动成为确认事实或长期记忆；助手历史回答本身不是事实证据。Hub 笔记的精确编号引用只能选择本轮 quoteCatalog，并核验当前授权和版本，不能沿用历史编号。公开网页来源可复用同一原生会话中已实际读取且仍适用的内容，以具名 HTTPS 链接引用；总结、解释和启示类追问材料足够时直接回答，不为重复引用而联网。新增事实、时效变化、证据冲突、上下文缺失或用户要求复核时再查证。普通延伸追问不等于否定此前事实。"});

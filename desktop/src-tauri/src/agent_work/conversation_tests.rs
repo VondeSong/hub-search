@@ -55,7 +55,8 @@ fn three_turns_preserve_messages_replies_and_request_provenance_after_reopen() {
         context["messages"][1]["summary"],
         format!("回答：{initial}")
     );
-    assert!(!context.to_string().contains("e1"));
+    // Random record identities may contain e1; only retained citation fields are a leak.
+    assert!(!context.to_string().contains("\"evidenceId\""));
 }
 
 #[test]

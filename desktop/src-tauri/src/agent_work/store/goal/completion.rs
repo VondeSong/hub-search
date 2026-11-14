@@ -81,17 +81,23 @@ pub(in crate::agent_work) fn sources_on(c: &Connection, work: &Work) -> Result<V
     if !work.success_criteria.trim().is_empty() {
         items.push(json!({"requirementId":format!("{}-criteria",work.id),"origin":"user","text":work.success_criteria}));
     }
-    let mut q = c.prepare("SELECT id,body_json FROM agent_records WHERE work_id=?1 AND kind IN ('userMessage','userDecision','steering') ORDER BY rowid").map_err(|e|e.to_string())?;
+    let mut q = c.prepare("SELECT id,kind,body_json FROM agent_records WHERE work_id=?1 AND kind IN ('userMessage','userDecision','steering') ORDER BY rowid").map_err(|e|e.to_string())?;
     let rows = q
         .query_map([&work.id], |r| {
-            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+            ))
         })
         .map_err(|e| e.to_string())?;
     for row in rows {
-        let (id, raw) = row.map_err(|e| e.to_string())?;
+        let (id, kind, raw) = row.map_err(|e| e.to_string())?;
         let body: Value = serde_json::from_str(&raw).map_err(|_| "用户要求记录损坏")?;
         // User-supplied material remains attributable without becoming a new command.
-        if body["materialOnly"] == true {
+        if body["materialOnly"] == true
+            || super::super::conversation::is_scope_confirmation(&kind, &body)
+        {
             continue;
         }
         items.push(json!({"requirementId":id,"origin":"user","text":body["text"]}));

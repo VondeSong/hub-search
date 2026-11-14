@@ -60,6 +60,29 @@ fn object(properties: Value) -> Value {
     json!({"type":"object","properties":properties,"required":required,"additionalProperties":false})
 }
 
+pub(super) fn capability_metadata(mut catalog: Value, schema: &Value) -> Value {
+    // Argument schemas already appear in requests; keep availability and descriptions here.
+    if let Some(tools) = catalog["tools"].as_array_mut() {
+        for tool in tools {
+            let duplicate = schema["properties"]["requests"]["items"]["anyOf"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .any(|request| {
+                    request["properties"]["operation"]["enum"] == json!(["capability"])
+                        && request["properties"]["name"]["enum"] == json!([tool["name"]])
+                        && request["properties"]["arguments"] == tool["inputSchema"]
+                });
+            if duplicate {
+                if let Some(tool) = tool.as_object_mut() {
+                    tool.remove("inputSchema");
+                }
+            }
+        }
+    }
+    catalog
+}
+
 pub(super) fn schema(mut base: Value) -> Value {
     let string = json!({"type":"string"});
     let strings = json!({"type":"array","items":string});
@@ -113,7 +136,7 @@ pub(super) fn schema(mut base: Value) -> Value {
     requests.push(object(json!({"operation":{"type":"string","enum":["conversationHistory"]},"before":{"type":["string","null"]},"recordId":{"type":["string","null"]},"startChar":{"type":"integer","minimum":0},"maxChars":{"type":"integer","minimum":1,"maximum":6000}})));
     base["properties"]["report"] = json!({"anyOf":[object(json!({
         "status":{"type":"string","enum":["completed","needsDecision","waiting","insufficientEvidence"]},
-        "completion":store::goal::completion::schema(),"markdown":{"type":"string","minLength":1,"maxLength":runner::ANSWER_CHARS},"citations":{"type":"array","items":object(json!({"quoteId":string}))},
+        "completion":store::goal::completion::schema(),"markdown":{"type":"string","minLength":1,"maxLength":runner::ANSWER_CHARS},"citations":{"type":"array","maxItems":40,"items":object(json!({"quoteId":string}))},
         "findings":{"type":"array","maxItems":12,"description":"仅在用户要求结构化发现时交付有精确引用的独立结论；普通问答为空，不从正文自动拆段。","items":object(json!({"text":{"type":"string","minLength":1,"maxLength":6000},"citations":{"type":"array","minItems":1,"maxItems":40,"items":object(json!({"quoteId":string}))}}))},
         "questions":strings,"limitations":strings,"waitCondition":string})),{"type":"null"}]});
     let finding = &mut base["properties"]["report"]["anyOf"][0]["properties"]["findings"]["items"];
@@ -156,11 +179,20 @@ pub(super) fn normalize(mut value: Value, quote_catalog: &Value) -> Result<Value
     }
     let answer: Answer =
         serde_json::from_value(value["report"].clone()).map_err(|_| "助手回答不符合正文合同")?;
-    if answer.markdown.trim().is_empty()
-        || answer.markdown.chars().count() > runner::ANSWER_CHARS
-        || answer.citations.len() > 40
-    {
-        return Err(format!("助手答复为空、引文超限或正文超过 {} 字符；未截断发布，原生最终答复可在未发布记录中查看",runner::ANSWER_CHARS));
+    if answer.markdown.trim().is_empty() {
+        return Err("助手答复为空，未发布本轮回答。".into());
+    }
+    if answer.markdown.chars().count() > runner::ANSWER_CHARS {
+        return Err(format!(
+            "助手正文超过 {} 字符，未截断发布；请在现有原文依据内重新组织答复。",
+            runner::ANSWER_CHARS
+        ));
+    }
+    if answer.citations.len() > 40 {
+        return Err(format!(
+            "本轮最多 40 项引用，当前为 {} 项；未发布或删除正文，请在现有原文依据内重新组织引用。",
+            answer.citations.len()
+        ));
     }
     let mut resolved = Vec::new();
     for citation in answer.citations {

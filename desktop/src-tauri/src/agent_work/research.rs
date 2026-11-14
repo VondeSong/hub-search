@@ -228,7 +228,7 @@ pub(super) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
                 if json!(next) == json!(w.grant) {
                     return Ok(());
                 }
-                let body = json!({"text":"已明确更新下一轮资料范围，历史与累计用量保留。","author":"user","revision":w.revision+1,"clientMessageId":format!("scope-{}",crate::random_url_safe(18)),"scopeBefore":w.grant,"scopeAfter":next,"authorizationVersion":w.authorization_version});
+                let body = json!({"text":"已明确更新下一轮资料范围，历史与累计用量保留。","author":"user","scopeOnly":true,"revision":w.revision+1,"clientMessageId":format!("scope-{}",crate::random_url_safe(18)),"scopeBefore":w.grant,"scopeAfter":next,"authorizationVersion":w.authorization_version});
                 store::insert(c, &id, None, "userMessage", &body)?;
                 c.execute("UPDATE agent_works SET anchor_json='null',grant_json=?2,revision=revision+1,authorization_version=authorization_version+1,report_json=NULL,state='ready',updated_at=?3 WHERE id=?1",params![id,topic_as_text(&next)?,store::stamp()]).map_err(|e|e.to_string())?;
                 watch::pause_on(c, &id, "资料范围已更新，自动复查暂停")?;
@@ -330,6 +330,34 @@ mod tests {
         let first=ui(&f.root,&json!({"action":"replaceResearchScope","id":id,"grant":topic,"expectedRevision":1,"expectedAuthorizationVersion":1})).unwrap();
         assert_eq!(first["work"]["id"], id);
         assert_eq!(first["work"]["grant"]["notes"], json!(topic.notes));
+        let first_work = store::load(&f.c(), &id).unwrap();
+        assert_eq!(
+            store::conversation::context(&f.root, &first_work).unwrap()["currentRequest"],
+            "同一问题"
+        );
+        assert_eq!(first["conversation"]["messages"][1]["kind"], "scope");
+        assert_eq!(
+            store::goal::completion::requirements_on(&f.c(), &first_work)
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .len(),
+            1,
+            "scope receipt must not become a user obligation"
+        );
+        assert_eq!(
+            first["conversation"]["messages"][1]["text"],
+            "已明确更新下一轮资料范围，历史与累计用量保留。"
+        );
+        assert_eq!(
+            first["conversation"]["messages"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|m| m["text"] == "同一问题")
+                .count(),
+            1
+        );
         assert!(!store::load(&f.c(), &id)
             .unwrap()
             .grant
@@ -351,6 +379,37 @@ mod tests {
             .unwrap()
             .grant
             .contains(&topic.notes[0]));
+        // Existing host scope confirmations predate the explicit marker.
+        f.c().execute("UPDATE agent_records SET body_json=json_remove(body_json,'$.scopeOnly') WHERE work_id=?1 AND kind='userMessage'", [&id]).unwrap();
+        let restored_work = store::load(&f.c(), &id).unwrap();
+        assert_eq!(
+            store::goal::completion::requirements_on(&f.c(), &restored_work)
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            store::conversation::context(&f.root, &restored_work).unwrap()["currentRequest"],
+            "同一问题"
+        );
+        let requested=super::super::ui(&f.root,&json!({"action":"message","id":id,"text":"只核对版本与范围","clientMessageId":"real-scope-question"})).unwrap();
+        let changed=ui(&f.root,&json!({"action":"replaceResearchScope","id":id,"grant":topic,"expectedRevision":requested["work"]["revision"],"expectedAuthorizationVersion":requested["work"]["authorizationVersion"]})).unwrap();
+        let changed_work = store::load(&f.c(), &id).unwrap();
+        assert_eq!(
+            store::goal::completion::requirements_on(&f.c(), &changed_work)
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(
+            store::conversation::context(&f.root, &changed_work).unwrap()["currentRequest"],
+            "只核对版本与范围"
+        );
+        assert_eq!(changed["work"]["id"], id);
         store::write(&f.root, |c| {
             store::insert(
                 c,
@@ -361,8 +420,11 @@ mod tests {
             )
         })
         .unwrap();
-        assert!(ui(&f.root, &json!({"action":"replaceResearchScope","id":id,"grant":topic,"expectedRevision":3,"expectedAuthorizationVersion":3})).unwrap_err().contains("原专题入口"));
-        assert_eq!(store::load(&f.c(), &id).unwrap().revision, 3);
+        assert!(ui(&f.root, &json!({"action":"replaceResearchScope","id":id,"grant":topic,"expectedRevision":changed["work"]["revision"],"expectedAuthorizationVersion":changed["work"]["authorizationVersion"]})).unwrap_err().contains("原专题入口"));
+        assert_eq!(
+            json!(store::load(&f.c(), &id).unwrap().revision),
+            changed["work"]["revision"]
+        );
     }
     #[test]
     fn related_tag_search_intersects_explicit_pages_and_supports_any_or_all() {

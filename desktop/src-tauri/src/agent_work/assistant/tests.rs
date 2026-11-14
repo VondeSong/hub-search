@@ -4,6 +4,73 @@ mod charts;
 mod sleep;
 
 #[test]
+fn capability_metadata_keeps_availability_and_schemas_remain_in_request_contract() {
+    let mut catalog = crate::hub_capabilities::catalog();
+    catalog["tools"][0]["available"] = json!(false);
+    catalog["tools"][0]["unavailableReason"] = json!("当前仅授权具体材料");
+    let contract = schema(runner::schema());
+    let metadata = capability_metadata(catalog.clone(), &contract);
+    assert_eq!(
+        metadata["tools"].as_array().unwrap().len(),
+        catalog["tools"].as_array().unwrap().len()
+    );
+    let requests = contract["properties"]["requests"]["items"]["anyOf"]
+        .as_array()
+        .unwrap();
+    for (tool, projected) in catalog["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .zip(metadata["tools"].as_array().unwrap())
+    {
+        let request = requests
+            .iter()
+            .find(|r| r["properties"]["name"]["enum"][0] == tool["name"])
+            .unwrap();
+        assert_eq!(request["properties"]["arguments"], tool["inputSchema"]);
+        assert!(projected.get("inputSchema").is_none());
+        assert_eq!(projected["description"], tool["description"]);
+        assert_eq!(projected["annotations"], tool["annotations"]);
+        assert_eq!(projected["available"], tool["available"]);
+        assert_eq!(projected["unavailableReason"], tool["unavailableReason"]);
+    }
+    // An external or changed schema can be the sole argument contract; retain it.
+    let external = json!({"tools":[{"name":"external_unique_tool","inputSchema":{"type":"object","properties":{"externalOnly":{"type":"string"}}}}]});
+    assert_eq!(capability_metadata(external.clone(), &contract), external);
+    catalog["tools"][0]["inputSchema"]["properties"]["changedArgument"] = json!({"type":"string"});
+    assert_eq!(
+        capability_metadata(catalog.clone(), &contract)["tools"][0],
+        catalog["tools"][0]
+    );
+}
+
+#[test]
+fn answer_schema_and_host_share_the_citation_limit_and_specific_feedback() {
+    let schema = schema(runner::schema());
+    assert_eq!(
+        schema["properties"]["report"]["anyOf"][0]["properties"]["citations"]["maxItems"],
+        40
+    );
+    let catalog = json!((1..=41)
+        .map(|i| json!({"quoteId":format!("e1:q{i}"),"evidenceId":"e1","text":format!("原文 {i}")}))
+        .collect::<Vec<_>>());
+    let answer = |count: usize| json!({"report":{"status":"completed","markdown":(1..=count).map(|i|format!("结论[{i}]。")).collect::<String>(),"citations":(1..=count).map(|i|json!({"quoteId":format!("e1:q{i}")})).collect::<Vec<_>>(),"questions":[],"limitations":[],"waitCondition":""}});
+    assert!(normalize(answer(40), &catalog).is_ok());
+    let oversized = answer(41);
+    let error = normalize(oversized.clone(), &catalog).unwrap_err();
+    assert!(error.contains("最多 40 项引用") && error.contains("当前为 41 项"));
+    let mut empty = answer(1);
+    empty["report"]["markdown"] = json!("");
+    assert_eq!(
+        normalize(empty, &catalog).unwrap_err(),
+        "助手答复为空，未发布本轮回答。"
+    );
+    let mut long = answer(1);
+    long["report"]["markdown"] = json!("文".repeat(runner::ANSWER_CHARS + 1));
+    assert!(normalize(long, &catalog).unwrap_err().contains("正文超过"));
+}
+
+#[test]
 fn reliability_native_turn_uses_existing_run_budget_and_keeps_other_limits() {
     for mode in ["quick", "deep"] {
         let original = budget(mode).unwrap();

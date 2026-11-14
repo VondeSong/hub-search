@@ -145,9 +145,9 @@ mod unified_task_read;
 mod user_profile;
 mod window_lifecycle;
 use window_lifecycle::configured_toggle_shortcut;
+mod module_search;
 mod reading_sync;
 mod search_index;
-mod module_search;
 mod search_index_runtime;
 #[cfg(test)]
 use search_index_runtime::{
