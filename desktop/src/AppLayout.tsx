@@ -126,6 +126,11 @@ export function DesktopAppLayout(props: AppLayoutProps) {
           {mainContent ? <><div className="main-content-override"><WorkspaceHeaderContext.Provider value={integratedHeader ? {
             actions: librariesLayout ? null : <WorkspaceModeControl mode={sidebarMode} onModeChange={changeMode} />,
             onMouseDown: startWindowDrag,
+            navigationResizer: librariesLayout ? <div className="context-sidebar-resizer" role="separator"
+              aria-label="调整资料库导航宽度" aria-orientation="vertical" tabIndex={0}
+              aria-valuemin={sidebarWidthMin} aria-valuemax={sidebarWidthMax} aria-valuenow={sidebarWidth}
+              title="拖动调整资料库导航宽度；双击恢复默认"
+              onPointerDown={resizeSidebar} onDoubleClick={resetSidebarWidth} onKeyDown={resizeSidebarWithKeyboard} /> : undefined,
           } : null}>{mainContent}</WorkspaceHeaderContext.Provider></div><FooterStatus {...footerStatusProps} /></> : <>
             <SearchFilterReveal open={filtersOpen}><FilterBar {...filterBarProps} visible={filtersOpen} /></SearchFilterReveal>
             {(desktopSidebarProps.activeView === "home" || headerProps.query.trim()) && <SearchFilterSummary {...filterBarProps} />}

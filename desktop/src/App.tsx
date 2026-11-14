@@ -1279,6 +1279,7 @@ useEffect(() => {
     /> : librariesActive ? <LibraryBrowse
       libraries={browseLibraries}
       favorites={favoriteResults}
+      onToggleFavorite={toggleFavorite}
       position={libraryPosition}
       onPosition={setLibraryPosition}
       selected={browsingPreview}

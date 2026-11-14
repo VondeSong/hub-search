@@ -33,6 +33,7 @@ export function WorkspaceChrome({ mode, onModeChange, actions, search, view }: {
 export const WorkspaceHeaderContext = createContext<{
   actions: ReactNode;
   onMouseDown: MouseEventHandler<HTMLElement>;
+  navigationResizer?: ReactNode;
 } | null>(null);
 
 export function WorkspaceModeControl({ mode, onModeChange }: {

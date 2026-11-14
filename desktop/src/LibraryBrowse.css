@@ -41,7 +41,7 @@ html:not([data-runtime-platform="android"]) .unified-shell.mode-standard.module-
 .library-browser svg { flex-shrink: 0; }
 .library-browser-navigation {
   display: flex;
-  flex: 0 0 242px;
+  flex: 0 0 var(--context-sidebar-width, 248px);
   flex-direction: column;
   min-height: 0;
   min-width: 0;
@@ -215,12 +215,17 @@ html:not([data-runtime-platform="android"]) .unified-shell.mode-standard.module-
   padding: 20px 13px;
   border-right: 1px solid var(--library-line);
 }
-.library-browser-list > header { padding: 0 7px; }
+.library-browser-list > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 0 7px; }
 .library-browser-list h2 { overflow-wrap: anywhere; font-size: 17px; }
 .library-browser-list header p { margin: 5px 0 0; color: var(--library-muted); font-size: 11px; }
 .library-browser-list-items { display: grid; gap: 4px; margin-top: 12px; }
 .library-browser-list-items .library-browser-row { min-height: 42px; padding: 9px 8px; }
-.library-browser-result { display: flex; align-items: center; gap: 2px; }
+.library-browser-result { padding-bottom: 13px; }
+.library-browser-result-actions { display: flex; gap: 7px; padding-left: 27px; }
+.library-browser-result-actions [aria-pressed="true"] { color: var(--library-active-text); }
+.library-browser-row .library-browser-excerpt { white-space: normal; line-height: 1.65; }
+.library-browser-body:has(> .library-browser-reader[hidden]) .library-browser-list { flex: 1; }
+.library-browser-reader[hidden] { display: none; }
 .library-browser button.library-browser-up, .library-browser button.library-browser-text-button {
   display: inline-flex;
   align-items: center;
@@ -305,11 +310,9 @@ html:not([data-runtime-platform="android"]) .unified-shell.mode-standard.module-
 .library-browser-reader-empty p { margin: 0; font-size: 12px; line-height: 1.6; }
 .library-browser-column-mode .library-browser-reader { flex: 0 0 max(270px, 42%); }
 @container library-workspace (max-width: 1160px) {
-  .library-browser-navigation { flex-basis: 224px; }
   .library-browser-list { flex-basis: clamp(207px, 27cqw, 284px); width: auto; }
 }
 @container library-workspace (max-width: 880px) {
-  .library-browser-navigation { flex-basis: 194px; }
   .library-browser-header, .library-browser-scope, .library-browser-toolbar { padding-left: 10px; padding-right: 10px; gap: 8px; }
   .library-browser-title span { max-width: 94px; }
   .library-browser-exit span { display: none; }
@@ -318,7 +321,6 @@ html:not([data-runtime-platform="android"]) .unified-shell.mode-standard.module-
   .library-browser-column-mode .library-browser-reader { flex-basis: 245px; }
 }
 @container library-workspace (max-width: 710px) {
-  .library-browser-navigation { flex-basis: 180px; }
   .library-browser-title :is(svg, span) { display: none; }
   .library-browser-list { flex: 1; }
   .library-browser-body:not(.library-browser-reading) .library-browser-reader,

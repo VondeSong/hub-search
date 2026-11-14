@@ -100,7 +100,7 @@ it("shows all libraries, opens real folder levels in column mode and restores th
   try {
     await act(async () => render());
     expect(container.textContent).toContain("尚未选择文档");
-    expect(invoke).not.toHaveBeenCalled();
+    expect(invoke.mock.calls.filter(([command]) => command === "library_contents")).toHaveLength(2);
     await click(container, "分栏浏览");
     expect(columns()).toHaveLength(1);
     await click(columns()[0], obsidian.name);
@@ -143,7 +143,7 @@ it("returns from a Craft subpage to the original document without changing the b
   try {
     await act(async () => render(parent));
     expect(home()).toBeUndefined();
-    expect(invoke).not.toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalledWith("library_contents", { libraryId: library.id });
     const child = browseSubpage(parent, "#craft-subpage=child", "子页面");
     const grandchild = browseSubpage(child, "#craft-subpage=grandchild", "深层子页面");
     expect(grandchild).toEqual(expect.objectContaining({
@@ -159,6 +159,54 @@ it("returns from a Craft subpage to the original document without changing the b
     expect(onPosition).not.toHaveBeenCalled();
   } finally {
     await act(async () => root.unmount());
+    invoke.mockReset();
+  }
+});
+
+it("browses cached documents across libraries, preserves a hidden preview and tolerates one unavailable library", async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  const library: LibrarySummary = { id: "vault", provider: "obsidian", name: "本地库", connected: false, documentCount: 3, excludedPaths: [] };
+  const libraries = [library, { ...library, id: "unavailable", name: "暂不可用的库" }];
+  invoke.mockImplementation(async (command, args) => {
+    if (command !== "library_contents") throw new Error(`Unexpected command: ${command}`);
+    if (args.libraryId !== library.id) throw new Error("来源暂不可用");
+    return contents;
+  });
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  const onPreview = vi.fn();
+  const onToggleFavorite = vi.fn();
+  const onPosition = vi.fn();
+  document.body.append(container);
+  const button = (label: string) => Array.from(container.querySelectorAll("button"))
+    .find(item => item.getAttribute("aria-label") === label || item.textContent === label)!;
+  try {
+    await act(async () => root.render(<LibraryBrowse libraries={libraries} onPosition={onPosition}
+      onPreview={onPreview} onClosePreview={vi.fn()} onToggleFavorite={onToggleFavorite}
+      preview={<article><input aria-label="预览内状态" defaultValue="保留阅读状态" /></article>} />));
+    expect(container.querySelector('[aria-label="当前目录内容"]')?.textContent).toContain("子目录文档");
+    expect(container.textContent).toContain("部分资料库读取失败");
+    await act(async () => container.querySelector(".library-browser")!.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true, cancelable: true })));
+    expect(document.activeElement).toBe(container.querySelector(".library-browser-search input"));
+    await act(async () => button("收藏 根文档").click());
+    expect(onToggleFavorite).toHaveBeenCalledWith(expect.objectContaining({ libraryId: "vault", documentId: "root" }));
+    const reader = container.querySelector<HTMLElement>('[aria-label="阅读区"]')!;
+    const previewInput = reader.querySelector("input");
+    await act(async () => button("收起阅读区").click());
+    expect(reader.hidden).toBe(true);
+    expect(reader.querySelector("input")).toBe(previewInput);
+    const documentButton = Array.from(container.querySelectorAll(".library-browser-result > button"))
+      .find(item => item.textContent?.startsWith("根文档")) as HTMLButtonElement;
+    await act(async () => documentButton.click());
+    expect(reader.hidden).toBe(false);
+    expect(onPreview).toHaveBeenCalledWith(expect.objectContaining({ documentId: "root" }));
+    expect(reader.querySelector("input")).toBe(previewInput);
+    await act(async () => button("定位").click());
+    expect(onPosition).toHaveBeenCalledWith(expect.objectContaining({ libraryId: "vault", folderId: "", documentId: "root" }));
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
     invoke.mockReset();
   }
 });

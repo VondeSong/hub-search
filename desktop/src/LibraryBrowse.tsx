@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft, ArrowUp, BookOpen, ChevronDown, ChevronRight, Columns3, FileText, Folder, FolderTree, Layers, PanelLeft, RotateCw, Search, Star, X } from "lucide-react";
+import { ArrowLeft, ArrowUp, BookOpen, ChevronDown, ChevronRight, Columns3, FileText, Folder, FolderTree, Layers, PanelLeft, PanelRight, RotateCw, Search, Star, X } from "lucide-react";
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { LibraryIcon } from "./LibraryIcon";
 import { providerName } from "./ProviderLabels";
@@ -111,7 +111,7 @@ function rootResult(library: LibrarySummary, document: DocumentNode): SearchResu
 }
 
 export function LibraryBrowse({
-  libraries, favorites = [], position, onPosition, selected, onPreview, onClosePreview, onExit, preview,
+  libraries, favorites = [], position, onPosition, selected, onPreview, onClosePreview, onExit, onToggleFavorite, preview,
 }: {
   libraries: LibrarySummary[];
   favorites?: SearchResult[];
@@ -121,6 +121,7 @@ export function LibraryBrowse({
   onPreview: (result: SearchResult) => void;
   onClosePreview: () => void;
   onExit?: () => void;
+  onToggleFavorite?: (result: SearchResult) => void;
   preview?: ReactNode;
 }) {
   const header = useContext(WorkspaceHeaderContext);
@@ -132,6 +133,7 @@ export function LibraryBrowse({
   const [expansion, setExpansion] = useState<Record<string, boolean>>({});
   const [openRoots, setOpenRoots] = useState<Record<string, boolean>>({});
   const [navigationOpen, setNavigationOpen] = useState(true);
+  const [readerOpen, setReaderOpen] = useState(true);
   const [mode, setMode] = useState<"tree" | "columns">("tree");
   const [showFavorites, setShowFavorites] = useState(false);
   const [folderQuery, setFolderQuery] = useState("");
@@ -147,7 +149,7 @@ export function LibraryBrowse({
 
   useEffect(() => {
     for (const item of libraries) {
-      const needed = item.id === library?.id || item.id === subpageLibraryId || Boolean(directoryQuery && !library) || (!library && openRoots[item.id]);
+      const needed = !library || item.id === library.id || item.id === subpageLibraryId;
       if (!needed) continue;
       const version = libraryVersion(item, revision);
       if (requested.current.get(item.id) === version) continue;
@@ -189,7 +191,11 @@ export function LibraryBrowse({
   }, [query, library?.id, library?.provider, libraryIds, tree, folderId, scope]);
   const matching = hits?.request === searchRequest ? hits : undefined;
   const libraryFavorites = favorites.filter(result => libraryIds.includes(result.libraryId) && (!library || library.id === result.libraryId));
+  const allDocuments = useMemo(() => libraries.flatMap(item =>
+    cache[item.id]?.contents?.documents.map(document => rootResult(item, document)) ?? []), [libraries, cache]);
   const inColumns = mode === "columns" && !query && !showFavorites;
+
+  const openPreview = (result: SearchResult) => { setReaderOpen(true); onPreview(result); };
 
   useEffect(() => {
     const timer = window.setTimeout(() => setQuery(input.trim()), 220);
@@ -243,7 +249,7 @@ export function LibraryBrowse({
       : undefined;
     const actualFolder = scopedFolder ?? resultTree?.documentFolders.get(result.documentId);
     move(result.libraryId, actualFolder ?? result.folderId ?? "", true, result.documentId);
-    onPreview(result);
+    openPreview(result);
   };
   const up = () => library && move(trail.length ? library.id : "", trail[trail.length - 2]?.id ?? "");
 
@@ -306,7 +312,7 @@ export function LibraryBrowse({
       {documents.filter((document, index) => index < limit || (selected?.libraryId === library.id && selected.documentId === document.id)).map(document =>
         <button className="library-browser-row" key={JSON.stringify([document.nodeId, document.id])} title={document.path}
           aria-current={selected?.libraryId === library.id && selected.documentId === document.id && (!document.nodeId || selected.entityKey === rootResult(library, document).entityKey) ? "true" : undefined}
-          onClick={() => onPreview(rootResult(library, document))}>
+          onClick={() => openPreview(rootResult(library, document))}>
           <FileText size={17} /><span>{document.title}<small>{document.folderId && !tree.nodes.has(document.folderId) ? "目录位置未知" : document.path}</small></span>
         </button>)}
       {documents.length > limit && <button className="library-browser-text-button" onClick={() => setLimits(current => ({ ...current, [key]: limit + 100 }))}>显示更多文档</button>}
@@ -315,12 +321,17 @@ export function LibraryBrowse({
   }
 
   const resultRows = (results: SearchResult[]) => results.map(result => <div className="library-browser-result" key={result.entityKey}>
-    <button className="library-browser-row" onClick={() => onPreview(result)} title={result.title}
+    <button className="library-browser-row" onClick={() => openPreview(result)} title={result.title}
       aria-current={selected?.entityKey === result.entityKey ? "true" : undefined}>
-      <FileText size={17} /><span>{result.title}<small>{[!library && result.libraryName, result.path].filter(Boolean).join(" · ")}</small></span>
+      <FileText size={17} /><span>{result.title}{result.snippet && <small className="library-browser-excerpt">{result.snippet}</small>}<small>{[!library && providerName(result.provider), !library && result.libraryName, result.path].filter(Boolean).join(" · ")}</small></span>
     </button>
+    <div className="library-browser-result-actions">
+    {onToggleFavorite && <button className="library-browser-text-button" aria-label={`收藏 ${result.title}`}
+      aria-pressed={favorites.some(item => item.libraryId === result.libraryId && item.documentId === result.documentId)}
+      onClick={() => onToggleFavorite(result)}><Star size={13} />收藏</button>}
     {(cache[result.libraryId]?.tree?.documentFolders.has(result.documentId) || !cache[result.libraryId]?.tree) &&
       <button className="library-browser-text-button" onClick={() => locate(result)}>定位</button>}
+    </div>
   </div>);
   const locationStatus = <>
     {library && loaded?.version !== activeVersion && !tree && <p className="library-browser-hint" role="status">正在读取本地目录…</p>}
@@ -335,9 +346,16 @@ export function LibraryBrowse({
   const rootDocument = subpageLibrary && cache[subpageLibrary.id]?.contents?.documents.find(document => document.id === selected?.documentId);
   const count = query ? matching?.results?.length : showFavorites ? libraryFavorites.length
     : library && tree ? (tree.children.get(folderId)?.length ?? 0) + (tree.pages.get(folderId)?.length ?? 0) + (!folderId ? tree.unresolved.length : 0)
-      : library ? undefined : libraries.length;
+      : library ? undefined : allDocuments.length;
 
-  return <div className="library-browser" data-hub-keyboard-scope>
+  return <div className="library-browser" data-hub-keyboard-scope onKeyDown={event => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault(); event.stopPropagation();
+      event.currentTarget.querySelector<HTMLInputElement>(".library-browser-search input")?.focus();
+    } else if (event.key === "Escape" && (input || folderQuery)) {
+      event.preventDefault(); event.stopPropagation(); clearSearch(); setFolderQuery("");
+    }
+  }}>
     {navigationOpen && <aside className="library-browser-navigation" aria-label="资料库导航">
       <header><h1>库结构</h1></header>
       <div className="library-browser-navigation-tools">
@@ -393,6 +411,7 @@ export function LibraryBrowse({
         })}
       </nav>
     </aside>}
+    {navigationOpen && header?.navigationResizer}
     <div className="library-browser-main">
       <header className="library-browser-header" onMouseDown={header?.onMouseDown}>
         <button className="library-browser-icon library-browser-nav-toggle" aria-expanded={navigationOpen}
@@ -434,8 +453,10 @@ export function LibraryBrowse({
           <button aria-pressed={mode === "columns"} onClick={() => setMode("columns")}><Columns3 size={15} />分栏浏览</button>
         </div>
         {rootDocument && subpageLibrary && <button className="library-browser-text-button" onClick={() => onPreview(rootResult(subpageLibrary, rootDocument))}>返回文档首页</button>}
+        {inColumns && <button className="library-browser-icon" aria-label={readerOpen ? "收起阅读区" : "显示阅读区"}
+          aria-pressed={readerOpen} onClick={() => setReaderOpen(value => !value)}><PanelRight size={16} /></button>}
       </div>
-      <div className={`library-browser-body${inColumns ? " library-browser-column-mode" : ""}${preview ? " library-browser-reading" : ""}`}>
+      <div className={`library-browser-body${inColumns ? " library-browser-column-mode" : ""}${preview && readerOpen ? " library-browser-reading" : ""}`}>
         {inColumns ? <div className="library-browser-columns" ref={columnStrip} aria-label="目录分栏">
           <section className="library-browser-column"><h2>全部库</h2>{libraryRows()}
             {!libraries.length && <p className="library-browser-hint">在设置中接入资料库后，即可在这里浏览。</p>}
@@ -447,8 +468,10 @@ export function LibraryBrowse({
               {folderRows(folder.id, trail[index]?.id)}
             </section>)}
         </div> : <section className="library-browser-list" aria-label="当前目录内容">
-          <header><h2 title={locationName}>{query ? "搜索结果" : showFavorites ? "收藏" : locationName}</h2>
-            {count !== undefined && <p>{count}{query && count === 100 ? "+" : ""} {library || query || showFavorites ? "项" : "个资料库"}</p>}
+          <header><div><h2 title={locationName}>{query ? "搜索结果" : showFavorites ? "收藏" : locationName}</h2>
+            {count !== undefined && <p>{count}{query && count === 100 ? "+" : ""} 项内容</p>}</div>
+            <button className="library-browser-icon" aria-label={readerOpen ? "收起阅读区" : "显示阅读区"}
+              aria-pressed={readerOpen} onClick={() => setReaderOpen(value => !value)}><PanelRight size={16} /></button>
           </header>
           {library && !query && !showFavorites && <button className="library-browser-up" onClick={up}><ArrowUp size={14} />返回上级</button>}
           {locationStatus}
@@ -460,11 +483,18 @@ export function LibraryBrowse({
               {matching?.results && resultRows(matching.results)}
             </> : showFavorites ? libraryFavorites.length ? resultRows(libraryFavorites)
               : <p className="library-browser-hint">当前范围内没有收藏。</p>
-              : library ? folderRows(folderId) : libraryRows()}
+              : library ? folderRows(folderId) : <>
+                {directoryLoading && <p className="library-browser-hint" role="status">正在读取各库的本地内容…</p>}
+                {directoryFailed && <p className="library-browser-hint" role="status">部分资料库读取失败，可刷新目录重试；已读取内容仍可浏览。</p>}
+                {resultRows(allDocuments.slice(0, limits.all ?? 100))}
+                {allDocuments.length > (limits.all ?? 100) && <button className="library-browser-text-button"
+                  onClick={() => setLimits(current => ({ ...current, all: (current.all ?? 100) + 100 }))}>显示更多文档</button>}
+                {!directoryLoading && !allDocuments.length && libraries.length > 0 && <p className="library-browser-hint">暂无已缓存的文档。</p>}
+              </>}
             {!libraries.length && !query && !showFavorites && <p className="library-browser-hint">在设置中接入资料库后，即可在这里浏览。</p>}
           </div>
         </section>}
-        <section className="library-browser-reader desktop-workspace" aria-label="阅读区">
+        <section className="library-browser-reader desktop-workspace" aria-label="阅读区" hidden={!readerOpen}>
           <div className="library-browser-reader-toolbar"><BookOpen size={15} /><span>{selected?.title || "文档预览"}</span></div>
           {preview ?? <div className="library-browser-reader-empty">
             <BookOpen size={25} /><h2>尚未选择文档</h2><p>从{inColumns ? "分栏" : "列表"}中选一篇文档，在这里预览。</p>
