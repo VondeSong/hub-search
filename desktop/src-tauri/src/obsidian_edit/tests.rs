@@ -1,4 +1,40 @@
 use super::*;
+
+#[test]
+#[ignore = "explicit read-only check of daily OS originals; never writes notes"]
+fn live_daily_note_snapshot_and_unchanged_compose() {
+    let database =
+        Path::new("C:/Users/yongs/AppData/Roaming/com.craftsearch.desktop/craft-search.sqlite3");
+    let c =
+        Connection::open_with_flags(database, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+    let mut query = c.prepare("SELECT l.id,d.id FROM libraries l JOIN documents d ON d.space_id=l.id WHERE l.enabled=1 AND l.provider='obsidian' AND d.provider='obsidian' AND length(d.markdown) BETWEEN 500 AND 4000 AND d.path NOT LIKE '%验收%' AND d.path NOT LIKE '%测试%' ORDER BY d.path LIMIT 2").unwrap();
+    let rows = query
+        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+        .unwrap();
+    let mut checked = 0;
+    for row in rows {
+        let (library, document) = row.unwrap();
+        let before = snapshot(&c, &library, &document).unwrap();
+        assert!(before.utf8);
+        let (_, body) = split(&before.before).unwrap();
+        let composed = compose(&before, body).unwrap();
+        assert_eq!(
+            composed, before.before,
+            "unchanged compose must retain original properties and line endings"
+        );
+        assert_eq!(
+            STANDARD.decode(&before.raw_base64).unwrap(),
+            before.before.as_bytes()
+        );
+        let after = snapshot(&c, &library, &document).unwrap();
+        assert_eq!(before.hash, after.hash);
+        assert_eq!(before.file_identity, after.file_identity);
+        checked += 1;
+    }
+    assert_eq!(checked, 2, "two existing daily notes required");
+    println!("two real note snapshots and unchanged-body round trips passed; no note written");
+}
+
 pub(crate) struct Fixture {
     pub root: PathBuf,
     pub vault: PathBuf,
