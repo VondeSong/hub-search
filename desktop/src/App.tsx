@@ -39,6 +39,7 @@ import "./MobileNavigationDesign.css";
 import "./MobilePrototype.css";
 import { GlobalExclusionReviewProvider } from "./GlobalExclusionReviewReminder";
 import { CollectionViewsProvider } from "./CollectionViews";
+import { JournalRecordsProvider } from "./JournalRecords";
 import { JournalViewsContext, useJournalViewStore } from "./JournalViews";
 import { UnifiedTaskProvider, useUnifiedTasks } from "./UnifiedTaskData";
 import { readAdjacentJournalPreview } from "./JournalPreviewNavigation";
@@ -1520,7 +1521,7 @@ useEffect(() => {
     } : undefined,
   };
 
-  return <AgentPanelProvider><TaskStatusStyleProvider style={appSettings.taskStatusStyle}><JournalViewsContext.Provider value={journalViewStore}><IsolatedRuntimeProbe /><CollectionViewsProvider><GlobalExclusionReviewProvider active={runtimeCapabilities.desktop}><AppLayout {...appLayoutProps} /></GlobalExclusionReviewProvider></CollectionViewsProvider></JournalViewsContext.Provider></TaskStatusStyleProvider></AgentPanelProvider>;
+  return <AgentPanelProvider><TaskStatusStyleProvider style={appSettings.taskStatusStyle}><JournalViewsContext.Provider value={journalViewStore}><JournalRecordsProvider enabled={runtimeCapabilities.desktop && desktopSidebarView === "journals"} dataVersion={journalDataVersion(indexStatus, currentSpaceIds)} scope={currentSpaceIds}><IsolatedRuntimeProbe /><CollectionViewsProvider><GlobalExclusionReviewProvider active={runtimeCapabilities.desktop}><AppLayout {...appLayoutProps} /></GlobalExclusionReviewProvider></CollectionViewsProvider></JournalRecordsProvider></JournalViewsContext.Provider></TaskStatusStyleProvider></AgentPanelProvider>;
 }
 
 function App() {

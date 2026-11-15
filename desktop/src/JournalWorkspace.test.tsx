@@ -20,7 +20,7 @@ beforeEach(()=>{(globalThis as unknown as {IS_REACT_ACT_ENVIRONMENT:boolean}).IS
 afterEach(async()=>{await act(async()=>root.unmount());container.remove();vi.useRealTimers();});
 describe("Journal database workspace",()=>{
  it("keeps same-day sources separate and previews the original page; favorite uses page identity",async()=>{
-  await act(async()=>root.render(<Fixture/>));await act(async()=>store.update({layout:"calendar"}));await click('[aria-label="2026年10月7日 · 周三，2篇日志"]');expect(container.querySelectorAll(".journal-entry-card")).toHaveLength(2);
+  await act(async()=>root.render(<Fixture/>));await act(async()=>store.update({layout:"calendar"}));await click('[aria-label="2026年10月7日 · 周三，2条记录"]');expect(container.querySelectorAll(".journal-entry-card")).toHaveLength(2);
   await click('.journal-entry-card:first-child .journal-entry-open');expect(preview).toHaveBeenLastCalledWith(items[0]);
   expect(container.querySelector('.journal-entry-actions button')?.getAttribute("aria-pressed")).toBe("true");
   await click('.journal-entry-actions button');expect(favorite).toHaveBeenLastCalledWith(items[0]);
@@ -28,7 +28,7 @@ describe("Journal database workspace",()=>{
  });
  it("selects a calendar date without narrowing the date filter, then explicitly filters that day",async()=>{
   await act(async()=>root.render(<Fixture/>));await act(async()=>store.update({layout:"calendar"}));
-  await click('[aria-label="2026年10月7日 · 周三，2篇日志"]');expect(store.view.period).toBe("month");
+  await click('[aria-label="2026年10月7日 · 周三，2条记录"]');expect(store.view.period).toBe("month");
   expect(container.querySelectorAll('.journal-month-cell')).toHaveLength(35);
   const filter=Array.from(container.querySelectorAll('button')).find(b=>b.textContent==='仅看这一天')!;
   await act(async()=>filter.click());expect(store.view.period).toBe("day");expect(store.view.day).toBe("2026-10-07");
@@ -47,8 +47,8 @@ describe("Journal database workspace",()=>{
   await act(async()=>root.render(<Fixture/>));
   expect([...container.querySelectorAll<HTMLElement>('[data-journal-day]')].map(row=>row.dataset.journalDay)).toEqual(['2026-10-13','2026-10-14','2026-10-15','2026-10-16','2026-10-17','2026-10-18','2026-10-19']);
   expect(container.querySelector('.journal-empty-range')).toBeNull();
-  await click('.journal-daily-day.is-today .journal-daily-add');expect(create).toHaveBeenLastCalledWith('2026-10-13');
+  await click('.journal-daily-day.is-today .journal-daily-add');expect(container.querySelector('.journal-floating-editor time')?.textContent).toBe('2026-10-13');expect(create).not.toHaveBeenCalled();
   await click('[data-journal-day="2026-10-15"] .journal-daily-date');
-  await click('[data-journal-day="2026-10-15"] .journal-daily-add');expect(create).toHaveBeenLastCalledWith('2026-10-15');
+  await click('[data-journal-day="2026-10-15"] .journal-daily-add');expect(container.querySelector('.journal-floating-editor time')?.textContent).toBe('2026-10-15');expect(create).not.toHaveBeenCalled();
  });
 });

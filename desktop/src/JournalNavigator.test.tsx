@@ -34,7 +34,7 @@ describe("Journal calendar navigation", () => {
   it("marks today and recorded days independently from the selected date, with one grid tab stop", async () => {
     await act(async () => root.render(<Fixture />));
     expect(container.querySelector('[data-date="2026-10-13"]')?.getAttribute("aria-current")).toBe("date");
-    expect(container.querySelector('[data-date="2026-10-07"]')?.getAttribute("aria-label")).toContain("3 个资料库");
+    expect(container.querySelector('[data-date="2026-10-07"]')?.getAttribute("aria-label")).toContain("3个资料库");
     expect(container.querySelectorAll('.journal-date[tabindex="0"]')).toHaveLength(1);
     await click('[data-date="2026-10-07"]');
     await click('[data-date="2026-10-07"]');
@@ -47,14 +47,17 @@ describe("Journal calendar navigation", () => {
     expect(container.querySelector('[role="grid"]')?.getAttribute("aria-label")).toBe("2027年1月");
     expect(onSelect).not.toHaveBeenCalled();
     await click('.journal-month-label');
+    expect(onSelect).not.toHaveBeenCalled();
+    await click('.journal-period-picker button[type="submit"]');
     expect(onSelect).toHaveBeenLastCalledWith("2027-01");
     await click('.journal-today-button');
     expect(onSelect).toHaveBeenLastCalledWith("2026-10-13");
   });
   it("selects a leap-year month from its compact heading and keeps day selection reachable", async () => {
     await act(async () => root.render(<Fixture initial="2024-02-29" />));
-    expect(container.querySelector('.journal-month-label strong')?.textContent).toBe("2024年 二月");
+    expect(container.querySelector('.journal-month-label strong')?.textContent).toBe("2024年2月");
     await click('.journal-month-label');
+    await click('.journal-period-picker button[type="submit"]');
     expect(onSelect).toHaveBeenLastCalledWith("2024-02");
     expect(container.querySelector('[data-date="2024-02-29"]')).not.toBeNull();
     await click('[data-date="2024-02-29"]');

@@ -13,7 +13,8 @@ import { isPdfContent } from "./PdfPreviewModel";
 
 export function previewDocumentKey(result: SearchResult): string {
   const taskStatus = result.provider === "dida365" ? `\u0000${result.taskStatus ?? "unknown"}` : "";
-  return `${result.spaceId}\u0000${result.documentId}\u0000${result.entityKey || result.blockId || result.documentId}\u0000${result.modifiedAt ?? 0}${taskStatus}`;
+  const fileVersion = result.contentType === "file_attachment" ? `\u0000${result.id}` : "";
+  return `${result.spaceId}\u0000${result.documentId}\u0000${result.entityKey || result.blockId || result.documentId}\u0000${result.modifiedAt ?? 0}${taskStatus}${fileVersion}`;
 }
 
 export function mcpToolText(result: unknown): string {
@@ -89,7 +90,7 @@ export function usePreviewController({
   const setPdfPreviewPage=useCallback((change:number|((page:number)=>number))=>{
     setPdfPageState(previous=>{const current=previous.key===pageKey?previous.page:selected?.pageNumber??1;return {key:pageKey,page:typeof change==="function"?change(current):change};});
   },[pageKey,selected?.pageNumber]);
-  const identity=selected?JSON.stringify([selected.spaceId,selected.documentId,selected.blockId??null,selected.sourceItemId??null,selected.contentType,pdfPreviewPage,selected.modifiedAt??0]):"";
+  const identity=selected?JSON.stringify([selected.spaceId,selected.documentId,selected.blockId??null,selected.sourceItemId??null,selected.contentType,pdfPreviewPage,selected.modifiedAt??0,selected.contentType==="file_attachment"?selected.id:null]):"";
 
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewMatchCount, setPreviewMatchCount] = useState(0);
@@ -190,7 +191,7 @@ export function usePreviewController({
       })
       .catch(async (reason) => {
         if (cancelled) return;
-        if (selected.provider !== "craft") {
+        if (selected.provider !== "craft" || selected.contentType === "file_attachment") {
           if (!cancelled) setPreview(`无法加载${providerName(selected.provider)}本地预览：${String(reason)}`);
           return;
         }

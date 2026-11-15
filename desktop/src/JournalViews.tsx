@@ -1,10 +1,10 @@
 import { userProfileStorage } from "./UserProfileStorage";
 import { createContext, useContext, useEffect, useState } from "react";
 
-export const journalLayouts = { stream: "日历流", records: "速记卡片", calendar: "月历", list: "列表", table: "表格" } as const;
+export const journalLayouts = { stream: "每日记录", records: "卡片", calendar: "月历", list: "列表", table: "表格" } as const;
 export type JournalLayout = keyof typeof journalLayouts;
 export type JournalViewConfig = {
-  layout: JournalLayout; query: string; libraries: string[] | null;
+  recordFilter?: "all" | "pinned" | "attachments" | "untagged"; layout: JournalLayout; query: string; libraries: string[] | null;
   period: "month" | "all" | "day"; day: string; month: string;
   ascending: boolean; sort: "date" | "modified"; compact: boolean;
   summary: boolean; source: boolean; modified: boolean;
@@ -51,13 +51,14 @@ export function journalMonthDays(month: string, grid = false) {
   return Array.from({ length: count }, (_, i) => civilDateKey(civilDate(year, number, 1 - offset + i))).filter(Boolean);
 }
 export function defaultJournalView(): JournalViewConfig {
-  return { layout: "stream", query: "", libraries: null, period: "month", day: "", month: localJournalDate().slice(0, 7), ascending: true, sort: "date", compact: false, summary: true, source: true, modified: false };
+  return { recordFilter: "all", layout: "stream", query: "", libraries: null, period: "month", day: "", month: localJournalDate().slice(0, 7), ascending: true, sort: "date", compact: false, summary: true, source: true, modified: false };
 }
 export function normalizeJournalView(value: unknown): JournalViewConfig {
   const base = defaultJournalView(), v = (value && typeof value === "object" ? value : {}) as Partial<JournalViewConfig>;
   const day = validDay(v.day) ? v.day : "";
   return {
     ...base,
+    recordFilter: ["pinned","attachments","untagged"].includes(v.recordFilter || "") ? v.recordFilter : "all",
     layout: typeof v.layout === "string" && Object.prototype.hasOwnProperty.call(journalLayouts, v.layout) ? v.layout : base.layout,
     query: typeof v.query === "string" ? v.query.slice(0, 500) : "",
     libraries: Array.isArray(v.libraries) ? [...new Set(v.libraries.filter((id): id is string => typeof id === "string" && Boolean(id.trim())))].sort() : null,
