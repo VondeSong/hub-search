@@ -933,6 +933,12 @@ useEffect(() => {
     applyMobileRoute(route);
   }, [applyMobileRoute, openRouteFromFlashcards]);
 
+  const closeMobileAgents = useCallback(() => {
+    mobileSearch.consumeBack();
+    window.history.replaceState({ hubMobileRoute: "search" }, "");
+    applyMobileRoute("search");
+  }, [applyMobileRoute, mobileSearch.consumeBack]);
+
   const navigateMobile = useCallback((destination: MobileDestination) => {
     if (destination === "review") {
       openStandaloneFlashcards();
@@ -1289,7 +1295,7 @@ useEffect(() => {
     mobileHeader: isMobileLayout && !mobilePreviewOpen && !mobileAgentsOpen ? <MobileHeader onBack={((!["home", "tasks"].includes(desktopSidebarView) && !mobileBrowseOpen) || mobileConnectionsOpen) ? () => navigateMobile("browse") : undefined} onSettings={() => setShowConnection(true)} /> : undefined,
     style: shellStyle,
     startWindowDrag,
-    mainContent: isMobileLayout && mobileAgentsOpen && !flashcardsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开 Agents…</div>}><LazyCloudAgents onClose={() => window.history.back()} /></Suspense> : isMobileLayout && mobileConnectionsOpen && !flashcardsActive ? <MobileConnections onContent={() => { setSettingsCategory("cloud"); setShowConnection(true); }} onAgents={() => navigateMobile("agents")} /> : isMobileLayout && mobileBrowseOpen && !flashcardsActive ? <MobileBrowse
+    mainContent: isMobileLayout && mobileAgentsOpen && !flashcardsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开 Agents…</div>}><LazyCloudAgents onClose={closeMobileAgents} /></Suspense> : isMobileLayout && mobileConnectionsOpen && !flashcardsActive ? <MobileConnections onContent={() => { setSettingsCategory("cloud"); setShowConnection(true); }} onAgents={() => navigateMobile("agents")} /> : isMobileLayout && mobileBrowseOpen && !flashcardsActive ? <MobileBrowse
       favoriteCount={favoriteResults.length}
       historyCount={viewHistory.length}
       journalCount={journalDates.length}

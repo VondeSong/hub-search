@@ -117,6 +117,25 @@ it("returns to the list on Android back without leaving the Agents route", async
   expect(window.history.state.hubMobileRoute).toBe("agents");
 });
 
+it("keeps the mobile chat-close action separate from leaving the Agents page", async () => {
+  runtimeCapabilities.mobile = true;
+  const onClose = vi.fn();
+  await act(async () => root.render(<CloudAgents onClose={onClose} />));
+  const returnToList = async () => {
+    const popped = new Promise<void>(resolve => window.addEventListener("popstate", () => resolve(), { once: true }));
+    await act(async () => { node.querySelector<HTMLButtonElement>('button[aria-label="返回会话列表"]')!.click(); await popped; });
+  };
+  await act(async () => node.querySelector<HTMLButtonElement>(".cloud-agents-thread")!.click());
+  await type(node.querySelector("textarea")!, "保留这条尚未发送的草稿");
+  await returnToList();
+  expect(onClose).not.toHaveBeenCalled();
+  await act(async () => node.querySelector<HTMLButtonElement>(".cloud-agents-thread")!.click());
+  expect(node.querySelector("textarea")?.value).toBe("保留这条尚未发送的草稿");
+  await returnToList(); await click("关闭云端 Agents");
+  expect(onClose).toHaveBeenCalledOnce();
+  expect(invoke.mock.calls.some(([, args]) => args.action.op === "send")).toBe(false);
+});
+
 it("disables archive while a real turn is still running", async () => {
   running = true;
   await render(); await act(async () => node.querySelector<HTMLButtonElement>(".cloud-agents-thread")!.click());
