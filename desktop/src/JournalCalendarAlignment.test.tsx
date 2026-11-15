@@ -9,6 +9,7 @@ import { JournalRecordsProvider, journalHeatLevel } from "./JournalRecords";
 import { JournalNavigation } from "./JournalNavigation";
 import { JournalViewsContext, defaultJournalView, useJournalViewStore, type JournalViewStore } from "./JournalViews";
 import { insertJournalTask,splitJournalCapture } from "./JournalCapture";
+import { isInsideKeyboardDialog } from "./AppKeyboardScope";
 
 const {invoke}=vi.hoisted(()=>({invoke:vi.fn()}));
 vi.mock("@tauri-apps/api/core",()=>({invoke}));
@@ -39,6 +40,18 @@ it("restores separate day drafts after minimizing without creating a record",asy
  await click('[aria-label="补记另一天"]');await text("16 日草稿");await click('[aria-label="收起日志草稿"]');
  await click('[aria-label="继续编辑 2026-11-15 的日志草稿"]');expect(host.querySelector('textarea')?.value).toBe("15 日尚未创建");
  expect(JSON.parse(drafts.get("2026-11-16")!).text).toBe("16 日草稿");
+});
+it("gives Escape to the open journal editor before the app can hide the window",async()=>{
+ await act(async()=>root.render(<Editor/>));await text("Esc 后保留的草稿");
+ const hide=vi.fn();const capture=(event:KeyboardEvent)=>{if(event.key==="Escape"&&!isInsideKeyboardDialog(event.target))hide();};
+ window.addEventListener("keydown",capture,true);
+ try {
+  await act(async()=>host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",isComposing:true,bubbles:true,cancelable:true})));
+  expect(host.querySelector('textarea')).not.toBeNull();
+  await act(async()=>host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true,cancelable:true})));
+  expect(hide).not.toHaveBeenCalled();expect(host.querySelector('textarea')).toBeNull();
+  await click('[aria-label="继续编辑 2026-11-15 的日志草稿"]');expect(host.querySelector('textarea')?.value).toBe("Esc 后保留的草稿");
+ } finally {window.removeEventListener("keydown",capture,true);}
 });
 it("only explicit creation captures, and a failure retains the same durable identity",async()=>{
  await act(async()=>root.render(<Editor/>));await text("需要保留的正文");
