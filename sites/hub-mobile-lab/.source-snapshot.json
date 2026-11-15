@@ -3,9 +3,9 @@
   "site": "mobile",
   "project_id": "appgprj_6af1d2dc12308191acc37e5566699c2d",
   "site_url": "https://hub-mobile-lab-von11.song02211368537057.chatgpt.site",
-  "source_commit": "a7c8e91a7b63e3744f8ee0ea65f53fc3dbef945f",
-  "published_version": 12,
-  "deployment_id": "appgdep_6af9c43227f481918074c14a66ac5b54",
+  "source_commit": "9e1a1bf0e23665b44656ca1443e944d83ccb0a54",
+  "published_version": 13,
+  "deployment_id": "appgdep_6af9d1d70fa08191b63e62bb6cc625ab",
   "files": {
     ".openai/hosting.json": {
       "sha256": "543a776095c0181cc870f784c075ab4f263fb739e3649cd8db74f493fb5b4ca3",
@@ -13,9 +13,9 @@
       "bytes": 106
     },
     "DESIGN.md": {
-      "sha256": "826c6fde7b599e9afa97170b6384358757c068635f6a50ab5ee8c2933565214f",
+      "sha256": "777e98d6e122192aa50f117b316bd37c0020a6b3d6e8038a3fbcfeff996fbf8c",
       "mode": "100644",
-      "bytes": 11007
+      "bytes": 11610
     },
     "PRODUCT.md": {
       "sha256": "625d08288c336b4d82c1d9640ac7f1ebf0f487a1975a8631b29c5c95af71207a",
@@ -23,9 +23,9 @@
       "bytes": 4282
     },
     "README.md": {
-      "sha256": "a0edc25ca7358541ace1580b1a78fbaa247008ff9d5e8c3216f4ddcc42130abe",
+      "sha256": "dfc857278c72195b9d54ade8379027877d91bb9ba415815d49534685615539b4",
       "mode": "100644",
-      "bytes": 15467
+      "bytes": 15922
     },
     "checks/agents-enhancements-checks.cjs": {
       "sha256": "163158e85484b74bb6b0798565cd71cfed692ada30485369eaa9dbf7afbd02d5",
@@ -33,9 +33,9 @@
       "bytes": 15424
     },
     "checks/mobile-checks.cjs": {
-      "sha256": "d2749a71e062fc22565011d2fad0b776507c3316e06df713a1e56d323778675c",
+      "sha256": "066272d5a7554026a4e0d17812d5a6910bfdce3d47f5167d4f1a7f5cb7b960ee",
       "mode": "100644",
-      "bytes": 6298
+      "bytes": 7889
     },
     "checks/search-interactions-checks.cjs": {
       "sha256": "3e995084be263e55c40b3c89079838a77f60e4f34679dcc6a0d8369c023bc96e",
@@ -53,9 +53,9 @@
       "bytes": 3783
     },
     "checks/workspace-checks.cjs": {
-      "sha256": "e281e9d0240822a476ea0b637fe25d262323ac9cc02e1192eb230d70b5548f59",
+      "sha256": "8650b65ce5234384cbfb95a8df555d22f9470eea51d0ca3540c59df26dd02fc7",
       "mode": "100644",
-      "bytes": 7664
+      "bytes": 8826
     },
     "dist/agents-runtime.js": {
       "sha256": "279f9eeb690178731955e9e05a438ca15c1660a62ceec4a1f6f27734cbc650de",
@@ -63,19 +63,19 @@
       "bytes": 29678
     },
     "dist/agents-ui.js": {
-      "sha256": "9e898f3528780890c9c010a1f710c0d2857c58909edd586f3d1a6497f4eee363",
+      "sha256": "55fba42ec6452b0f7ec8c9392d462ff1bf9f842fdbfe432802c7a647929580cf",
       "mode": "100644",
-      "bytes": 66417
+      "bytes": 66576
     },
     "dist/agents.css": {
-      "sha256": "e2bc1dec7cb21e872091e849c0131edf3b78b42374c2c801de94c36bffc1a143",
+      "sha256": "cc679c4a217d50a8eca21a1945a1b4a5c4e75b96776e7d3e00c6f310eebcafa8",
       "mode": "100644",
-      "bytes": 33311
+      "bytes": 33414
     },
     "dist/app.js": {
-      "sha256": "6f46f3360d8986819dd1c60eff5b0fdd0d809d9fad7825fb24b221d0d9cc38de",
+      "sha256": "389c7072e0448ddcd08aee34212c8e99e04f3abba2d5284241ad1e3fb637df44",
       "mode": "100644",
-      "bytes": 61353
+      "bytes": 63701
     },
     "dist/hub.svg": {
       "sha256": "a7229c43b74d0dba3e1441f0d14c62320e441a8c16df9c1f2378f88ffbe172b1",
@@ -88,19 +88,19 @@
       "bytes": 1398
     },
     "dist/mobile-features.js": {
-      "sha256": "b5ec2aba545140488957caf71bd1525b5ed6e27eec9bd8c93ab7c101d7ecbcd5",
+      "sha256": "ad0e551ed66e1d3dc53e34721be57d4c680374266880e1bddab9544c519634c0",
       "mode": "100644",
-      "bytes": 27548
+      "bytes": 30184
     },
     "dist/mobile-polish.css": {
-      "sha256": "b22f5990a47273977c6a6b3d85243c7aa9c792adafc07ed4e5552df03e302be9",
+      "sha256": "e26d3a79ff7bdd13fe80631241161ea9eb5e8026acee68a4fbf4c67fef22219f",
       "mode": "100644",
-      "bytes": 6112
+      "bytes": 10815
     },
     "dist/mobile.js": {
-      "sha256": "ec5b6e8dc512c62b710719e88ce60ff51a0412b853120dc2245255d4899f74a4",
+      "sha256": "4fd691009715a2f355f44e0c1c2e6a78f5ab5af1ba94b838a8a82e0e84efc1f8",
       "mode": "100644",
-      "bytes": 16088
+      "bytes": 16299
     },
     "dist/style.css": {
       "sha256": "b97c2863349fd0a517dc86bb5b3f2cc7b575601a79b95888a1e92ce327269b72",
@@ -138,14 +138,44 @@
       "bytes": 12325
     },
     "dist/workspace-tools.js": {
-      "sha256": "5bf30afb8a70b2ed1e7bae082331c43d71fb0e13fb85fe318d3989d1eabf5a2e",
+      "sha256": "6d4da233463bddd08b15e95426ff448463c6e542d8c7bd824b644825442c02e7",
       "mode": "100644",
-      "bytes": 33891
+      "bytes": 34086
     },
     "docs/agents-32.md": {
       "sha256": "a4f3eb6917abc89147a0a9dd216484da3d3a5eeb5f9ab48af49c69c412398dcc",
       "mode": "100644",
       "bytes": 10105
+    },
+    "docs/gemini-chat-materials-after.jpg": {
+      "sha256": "482240fc952349592b3946c69a94faa3e6e501d91574e5d9ec9cd81931186308",
+      "mode": "100644",
+      "bytes": 31566
+    },
+    "docs/gemini-editor-short.jpg": {
+      "sha256": "acc273bd2f56b1c67ced0040cd1331230dc7d3160120d8b25d88422893488002",
+      "mode": "100644",
+      "bytes": 16630
+    },
+    "docs/gemini-optimization-2026-11-15.md": {
+      "sha256": "fbd8873815c4edaf765cda7fc9e66224fd4cd66da913ce07e5dcf1c843d3c2bb",
+      "mode": "100644",
+      "bytes": 5595
+    },
+    "docs/gemini-reading-after.jpg": {
+      "sha256": "29e3f42cb146f73db154fde8be926880c525f669c94fcf438b22a9380a52653a",
+      "mode": "100644",
+      "bytes": 29793
+    },
+    "docs/gemini-reading-before.jpg": {
+      "sha256": "c61a4e81cd5f370408a5341a7065c6ddb380ae2385925c2b8e538a9fbee6797b",
+      "mode": "100644",
+      "bytes": 33074
+    },
+    "docs/gemini-review-after.jpg": {
+      "sha256": "6c683c5c504bbd53d0e1258a60ee1a9fc46a5d4db03234f28dc18ce4ab659a86",
+      "mode": "100644",
+      "bytes": 20557
     },
     "docs/hub-mobile-agents-chat.png": {
       "sha256": "7700010aa7b136594e8aa47c1bee66f88beffd8a1c06589a4af82d5b9fe9bd59",
@@ -213,5 +243,5 @@
       "bytes": 3301
     }
   },
-  "imported_at": "2026-11-15T14:40:14.893530+00:00"
+  "imported_at": "2026-11-15T15:39:08.985717+00:00"
 }

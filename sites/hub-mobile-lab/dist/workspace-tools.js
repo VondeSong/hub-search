@@ -151,7 +151,8 @@ function workspaceSearchPage() {
 function workspaceResultRow(item) {
   const term=query.split(/\s+/).find(t=>t&&match(item.body,t)), pos=term?item.body.toLocaleLowerCase().indexOf(term.toLocaleLowerCase()):-1;
   const excerpt=pos>=0?(pos>20?'…':'')+item.body.slice(Math.max(0,pos-20),pos+65):item.body.slice(0,65);
-  return '<button type="button" class="row search-result" data-act="go:'+esc(item.route)+'"><span class="tile '+(item.kind==='reading'?'purple':'')+'">'+ico(item.icon,19)+'</span><span class="copy"><strong>'+marked(item.title,query.split(/\s+/).find(Boolean))+'</strong>'+(query?'<small class="result-excerpt">'+marked(excerpt,term)+'</small>':'')+'<small>'+esc(item.type+' · '+(item.type===item.source?'':item.source+' · ')+item.dateLabel)+'</small></span><span class="tail">'+ico('chev',16)+'</span></button>';
+  const needsExcerpt=query||/^[\d\s./年月日-]+$/.test(item.title)||/的推文$/.test(item.title)||workspaceIndex().some(other=>other.key!==item.key&&other.title===item.title);
+  return '<button type="button" class="row search-result" data-act="go:'+esc(item.route)+'"><span class="tile '+(item.kind==='reading'?'purple':'')+'">'+ico(item.icon,19)+'</span><span class="copy"><strong>'+marked(item.title,query.split(/\s+/).find(Boolean))+'</strong>'+(needsExcerpt&&excerpt?'<small class="result-excerpt">'+marked(excerpt,term)+'</small>':'')+'<small>'+esc(item.type+' · '+(item.type===item.source?'':item.source+' · ')+item.dateLabel)+'</small></span><span class="tail">'+ico('chev',16)+'</span></button>';
 }
 function workspaceSearchResults() {
   const active=Boolean(query||workspaceFacets().length);

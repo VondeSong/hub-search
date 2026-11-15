@@ -98,6 +98,23 @@ context.mobileFeatureAction('dismiss-card','demo-card-inbox-2');
 context.mobileFeatureAction('restore-inbox');
 assert.equal(context.st.inboxStatus['demo-card-inbox-2'],undefined);
 assert.ok(renders>0);
+// A failed edit must leave the old card, provenance and review history intact.
+context.st.drafts={'card-c1':{q:'new question',a:'new answer'}};
+context.st.grades.c1='困难';
+const editFeedback={textContent:''};
+const editForm={dataset:{id:'c1'},querySelector(s){return s==='[name="q"]'?{value:'new question'}:s==='[name="a"]'?{value:'new answer'}:editFeedback;}};
+canSave=false;
+assert.equal(context.saveCardEdit(editForm),false);
+assert.equal(context.allReviewCards()[0].q,'question');
+assert.equal(context.st.drafts['card-c1'].a,'new answer');
+canSave=true;
+assert.equal(context.saveCardEdit(editForm),true);
+assert.equal(context.allReviewCards()[0].q,'new question');
+assert.equal(context.allReviewCards()[0].doc,'d1');
+assert.equal(context.allReviewCards()[0].deck,'test');
+assert.equal(context.st.grades.c1,'困难');
+assert.equal(context.st.drafts['card-c1'],undefined);
+assert.equal(context.cards[0].q,'question');
 async function backupChecks() {
   const data={kind:'hub-mobile-review-demo',version:1,customCards:[{id:'demo-card-extra',q:'question',a:'answer',deck:'test',doc:'d1'}],reviewed:['c1'],grades:{c1:'记得'}};
   const input=payload=>({files:[{size:100,text:async()=>JSON.stringify(payload)}],value:'file'});
@@ -106,14 +123,21 @@ async function backupChecks() {
   assert.equal(JSON.stringify(context.st),before);
   await context.restoreReviewBackup(input({...data,customCards:[data.customCards[0],data.customCards[0]]}));
   assert.equal(JSON.stringify(context.st),before);
+  await context.restoreReviewBackup(input({...data,cardEdits:{c1:{q:'hijacked',a:'answer',doc:'d2'}}}));
+  assert.equal(JSON.stringify(context.st),before);
+  await context.restoreReviewBackup(input({...data,cardEdits:{missing:{q:'unknown',a:'answer'}}}));
+  assert.equal(JSON.stringify(context.st),before);
   await context.restoreReviewBackup(input(data));
   await context.restoreReviewBackup(input(data));
   assert.equal(context.st.customCards.filter(c=>c.id==='demo-card-extra').length,1);
   assert.ok(context.st.reviewed.includes('c1'));
+  await context.restoreReviewBackup(input({...data,cardEdits:{'demo-card-extra':{q:'restored question',a:'restored answer'},c1:{q:'older question',a:'older answer'}}}));
+  assert.equal(context.allReviewCards().find(c=>c.id==='demo-card-extra').q,'restored question');
+  assert.equal(context.allReviewCards()[0].q,'new question');
   canSave=false;
   const retained=JSON.stringify(context.st);
   await context.restoreReviewBackup(input({...data,reviewed:[],grades:{c1:'困难'}}));
   assert.equal(JSON.stringify(context.st),retained);
-  console.log('PASS: date identity, legacy drafts, capture rollback, tag routing, staged sync/retry/rollback, inbox deduplication/recovery, backup validation/merge/rollback');
+  console.log('PASS: date identity, legacy drafts, capture rollback, tag routing, staged sync/retry/rollback, inbox deduplication/recovery, card edit failure/provenance, backup validation/merge/rollback');
 }
 backupChecks().catch(error=>{console.error(error);process.exitCode=1;});

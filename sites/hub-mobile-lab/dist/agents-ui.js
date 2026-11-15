@@ -110,6 +110,7 @@ function agentUiAttachment(a, threadId, removable = false) {
   return '<div class="agent-attachment' + (isImage ? ' is-image' : '') + '"><button type="button" class="agent-attachment-open" data-act="agent-material:' + esc(threadId) + ':' + esc(a.id) + '">' + thumb + '<span class="agent-attachment-copy"><strong>' + esc(agentUiAttachmentLabel(a)) + '</strong><small>' + (a.kind === 'frame' ? '关键帧示例' : a.kind === 'image' ? '图片 · 仅本机预览' : '已选资料') + '</small></span></button>' + (removable ? '<button type="button" class="agent-remove-attachment" data-act="agent-remove:' + esc(threadId) + ':' + esc(a.id) + '" aria-label="移除 ' + esc(agentUiAttachmentLabel(a)) + '">' + ico('close', 15) + '</button>' : '') + '</div>';
 }
 function agentUiAttachments(items, threadId, removable = false) { return items?.length ? '<div class="agent-attachments">' + items.map(a => agentUiAttachment(a, threadId, removable)).join('') + '</div>' : ''; }
+function agentUiDraftMaterials(thread) { return thread.attachments.length ? '<p class="agent-material-count">待发送 '+thread.attachments.length+' 份材料 · 仅在本机</p>'+agentUiAttachments(thread.attachments,thread.id,true) : ''; }
 function agentUiReceipt(run) {
   if (!run) return '';
   let copy = '', action = '';
@@ -173,7 +174,7 @@ function agentUiSendControl(thread) {
 }
 function agentUiComposer(thread) {
   if (thread.archivedAt) return '<div id="agent-composer" class="agent-composer agent-archived-composer"><span>已归档 · 内容完整保留</span>' + btn('恢复并继续', 'agent-restore:' + thread.id, 'secondary', 'sync') + '</div>';
-  return '<div id="agent-composer" class="agent-composer"><div id="agent-draft-attachments">' + agentUiAttachments(thread.attachments, thread.id, true) + '</div><form id="agent-send-form" data-thread="' + esc(thread.id) + '"><label class="agent-sr-only" for="agent-prompt">给 Agents 的消息</label><textarea id="agent-prompt" name="message" rows="2" maxlength="6000" placeholder="问一个问题，或接着聊…" enterkeyhint="enter">' + esc(thread.draft || '') + '</textarea><div class="agent-composer-tools">' + iconBtn('添加照片或资料', 'agent-attach:' + thread.id, 'plus') + '<button type="button" class="agent-model-trigger" data-act="agent-model" aria-label="查看模型与原型说明"><span>Codex</span><small>演示说明</small>' + ico('info', 13) + '</button><div id="agent-send-control">' + agentUiSendControl(thread) + '</div></div></form><div class="agent-composer-hint"><span id="agent-draft-status">' + (thread.draft ? '草稿已保留' : '交互演示 · 未调用模型') + '</span><span>固定示例回复</span></div></div>';
+  return '<div id="agent-composer" class="agent-composer"><div id="agent-draft-attachments">' + agentUiDraftMaterials(thread) + '</div><form id="agent-send-form" data-thread="' + esc(thread.id) + '"><label class="agent-sr-only" for="agent-prompt">给 Agents 的消息</label><textarea id="agent-prompt" name="message" rows="2" maxlength="6000" placeholder="问一个问题，或接着聊…" enterkeyhint="enter">' + esc(thread.draft || '') + '</textarea><div class="agent-composer-tools">' + iconBtn('添加照片或资料', 'agent-attach:' + thread.id, 'plus') + '<button type="button" class="agent-model-trigger" data-act="agent-model" aria-label="查看模型与原型说明"><span>Codex</span><small>演示说明</small>' + ico('info', 13) + '</button><div id="agent-send-control">' + agentUiSendControl(thread) + '</div></div></form><div class="agent-composer-hint"><span id="agent-draft-status">' + (thread.draft ? '草稿已保留' : '交互演示 · 未调用模型') + '</span></div></div>';
 }
 function agentChatPage(id) {
   const thread = agentThread(id);
@@ -560,7 +561,7 @@ function refreshAgentView() {
   const banner = document.querySelector('#agent-connection-banner'); if (banner) { const html = agentUiBanner(thread); if (banner.innerHTML !== html) banner.innerHTML = html; }
   const subtitle = document.querySelector('.agent-header-subtitle'); if (subtitle) subtitle.textContent = '交互演示 · ' + agentUiConnectionLabel();
   const title = document.querySelector('.agent-header-title'); if (title) title.textContent = thread.title;
-  const attachments = document.querySelector('#agent-draft-attachments'); if (attachments) { const html = agentUiAttachments(thread.attachments, thread.id, true); if (attachments.innerHTML !== html) attachments.innerHTML = html; }
+  const attachments = document.querySelector('#agent-draft-attachments'); if (attachments) { const html = agentUiDraftMaterials(thread); if (attachments.innerHTML !== html) attachments.innerHTML = html; }
   const send = document.querySelector('#agent-send-control'); if (send) { const html = agentUiSendControl(thread); if (send.innerHTML !== html) send.innerHTML = html; }
   const materials = document.querySelector('#agent-materials-panel'); if (materials && thread.view === 'materials') { const html = agentUiMaterials(thread); if (materials.innerHTML !== html) materials.innerHTML = html; }
   const results = document.querySelector('#agent-results-panel'); if (results && thread.view === 'results') { const html = agentUiResults(thread); if (results.innerHTML !== html) results.innerHTML = html; }

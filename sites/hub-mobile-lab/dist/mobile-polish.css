@@ -78,3 +78,62 @@ body[data-view="review"] .review-progress { margin-top: 16px; }
   .root-title { font-size: 21px; }
   .search-menu-button { font-size: 12px; }
 }
+
+/* Reading keeps the article list close to its search and status controls. */
+.reading-search { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.reading-search > .field { flex: 1; min-width: 0; margin: 0; }
+.reading-search > .field > label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.reading-search input { min-height: 48px; border: 0; background: var(--surface); }
+.reading-search > .icon-btn { flex: 0 0 48px; width: 48px; height: 48px; background: transparent; }
+.reading-status { gap: 6px; margin-block: 0 8px; }
+.reading-status .chip { min-height: 48px; padding-inline: 16px; }
+.reading-conditions { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.reading-conditions:empty { display: none; }
+.reading-conditions .plain { min-height: 44px; padding: 5px 0; font-size: 13px; }
+.reading-count { margin: 14px 0 6px; font-size: 12px; color: var(--muted); }
+.reading-workspace .group { background: transparent; border-radius: 0; }
+.reading-result.row { min-height: 108px; padding: 18px 0; gap: 14px; }
+.reading-result strong { font-size: 17px; line-height: 1.5; font-weight: 600; }
+.reading-result .reading-excerpt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 5px; color: var(--muted); font-size: 14px; line-height: 1.65; }
+.reading-result small { display: block; margin-top: 7px; font-size: 12px; line-height: 1.5; }
+.reader h1 { text-wrap: balance; overflow-wrap: anywhere; }
+.reader-body { overflow-wrap: anywhere; }
+.reader-body table { display: block; max-width: 100%; overflow-x: auto; }
+.search-result .result-excerpt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Focused review: content scrolls behind a stable, measurable action bar. */
+body.focus-session { --page-bottom: calc(var(--study-actions-height, 150px) + 24px); }
+.study-context { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; }
+.study-context > span { min-width: 0; overflow-wrap: anywhere; }
+.study-context .plain { min-height: 48px; flex-shrink: 0; }
+.study-face { margin: 12px 2px 10px; color: var(--muted); font-size: 14px; }
+.study-content .review-focus-card { min-height: min(300px, 40dvh); padding: 28px 22px; border-radius: 16px; }
+.study-content .review-focus-card p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--reader-font-size); }
+.study-source { margin-top: 16px; }
+.study-actions { position: fixed; z-index: 4; left: 50%; bottom: var(--viewport-bottom, 0px); width: min(100%, 480px); padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--bg); border-top: 1px solid var(--line-soft); }
+.study-actions .actions { margin: 0; }
+.study-actions .ratings { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.study-actions .ratings button { min-width: 0; min-height: 64px; padding: 10px 4px; border: 0; border-radius: 12px; background: var(--surface); color: var(--ink); font-size: 15px; }
+.study-actions .ratings .grade-0 { color: var(--navy); }
+.study-actions .ratings .grade-1 { background: var(--warn-surface); color: var(--warn); }
+.study-actions .ratings .grade-2 { background: var(--selected); color: var(--blue); }
+.study-actions .ratings .grade-3 { background: var(--ok-surface); color: var(--ok); }
+.study-actions .ratings small { color: inherit; }
+.study-actions > .fine { margin: 7px 0 0; text-align: center; font-size: 11px; }
+dialog:has(#card-edit-form) { display: flex; flex-direction: column; max-height: min(88dvh, calc(var(--viewport-height, 100dvh) - 16px)); overflow: hidden; }
+dialog:has(#card-edit-form):not([open]) { display: none; }
+dialog:has(#card-edit-form) .sheet-head { flex-shrink: 0; margin: 0 0 8px; }
+dialog:has(#card-edit-form) .sheet-head h2 { font-size: 17px; }
+dialog:has(#card-edit-form) .sheet-head .plain { min-height: 48px; padding-inline: 0; font-size: 14px; }
+dialog:has(#card-edit-form) .sheet-head .btn { min-height: 48px; padding: 8px 16px; border-radius: 12px; }
+dialog:has(#card-edit-form) .sheet-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: 16px; }
+#card-edit-form textarea { min-height: 130px; resize: vertical; line-height: 1.65; }
+#card-edit-feedback { margin-block: 12px; }
+@media (max-width: 350px) {
+  .study-actions .ratings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .study-actions { padding-inline: 16px; }
+  .reading-status .chip { padding-inline: 13px; }
+}
+@media (max-height: 520px) {
+  .study-content .review-focus-card { min-height: 120px; }
+}
