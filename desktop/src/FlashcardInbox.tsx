@@ -88,6 +88,9 @@ export function FlashcardInbox({ drafts, decks, isAndroid, resolving, onCreate, 
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [previewId, setPreviewId] = useState("");
+  const [mobileMode, setMobileMode] = useState<"cards" | "detail" | "manage">("cards");
+  const mobileAcceptTrigger = useRef<HTMLButtonElement | null>(null);
+  const mobileToolsRef = useRef<HTMLButtonElement>(null);
   const [movePopoverOpen, setMovePopoverOpen] = useState(false);
   const [movePopoverScope, setMovePopoverScope] = useState("");
   const [deckQuery, setDeckQuery] = useState("");
@@ -366,6 +369,10 @@ export function FlashcardInbox({ drafts, decks, isAndroid, resolving, onCreate, 
       await onResolve(moveIds, true, "inbox-move", deckId);
     } finally {
       requestAnimationFrame(() => {
+        if (isAndroid && mobileMode === "cards") {
+          (mobileAcceptTrigger.current?.isConnected ? mobileAcceptTrigger.current : mobileToolsRef.current)?.focus();
+          return;
+        }
         if (document.activeElement !== document.body && document.activeElement !== moveTriggerRef.current) return;
         if (moveTriggerRef.current && !moveTriggerRef.current.disabled) moveTriggerRef.current.focus();
         else inboxSearchRef.current?.focus();
@@ -381,7 +388,31 @@ export function FlashcardInbox({ drafts, decks, isAndroid, resolving, onCreate, 
     return items.length > 0 ? <div className="flashcards-media">{items.map((item, index) => <FlashcardAttachment key={`${item.url}-${index}`} item={item} />)}</div> : null;
   };
 
-  return <section className="flashcard-inbox" aria-label="闪卡收件箱">
+  return <section className={`flashcard-inbox${isAndroid ? ` mobile-inbox-mode-${mobileMode}` : ""}`} aria-label="闪卡收件箱">
+    {isAndroid && <>
+      {mobileMode === "cards" ? <>
+        <p className="mobile-flashcard-inbox-note">先核对问题、答案和来源，再决定是否加入牌库。</p>
+        <button type="button" ref={mobileToolsRef} className="mobile-flashcard-inbox-tools" onClick={() => setMobileMode("manage")}>筛选与批量整理</button>
+        <div className="mobile-flashcard-inbox-cards">
+          {visible.map(draft => <article key={draft.id}>
+            <h2>{flashcardFrontPreview(draft)}</h2>
+            <p>{plainPreview(draft.answer).slice(0, 600)}{plainPreview(draft.answer).length > 600 ? "…" : ""}</p>
+            <button type="button" className="mobile-flashcard-inbox-source" onClick={() => onOpenSource(draft)}>查看来源</button>
+            <div className="mobile-flashcard-inbox-actions">
+              <button type="button" className="mobile-flashcard-primary" disabled={resolving} onClick={event => {
+                mobileAcceptTrigger.current = event.currentTarget;
+                setSelectedIds(new Set([draft.id])); setPreviewId(draft.id); setDeckQuery("");
+                setMovePopoverScope(JSON.stringify([draft.id])); setMovePopoverOpen(true);
+              }}>加入牌库</button>
+              <button type="button" disabled={resolving} onClick={() => { setPreviewId(draft.id); setMobileMode("detail"); }}>查看详情</button>
+              <button type="button" disabled={resolving} onClick={() => { if (window.confirm("从收件箱移除这张草稿？此操作不会删除已经加入牌库的卡片。")) void onResolve([draft.id], false, draft.id); }}>移除</button>
+            </div>
+          </article>)}
+          {!visible.length && <p className="mobile-flashcard-empty">{drafts.length ? "没有符合筛选条件的草稿。" : "收件箱已处理完。"}</p>}
+          {filtered.length > visible.length && <button type="button" className="mobile-flashcard-inbox-tools" onClick={() => setVisibleCount(count => count + PAGE_SIZE)}>显示更多草稿</button>}
+        </div>
+      </> : <button type="button" className="mobile-flashcard-inbox-tools" onClick={() => setMobileMode("cards")}>返回草稿卡片</button>}
+    </>}
     <header className="flashcard-inbox-toolbar">
       <div className="flashcard-inbox-title"><h1>收件箱</h1><span>{drafts.length}</span></div>
       <label className="flashcard-inbox-search"><Search size={15} aria-hidden="true" /><input ref={inboxSearchRef} aria-label="搜索收件箱" placeholder="搜索收件箱" value={query} onChange={(event) => { setQuery(event.target.value); resetBrowse(); }} />{query && <button aria-label="清除搜索" onClick={() => { setQuery(""); resetBrowse(); }}><X size={13} /></button>}</label>

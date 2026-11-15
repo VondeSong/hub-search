@@ -1,3 +1,5 @@
+import { MobileFlashcardIntro, MobileFlashcardToday, MobileFlashcardDecks, MobileFlashcardManagement, type MobileFlashcardTab } from "./MobileFlashcardHome";
+import "./MobileFlashcardPrototype.css";
 import { USER_PROFILE_PREPARE_FLUSH_EVENT, userProfileStorage } from "./UserProfileStorage";
 import { useFlashcardStudyPlan } from "./useFlashcardStudyPlan";
 import {AgentFlashcardMaterial} from "./StandaloneAgentLauncher";
@@ -7,7 +9,6 @@ import { CardSizeIcon } from "./CardSizeControl";
 import type { QualityTarget } from "./FlashcardQuality";
 import { formatReviewInterval, useFlashcardSchedulePreview } from "./FlashcardScheduling";
 import { inboxDraftIdsFromTransfer } from "./FlashcardInboxTransfer";
-import { MobileTabBar } from "./MobileTabBar";
 import { invoke } from "@tauri-apps/api/core";
 import {
   ArrowLeft,
@@ -123,6 +124,7 @@ import { FlashcardTodayProgress } from "./FlashcardTodayProgress";
 import { effectiveNewLimit, estimatedStudyMinutes, nextStudyDue } from "./FlashcardStudyExperience";
 import { MobileFlashcardPreview } from "./MobileFlashcardPreview";
 import "./FlashcardMobileExperience.css";
+import "./MobileFlashcardPrototype.css";
 
 const FlashcardInbox = lazy(() => import("./FlashcardInbox").then(module => ({ default: module.FlashcardInbox })));
 const StudyDashboard = lazy(() => import("./StudyDashboard").then(module => ({ default: module.StudyDashboard })));
@@ -2399,36 +2401,14 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
   const currentOcclusionImage = currentCard?.media.find((item) => item.mimeType.startsWith("image/"));
   const mobileReviewProgress = reviewSessionTotal > 0 ? `${reviewSessionTotal - reviewQueue.length + 1}/${reviewSessionTotal}` : "0/0";
 
-  return <section
-    className={`flashcards-workspace${isAndroid ? ` flashcards-android mobile-page-${mobilePage}` : ""}${reviewing ? " is-reviewing" : ""}${resizingDeckSidebar ? " is-resizing-decks" : ""}`}
-    style={{ "--flashcards-decks-width": `${deckSidebarWidth}px` } as CSSProperties}
-  >
-    <header className="flashcards-header">
-      <div className="flashcards-header-identity">
-        {!desktopSidebarVisible && onToggleDesktopSidebar && <button className="flashcards-sidebar-restore" onClick={onToggleDesktopSidebar} title="展开左侧边栏" aria-label="展开左侧边栏"><PanelLeftOpen size={18} /></button>}
-        <button className="flashcards-back" onClick={onClose} title="返回搜索"><ArrowLeft size={20} /></button>
-        <span className="flashcards-title"><BookOpenCheck size={20} /><strong>闪卡复习</strong></span>
-      </div>
-      {isAndroid && <label className="flashcards-global-search">
-        <Search size={17} />
-        <input ref={cardSearchRef} value={cardSearch} onChange={(event) => setCardSearch(event.target.value)} placeholder="搜索卡片内容…" aria-label="搜索卡片内容" />
-        {cardSearch && <button onClick={() => setCardSearch("")} title="清除搜索" aria-label="清除搜索"><X size={14} /></button>}
-      </label>}
-      <div className="flashcards-header-actions">
-        <button className="flashcards-sync-settings-toggle" onClick={() => setBackupOpen(true)} title="闪卡备份与恢复" aria-label="闪卡备份与恢复"><History size={18} /></button>
-        <button className="flashcards-sync-settings-toggle" onClick={openCloudSyncSettings} title="云同步设置" aria-label="云同步设置"><Cloud size={18} /></button>
-      </div>
-    </header>
-
-    {isAndroid && !reviewing && mobilePage !== "library" && <header className="flashcards-mobile-topbar">
-      <button onClick={() => { if (mobilePage === "stats") { setMobilePage("review"); void openView("due"); } else { setMobilePage("library"); setReviewing(false); } }} aria-label={mobilePage === "stats" ? "返回今日" : "返回牌库"}><ArrowLeft size={21} /></button>
-      <span><strong>{mobilePage === "deck" ? selectedDeck?.name ?? "牌组" : mobilePage === "review" ? "今日" : mobilePage === "stats" ? "学习统计" : "收件箱"}</strong>{mobilePage === "deck" && <small>{selectedDeckCounts.cardCount} 张卡片</small>}</span>
-      {mobilePage === "deck" ? <button onClick={beginCreateCard} aria-label="新建卡片"><CirclePlus size={21} /></button> : <div className="flashcards-mobile-utilities"><button onClick={() => setBackupOpen(true)} aria-label="闪卡备份与恢复"><History size={20} /></button><button onClick={openCloudSyncSettings} aria-label="云同步设置"><Cloud size={20} /></button></div>}
-    </header>}
-
-    {!isAndroid && chromeActions && createPortal(<><button type="button" onClick={() => setBackupOpen(true)} title="闪卡备份与恢复" aria-label="闪卡备份与恢复" aria-haspopup="dialog"><History size={18} /></button><button className="flashcards-chrome-sync" type="button" onClick={openCloudSyncSettings} title="云同步设置" aria-label="云同步设置" aria-haspopup="dialog"><Cloud size={18} /></button></>, chromeActions)}
-    {loading ? <div className="flashcards-loading"><LoaderCircle className="spin" size={24} />正在准备闪卡库…</div> : <div className="flashcards-body" ref={flashcardsBodyRef} inert={backupOpen}>
-      <aside className="flashcards-decks">
+  const changeMobileTab = (tab: MobileFlashcardTab) => {
+    if (tab === "review") { setMobilePage("review"); void openView("due"); }
+    else if (tab === "library") setMobilePage("library");
+    else { setMobilePage("inbox"); void openView("inbox"); }
+  };
+  const mobileIntro = () => <MobileFlashcardIntro active={mobilePage === "library" ? "library" : mobilePage === "inbox" ? "inbox" : "review"} inboxCount={drafts.length} onSelect={changeMobileTab} />;
+  const mobileManagement = () => <MobileFlashcardManagement onBackup={() => setBackupOpen(true)} onSync={openCloudSyncSettings} />;
+  const deckSidebarContents = <>
         {!isAndroid && <div className="flashcards-sidebar-toolbar">
           <label className="flashcards-global-search flashcards-sidebar-search">
             <Search size={16} />
@@ -2494,6 +2474,52 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
           </>}
           {deckDropTarget !== null && <div className="flashcards-root-drop-zone" data-deck-drop-folder="" onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDeckDropTarget(""); }} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); const deckId = droppedDeckId(event); if (deckId) void moveDeckToFolder(deckId, ""); }}>移到牌组根目录</div>}
         </div>
+</>;
+  const reviewActions = currentCard && (            <div className="flashcards-review-actions">
+              <button disabled={reviewingCard} onClick={()=>openQuality({card:currentCard,draft:false})}><Pencil size={15}/>反馈</button>
+              <button disabled={reviewingCard} onClick={() => openGridCard(currentCard)}><Pencil size={15} />编辑</button>
+              {isAndroid && <button disabled={reviewingCard || savingPropertyCell} onClick={() => void changeCardStage(currentCard, "suspended")}><Pause size={15} />暂停此卡</button>}
+              <button disabled={reviewingCard || reviewQueue.length < 2} onClick={() => reviewSession.postpone()} title={reviewQueue.length < 2 ? "本轮只剩这一张" : "把当前卡片移到本轮末尾"}><SkipForward size={15} />稍后再看</button>
+              {lastRated && <button disabled={reviewingCard} onClick={() => void undoLastRating()}><RotateCcw size={15} />撤销评分</button>}
+              <button disabled={reviewingCard} onClick={() => reviewSession.pause()}>暂停复习</button>
+            </div>);
+
+  return <section
+    className={`flashcards-workspace${isAndroid ? ` flashcards-android mobile-page-${mobilePage}` : ""}${reviewing ? " is-reviewing" : ""}${resizingDeckSidebar ? " is-resizing-decks" : ""}`}
+    style={{ "--flashcards-decks-width": `${deckSidebarWidth}px` } as CSSProperties}
+  >
+    <header className="flashcards-header">
+      <div className="flashcards-header-identity">
+        {!desktopSidebarVisible && onToggleDesktopSidebar && <button className="flashcards-sidebar-restore" onClick={onToggleDesktopSidebar} title="展开左侧边栏" aria-label="展开左侧边栏"><PanelLeftOpen size={18} /></button>}
+        <button className="flashcards-back" onClick={onClose} title="返回搜索"><ArrowLeft size={20} /></button>
+        <span className="flashcards-title"><BookOpenCheck size={20} /><strong>闪卡复习</strong></span>
+      </div>
+      {isAndroid && <label className="flashcards-global-search">
+        <Search size={17} />
+        <input ref={cardSearchRef} value={cardSearch} onChange={(event) => setCardSearch(event.target.value)} placeholder="搜索卡片内容…" aria-label="搜索卡片内容" />
+        {cardSearch && <button onClick={() => setCardSearch("")} title="清除搜索" aria-label="清除搜索"><X size={14} /></button>}
+      </label>}
+      <div className="flashcards-header-actions">
+        <button className="flashcards-sync-settings-toggle" onClick={() => setBackupOpen(true)} title="闪卡备份与恢复" aria-label="闪卡备份与恢复"><History size={18} /></button>
+        <button className="flashcards-sync-settings-toggle" onClick={openCloudSyncSettings} title="云同步设置" aria-label="云同步设置"><Cloud size={18} /></button>
+      </div>
+    </header>
+
+    {isAndroid && !reviewing && (mobilePage === "deck" || mobilePage === "stats") && <header className="flashcards-mobile-topbar">
+      <button onClick={() => { if (mobilePage === "stats") { setMobilePage("review"); void openView("due"); } else { setMobilePage("library"); setReviewing(false); } }} aria-label={mobilePage === "stats" ? "返回今日" : "返回牌库"}><ArrowLeft size={21} /></button>
+      <span><strong>{mobilePage === "deck" ? selectedDeck?.name ?? "牌组" : "学习统计"}</strong>{mobilePage === "deck" && <small>{selectedDeckCounts.cardCount} 张卡片</small>}</span>
+      {mobilePage === "deck" ? <button onClick={beginCreateCard} aria-label="新建卡片"><CirclePlus size={21} /></button> : <div className="flashcards-mobile-utilities"><button onClick={() => setBackupOpen(true)} aria-label="闪卡备份与恢复"><History size={20} /></button><button onClick={openCloudSyncSettings} aria-label="云同步设置"><Cloud size={20} /></button></div>}
+    </header>}
+
+    {!isAndroid && chromeActions && createPortal(<><button type="button" onClick={() => setBackupOpen(true)} title="闪卡备份与恢复" aria-label="闪卡备份与恢复" aria-haspopup="dialog"><History size={18} /></button><button className="flashcards-chrome-sync" type="button" onClick={openCloudSyncSettings} title="云同步设置" aria-label="云同步设置" aria-haspopup="dialog"><Cloud size={18} /></button></>, chromeActions)}
+    {loading ? <div className="flashcards-loading"><LoaderCircle className="spin" size={24} />正在准备闪卡库…</div> : <div className="flashcards-body" ref={flashcardsBodyRef} inert={backupOpen}>
+      <aside className="flashcards-decks">
+        {isAndroid && mobilePage === "library" ? <>
+          {mobileIntro()}
+          <MobileFlashcardDecks title="牌组" decks={decks} onOpen={deck => { setSelectedDeckId(deck.id); setMobilePage("deck"); void openView("deck", deck.id); }} />
+          {mobileManagement()}
+          <details className="mobile-flashcard-more mobile-flashcard-deck-management"><summary>管理牌组</summary>{deckSidebarContents}</details>
+        </> : deckSidebarContents}
       </aside>
 
       <div
@@ -2513,6 +2539,7 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
       />
 
       <main className={`flashcards-main${!reviewing && activeView === "inbox" ? " flashcards-main-inbox" : ""}`} ref={mainScrollRef} onScroll={rememberMainScroll} inert={Boolean(gridModalCardId || creatingCard)}>
+        {isAndroid && !reviewing && (mobilePage === "review" || mobilePage === "inbox") && mobileIntro()}
         {reviewError && <p role="alert">{reviewError}</p>}
         {!reviewing && workspaceDraft && !gridModalCardId && !creatingCard && <section className="flashcards-editor-recovery" aria-label="未保存的闪卡草稿">
           <Pencil size={18} /><span><strong>有一份未保存的闪卡草稿</strong><small>{workspaceDraft.values.question || "新建卡片"} · 仅保存在本机</small></span>
@@ -2528,19 +2555,14 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
             <div>{lastRated && <button className="secondary" disabled={reviewingCard} onClick={() => void undoLastRating()}><RotateCcw size={15} />撤销上一次评分</button>}<button onClick={() => setReviewing(false)}>返回列表</button></div>
           </div> : <>
             <div className="flashcards-review-progress">
-              {isAndroid && <button onClick={() => setReviewing(false)} aria-label="退出复习"><ArrowLeft size={20} /></button>}
-              <span>{reviewLabel}</span><small>{isAndroid ? mobileReviewProgress : `还剩 ${reviewQueue.length} 张`}</small>
+              {isAndroid && <button onClick={() => setReviewing(false)} aria-label="退出复习"><ArrowLeft size={20} /><span>退出复习</span></button>}
+              <span>{isAndroid ? "专注复习" : reviewLabel}</span><small>{isAndroid ? mobileReviewProgress : `还剩 ${reviewQueue.length} 张`}</small>
             </div>
-            <div className="flashcards-review-actions">
-              <button disabled={reviewingCard} onClick={()=>openQuality({card:currentCard,draft:false})}><Pencil size={15}/>反馈</button>
-              <button disabled={reviewingCard} onClick={() => openGridCard(currentCard)}><Pencil size={15} />编辑</button>
-              {isAndroid && <button disabled={reviewingCard || savingPropertyCell} onClick={() => void changeCardStage(currentCard, "suspended")}><Pause size={15} />暂停此卡</button>}
-              <button disabled={reviewingCard || reviewQueue.length < 2} onClick={() => reviewSession.postpone()} title={reviewQueue.length < 2 ? "本轮只剩这一张" : "把当前卡片移到本轮末尾"}><SkipForward size={15} />稍后再看</button>
-              {lastRated && <button disabled={reviewingCard} onClick={() => void undoLastRating()}><RotateCcw size={15} />撤销评分</button>}
-              <button disabled={reviewingCard} onClick={() => reviewSession.pause()}>暂停复习</button>
-            </div>
-            <article className={`flashcards-review-card ${answerVisible ? "revealed" : ""} ${!answerVisible && (currentCard.cardType === "qa" || currentCard.cardType === "cloze" || currentCard.cardType === "image_occlusion") ? "tap-to-reveal" : ""}`} onClick={() => { if (!answerVisible && (currentCard.cardType === "qa" || currentCard.cardType === "cloze" || currentCard.cardType === "image_occlusion")) setAnswerVisible(true); }}>
-              <small>{CARD_TYPE_LABELS[currentCard.cardType]}卡</small>
+            {!isAndroid && reviewActions}
+            {isAndroid && <div className="mobile-flashcard-study-intro"><h1>闪卡复习</h1><p>{reviewQueue.length} 张待复习</p></div>}
+            {isAndroid && <h2 className="mobile-flashcard-face-label">{answerVisible ? "答案" : "问题"}</h2>}
+            <article data-card-type={currentCard.cardType} className={`flashcards-review-card ${answerVisible ? "revealed" : ""} ${!answerVisible && (currentCard.cardType === "qa" || currentCard.cardType === "cloze" || currentCard.cardType === "image_occlusion") ? "tap-to-reveal" : ""}`} onClick={() => { if (!answerVisible && (currentCard.cardType === "qa" || currentCard.cardType === "cloze" || currentCard.cardType === "image_occlusion")) setAnswerVisible(true); }}>
+              <small>{isAndroid ? decks.find(deck => deck.id === currentCard.deckId)?.name || `${CARD_TYPE_LABELS[currentCard.cardType]}卡` : `${CARD_TYPE_LABELS[currentCard.cardType]}卡`}</small>
               <h2>{flashcardFrontPreview(currentCard)}</h2>
               {renderReviewMedia(mediaAt(currentCard, "question").filter(item => currentCard.cardType !== "image_occlusion" || !item.mimeType.startsWith("image/")), "flashcards-media flashcards-question-media")}
               {currentCard.cardType === "image_occlusion" && currentOcclusionImage && <Suspense fallback={<div className="flashcard-lazy-loading" role="status">正在准备内容…</div>}><ImageOcclusionCanvas imageUrl={currentOcclusionImage.url} occlusions={currentCard.cardData.occlusions ?? []} revealed={answerVisible} /></Suspense>}
@@ -2558,7 +2580,7 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
                 {currentCard.cardType === "ordering" && <div className={`flashcards-response-result ${orderingMatches ? "correct" : "wrong"}`}>{orderingMatches ? <Check size={15} /> : <X size={15} />}{orderingMatches ? "顺序正确" : "顺序不正确，请对照正确顺序"}</div>}
                 {currentCard.explanation && <blockquote>{currentCard.explanation}</blockquote>}
                 {renderReviewMedia(mediaAt(currentCard, "explanation").filter(item => currentCard.cardType !== "image_occlusion" || !item.mimeType.startsWith("image/")))}
-                {(currentCard.sourceTitle || currentCard.sourcePath) && <div className="flashcards-source"><span>来源：</span>{renderCardSource(currentCard, "来源")}</div>}
+                {!isAndroid && (currentCard.sourceTitle || currentCard.sourcePath) && <div className="flashcards-source"><span>来源：</span>{renderCardSource(currentCard, "来源")}</div>}
                 {currentCard.sourceChanged && <div className="flashcards-source-changed">来源笔记已变化，这张卡片可能需要更新。</div>}
               </div>}
             </article>
@@ -2574,9 +2596,27 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
                 <strong>{item.label}</strong><small>{schedulePreview.preview ? formatReviewInterval(schedulePreview.preview.choices.find(choice => choice.rating === item.rating)!.intervalSeconds) : "加载间隔…"}</small>
               </button>)}
             </div> : null}
+            {isAndroid && <>
+              {answerVisible && (currentCard.sourceTitle || currentCard.sourcePath) && <section className="mobile-flashcard-section mobile-flashcard-review-source"><h2>来源</h2><div className="mobile-flashcard-group">{renderCardSource(currentCard, "来源")}</div></section>}
+              <details className="mobile-flashcard-more"><summary>更多复习操作</summary>{reviewActions}</details>
+            </>}
           </>}
         </div> : <>
-          {activeView !== "inbox" && <section className={`flashcards-overview${activeView === "due" ? " flashcards-overview-due" : ""}`}>
+          {isAndroid && activeView === "due" && <>
+            <MobileFlashcardToday count={totalDueCount} roundTotal={reviewQueue.length ? reviewSessionTotal : plannedSessionCount} roundRemaining={reviewQueue.length}
+              label={reviewQueue.length ? "继续复习" : startingReview || savingExtraNew ? "正在准备…" : plannedSessionCount > 0 ? "开始复习" : extraNewCount > 0 ? `再学 ${extraNewCount} 张新卡` : "查看牌库"}
+              disabled={!dailyLimitReady || startingReview || savingExtraNew || reviewingCard || (!reviewQueue.length && plannedSessionCount === 0 && extraNewCount > 0 && !extraNewReady)}
+              onStart={() => { if (reviewQueue.length) void reviewSession.resume(() => loadFlashcardsByIds(reviewQueue.map(card => card.id))); else if (plannedSessionCount > 0) void startReview(); else if (extraNewCount > 0) void addExtraNew(); else setMobilePage("library"); }} />
+            <MobileFlashcardDecks title="接着复习" decks={decks.filter(deck => deck.dueCount > 0)} today continuing={reviewQueue.length > 0} onOpen={deck => void startMobileDeck(deck)} />
+            {mobileManagement()}
+            <details className="mobile-flashcard-more"><summary>学习计划与统计</summary>
+<details className="flashcard-review-preferences"><summary>复习偏好</summary><label>本次<select aria-label="本次复习张数" value={sessionLimit} onChange={event => { const count=Number(event.target.value); setSessionLimit(count); try { userProfileStorage.setItem("hub.flashcards.session-limit", String(count)); } catch { /* Keep this session preference. */ } }}>{[10,20,50,100].map(count => <option key={count} value={count}>{count} 张</option>)}<option value={0}>全部</option></select></label><label>每天新卡<select aria-label="每日新卡额度" value={dailyNewLimit} disabled={!dailyLimitReady || savingDailyLimit} onChange={event => void updateDailyNewLimit(Number(event.target.value))}>{DAILY_NEW_CARD_LIMIT_OPTIONS.map(count => <option key={count} value={count}>{count === 0 ? "不限" : `${count} 张`}</option>)}</select></label></details>
+          {activeView === "due" && isAndroid && <section className="flashcard-mobile-plan" aria-label="今日与本轮学习计划"><p>{reviewPlan.revision === "0" ? "正在核对本轮计划…" : <>今日待学习 {reviewPlan.eligibleCount} 张 · 本轮 {reviewQueue.length ? reviewSessionTotal : plannedSessionCount} 张</>}</p>{plannedSessionCount > 0 && <small>{plannedMinutes === null ? "计时样本不足，完成至少 5 次有效计时后显示预计用时。" : `本轮约 ${plannedMinutes} 分钟 · 依近30天有效计时估算，不含超过5分钟的单次记录。`}</small>}{extraNewCount > 0 && reviewQueue.length === 0 && <><button disabled={savingExtraNew || !extraNewReady} onClick={() => void addExtraNew()}>{savingExtraNew ? "正在保存…" : `今日临时增加 ${extraNewCount} 张新卡额度`}</button><small>{extraNewReady ? "仅本机今日有效，计入今日新卡；不改每日偏好。" : "更新安卓原生程序后可使用临时额度。"}</small></>}<MobileFlashcardPreview disabled={loading || plannedSessionCount === 0} /></section>}
+          {activeView === "due" && dashboardStats && <FlashcardTodayProgress stats={dashboardStats} dailyNewLimit={dailyNewLimit} mobile={isAndroid} onOpenStats={() => { if (isAndroid) setMobilePage("stats"); void openView("stats"); }} />}
+              {reviewQueue.length > 0 && <button className="mobile-flashcard-end-round" disabled={reviewingCard} onClick={() => { if (window.confirm("结束本轮复习？已保存的评分会保留，当前未提交答案将丢弃。")) reviewSession.discard(); }}>结束本轮</button>}
+            </details>
+          </>}
+          {activeView !== "inbox" && !(isAndroid && activeView === "due") && <section className={`flashcards-overview${activeView === "due" ? " flashcards-overview-due" : ""}`}>
             {activeView === "due" ? <div><div className="flashcards-overview-eyebrow"><span>闪卡</span><ChevronRight size={13} aria-hidden="true" /><strong>今日</strong><span className="flashcard-today-date">{new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(new Date())}</span></div><h1>{loading ? "正在读取复习进度…" : totalDueCount > 0 ? <>今天还有 <strong className="flashcard-today-remaining">{totalDueCount}</strong> 张</> : dailyNewLimit > 0 && remainingNew === 0 && (dashboardStats?.newDueCards ?? 0) > 0 ? "今日新卡已达上限" : "今天已完成"}</h1><p>{dashboardStats?.reviewedToday ? `今天已复习 ${dashboardStats.reviewedToday} 次，可以继续保持节奏` : totalDueCount > 0 ? "完成一轮短复习，保持知识活跃" : dailyNewLimit > 0 && remainingNew === 0 && (dashboardStats?.newDueCards ?? 0) > 0 ? "已到期的新卡明天继续，已学卡片到期后仍可复习" : "没有到期卡片，可以浏览牌库或查看学习统计"}</p><div className="flashcards-daily-new-progress" role="status">{dashboardStats && dailyNewLimit > 0 ? <>今日新卡 {isAndroid ? (dashboardStats.newStudiedToday ?? 0) : Math.min(dailyNewLimit, dashboardStats.newStudiedToday ?? 0)} / {isAndroid ? effectiveDailyNewLimit : dailyNewLimit}{(dashboardStats.newDueCards ?? 0) > 0 && remainingNew === 0 ? " · 其余新卡明天继续" : ""}</> : loading ? "正在准备今日学习计划" : "按自己的节奏学习新卡"}</div></div>
                 : activeView === "stats" ? <div><div className="flashcards-overview-eyebrow"><span>闪卡</span><ChevronRight size={13} /><strong>统计</strong></div><h1>学习统计</h1><p>回顾学习节奏、卡片状态和评分分布</p></div>
                 : activeView === "cards" ? <div><div className="flashcards-overview-eyebrow"><span>闪卡</span><ChevronRight size={13} /><strong>牌库</strong></div><h1>全部卡片</h1><p><span>{browser.page.scopeTotal ?? 0} 张卡片</span><i /><span>使用视图、排序和筛选组织数据库</span></p></div>
@@ -2589,10 +2629,11 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
             {activeView === "stats" && <button className="flashcards-overview-back" onClick={() => void openView("due")}><ArrowLeft size={15} />返回今日</button>}
           </section>}
 
-          {activeView === "due" && isAndroid && <section className="flashcard-mobile-plan" aria-label="今日与本轮学习计划"><p>{reviewPlan.revision === "0" ? "正在核对本轮计划…" : <>今日待学习 {reviewPlan.eligibleCount} 张 · 本轮 {reviewQueue.length ? reviewSessionTotal : plannedSessionCount} 张</>}</p>{plannedSessionCount > 0 && <small>{plannedMinutes === null ? "计时样本不足，完成至少 5 次有效计时后显示预计用时。" : `本轮约 ${plannedMinutes} 分钟 · 依近30天有效计时估算，不含超过5分钟的单次记录。`}</small>}{extraNewCount > 0 && reviewQueue.length === 0 && <><button disabled={savingExtraNew || !extraNewReady} onClick={() => void addExtraNew()}>{savingExtraNew ? "正在保存…" : `今日临时增加 ${extraNewCount} 张新卡额度`}</button><small>{extraNewReady ? "仅本机今日有效，计入今日新卡；不改每日偏好。" : "更新安卓原生程序后可使用临时额度。"}</small></>}<MobileFlashcardPreview disabled={loading || plannedSessionCount === 0} /></section>}
-          {activeView === "due" && dashboardStats && <FlashcardTodayProgress stats={dashboardStats} dailyNewLimit={dailyNewLimit} mobile={isAndroid} onOpenStats={() => { if (isAndroid) setMobilePage("stats"); void openView("stats"); }} />}
+
+          {activeView === "due" && !isAndroid && dashboardStats && <FlashcardTodayProgress stats={dashboardStats} dailyNewLimit={dailyNewLimit} mobile={isAndroid} onOpenStats={() => { if (isAndroid) setMobilePage("stats"); void openView("stats"); }} />}
 
           {activeView === "inbox" && <Suspense fallback={<div className="flashcard-lazy-loading" role="status">正在准备内容…</div>}><FlashcardInbox drafts={drafts} decks={decks} isAndroid={isAndroid} resolving={Boolean(resolvingDraft)} onCreate={beginCreateCard} onResolve={resolveDrafts} onFeedback={(draft) => openQuality({ card: draft, draft: true })} onDragEnd={() => setInboxDropDeckId("")} onDragTarget={setInboxDropDeckId} onOpenLink={openExternalLink} onOpenSource={(draft) => void openCardSource(draft, draft.sourcePath)} /></Suspense>}
+          {isAndroid && activeView === "inbox" && mobileManagement()}
 
           {activeView === "stats" && dashboardStats && <Suspense fallback={<div className="flashcard-lazy-loading" role="status">正在准备内容…</div>}><StudyDashboard stats={dashboardStats} decks={decks} dueCount={totalDueCount} dailyNewLimit={dailyNewLimit} onOpenDeck={(id) => { setSelectedDeckId(id); if (isAndroid) setMobilePage("deck"); void openView("deck", id); }} /></Suspense>}
 
@@ -2834,21 +2875,7 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
       <button className="danger" disabled={batchBusy} onClick={() => void runBatchDelete()}><Trash2 size={14} /><span>删除</span></button>
       <button className="flashcards-batch-close" onClick={() => { setSelectedCardIds(new Set()); setBatchEditorOpen(false); }} aria-label="退出批量选择"><X size={15} /></button>
     </div>}
-    {isAndroid && !reviewing && <MobileTabBar
-      className="flashcards-mobile-nav"
-      label="闪卡导航"
-      active={mobilePage === "stats" ? "review" : mobilePage === "deck" ? "library" : mobilePage}
-      items={[
-        { key: "review", label: "今日", icon: RotateCcw, count: totalDueCount },
-        { key: "library", label: "牌库", icon: Layers3 },
-        { key: "inbox", label: "收件箱", icon: Inbox, count: drafts.length },
-      ]}
-      onSelect={(key) => {
-        if (key === "review") { setMobilePage("review"); void openView("due"); }
-        else if (key === "library") setMobilePage("library");
-        else { setMobilePage("inbox"); void openView("inbox"); }
-      }}
-    />}
+
     {tableColumnDrag && <div className="flashcards-table-column-drag-preview" style={{ left: tableColumnDrag.x, top: tableColumnDrag.y, width: tableColumnDrag.width }}>{tableColumnLabel(tableColumnDrag.key)}</div>}
     {deckDragPreview && <div className="flashcards-deck-drag-preview" style={{ left: deckDragPreview.x + 14, top: deckDragPreview.y + 14 }}><Layers3 size={14} /><span>{deckDragPreview.name}</span></div>}
     {boardDragPreview && <div className="flashcards-board-drag-preview" style={{ left: boardDragPreview.x + 14, top: boardDragPreview.y + 14 }}><GripVertical size={14} /><span>{boardDragPreview.title}</span></div>}

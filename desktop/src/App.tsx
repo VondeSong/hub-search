@@ -1284,7 +1284,7 @@ useEffect(() => {
     filtersOpen,
     mobilePreviewOpen,
     onSelectMobileLibraries: selectLibraries,
-    mobileHeader: isMobileLayout && !mobilePreviewOpen && !mobileAgentsOpen && !flashcardsActive ? <MobileHeader onBack={((!["home", "tasks"].includes(desktopSidebarView) && !mobileBrowseOpen) || mobileConnectionsOpen) ? () => navigateMobile("browse") : undefined} onSettings={() => setShowConnection(true)} /> : undefined,
+    mobileHeader: isMobileLayout && !mobilePreviewOpen && !mobileAgentsOpen ? <MobileHeader onBack={((!["home", "tasks"].includes(desktopSidebarView) && !mobileBrowseOpen) || mobileConnectionsOpen) ? () => navigateMobile("browse") : undefined} onSettings={() => setShowConnection(true)} /> : undefined,
     style: shellStyle,
     startWindowDrag,
     mainContent: isMobileLayout && mobileAgentsOpen && !flashcardsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开 Agents…</div>}><LazyCloudAgents onClose={() => window.history.back()} /></Suspense> : isMobileLayout && mobileConnectionsOpen && !flashcardsActive ? <MobileConnections onContent={() => { setSettingsCategory("cloud"); setShowConnection(true); }} onAgents={() => navigateMobile("agents")} /> : isMobileLayout && mobileBrowseOpen && !flashcardsActive ? <MobileBrowse
@@ -1435,7 +1435,7 @@ useEffect(() => {
       versionLabel: "v85",
       flashcardsActive,
       mobileNavigation: isMobileLayout ? <MobileNavigation
-        active={mobileAgentsOpen ? "agents" : mobileBrowseOpen || mobileConnectionsOpen || (["favorites", "history", "journals", "tags", "collections", "insights"] as DesktopSidebarView[]).includes(desktopSidebarView) ? "browse" : tasksActive ? "tasks" : "search"}
+        active={flashcardsActive ? "review" : mobileAgentsOpen ? "agents" : mobileBrowseOpen || mobileConnectionsOpen || (["favorites", "history", "journals", "tags", "collections", "insights"] as DesktopSidebarView[]).includes(desktopSidebarView) ? "browse" : tasksActive ? "tasks" : "search"}
         onSelect={navigateMobile}
         dueCount={flashcardDueCount}
       /> : undefined,
