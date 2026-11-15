@@ -898,7 +898,11 @@ fn investigate_loop(
                 normal_calls += 1;
             }
             let final_call = normal_calls >= budget.model_calls;
-            let mut turn_schema = schema.clone();
+            let request_tools = context.skills.as_ref().map(|s| s.tools()).transpose()?;
+            let mut turn_schema = request_tools.as_ref().map_or_else(
+                || schema.clone(),
+                |tools| assistant::available_schema(schema.clone(), tools),
+            );
             if final_call {
                 turn_schema["properties"]["requests"]["maxItems"] = json!(0);
                 turn_schema["properties"]["report"] =
@@ -944,7 +948,7 @@ fn investigate_loop(
                     "businessActionRecords":action_receipts,"observations":model_observations,"quoteCatalog":quote_catalog,
                     "skills":context.skills.as_ref().map(|s|s.metadata()),
                     "knowledgeRules":context.skills.as_ref().map(|s|s.guidance()),
-                    "hubCapabilities":context.skills.as_ref().map(|s|s.tools().map(|tools|assistant::capability_metadata(tools, &turn_schema))).transpose()?,
+                    "hubCapabilities":request_tools.as_ref().map(|tools|assistant::capability_metadata(tools.clone(), &turn_schema)),
                     "capabilities":session.capabilities()?,"budget":budget,"usage":context.usage(),
                     "callsRemaining":budget.model_calls.saturating_sub(normal_calls)+1,"finalCall":final_call});
                 let material = native::project_request(material);
@@ -963,12 +967,23 @@ fn investigate_loop(
                 json!({"rationale":"本轮公开工作意图","requests":[],"report":example_report});
             let prompt = format!("{}\n以下是完整 JSON 输出结构示例，仅演示字段和层级，不是本轮结论。completion 示例只含第一项，实际须覆盖全部有效要求并按事实填写类型、状态、说明和凭证。正文、citations、status 等是 report 的字段，与 completion 并列，不能放进 completion。校验反馈含 additionalProperties 时，对象只保留 allowed fields 中的字段；说明写入 explanation 或正文，不添加字段。只输出一个根对象，不追加第二段 JSON 或额外字段。\n完整输出示例(JSON):\n{output_example}\n{prompt}", store::goal::completion::GUIDE);
             let bytes = prompt.len() + turn_schema.to_string().len() + 256;
+            let single_limit = if session.is_some() { 196_608 } else { 65_536 };
+            store::record(
+                root,
+                run,
+                "requestMaterialUsage",
+                &json!({
+                    "promptBytes":prompt.len(),"schemaBytes":turn_schema.to_string().len(),
+                    "envelopeAllowanceBytes":256,"estimatedRequestBytes":bytes,
+                    "singleRequestLimitBytes":single_limit,"previousRequestBytes":context.usage.request_bytes,
+                    "runLimitBytes":budget.request_bytes,"archiveReservedBytes":archive_reserved_bytes,
+                    "overrunBytes":bytes.saturating_sub(single_limit),
+                    "scope":"UTF-8 request admission estimate; not provider tokens or billed usage"
+                }),
+            )?;
             // 预算字样也用于既有中断分类，不能随提示一起丢失。
-            if bytes > if session.is_some() { 196_608 } else { 65_536 } {
-                return Err(
-                    "单次请求材料超过本轮预算上限，已保留读取记录；请明确缩小资料范围后重试。"
-                        .into(),
-                );
+            if bytes > single_limit {
+                return Err(format!("单次请求材料超过预算上限：本次约 {bytes} 字节，上限 {single_limit} 字节（包含聊天、资料、规则和工具说明）。已保留进展，本次未发送给模型。"));
             }
             if context.usage.request_bytes + bytes + archive_reserved_bytes > budget.request_bytes {
                 return Err("本轮累计请求材料达到预算限制，已保留进展；请核对资料范围和已有结果后再决定下一步。".into());
