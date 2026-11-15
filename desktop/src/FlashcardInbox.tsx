@@ -95,6 +95,10 @@ export function FlashcardInbox({ drafts, decks, isAndroid, resolving, onCreate, 
   const [movePopoverScope, setMovePopoverScope] = useState("");
   const [deckQuery, setDeckQuery] = useState("");
   const moveTriggerRef = useRef<HTMLButtonElement>(null);
+  const focusMoveTrigger = () => {
+    const target = isAndroid && mobileMode === "cards" ? (mobileAcceptTrigger.current?.isConnected ? mobileAcceptTrigger.current : mobileToolsRef.current) : moveTriggerRef.current;
+    target?.focus();
+  };
   const movePopoverRef = useRef<HTMLDivElement>(null);
   const deckSearchRef = useRef<HTMLInputElement>(null);
   const inboxSearchRef = useRef<HTMLInputElement>(null);
@@ -219,7 +223,7 @@ export function FlashcardInbox({ drafts, decks, isAndroid, resolving, onCreate, 
   useEffect(() => {
     if (movePopoverOpen && movePopoverScope !== moveScope) {
       setMovePopoverOpen(false);
-      moveTriggerRef.current?.focus();
+      focusMoveTrigger();
     }
   }, [movePopoverOpen, movePopoverScope, moveScope]);
 
@@ -231,7 +235,7 @@ export function FlashcardInbox({ drafts, decks, isAndroid, resolving, onCreate, 
       if (target && !movePopoverRef.current?.contains(target) && !moveTriggerRef.current?.contains(target)) setMovePopoverOpen(false);
     };
     const dismissOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { event.preventDefault(); setMovePopoverOpen(false); moveTriggerRef.current?.focus(); }
+      if (event.key === "Escape") { event.preventDefault(); setMovePopoverOpen(false); focusMoveTrigger(); }
     };
     document.addEventListener("pointerdown", dismissOutside);
     document.addEventListener("focusin", dismissOutside);
@@ -364,7 +368,7 @@ export function FlashcardInbox({ drafts, decks, isAndroid, resolving, onCreate, 
   };
   const moveToDeck = async (deckId: string) => {
     setMovePopoverOpen(false);
-    moveTriggerRef.current?.focus();
+    focusMoveTrigger();
     try {
       await onResolve(moveIds, true, "inbox-move", deckId);
     } finally {
@@ -420,7 +424,7 @@ export function FlashcardInbox({ drafts, decks, isAndroid, resolving, onCreate, 
       <button className="flashcard-inbox-new" onClick={onCreate}><CirclePlus size={16} /><span>新建</span></button>
       <div className="flashcard-inbox-popover-wrap">
         <button ref={moveTriggerRef} className="flashcard-inbox-move-trigger" aria-label="移入牌组" aria-haspopup="dialog" aria-expanded={movePopoverOpen} aria-controls={movePopoverOpen ? "flashcard-inbox-move-popover" : undefined} disabled={resolving || moveIds.length === 0} onClick={() => { setDeckQuery(""); setMovePopoverScope(moveScope); setMovePopoverOpen((open) => !open); }}>{resolving ? <LoaderCircle size={16} className="spin" /> : <FolderInput size={16} />}<span>移入…</span><ChevronDown size={12} /></button>
-        {movePopoverOpen && <div ref={movePopoverRef} className="flashcard-inbox-move-popover" id="flashcard-inbox-move-popover" role="dialog" aria-label="选择目标牌组"><header><strong>{selected.length > 0 ? `移动 ${selected.length} 张卡片` : "移动当前卡片"}</strong><button aria-label="关闭牌组选择" onClick={() => { setMovePopoverOpen(false); moveTriggerRef.current?.focus(); }}><X size={15} /></button></header>
+        {movePopoverOpen && <div ref={movePopoverRef} className="flashcard-inbox-move-popover" id="flashcard-inbox-move-popover" role="dialog" aria-label="选择目标牌组"><header><strong>{selected.length > 0 ? `移动 ${selected.length} 张卡片` : "移动当前卡片"}</strong><button aria-label="关闭牌组选择" onClick={() => { setMovePopoverOpen(false); focusMoveTrigger(); }}><X size={15} /></button></header>
           {hiddenSelectedCount > 0 && <p className="flashcard-inbox-popover-note">包含 {hiddenSelectedCount} 张筛选外的卡片</p>}
           <label className="flashcard-inbox-deck-search"><Search size={14} /><input ref={deckSearchRef} aria-label="搜索目标牌组" placeholder="搜索牌组" value={deckQuery} onChange={(event) => setDeckQuery(event.target.value)} /></label>
           <div className="flashcard-inbox-deck-options">{matchingDecks.map((deck) => <button key={deck.id} disabled={resolving} onClick={() => void moveToDeck(deck.id)}><Layers3 size={16} /><span>{deck.name}</span><small>{deck.cardCount}</small></button>)}{matchingDecks.length === 0 && <p>{decks.length === 0 ? "先在牌库中创建一个牌组" : "没有匹配的牌组"}</p>}</div>
