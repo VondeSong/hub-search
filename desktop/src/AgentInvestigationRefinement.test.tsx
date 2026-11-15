@@ -441,6 +441,30 @@ describe("site v71 assistant controls",()=>{
     expect(select<HTMLDetailsElement>('.agent-dialogue-details').open).toBe(false);expect(document.activeElement).toBe(trigger);
     expect(calls('create')).toHaveLength(0);expect(calls('respond')).toHaveLength(0);
   });
+  it("shows the effective topic scope without advertising a retained manual library",async()=>{
+    const topic={id:"page-only",revision:1,title:"单页核对",pinned:false,grant:{libraryIds:[],notes:[{kind:"note",libraryId:"library-b",documentId:"topic-page",pageId:null}],readingItemKeys:[]},policy:"materials-only",skills:[],versions:[]};
+    current=makeView("已有真实工作",{libraryIds:["library-a"],notes:[],readingItemKeys:[]});
+    invoke.mockImplementation(async(command,payload)=>{
+      if(payload?.args?.action==="researchTopics")return {topics:[topic]};
+      if(payload?.args?.action==="checkResearchTopic")return {grant:topic.grant,unavailable:[],changed:[],versions:[]};
+      return native(command,payload);
+    });
+    await render(<ExistingWorkInvestigation workId="new-work"/>);
+    const scope=()=>select<HTMLButtonElement>(".agent-scope-trigger").getAttribute("aria-label");
+    expect(scope()).toBe("搜索范围：资料库 A");
+    await type(select<HTMLTextAreaElement>('[name="investigationGoal"]'),"保留手写草稿");
+    await activate(select<HTMLElement>('.agent-task-mode>summary'));
+    await activate([...document.querySelectorAll<HTMLButtonElement>('.agent-mode-menu button')].find(b=>b.textContent?.includes("全部专题"))!);
+    await activate([...document.querySelectorAll<HTMLButtonElement>('.agent-topic-list button')].find(b=>b.textContent?.includes(topic.title))!);
+    await activate([...document.querySelectorAll<HTMLButtonElement>('.agent-research-topics button')].find(b=>b.textContent==="应用到当前对话")!);
+    expect(scope()).toContain("1 份资料");expect(scope()).not.toContain("资料库 A");
+    await activate(select<HTMLInputElement>('.agent-topic-selection>label input'));
+    expect(scope()).toContain("资料库 A");
+    await activate(select<HTMLButtonElement>('[aria-label="取消当前专题"]'));
+    expect(scope()).toContain("搜索范围：资料库 A");
+    expect(select<HTMLTextAreaElement>('[name="investigationGoal"]').value).toBe("保留手写草稿");
+    expect(calls("create")).toHaveLength(0);expect(calls("respond")).toHaveLength(0);
+  });
   it("creates an empty new chat and explicitly applies its topic scope before the first model request",async()=>{
     const topic={id:"new-topic",revision:1,title:"首次专题",pinned:false,grant:{libraryIds:[],notes:[{kind:"note",libraryId:"library-a",documentId:"note-a",pageId:null}],readingItemKeys:[]},policy:"materials-only",skills:[],versions:[]};
     invoke.mockImplementation(async(command,payload)=>{
