@@ -74,7 +74,8 @@ fn capabilities_for(provider: &str, native_ocr: bool) -> Policy {
         image_download: incoming,
         image_ocr: incoming && native_ocr,
         pdf_download: incoming,
-        other_download: matches!(provider, "craft" | "dida365" | "global"),
+        other_download: matches!(provider, "craft" | "dida365" | "global")
+            || (provider == "files" && cfg!(feature = "experimental-local-file-text")),
         pdf_text: incoming,
         pdf_ocr: incoming && native_ocr,
         outgoing_attachments: matches!(provider, "craft" | "obsidian" | "dida365" | "global"),
@@ -332,7 +333,7 @@ pub(crate) fn outgoing_enabled(
 pub(crate) fn eligible_sql(connection: &Connection, job_type: &str) -> String {
     if job_type == "extract_file" {
         return if cfg!(feature = "experimental-local-file-text") {
-            "l.enabled=1 AND l.provider IN ('craft','dida365') AND s.mime_type IN ('text/plain','application/vnd.openxmlformats-officedocument.wordprocessingml.document')".into()
+            "l.enabled=1 AND l.provider IN ('craft','dida365','files') AND s.mime_type IN ('text/plain','application/vnd.openxmlformats-officedocument.wordprocessingml.document')".into()
         } else {
             "0".into()
         };

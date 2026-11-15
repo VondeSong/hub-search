@@ -20,9 +20,9 @@ mod content;
 mod database;
 mod database_maintenance_entry;
 mod file_lock;
-#[cfg(any(test, feature = "experimental-local-file-text"))]
 mod file_text;
 mod index_job_metadata;
+mod local_files;
 mod model_runtime;
 mod model_skills;
 mod obsidian_edit;
@@ -5918,7 +5918,7 @@ fn claim_enabled_attachment_jobs(
     let (mut connection, _writer) = open_write_database(path)?;
     let root = path.parent().ok_or("资料库路径不可用。")?;
     let library_ids = {
-        let mut statement=connection.prepare("SELECT id FROM libraries WHERE enabled=1 AND provider IN ('craft','obsidian','dida365')").map_err(|_|"无法读取内容管线资料库".to_string())?;
+        let mut statement=connection.prepare("SELECT id FROM libraries WHERE enabled=1 AND provider IN ('craft','obsidian','dida365','files')").map_err(|_|"无法读取内容管线资料库".to_string())?;
         let rows = statement
             .query_map([], |row| row.get::<_, String>(0))
             .map_err(|_| "无法读取内容管线资料库".to_string())?;
@@ -14618,75 +14618,86 @@ fn delete_obsidian_document(
     document_id: &str,
     now: i64,
 ) -> Result<(), String> {
+    delete_local_document(transaction, library_id, document_id, now, PROVIDER_OBSIDIAN)
+}
+
+fn delete_local_document(
+    transaction: &rusqlite::Transaction<'_>,
+    library_id: &str,
+    document_id: &str,
+    now: i64,
+    provider: &str,
+) -> Result<(), String> {
     transaction
         .execute(
             "DELETE FROM ocr_pages WHERE source_item_id IN
                (SELECT id FROM source_items WHERE space_id=?1 AND document_id=?2)",
             params![library_id, document_id],
         )
-        .map_err(|error| format!("无法删除 Obsidian 文档附件 OCR：{error}"))?;
+        .map_err(|error| format!("无法删除 本地 文档附件 OCR：{error}"))?;
     transaction
         .execute(
             "DELETE FROM extractions WHERE source_item_id IN
                (SELECT id FROM source_items WHERE space_id=?1 AND document_id=?2)",
             params![library_id, document_id],
         )
-        .map_err(|error| format!("无法删除 Obsidian 文档附件提取记录：{error}"))?;
+        .map_err(|error| format!("无法删除 本地 文档附件提取记录：{error}"))?;
     transaction
         .execute(
             "DELETE FROM index_jobs WHERE source_id IN
                (SELECT id FROM source_items WHERE space_id=?1 AND document_id=?2)",
             params![library_id, document_id],
         )
-        .map_err(|error| format!("无法删除 Obsidian 文档附件任务：{error}"))?;
+        .map_err(|error| format!("无法删除 本地 文档附件任务：{error}"))?;
     transaction
         .execute(
             "DELETE FROM source_items WHERE space_id=?1 AND document_id=?2",
             params![library_id, document_id],
         )
-        .map_err(|error| format!("无法删除 Obsidian 文档附件来源：{error}"))?;
+        .map_err(|error| format!("无法删除 本地 文档附件来源：{error}"))?;
     transaction
         .execute(
             "DELETE FROM obsidian_aliases WHERE space_id=?1 AND document_id=?2",
             params![library_id, document_id],
         )
-        .map_err(|error| format!("无法删除 Obsidian 文档别名：{error}"))?;
+        .map_err(|error| format!("无法删除 本地 文档别名：{error}"))?;
     transaction
         .execute(
             "DELETE FROM obsidian_tags WHERE space_id=?1 AND document_id=?2",
             params![library_id, document_id],
         )
-        .map_err(|error| format!("无法删除 Obsidian 文档标签：{error}"))?;
+        .map_err(|error| format!("无法删除 本地 文档标签：{error}"))?;
     transaction
         .execute(
             "DELETE FROM content_items WHERE space_id=?1 AND document_id=?2",
             params![library_id, document_id],
         )
-        .map_err(|error| format!("无法删除 Obsidian 旧内容块：{error}"))?;
+        .map_err(|error| format!("无法删除 本地 旧内容块：{error}"))?;
     transaction
         .execute(
-            "DELETE FROM documents WHERE space_id=?1 AND id=?2 AND provider='obsidian'",
-            params![library_id, document_id],
+            "DELETE FROM documents WHERE space_id=?1 AND id=?2 AND provider=?3",
+            params![library_id, document_id, provider],
         )
-        .map_err(|error| format!("无法删除 Obsidian 旧文档：{error}"))?;
+        .map_err(|error| format!("无法删除 本地 旧文档：{error}"))?;
     transaction
         .execute(
             "INSERT INTO index_jobs
                (job_key,space_id,source_id,source_type,job_type,status,priority,
                 created_at,updated_at,provider)
-             VALUES (?1,?2,?3,'document','delete_lexical','pending',25,?4,?4,'obsidian')
+             VALUES (?1,?2,?3,'document','delete_lexical','pending',25,?4,?4,?5)
              ON CONFLICT(job_key) DO UPDATE SET
                job_type='delete_lexical',status='pending',priority=25,attempts=0,
                updated_at=excluded.updated_at,last_error=NULL,next_attempt_at=0,
-               worker_id=NULL,locked_at=NULL,lease_until=NULL,provider='obsidian'",
+               worker_id=NULL,locked_at=NULL,lease_until=NULL,provider=excluded.provider",
             params![
                 format!("lexical:{library_id}:{document_id}"),
                 library_id,
                 document_id,
-                now
+                now,
+                provider
             ],
         )
-        .map_err(|error| format!("无法排队 Obsidian 删除任务：{error}"))?;
+        .map_err(|error| format!("无法排队 本地 删除任务：{error}"))?;
     Ok(())
 }
 
@@ -17399,6 +17410,20 @@ async fn sync_library_inner(
                     .and_then(|path| full_reconcile_due(&path, &library_id))
                     .unwrap_or(true);
             sync_craft_with_auth_retry(app, library_id, state, full_reconcile, operation).await
+        }
+        "files" => {
+            if !cfg!(feature = "experimental-local-file-text") {
+                return Err("当前客户端未启用实验性本地文件接入".into());
+            }
+            let root = PathBuf::from(location.ok_or("本地文件资料库缺少路径")?);
+            let store = blob_store_for(&app, &state)?;
+            let summary = tokio::task::spawn_blocking(move || {
+                local_files::sync(&path, &library_id, &root, &store, &operation)
+            })
+            .await
+            .map_err(|e| e.to_string())??;
+            flush_content_pipeline(&app, &state).await?;
+            Ok(summary)
         }
         PROVIDER_OBSIDIAN => {
             let root =
@@ -31086,6 +31111,7 @@ async fn recent_documents(
                 "WITH ranked_documents AS (
                    SELECT d.id, d.space_id, l.name, d.title, d.path, d.folder_id,
                           d.modified_at, substr(d.markdown, 1, 160) AS snippet, d.provider,
+                          d.content_hash||':'||COALESCE((SELECT status||':'||COALESCE(input_version,'') FROM extractions WHERE source_item_id='local-file:'||d.id AND extractor='file_text' AND extractor_version='1'),'pending') AS content_hash,
                           (SELECT t.status FROM dida_tasks t
                            WHERE t.library_id=d.space_id AND t.task_id=d.id) AS task_status,
                           CASE WHEN d.provider='dida365'
@@ -31107,7 +31133,7 @@ async fn recent_documents(
                            ELSE COALESCE(d.modified_at,d.indexed_at) END>=?3)
                  )
                  SELECT id, space_id, name, title, path, folder_id,
-                        modified_at, snippet, provider, task_status
+                        modified_at, snippet, provider, task_status, content_hash
                  FROM ranked_documents
                  WHERE (provider<>'dida365' AND recent_rank<=?4)
                     OR (provider='dida365' AND recent_rank<=?5)
@@ -31125,7 +31151,7 @@ async fn recent_documents(
                 ],
                 |row| {
                     Ok(IndexedSearchResult {
-                        id: row.get(0)?,
+                        id: if row.get::<_,String>(8)?=="files" { format!("file-root:{}:{}",row.get::<_,String>(0)?,row.get::<_,String>(10)?) } else {row.get(0)?},
                         entity_key: format!(
                             "document:{}:{}",
                             row.get::<_, String>(1)?,
@@ -31134,6 +31160,7 @@ async fn recent_documents(
                         block_id: row.get(0)?,
                         document_id: row.get(0)?,
                         content_type: match row.get::<_, String>(8)?.as_str() {
+                            "files" => "file_document".to_string(),
                             PROVIDER_OBSIDIAN => "obsidian_markdown".to_string(),
                             PROVIDER_DIDA365 => "dida_task".to_string(),
                             PROVIDER_FEISHU if row.get::<_, String>(0)?.starts_with("bitable") => {
@@ -31144,6 +31171,7 @@ async fn recent_documents(
                         },
                         source_item_id: None,
                         source_type: match row.get::<_, String>(8)?.as_str() {
+                            "files" => "local_file".to_string(),
                             PROVIDER_OBSIDIAN => "obsidian_page".to_string(),
                             PROVIDER_DIDA365 => "dida_task".to_string(),
                             PROVIDER_FEISHU if row.get::<_, String>(0)?.starts_with("bitable") => {
@@ -31403,8 +31431,10 @@ fn local_document(
     if hidden_library_ids(&path, &connection)?.contains(&space_id) {
         return Err("资料库已移除或停用".into());
     }
-    #[cfg(feature = "experimental-local-file-text")]
-    if let Some(result) = result_id.as_deref() {
+    if let Some(result) = result_id
+        .as_deref()
+        .filter(|id| id.starts_with("attachment-meta:") || id.contains(":file:v1:"))
+    {
         if let Some(text) = file_text::preview(
             &connection,
             &blob_store_for(&app, &state)?,
@@ -31434,6 +31464,27 @@ fn local_document(
             .ok()
             .flatten()
     });
+    if provider == "files" {
+        {
+            let (source, read_error): (String, Option<String>) = connection.query_row("SELECT id,json_extract(metadata_json,'$.readError') FROM source_items WHERE space_id=?1 AND document_id=?2 AND source_type='local_file'", params![space_id,document_id], |r| Ok((r.get(0)?,r.get(1)?))).map_err(|e|e.to_string())?;
+            if let Some(reason) = read_error {
+                return Err(format!("无法读取原文件：{reason}"));
+            }
+            let input = attachment_evidence::input_on(&connection, &space_id, &source)?;
+            let failure: Option<String>=connection.query_row("SELECT last_error FROM extractions WHERE source_item_id=?1 AND extractor='file_text' AND extractor_version='1' AND status='failed' AND input_version=?2",params![source,input.version],|r|r.get(0)).optional().map_err(|e|e.to_string())?.flatten();
+            if let Some(reason) = failure {
+                return Err(format!("正文提取失败：{reason}；可打开原文件"));
+            }
+            return file_text::preview(
+                &connection,
+                &blob_store_for(&app, &state)?,
+                &space_id,
+                &document_id,
+                &format!("attachment-meta:{source}"),
+            )?
+            .ok_or("此文件尚无可用提取正文，请打开原文件".into());
+        }
+    }
     if !markdown.is_empty() {
         if provider != PROVIDER_CRAFT {
             return Ok(markdown);
@@ -34198,6 +34249,7 @@ async fn result_url(
             }
             craft_deep_link(library_id, &fallback_page_id, state)
         }
+        "files" => local_files::original_url(&connection, library_id, document_id),
         PROVIDER_OBSIDIAN => obsidian_open_url(
             &library_location::vault_name(&connection, library_id)?,
             &document_path,
@@ -34957,6 +35009,7 @@ pub fn run() {
                 restart_obsidian_watcher,
                 relocate_obsidian_library,
                 add_obsidian_library,
+                local_files::local_file_sources,
                 update_obsidian_exclusions,
                 update_library_icon,
                 rename_library,

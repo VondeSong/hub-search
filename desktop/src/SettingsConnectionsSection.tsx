@@ -13,6 +13,7 @@ import { DidaConnectionSection } from "./DidaConnectionSection";
 import { FeishuBitableConnectionSection } from "./FeishuBitableConnectionSection";
 import { FeishuLibraryConnectionSection } from "./FeishuLibraryConnectionSection";
 import { ObsidianConnectionSection } from "./ObsidianConnectionSection";
+import { LocalFilesConnectionSection } from "./LocalFilesConnectionSection";
 import type { RuntimeCapabilities } from "./RuntimePlatform";
 import type { LibrarySummary } from "./SearchTypes";
 
@@ -99,7 +100,7 @@ export function SettingsConnectionsSection({
   saveCraftApiConnection,
 }: SettingsConnectionsSectionProps) {
   const [globalPolicy, setGlobalPolicy] = useState<LibraryContentPolicy>();
-  const [policies, setPolicies] = useState<Record<Provider, LibraryContentOverrides>>({ craft: { ...INHERIT_LIBRARY_POLICY }, obsidian: { ...INHERIT_LIBRARY_POLICY }, dida365: { ...INHERIT_LIBRARY_POLICY }, feishu: { ...INHERIT_LIBRARY_POLICY } });
+  const [policies, setPolicies] = useState<Record<Provider, LibraryContentOverrides>>({ craft: { ...INHERIT_LIBRARY_POLICY }, obsidian: { ...INHERIT_LIBRARY_POLICY }, dida365: { ...INHERIT_LIBRARY_POLICY }, feishu: { ...INHERIT_LIBRARY_POLICY }, files: { ...INHERIT_LIBRARY_POLICY } });
   useEffect(() => {
     let alive = true; let revision = 0;
     const read = () => { const current = ++revision; void invoke<LibraryPolicySnapshot>("library_content_policy", { args: { action: "get" } }).then(result => { if (alive && current === revision) setGlobalPolicy(result.global); }).catch(reason => { if (alive && current === revision) publishCodexNotice(`读取默认内容策略失败：${String(reason)}`, "error", 10000); }); };
@@ -111,6 +112,7 @@ export function SettingsConnectionsSection({
   return (
     <div className="settings-connections settings-category libraries">
       <div className="settings-connections-heading"><h3>添加或重新连接资料库</h3><p>选择软件展开填写，已输入的内容会保留。</p></div>
+      {runtimeCapabilities.localVault&&<LocalFilesConnectionSection blocked={connectingAction!==null}/>}
       <ConnectionGroup provider="feishu" label="飞书" description="文档、知识库与多维表格" busy={connectingAction === "feishu" || connectingAction === "feishuBitable"}>
       {policy("feishu")}
       <FeishuLibraryConnectionSection

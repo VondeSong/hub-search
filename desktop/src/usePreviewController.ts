@@ -13,7 +13,7 @@ import { isPdfContent } from "./PdfPreviewModel";
 
 export function previewDocumentKey(result: SearchResult): string {
   const taskStatus = result.provider === "dida365" ? `\u0000${result.taskStatus ?? "unknown"}` : "";
-  const fileVersion = result.contentType === "file_attachment" ? `\u0000${result.id}` : "";
+  const fileVersion = result.contentType === "file_attachment" || result.contentType === "file_document" ? `\u0000${result.id}` : "";
   return `${result.spaceId}\u0000${result.documentId}\u0000${result.entityKey || result.blockId || result.documentId}\u0000${result.modifiedAt ?? 0}${taskStatus}${fileVersion}`;
 }
 

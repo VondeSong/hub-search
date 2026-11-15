@@ -214,6 +214,8 @@ struct BrowseDocument {
     document_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     page_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    version: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -531,6 +533,7 @@ fn craft_contents(
                 node_id: None,
                 document_id: Some(document.id.clone()),
                 page_id: Some(page.id.clone()),
+                version: None,
             });
         }
     }
@@ -584,7 +587,7 @@ pub(crate) async fn library_contents(
 
 fn read_contents(connection: &Connection, library_id: &str) -> Result<LibraryContents, String> {
     let (provider, location): (String, String) = connection.query_row(
-        "SELECT provider,COALESCE(location,'') FROM libraries WHERE id=?1 AND enabled=1 AND provider IN ('craft','obsidian','feishu','dida365')",
+        "SELECT provider,COALESCE(location,'') FROM libraries WHERE id=?1 AND enabled=1 AND provider IN ('craft','obsidian','feishu','dida365','files')",
         [library_id],
         |row| Ok((row.get(0)?, row.get(1)?)),
     ).map_err(|_| "此资料库不可浏览")?;
@@ -623,7 +626,8 @@ fn read_contents(connection: &Connection, library_id: &str) -> Result<LibraryCon
     let mut document_query = connection
         .prepare(
             "SELECT id, title, path, folder_id, modified_at,
-                    CASE WHEN ?2='feishu' AND id LIKE 'bitable-table:%' THEN 'feishu_bitable_table' END
+                    CASE WHEN ?2='feishu' AND id LIKE 'bitable-table:%' THEN 'feishu_bitable_table' END,
+                    CASE WHEN ?2='files' THEN content_hash||':'||COALESCE((SELECT status||':'||COALESCE(input_version,'') FROM extractions WHERE source_item_id='local-file:'||documents.id AND extractor='file_text' AND extractor_version='1'),'pending') END
              FROM documents WHERE space_id=?1 AND provider=?2 ORDER BY lower(title), id",
         )
         .map_err(|error| error.to_string())?;
@@ -639,6 +643,7 @@ fn read_contents(connection: &Connection, library_id: &str) -> Result<LibraryCon
                 node_id: None,
                 document_id: None,
                 page_id: None,
+                version: row.get(6)?,
             })
         })
         .map_err(|error| error.to_string())?
@@ -698,6 +703,28 @@ fn read_contents(connection: &Connection, library_id: &str) -> Result<LibraryCon
         if incomplete {
             notice = Some("部分页面结构不完整，已保留文档入口；同步后可重试。");
         }
+    } else if provider == "files" {
+        for document in &mut documents {
+            let path = document.path.rsplit_once('/').map(|(parent, _)| parent);
+            document.folder_id = path.map(|p| crate::obsidian_folder_id(library_id, p));
+            if let Some(path) = path {
+                paths.insert(path.to_string());
+                for (index, _) in path.match_indices('/') {
+                    paths.insert(path[..index].to_string());
+                }
+            }
+        }
+        for path in paths {
+            let (parent, name) = path
+                .rsplit_once('/')
+                .map_or((None, path.as_str()), |(parent, name)| (Some(parent), name));
+            folders.push(BrowseFolder {
+                id: crate::obsidian_folder_id(library_id, &path),
+                name: name.to_string(),
+                parent_id: parent.map(|p| crate::obsidian_folder_id(library_id, p)),
+            });
+        }
+        notice = Some("只读接入TXT、DOCX；其他格式暂未收录。更新资料库可检查文件变化。");
     } else if provider == "obsidian" {
         let excluded = crate::library_excluded_paths(connection, library_id)?;
         documents.retain(|document| {
@@ -1084,6 +1111,7 @@ mod tests {
             node_id: None,
             document_id: None,
             page_id: None,
+            version: None,
         }
     }
 }

@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { providerName, type SearchProvider } from "./ProviderLabels";
-import { BookOpen, Layers3 } from "lucide-react";
+import { BookOpen, FolderOpen, Layers3 } from "lucide-react";
 
 type LibraryIconProps = {
   provider: SearchProvider;
@@ -21,6 +21,7 @@ export const LibraryIcon = memo(function LibraryIcon({
 }: LibraryIconProps) {
   if(provider==="hub")return <span className={`library-icon hub${compact?" compact":""}`} title={title||name}>{name==="阅读"?<BookOpen size={19}/>:<Layers3 size={19}/>}</span>;
   const hasCustomIcon = Boolean(iconSvg);
+  if(provider==="files"&&!iconSvg&&!defaultIconUrl)return <span className={`library-icon files${compact?" compact":""}`} title={title||`${name} · 本地文件`}><FolderOpen size={19}/></span>;
   const fallback = provider === "feishu"
     ? "/icons/library/feishu.webp?v=1"
     : `/icons/library/${provider}.svg${provider === "dida365" ? "?v=2" : ""}`;

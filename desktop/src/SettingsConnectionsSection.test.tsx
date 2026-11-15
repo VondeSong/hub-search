@@ -63,5 +63,12 @@ it("refreshes inherited global labels after a saved global policy without replac
   await act(async () => window.dispatchEvent(new CustomEvent("hub:library-content-policy-changed")));
   expect(select.options[0].text).toBe("沿用全局（关闭）");
   expect(download.value).toBe("disabled");
-  expect(invoke).toHaveBeenCalledTimes(2);
+  expect(invoke.mock.calls.filter(([command])=>command==="library_content_policy")).toHaveLength(2);
+});
+
+it("keeps the local-file entry hidden unless the native build explicitly enables it", async () => {
+  await act(async () => root.render(<SettingsConnectionsSection {...props} />));
+  expect(container.querySelector('[data-provider="files"]')).toBeNull();
+  expect(invoke).toHaveBeenCalledWith("local_file_sources", { args: { action: "capabilities" } });
+  expect(invoke.mock.calls.some(([,args])=>args?.args?.action==="add")).toBe(false);
 });

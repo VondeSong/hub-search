@@ -27,7 +27,7 @@ export function browseSubpage(result: SearchResult | undefined, href?: string, t
 }
 
 type FolderNode = { id: string; name: string; parentId?: string };
-type DocumentNode = { id: string; title: string; path: string; folderId?: string; modifiedAt?: number; contentType?: string; nodeId?: string; documentId?: string; pageId?: string };
+type DocumentNode = { id: string; title: string; path: string; folderId?: string; modifiedAt?: number; contentType?: string; nodeId?: string; documentId?: string; pageId?: string; version?: string };
 type LibraryContents = { folders: FolderNode[]; documents: DocumentNode[]; craftLocationsSynced: boolean; notice?: string; pageFolders?: Record<string, string>; folderNotices?: Record<string, string> };
 
 export type LibraryPosition = { libraryId: string; folderId: string; documentId?: string };
@@ -120,10 +120,10 @@ export function browseFolderScope(tree: BrowseTree, folderId: string, includeDes
 
 function rootResult(library: LibrarySummary, document: DocumentNode): SearchResult {
   const contentType = document.contentType ?? {
-    craft: "document", obsidian: "obsidian_markdown", feishu: "feishu_document", dida365: "dida_task",
+    craft: "document", obsidian: "obsidian_markdown", feishu: "feishu_document", dida365: "dida_task", files: "file_document",
   }[library.provider];
   return {
-    id: document.pageId ? `craft-subpage:${library.id}:${document.documentId}:${document.pageId}` : document.id,
+    id: library.provider==="files"?`file-root:${document.id}:${document.version||"pending"}`:document.pageId ? `craft-subpage:${library.id}:${document.documentId}:${document.pageId}` : document.id,
     entityKey: document.pageId ? `craft-subpage:${library.id}:${document.documentId}:${document.pageId}` : document.nodeId
       ? `wiki:${library.id}:${document.nodeId}:${document.id}`
       : `document:${library.id}:${document.id}`,

@@ -1,11 +1,16 @@
 //! Bounded, read-only text extraction. Original bytes remain the source of truth.
+#[cfg(any(test, feature = "experimental-local-file-text"))]
 use quick_xml::{events::Event, name::ResolveResult, reader::NsReader};
+use std::io::Read;
+#[cfg(any(test, feature = "experimental-local-file-text"))]
 use std::{
-    io::{Cursor, Read},
+    io::Cursor,
     time::{Duration, Instant},
 };
 
+#[cfg(any(test, feature = "experimental-local-file-text"))]
 const MAX_INPUT: usize = 64 * 1024 * 1024;
+#[cfg(any(test, feature = "experimental-local-file-text"))]
 const MAX_XML: u64 = 8 * 1024 * 1024;
 const MAX_TEXT: usize = 4 * 1024 * 1024;
 
@@ -16,6 +21,7 @@ pub(crate) fn supported(mime: &str) -> bool {
     )
 }
 
+#[cfg(any(test, feature = "experimental-local-file-text"))]
 pub(crate) fn extract(bytes: &[u8], mime: &str) -> Result<String, String> {
     if bytes.is_empty() {
         return Err("文件为零字节，不能提取正文".into());
@@ -50,6 +56,7 @@ pub(crate) fn extract(bytes: &[u8], mime: &str) -> Result<String, String> {
     }
 }
 
+#[cfg(any(test, feature = "experimental-local-file-text"))]
 fn decode_text(bytes: &[u8]) -> Result<String, String> {
     let text = if bytes.starts_with(&[0xff, 0xfe]) || bytes.starts_with(&[0xfe, 0xff]) {
         let raw = &bytes[2..];
@@ -89,6 +96,7 @@ fn decode_text(bytes: &[u8]) -> Result<String, String> {
     Ok(text.replace("\r\n", "\n").replace('\r', "\n"))
 }
 
+#[cfg(any(test, feature = "experimental-local-file-text"))]
 fn word_text(xml: &[u8]) -> Result<String, String> {
     let mut reader = NsReader::from_reader(xml);
     let started = Instant::now();
@@ -206,7 +214,7 @@ pub(crate) async fn process_jobs(
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(|e| e.to_string())?;
         let sources = {
-            let mut stmt = transaction.prepare("SELECT s.space_id,s.id,s.source_type,s.provider FROM source_items s JOIN libraries l ON l.id=s.space_id WHERE l.enabled=1 AND l.provider IN ('craft','dida365') AND s.blob_hash IS NOT NULL AND s.status NOT IN ('removed','missing','unavailable') AND s.mime_type IN ('text/plain','application/vnd.openxmlformats-officedocument.wordprocessingml.document')").map_err(|e|e.to_string())?;
+            let mut stmt = transaction.prepare("SELECT s.space_id,s.id,s.source_type,s.provider FROM source_items s JOIN libraries l ON l.id=s.space_id WHERE l.enabled=1 AND l.provider IN ('craft','dida365','files') AND s.blob_hash IS NOT NULL AND s.status NOT IN ('removed','missing','unavailable') AND s.mime_type IN ('text/plain','application/vnd.openxmlformats-officedocument.wordprocessingml.document')").map_err(|e|e.to_string())?;
             let rows = stmt
                 .query_map([], |r| {
                     Ok((
@@ -463,7 +471,7 @@ mod tests {
         let c =
             Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
         let originals = {
-            let mut q=c.prepare("SELECT DISTINCT b.hash,b.relative_path FROM source_items s JOIN blobs b ON b.hash=s.blob_hash JOIN libraries l ON l.id=s.space_id WHERE l.enabled=1 AND l.provider IN ('craft','dida365') AND s.mime_type IN ('text/plain','application/vnd.openxmlformats-officedocument.wordprocessingml.document')").unwrap();
+            let mut q=c.prepare("SELECT DISTINCT b.hash,b.relative_path FROM source_items s JOIN blobs b ON b.hash=s.blob_hash JOIN libraries l ON l.id=s.space_id WHERE l.enabled=1 AND l.provider IN ('craft','dida365','files') AND s.mime_type IN ('text/plain','application/vnd.openxmlformats-officedocument.wordprocessingml.document')").unwrap();
             q.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
                 .unwrap()
                 .collect::<Result<Vec<_>, _>>()
@@ -488,7 +496,7 @@ mod tests {
         let c =
             Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
         let completed:i64=c.query_row("SELECT count(*) FROM extractions WHERE extractor='file_text' AND status='completed'",[],|r|r.get(0)).unwrap();
-        let expected_nonempty:i64=c.query_row("SELECT count(*) FROM source_items s JOIN libraries l ON l.id=s.space_id JOIN blobs b ON b.hash=s.blob_hash WHERE l.enabled=1 AND l.provider IN ('craft','dida365') AND s.mime_type IN ('text/plain','application/vnd.openxmlformats-officedocument.wordprocessingml.document') AND b.size>0 AND b.size<=67108864",[],|r|r.get(0)).unwrap();
+        let expected_nonempty:i64=c.query_row("SELECT count(*) FROM source_items s JOIN libraries l ON l.id=s.space_id JOIN blobs b ON b.hash=s.blob_hash WHERE l.enabled=1 AND l.provider IN ('craft','dida365','files') AND s.mime_type IN ('text/plain','application/vnd.openxmlformats-officedocument.wordprocessingml.document') AND b.size>0 AND b.size<=67108864",[],|r|r.get(0)).unwrap();
         assert_eq!(completed,expected_nonempty,"every current nonempty real input must reach text storage; partial success is not full acceptance");
         let (result,library,document,expected):(String,String,String,String)=c.query_row("SELECT ci.id,ci.space_id,ci.document_id,ci.body FROM content_items ci JOIN extractions e ON e.source_item_id=ci.source_item_id AND e.extractor='file_text' WHERE ci.content_type='file_attachment' AND e.status='completed' LIMIT 1",[],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).unwrap();
         let preview_result = preview(&c, &store, &library, &document, &result);
@@ -518,7 +526,6 @@ mod tests {
     }
 }
 
-#[cfg(feature = "experimental-local-file-text")]
 pub(crate) fn preview(
     c: &rusqlite::Connection,
     store: &crate::BlobStore,
@@ -574,7 +581,6 @@ pub(crate) fn preview(
     )))
 }
 
-#[cfg(feature = "experimental-local-file-text")]
 fn read_text_blob(store: &crate::BlobStore, hash: &str) -> Result<String, String> {
     use sha2::{Digest, Sha256};
     let mut bytes = Vec::new();

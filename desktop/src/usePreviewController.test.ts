@@ -30,4 +30,9 @@ describe("preview controller policy", () => {
     const file = { ...result, contentType: "file_attachment", sourceItemId: "source-1", id: "source-1:file:version-1:0" };
     expect(previewDocumentKey({ ...file, id: "source-1:file:version-2:0" })).not.toBe(previewDocumentKey(file));
   });
+  it("reloads a local-file root when its content or extraction version changes at the same timestamp", () => {
+    const file={...result,provider:"files" as const,contentType:"file_document",id:"file-root:doc:hash:pending"};
+    expect(previewDocumentKey({...file,id:"file-root:doc:hash:completed:v1"})).not.toBe(previewDocumentKey(file));
+    expect(previewDocumentKey({...file,id:"file-root:doc:new-hash:completed:v2"})).not.toBe(previewDocumentKey(file));
+  });
 });
