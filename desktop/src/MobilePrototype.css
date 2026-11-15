@@ -119,6 +119,10 @@ html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(> .mobile-
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(> .mobile-top-area) { grid-template-rows:auto minmax(0,1fr) auto; }
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell > :is(.mobile-hub-header,.mobile-top-area) { grid-row:1; min-height:0; }
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell > .main-content-override { grid-row:2; height:auto; min-height:0; padding-bottom:84px; }
+/* Flashcards supplies its own header and navigation inside the available row. */
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android) { grid-template-rows:minmax(0,1fr); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android) > .main-content-override { grid-row:1; height:100%; padding-bottom:0; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android { height:100%; }
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell > .mobile-navigation-footer { inset-inline:12px; bottom:calc(10px + env(safe-area-inset-bottom,0px)); margin:0; background:var(--mobile-surface); border-color:var(--mobile-separator); }
 html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.flashcards-workspace.flashcards-android) .mobile-tab-bar button { font-size:12px; color:var(--mobile-secondary); }
 html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.flashcards-workspace.flashcards-android) .mobile-tab-bar button[aria-current="page"] { background:var(--mobile-selected); color:var(--mobile-accent); box-shadow:none; }
