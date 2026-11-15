@@ -20,11 +20,13 @@ export function useAgentPopover(options: { deferEscapeSelector?: string; trigger
     if (!element) return;
     // Padding clicks keep a focus owner inside the disclosure for Escape.
     if (!element.hasAttribute("tabindex")) element.tabIndex = -1;
+    // A native picker owns focus temporarily; keep its caller mounted for the result.
+    const nativeDialogOpen = () => !!element.querySelector("[data-agent-native-dialog]");
     const outside = (event: Event) => {
-      if (event.target instanceof Node && !ref.current?.contains(event.target) && !trigger?.current?.contains(event.target)) close();
+      if (!nativeDialogOpen() && event.target instanceof Node && !ref.current?.contains(event.target) && !trigger?.current?.contains(event.target)) close();
     };
     const escape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented || !ref.current?.open ||
+      if (nativeDialogOpen() || event.key !== "Escape" || event.isComposing || event.defaultPrevented || !ref.current?.open ||
           !(event.target instanceof Node) || !ref.current.contains(event.target)) return;
       // Let a nested search field or action menu consume its first Escape.
       if (deferredEscape.current && event.target instanceof Element && event.target.closest(deferredEscape.current)) return;
@@ -32,7 +34,7 @@ export function useAgentPopover(options: { deferEscapeSelector?: string; trigger
       event.stopPropagation();
       close(true);
     };
-    const blur=()=>close();
+    const blur=()=>{if(!nativeDialogOpen())close();};
     window.addEventListener("blur",blur);
     document.addEventListener("pointerdown", outside, true);
     document.addEventListener("focusin", outside);

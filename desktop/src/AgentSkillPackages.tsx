@@ -16,6 +16,7 @@ function validate(value:Inspection,packageId?:string,methodVersion?:string) {
 }
 
 export function AgentSkillPackages({onChanged,initiallyExpanded=false}:{onChanged:()=>void;initiallyExpanded?:boolean}) {
+ const panel=useRef<HTMLElement|null>(null);
  const alive=useRef(true),sequence=useRef(0),writing=useRef(false),pending=useRef<Record<string,unknown>|null>(null),fileReturn=useRef<HTMLButtonElement|null>(null),closeFile=useRef<HTMLButtonElement|null>(null);
  const manager=useRef<HTMLButtonElement|null>(null),deleteReturn=useRef<HTMLButtonElement|null>(null);
  const [removal,setRemoval]=useState<Removal|null>(null),[confirmed,setConfirmed]=useState(false),[notice,setNotice]=useState("");
@@ -47,7 +48,16 @@ export function AgentSkillPackages({onChanged,initiallyExpanded=false}:{onChange
   }catch(reason){if(alive.current&&ticket===sequence.current)setError(String(reason));}
   finally{if(alive.current&&ticket===sequence.current)setBusy(false);}
  }
- async function choose(){if(blocked)return;setError("");try{const directory=await open({directory:true,multiple:false,title:"选择包含 SKILL.md 的普通方法文件夹"});if(alive.current&&typeof directory==="string"){setDetail(null);await read({action:"skillPackagePreview",directory},"preview");}}catch(reason){if(alive.current)setError(String(reason));}}
+ async function chooseDirectory(title:string){
+  const owner=panel.current,previousFocus=document.activeElement;
+  owner?.setAttribute("data-agent-native-dialog","");
+  try{return await open({directory:true,multiple:false,title});}
+  finally{
+   if(alive.current&&previousFocus instanceof HTMLElement&&owner?.contains(previousFocus))previousFocus.focus();
+   owner?.removeAttribute("data-agent-native-dialog");
+  }
+ }
+ async function choose(){if(blocked)return;setError("");try{const directory=await chooseDirectory("选择包含 SKILL.md 的普通方法文件夹");if(alive.current&&typeof directory==="string"){setDetail(null);await read({action:"skillPackagePreview",directory},"preview");}}catch(reason){if(alive.current)setError(String(reason));}}
  function acceptResult(result:Inspection|Operation,payload:Record<string,unknown>){
   if(payload.action==="skillPackageDelete"||payload.action==="skillPackageExport"){
    const op=result as Operation;const kind=payload.action==="skillPackageDelete"?"delete":"export";
@@ -60,7 +70,7 @@ export function AgentSkillPackages({onChanged,initiallyExpanded=false}:{onChange
    if(payload.action==="skillPackageImport"&&value.skill.name!==preview?.skill.name)throw new Error("提交结果的方法名称不一致，待核对");accept(value);
   }
  }
- async function exportFolder(){if(blocked||!detail?.source)return;setError("");try{const directory=await open({directory:true,multiple:false,title:"选择导出父文件夹（新建方法子目录，不覆盖）"});if(alive.current&&typeof directory==="string")await mutate({action:"skillPackageExport",packageId:detail.source.packageId,expectedRevision:detail.source.revision,methodVersion:detail.methodVersion,directory});}catch(reason){if(alive.current)setError(String(reason));}}
+ async function exportFolder(){if(blocked||!detail?.source)return;setError("");try{const directory=await chooseDirectory("选择导出父文件夹（新建方法子目录，不覆盖）");if(alive.current&&typeof directory==="string")await mutate({action:"skillPackageExport",packageId:detail.source.packageId,expectedRevision:detail.source.revision,methodVersion:detail.methodVersion,directory});}catch(reason){if(alive.current)setError(String(reason));}}
  async function mutate(args:Record<string,unknown>,retry=false) {
   if(writing.current||(!retry&&uncertain))return;
   const payload=retry?pending.current:{...args,clientRequestId:crypto.randomUUID()};if(!payload)return;
@@ -75,7 +85,7 @@ export function AgentSkillPackages({onChanged,initiallyExpanded=false}:{onChange
  useEffect(()=>{if(initiallyExpanded){setBusy(true);void list().catch(reason=>{if(alive.current)setError(String(reason));}).finally(()=>{if(alive.current)setBusy(false);});}},[initiallyExpanded]);
  const dismissFile=()=>{setFile(null);fileReturn.current?.focus();};
  const active=detail?.source;
- return <section aria-label="方法包管理" style={{overflowWrap:"anywhere"}}>
+ return <section ref={panel} aria-label="方法包管理" style={{overflowWrap:"anywhere"}}>
   {!initiallyExpanded && <button type="button" ref={manager} aria-expanded={expanded} onClick={()=>void toggle()} disabled={busy}>管理方法包</button>}
   {expanded&&<div>
    <p className="agent-note">从包含 SKILL.md 的文件夹添加技能，检查后保存。已添加的技能可在下方查看版本、检查更新或导出。</p>
