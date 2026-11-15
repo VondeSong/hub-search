@@ -21,6 +21,7 @@ pub(crate) mod external;
 #[cfg(test)]
 mod flow_acceptance;
 mod guidance;
+pub(super) use guidance::project_request;
 mod input;
 mod late_steering;
 #[cfg(test)]
