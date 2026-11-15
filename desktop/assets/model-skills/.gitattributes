@@ -1,0 +1,2 @@
+# Fixed skill packages retain their original bytes, including intentional final blank lines.
+v1/record-to-log/** -text whitespace=-blank-at-eof
