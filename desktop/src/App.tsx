@@ -285,7 +285,7 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
   const { mcpUrl,setMcpUrl,craftApiUrl,setCraftApiUrl,craftApiKey,setCraftApiKey,obsidianPath,setObsidianPath,connectingAction,connectionError,setConnectionError,connectionErrorProvider,setConnectionErrorProvider,feishuAppId,setFeishuAppId,feishuAppSecret,setFeishuAppSecret,feishuAuthorization,setFeishuAuthorization,selectedFeishuSpaceIds,setSelectedFeishuSpaceIds,feishuBitableUrl,setFeishuBitableUrl,feishuBitableSourceId,setFeishuBitableSourceId,connect,saveCraftApiConnection,connectDida365,connectFeishu,addSelectedFeishuSpaces,addFeishuBitable,addObsidian } = useLibraryConnections({ ready, spaces, registryError, reloadSpaces, refreshStatus, libraryManagement, selectOnlyLibrary, selectLibraries, searchInput, showOperationStatus });
   const { editingExclusions,setEditingExclusions,exclusionDraft,setExclusionDraft,savingExclusions,renamingLibraryId,setRenamingLibraryId,libraryNameDraft,setLibraryNameDraft,iconCrop,setIconCrop,relocatingLibraryId,relocateObsidian,removeSpace,editExclusions,saveExclusions,updateLibraryIcon,resetLibraryIcon,beginRenameLibrary,saveLibraryName,commitLibraryIcon } = useManagedLibraryOperations({ libraryManagement, reloadSpaces, refreshStatus, removeLibrarySelection, setConnectionError, setConnectionErrorProvider, setMaintenanceMessage });
   useEffect(() => { if (connectionError) showOperationStatus(connectionError, "error", 10000); }, [connectionError, showOperationStatus]);
-  const { openFlashcards: openStandaloneFlashcards, closeFlashcards: closeStandaloneFlashcards, openPreview: openMobilePreview, closePreview: closeMobilePreview, bindRoute: bindMobileRoute, openRouteFromPreview } = useMobileOverlayHistory({
+  const { openFlashcards: openStandaloneFlashcards, closeFlashcards: closeStandaloneFlashcards, openPreview: openMobilePreview, closePreview: closeMobilePreview, bindRoute: bindMobileRoute, openRouteFromPreview, openRouteFromFlashcards } = useMobileOverlayHistory({
     enabled: isMobileLayout, filtersOpen, settingsOpen: showConnection, captureOpen: quickCaptureOpen, setCaptureOpen: setQuickCaptureOpen,
     setFiltersOpen, setSettingsOpen: setShowConnection, setPreviewOpen: setMobilePreviewOpen,
     setFlashcardsOpen: setFlashcardsStandaloneOpen, setSelectedTag: setSelectedSidebarTag,
@@ -909,7 +909,7 @@ useEffect(() => {
     setMobileBrowseOpen(route === "browse");
     setMobileAgentsOpen(route === "agents");
     setMobileConnectionsOpen(route === "connections");
-    if (route === "search" || route === "browse") selectDesktopSidebarView("home");
+    if (route === "search" || route === "browse" || route === "agents" || route === "connections") selectDesktopSidebarView("home");
     else if (route === "tasks" || route === "favorites" || route === "history" || route === "journals" || route === "tags" || route === "collections" || route === "insights") {
       selectDesktopSidebarView(route);
       if (route !== "tasks") setQuery("");
@@ -922,6 +922,7 @@ useEffect(() => {
   bindMobileRoute(applyMobileRoute);
 
   const pushMobileRoute = useCallback((route: string) => {
+    if (openRouteFromFlashcards(route)) return;
     if (window.history.state?.hubMobileRoute !== route) {
       if (window.history.state?.hubReadingPreview || window.history.state?.hubQuickCapture) {
         window.history.replaceState({ hubMobileRoute: route }, "");
@@ -930,7 +931,7 @@ useEffect(() => {
       }
     }
     applyMobileRoute(route);
-  }, [applyMobileRoute]);
+  }, [applyMobileRoute, openRouteFromFlashcards]);
 
   const navigateMobile = useCallback((destination: MobileDestination) => {
     if (destination === "review") {
