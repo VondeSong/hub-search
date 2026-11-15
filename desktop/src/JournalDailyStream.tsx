@@ -2,15 +2,16 @@ import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useJournalDailyData, type JournalDailyTaskEntry } from "./JournalDailyData";
-import { journalEntryTitle } from "./JournalPresentation";
 import { shiftJournalDay, type JournalViewStore } from "./JournalViews";
-import { cleanSearchSnippet } from "./ResultExcerpt";
 import { journalDateKey, journalDateLabel } from "./SearchWorkspacePresentation";
 import type { SearchResult } from "./SearchTypes";
 import { resolveTaskResult } from "./TaskWorkspaceResult";
 import { TaskStatusControl } from "./TaskStatusControl";
 import type { UnifiedTask } from "./TaskWorkspacePresentation";
 import { useJournalPage } from "./useJournalPage";
+import { JournalRecordCard } from "./JournalRecordCard";
+import { QuickJournalCard } from "./QuickJournal";
+import { journalDocumentKey,journalRecordMatches,journalIndexInView,useJournalRecords } from "./JournalRecords";
 import "./JournalDaily.css";
 
 /** Continuous civil dates include empty days and safely cross month/DST boundaries. */
@@ -31,10 +32,13 @@ type Props = {
   selectedKey: string; canCreate: boolean;
   onChoose: (date: string) => void; onPreview: (result: SearchResult) => void;
   onCreate?: (date: string) => void;
+  onOpen?: (entry:SearchResult)=>void;
 };
 
-export function JournalDailyStream({ store, today, scope, dataVersion, selectedKey, canCreate, onChoose, onPreview, onCreate }: Props) {
+export function JournalDailyStream({ store, today, scope, dataVersion, selectedKey, canCreate, onChoose, onPreview, onCreate, onOpen }: Props) {
   const { view } = store;
+  const records=useJournalRecords();
+  const quick=records.items.filter(item=>{const meta={id:item.record.id,date:item.record.date,libraryId:item.libraryId,hasAttachments:item.record.attachments.length>0,hasTags:/(?:^|\s)#[^\s#]+/u.test(item.body)};return journalIndexInView(meta,view,scope,false)&&journalRecordMatches(meta,view.recordFilter||"all",records.pins)&&`${item.body} ${item.record.attachments.map(a=>a.name).join(" ")}`.toLowerCase().includes(view.query.trim().toLowerCase());});
   const singleDay = view.period === "day";
   const requested = singleDay ? view.day : store.anchor || (view.month === today.slice(0, 7) ? today : `${view.month}-01`);
   const context = `${view.month}:${view.period}:${view.day}:${store.activeId}`;
@@ -54,11 +58,14 @@ export function JournalDailyStream({ store, today, scope, dataVersion, selectedK
   const grouped = useMemo(() => {
     const groups = new Map<string, SearchResult[]>();
     for (const entry of page.items) {
+      const meta=records.index.find(item=>item.id===journalDocumentKey(entry.libraryId,entry.documentId));
+      if(meta?.representedByQuick||meta?.matchesQuery===false)continue;
+      if(view.recordFilter&&view.recordFilter!=="all"&&(!meta||!journalRecordMatches(meta,view.recordFilter,records.pins)))continue;
       const date = journalDateKey(entry);
       if (date >= range.from && date < range.to) groups.set(date, [...(groups.get(date) || []), entry]);
     }
     return groups;
-  }, [page.items, range.from, range.to]);
+  }, [page.items, range.from, range.to,view.recordFilter,records.index,records.pins]);
   const [previewError, setPreviewError] = useState(""), [openingTask, setOpeningTask] = useState("");
   const [completedDate, setCompletedDate] = useState("");
   const completedDialog = useRef<HTMLDialogElement>(null), completedTrigger = useRef<HTMLButtonElement | null>(null);
@@ -140,13 +147,13 @@ export function JournalDailyStream({ store, today, scope, dataVersion, selectedK
       return <section key={date} className={`journal-daily-day ${date === today ? "is-today" : ""}`} data-journal-day={date} aria-label={journalDateLabel(date)}>
         <button className="journal-daily-date" aria-label={`选择 ${journalDateLabel(date)}`} aria-pressed={store.anchor === date} onClick={() => onChoose(date)}><span className="date-title">{Number(date.slice(5, 7))}月{Number(date.slice(8))}日</span>{relative && <span className="relative-day">{relative}</span>}<span className="weekday">星期{weekday}</span></button>
         <div className="journal-daily-content">
-          {!!entries.length && <div className="journal-daily-docs" aria-label="当天日志">{entries.map(entry => <button key={entry.entityKey} className={`journal-daily-document ${selectedKey === entry.entityKey ? "is-selected" : ""}`} disabled={page.loading} title={`${journalEntryTitle(entry)} · ${entry.libraryName}`} aria-label={`预览日志：${journalEntryTitle(entry)} · ${entry.libraryName}`} aria-pressed={selectedKey === entry.entityKey} onClick={() => onPreview(entry)}><span className="document-heading">{relative || `星期${weekday}`}</span>{view.summary && <span className="document-body">{cleanSearchSnippet(entry.snippet).replace(/^\d{4}[-.]\d{2}[-.]\d{2}\s*/, "") || "暂无正文摘要"}</span>}{view.source && <span className="document-library">{entry.libraryName}</span>}</button>)}</div>}
+          {(entries.length>0||quick.some(item=>item.record.date===date))&&<div className="journal-daily-records memo-embedded" aria-label="当天日志">{entries.map(entry=><JournalRecordCard key={entry.entityKey} entry={entry} summary={view.summary} source={view.source} onPreview={onPreview} onOpen={onOpen} selected={entry.entityKey===selectedKey} disabled={page.loading}/>)}{quick.filter(item=>item.record.date===date).map(item=><QuickJournalCard key={item.record.id} item={item} mobile={false} onPreview={onPreview} onTag={tag=>store.update({query:"#"+tag})}/>)}</div>}
           {hasTasks && <div className="journal-daily-tasks" aria-label="当天任务">
             {tasks.scheduled.map(entry => taskRow(entry, "scheduled"))}
             {!!tasks.created.length && <details className="journal-daily-created" open><summary><b>{tasks.created.length}</b>当天新建</summary>{tasks.created.map(entry => taskRow(entry, "created"))}</details>}
             {tasks.completed.length > 0 && <button type="button" className="journal-daily-completed-trigger" aria-haspopup="dialog" aria-expanded={completedDate === date} aria-label={`${tasks.completed.length} 已完成的任务 · ${journalDateLabel(date)}`} onClick={event => { completedTrigger.current = event.currentTarget; setCompletedDate(date); }}><b>{tasks.completed.length}</b><span>已完成的任务</span></button>}
           </div>}
-          {canCreate && onCreate && (store.anchor === date || (!entries.length && date === today)) && <button className="journal-daily-add" onClick={() => onCreate(date)}><Plus size={13}/>写日志</button>}
+          {canCreate && onCreate && <div className="journal-daily-actions"><button className="journal-daily-add" onClick={() => onCreate(date)}><Plus size={13}/>新建</button></div>}
         </div>
       </section>;
     })}

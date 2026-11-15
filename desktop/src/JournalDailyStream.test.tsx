@@ -81,7 +81,7 @@ afterEach(async () => {
 it("starts at today and preserves all seven empty date blocks without older logs or reading", async () => {
   logs = [journal("2026-10-12")]; await render();
   expect(rows()).toEqual(["2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19"]);
-  expect(container.querySelectorAll(".journal-daily-date")).toHaveLength(7); expect(container.querySelectorAll(".journal-daily-document")).toHaveLength(0);
+  expect(container.querySelectorAll(".journal-daily-date")).toHaveLength(7); expect(container.querySelectorAll(".journal-record-preview")).toHaveLength(0);
   expect(container.querySelector(".is-today .relative-day")?.textContent).toBe("今天");
   expect(day("2026-10-14").querySelector(".relative-day")?.textContent).toBe("明天");
   expect(container.textContent).not.toContain("更早的日志");
@@ -109,10 +109,10 @@ it("resets to an outside date or single-day filter while reusing the same tasks"
 });
 it("keeps multiple source journals independent and forwards preview and creation dates", async () => {
   logs = [journal("2026-10-13", "one"), { ...journal("2026-10-13", "two"), libraryId: "other", libraryName: "个人库" }];
-  await render(undefined, undefined, { canCreate: true }); expect(container.querySelectorAll(".journal-daily-document")).toHaveLength(2);
+  await render(undefined, undefined, { canCreate: true }); expect(container.querySelectorAll(".journal-record-preview")).toHaveLength(2);
   await click(ariaButton("预览日志：")); expect(preview.mock.calls[0][0]).toEqual(expect.objectContaining({ documentId: "one", libraryName: "日记库" }));
   await click(container.querySelector<HTMLButtonElement>(".journal-daily-date")!); expect(choose).toHaveBeenCalledWith("2026-10-13");
-  await render({ ...currentStore, anchor: "2026-10-13" }, undefined, { canCreate: true }); await click(button("写日志")); expect(create).toHaveBeenCalledWith("2026-10-13");
+  await render({ ...currentStore, anchor: "2026-10-13" }, undefined, { canCreate: true }); await click(button("新建")); expect(create).toHaveBeenCalledWith("2026-10-13");
 });
 it("separates today's arrangements, actual completions and new tasks without same-day duplicates", async () => {
   tasks = [
@@ -252,7 +252,7 @@ it("keeps the continuous calendar forward and exposes all four task inclusion ru
   await render(store({ ascending: false }), undefined, { scope: ["library"] });
   expect(rows()[0]).toBe("2026-10-13"); expect(rows()[1]).toBe("2026-10-14");
   expect(day().querySelector(".date-title")?.textContent).toBe("10月13日");
-  expect(day().querySelector(".document-heading")?.textContent).toBe("今天");
+  expect(day().querySelector(".journal-record-card>header")?.textContent).toContain("2026-10-13");
   expect(day().querySelector('[data-task-id="区间中的任务"] .task-library')?.textContent).toBe("工作清单");
   expect(day().querySelector('[data-task-id="区间中的任务"] button[aria-label^="查看任务"]')?.getAttribute("title")).toContain("进行中");
   expect(day().querySelector('[data-task-id="今天提醒"]')).not.toBeNull();
@@ -305,7 +305,7 @@ it("hides completion controls when today has only logs and open tasks", async ()
     task("未知完成日期", { status: "completed", completed: true })];
   await render();
   expect(day().querySelectorAll(".journal-daily-task")).toHaveLength(2);
-  expect(day().querySelector(".journal-daily-document")).not.toBeNull();
+  expect(day().querySelector(".journal-record-preview")).not.toBeNull();
   expect(day().querySelector(".journal-daily-completed-trigger")).toBeNull();
   expect(modal()).toBeNull();
 });

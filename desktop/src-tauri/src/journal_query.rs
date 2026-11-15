@@ -142,6 +142,7 @@ pub(crate) struct JournalSummary {
 pub(crate) struct JournalDate {
     pub date: String,
     pub sources: usize,
+    pub count: usize,
 }
 
 #[derive(Serialize)]
@@ -256,6 +257,52 @@ fn map_document(row: &rusqlite::Row<'_>) -> rusqlite::Result<crate::IndexedSearc
     })
 }
 
+fn record_has_attachments(markdown: &str) -> bool {
+    use pulldown_cmark::{Event, Tag, TagEnd};
+    let mut code = false;
+    for event in pulldown_cmark::Parser::new(markdown) {
+        match event {
+            Event::Start(Tag::CodeBlock(_)) => code = true,
+            Event::End(TagEnd::CodeBlock) => code = false,
+            Event::Start(Tag::Image { .. }) if !code => return true,
+            Event::Start(Tag::Link { dest_url, .. }) if !code => {
+                let target = dest_url.split(['?', '#']).next().unwrap_or("");
+                if let Some(ext) = Path::new(target).extension().and_then(|v| v.to_str()) {
+                    if !matches!(ext.to_ascii_lowercase().as_str(), "md" | "html" | "htm") {
+                        return true;
+                    }
+                }
+            }
+            Event::Text(text) if !code && text.contains("![[") => return true,
+            _ => {}
+        }
+    }
+    false
+}
+
+/// Only metadata crosses IPC; body inspection stays local and follows journal eligibility.
+pub(crate) fn record_index(
+    connection: &Connection,
+    scope: Vec<String>,
+    query: &str,
+) -> Result<serde_json::Value, String> {
+    if scope.is_empty() {
+        return Ok(serde_json::json!([]));
+    }
+    let filter = serde_json::to_string(&scope).map_err(|e| e.to_string())?;
+    let needle = query.trim().to_lowercase();
+    let known = crate::quick_journal::calendar::known_records(connection)?;
+    let empty = HashSet::new();
+    let mut query=connection.prepare(&format!("SELECT d.id,d.space_id,l.name,d.title,d.path,d.folder_id,d.modified_at,'',d.provider,COALESCE(d.markdown,'') FROM documents d JOIN libraries l ON l.id=d.space_id WHERE {FILTER}")).map_err(|e|e.to_string())?;
+    let rows=query.query_map([filter],|row|{
+  let id:String=row.get(0)?;let library:String=row.get(1)?;let markdown:String=row.get(9)?;let body=crate::quick_journal::calendar::source_body(&markdown,known.get(&library).unwrap_or(&empty));let removed=body!=markdown;let body=crate::obsidian_edit::split(&body).map(|(_,body)|body).unwrap_or(&body);let represented=body.trim().is_empty()||body.trim()==format!("# {}",row.get::<_,String>(3)?);
+  let has_attachments=record_has_attachments(body);
+  let has_tags=!crate::craft_markdown_tags(body).is_empty()||!crate::obsidian_markdown_tags(body).is_empty();
+  Ok(serde_json::json!({"id":serde_json::to_string(&[&library,&id]).unwrap(),"date":row.get::<_,String>(3)?.trim().replace('.',"-"),"libraryId":library,"documentId":id,"path":row.get::<_,String>(4)?,"preview":map_document(row)?,"hasAttachments":has_attachments,"hasTags":has_tags,"representedByQuick":represented&&removed,"matchesQuery":format!("{} {} {}",row.get::<_,String>(3)?,row.get::<_,String>(2)?,body).to_lowercase().contains(&needle)}))
+ }).map_err(|e|e.to_string())?.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())?;
+    Ok(serde_json::json!(rows))
+}
+
 pub(crate) fn summary(
     connection: &Connection,
     space_ids: Option<Vec<String>>,
@@ -295,7 +342,11 @@ pub(crate) fn summary(
     for row in rows {
         let (date, count, sources) = row.map_err(|error| format!("日志统计无法读取：{error}"))?;
         result.count += count;
-        result.dates.push(JournalDate { date, sources });
+        result.dates.push(JournalDate {
+            date,
+            sources,
+            count,
+        });
     }
     Ok(result)
 }
@@ -418,11 +469,13 @@ pub(crate) fn page(
     };
     let limit = options.limit.unwrap_or(200).clamp(1, 500) as i64;
     let offset = options.offset.unwrap_or(0).min(i64::MAX as usize) as i64;
+    let known = crate::quick_journal::calendar::known_records(&transaction)?;
+    let empty_known = HashSet::new();
     let items = {
         let mut statement = transaction
             .prepare(&format!(
                 "SELECT d.id,d.space_id,l.name,d.title,d.path,d.folder_id,d.modified_at,
-                        COALESCE(substr(d.markdown,1,1000),''),d.provider
+                        COALESCE(d.markdown,''),d.provider
                  FROM documents d JOIN libraries l ON l.id=d.space_id WHERE {clause}
                  ORDER BY {sort} {direction},replace(trim(d.title),'.','-') {direction},
                           d.space_id,d.id LIMIT ?5 OFFSET ?6"
@@ -430,7 +483,14 @@ pub(crate) fn page(
             .map_err(|error| format!("无法准备日志页面查询：{error}"))?;
         let rows = statement
             .query_map(params![filter, from, to, query, limit, offset], |row| {
-                let item = map_document(row)?;
+                let mut item = map_document(row)?;
+                item.snippet = crate::quick_journal::calendar::source_body(
+                    &item.snippet,
+                    known.get(&item.space_id).unwrap_or(&empty_known),
+                )
+                .chars()
+                .take(1000)
+                .collect();
                 let journal_date = item.title.trim().replace('.', "-");
                 Ok(JournalRecord { item, journal_date })
             })
@@ -509,6 +569,63 @@ mod tests {
             "SELECT COALESCE((SELECT value FROM metadata WHERE key='journal_document_revision:' || ?1),'0')",
             params![library], |row| row.get(0),
         ).unwrap()
+    }
+
+    #[test]
+    fn calendar_attachment_filter_ignores_links_and_fenced_examples() {
+        assert!(!record_has_attachments(
+            "[网页](https://example.com/page)\n[笔记](note.md)\n```md\n![示例](photo.png)\n```"
+        ));
+        assert!(record_has_attachments("[文件](<folder/file.pdf>)"));
+        assert!(record_has_attachments(
+            "![照片](https://example.com/photo.png)"
+        ));
+    }
+
+    #[test]
+    fn calendar_index_does_not_count_a_known_record_container_twice() {
+        let c = revision_fixture();
+        let id = "a".repeat(32);
+        c.execute_batch(
+            "CREATE TABLE quick_journal_records(id TEXT,library_id TEXT,applied INTEGER)",
+        )
+        .unwrap();
+        c.execute("INSERT INTO quick_journal_records VALUES(?1,'b',1)", [&id])
+            .unwrap();
+        let body=format!("# 2026-11-15\n\n<!-- hub-journal:v1 begin {id} -->\n#记录\n<!-- hub-journal:v1 end {id} -->\n");
+        insert_record(&c, "b", "quick", "2026-11-15", &body, 1);
+        let rows = record_index(&c, vec!["b".into()], "").unwrap();
+        assert_eq!(rows[0]["representedByQuick"], true);
+        c.execute(
+            "UPDATE documents SET markdown=?1 WHERE id='quick'",
+            [format!("独立正文\n\n{body}")],
+        )
+        .unwrap();
+        let rows = record_index(&c, vec!["b".into()], "").unwrap();
+        assert_eq!(rows[0]["representedByQuick"], false);
+        assert_eq!(rows[0]["hasTags"], false);
+    }
+
+    #[test]
+    fn calendar_index_uses_full_bodies_and_excludes_unselected_libraries() {
+        let c = revision_fixture();
+        insert_record(
+            &c,
+            "a",
+            "tagged",
+            "2026-11-15",
+            &format!("{}\n#真实标签\n![照片](photo.png)", "正文".repeat(1200)),
+            1,
+        );
+        insert_record(&c, "b", "private", "2026-11-15", "私人", 1);
+        let result = record_index(&c, vec!["a".into()], "").unwrap();
+        let rows = result.as_array().unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["hasTags"], true);
+        assert_eq!(rows[0]["hasAttachments"], true);
+        assert_eq!(rows[0]["preview"]["snippet"], "");
+        assert_eq!(rows[0]["date"], "2026-11-15");
+        assert_eq!(record_index(&c, vec![], "").unwrap(), serde_json::json!([]));
     }
 
     #[test]
@@ -1389,20 +1506,19 @@ mod tests {
         insert_record(&reader, "a", "old", "2026-10-13", "old body", 1);
         let before = page(&database, &reader, None, PageOptions::default()).unwrap();
         let writer = Connection::open(&database).unwrap();
-        let mut wrote = false;
-        // Preparing the item query happens after the version and statistics have
-        // been read. Commit a producer update at that exact boundary.
+        let mut searches = 0;
+        // The second text predicate is prepared for items, after revision/statistics.
         reader.authorizer(Some(move |context: AuthContext<'_>| {
-            if !wrote
-                && matches!(
-                    context.action,
-                    AuthAction::Function {
-                        function_name: "substr"
-                    }
-                )
-            {
-                insert_record(&writer, "a", "new", "2026-10-14", "new body", 1);
-                wrote = true;
+            if matches!(
+                context.action,
+                AuthAction::Function {
+                    function_name: "journal_text_contains"
+                }
+            ) {
+                searches += 1;
+                if searches == 2 {
+                    insert_record(&writer, "a", "new", "2026-10-14", "new body", 1);
+                }
             }
             Authorization::Allow
         }));
