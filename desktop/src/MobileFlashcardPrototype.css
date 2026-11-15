@@ -1,0 +1,103 @@
+/* Mobile Site v10: use the existing phone tokens, with its measured layout. */
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android) {
+  grid-template-rows: auto minmax(0,1fr) calc(74px + env(safe-area-inset-bottom,0px));
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android) > .main-content-override {
+  grid-row: 2; height: auto; min-height: 0; padding-bottom: 0;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android) > .footer-bar { display: block; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android:is(.is-reviewing,.mobile-page-deck,.mobile-page-stats)) > .mobile-hub-header { display: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android.is-reviewing) { grid-template-rows: minmax(0,1fr); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android.is-reviewing) > .main-content-override { grid-row: 1; height: 100%; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android.is-reviewing) > .footer-bar { display: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android {
+  height: 100%; background: var(--mobile-surface); color: var(--mobile-ink);
+  --flashcards-text: var(--mobile-ink); --flashcards-secondary: var(--mobile-secondary);
+  --flashcards-canvas: var(--mobile-surface); --flashcards-action: var(--mobile-accent);
+  --flashcards-hairline: var(--mobile-separator);
+}
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android:not(.is-reviewing) .flashcards-main,
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android.mobile-page-library .flashcards-decks {
+  height: 100%; box-sizing: border-box; overflow-y: auto; padding: 9px 20px 32px;
+  background: var(--mobile-surface); scrollbar-gutter: auto;
+}
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-main-inbox { display: block; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcards-main.flashcards-main-inbox { display: block; height: 100%; overflow-y: auto; padding: 9px 20px 32px; }
+.mobile-flashcard-intro { margin: 0; padding: 0; }
+.mobile-flashcard-intro h1,.mobile-flashcard-study-intro h1 { margin: 0; font-size: 30px; line-height: 1.25; font-weight: 700; letter-spacing: -.025em; color: var(--mobile-ink); }
+.mobile-flashcard-intro > p,.mobile-flashcard-study-intro > p { margin: 9px 0 0; font-size: 14px; line-height: 1.65; color: var(--mobile-secondary); }
+.mobile-flashcard-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 2px 0 12px; }
+.mobile-flashcard-tabs button { min-height: 48px; padding: 10px 12px; border: 1px solid transparent; border-radius: 14px; background: transparent; color: var(--mobile-secondary); font: inherit; font-size: 13px; line-height: 1.5; font-weight: 550; }
+.mobile-flashcard-tabs button[aria-pressed="true"] { background: var(--mobile-selected); color: var(--mobile-accent); }
+.mobile-flashcard-today { margin: 24px 0; }
+.mobile-flashcard-today > div { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.mobile-flashcard-today h2,.mobile-flashcard-section > h2,.mobile-flashcard-face-label { margin: 0; font-size: 19px; line-height: 1.4; font-weight: 650; color: var(--mobile-ink); }
+.mobile-flashcard-today p { margin: 0; color: var(--mobile-secondary); font-size: 12px; line-height: 1.65; }
+.mobile-flashcard-primary { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; box-sizing: border-box; margin-top: 18px; padding: 12px 16px; border: 0; border-radius: 14px; background: var(--mobile-accent); color: #fff; font: inherit; font-size: 14px; font-weight: 600; line-height: 1.5; }
+.mobile-flashcard-primary:disabled { opacity: .5; }
+.mobile-flashcard-today > small { display: block; margin-top: 8px; font-size: 12px; line-height: 1.65; color: var(--mobile-secondary); }
+.mobile-flashcard-section { margin-top: 28px; }
+.mobile-flashcard-section > h2 { margin-bottom: 10px; }
+.mobile-flashcard-group { min-width: 0; overflow: hidden; border-radius: 20px; background: var(--mobile-fill); }
+.mobile-flashcard-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 76px; box-sizing: border-box; border: 0; padding: 16px; background: transparent; color: var(--mobile-ink); text-align: left; font: inherit; }
+.mobile-flashcard-row + .mobile-flashcard-row { border-top: 1px solid color-mix(in srgb,var(--mobile-separator) 55%,transparent); }
+.mobile-flashcard-row > span:not(.mobile-flashcard-tile) { flex: 1; min-width: 0; }
+.mobile-flashcard-row strong { display: block; font-size: 16px; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; }
+.mobile-flashcard-row small { display: block; margin-top: 5px; color: var(--mobile-secondary); font-size: 13px; line-height: 1.65; }
+.mobile-flashcard-row > svg { flex-shrink: 0; color: var(--mobile-secondary); }
+.mobile-flashcard-tile { display: grid; place-items: center; flex: 0 0 35px; width: 35px; height: 35px; border-radius: 11px; background: var(--mobile-selected); color: var(--mobile-accent); }
+.mobile-flashcard-empty { margin: 0; padding: 16px; color: var(--mobile-secondary); font-size: 14px; line-height: 1.65; }
+.mobile-flashcard-more { margin: 24px 0 0; font-size: 14px; line-height: 1.65; color: var(--mobile-secondary); }
+.mobile-flashcard-more > summary { min-height: 48px; align-content: center; cursor: pointer; color: var(--mobile-accent); }
+.mobile-flashcard-more .flashcard-review-preferences { margin-block: 12px; }
+.mobile-flashcard-more select { min-height: 44px; margin: 6px 12px; font: inherit; }
+.mobile-flashcard-end-round { min-height: 44px; border: 1px solid var(--mobile-separator); border-radius: 14px; padding: 8px 16px; background: var(--mobile-surface); color: var(--mobile-secondary); font: inherit; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcard-inbox { display: block; min-height: 0; overflow: visible; padding: 0; background: var(--mobile-surface); }
+.mobile-flashcard-inbox-note { color: var(--mobile-secondary); font-size: 12px; line-height: 1.65; margin: 12px 0 0; }
+.mobile-flashcard-inbox-tools,.mobile-flashcard-inbox-source { min-height: 48px; padding: 8px 0; border: 0; background: transparent; color: var(--mobile-accent); font: inherit; font-size: 14px; text-align: left; }
+.mobile-flashcard-inbox-cards { display: grid; gap: 16px; }
+.mobile-flashcard-inbox-cards > article { padding: 20px; border-radius: 20px; background: var(--mobile-fill); }
+.mobile-flashcard-inbox-cards h2 { margin: 0; font-size: 19px; line-height: 1.4; color: var(--mobile-ink); overflow-wrap: anywhere; }
+.mobile-flashcard-inbox-cards p { font-size: 14px; line-height: 1.75; color: var(--mobile-ink); overflow-wrap: anywhere; }
+.mobile-flashcard-inbox-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.mobile-flashcard-inbox-actions .mobile-flashcard-primary { width: auto; margin: 0; }
+.mobile-flashcard-inbox-actions > button:not(.mobile-flashcard-primary) { min-height: 48px; border: 0; padding: 8px; background: transparent; color: var(--mobile-accent); font: inherit; font-size: 14px; }
+html[data-runtime-platform="android"] .flashcard-inbox.mobile-inbox-mode-cards .flashcard-inbox-workbench,
+html[data-runtime-platform="android"] .flashcard-inbox.mobile-inbox-mode-cards .flashcard-inbox-toolbar > :not(.flashcard-inbox-popover-wrap),
+html[data-runtime-platform="android"] .flashcard-inbox.mobile-inbox-mode-cards .flashcard-inbox-move-trigger { display: none; }
+html[data-runtime-platform="android"] .flashcard-inbox.mobile-inbox-mode-cards .flashcard-inbox-toolbar,
+html[data-runtime-platform="android"] .flashcard-inbox.mobile-inbox-mode-cards .flashcard-inbox-popover-wrap { display: contents; }
+html[data-runtime-platform="android"] .flashcard-inbox.mobile-inbox-mode-cards .flashcard-inbox-move-popover { position: fixed; z-index: 1800; top: 20%; left: 20px; right: 20px; width: auto; max-height: 65dvh; overflow-y: auto; background: var(--mobile-surface); color: var(--mobile-ink); }
+html[data-runtime-platform="android"] .flashcard-inbox.mobile-inbox-mode-detail .flashcard-inbox-toolbar,
+html[data-runtime-platform="android"] .flashcard-inbox.mobile-inbox-mode-detail .flashcard-inbox-queue,
+html[data-runtime-platform="android"] .flashcard-inbox.mobile-inbox-mode-detail .flashcard-inbox-divider { display: none; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcard-inbox.mobile-inbox-mode-detail .flashcard-inbox-workbench { display: block; height: auto; overflow: visible; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcard-inbox.mobile-inbox-mode-detail .flashcard-inbox-detail { max-height: none; overflow: visible; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .mobile-flashcard-deck-management .flashcards-mobile-library-intro { display: block; padding: 0; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android.is-reviewing .flashcards-main { overflow-y: auto; padding: 0; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android.is-reviewing .flashcards-review { display: block; height: auto; min-height: 100%; box-sizing: border-box; padding: 9px 20px 40px; background: var(--mobile-surface); }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review-progress { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; min-height: calc(58px + env(safe-area-inset-top,0px)); height: auto; box-sizing: border-box; margin: -9px -20px 0; padding: env(safe-area-inset-top,0px) 20px 0; border: 0; background: var(--mobile-surface); }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review-progress > button { display: inline-flex; align-items: center; justify-self: start; gap: 4px; width: auto; min-width: 0; min-height: 48px; padding: 0; border: 0; background: transparent; color: var(--mobile-accent); font-size: 13px; white-space: nowrap; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review-progress > span { color: var(--mobile-secondary); font-size: 14px; font-weight: 600; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review-progress > small { justify-self: end; font-size: 12px; color: var(--mobile-secondary); }
+.mobile-flashcard-study-intro { margin-top: 9px; }
+.mobile-flashcard-face-label { margin: 28px 0 10px; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review-card { display: flex; flex-direction: column; justify-content: center; align-items: stretch; gap: 22px; min-height: 300px; box-sizing: border-box; overflow: visible; padding: 29px 24px; border: 0; border-radius: 24px; background: var(--mobile-fill); box-shadow: none; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review-card > small { align-self: flex-start; width: auto; margin: 0; padding: 4px 8px; border-radius: 7px; background: var(--mobile-selected); color: var(--mobile-accent); font-size: 12px; line-height: 1.4; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review-card > small::before { display: none; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review-card h2,
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-answer > p { margin: 0; font-size: 21px; line-height: 1.7; letter-spacing: -.01em; font-weight: 400; color: var(--mobile-ink); overflow-wrap: anywhere; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review-card.revealed:is([data-card-type="qa"],[data-card-type="cloze"],[data-card-type="typed_answer"]) > h2 { display: none; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review-card .flashcards-answer { margin: 0; padding: 0; border: 0; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-answer-label,
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-mobile-reveal-hint { display: none; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review > .flashcards-ratings { position: static; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; width: auto; margin: 18px 0 8px; padding: 0; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-ratings > button { min-height: 66px; padding: 12px 16px; border: 1px solid var(--mobile-separator); border-radius: 14px; background: var(--mobile-surface); color: var(--mobile-ink); font-size: 14px; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-ratings > button small { color: var(--mobile-secondary); font-size: 12px; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review > .flashcards-reveal { position: static; width: auto; min-height: 48px; margin: 20px 0 0; padding: 12px 16px; border-radius: 14px; background: var(--mobile-accent); color: #fff; font-size: 14px; }
+.mobile-flashcard-review-source .mobile-flashcard-group { padding: 16px; font-size: 14px; line-height: 1.65; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .mobile-flashcard-more .flashcards-review-actions { display: flex; flex-wrap: wrap; margin: 0; }
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .mobile-flashcard-more .flashcards-review-actions button { flex: 1 1 40%; min-height: 48px; justify-content: flex-start; }
+@media (max-height: 700px) {
+  html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review-card { min-height: 225px; }
+}

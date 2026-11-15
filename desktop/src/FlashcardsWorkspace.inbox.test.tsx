@@ -4,7 +4,7 @@ import { flashcardPageFixture, flashcardReviewPlanFixture } from "./FlashcardQue
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FlashcardDeckSummary, FlashcardDraft } from "./FlashcardTypes";
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
@@ -12,6 +12,9 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 const notices = vi.fn();
 
 import { FlashcardsWorkspace } from "./FlashcardsWorkspace";
+
+// Prepare the real lazy reader outside the interaction timer (math/Markdown).
+beforeAll(async () => { await import("./FlashcardInbox"); });
 
 const decks: FlashcardDeckSummary[] = [
   { id: "deck-energy", name: "能量链", cardCount: 0, dueCount: 0, newCount: 0, updatedAt: 1 },
@@ -427,6 +430,36 @@ describe("FlashcardsWorkspace inbox", () => {
     expect(resizeHandle()!.hidden).toBe(true);
     expect(resizeHandle()!.tabIndex).toBe(-1);
     expect(detail().textContent).toContain(firstDraft.question);
+  });
+
+  it("shows mobile draft cards and accepts only the chosen card after selecting a real target deck", async () => {
+    document.documentElement.dataset.runtimePlatform = "android";
+    await openInbox();
+    const cards = host.querySelectorAll<HTMLElement>(".mobile-flashcard-inbox-cards > article");
+    expect(cards).toHaveLength(3);
+    expect(cards[0].textContent).toContain(firstDraft.answer);
+    await act(async () => button(cards[0], "加入牌库").click());
+    await settle();
+    expect(resolutionCalls()).toHaveLength(0);
+    expect(host.querySelector('[aria-label="选择目标牌组"]')).not.toBeNull();
+    await act(async () => button(host.querySelector('[aria-label="选择目标牌组"]')!, decks[1].name).click());
+    await settle();
+    expect(resolutionCalls()).toEqual([["resolve_flashcard_drafts", {
+      draftIds: [firstDraft.id], accept: true, targetDeckId: decks[1].id,
+    }]]);
+    expect(host.querySelectorAll(".mobile-flashcard-inbox-cards > article")).toHaveLength(2);
+  });
+
+  it("opens the full mobile draft reader and returns without resolving or changing the draft", async () => {
+    document.documentElement.dataset.runtimePlatform = "android";
+    await openInbox();
+    const card = host.querySelector<HTMLElement>(".mobile-flashcard-inbox-cards > article")!;
+    await act(async () => button(card, "查看详情").click());
+    expect(host.querySelector(".mobile-inbox-mode-detail")).not.toBeNull();
+    expect(detail().textContent).toContain(firstDraft.evidence.replace(/\*/g, ""));
+    await act(async () => button(host, "返回草稿卡片").click());
+    expect(host.querySelector(".mobile-inbox-mode-cards")).not.toBeNull();
+    expect(resolutionCalls()).toHaveLength(0);
   });
 
   it("selects only visible search results and moves exactly those drafts into the chosen deck", async () => {
