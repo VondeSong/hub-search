@@ -117,6 +117,8 @@ class AppServer:
         self.process.stdout.close()
 
     def run(self, workspace, thread, prompt, images, save_thread, save_output, cancelled, account_status, skill=None):
+        execution = [f"云端已准备 {len(images)} 张选定图片。"] if images else ["云端已收到本轮文字。"]
+        save_output("", [], execution.copy())
         self.rpc("initialize", {"clientInfo": {"name": "hub_cloud_agents", "version": "1.0"}})
         self.send({"method": "initialized", "params": {}})
         account = (self.rpc("account/read", {"refreshToken": False}).get("account") or {})
@@ -126,6 +128,8 @@ class AppServer:
 
         status = {"state": "ready", "plan": account.get("planType")}
         account_status(status)
+        execution.append("已连接 Codex，并确认订阅登录。")
+        save_output("", [], execution.copy())
         try:
             limits = self.rpc("account/rateLimits/read", timeout=5).get("rateLimits") or {}
             status["limits"] = [
@@ -156,6 +160,8 @@ class AppServer:
             raise CodexError("runtime", "Codex 返回的会话与记录不一致。")
         save_thread(thread_id)
         account_status({**status, "model": started.get("model")})
+        execution.append("已恢复原对话。" if thread else "已建立本次对话。")
+        save_output("", [], execution.copy())
 
         if cancelled():
             return "stopped", ""
@@ -167,7 +173,10 @@ class AppServer:
             if seconds is not None:
                 inputs.append({"type": "text", "text": f"下面的关键帧取自视频 {seconds:.2f} 秒。"})
             inputs.append({"type": "localImage", "path": str(path)})
-        turn = self.rpc("turn/start", {"threadId": thread_id, "input": inputs}, keep_events=True)["turn"]["id"]
+        # Ask per turn; the selected runtime may still omit public summaries.
+        turn = self.rpc("turn/start", {"threadId": thread_id, "input": inputs, "summary": "detailed"}, keep_events=True)["turn"]["id"]
+        execution.append("Codex 已接收本轮请求。")
+        save_output("", [], execution.copy())
         pieces = {}
         commentary = {}
         summaries = {}
@@ -180,7 +189,7 @@ class AppServer:
         def publish():
             answer = final if final is not None else "".join(pieces.values())[:200000]
             summary = [part for sections in summaries.values() for _, part in sorted(sections.items()) if part.strip()]
-            save_output(answer, summary[:12], [part for part in commentary.values() if part.strip()][:8])
+            save_output(answer, summary[:12], execution + [part for part in commentary.values() if part.strip()][:8])
             return answer
 
         while time.monotonic() < deadline:

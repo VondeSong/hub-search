@@ -57,6 +57,7 @@ for line in sys.stdin:
         assert params["config"]["model_reasoning_summary"] == "detailed"
         result = {"thread":{"id":"native-thread"},"model":"test-model"}
     if method == "turn/start":
+        assert params.get("summary") == "detailed"
         assert params["threadId"] == "native-thread"
         inputs = params["input"]
         for image in (v for v in inputs if v["type"]=="localImage"):
@@ -172,7 +173,11 @@ class GatewayTest(unittest.TestCase):
                     turn, = reply["thread"]["turns"]
                     self.assertEqual(turn["answer"], "收到：照片")
                     self.assertEqual(turn["progress"]["summary"], ["根据图片回答。"])
-                    self.assertEqual(turn["progress"]["updates"], ["已读取图片。"])
+                    self.assertEqual(turn["progress"]["updates"], [
+                        "云端已准备 1 张选定图片。", "已连接 Codex，并确认订阅登录。",
+                        "已建立本次对话。", "Codex 已接收本轮请求。",
+                        "已读取图片。",
+                    ])
                     self.assertGreaterEqual(turn["progress"]["finishedAt"], turn["progress"]["startedAt"])
                     self.assertNotIn("PRIVATE_REASONING", str(turn))
                     self.assertNotIn("OTHER_TURN", str(turn))
@@ -212,7 +217,13 @@ class GatewayTest(unittest.TestCase):
                     continuation = {"text": "继续技能", "attachments": []}
                     self.assertEqual(call("POST", five, {**continuation, "skill": identify({**skill, "version": "method-" + "b" * 64})})[0], 409)
                     self.assertEqual(call("POST", five, continuation)[0], 202)
-                    self.assertEqual(wait_for(thread, "completed")["thread"]["turns"][-1]["answer"], "收到：继续技能")
+                    continued = wait_for(thread, "completed")["thread"]["turns"][-1]
+                    self.assertEqual(continued["answer"], "收到：继续技能")
+                    self.assertEqual(continued["progress"]["summary"], [])
+                    self.assertEqual(continued["progress"]["updates"], [
+                        "云端已收到本轮文字。", "已连接 Codex，并确认订阅登录。",
+                        "已恢复原对话。", "Codex 已接收本轮请求。",
+                    ])
                     with closing(store.connect()) as db, db:
                         db.execute("DELETE FROM devices WHERE id='phone'")
                     self.assertEqual(call("GET", thread)[0], 403)
