@@ -25,4 +25,9 @@ describe("preview controller policy", () => {
     expect(mcpToolText({ content: [{ type: "text", text: "第一段" }, { type: "image" }, { type: "text", text: "第二段" }] }))
       .toBe("第一段\n第二段");
   });
+
+  it("invalidates extracted file text even when the parent document timestamp is unchanged", () => {
+    const file = { ...result, contentType: "file_attachment", sourceItemId: "source-1", id: "source-1:file:version-1:0" };
+    expect(previewDocumentKey({ ...file, id: "source-1:file:version-2:0" })).not.toBe(previewDocumentKey(file));
+  });
 });

@@ -130,6 +130,13 @@ it("does not let a late image response replace another attachment on the same pa
   expect(container.textContent).toBe("current image");
 });
 
+it("keeps an expired extracted attachment error instead of replacing it with the parent Craft page", async () => {
+  vi.mocked(invoke).mockRejectedValue(new Error("附件预览已过期"));
+  await act(async () => root.render(<MediaProbe result={media("source:file:v1:old:0", "file_attachment")} />));
+  expect(container.textContent).toContain("附件预览已过期");
+  expect(vi.mocked(invoke).mock.calls.some(call => call[0] === "craft_read")).toBe(false);
+});
+
 it("queues only the latest PDF page and starts a new result at its own search page",async()=>{
   let finishOld!:(value:unknown)=>void;
   vi.mocked(invoke).mockImplementation((command,args)=>{
