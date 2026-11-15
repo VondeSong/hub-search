@@ -15,7 +15,7 @@ async function mount(notes=[current]){await act(async()=>root.render(<InsightHis
 async function open(){await act(async()=>{host.querySelector('details')!.open=true;host.querySelector('details')!.dispatchEvent(new Event('toggle'));});}
 async function search(){await open();await act(async()=>host.querySelector<HTMLInputElement>('fieldset input')!.click());await act(async()=>button('查找可能相关的旧资料').click());}
 beforeEach(()=>{Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});host=document.createElement('div');document.body.append(host);root=createRoot(host);add.mockClear();preview.mockClear();listeners.clear();invoke.mockReset();invoke.mockImplementation(async(_,{args})=>{
- if(args.action==='insightHistoryLibraries')return {libraries:[{libraryId:'history',name:'历史库'}]};
+ if(args.action==='insightHistoryLibraries')return {libraries:[{libraryId:'history',state:'idle',name:'历史库'}]};
  if(args.action==='insightHistorySearch')return {candidates:[candidate],queries:['小样'],limitReached:false,unavailableCandidates:0};
  if(args.action==='insightDiscoveryPreview')return {content:'先核对小样'};
  throw Error(args.action);
@@ -29,6 +29,18 @@ it('ignores the native automatic-backup tick while still treating source or unkn
  expect(insightSourceChanged('library-runtime-updated',null)).toBe(true);
  expect(insightSourceChanged('data-portability-updated',undefined)).toBe(true);
  expect(insightSourceChanged('data-portability-updated',{action:'restore'})).toBe(true);
+});
+it('keeps candidates during another library sync but invalidates current or allowed history changes',async()=>{
+ await mount();await search();const before=invoke.mock.calls.length;
+ await act(async()=>listeners.get('library-runtime-updated')?.({payload:{libraryId:'unrelated',state:'idle'}}));
+ expect(host.textContent).toContain('旧方法');expect(invoke.mock.calls.length).toBe(before);
+ await act(async()=>listeners.get('library-runtime-updated')?.({payload:{libraryId:'history',state:'idle'}}));
+ expect(host.textContent).not.toContain('旧方法');expect(host.querySelector<HTMLInputElement>('fieldset input')?.checked).toBe(true);
+ expect(insightSourceChanged('library-runtime-updated',{libraryId:'current'},['current','history'])).toBe(true);
+ expect(insightSourceChanged('library-runtime-updated',{libraryId:'unrelated',state:'idle'},[])).toBe(true);
+ expect(insightSourceChanged('library-registry-updated',{libraryId:'unrelated',state:'idle'},['current'])).toBe(true);
+ expect(insightSourceChanged('library-runtime-updated',{libraryId:'unrelated',state:'removed'},['current'])).toBe(true);
+ expect(insightSourceChanged('library-runtime-updated',{libraryId:'unrelated'},['current'])).toBe(true);
 });
 it('requires explicit library choice, previews and version-checks only the selected addition without running a model',async()=>{
  await mount();await open();expect(button('查找可能相关的旧资料').disabled).toBe(true);

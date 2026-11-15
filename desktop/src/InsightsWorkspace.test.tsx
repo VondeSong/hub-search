@@ -64,6 +64,28 @@ it("opens the same original Work and rechecks a citation before showing its sour
  await click("返回回答");await click("原事项");expect(openWork).toHaveBeenCalledWith({workId:"work-a"});expect(document.querySelector('dialog[aria-label="发现与依据"]')).toBeNull();
 });
 
+it("preserves an explicitly selected historical revision across focus revalidation",async()=>{
+ store.items[0].headRevision=3;await mount();await click('查看发现');
+ const select=document.querySelector<HTMLSelectElement>('select[aria-label="查看内容版本"]')!;
+ await act(async()=>{select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));});
+ vi.useFakeTimers();await act(async()=>window.dispatchEvent(new Event('focus')));
+ await act(async()=>vi.advanceTimersByTimeAsync(160));
+ const request=invoke.mock.calls.filter(([,v])=>v.args.action==='insightDetail').slice(-1)[0][1].args;
+ expect(request.revision).toBe(1);expect(document.querySelector<HTMLSelectElement>('select[aria-label="查看内容版本"]')!.value).toBe('1');
+});
+
+it("returns to the current revision after reconciling a committed write with a lost reply",async()=>{
+ store.items[0].headRevision=3;store.lostReply=true;await mount();
+ await act(async()=>host.querySelector<HTMLButtonElement>('button[aria-label="列表与详情"]')!.click());
+ await click('查看发现');const select=document.querySelector<HTMLSelectElement>('select[aria-label="查看内容版本"]')!;
+ await act(async()=>{select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));});
+ const action=[...host.querySelectorAll<HTMLButtonElement>('.insights-card-menu button')].find(b=>b.textContent==='已处理')!;
+ await act(async()=>action.click());await click('核对提交结果');
+ vi.useFakeTimers();await act(async()=>window.dispatchEvent(new Event('focus')));await act(async()=>vi.advanceTimersByTimeAsync(160));
+ const request=invoke.mock.calls.filter(([,v])=>v.args.action==='insightDetail').slice(-1)[0][1].args;
+ expect(request.revision).toBeUndefined();expect(document.querySelector<HTMLSelectElement>('select[aria-label="查看内容版本"]')!.value).toBe('3');
+});
+
 it("requires source confirmation before saving a selected structured candidate",async()=>{
  await mount();await click("从已有分析导入");
  const save=button("保存所选发现");expect(save.disabled).toBe(true);
@@ -294,6 +316,14 @@ it("renders native finding emphasis without exposing markdown markers or loading
  store.items[0].snapshot!.text="**明确的标题。** 保留条件与原文。 ![远程图片](https://fixture.invalid/track.png)";
  await mount();expect(host.querySelector('.insights-card h2')!.textContent).toBe("明确的标题。");
  await click("查看发现");expect(document.querySelector('.insights-finding-text strong')!.textContent).toBe("明确的标题。");expect(document.querySelector('.insights-finding-text img')).toBeNull();expect(document.querySelector('.insights-finding-text')!.textContent).not.toContain("**");
+});
+
+it("uses the finding body for a sectioned card heading without changing the stored content",async()=>{
+ const raw="## 发现\n\n先核对常用目录的深度。模板是理想目标，工程笔记给出了常用工作区建议。\n\n## 适用条件\n\n用于日常工作区。";
+ store.items[0].snapshot!.text=raw;await mount();
+ expect(host.querySelector('.insights-card h2')!.textContent).toBe("先核对常用目录的深度。");
+ expect(host.querySelector('.insights-card-summary')!.textContent).toContain("模板是理想目标");
+ expect(store.items[0].snapshot!.text).toBe(raw);
 });
 
 it("preserves card menu identity during focus refresh while hiding stale evidence",async()=>{

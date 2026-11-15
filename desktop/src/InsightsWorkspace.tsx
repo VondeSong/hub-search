@@ -9,6 +9,7 @@ import {StageReview} from "./StageReview";
 import {InsightRecall} from "./InsightRecall";
 import {InsightDiscovery} from "./InsightDiscovery";
 import {InsightMethods} from "./InsightMethods";
+import {findingSections} from "./InsightFindingText";
 import type {Insight,InsightCandidates,InsightDelivery,InsightEvent,InsightSource} from "./InsightTypes";
 import type {WorkSummary} from "./AgentConversationHistoryData";
 import {AgentPanelContext} from "./StandaloneAgentLauncher";
@@ -129,11 +130,12 @@ function eventLabel(event:InsightEvent){const labels:Record<string,string>={cont
 
 // Presentation only: shorten the heading without changing the saved finding or its evidence.
 function findingPreview(text:string){
+ text=findingSections(text).body;
  const heading=text.match(/^\*\*(.+?[。！？])\*\*\s*/u);
  if(heading)return {title:heading[1],body:text.slice(heading[0].length).trim()};
  const firstLine=text.split(/\n/)[0].trim();
  const sentence=firstLine.match(/^.{1,90}?[。！？](?:[”’」』])?/u)?.[0];
- const title=firstLine.length<=90?firstLine:sentence??`${firstLine.slice(0,72)}…`;
+ const title=sentence??(firstLine.length<=90?firstLine:`${firstLine.slice(0,72)}…`);
  const rest=text.startsWith(title)?text.slice(title.length).trim():text;
  return {title,body:rest};
 }

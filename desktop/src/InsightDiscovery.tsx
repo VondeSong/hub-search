@@ -43,6 +43,9 @@ export function InsightDiscovery({data,target,onOpenWork,onView}:{data:ReturnTyp
  const alive=useRef(true),request=useRef(0),locked=useRef(false),pending=useRef<Record<string,unknown>|null>(null),currentId=useRef(id);
  const restoreQuestion=useRef(!target);
  const currentTarget=useRef(targetItem);currentTarget.current=targetItem;
+ const openSource=useRef({source,previewing});openSource.current={source,previewing};
+ const scope=useRef<string[]>([]),readingLibrary=useRef<string|undefined>(undefined);scope.current=[...materials.map(m=>m.locator.libraryId),...inherited.map(s=>(s.locator as {libraryId?:string})?.libraryId)].filter((id):id is string=>typeof id==="string");
+ const scopeWork=useRef(""),scopeEpoch=useRef(0);
  currentId.current=id;
  useEffect(()=>{try{pending.current=JSON.parse(userProfileStorage.getItem(PENDING)||"null");setPendingPreparation(!!pending.current);}catch{}},[]);
  async function refresh(workId:string){
@@ -52,17 +55,17 @@ export function InsightDiscovery({data,target,onOpenWork,onView}:{data:ReturnTyp
    const targetId=currentTarget.current?.id??next.config.targetInsightId;
    const restored=targetId?await call<Insight>({action:"insightDetail",insightId:targetId}):null;
    if(!alive.current||currentId.current!==workId||ticket!==request.current)return;
-   setBundle(targetId&&next.config.targetInsightId!==targetId?null:next);setStatus(work);if(restored)setTargetItem(restored);setInherited(next.sources.map(s=>({title:s.title,locator:s.locator,sourcePath:s.path})));if(restoreQuestion.current){setQuestion(next.config.question);restoreQuestion.current=false;}setError("");
-  }catch(e){if(alive.current&&ticket===request.current){setBundle(null);setSource(null);setStatus(null);setInherited([]);setError(String(e));}}
+   scopeWork.current=workId;setBundle(targetId&&next.config.targetInsightId!==targetId?null:next);setStatus(work);if(restored)setTargetItem(restored);setInherited(next.sources.map(s=>({title:s.title,locator:s.locator,sourcePath:s.path})));if(restoreQuestion.current){setQuestion(next.config.question);restoreQuestion.current=false;}setError("");
+  }catch(e){if(alive.current&&ticket===request.current){scopeWork.current="";setBundle(null);setSource(null);setStatus(null);setInherited([]);setError(String(e));}}
  }
  useEffect(()=>{
   alive.current=true;let disposed=false;const stops:(()=>void)[]=[];
   if(id){
-   if(target){void Promise.all([call<Status>({action:"status",id}),call<{sources:typeof inherited}>({action:"insightAnalysisScope",id})]).then(([v,s])=>{if(!disposed){setStatus(v);setInherited(s.sources);}},e=>{if(!disposed){setError(String(e));setTargetItem(old=>old?{...old,snapshot:undefined}:old);}});}
+   if(target){const epoch=scopeEpoch.current;void Promise.all([call<Status>({action:"status",id}),call<{sources:typeof inherited}>({action:"insightAnalysisScope",id})]).then(([v,s])=>{if(!disposed&&epoch===scopeEpoch.current&&currentId.current===id){scopeWork.current=id;setStatus(v);setInherited(s.sources);}},e=>{if(!disposed&&epoch===scopeEpoch.current){setError(String(e));setTargetItem(old=>old?{...old,snapshot:undefined}:old);}});}
    else void refresh(id);
   }
-  for(const event of ["library-registry-updated","library-runtime-updated","data-portability-updated"]){void listen(event,e=>{if(disposed||!insightSourceChanged(event,e?.payload))return;setBundle(null);setSource(null);setStatus(null);setInherited([]);setTargetItem(old=>old?{...old,snapshot:undefined}:old);setChecked({});if(currentId.current)void refresh(currentId.current);}).then(stop=>disposed?stop():stops.push(stop));}
-  const focus=()=>{setSource(null);setChecked({});if(currentId.current)void refresh(currentId.current);};window.addEventListener("focus",focus);
+  for(const event of ["library-registry-updated","library-runtime-updated","data-portability-updated"]){void listen(event,e=>{if(disposed||!insightSourceChanged(event,e?.payload,currentId.current&&scopeWork.current!==currentId.current?undefined:[...scope.current,...(readingLibrary.current?[readingLibrary.current]:[])]))return;++request.current;++scopeEpoch.current;scopeWork.current="";readingLibrary.current=undefined;setBundle(null);setSource(null);setStatus(null);setInherited([]);setTargetItem(old=>old?{...old,snapshot:undefined}:old);setChecked({});if(currentId.current)void refresh(currentId.current);}).then(stop=>disposed?stop():stops.push(stop));}
+  const focus=()=>{setChecked({});const open=openSource.current;if(open.source)void readSource(open.source,open.source.startChar,open.previewing,true);else if(currentId.current)void refresh(currentId.current);};window.addEventListener("focus",focus);
   return()=>{alive.current=false;disposed=true;++request.current;stops.forEach(stop=>stop());window.removeEventListener("focus",focus);};
  },[]);
  useEffect(()=>{if(!id||(!busy&&!status?.runActive&&!status?.lifecycle?.activeRunId))return;let stopped=false;let timer:ReturnType<typeof setTimeout>;const poll=async()=>{await refresh(id);if(!stopped)timer=setTimeout(()=>void poll(),2000);};timer=setTimeout(()=>void poll(),2000);return()=>{stopped=true;clearTimeout(timer);};},[id,busy,status?.runActive,status?.lifecycle?.activeRunId]);
@@ -85,7 +88,7 @@ export function InsightDiscovery({data,target,onOpenWork,onView}:{data:ReturnTyp
   if(!pending.current)return;
   const prepared=await call<Discovery>(pending.current);
   if(!alive.current)return;
-  currentId.current=prepared.workId;setId(prepared.workId);setBundle(prepared);setMaterials([]);setSaved({});
+  ++scopeEpoch.current;scopeWork.current="";currentId.current=prepared.workId;setId(prepared.workId);setBundle(prepared);setMaterials([]);setSaved({});
   userProfileStorage.setItem(LAST,prepared.workId);userProfileStorage.removeItem(PENDING);pending.current=null;setPendingPreparation(false);
   if(!prepared.results)await run(prepared.workId);else await refresh(prepared.workId);
  }
@@ -94,9 +97,9 @@ export function InsightDiscovery({data,target,onOpenWork,onView}:{data:ReturnTyp
   if(value.runActive||value.lifecycle?.activeRunId)return;
   await startDiscoveryRun(workId,value);await refresh(workId);
  }
- async function readSource(value:{locator:unknown;version?:unknown;startChar?:number},startChar=value.startChar??0,preview=false){
-  const ticket=++request.current;setSource(null);setPreviewing(preview);
-  try{const result=await call<InsightSource["excerpt"]>({action:preview?"insightDiscoveryPreview":"insightDiscoverySource",id,locator:value.locator,version:value.version,startChar});if(alive.current&&ticket===request.current)setSource(result);}catch(e){if(alive.current&&ticket===request.current){setBundle(null);setStatus(null);setInherited([]);setTargetItem(old=>old?{...old,snapshot:undefined}:old);setChecked({});setError(String(e));}}
+ async function readSource(value:{locator:unknown;version?:unknown;startChar?:number},startChar=value.startChar??0,preview=false,recheck=false){
+  const ticket=++request.current;readingLibrary.current=(value.locator as {libraryId?:string})?.libraryId;if(!recheck)setSource(null);setPreviewing(preview);
+  try{const result=await call<InsightSource["excerpt"]>({action:preview?"insightDiscoveryPreview":"insightDiscoverySource",id:currentId.current,locator:value.locator,version:value.version,startChar});if(alive.current&&ticket===request.current)setSource(result);}catch(e){if(alive.current&&ticket===request.current){scopeWork.current="";setSource(null);setBundle(null);setStatus(null);setInherited([]);setTargetItem(old=>old?{...old,snapshot:undefined}:old);setChecked({});setError(String(e));}}
  }
  async function save(candidate:InsightCandidate,outcome?:"maintain"|"revise"){
   if(!bundle?.results||!checked[candidate.findingPointer]||locked.current)return;locked.current=true;setBusy(true);setError("");
@@ -105,14 +108,14 @@ export function InsightDiscovery({data,target,onOpenWork,onView}:{data:ReturnTyp
    if(alive.current){setSaved(old=>({...old,[candidate.findingPointer]:result.item}));if(targetItem)setTargetItem(result.item);}
   }catch(e){if(alive.current)setError(String(e));}finally{locked.current=false;if(alive.current)setBusy(false);}
  }
- function fresh(){++request.current;currentId.current="";setId("");setTargetItem(undefined);setBundle(null);setStatus(null);setInherited([]);setMaterials([]);setQuestion("");setSource(null);setSaved({});setChecked({});userProfileStorage.removeItem(LAST);setError("");}
+ function fresh(){++request.current;++scopeEpoch.current;scopeWork.current="";readingLibrary.current=undefined;currentId.current="";setId("");setTargetItem(undefined);setBundle(null);setStatus(null);setInherited([]);setMaterials([]);setQuestion("");setSource(null);setSaved({});setChecked({});userProfileStorage.removeItem(LAST);setError("");}
  const results=bundle?.results;
  const reviewing=!!bundle?.config.targetInsightId;
  function follow(item:Insight){setTargetItem(item);setBundle(null);setSaved({});setChecked({});setMaterials([]);setQuestion("这些后续记录是否影响原判断？请说明维持还是调整，以及依据。");}
  return <div className="insight-discovery-flow">
   <p className="idd-intro"><Sparkles size={15}/>使用本机已同步的真实资料；点击开始后调用当前助手模型。</p>
   {pendingPreparation&&!busy&&<div className="idd-progress" role="status"><p>上次准备的结果需要核对；将按原问题与原资料恢复，不重复创建分析。</p><button type="button" onClick={()=>{setBusy(true);void completePreparation().catch(e=>setError(String(e))).finally(()=>setBusy(false));}}>核对上次准备并继续</button></div>}
-  {source&&<section className="idd-source"><button type="button" onClick={()=>{++request.current;setSource(null);}}> <ArrowLeft size={14}/>返回发现</button><h3>{source.title}</h3><p className="insights-muted">{source.sourcePath} · 第{source.startChar+1}–{source.endChar} / {source.totalChars}字符</p><div className="idd-source-text"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{img:({alt})=><span>［图片：{alt||"未读取"}］</span>,a:({children})=><span>{children}</span>}}>{source.facts?.provider==="craft"?renderableCraftMarkdown(source.content):source.content}</ReactMarkdown></div>{(source.facts?.unreadImageCount??0)>0&&<p className="insights-muted">以下为读取的文字；图片内容未读取，图片访问地址已省略。</p>}<details><summary>{(source.facts?.unreadImageCount??0)>0?"核对本次读取的文字":"逐字核对原文"}</summary><blockquote>{source.content}</blockquote></details>{source.startChar>0&&<button type="button" onClick={()=>void readSource(source,0,previewing)}>从头阅读</button>}{source.endChar<source.totalChars&&<button type="button" onClick={()=>void readSource(source,source.endChar,previewing)}>继续读原文</button>}</section>}<div hidden={!!source}>
+  {source&&<section className="idd-source"><button type="button" onClick={()=>{++request.current;readingLibrary.current=undefined;setSource(null);}}> <ArrowLeft size={14}/>返回发现</button><h3>{source.title}</h3><p className="insights-muted">{source.sourcePath} · 第{source.startChar+1}–{source.endChar} / {source.totalChars}字符</p><div className="idd-source-text"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{img:({alt})=><span>［图片：{alt||"未读取"}］</span>,a:({children})=><span>{children}</span>}}>{source.facts?.provider==="craft"?renderableCraftMarkdown(source.content):source.content}</ReactMarkdown></div>{(source.facts?.unreadImageCount??0)>0&&<p className="insights-muted">以下为读取的文字；图片内容未读取，图片访问地址已省略。</p>}<details><summary>{(source.facts?.unreadImageCount??0)>0?"核对本次读取的文字":"逐字核对原文"}</summary><blockquote>{source.content}</blockquote></details>{source.startChar>0&&<button type="button" onClick={()=>void readSource(source,0,previewing)}>从头阅读</button>}{source.endChar<source.totalChars&&<button type="button" onClick={()=>void readSource(source,source.endChar,previewing)}>继续读原文</button>}</section>}<div hidden={!!source}>
    {id&&<button type="button" disabled={busy||running} onClick={fresh}> <Plus size={14}/>另开始一次发现</button>}
    {targetItem&&!results?.candidates.some(candidate=>candidate.eligibility==="verifiedSources")&&<section className="idd-original"><p className="idd-kicker">原判断 · 历史保留</p><ReactMarkdown remarkPlugins={[remarkGfm]} components={{img:()=>null,a:({children})=><span>{children}</span>}}>{bundle?.config.previousText||targetItem.snapshot?.text||"当前来源不可访问"}</ReactMarkdown></section>}
    <label className="idd-question">{targetItem?"这次要核对什么":"当前关心什么"}<textarea aria-label="发现问题" rows={2} maxLength={1200} disabled={busy||running} value={question} onChange={e=>setQuestion(e.target.value)} placeholder="例如：这些旧经验能怎样帮助目前的工作？也可以留空，开放探索。"/></label>

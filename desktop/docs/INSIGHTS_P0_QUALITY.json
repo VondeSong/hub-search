@@ -582,7 +582,7 @@
       "citationCount": 1
     }
   ],
-  "conclusion": "The eight first outputs across four paired cases support grounded analysis and broadly comparable answer quality. They did not test saving, persistent continuation or user operation benefits. Collection and traceable continuation are the current product positioning; prior separate window evidence covers earlier saving/revision, while the new workflow remains unverified. These outputs do not establish superior reasoning, lower fees, user adoption or long-term value.",
+  "conclusion": "The eight first outputs across four paired cases support grounded analysis and broadly comparable answer quality. Those eight runs did not test saving, persistent continuation or user operation benefits. Separate final daily-window evidence for the new workflow is summarized in workflowVerification; it does not change these quality scores. The predeclared fallback retains bounded convenient analysis, collection and traceable continuation. Superior reasoning, exhaustive recall, lower fees, human adoption and long-term value are not established.",
   "rubric": {
     "unit": "one persisted finding/candidate; compare complete answers; never split compound candidates to improve counts",
     "countUseful": "identifiable task-relevant connection, condition affecting a choice, useful evidence distinction or targeted judgement check beyond shared general principles; a contextual attributed reminder may help the asked future review; novelty is not required",
@@ -598,5 +598,63 @@
       "redundant": "equivalent central judgement in the same decision context",
       "unsupported_or_misleading": "unsupported or misleading, not counted useful"
     }
+  },
+  "workflowVerification": {
+    "date": "2026-11-15",
+    "environment": "normal daily desktop and actual synced library",
+    "separateFromEightQualityRuns": true,
+    "historyCandidateFlow": {
+      "unselectedHistoricalTextRead": true,
+      "explicitlyAdded": true,
+      "actualModelRun": true,
+      "savedInPlace": true,
+      "stoppedThenExplicitlyResumedSameWork": true,
+      "keywordFalsePositivesRetained": true
+    },
+    "persistentFollowup": {
+      "sameFindingAndWork": true,
+      "headBefore": 2,
+      "headAfter": 3,
+      "maintainAttempt": "rejected because original evidence versions changed; no commit",
+      "finalOutcome": "revise",
+      "previousVersionsRetainedAndRead": [
+        1,
+        2,
+        3
+      ]
+    },
+    "operationComparison": {
+      "AEndpoint": "same question, same two source bodies and method ready to send; baseline unsent draft cleared",
+      "BEndpoint": "same current report ready to save; baseline cancelled before duplicate submission",
+      "humanElapsedTimeMeasured": false,
+      "completeEndToEndTimeComparison": false,
+      "BDirectRequiredConfirmations": 1,
+      "BBaselineUIActions": 6,
+      "BOperationBreakdown": {
+        "directFromExpandedResult": {
+          "evidenceConfirmation": 1
+        },
+        "baselineFromOpeningUpdate": {
+          "openUpdate": 1,
+          "chooseCandidate": 1,
+          "chooseBackground": 3,
+          "methodConfirmation": 1
+        },
+        "differentStartingPoints": true,
+        "notFullEfficiencyScore": true
+      }
+    },
+    "strongGoalsNotFullyProved": [
+      "start within two explicit operations after initial setup",
+      "two real cases reducing source search or context preparation"
+    ],
+    "decision": "apply predeclared fallback: bounded convenient analysis, collection and traceable continuation; do not expand P1/P2 on this evidence",
+    "notEstablished": [
+      "smarter than suitable Skill",
+      "exhaustive or semantic recall",
+      "human adoption",
+      "cost advantage",
+      "long-term proactive value"
+    ]
   }
 }

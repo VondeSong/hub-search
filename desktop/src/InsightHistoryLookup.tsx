@@ -12,11 +12,12 @@ export function InsightHistoryLookup({notes,disabled,onAdd,onPreview}:{notes:Not
  const [libraries,setLibraries]=useState<{libraryId:string;name:string}[]>([]),[allowed,setAllowed]=useState<string[]>([]),[query,setQuery]=useState("");
  const [result,setResult]=useState<Result|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState("");
  const ticket=useRef(0),alive=useRef(true),loaded=useRef(false);
+ const scope=useRef<string[]>([]);scope.current=[...allowed,...notes.map(n=>n.libraryId)];
  const key=JSON.stringify(notes);
  function invalidate(){++ticket.current;setResult(null);setError("");setBusy(false);}
  useEffect(()=>{invalidate();},[key,disabled]);
  useEffect(()=>{alive.current=true;let disposed=false;const stops:(()=>void)[]=[];
-  for(const event of ["library-registry-updated","library-runtime-updated","data-portability-updated"]){void listen(event,e=>{if(!disposed&&insightSourceChanged(event,e?.payload)){invalidate();loaded.current=false;void catalog();}}).then(stop=>disposed?stop():stops.push(stop));}
+  for(const event of ["library-registry-updated","library-runtime-updated","data-portability-updated"]){void listen(event,e=>{if(!disposed&&insightSourceChanged(event,e?.payload,scope.current)){invalidate();loaded.current=false;void catalog();}}).then(stop=>disposed?stop():stops.push(stop));}
   return()=>{disposed=true;alive.current=false;++ticket.current;stops.forEach(stop=>stop());};
  },[]);
  async function catalog(){if(loaded.current)return;const seq=++ticket.current;setBusy(true);setError("");try{const value=await call<{libraries:typeof libraries}>({action:"insightHistoryLibraries"});if(alive.current&&seq===ticket.current){setLibraries(value.libraries);setAllowed(old=>old.filter(id=>value.libraries.some(l=>l.libraryId===id)));loaded.current=true;}}catch(e){if(alive.current&&seq===ticket.current){setLibraries([]);setAllowed([]);setError(String(e));}}finally{if(alive.current&&seq===ticket.current)setBusy(false);}}

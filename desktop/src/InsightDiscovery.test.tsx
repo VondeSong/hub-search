@@ -5,9 +5,9 @@ import {afterEach,beforeEach,expect,it,vi} from "vitest";
 import {InsightDiscovery} from "./InsightDiscovery";
 import type {useInsights} from "./useInsights";
 import type {Insight} from "./InsightTypes";
-const {invoke,listeners,handlers}=vi.hoisted(()=>({invoke:vi.fn(),listeners:new Map<string,()=>void>(),handlers:new Map<string,Set<()=>void>>()}));
+const {invoke,listeners,handlers}=vi.hoisted(()=>({invoke:vi.fn(),listeners:new Map<string,(e?:{payload:unknown})=>void>(),handlers:new Map<string,Set<(e?:{payload:unknown})=>void>>()}));
 vi.mock("@tauri-apps/api/core",()=>({invoke}));
-vi.mock("@tauri-apps/api/event",()=>({listen:vi.fn(async(name:string,fn:()=>void)=>{const set=handlers.get(name)??new Set<()=>void>();set.add(fn);handlers.set(name,set);listeners.set(name,()=>set.forEach(handler=>handler()));return()=>{set.delete(fn);if(!set.size){handlers.delete(name);listeners.delete(name);}};})}));
+vi.mock("@tauri-apps/api/event",()=>({listen:vi.fn(async(name:string,fn:(e?:{payload:unknown})=>void)=>{const set=handlers.get(name)??new Set<(e?:{payload:unknown})=>void>();set.add(fn);handlers.set(name,set);listeners.set(name,e=>set.forEach(handler=>handler(e)));return()=>{set.delete(fn);if(!set.size){handlers.delete(name);listeners.delete(name);}};})}));
 let host:HTMLDivElement,root:Root,finished:boolean,revoked:boolean,prepares:Record<string,unknown>[];let candidateCount=1;
 const source={title:"旧复盘",sourcePath:"旧复盘.md",content:"先做小样验证。",startChar:0,endChar:8,totalChars:8,truncated:false,locator:{kind:"note",libraryId:"notes",documentId:"one",pageId:null},version:{kind:"document",fingerprint:"v1"}};
 const origin={workId:"work",runId:"run",deliveryRecordId:"delivery",deliveryHash:"hash",generatedAt:1};
@@ -61,6 +61,52 @@ it('hides the displayed answer and source when current authorization becomes unr
  revoked=true;await act(async()=>listeners.get('library-runtime-updated')?.());
  expect(host.querySelector('blockquote')).toBeNull();expect(host.textContent).not.toContain(candidate.text);expect(host.textContent).not.toContain('完整答复');expect(saveCandidate).not.toHaveBeenCalled();
 });
+
+it('rejects a late preview after a real source change before any work has been created',async()=>{
+ await mount();let complete:((value:typeof source)=>void)|undefined;
+ const original=invoke.getMockImplementation()!;
+ invoke.mockImplementation((command,request)=>request.args.action==='insightDiscoveryPreview'?new Promise(resolve=>{complete=resolve;}):original(command,request));
+ await act(async()=>button('查看原文').click());
+ await act(async()=>listeners.get('library-runtime-updated')?.());
+ await act(async()=>complete!(source));
+ expect(host.querySelector('.idd-source')).toBeNull();expect(prepares).toHaveLength(0);
+});
+
+it('keeps an unrelated sync from interrupting a preview while still rejecting changes to its own library',async()=>{
+ await mount();let complete:((value:typeof source)=>void)|undefined;
+ const original=invoke.getMockImplementation()!;
+ invoke.mockImplementation((command,request)=>request.args.action==='insightDiscoveryPreview'?new Promise(resolve=>{complete=resolve;}):original(command,request));
+ await act(async()=>button('查看原文').click());
+ await act(async()=>listeners.get('library-runtime-updated')?.({payload:{libraryId:'unrelated',state:'idle'}}));
+ await act(async()=>complete!(source));expect(host.querySelector('blockquote')?.textContent).toBe(source.content);
+ await act(async()=>listeners.get('library-runtime-updated')?.({payload:{libraryId:'notes'}}));
+ expect(host.querySelector('.idd-source')).toBeNull();
+});
+
+it('treats a restoring work scope as unknown and rejects its late initial scope after invalidation',async()=>{
+ let completeScope:((value:unknown)=>void)|undefined,completeRead:((value:unknown)=>void)|undefined;
+ const original=invoke.getMockImplementation()!;
+ invoke.mockImplementation((command,request)=>{
+  if(request.args.action==='insightAnalysisScope')return new Promise(resolve=>{completeScope=resolve;});
+  if(request.args.action==='insightDiscoveryRead')return new Promise(resolve=>{completeRead=resolve;});
+  return original(command,request);
+ });
+ await act(async()=>root.render(<InsightDiscovery data={data} target={saved} onOpenWork={vi.fn()} onView={vi.fn()}/>));
+ await click('查看原文');expect(host.querySelector('.idd-source')).not.toBeNull();
+ await act(async()=>listeners.get('library-runtime-updated')?.({payload:{libraryId:'inherited-other',state:'idle'}}));
+ expect(host.querySelector('.idd-source')).toBeNull();expect(completeRead).toBeDefined();
+ await act(async()=>completeScope!({sources:[{title:'stale-inherited-source',locator:source.locator,sourcePath:'old.md'}]}));
+ expect(host.textContent).not.toContain('stale-inherited-source');
+});
+
+it('allows an unrelated preview while a valid initial inherited scope is still loading',async()=>{
+ let completeScope:((value:unknown)=>void)|undefined;const original=invoke.getMockImplementation()!;
+ invoke.mockImplementation((command,request)=>request.args.action==='insightAnalysisScope'?new Promise(resolve=>{completeScope=resolve;}):original(command,request));
+ await act(async()=>root.render(<InsightDiscovery data={data} target={saved} onOpenWork={vi.fn()} onView={vi.fn()}/>));
+ await click('查看原文');expect(host.querySelector('.idd-source')).not.toBeNull();
+ await act(async()=>completeScope!({sources:[{title:'valid-inherited-source',locator:source.locator,sourcePath:'old.md'}]}));
+ await click('返回发现');expect(host.textContent).toContain('valid-inherited-source');
+});
 it('formats Craft source with the shared reader while keeping exact text available',async()=>{
  await mount();const raw='<page id="one">\n<pageTitle>旧复盘</pageTitle>\n<content>\n  **先做小样验证。**\n</content>\n</page>';
  invoke.mockImplementationOnce(async()=>({...source,content:raw,facts:{provider:'craft'}}));await click('查看原文');
@@ -81,6 +127,30 @@ it('keeps the current lookup when previewing a historical candidate and returnin
  await click('加入本次资料');expect(host.textContent).toContain('待添加 · 2');
  expect(invoke.mock.calls.filter(([,v])=>v.args.action==='insightHistorySearch')).toHaveLength(1);
  expect(invoke.mock.calls.some(([,v])=>v.args.action==='respond')).toBe(false);
+});
+
+it('rechecks an open preview on focus and preserves it only while its version is readable',async()=>{
+ await mount();await click('查看原文');
+ await act(async()=>window.dispatchEvent(new Event('focus')));
+ expect(host.querySelector('blockquote')?.textContent).toBe(source.content);
+ expect(invoke.mock.calls.filter(([,v])=>v.args.action==='insightDiscoveryPreview')).toHaveLength(2);
+ const original=invoke.getMockImplementation()!;
+ invoke.mockImplementation((command,request)=>request.args.action==='insightDiscoveryPreview'?Promise.reject(Error('原文版本已变化')):original(command,request));
+ await act(async()=>window.dispatchEvent(new Event('focus')));
+ expect(host.querySelector('blockquote')).toBeNull();expect(host.textContent).toContain('原文版本已变化');
+ expect(invoke.mock.calls.some(([,v])=>v.args.action==='respond')).toBe(false);
+});
+
+it('uses the current work when rechecking a delivered source after starting and replacing a discovery',async()=>{
+ await mount();await act(async()=>host.querySelector<HTMLInputElement>('.agent-material-choice input')!.click());await click('开始发现');await click('旧复盘');
+ await act(async()=>window.dispatchEvent(new Event('focus')));
+ expect(invoke.mock.calls.filter(([,v])=>v.args.action==='insightDiscoverySource').map(([,v])=>v.args.id)).toEqual(['work','work']);
+ await click('返回发现');await click('另开始一次发现');
+ const original=invoke.getMockImplementation()!;
+ invoke.mockImplementation(async(command,request)=>{const value=await original(command,request);if(request.args.action==='insightDiscoveryPrepare')return {...value,workId:'new-work'};return value;});
+ await act(async()=>host.querySelector<HTMLInputElement>('.agent-material-choice input')!.click());await click('开始发现');await click('旧复盘');
+ await act(async()=>window.dispatchEvent(new Event('focus')));
+ expect(invoke.mock.calls.filter(([,v])=>v.args.action==='insightDiscoverySource').slice(-2).map(([,v])=>v.args.id)).toEqual(['new-work','new-work']);
 });
 
 it('keeps the original judgment visible when every new candidate needs rechecking',async()=>{
