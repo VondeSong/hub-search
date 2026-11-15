@@ -1,0 +1,27 @@
+html[data-runtime-platform="android"] .flashcard-mobile-plan { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 20px; color: var(--flashcards-secondary); }
+html[data-runtime-platform="android"] .flashcard-mobile-plan p,html[data-runtime-platform="android"] .flashcard-mobile-plan small { flex-basis: 100%; margin: 0; line-height: 1.6; }
+html[data-runtime-platform="android"] .flashcard-mobile-plan button,html[data-runtime-platform="android"] .flashcard-rhythm-day { min-height: 44px; border: 1px solid var(--flashcards-hairline); border-radius: 10px; background: var(--flashcards-canvas); color: var(--flashcards-text); font: inherit; padding: 8px 12px; }
+html[data-runtime-platform="android"] .flashcard-rhythm-day { width: 100%; display: grid; justify-items: center; gap: 10px; padding: 6px 0; border: 0; background: transparent; }
+html[data-runtime-platform="android"] .flashcard-rhythm-day[aria-pressed="true"] { outline: 2px solid var(--flashcards-action); outline-offset: 2px; }
+html[data-runtime-platform="android"] .flashcard-study-detail,html[data-runtime-platform="android"] .flashcard-study-forecast > p { color: var(--flashcards-secondary); font-size: .8125rem; line-height: 1.6; }
+html[data-runtime-platform="android"] .flashcards-review-actions { flex-wrap: wrap; }
+html[data-runtime-platform="android"] .flashcards-review-actions button { min-height: 44px; }
+html[data-runtime-platform="android"] .flashcards-review-card { padding-bottom: 24px; }
+html[data-runtime-platform="android"] .flashcards-review > .flashcards-ratings,html[data-runtime-platform="android"] .flashcards-review > .flashcards-reveal { position: static; flex: 0 0 auto; width: auto; margin: 10px; padding-bottom: env(safe-area-inset-bottom,0px); }
+html[data-runtime-platform="android"] .flashcards-ratings .flashcards-rating-recommendation { position: static; grid-column: 1 / -1; margin: 0; padding: 8px; background: var(--flashcards-canvas); color: var(--flashcards-text); border-radius: 10px; font-size: .8125rem; }
+html[data-runtime-platform="android"] .flashcards-ratings .flashcards-rating-recommendation button { min-height: 44px; color: var(--flashcards-text); }
+html[data-runtime-platform="android"] .flashcards-review-complete { overflow-y: auto; padding-bottom: calc(24px + env(safe-area-inset-bottom,0px)); }
+html[data-runtime-platform="android"] .flashcards-mobile-deck-row { position: relative; flex: 1; min-width: 0; }
+html[data-runtime-platform="android"] .flashcards-mobile-deck-row > button[data-deck-drop-before] { width: 100%; min-height: 78px; display: grid; align-items: center; grid-template-columns: 38px minmax(0,1fr); grid-template-rows: auto auto; gap: 3px 10px; padding: 13px 120px 13px 14px; border: 1px solid var(--flashcards-hairline); border-radius: 16px; background: var(--flashcards-canvas); color: var(--flashcards-text); font: inherit; text-align: left; touch-action: pan-y; }
+html[data-runtime-platform="android"] .flashcards-mobile-deck-row > button[data-deck-drop-before] > svg { grid-row: 1 / 3; width: 34px; height: 34px; padding: 7px; box-sizing: border-box; border-radius: 11px; background: var(--flashcards-accent-soft); color: var(--flashcards-action); }
+html[data-runtime-platform="android"] .flashcards-mobile-deck-row > button[data-deck-drop-before] > span:not(.flashcards-mobile-deck-meta) { align-self: end; font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+html[data-runtime-platform="android"] .flashcards-mobile-deck-row > button[data-deck-drop-before] > small { display: none; }
+html[data-runtime-platform="android"] .flashcard-deck-start { position: absolute; top: 50%; right: 30px; transform: translateY(-50%); max-width: 90px; min-height: 44px; border: 1px solid var(--flashcards-hairline); border-radius: 10px; background: var(--flashcards-accent-soft); color: var(--flashcards-action); font: inherit; font-size: .8125rem; }
+html[data-runtime-platform="android"] .flashcard-review-preferences { display: grid; grid-column: 1 / -1; gap: 10px; }
+html[data-runtime-platform="android"] .flashcard-review-preferences summary { min-height: 44px; cursor: pointer; align-content: center; }
+.flashcard-mobile-preview { width: min(90vw,520px); max-height: 80dvh; overflow: auto; box-sizing: border-box; border: 1px solid var(--flashcards-hairline); border-radius: 20px; padding: 20px; background: var(--flashcards-canvas); color: var(--flashcards-text); }
+.flashcard-mobile-preview::backdrop { background: #0006; }
+.flashcard-mobile-preview header,.flashcard-mobile-preview footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.flashcard-mobile-preview button { min-height: 44px; border: 1px solid var(--flashcards-hairline); border-radius: 10px; padding: 8px 12px; background: var(--flashcards-accent-soft); color: inherit; font: inherit; }
+.flashcard-mobile-preview h2,.flashcard-preview-answer { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 1rem; line-height: 1.7; }
+.flashcard-mobile-preview footer { margin-top: 20px; flex-wrap: wrap; }

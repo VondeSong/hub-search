@@ -120,6 +120,9 @@ import { editorSaveErrorDetail } from "./EditorSaveStatus";
 import { validateFlashcardEditor, type FlashcardEditorValidationIssue } from "./FlashcardEditorValidation";
 import "./FlashcardsWorkspace.css";
 import { FlashcardTodayProgress } from "./FlashcardTodayProgress";
+import { effectiveNewLimit, estimatedStudyMinutes, nextStudyDue } from "./FlashcardStudyExperience";
+import { MobileFlashcardPreview } from "./MobileFlashcardPreview";
+import "./FlashcardMobileExperience.css";
 
 const FlashcardInbox = lazy(() => import("./FlashcardInbox").then(module => ({ default: module.FlashcardInbox })));
 const StudyDashboard = lazy(() => import("./StudyDashboard").then(module => ({ default: module.StudyDashboard })));
@@ -265,6 +268,7 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
   const [dailyNewLimit, setDailyNewLimit] = useState(() => loadDailyNewCardLimit(userProfileStorage));
   const [dailyLimitReady, setDailyLimitReady] = useState(false);
   const [savingDailyLimit, setSavingDailyLimit] = useState(false);
+  const [savingExtraNew, setSavingExtraNew] = useState(false);
   const [mobileDeckSearch, setMobileDeckSearch] = useState("");
   const [savingCard, setSavingCard] = useState(false);
   const [creatingCard, setCreatingCard] = useState(false);
@@ -295,7 +299,7 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
   const [qualityFeedbackOpen,setQualityFeedbackOpen] = useState(false);
   const [qualityTarget,setQualityTarget] = useState<QualityTarget | undefined>();
   const openQuality = (target?:QualityTarget) => {setQualityTarget(target);setQualityFeedbackOpen(true);};
-  useEffect(()=>{if(qualityFeedbackOpen){reviewSession.suspendTiming();return ()=>reviewSession.resumeTiming();}},[qualityFeedbackOpen,reviewSession]);
+  useEffect(()=>{if(qualityFeedbackOpen || gridModalCardId){reviewSession.suspendTiming();return ()=>reviewSession.resumeTiming();}},[qualityFeedbackOpen,gridModalCardId,reviewSession]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -532,6 +536,22 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
   }, []);
 
   useEffect(() => {
+    if (!isAndroid) return;
+    let reading = false;
+    const refresh = async () => {
+      if (document.visibilityState === "hidden" || reading) return;
+      reading = true;
+      try { await Promise.all([refreshDashboard(), refreshStudySettings()]); }
+      catch { /* Keep existing content; explicit actions report failures. */ }
+      finally { reading = false; }
+    };
+    const timer = window.setInterval(() => void refresh(), 60_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { window.clearInterval(timer); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+  }, [isAndroid, refreshDashboard, refreshStudySettings]);
+
+  useEffect(() => {
     void refreshStudySettings().catch(() => undefined).finally(() => setDailyLimitReady(true));
   }, [refreshStudySettings]);
 
@@ -688,9 +708,10 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
   const galleryShowPropertyNames = activeDeckView?.galleryShowPropertyNames ?? true;
   const galleryShowFullTitle = activeDeckView?.galleryShowFullTitle ?? false;
   const galleryCompactHiddenProperties = activeDeckView?.galleryCompactHiddenProperties ?? true;
-  const remainingNew = remainingNewCardAllowance(dailyNewLimit, dashboardStats?.newStudiedToday ?? 0);
+  const effectiveDailyNewLimit = effectiveNewLimit(dailyNewLimit, dashboardStats?.extraNewAllowance);
+  const remainingNew = remainingNewCardAllowance(effectiveDailyNewLimit, dashboardStats?.newStudiedToday ?? 0);
   const totalDueCount = dashboardStats
-    ? todayFlashcardDueCount(dashboardStats, dailyNewLimit)
+    ? todayFlashcardDueCount(dashboardStats, effectiveDailyNewLimit)
     : decks.reduce((sum, deck) => sum + deck.dueCount, 0);
   useEffect(() => {
     if (dashboardStats && dailyLimitReady) onDueCountChange?.(totalDueCount);
@@ -701,10 +722,15 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
     scopeName:activeView === "due" ? "今日待复习" : selectedDeck?.name ?? "闪卡",
     includeSubdecks:activeView === "deck" && Boolean(activeDeckView?.showSubdecks),sessionLimit,
     enabled:!loading && !reviewing && dailyLimitReady && (activeView === "due" || activeView === "deck"),
-    quota:dailyNewLimit,refreshToken:dashboardStats,decksToken:decks,
+    quota:effectiveDailyNewLimit,refreshToken:dashboardStats,decksToken:decks,
     onStart:reviewSession.start,onError:setError,
   });
   const plannedSessionCount=reviewPlan.sessionCount ?? reviewPlan.sessionIds.length;
+  const extraNewCount = Math.min(5, activeView === "deck" && !reviewing ? reviewPlan.newWaiting : Math.max(0, (dashboardStats?.newDueCards ?? 0) - remainingNew));
+  const extraNewReady = typeof dashboardStats?.extraNewAllowance === "number" && Boolean(dashboardStats.studyDay);
+  const plannedMinutes = dashboardStats ? estimatedStudyMinutes(dashboardStats, plannedSessionCount) : null;
+  const studyScope = JSON.stringify([activeView, selectedDeckId, reviewing, mobilePage]);
+  const studyScopeRef = useRef(studyScope); studyScopeRef.current = studyScope;
   const currentCard = reviewQueue[0];
   const schedulePreview = useFlashcardSchedulePreview(currentCard, reviewing && answerVisible);
 
@@ -1009,8 +1035,7 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
     if (folderId !== undefined) void moveDeckToFolder(drag.deckId, folderId);
   };
   const mobileDeckMatches = (deck: FlashcardDeckSummary) => !mobileDeckSearch.trim() || deck.name.toLocaleLowerCase().includes(mobileDeckSearch.trim().toLocaleLowerCase());
-  const renderDeckTreeItem = (deck: FlashcardDeckSummary, nested = false) => <button
-    key={deck.id}
+  const renderDeckTreeItem = (deck: FlashcardDeckSummary, nested = false) => { const item = <button key={deck.id}
     className={`${activeView === "deck" && selectedDeckId === deck.id ? "active" : ""}${nested ? " nested" : ""}${deckInsertTarget === deck.id ? " drop-before" : ""}${inboxDropDeckId === deck.id ? " inbox-drop-target" : ""}`}
     aria-current={activeView === "deck" && selectedDeckId === deck.id ? "page" : undefined}
     data-deck-drop-before={deck.id}
@@ -1030,10 +1055,10 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
     onClick={() => { setSelectedDeckId(deck.id); if (isAndroid) setMobilePage("deck"); void openView("deck", deck.id); }}
   >
     <Layers3 size={15} /><span>{deck.name}</span><span className="flashcards-mobile-deck-meta">{deck.cardCount} 张卡片{deck.dueCount > 0 ? ` · ${deck.dueCount} 张待复习` : " · 今日已完成"}</span><small>{deck.dueCount > 0 ? deck.dueCount : deck.cardCount}</small>
-  </button>;
+  </button>; return isAndroid ? <div key={deck.id} className="flashcards-mobile-deck-row">{item}{(deck.dueCount > 0 || reviewQueue.length > 0) && <button type="button" className="flashcard-deck-start" disabled={startingReview || reviewingCard} aria-label={reviewQueue.length ? "继续当前一轮" : `开始复习 ${deck.name}`} onClick={() => void startMobileDeck(deck)}>{reviewQueue.length ? "继续当前一轮" : "开始"}</button>}</div> : item; };
 
   const startReview = async () => {
-    if (startingReview) return;
+    if (startingReview || savingExtraNew) return;
     if (reviewQueue.length && !window.confirm("开始新一轮会替换尚未完成的复习。已保存的评分不受影响，确定重新开始？")) return;
     if(await beginPlannedReview()) setMessage("");
   };
@@ -1058,6 +1083,38 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
     } finally {
       setSavingDailyLimit(false);
     }
+  };
+
+  const addExtraNew = async () => {
+    if (savingExtraNew || !extraNewReady || extraNewCount <= 0 || reviewQueue.length > 0) return;
+    setSavingExtraNew(true);
+    const scope = studyScopeRef.current;
+    let granted = false;
+    try {
+      await invoke("update_flashcard_study_settings", { dailyNewLimit, extraNewCount: (dashboardStats?.extraNewAllowance ?? 0) + extraNewCount, extraNewDay: dashboardStats?.studyDay });
+      granted = true;
+      if (!workspaceMounted.current) return;
+      if (studyScopeRef.current !== scope || reviewSession.getSnapshot().queue.length > 0) {
+        await refreshDashboard();
+        setMessage("今日临时额度已保存；当前页面和未完成的一轮保持不变。");
+        return;
+      }
+      const inDeck = activeView === "deck" && !reviewing;
+      const started = await beginPlannedReview({deckId: inDeck ? selectedDeckId : null, scopeName: inDeck ? selectedDeck?.name ?? "闪卡" : "今日待复习", includeSubdecks: inDeck && Boolean(activeDeckView?.showSubdecks)});
+      await refreshDashboard();
+      if (!started) { reviewSession.pause(); setMessage("今日临时额度已保存，请点击开始重试；每日偏好保持不变。"); }
+    } catch (reason) {
+      setError(`${granted ? "临时额度已保存，但复习或统计刷新失败" : "无法增加临时额度"}：${String(reason)}`);
+      if (!granted) void refreshDashboard().catch(() => undefined);
+    }
+    finally { setSavingExtraNew(false); }
+  };
+
+  const startMobileDeck = async (deck: FlashcardDeckSummary) => {
+    if (reviewingCard || startingReview || savingExtraNew) return;
+    if (reviewQueue.length) await reviewSession.resume(() => loadFlashcardsByIds(reviewQueue.map(card => card.id)));
+    else await beginPlannedReview({deckId:deck.id,scopeName:deck.name,includeSubdecks:false});
+    if (reviewSession.getSnapshot().reviewing) { setMobilePage("review"); setActiveView("due"); }
   };
 
   const rate = async (rating: number) => {
@@ -1897,6 +1954,7 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
     setError("");
     try {
       await invoke<Flashcard>("set_flashcard_stage", { cardId: card.id, stage });
+      if (stage === "suspended") reviewSession.removeCard(card.id);
       setStatusCellId("");
       await Promise.all([refreshDecks(), refreshViewCards(activeView, selectedDeckId), refreshDashboard()]);
       setMessage(stage === "resume" ? "已恢复学习，原复习时间保留" : stage === "suspended" ? "已暂停学习，卡片仍保留在牌库" : `状态已改为“${CARD_STAGE_LABELS[stage]}”`);
@@ -2466,6 +2524,7 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
             <BrainCircuit size={44} />
             <h2>本轮复习完成</h2>
             <p>本轮已无待复习卡片。已提交的评分已保存；已删除或在其他位置复习的卡片会自动跳过。</p>
+            {isAndroid && <><p>{nextStudyDue(dashboardStats) ? `下一批已学卡片到期：${nextStudyDue(dashboardStats)}` : "当前没有已安排的下一批已学卡片。"}</p>{extraNewCount > 0 && <button disabled={savingExtraNew || !extraNewReady} onClick={() => void addExtraNew()}>今日临时增加 {extraNewCount} 张新卡额度</button>}</>}
             <div>{lastRated && <button className="secondary" disabled={reviewingCard} onClick={() => void undoLastRating()}><RotateCcw size={15} />撤销上一次评分</button>}<button onClick={() => setReviewing(false)}>返回列表</button></div>
           </div> : <>
             <div className="flashcards-review-progress">
@@ -2475,6 +2534,7 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
             <div className="flashcards-review-actions">
               <button disabled={reviewingCard} onClick={()=>openQuality({card:currentCard,draft:false})}><Pencil size={15}/>反馈</button>
               <button disabled={reviewingCard} onClick={() => openGridCard(currentCard)}><Pencil size={15} />编辑</button>
+              {isAndroid && <button disabled={reviewingCard || savingPropertyCell} onClick={() => void changeCardStage(currentCard, "suspended")}><Pause size={15} />暂停此卡</button>}
               <button disabled={reviewingCard || reviewQueue.length < 2} onClick={() => reviewSession.postpone()} title={reviewQueue.length < 2 ? "本轮只剩这一张" : "把当前卡片移到本轮末尾"}><SkipForward size={15} />稍后再看</button>
               {lastRated && <button disabled={reviewingCard} onClick={() => void undoLastRating()}><RotateCcw size={15} />撤销评分</button>}
               <button disabled={reviewingCard} onClick={() => reviewSession.pause()}>暂停复习</button>
@@ -2517,7 +2577,7 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
           </>}
         </div> : <>
           {activeView !== "inbox" && <section className={`flashcards-overview${activeView === "due" ? " flashcards-overview-due" : ""}`}>
-            {activeView === "due" ? <div><div className="flashcards-overview-eyebrow"><span>闪卡</span><ChevronRight size={13} aria-hidden="true" /><strong>今日</strong><span className="flashcard-today-date">{new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(new Date())}</span></div><h1>{loading ? "正在读取复习进度…" : totalDueCount > 0 ? <>今天还有 <strong className="flashcard-today-remaining">{totalDueCount}</strong> 张</> : dailyNewLimit > 0 && remainingNew === 0 && (dashboardStats?.newDueCards ?? 0) > 0 ? "今日新卡已达上限" : "今天已完成"}</h1><p>{dashboardStats?.reviewedToday ? `今天已复习 ${dashboardStats.reviewedToday} 次，可以继续保持节奏` : totalDueCount > 0 ? "完成一轮短复习，保持知识活跃" : dailyNewLimit > 0 && remainingNew === 0 && (dashboardStats?.newDueCards ?? 0) > 0 ? "已到期的新卡明天继续，已学卡片到期后仍可复习" : "没有到期卡片，可以浏览牌库或查看学习统计"}</p><div className="flashcards-daily-new-progress" role="status">{dashboardStats && dailyNewLimit > 0 ? <>今日新卡 {Math.min(dailyNewLimit, dashboardStats.newStudiedToday ?? 0)} / {dailyNewLimit}{(dashboardStats.newDueCards ?? 0) > 0 && remainingNew === 0 ? " · 其余新卡明天继续" : ""}</> : loading ? "正在准备今日学习计划" : "按自己的节奏学习新卡"}</div></div>
+            {activeView === "due" ? <div><div className="flashcards-overview-eyebrow"><span>闪卡</span><ChevronRight size={13} aria-hidden="true" /><strong>今日</strong><span className="flashcard-today-date">{new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(new Date())}</span></div><h1>{loading ? "正在读取复习进度…" : totalDueCount > 0 ? <>今天还有 <strong className="flashcard-today-remaining">{totalDueCount}</strong> 张</> : dailyNewLimit > 0 && remainingNew === 0 && (dashboardStats?.newDueCards ?? 0) > 0 ? "今日新卡已达上限" : "今天已完成"}</h1><p>{dashboardStats?.reviewedToday ? `今天已复习 ${dashboardStats.reviewedToday} 次，可以继续保持节奏` : totalDueCount > 0 ? "完成一轮短复习，保持知识活跃" : dailyNewLimit > 0 && remainingNew === 0 && (dashboardStats?.newDueCards ?? 0) > 0 ? "已到期的新卡明天继续，已学卡片到期后仍可复习" : "没有到期卡片，可以浏览牌库或查看学习统计"}</p><div className="flashcards-daily-new-progress" role="status">{dashboardStats && dailyNewLimit > 0 ? <>今日新卡 {isAndroid ? (dashboardStats.newStudiedToday ?? 0) : Math.min(dailyNewLimit, dashboardStats.newStudiedToday ?? 0)} / {isAndroid ? effectiveDailyNewLimit : dailyNewLimit}{(dashboardStats.newDueCards ?? 0) > 0 && remainingNew === 0 ? " · 其余新卡明天继续" : ""}</> : loading ? "正在准备今日学习计划" : "按自己的节奏学习新卡"}</div></div>
                 : activeView === "stats" ? <div><div className="flashcards-overview-eyebrow"><span>闪卡</span><ChevronRight size={13} /><strong>统计</strong></div><h1>学习统计</h1><p>回顾学习节奏、卡片状态和评分分布</p></div>
                 : activeView === "cards" ? <div><div className="flashcards-overview-eyebrow"><span>闪卡</span><ChevronRight size={13} /><strong>牌库</strong></div><h1>全部卡片</h1><p><span>{browser.page.scopeTotal ?? 0} 张卡片</span><i /><span>使用视图、排序和筛选组织数据库</span></p></div>
                   : <div><div className="flashcards-overview-eyebrow"><span>当前牌组</span><ChevronRight size={13} /><strong>{selectedDeck?.name ?? "闪卡"}</strong></div><h1>{selectedDeck?.name ?? "闪卡"}</h1><p><span>{selectedDeckCounts.cardCount} 张卡片</span><i /> <span>{selectedDeckCounts.dueCount} 张已到期</span>{selectedDeckCounts.newCount > 0 && <><i /><span>{selectedDeckCounts.newCount} 张新卡片</span></>}{selectedDeckCounts.suspendedCount > 0 && <><i /><span>{selectedDeckCounts.suspendedCount} 张已暂停</span></>}</p></div>}
@@ -2525,11 +2585,12 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
               <div className="flashcards-resume-copy"><History size={17} /><span><strong>{reviewLabel} · 复习已暂停</strong><small>还剩 {reviewQueue.length} 张，进度已保存在本机</small></span></div>
               <button className="primary" disabled={reviewingCard || loading} onClick={() => void reviewSession.resume(() => loadFlashcardsByIds(reviewQueue.map(card => card.id)))}>{reviewingCard ? "正在处理…" : "继续复习"}</button>
               <button className="secondary" disabled={reviewingCard} onClick={() => { if (window.confirm("结束本轮复习？已保存的评分会保留，当前未提交答案将丢弃。")) reviewSession.discard(); }}>结束本轮</button>
-            </div> : (activeView === "due" || activeView === "deck") && <div className="flashcards-session-actions"><label>本次<select aria-label="本次复习张数" value={sessionLimit} onChange={event => { const count=Number(event.target.value); setSessionLimit(count); try { userProfileStorage.setItem("hub.flashcards.session-limit", String(count)); } catch { /* Keep this session preference. */ } }}>{[10,20,50,100].map(count => <option key={count} value={count}>{count} 张</option>)}<option value={0}>全部</option></select></label><label>每天新卡<select aria-label="每日新卡额度" value={dailyNewLimit} disabled={!dailyLimitReady || savingDailyLimit} onChange={event => void updateDailyNewLimit(Number(event.target.value))}>{DAILY_NEW_CARD_LIMIT_OPTIONS.map(count => <option key={count} value={count}>{count === 0 ? "不限" : `${count} 张`}</option>)}</select></label><button className="flashcards-start" disabled={!dailyLimitReady || startingReview || plannedSessionCount === 0} onClick={() => void startReview()}><Play size={16} />{plannedSessionCount > 0 ? `开始复习 ${plannedSessionCount} 张` : reviewPlan.newWaiting > 0 ? "今日新卡已达上限" : "今天已完成"}</button></div>}
+            </div> : (activeView === "due" || activeView === "deck") && <div className="flashcards-session-actions">{isAndroid ? <details className="flashcard-review-preferences"><summary>复习偏好</summary><label>本次<select aria-label="本次复习张数" value={sessionLimit} onChange={event => { const count=Number(event.target.value); setSessionLimit(count); try { userProfileStorage.setItem("hub.flashcards.session-limit", String(count)); } catch { /* Keep this session preference. */ } }}>{[10,20,50,100].map(count => <option key={count} value={count}>{count} 张</option>)}<option value={0}>全部</option></select></label><label>每天新卡<select aria-label="每日新卡额度" value={dailyNewLimit} disabled={!dailyLimitReady || savingDailyLimit} onChange={event => void updateDailyNewLimit(Number(event.target.value))}>{DAILY_NEW_CARD_LIMIT_OPTIONS.map(count => <option key={count} value={count}>{count === 0 ? "不限" : `${count} 张`}</option>)}</select></label></details> : <><label>本次<select aria-label="本次复习张数" value={sessionLimit} onChange={event => { const count=Number(event.target.value); setSessionLimit(count); try { userProfileStorage.setItem("hub.flashcards.session-limit", String(count)); } catch { /* Keep this session preference. */ } }}>{[10,20,50,100].map(count => <option key={count} value={count}>{count} 张</option>)}<option value={0}>全部</option></select></label><label>每天新卡<select aria-label="每日新卡额度" value={dailyNewLimit} disabled={!dailyLimitReady || savingDailyLimit} onChange={event => void updateDailyNewLimit(Number(event.target.value))}>{DAILY_NEW_CARD_LIMIT_OPTIONS.map(count => <option key={count} value={count}>{count === 0 ? "不限" : `${count} 张`}</option>)}</select></label></>}<button className="flashcards-start" disabled={!dailyLimitReady || startingReview || savingExtraNew || (plannedSessionCount === 0 && !(isAndroid && extraNewCount > 0 && extraNewReady))} onClick={() => void (isAndroid && plannedSessionCount === 0 && extraNewCount > 0 ? addExtraNew() : startReview())}><Play size={16} />{plannedSessionCount > 0 ? `开始复习 ${plannedSessionCount} 张` : isAndroid && extraNewCount > 0 ? `再学 ${extraNewCount} 张新卡` : reviewPlan.newWaiting > 0 ? "今日新卡已达上限" : "今天已完成"}</button></div>}
             {activeView === "stats" && <button className="flashcards-overview-back" onClick={() => void openView("due")}><ArrowLeft size={15} />返回今日</button>}
           </section>}
 
-          {activeView === "due" && dashboardStats && <FlashcardTodayProgress stats={dashboardStats} dailyNewLimit={dailyNewLimit} onOpenStats={() => { if (isAndroid) setMobilePage("stats"); void openView("stats"); }} />}
+          {activeView === "due" && isAndroid && <section className="flashcard-mobile-plan" aria-label="今日与本轮学习计划"><p>{reviewPlan.revision === "0" ? "正在核对本轮计划…" : <>今日待学习 {reviewPlan.eligibleCount} 张 · 本轮 {reviewQueue.length ? reviewSessionTotal : plannedSessionCount} 张</>}</p>{plannedSessionCount > 0 && <small>{plannedMinutes === null ? "计时样本不足，完成至少 5 次有效计时后显示预计用时。" : `本轮约 ${plannedMinutes} 分钟 · 依近30天有效计时估算，不含超过5分钟的单次记录。`}</small>}{extraNewCount > 0 && reviewQueue.length === 0 && <><button disabled={savingExtraNew || !extraNewReady} onClick={() => void addExtraNew()}>{savingExtraNew ? "正在保存…" : `今日临时增加 ${extraNewCount} 张新卡额度`}</button><small>{extraNewReady ? "仅本机今日有效，计入今日新卡；不改每日偏好。" : "更新安卓原生程序后可使用临时额度。"}</small></>}<MobileFlashcardPreview disabled={loading || plannedSessionCount === 0} /></section>}
+          {activeView === "due" && dashboardStats && <FlashcardTodayProgress stats={dashboardStats} dailyNewLimit={dailyNewLimit} mobile={isAndroid} onOpenStats={() => { if (isAndroid) setMobilePage("stats"); void openView("stats"); }} />}
 
           {activeView === "inbox" && <Suspense fallback={<div className="flashcard-lazy-loading" role="status">正在准备内容…</div>}><FlashcardInbox drafts={drafts} decks={decks} isAndroid={isAndroid} resolving={Boolean(resolvingDraft)} onCreate={beginCreateCard} onResolve={resolveDrafts} onFeedback={(draft) => openQuality({ card: draft, draft: true })} onDragEnd={() => setInboxDropDeckId("")} onDragTarget={setInboxDropDeckId} onOpenLink={openExternalLink} onOpenSource={(draft) => void openCardSource(draft, draft.sourcePath)} /></Suspense>}
 

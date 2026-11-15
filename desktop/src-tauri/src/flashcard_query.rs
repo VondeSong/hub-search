@@ -1,8 +1,6 @@
 //! Read-only browser projections and atomic selected-card operations.
 //! Full bodies are materialized only for the requested page or explicit IDs.
 
-use crate::flashcard_study_settings::read_flashcard_study_settings;
-
 use icu_casemap::CaseMapper;
 use icu_collator::{options::CollatorOptions, Collator};
 use icu_locale::{langid, locale};
@@ -428,8 +426,7 @@ pub(crate) fn review_plan_details(
         .unchecked_transaction()
         .map_err(|e| e.to_string())?;
     let actual = revision(&transaction, None)?;
-    let daily_limit = crate::flashcard_study_settings::read_flashcard_study_settings(&transaction)
-        .daily_new_limit;
+    let daily_limit = crate::flashcard_study_settings::effective_daily_limit(&transaction, as_of)?;
     let studied: i64 = transaction.query_row("SELECT COUNT(DISTINCT r.card_id) FROM flashcard_reviews r WHERE date(r.reviewed_at,'unixepoch','localtime')=date(?1,'unixepoch','localtime') AND ((r.previous_repetitions=0 AND r.previous_lapses=0) OR (r.previous_repetitions IS NULL AND NOT EXISTS(SELECT 1 FROM flashcard_reviews older WHERE older.card_id=r.card_id AND (older.reviewed_at<r.reviewed_at OR (older.reviewed_at=r.reviewed_at AND older.id<r.id)))))", params![as_of], |row| row.get(0)).map_err(|e| e.to_string())?;
     let predicate = format!("{} AND ?2>=0", scope(deck_id, true, include_subdecks));
     let bindings = vec![

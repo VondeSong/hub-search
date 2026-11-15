@@ -32,6 +32,12 @@ export type FlashcardDashboardStats = {
   retentionRate: number;
   ratingCounts: [number, number, number, number];
   dailyActivity: Array<{ date: string; count: number }>;
+  studyDay?: string;
+  extraNewAllowance?: number;
+  timedReviewCount?: number;
+  averageReviewMs?: number | null;
+  futureDue?: Array<{ date: string; count: number }>;
+  nextDueAt?: number | null;
 };
 
 export type FlashcardMedia = {

@@ -29,9 +29,9 @@ export function useFlashcardStudyPlan(options:Options){
       .catch(reason=>{if(active&&owner.current.mounted&&owner.current.planGeneration===generation)latest.current.onError(String(reason));});
     return()=>{active=false;};
   },[scopeKey,options.quota,options.refreshToken,options.decksToken]);
-  const start=useCallback(async()=>{
-    if(owner.current.starting||!latest.current.enabled)return false;
-    const config=latest.current,key=owner.current.key,generation=owner.current.generation;
+  const start=useCallback(async(scope?:Pick<Options,"deckId"|"scopeName"|"includeSubdecks">)=>{
+    if(owner.current.starting||(!latest.current.enabled&&!scope))return false;
+    const config={...latest.current,...scope},key=owner.current.key,generation=owner.current.generation;
     const current=()=>owner.current.mounted&&owner.current.key===key&&owner.current.generation===generation;
     owner.current.starting=true;setStarting(true);
     try{

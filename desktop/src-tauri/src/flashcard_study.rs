@@ -15,6 +15,9 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 use tauri::AppHandle;
 
+#[path = "flashcard_study_experience.rs"]
+mod experience;
+
 #[tauri::command]
 pub(crate) fn get_flashcard_study_settings(
     app: AppHandle,
@@ -27,12 +30,28 @@ pub(crate) fn get_flashcard_study_settings(
 pub(crate) fn update_flashcard_study_settings(
     app: AppHandle,
     daily_new_limit: i64,
+    extra_new_count: Option<i64>,
+    extra_new_day: Option<String>,
 ) -> Result<FlashcardStudySettings, String> {
     if !matches!(daily_new_limit, 0 | 5 | 10 | 20 | 50) {
         return Err("每日新卡额度只能设为不限、5、10、20 或 50 张".to_string());
     }
     let (mut connection, _writer) = open_write_database(&database_path(&app)?)?;
     let current = read_flashcard_study_settings(&connection);
+    if let Some(target) = extra_new_count {
+        if current.daily_new_limit != daily_new_limit {
+            return Err("每日偏好已变更，请刷新后重试临时额度".into());
+        }
+        crate::flashcard_study_settings::grant_extra_new_cards(
+            &mut connection,
+            target,
+            now_timestamp(),
+            extra_new_day
+                .as_deref()
+                .ok_or("请刷新今日计划后再增加临时额度")?,
+        )?;
+        return Ok(current);
+    }
     if current.daily_new_limit == daily_new_limit {
         return Ok(current);
     }
@@ -157,6 +176,7 @@ pub(crate) fn get_flashcard_dashboard_stats(
         },
         rating_counts,
         daily_activity,
+        experience: experience::read_experience(&connection, now)?,
     })
 }
 
@@ -477,7 +497,8 @@ pub(crate) fn review_flashcard(
         return Err("这张闪卡已暂停学习，请先恢复".to_string());
     }
     if current.repetitions == 0 && current.lapses == 0 {
-        let daily_limit = read_flashcard_study_settings(&connection).daily_new_limit;
+        let daily_limit =
+            crate::flashcard_study_settings::effective_daily_limit(&connection, now_timestamp())?;
         if daily_limit > 0 && flashcard_new_studied_today(&connection)? >= daily_limit {
             let started_today = connection
                 .query_row(

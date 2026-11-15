@@ -37,3 +37,12 @@ it("keeps a requested round alive across a count-only background refresh",async(
   await act(async()=>{resolve({...metadata,sessionIds:["tail"]});await pending;});
   expect(cardsMock).toHaveBeenCalledWith(["tail"]);expect(started).toHaveBeenCalledTimes(1);
 });
+
+it("starts an explicitly chosen deck from the library with the same native quota plan",async()=>{
+  await render(false,false);
+  planMock.mockResolvedValueOnce({...metadata,sessionIds:["chosen"]});
+  cardsMock.mockResolvedValueOnce([{id:"chosen",status:"active"}]);
+  await act(async()=>{await owner.start({deckId:"chosen-deck",scopeName:"Chosen",includeSubdecks:false});});
+  expect(planMock).toHaveBeenCalledWith("chosen-deck",0,false);
+  expect(started).toHaveBeenCalledWith([{id:"chosen",status:"active"}],"Chosen");
+});

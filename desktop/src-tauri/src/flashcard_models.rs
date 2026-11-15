@@ -29,6 +29,19 @@ pub(crate) struct FlashcardDashboardStats {
     pub(crate) retention_rate: f64,
     pub(crate) rating_counts: [i64; 4],
     pub(crate) daily_activity: Vec<FlashcardDateCount>,
+    #[serde(flatten)]
+    pub(crate) experience: FlashcardStudyExperience,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FlashcardStudyExperience {
+    pub(crate) study_day: String,
+    pub(crate) extra_new_allowance: i64,
+    pub(crate) timed_review_count: i64,
+    pub(crate) average_review_ms: Option<f64>,
+    pub(crate) future_due: Vec<FlashcardDateCount>,
+    pub(crate) next_due_at: Option<i64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
