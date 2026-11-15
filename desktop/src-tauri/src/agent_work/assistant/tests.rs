@@ -4,6 +4,84 @@ mod charts;
 mod sleep;
 
 #[test]
+fn direct_contract_omits_only_explicitly_unavailable_capabilities() {
+    let original = schema(runner::schema());
+    let mut catalog = crate::hub_capabilities::catalog();
+    for (i, tool) in catalog["tools"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .enumerate()
+    {
+        tool["available"] = json!(i % 2 == 0);
+        tool["unavailableReason"] = json!("本轮未授权");
+    }
+    let projected = available_schema(original.clone(), &catalog);
+    let requests = projected["properties"]["requests"]["items"]["anyOf"]
+        .as_array()
+        .unwrap();
+    for request in original["properties"]["requests"]["items"]["anyOf"]
+        .as_array()
+        .unwrap()
+    {
+        let disabled = catalog["tools"].as_array().unwrap().iter().any(|tool| {
+            tool["available"] == false
+                && request["properties"]["operation"]["enum"] == json!(["capability"])
+                && request["properties"]["name"]["enum"] == json!([tool["name"]])
+        });
+        assert_eq!(requests.contains(request), !disabled);
+    }
+    assert_eq!(
+        projected["properties"]["report"],
+        original["properties"]["report"]
+    );
+    assert_eq!(available_schema(original.clone(), &Value::Null), original);
+    let metadata = capability_metadata(catalog.clone(), &projected);
+    for (before, after) in catalog["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .zip(metadata["tools"].as_array().unwrap())
+    {
+        for field in [
+            "name",
+            "description",
+            "annotations",
+            "available",
+            "unavailableReason",
+        ] {
+            assert_eq!(before[field], after[field]);
+        }
+        assert!(after.get("inputSchema").is_none());
+    }
+}
+
+#[test]
+#[ignore = "pure value measurement of an explicitly supplied real initial request; no database or model calls"]
+fn direct_contract_saved_material_measurement() {
+    let path = std::env::var("HUB_MATERIAL_INPUT").unwrap();
+    let text = std::fs::read_to_string(path).unwrap();
+    let material: Value = serde_json::from_str(&text[text.find('{').unwrap()..]).unwrap();
+    let mut catalog = crate::hub_capabilities::catalog();
+    for tool in catalog["tools"].as_array_mut().unwrap() {
+        let saved = material["hubCapabilities"]["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|saved| saved["name"] == tool["name"])
+            .unwrap();
+        tool["available"] = saved["available"].clone();
+        tool["unavailableReason"] = saved["unavailableReason"].clone();
+    }
+    let before = schema(runner::schema());
+    let after = available_schema(before.clone(), &catalog);
+    let sizes: Vec<_> = before["properties"]["requests"]["items"]["anyOf"].as_array().unwrap().iter().map(|r| json!({"operation":r["properties"]["operation"]["enum"],"name":r["properties"]["name"]["enum"],"bytes":r.to_string().len()})).collect();
+    let result = json!({"nativeInitialInputBytes":text.len(),"beforeSchemaBytes":before.to_string().len(),"afterSchemaBytes":after.to_string().len(),"savedSchemaBytes":before.to_string().len()-after.to_string().len(),"allTools":catalog["tools"].as_array().unwrap().len(),"availableTools":catalog["tools"].as_array().unwrap().iter().filter(|t|t["available"]==true).count(),"operations":sizes,"scope":"production direct schema and saved real availability; not an exact failed DeepSeek prompt or a model run"});
+    println!("MATERIAL_CONTRACT {result}");
+    assert!(after.to_string().len() < before.to_string().len());
+}
+
+#[test]
 fn capability_metadata_keeps_availability_and_schemas_remain_in_request_contract() {
     let mut catalog = crate::hub_capabilities::catalog();
     catalog["tools"][0]["available"] = json!(false);
@@ -37,6 +115,7 @@ fn capability_metadata_keeps_availability_and_schemas_remain_in_request_contract
     // An external or changed schema can be the sole argument contract; retain it.
     let external = json!({"tools":[{"name":"external_unique_tool","inputSchema":{"type":"object","properties":{"externalOnly":{"type":"string"}}}}]});
     assert_eq!(capability_metadata(external.clone(), &contract), external);
+    catalog["tools"][0]["available"] = json!(true);
     catalog["tools"][0]["inputSchema"]["properties"]["changedArgument"] = json!({"type":"string"});
     assert_eq!(
         capability_metadata(catalog.clone(), &contract)["tools"][0],

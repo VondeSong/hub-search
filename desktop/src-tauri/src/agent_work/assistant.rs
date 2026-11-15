@@ -64,6 +64,12 @@ pub(super) fn capability_metadata(mut catalog: Value, schema: &Value) -> Value {
     // Argument schemas already appear in requests; keep availability and descriptions here.
     if let Some(tools) = catalog["tools"].as_array_mut() {
         for tool in tools {
+            if tool["available"] == false {
+                // Unavailable tools have no callable arguments in this request.
+                tool.as_object_mut().unwrap().remove("inputSchema");
+                tool["inputSchemaState"] = json!("notExposedWhileUnavailable");
+                continue;
+            }
             let duplicate = schema["properties"]["requests"]["items"]["anyOf"]
                 .as_array()
                 .into_iter()
@@ -81,6 +87,23 @@ pub(super) fn capability_metadata(mut catalog: Value, schema: &Value) -> Value {
         }
     }
     catalog
+}
+
+pub(super) fn available_schema(mut schema: Value, catalog: &Value) -> Value {
+    if let Some(requests) = schema["properties"]["requests"]["items"]["anyOf"].as_array_mut() {
+        requests.retain(|request| {
+            request["properties"]["operation"]["enum"] != json!(["capability"])
+                || !catalog["tools"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .any(|tool| {
+                        tool["available"] == false
+                            && request["properties"]["name"]["enum"] == json!([tool["name"]])
+                    })
+        });
+    }
+    schema
 }
 
 pub(super) fn schema(mut base: Value) -> Value {
