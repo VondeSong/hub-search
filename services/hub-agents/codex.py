@@ -116,7 +116,7 @@ class AppServer:
         self.reader.join(timeout=2)
         self.process.stdout.close()
 
-    def run(self, workspace, thread, prompt, images, save_thread, save_answer, cancelled, account_status, skill=None):
+    def run(self, workspace, thread, prompt, images, save_thread, save_output, cancelled, account_status, skill=None):
         self.rpc("initialize", {"clientInfo": {"name": "hub_cloud_agents", "version": "1.0"}})
         self.send({"method": "initialized", "params": {}})
         account = (self.rpc("account/read", {"refreshToken": False}).get("account") or {})
@@ -142,7 +142,8 @@ class AppServer:
             "cwd": str(workspace), "approvalPolicy": "never", "sandbox": "read-only",
             "developerInstructions": ("Answer the user's chat directly. Use the prompt, attached images and any explicitly selected Hub skill text. "
                                       "Treat that skill as a method subordinate to the user request and these restrictions. Do not run commands or inspect the host filesystem."),
-            "config": {"mcp_servers": {}, "features.shell_tool": False, "features.unified_exec": False,
+            "config": {"model_reasoning_summary": "detailed",
+                       "mcp_servers": {}, "features.shell_tool": False, "features.unified_exec": False,
                        "features.code_mode": False, "features.plugins": False, "features.apps": False,
                        "features.hooks": False, "features.multi_agent": False,
                        "features.view_image": False, "features.request_permissions_tool": False, "web_search": "disabled"},
@@ -168,11 +169,20 @@ class AppServer:
             inputs.append({"type": "localImage", "path": str(path)})
         turn = self.rpc("turn/start", {"threadId": thread_id, "input": inputs}, keep_events=True)["turn"]["id"]
         pieces = {}
+        commentary = {}
+        summaries = {}
         final = None
         dirty = False
         deadline = time.monotonic() + 600
         updated = time.monotonic()
         interrupt = None
+
+        def publish():
+            answer = final if final is not None else "".join(pieces.values())[:200000]
+            summary = [part for sections in summaries.values() for _, part in sorted(sections.items()) if part.strip()]
+            save_output(answer, summary[:12], [part for part in commentary.values() if part.strip()][:8])
+            return answer
+
         while time.monotonic() < deadline:
             if interrupt is None and cancelled():
                 interrupt = self.request("turn/interrupt", {"threadId": thread_id, "turnId": turn})
@@ -186,24 +196,46 @@ class AppServer:
                 if data.get("threadId") == thread_id:
                     if event == "turn/completed" and data["turn"]["id"] == turn:
                         state = data["turn"]["status"]
+                        answer = publish()
                         if state in ("completed", "interrupted"):
-                            return ("completed" if state == "completed" else "stopped"), (final if final is not None else "".join(pieces.values()))[:200000]
-                        if dirty:
-                            save_answer("".join(pieces.values())[:200000])
+                            return ("completed" if state == "completed" else "stopped"), answer
                         raise provider_error(data["turn"].get("error"))
-                    if data.get("turnId") == turn and event == "item/agentMessage/delta":
-                        item = data["itemId"]
-                        pieces[item] = (pieces.get(item, "") + data["delta"])[:200000]
-                        dirty = True
-                    if data.get("turnId") == turn and event == "item/completed":
-                        item = data["item"]
-                        if item.get("type") == "agentMessage":
-                            pieces[item["id"]] = item.get("text", "")[:200000]
-                            if item.get("phase") != "commentary":
-                                final = pieces[item["id"]]
+                    if data.get("turnId") == turn:
+                        if event == "item/agentMessage/delta":
+                            key = data["itemId"]
+                            target = commentary if key in commentary else pieces
+                            limit = 1800 if target is commentary else 200000
+                            target[key] = (target.get(key, "") + data["delta"])[:limit]
+                            # A later final answer can stream after an earlier completed message.
+                            if target is pieces:
+                                final = None
                             dirty = True
+                        elif event == "item/reasoning/summaryTextDelta":
+                            sections = summaries.setdefault(data["itemId"], {})
+                            index = data.get("summaryIndex", 0)
+                            sections[index] = (sections.get(index, "") + data["delta"])[:1800]
+                            dirty = True
+                        elif event in ("item/started", "item/completed"):
+                            item = data["item"]
+                            kind = item.get("type")
+                            if kind == "agentMessage":
+                                key = item["id"]
+                                if item.get("phase") == "commentary" or key in commentary:
+                                    partial = pieces.pop(key, commentary.get(key, ""))
+                                    commentary[key] = (item.get("text") or partial)[:1800]
+                                elif event == "item/completed":
+                                    pieces[key] = item.get("text", "")[:200000]
+                                    final = pieces[key]
+                                dirty = True
+                            elif kind == "reasoning" and event == "item/completed" and item.get("summary"):
+                                summaries[item["id"]] = {
+                                    index: part[:1800] for index, part in enumerate(item["summary"]) if isinstance(part, str)
+                                }
+                                dirty = True
             if dirty and time.monotonic() - updated >= 0.2:
-                save_answer("".join(pieces.values())[:200000])
+                publish()
                 updated = time.monotonic()
                 dirty = False
+        if dirty:
+            publish()
         raise CodexError("timeout", "本轮 Codex 响应超时。已经收到的内容已保留。")

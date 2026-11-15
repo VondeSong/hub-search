@@ -169,6 +169,8 @@ class Store:
             """)
             if "archived" not in {row[1] for row in db.execute("PRAGMA table_info(threads)")}:
                 db.execute("ALTER TABLE threads ADD COLUMN archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0,1))")
+            if "progress" not in {row[1] for row in db.execute("PRAGMA table_info(turns)")}:
+                db.execute("ALTER TABLE turns ADD COLUMN progress TEXT NOT NULL DEFAULT '{}'")
 
     def connect(self):
         db = sqlite3.connect(self.root / "agents.sqlite3", timeout=6)
@@ -261,12 +263,13 @@ class Store:
             entry = db.execute("SELECT id,title,updated,archived FROM threads WHERE id=?", (thread,)).fetchone()
             if entry is None:
                 raise RequestError(404, "尚未找到此对话。")
-            rows = db.execute("SELECT seq,id,text,status,answer,error,code,created FROM turns WHERE thread=? AND seq<? ORDER BY seq DESC LIMIT 31", (thread, before)).fetchall()
+            rows = db.execute("SELECT seq,id,text,status,answer,error,code,created,progress FROM turns WHERE thread=? AND seq<? ORDER BY seq DESC LIMIT 31", (thread, before)).fetchall()
             turns = []
             for row in reversed(rows[:30]):
                 attachments = db.execute("SELECT id,name,mime,seconds,length(data) AS bytes FROM attachments WHERE turn=? ORDER BY position", (row["id"],))
                 material = db.execute("SELECT payload FROM turn_materials WHERE turn=?", (row["id"],)).fetchone()
                 turns.append({**dict(row), "attachments": [dict(value) for value in attachments],
+                              "progress": json.loads(row["progress"]),
                               "material": json.loads(material["payload"]) if material else None})
             bound = db.execute("SELECT payload FROM thread_skills WHERE thread=?", (thread,)).fetchone()
             skill = json.loads(bound["payload"]) if bound else None
@@ -343,6 +346,7 @@ class Worker:
 
     def run(self, row):
         turn, thread, text = row
+        progress = {"startedAt": int(time.time() * 1000)}
 
         def stopped():
             if self.shutdown.is_set():
@@ -353,7 +357,13 @@ class Worker:
         def status(value):
             self.account = value
 
+        def publish(answer, summary, updates):
+            progress.update(summary=summary, updates=updates)
+            self.update("UPDATE turns SET answer=?,progress=? WHERE id=?",
+                        (answer, json.dumps(progress, ensure_ascii=False), turn))
+
         try:
+            self.update("UPDATE turns SET progress=? WHERE id=?", (json.dumps(progress), turn))
             with tempfile.TemporaryDirectory(dir=self.store.workspaces) as directory:
                 workspace = Path(directory)
                 images = []
@@ -374,17 +384,21 @@ class Worker:
                     state, answer = adapter.run(
                         workspace, previous, text or "请描述并分析这些附件。", images,
                         lambda value: self.update("UPDATE threads SET codex_thread=? WHERE id=?", (value, thread)),
-                        lambda value: self.update("UPDATE turns SET answer=? WHERE id=?", (value, turn)),
+                        publish,
                         stopped, status,
                         **({"skill": validate_skill(json.loads(bound["payload"]))} if bound else {}),
                     )
-                self.update("UPDATE turns SET status=?,answer=? WHERE id=?", (state, answer, turn))
+                progress["finishedAt"] = int(time.time() * 1000)
+                self.update("UPDATE turns SET status=?,answer=?,progress=? WHERE id=?",
+                            (state, answer, json.dumps(progress, ensure_ascii=False), turn))
         except (CodexError, OSError, KeyError, TypeError, ValueError) as error:
             code = error.code if isinstance(error, CodexError) else "runtime"
             message = str(error) if isinstance(error, CodexError) else "VPS 上的 Codex 服务未能运行。"
             if code in ("quota", "login"):
                 self.account = {**self.account, "state": code}
-            self.update("UPDATE turns SET status='failed',code=?,error=? WHERE id=?", (code, message, turn))
+            progress["finishedAt"] = int(time.time() * 1000)
+            self.update("UPDATE turns SET status='failed',code=?,error=?,progress=? WHERE id=?",
+                        (code, message, json.dumps(progress, ensure_ascii=False), turn))
 
 
 class Gateway(ThreadingHTTPServer):

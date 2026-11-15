@@ -54,6 +54,7 @@ for line in sys.stdin:
     if method == "account/rateLimits/read": result = {"rateLimits":{"primary":{"usedPercent":17}}}
     if method in ("thread/start", "thread/resume"):
         if method == "thread/resume": assert params["threadId"] == "native-thread"
+        assert params["config"]["model_reasoning_summary"] == "detailed"
         result = {"thread":{"id":"native-thread"},"model":"test-model"}
     if method == "turn/start":
         assert params["threadId"] == "native-thread"
@@ -65,13 +66,23 @@ for line in sys.stdin:
             attached = json.loads(inputs[1]["text"].split("\\n", 1)[1])
             assert attached["files"]["references/rules.md"]["text"] == "核对同一份参考。"
             assert attached["version"] == "method-" + "a" * 64
+        if msg == "照片":
+            ids = {"threadId":"native-thread","turnId":"native-turn"}
+            event("item/reasoning/summaryTextDelta", **ids, itemId="summary", summaryIndex=0, delta="查看用户选定的图片")
+            event("item/reasoning/textDelta", **ids, itemId="summary", contentIndex=0, delta="PRIVATE_REASONING")
+            event("item/reasoning/summaryTextDelta", threadId="native-thread", turnId="older-turn", itemId="other", summaryIndex=0, delta="OTHER_TURN")
+            event("item/started", **ids, item={"id":"progress","type":"agentMessage","phase":"commentary","text":""})
+            event("item/agentMessage/delta", **ids, itemId="progress", delta="已读取图片")
+            event("item/completed", **ids, item={"id":"progress","type":"agentMessage","phase":"commentary","text":"已读取图片。"})
         event("item/agentMessage/delta", threadId="native-thread", turnId="native-turn", itemId="answer", delta="半段")
         emit(id=m["id"], result={"turn":{"id":"native-turn"}})
         if msg == "stop": continue
         if msg == "quota":
             event("turn/completed", threadId="native-thread", turn={"id":"native-turn","status":"failed","error":{"message":"usage limit"}})
             continue
-        time.sleep(.35)
+        time.sleep(.65 if msg == "照片" else .35)
+        if msg == "照片":
+            event("item/completed", **ids, item={"id":"summary","type":"reasoning","summary":["根据图片回答。"],"content":["PRIVATE_REASONING"]})
         event("item/completed", threadId="native-thread", turnId="native-turn", item={"id":"answer","type":"agentMessage","text":"收到："+msg})
         event("turn/completed", threadId="native-thread", turn={"id":"native-turn","status":"completed"})
         continue
@@ -134,11 +145,13 @@ class GatewayTest(unittest.TestCase):
                     raw = response.read()
                     return response.status, (json.loads(raw) if response.getheader("Content-Type").startswith("application/json") else raw)
 
-                def wait_for(route, state):
+                def wait_for(route, state, ready=lambda _: True):
                     for _ in range(100):
                         code, body = call("GET", route, auth=other_token)
-                        if code == 200 and body["thread"]["turns"][-1]["status"] == state:
-                            return body
+                        if code == 200:
+                            latest = body["thread"]["turns"][-1]
+                            if latest["status"] == state and ready(latest):
+                                return body
                         time.sleep(.025)
                     self.fail(f"Did not observe {state}: {body}")
 
@@ -151,9 +164,18 @@ class GatewayTest(unittest.TestCase):
                     call("POST", one, data, drop=True)
                     self.assertEqual(call("POST", one, data)[0], 202)
                     self.assertEqual(call("POST", one, {**data, "text": "changed"})[0], 409)
+                    during = wait_for(thread, "running", lambda turn: bool(turn["progress"].get("summary")))["thread"]["turns"][0]
+                    self.assertGreater(during["progress"]["startedAt"], 0)
+                    self.assertEqual(during["progress"]["summary"], ["查看用户选定的图片"])
+                    self.assertEqual(during["answer"], "半段")
                     reply = wait_for(thread, "completed")
                     turn, = reply["thread"]["turns"]
                     self.assertEqual(turn["answer"], "收到：照片")
+                    self.assertEqual(turn["progress"]["summary"], ["根据图片回答。"])
+                    self.assertEqual(turn["progress"]["updates"], ["已读取图片。"])
+                    self.assertGreaterEqual(turn["progress"]["finishedAt"], turn["progress"]["startedAt"])
+                    self.assertNotIn("PRIVATE_REASONING", str(turn))
+                    self.assertNotIn("OTHER_TURN", str(turn))
                     attachment, = turn["attachments"]
                     self.assertEqual(attachment["seconds"], 2.5)
                     self.assertEqual(call("GET", f'/v1/attachments/{attachment["id"]}', auth=other_token), (200, image))

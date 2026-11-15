@@ -54,6 +54,8 @@ pub(crate) enum Action {
     Read {
         thread: String,
         before: Option<u64>,
+        #[serde(default)]
+        missing: bool,
     },
     Send {
         thread: String,
@@ -110,13 +112,40 @@ fn config_view(config: &Config) -> Value {
     json!({"endpoint":config.endpoint,"binding":format!("{binding:x}")})
 }
 
+enum RequestFailure {
+    Http(u16, String),
+    Transport(String),
+}
+
+impl From<RequestFailure> for String {
+    fn from(error: RequestFailure) -> Self {
+        match error {
+            RequestFailure::Http(_, message) | RequestFailure::Transport(message) => message,
+        }
+    }
+}
+
+fn delivery_receipt(turn: &str, result: Result<Value, RequestFailure>) -> Value {
+    match result {
+        Ok(receipt) if receipt["id"].as_str() == Some(turn) => {
+            json!({"delivery":"accepted","id":turn})
+        }
+        Err(RequestFailure::Http(status, error))
+            if (400..500).contains(&status) && !matches!(status, 408 | 499) =>
+        {
+            json!({"delivery":"rejected","error":error})
+        }
+        _ => json!({"delivery":"unknown"}),
+    }
+}
+
 async fn request(
     config: &Config,
     method: Method,
     path: &str,
     body: Option<Value>,
     image: bool,
-) -> Result<Value, String> {
+) -> Result<Value, RequestFailure> {
     static CLIENT: OnceLock<Result<Client, String>> = OnceLock::new();
     let client = CLIENT
         .get_or_init(|| {
@@ -129,18 +158,28 @@ async fn request(
                 .map_err(|_| "无法启动云端 Agents 网络连接。".into())
         })
         .as_ref()
-        .map_err(Clone::clone)?;
-    let url = endpoint(&config.endpoint)?
+        .map_err(|message| RequestFailure::Transport(message.clone()))?;
+    let url = endpoint(&config.endpoint)
+        .map_err(RequestFailure::Transport)?
         .join(path)
-        .map_err(|_| "云端请求地址无效。")?;
+        .map_err(|_| RequestFailure::Transport("云端请求地址无效。".into()))?;
     let mut call = client.request(method, url).bearer_auth(&config.token);
     if let Some(body) = body {
+        if body["attachments"]
+            .as_array()
+            .is_some_and(|images| !images.is_empty())
+        {
+            call = call.timeout(Duration::from_secs(180));
+        }
         call = call.json(&body);
     }
-    let mut response = call
-        .send()
-        .await
-        .map_err(|_| "无法连接 VPS。检查网络后可安全重试。")?;
+    let mut response = call.send().await.map_err(|error| {
+        RequestFailure::Transport(if error.is_timeout() {
+            "等待个人云端回应超时。".into()
+        } else {
+            "暂时无法连接个人云端。".into()
+        })
+    })?;
     let status = response.status();
     let mime = response
         .headers()
@@ -150,9 +189,13 @@ async fn request(
         .to_owned();
     let limit = if image { 4 * 1024 * 1024 } else { MAX_RESPONSE };
     let mut bytes = Vec::new();
-    while let Some(chunk) = response.chunk().await.map_err(|_| "连接中断，请重试。")? {
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|_| RequestFailure::Transport("接收云端回应时连接中断。".into()))?
+    {
         if bytes.len() + chunk.len() > limit {
-            return Err("VPS 返回内容超出限制。".into());
+            return Err(RequestFailure::Transport("VPS 返回内容超出限制。".into()));
         }
         bytes.extend_from_slice(&chunk);
     }
@@ -165,15 +208,21 @@ async fn request(
                     .as_str()
                     .map(|message| message.chars().take(240).collect::<String>())
             });
-        return Err(error.unwrap_or(fallback));
+        return Err(RequestFailure::Http(
+            status.as_u16(),
+            error.unwrap_or(fallback),
+        ));
     }
     if image {
         if !matches!(mime.as_str(), "image/jpeg" | "image/png" | "image/webp") {
-            return Err("VPS 返回了无法预览的附件类型。".into());
+            return Err(RequestFailure::Transport(
+                "VPS 返回了无法预览的附件类型。".into(),
+            ));
         }
         return Ok(json!({"url":format!("data:{mime};base64,{}",STANDARD.encode(bytes))}));
     }
-    serde_json::from_slice(&bytes).map_err(|_| "VPS 返回格式无效，请检查服务地址。".into())
+    serde_json::from_slice(&bytes)
+        .map_err(|_| RequestFailure::Transport("VPS 返回格式无效，请检查服务地址。".into()))
 }
 
 #[tauri::command]
@@ -232,6 +281,7 @@ pub(crate) async fn cloud_agents(app: AppHandle, action: Action) -> Result<Value
         }
         action => {
             let config = current()?.ok_or("请先连接 VPS。")?;
+            let missing = matches!(&action, Action::Read { missing: true, .. });
             let (method, path, body, image) = match action {
                 Action::AnswerNote { thread, turn, date } => (
                     Method::POST,
@@ -267,7 +317,7 @@ pub(crate) async fn cloud_agents(app: AppHandle, action: Action) -> Result<Value
                         false,
                     )
                 }
-                Action::Read { thread, before } => (
+                Action::Read { thread, before, .. } => (
                     Method::GET,
                     format!(
                         "/v1/threads/{}{}",
@@ -284,28 +334,29 @@ pub(crate) async fn cloud_agents(app: AppHandle, action: Action) -> Result<Value
                     turn,
                     message,
                 } => {
-                    if message.get("material").is_some() {
+                    if message.get("material").is_some() || message.get("skill").is_some() {
                         let capabilities =
                             request(&config, Method::GET, "/v1/threads", None, false).await?;
-                        if capabilities["materials"] != true {
-                            return Err(
-                                "当前 VPS 尚不支持资料快照，请更新服务后重试；正文未发送。".into(),
+                        if message.get("material").is_some() && capabilities["materials"] != true {
+                            return Ok(
+                                json!({"delivery":"rejected","error":"当前 VPS 尚不支持资料快照，请更新服务后重试。"}),
+                            );
+                        }
+                        if message.get("skill").is_some() && capabilities["skillPackages"] != true {
+                            return Ok(
+                                json!({"delivery":"rejected","error":"当前 VPS 网关不支持固定技能，请更新网关后重试。"}),
                             );
                         }
                     }
-                    if message.get("skill").is_some() {
-                        let capabilities =
-                            request(&config, Method::GET, "/v1/threads", None, false).await?;
-                        if capabilities["skillPackages"] != true {
-                            return Err("当前 VPS 网关不支持固定技能，请更新网关后重试。".into());
-                        }
-                    }
-                    (
+                    let result = request(
+                        &config,
                         Method::POST,
-                        format!("/v1/threads/{}/turns/{}", id(&thread)?, id(&turn)?),
+                        &format!("/v1/threads/{}/turns/{}", id(&thread)?, id(&turn)?),
                         Some(message),
                         false,
                     )
+                    .await;
+                    return Ok(delivery_receipt(&turn, result));
                 }
                 Action::Stop { thread, turn } => (
                     Method::POST,
@@ -321,7 +372,10 @@ pub(crate) async fn cloud_agents(app: AppHandle, action: Action) -> Result<Value
                 ),
                 _ => unreachable!(),
             };
-            request(&config, method, &path, body, image).await
+            match request(&config, method, &path, body, image).await {
+                Err(RequestFailure::Http(404, _)) if missing => Ok(json!({"thread":null})),
+                result => result.map_err(Into::into),
+            }
         }
     }
 }
@@ -344,5 +398,26 @@ mod tests {
             assert!(endpoint(invalid).is_err(), "{invalid}");
         }
         assert!(id("../attachments").is_err());
+    }
+
+    #[test]
+    fn delivery_requires_its_own_receipt_or_a_confirmed_rejection() {
+        for failure in [
+            Err(RequestFailure::Transport("connection closed".into())),
+            Err(RequestFailure::Http(504, "gateway timeout".into())),
+            Err(RequestFailure::Http(408, "timeout".into())),
+            Ok(json!({"id":"other-turn"})),
+        ] {
+            assert_eq!(delivery_receipt("turn", failure)["delivery"], "unknown");
+        }
+        assert_eq!(
+            delivery_receipt("turn", Ok(json!({"id":"turn"})))["delivery"],
+            "accepted"
+        );
+        assert_eq!(
+            delivery_receipt("turn", Err(RequestFailure::Http(413, "too large".into())))
+                ["delivery"],
+            "rejected"
+        );
     }
 }

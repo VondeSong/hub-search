@@ -3,6 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import CloudAgents from "./CloudAgents";
+import { imageUpload, outbox } from "./CloudAgentMedia";
 import { runtimeCapabilities } from "./RuntimePlatform";
 
 const invoke = vi.fn();
@@ -31,6 +32,8 @@ beforeEach(() => {
   (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   node = document.createElement("div"); document.body.append(node); root = createRoot(node);
   runtimeCapabilities.mobile = false; running = false;
+  vi.mocked(imageUpload).mockReset();
+  vi.mocked(outbox).mockClear();
   window.history.replaceState({ hubMobileRoute: "agents" }, "");
   entries = [
     { id: "one", title: "设计复核", updated: Date.now(), archived: false, preview: "已找到参考依据", status: "completed", matches: true },
@@ -159,4 +162,78 @@ it("ignores an older search result that arrives after the new query", async () =
   await type(node.querySelector('input[type="search"]')!, "正文独有词"); await waitSearch();
   await act(async () => resolveOld({ threads: [], threadManagement: true, account: { state: "ready" } }));
   expect(node.querySelector(".cloud-agents-thread")?.textContent).toContain("设计复核");
+});
+
+it("keeps the photo visible and reconciles a lost upload receipt even before the thread reaches the list", async () => {
+  runtimeCapabilities.mobile = true;
+  const handler = invoke.getMockImplementation()!;
+  let submitted: { thread: string; turn: string } | undefined;
+  let delivered = false;
+  invoke.mockImplementation((cmd, args) => {
+    const { action } = args;
+    if (action.op === "send") {
+      submitted = action;
+      return Promise.reject(new Error("无法连接 VPS"));
+    }
+    if (action.op === "read" && action.thread === submitted?.thread) {
+      if (!delivered) return Promise.resolve({ thread: null });
+      return Promise.resolve({ thread: {
+        id: submitted?.thread, title: "附件对话", before: null,
+        turns: [{ id: submitted?.turn, text: "", answer: "原图片已收到", status: "completed", attachments: [{ id: "photo", name: "截图.jpg" }] }],
+      } });
+    }
+    return handler(cmd, args);
+  });
+  vi.mocked(imageUpload).mockResolvedValue({ name: "截图.jpg", mime: "image/jpeg", data: "/9j/" });
+
+  await render();
+  await click("新对话");
+  await click("添加照片或资料");
+  const input = node.querySelector<HTMLInputElement>('input[aria-label="选择图片"]')!;
+  Object.defineProperty(input, "files", { value: [new File(["fixture"], "截图.jpg", { type: "image/jpeg" })] });
+  await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
+  expect(node.querySelector(".cloud-agents-compose .cloud-agent-thumbnail")).not.toBeNull();
+  await click("发送");
+  expect(node.querySelector(".is-pending .cloud-agent-thumbnail")).not.toBeNull();
+  expect(node.textContent).toContain("正在确认是否送达");
+  expect(node.textContent).not.toContain("无法连接 VPS");
+
+  delivered = true;
+  await click("查询原结果");
+  expect(node.textContent).toContain("原图片已收到");
+  expect(node.querySelector(".is-pending")).toBeNull();
+  expect(node.textContent).not.toContain("正在确认是否送达");
+  expect(invoke.mock.calls.filter(([, args]) => args.action.op === "send")).toHaveLength(1);
+  expect(outbox).toHaveBeenCalledWith("device", null, submitted?.turn);
+});
+
+it("shows real cloud materials, completed results and the public process in the mobile views", async () => {
+  runtimeCapabilities.mobile = true;
+  const handler = invoke.getMockImplementation()!;
+  invoke.mockImplementation((cmd, args) => args.action.op === "read" ? Promise.resolve({ thread: {
+    ...entries[0], before: null, turns: [{
+      id: "turn", seq: 1, text: "原问题", answer: "从照片得出的回答", status: "completed",
+      progress: { startedAt: 1000, finishedAt: 4000, summary: ["核对图片中的日期。"], updates: ["已读取用户选定的图片。"] },
+      attachments: [{ id: "photo", name: "截图.jpg" }],
+    }],
+  } }) : handler(cmd, args));
+  await render();
+  await act(async () => node.querySelector<HTMLButtonElement>(".cloud-agents-thread")!.click());
+  await click("查看运行过程");
+  const dialog = node.querySelector('[role="dialog"]')!;
+  expect(dialog.textContent).toContain("已读取用户选定的图片。");
+  expect(dialog.textContent).toContain("模型公开摘要");
+  expect(dialog.textContent).toContain("核对图片中的日期。");
+  expect(dialog.textContent).toContain("3 秒");
+  const back = new Promise<void>(resolve => window.addEventListener("popstate", () => resolve(), { once: true, capture: true }));
+  await click("关闭");
+  await act(async () => back);
+  await click("材料");
+  expect(node.querySelector('[aria-label="会话材料"]')?.textContent).toContain("截图.jpg");
+  expect(node.querySelector(".cloud-agents-compose")).toBeNull();
+  await click("成果");
+  expect(node.querySelector('[aria-label="会话成果"]')?.textContent).toContain("从照片得出的回答");
+  await click("对话");
+  expect(node.querySelector(".cloud-agents-compose")).not.toBeNull();
+  expect(invoke.mock.calls.some(([, args]) => args.action.op === "send")).toBe(false);
 });
