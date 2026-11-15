@@ -301,6 +301,12 @@ pub(crate) fn is_image_source(mime: &str, link_kind: &str) -> bool {
         || (matches!(mime, "" | "application/octet-stream") && link_kind == "image")
 }
 pub(crate) fn source_allowed(policy: &Policy, job_type: &str, mime: &str, link_kind: &str) -> bool {
+    #[cfg(any(test, feature = "experimental-local-file-text"))]
+    if job_type == "extract_file" {
+        return cfg!(feature = "experimental-local-file-text")
+            && policy.other_download
+            && crate::file_text::supported(mime);
+    }
     if mime == "application/pdf" {
         stage_allowed(policy, job_type, true)
     } else if is_image_source(mime, link_kind) {
@@ -324,6 +330,13 @@ pub(crate) fn outgoing_enabled(
 /// Fixed SQL over the existing j/s/l aliases. Filtering happens before ranking,
 /// so disabled images cannot starve enabled PDFs in the same library.
 pub(crate) fn eligible_sql(connection: &Connection, job_type: &str) -> String {
+    if job_type == "extract_file" {
+        return if cfg!(feature = "experimental-local-file-text") {
+            "l.enabled=1 AND l.provider IN ('craft','dida365') AND s.mime_type IN ('text/plain','application/vnd.openxmlformats-officedocument.wordprocessingml.document')".into()
+        } else {
+            "0".into()
+        };
+    }
     if job_type == "ocr_page" && !cfg!(windows) {
         return "0".into();
     }
