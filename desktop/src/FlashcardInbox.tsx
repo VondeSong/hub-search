@@ -431,7 +431,7 @@ export function FlashcardInbox({ drafts, decks, isAndroid, resolving, onCreate, 
         </div>}
       </div>
     </header>
-    {drafts.length === 0 ? <div className="flashcard-inbox-empty"><Inbox size={38} strokeWidth={1.5} /><strong>收件箱已整理完毕</strong><p>新建和导入的闪卡会先到这里。</p><button onClick={onCreate}><CirclePlus size={15} />新建卡片</button></div> : <div ref={workbenchRef} className={`flashcard-inbox-workbench${compact ? " is-compact" : ""}`} style={{ "--inbox-list-width": `${effectiveListWidth}px` } as CSSProperties}>
+    {drafts.length === 0 ? (!isAndroid || mobileMode !== "cards") && <div className="flashcard-inbox-empty"><Inbox size={38} strokeWidth={1.5} /><strong>收件箱已整理完毕</strong><p>新建和导入的闪卡会先到这里。</p><button onClick={onCreate}><CirclePlus size={15} />新建卡片</button></div> : <div ref={workbenchRef} className={`flashcard-inbox-workbench${compact ? " is-compact" : ""}`} style={{ "--inbox-list-width": `${effectiveListWidth}px` } as CSSProperties}>
       <section className="flashcard-inbox-queue" id="flashcard-inbox-queue" aria-label="待归组卡片">
         <div className="flashcard-inbox-queue-bar"><label><input ref={selectAllRef} type="checkbox" aria-label="选择当前显示的卡片" checked={allVisibleSelected} disabled={resolving || visible.length === 0} onChange={() => setSelectedIds((current) => {
           const next = new Set(current); visible.forEach((draft) => { if (allVisibleSelected) next.delete(draft.id); else next.add(draft.id); }); return next;

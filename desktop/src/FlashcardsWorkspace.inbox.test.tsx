@@ -450,6 +450,16 @@ describe("FlashcardsWorkspace inbox", () => {
     expect(host.querySelectorAll(".mobile-flashcard-inbox-cards > article")).toHaveLength(2);
   });
 
+  it("renders one mobile empty inbox and keeps creation available in advanced management", async () => {
+    availableDrafts = [];
+    document.documentElement.dataset.runtimePlatform = "android";
+    await openInbox();
+    expect(host.querySelector(".mobile-flashcard-inbox-cards")?.textContent).toContain("收件箱已处理完");
+    expect(host.querySelector(".flashcard-inbox-empty")).toBeNull();
+    await act(async () => button(host, "筛选与批量整理").click());
+    expect(host.querySelector(".flashcard-inbox-empty")?.textContent).toContain("新建卡片");
+  });
+
   it("opens the full mobile draft reader and returns without resolving or changing the draft", async () => {
     document.documentElement.dataset.runtimePlatform = "android";
     await openInbox();
