@@ -62,13 +62,13 @@ html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-wo
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcard-inbox.mobile-inbox-mode-cards .flashcard-inbox-toolbar,
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcard-inbox.mobile-inbox-mode-cards .flashcard-inbox-popover-wrap { display: contents; }
 .mobile-flashcard-inbox-note { color: var(--mobile-secondary); font-size: 12px; line-height: 1.65; margin: 12px 0 0; }
-.mobile-flashcard-inbox-tools,.mobile-flashcard-inbox-source { min-height: 48px; padding: 8px 0; border: 0; background: transparent; color: var(--mobile-accent); font: inherit; font-size: 14px; text-align: left; }
+.flashcard-inbox .mobile-flashcard-inbox-tools,.flashcard-inbox .mobile-flashcard-inbox-source { min-height: 48px; padding: 8px 0; border: 0; background: transparent; color: var(--mobile-accent); font: inherit; font-size: 14px; text-align: left; }
 .mobile-flashcard-inbox-cards { display: grid; gap: 16px; }
 .mobile-flashcard-inbox-cards > article { padding: 20px; border-radius: 20px; background: var(--mobile-fill); }
 .mobile-flashcard-inbox-cards h2 { margin: 0; font-size: 19px; line-height: 1.4; color: var(--mobile-ink); overflow-wrap: anywhere; }
 .mobile-flashcard-inbox-cards p { font-size: 14px; line-height: 1.75; color: var(--mobile-ink); overflow-wrap: anywhere; }
 .mobile-flashcard-inbox-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
-.mobile-flashcard-inbox-actions .mobile-flashcard-primary { width: auto; margin: 0; }
+.mobile-flashcard-inbox-actions .mobile-flashcard-primary { width: auto; margin: 0; color: var(--mobile-surface); }
 .mobile-flashcard-inbox-actions > button:not(.mobile-flashcard-primary) { min-height: 48px; border: 0; padding: 8px; background: transparent; color: var(--mobile-accent); font: inherit; font-size: 14px; }
 html[data-runtime-platform="android"] .flashcard-inbox.mobile-inbox-mode-cards .flashcard-inbox-workbench,
 html[data-runtime-platform="android"] .flashcard-inbox.mobile-inbox-mode-cards .flashcard-inbox-toolbar > :not(.flashcard-inbox-popover-wrap),
