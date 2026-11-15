@@ -60,11 +60,11 @@ export function useMobileOverlayHistory(options: Options) {
       if (state.closingCapture) { state.closingCapture = false; return; }
       if (state.closingFilters) { state.closingFilters = false; return; }
       if (state.closingSettings) { state.closingSettings = false; return; }
-      if (state.settings) { state.settings = false; current.setSettingsOpen(false); return; }
-      if (state.capture) { state.capture = false; current.setCaptureOpen?.(false); return; }
-      if (state.flashcards) { state.flashcards = false; current.setFlashcardsOpen(false); return; }
-      if (state.preview) { state.preview = false; current.setPreviewOpen(false); return; }
-      if (state.filters) { state.filters = false; current.setFiltersOpen(false); return; }
+      if (state.capture && !event.state?.hubQuickCapture) { state.capture = false; current.setCaptureOpen?.(false); return; }
+      if (state.settings && !event.state?.hubSettings) { state.settings = false; current.setSettingsOpen(false); return; }
+      if (state.flashcards && !event.state?.hubFlashcards) { state.flashcards = false; current.setFlashcardsOpen(false); return; }
+      if (state.preview && !event.state?.hubMobilePreview) { state.preview = false; current.setPreviewOpen(false); return; }
+      if (state.filters && !event.state?.hubMobileFilter) { state.filters = false; current.setFiltersOpen(false); return; }
       if (current.consumeSearchBack()) return;
       route.current(event.state?.hubMobileRoute ?? "search");
       current.setSelectedTag(event.state?.hubMobileTag ?? "");
@@ -88,7 +88,8 @@ export function useMobileOverlayHistory(options: Options) {
     if (options.settingsOpen && !state.settings) {
       if (!window.history.state?.hubSettings) window.history.pushState({ ...(window.history.state ?? {}), hubSettings: true }, ""); state.settings = true;
     } else if (!options.settingsOpen && state.settings) {
-      state.settings = false; state.closingSettings = true; window.history.back();
+      state.settings = false;
+      if (window.history.state?.hubSettings) { state.closingSettings = true; window.history.back(); }
     }
   }, [options.enabled, options.settingsOpen]);
   useEffect(() => {

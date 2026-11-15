@@ -71,4 +71,29 @@ describe("useModalFocus", () => {
     expect(container.querySelector('[role="dialog"]')).toBeTruthy();
     expect(document.activeElement?.id).toBe("nested-opener");
   });
+
+  it("consumes Android Back only in the top modal, then releases the route", async () => {
+    await act(async () => root.render(<Harness />));
+    await act(async () => container.querySelector<HTMLButtonElement>("#opener")!.click());
+    await act(async () => container.querySelector<HTMLButtonElement>("#nested-opener")!.click());
+    const nestedBack = new Event("hub:native-back", { cancelable: true });
+    await act(async () => window.dispatchEvent(nestedBack));
+    expect(nestedBack.defaultPrevented).toBe(true);
+    expect(container.querySelector('[aria-label="预览"]')).toBeNull();
+    expect(container.querySelector('[role="dialog"]')).toBeTruthy();
+    await act(async () => window.dispatchEvent(new Event("hub:native-back", { cancelable: true })));
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    const routeBack = new Event("hub:native-back", { cancelable: true });
+    window.dispatchEvent(routeBack); expect(routeBack.defaultPrevented).toBe(false);
+  });
+
+  it("leaves an HTML dialog above the modal for the native cancel handler", async () => {
+    await act(async () => root.render(<Harness />));
+    await act(async () => container.querySelector<HTMLButtonElement>("#opener")!.click());
+    const top = document.createElement("dialog"); top.open = true; document.body.append(top);
+    try {
+      const back = new Event("hub:native-back", { cancelable: true }); window.dispatchEvent(back);
+      expect(back.defaultPrevented).toBe(false); expect(container.querySelector('[role="dialog"]')).toBeTruthy();
+    } finally { top.remove(); }
+  });
 });

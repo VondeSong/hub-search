@@ -19,7 +19,7 @@ export function MobileQuickCapture({ onClose, onSaved, onSyncSettings }: {
     return () => { element?.close(); if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true }); };
   }, []);
   return createPortal(<dialog ref={dialog} className={`mobile-quick-capture ${keyboardOpen ? "keyboard-open" : ""}`} style={{ "--capture-viewport-height": `${height}px`, "--capture-keyboard-inset": `${Math.max(0, window.innerHeight - height)}px` } as CSSProperties} aria-label="速记"
-    onCancel={event => { event.preventDefault(); onClose(); }} onClick={event => {
+    onCancel={event => { if (event.target !== event.currentTarget) return; event.preventDefault(); onClose(); }} onClick={event => {
       if (event.target !== dialog.current) return;
       const rect = event.currentTarget.getBoundingClientRect();
       if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) onClose();

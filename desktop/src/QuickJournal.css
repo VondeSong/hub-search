@@ -20,9 +20,9 @@
 .quick-journal-compose footer { margin-top: 12px; }
 .quick-journal-compose button[type=submit] { margin-left: auto; background: var(--journal-db-accent); color: #fff; border-color: transparent; }
 .quick-journal-compose button[type=submit]:hover:not(:disabled) { filter: brightness(.9); background: var(--journal-db-accent); }
-.quick-journal-compose ul { padding: 0; list-style: none; }
-.quick-journal-compose li { display: flex; gap: 6px; align-items: center; }
-.quick-journal-compose li span { overflow-wrap: anywhere; }
+.quick-journal-draft-files { padding: 0; list-style: none; }
+.quick-journal-draft-files > li { display: flex; gap: 6px; align-items: center; }
+.quick-journal-draft-files > li span { overflow-wrap: anywhere; }
 .quick-journal-card { border: 1px solid var(--journal-db-line); border-radius: 12px; padding: 20px; min-width: 0; }
 .quick-journal-card header { color: var(--hub-text-secondary, #626b77); font-size: .88em; font-variant-numeric: tabular-nums; margin-bottom: 14px; }
 .quick-journal-card header span:nth-child(2) { margin-left: auto; }

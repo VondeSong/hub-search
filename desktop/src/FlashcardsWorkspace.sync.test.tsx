@@ -186,7 +186,7 @@ describe("FlashcardsWorkspace synchronization", () => {
         newStudiedToday: syncCompleted ? 10 : 7, retentionRate: 1, ratingCounts: [0, 0, 49, 0],
         dailyActivity: [],
       };
-      if (command === "flashcard_review_plan") return { sessionIds: [], sessionCount: syncCompleted ? 8 : 11, eligibleCount: syncCompleted ? 8 : 11, newAvailable: 0, newWaiting: 699, revision: "1", asOf: 0 };
+      if (command === "flashcard_review_plan") return { sessionIds: Array.from({length:syncCompleted ? 8 : 11},(_,index)=>`card-${index}`), sessionCount: syncCompleted ? 8 : 11, eligibleCount: syncCompleted ? 8 : 11, newAvailable: 0, newWaiting: 699, revision: "1", asOf: 0 };
       return original(command, args);
     });
     const onDueCountChange = vi.fn();
@@ -200,17 +200,20 @@ describe("FlashcardsWorkspace synchronization", () => {
     }
     await act(async () => buttonWithText(container, "今日").click());
     await settle();
-    expect(container.textContent).toContain("今天还有 11 张");
-    expect(container.textContent).toContain("今天已复习 13 次");
+    expect(container.textContent).toContain(platform === "android" ? "11 张待复习" : "今天还有 11 张");
+    if(platform === "android") expect(container.querySelector(".flashcard-today-value strong")?.textContent).toBe("13");
+    else expect(container.textContent).toContain("今天已复习 13 次");
     const nativeListener = listenMock.mock.calls.find(([event]) => event === "flashcards-data-changed")?.[1];
     expect(nativeListener).toBeTypeOf("function");
     syncCompleted = true;
     await act(async () => nativeListener({ event: "flashcards-data-changed", payload: null, id: 1 }));
     await settle();
-    expect(container.textContent).toContain("今天还有 8 张");
-    expect(container.textContent).toContain("今天已复习 16 次");
+    expect(container.textContent).toContain(platform === "android" ? "8 张待复习" : "今天还有 8 张");
+    if(platform === "android") expect(container.querySelector(".flashcard-today-value strong")?.textContent).toBe("16");
+    else expect(container.textContent).toContain("今天已复习 16 次");
     expect(container.textContent).toContain("新卡目标已完成");
-    expect(container.textContent).toContain("开始复习 8 张");
+    if(platform === "android") expect(container.querySelector(".mobile-flashcard-primary")?.textContent).toBe("开始复习");
+    else expect(container.textContent).toContain("开始复习 8 张");
     expect(onDueCountChange).toHaveBeenLastCalledWith(8);
   });
 
@@ -246,7 +249,7 @@ describe("FlashcardsWorkspace synchronization", () => {
     await settle();
     await act(async () => buttonWithText(container, "今日").click());
     await settle();
-    await act(async () => buttonWithText(container, container.querySelector(".flashcards-resume-panel") ? "继续复习" : "开始复习 1 张").click());
+    await act(async () => (container.querySelector<HTMLButtonElement>(".mobile-flashcard-primary") ?? buttonWithText(container, container.querySelector(".flashcards-resume-panel") ? "继续复习" : "开始复习 1 张")).click());
     await settle();
     await act(async () => window.dispatchEvent(new Event("hub:flashcards-sync")));
     await settle();
@@ -302,7 +305,7 @@ describe("FlashcardsWorkspace synchronization", () => {
     await act(async () => root.render(<FlashcardsWorkspace onClose={() => undefined} onStatusMessage={onStatusMessage} />));
     await settle();
     await act(async () => buttonWithText(container, "今日").click()); await settle();
-    await act(async () => buttonWithText(container, container.querySelector(".flashcards-resume-panel") ? "继续复习" : "开始复习 1 张").click());
+    await act(async () => (container.querySelector<HTMLButtonElement>(".mobile-flashcard-primary") ?? buttonWithText(container, container.querySelector(".flashcards-resume-panel") ? "继续复习" : "开始复习 1 张")).click());
     syncCompleted = true;
     await act(async () => window.dispatchEvent(new Event("hub:cloud-data-changed")));
     await settle();
@@ -352,7 +355,7 @@ describe("FlashcardsWorkspace synchronization", () => {
     await act(async () => root.render(<FlashcardsWorkspace onClose={() => undefined} onStatusMessage={onStatusMessage} />));
     await settle();
     await act(async () => buttonWithText(container, "今日").click()); await settle();
-    await act(async () => buttonWithText(container, container.querySelector(".flashcards-resume-panel") ? "继续复习" : "开始复习 1 张").click());
+    await act(async () => (container.querySelector<HTMLButtonElement>(".mobile-flashcard-primary") ?? buttonWithText(container, container.querySelector(".flashcards-resume-panel") ? "继续复习" : "开始复习 1 张")).click());
     await settle();
     await act(async () => buttonWithText(container, "显示答案").click());
     const good = () => container.querySelector<HTMLButtonElement>(".flashcards-ratings > .rating-3")!;
@@ -393,7 +396,7 @@ describe("FlashcardsWorkspace synchronization", () => {
     await act(async () => root.render(<FlashcardsWorkspace onClose={() => undefined} onStatusMessage={onStatusMessage} />));
     await settle();
     await act(async () => buttonWithText(container, "今日").click()); await settle();
-    await act(async () => buttonWithText(container, container.querySelector(".flashcards-resume-panel") ? "继续复习" : "开始复习 1 张").click());
+    await act(async () => (container.querySelector<HTMLButtonElement>(".mobile-flashcard-primary") ?? buttonWithText(container, container.querySelector(".flashcards-resume-panel") ? "继续复习" : "开始复习 1 张")).click());
     await act(async () => buttonWithText(container, "显示答案").click()); await settle();
     expect(container.querySelector(".flashcards-answer")?.textContent).toContain(card.answer);
     expect(container.textContent).toContain("卡片内容已变化");
@@ -430,7 +433,7 @@ describe("FlashcardsWorkspace synchronization", () => {
     await act(async () => root.render(<FlashcardsWorkspace onClose={() => undefined} onStatusMessage={onStatusMessage} />));
     await settle();
     await act(async () => buttonWithText(container, "今日").click()); await settle();
-    await act(async () => buttonWithText(container, container.querySelector(".flashcards-resume-panel") ? "继续复习" : "开始复习 1 张").click());
+    await act(async () => (container.querySelector<HTMLButtonElement>(".mobile-flashcard-primary") ?? buttonWithText(container, container.querySelector(".flashcards-resume-panel") ? "继续复习" : "开始复习 1 张")).click());
     await act(async () => buttonWithText(container, "显示答案").click()); await settle();
     await act(async () => buttonWithText(container, "重新加载卡片").click()); await settle();
     expect(container.querySelector(".flashcards-review-complete")).not.toBeNull();

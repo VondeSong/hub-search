@@ -66,10 +66,24 @@ it("closes capture on Android back without navigating the underlying page", asyn
   await act(async()=>window.dispatchEvent(new PopStateEvent("popstate",{state:window.history.state})));
   expect(setters.setCaptureOpen).toHaveBeenLastCalledWith(false); expect(route).not.toHaveBeenCalled();
 });
+
+it("closes the top capture while preserving an underlying settings layer", async () => {
+  const route = vi.fn(); await act(async () => root.render(<Harness settingsOpen />)); owner.bindRoute(route);
+  await act(async () => root.render(<Harness settingsOpen captureOpen />));
+  await act(async () => window.dispatchEvent(new PopStateEvent("popstate", { state: { hubMobileRoute: "search", hubSettings: true } })));
+  expect(setters.setCaptureOpen).toHaveBeenCalledWith(false);
+  expect(setters.setSettingsOpen).not.toHaveBeenCalled(); expect(route).not.toHaveBeenCalled();
+});
 it("does not pop the destination when saving replaces the capture entry", async()=>{
   const back=vi.spyOn(window.history,"back"); await act(async()=>root.render(<Harness captureOpen/>));
   window.history.replaceState({hubMobileRoute:"journals"},"");
   await act(async()=>root.render(<Harness/>)); expect(back).not.toHaveBeenCalled();
+});
+
+it("does not pop the journal destination after capture also closes underlying settings", async () => {
+  const back = vi.spyOn(window.history, "back"); await act(async () => root.render(<Harness settingsOpen captureOpen />));
+  window.history.replaceState({ hubMobileRoute: "journals" }, "");
+  await act(async () => root.render(<Harness />)); expect(back).not.toHaveBeenCalled();
 });
 it("hands capture to sync settings without creating another entry", async()=>{
   const push=vi.spyOn(window.history,"pushState"),back=vi.spyOn(window.history,"back");

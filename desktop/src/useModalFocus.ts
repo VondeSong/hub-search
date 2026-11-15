@@ -97,8 +97,17 @@ export function useModalFocus({ active, containerRef, onDismiss, suspended = fal
     };
 
     document.addEventListener("keydown", handleKeyDown, true);
+    const nativeBack = (event: Event) => {
+      if (suspendedRef.current || modalStack[modalStack.length - 1] !== container) return;
+      const nativeDialogs = document.querySelectorAll<HTMLDialogElement>("dialog[open]");
+      const topDialog = nativeDialogs[nativeDialogs.length - 1];
+      if (topDialog && !topDialog.contains(container)) return;
+      event.preventDefault(); dismissRef.current();
+    };
+    window.addEventListener("hub:native-back", nativeBack);
     return () => {
       document.removeEventListener("keydown", handleKeyDown, true);
+      window.removeEventListener("hub:native-back", nativeBack);
       const index = modalStack.lastIndexOf(container); if (index !== -1) modalStack.splice(index, 1);
       restoreBackground();
       // Nested dialogs may unmount together. Restore after every owner releases

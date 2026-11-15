@@ -664,6 +664,7 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
           {!mobile && <>{skillControls}{quota}</>}
           {pending && pending.thread !== selected && <button type="button" className="cloud-agents-resume" onClick={() => select(pending.thread)}>返回待确认消息</button>}
           {material && <div className="cloud-agents-draft-material">{materialButton(material)}<button type="button" className="cloud-agents-remove" aria-label="移除本次资料" onClick={() => setMaterial(undefined)}><X size={14}/></button></div>}
+          {mobile && (attachments.length>0||material) && <small className="cloud-agents-pending-count">待发送材料 {attachments.length+Number(Boolean(material))} 份</small>}
           {draftFiles(attachments, true)}
           {attachments.some(file => file.seconds != null) && <small>将发送带时间戳的关键帧，短暂变化可能漏掉。</small>}
           <textarea ref={textarea} value={text} onChange={event => setText(event.target.value)} disabled={archived || busy || Boolean(pending)} maxLength={20000} placeholder={archived ? "恢复会话后可继续提问" : "问一个问题，或接着聊…"} aria-label="消息" rows={mobile ? 1 : 2}/>

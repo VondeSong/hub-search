@@ -47,7 +47,7 @@ it("retains an explicitly empty library range instead of broadening to all", asy
 it("switches content type without changing query, date or library range; clears conditions individually", async () => {
   const props = filters();
   await act(async () => root.render(<MobileSearchControls filters={props}/>));
-  await click("任务");
+  await select("内容类型", "task");
   expect(props.setSourceFilters).toHaveBeenCalledWith({ craft: false, task: true, pdf: false, media: false, attachment: false, reading: false, flashcard: false });
   expect(props.setDateFilter).not.toHaveBeenCalled(); expect(props.setFolderId).not.toHaveBeenCalled();
   await act(async () => host.querySelector<HTMLButtonElement>("[aria-label='移除筛选：近 7 天']")!.click());
@@ -77,10 +77,10 @@ it("keeps content synchronization and Agents as distinct connection actions", as
   expect(agents).toHaveBeenCalledOnce();
 });
 
- it.each([['阅读','reading'],['闪卡','flashcard']])('selects %s without broadening the current library or date range',async(label,key)=>{
+ it.each([['阅读','reading'],['闪卡','flashcard']])('selects %s without broadening the current library or date range',async(_label,key)=>{
   const props=filters(),scope=vi.fn(); props.selectedLibraryIds=[];
   await act(async()=>root.render(<MobileSearchControls filters={props} onSelectLibraries={scope}/>));
-  await click(label);
+  await select("内容类型", key);
   expect(props.setSourceFilters).toHaveBeenCalledWith(Object.fromEntries(['craft','task','pdf','media','attachment','reading','flashcard'].map(id=>[id,id===key])));
   expect(scope).not.toHaveBeenCalled();expect(props.setDateFilter).not.toHaveBeenCalled();
  });

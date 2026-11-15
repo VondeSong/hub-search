@@ -71,7 +71,7 @@ function recordAttachments(record) {
 function attachmentMarkup(record, removable = false) {
   const legacy = capturePhotoStrip(record.photos, removable);
   const files = recordAttachments(record).map(a => '<figure class="capture-file">' +
-    (a.image ? '<img data-local-image="' + esc(a.id) + '" alt="' + esc(a.name) + '" hidden><span class="attachment-loading">照片加载中</span>' : '<span class="file-icon">' + ico('note', 25) + '</span>') +
+    (a.image ? '<button type="button" class="journal-photo-open" aria-label="查看照片 '+esc(a.name)+'" data-act="journal-photo:'+esc(a.id)+'"><img data-local-image="' + esc(a.id) + '" alt="' + esc(a.name) + '" hidden><span class="attachment-loading">照片加载中</span></button>' : '<button type="button" data-act="download-attachment:'+esc(a.id)+'">'+ico('note',25)+' '+esc(a.name)+'</button>') +
     (removable ? '<span class="file-name">' + esc(a.name) + '</span><button type="button" aria-label="移除附件 ' + esc(a.name) + '" data-act="capture-remove-file:' + esc(a.id) + '">' + ico('close',14) + '</button>' : '') + '</figure>').join('');
   return legacy + files;
 }
@@ -100,7 +100,7 @@ function downloadBlob(blob, name) {
 }
 async function downloadAttachment(id) {
   try {
-    const meta = st.notes.flatMap(recordAttachments).find(a => a.id === id);
+    const meta = (typeof journalStudioRecords==='function'?journalStudioRecords(true):st.notes).flatMap(recordAttachments).find(a => a.id === id);
     const blob = await attachmentTransaction('readonly', store => store.get(id));
     if (!meta || !blob) throw new Error('本机附件缺失，原记录仍保留。');
     downloadBlob(blob, meta.name);
@@ -108,7 +108,7 @@ async function downloadAttachment(id) {
 }
 async function addCaptureAttachments(input) {
   if (attachmentBusy || !input.files?.length) return;
-  const draft = workflowDraft('note'), files = [...input.files], added = [];
+  const draft = typeof journalDraftFor === 'function' ? journalDraftFor(input.form) : workflowDraft('note'), files = [...input.files], added = [];
   attachmentBusy = true; updateCaptureSubmit(input.form);
   input.form.querySelector('.capture-status').textContent = '正在保存附件…';
   let errorText = '';
@@ -128,9 +128,9 @@ async function addCaptureAttachments(input) {
     for (const a of added) await attachmentTransaction('readwrite', store => store.delete(a.id)).catch(() => {});
   } finally {
     attachmentBusy = false; input.value = '';
-    const form = document.querySelector('#quick-capture-form[data-kind="note"]');
+    const form = input.form || document.querySelector('#quick-capture-form[data-kind="note"]');
     if (form) {
-      form.querySelector('.capture-photos').innerHTML = attachmentMarkup(workflowDraft('note'), true);
+      form.querySelector('.capture-photos').innerHTML = attachmentMarkup(typeof journalDraftFor === 'function' ? journalDraftFor(form) : workflowDraft('note'), true);
       updateCaptureSubmit(form); void hydrateAttachmentImages(form);
       form.querySelector('.capture-status').textContent = errorText ? '输入已保留' : '草稿已保存';
       form.querySelector('.capture-error').textContent = errorText;
@@ -139,6 +139,7 @@ async function addCaptureAttachments(input) {
 }
 
 function journalRecords() {
+  if (typeof journalStudioRecords === 'function') return journalStudioRecords();
   const examples = ['d6','d2','d1','d8'].map(id => ({ id, date: `2026-${docs[id].date.startsWith('10') ? '10' : '11'}-${docs[id].date.match(/\s(\d+)\s日/)[1].padStart(2,'0')}`, text: docs[id].body, demo: true, syncState: 'written', attachments: [] }));
   return [...st.notes.map(n => ({ ...n, date: recordDay(n), syncState: n.syncState || 'pending' })), ...examples].sort((a,b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
 }
@@ -146,6 +147,7 @@ function journalStatus(note) {
   return ({ pending: '已保存本机 · 待上传', uploaded: '示例 · 已上传，等待电脑', written: '示例 · 已写入 OS', error: '示例 · 上传失败' })[note.syncState] || '已保存本机';
 }
 function journalCard(note) {
+  if (typeof journalStudioCard === 'function') return journalStudioCard(note);
   const long = note.text.length > 280 || note.text.split('\n').length > 7;
   const expanded = journalExpanded.has(note.id);
   return '<article class="journal-memo" data-record-id="' + esc(note.id) + '"><header><span>' + esc(note.date || '日期未记录') + '</span><span class="journal-state ' + (note.syncState === 'error' ? 'has-error' : '') + '">' + esc(journalStatus(note)) + '</span></header>' +
@@ -160,6 +162,7 @@ function journalFeed() {
   return records.map(journalCard).join('') || '<div class="empty-state"><h2>这里还没有记录</h2><p>写下一个想法，或放宽日期与标签筛选。</p>' + btn('记一条','quick-capture:note') + plain('清除筛选','journal-reset') + '</div>';
 }
 function journalPage() {
+  if (typeof journalStudioPage === 'function') return journalStudioPage();
   const pending = st.notes.filter(n => (n.syncState || 'pending') !== 'written').length;
   const tags = [...new Set(journalRecords().flatMap(n => journalTags(n.text)))];
   return intro('日志','按天留下想法，随时回来接着看。') + prototypeHint() +

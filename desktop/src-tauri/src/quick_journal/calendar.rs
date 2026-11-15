@@ -5,6 +5,13 @@ fn draft_key(slot: Option<&str>) -> Result<String, String> {
     match slot {
         None => Ok("quick_journal_draft".into()),
         Some(day) if format::valid_date(day) => Ok(format!("quick_journal_draft:{day}")),
+        Some(key)
+            if key
+                .strip_prefix("edit:")
+                .is_some_and(|id| format::hex_id(id, 32)) =>
+        {
+            Ok(format!("quick_journal_draft:{key}"))
+        }
         _ => Err("日历草稿日期无效".into()),
     }
 }

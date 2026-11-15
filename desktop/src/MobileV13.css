@@ -1,0 +1,73 @@
+/* v13 content hierarchy; preserve native records, grading and source controls. */
+html[data-runtime-platform="android"] .mobile-hub-header {min-height:56px;padding:4px 12px;}
+html[data-runtime-platform="android"] .mobile-hub-page-title {font-size:20px;font-weight:680;}
+html[data-runtime-platform="android"] .mobile-browse-scroll {padding-top:6px;}
+html[data-runtime-platform="android"] .mobile-browse-scroll>h1,
+html[data-runtime-platform="android"] .mobile-browse-scroll>.mobile-browse-intro {display:none;}
+html[data-runtime-platform="android"] .mobile-top-area>.mobile-page-intro {display:none;}
+.mobile-result-summary {display:block;max-width:100%;margin-top:5px;color:var(--mobile-secondary);font-size:13px;line-height:1.6;white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.mobile-reading-controls {padding:6px 16px 8px;}
+.mobile-reading-search {display:flex;align-items:center;gap:8px;padding:0 12px;min-height:46px;border-radius:14px;background:var(--mobile-fill);color:var(--mobile-secondary);}
+.mobile-reading-search input {width:100%;min-width:0;background:transparent;color:var(--mobile-ink);border:0;outline:0;font:inherit;min-height:46px;}
+.mobile-reading-search button {display:grid;place-items:center;min-height:44px;min-width:36px;border:0;background:transparent;color:var(--mobile-secondary);}
+.mobile-reading-status {display:flex;gap:3px;align-items:center;margin-top:10px;}
+.mobile-reading-status button {display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:44px;padding:8px 11px;border:0;border-radius:12px;background:transparent;color:var(--mobile-secondary);font:inherit;font-size:14px;}
+.mobile-reading-status button[aria-pressed=true] {background:var(--mobile-selected);color:var(--mobile-accent);}
+.mobile-reading-status button:last-child {margin-left:auto;}
+.mobile-reading-count {display:block;margin:6px 4px 0;color:var(--mobile-secondary);font-size:12px;}
+.mobile-reading-filter-fields {display:grid;gap:18px;margin-bottom:24px;}
+.mobile-reading-filter-fields select {width:100%;font:inherit;padding:10px;border:1px solid var(--mobile-separator);border-radius:9px;background:var(--mobile-fill);color:var(--mobile-ink);min-height:44px;}
+.mobile-reading-filter-fields fieldset {border:1px solid var(--mobile-separator);border-radius:10px;}
+.mobile-reading-filter-fields fieldset label,.mobile-reading-filter-fields>label:has(input[type=checkbox]) {display:flex;align-items:center;gap:8px;min-height:44px;}
+.mobile-reading-filter-dialog>footer {position:sticky;bottom:-20px;display:flex;gap:12px;padding:12px 0 max(12px,env(safe-area-inset-bottom,0px));background:var(--mobile-surface);}
+.mobile-reading-filter-dialog>footer button {flex:1;}
+.mobile-reading-filter-dialog>footer .primary {background:var(--mobile-accent);color:#fff;}
+html[data-runtime-platform="android"] .collection-row .mobile-reading-excerpt {font-size:13px;line-height:1.65;color:var(--mobile-secondary);margin:7px 0 0;white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+html[data-runtime-platform="android"] .collections-workspace .collection-browse-controls {flex:0 0 auto;}
+html[data-runtime-platform="android"] .collections-workspace .collection-row {padding:15px 17px;}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-flashcard-intro>h1,
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-flashcard-intro>p {display:none;}
+.mobile-flashcard-study-meta {display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;font-size:12px;color:var(--mobile-secondary);}
+.mobile-flashcard-study-meta>span {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mobile-flashcard-study-meta>button {flex:0 0 auto;min-width:44px;min-height:44px;background:transparent;border:0;color:var(--mobile-accent);font:inherit;}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-flashcard-face-label {font-size:13px;font-weight:600;color:var(--mobile-secondary);margin:14px 0 8px;}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android.is-reviewing .flashcards-review-card {flex:0 0 auto;min-height:min(300px,40dvh);justify-content:center;gap:14px;padding:20px;border-radius:18px;}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android.is-reviewing .flashcards-review-card>small {display:none;}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcards-review-card h2,
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcards-answer>p {font-size:19px;line-height:1.65;}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android.is-reviewing .flashcards-review {display:flex;flex-direction:column;min-height:100%;padding-bottom:0;}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android.is-reviewing .flashcards-review>.flashcards-ratings,
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android.is-reviewing .flashcards-review>.flashcards-reveal {position:sticky;bottom:0;z-index:5;margin-top:auto;padding:12px 0 calc(12px + env(safe-area-inset-bottom,0px));background:var(--mobile-surface);}
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review>.flashcards-ratings {grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;}
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review>:is(.flashcards-ratings,.flashcards-reveal) {order:10;}
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-ratings>.flashcards-rating-recommendation {grid-column:1 / -1;}
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-ratings>button {padding:9px 4px;min-height:58px;font-size:13px;}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcards-ratings>.rating-1 {background:var(--mobile-fill);color:var(--mobile-ink);}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcards-ratings>.rating-2 {background:color-mix(in srgb,#9a6a29 12%,var(--mobile-surface));color:#9a6a29;}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcards-ratings>.rating-3 {background:var(--mobile-selected);color:var(--mobile-accent);}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcards-ratings>.rating-4 {background:color-mix(in srgb,#447b53 12%,var(--mobile-surface));color:#447b53;}
+html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review>.flashcards-reveal {flex:0 0 auto;border-radius:14px;min-height:52px;color:var(--mobile-accent);border:1px solid var(--mobile-separator);}
+html[data-runtime-platform="android"] .flashcards-card-modal>header {background:var(--mobile-surface);border-color:var(--mobile-separator);}
+html[data-runtime-platform="android"] .flashcards-card-modal>header button {min-height:44px;min-width:44px;color:var(--mobile-accent);}
+html[data-runtime-platform="android"] body:has(.flashcards-card-modal) .app-shell.mobile-app-shell>.footer-bar,
+html[data-runtime-platform="android"] .flashcards-card-modal .flashcards-card-editor-actions {display:none;}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-pane .section-label {background:var(--mobile-surface);color:var(--mobile-secondary);}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-pane .result-row,
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-pane .recent-row {background:transparent;color:var(--mobile-ink);}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-pane :is(.result-title,.recent-title,.result-copy,.recent-copy) {color:var(--mobile-ink);background:transparent;min-width:0;}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-pane :is(.result-meta,.recent-path,.result-path,.result-snippet) {color:var(--mobile-secondary);}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-pane :is(.result-meta,.result-path) {max-width:100%;overflow:hidden;text-overflow:ellipsis;}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-pane :is(.grouped-page-hit,.quick-craft-result-block) {color:var(--mobile-ink);background:transparent;}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-pane :is(.grouped-page-hit,.quick-craft-result-block).selected {background:var(--mobile-selected);}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-pane :is(.grouped-page-title,.grouped-passage-excerpt) {color:var(--mobile-ink);}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-pane :is(.grouped-page-summary,.grouped-page-evidence,.grouped-passage-kind) {color:var(--mobile-secondary);}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-header .search-box {border:1px solid var(--mobile-separator);}
+.cloud-agents-pending-count {display:block;color:var(--mobile-secondary);font-size:12px;margin:3px 12px 7px;}
+.mobile-search-compact-filters {display:flex;align-items:center;gap:6px;min-width:0;padding:0 2px 5px;}
+.mobile-search-compact-filters>button,.mobile-search-type-select {display:flex;align-items:center;gap:6px;min-height:44px;max-width:100%;padding:8px 10px;border:0;border-radius:11px;background:var(--mobile-fill);color:var(--mobile-secondary);font:inherit;font-size:12px;white-space:nowrap;}
+.mobile-search-compact-filters>button:first-child {max-width:45%;overflow:hidden;}
+.mobile-search-compact-filters>button:last-child {margin-left:auto;background:transparent;min-width:40px;}
+.mobile-search-type-select {min-width:0;flex:0 1 auto;text-overflow:ellipsis;}
+html[data-runtime-platform="android"] .mobile-top-area:has(.mobile-search-facets) .search-header .filter-toggle {display:none;}
+.mobile-applied-scope:empty {display:none;}
+@media(max-width:360px){html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review>.flashcards-ratings {grid-template-columns:repeat(2,minmax(0,1fr));}}

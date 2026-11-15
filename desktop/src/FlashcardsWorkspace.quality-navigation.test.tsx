@@ -82,9 +82,9 @@ async function openQualityFromToday() {
   await settle();
   await act(async () => button(container, "今日").click());
   await settle();
-  expect(container.querySelector(".flashcards-overview-due")).not.toBeNull();
+  expect(container.querySelector(document.documentElement.dataset.runtimePlatform === "android" ? ".mobile-flashcard-today" : ".flashcards-overview-due")).not.toBeNull();
   if (document.documentElement.dataset.runtimePlatform === "android") {
-    await act(async () => button(container.querySelector<HTMLElement>(".flashcards-mobile-nav")!, "牌库").click());
+    await act(async () => button(container.querySelector<HTMLElement>(".mobile-flashcard-tabs")!, "牌库").click());
     expect(container.querySelector(".flashcards-workspace")?.classList.contains("mobile-page-library")).toBe(true);
   }
   await act(async () => button(container, "质量与制卡偏好").click());
@@ -149,10 +149,11 @@ it.each([
   await act(async () => button(editor!, "取消").click());
   expect(container.querySelector('[aria-label="编辑闪卡"]')).toBeNull();
   expect(container.querySelector(".flashcards-main")?.hasAttribute("inert")).toBe(false);
-  const todayNavigation = android ? container.querySelector<HTMLElement>(".flashcards-mobile-nav")! : container;
+  if (android) await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="返回牌库"]')!.click());
+  const todayNavigation = android ? container.querySelector<HTMLElement>(".mobile-flashcard-tabs")! : container;
   await act(async () => button(todayNavigation, "今日").click());
   await settle();
-  expect(container.querySelector(".flashcards-overview-due")).not.toBeNull();
+  expect(container.querySelector(android ? ".mobile-flashcard-today" : ".flashcards-overview-due")).not.toBeNull();
   if (android) expect(container.querySelector(".flashcards-workspace")?.classList.contains("mobile-page-review")).toBe(true);
   expect(container.querySelector(".flashcards-main")?.textContent).not.toContain(target.question);
 });

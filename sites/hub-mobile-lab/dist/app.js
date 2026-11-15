@@ -74,8 +74,8 @@ const group=(content,empty='暂无项目。')=>'<div class="group">'+(content||'
 const intro=(t,d)=>t===routes[route()[0]]&&!['doc','note','article','task','finding','work','deck','study','widgets'].includes(route()[0])?'':'<h1>'+esc(t)+'</h1><p class="lede">'+esc(d)+'</p>';
 const detail=(t,badge,body)=>'<article class="detail">'+badge+'<h1>'+esc(t)+'</h1>'+body+'</article>';
 const sourceRow=(id)=>row(docs[id].t,docs[id].s+' · '+docs[id].tag,'note','go:doc/'+id);
-const routes={future:'后续功能',deck:'牌组', 'collab-sync':'协作同步演示',search:'搜索',browse:'浏览',tasks:'任务',review:'复习',insights:'洞察',reading:'阅读',favorites:'收藏',recent:'最近浏览',logs:'日志',tags:'标签',libraries:'资料库',settings:'设置',sync:'同步状态',agent:'Agents',agents:'Agents','agent-chat':'Agents 对话','agent-connection':'云端连接',requests:'更新请求',request:'请求详情',guide:'功能梳理',doc:'资料详情',article:'阅读详情',task:'任务详情',finding:'发现详情',capture:'快速记录',recap:'阶段回顾',works:'工作与专题',work:'工作详情',saved:'日志',label:'标签详情',study:'牌组复习',appearance:'外观与阅读'};
-const parent={future:'settings',deck:'review','collab-sync':'future',reading:'browse',favorites:'browse',recent:'browse',logs:'browse',tags:'browse',libraries:'browse',settings:'browse',sync:'browse',agent:'browse',agents:'browse','agent-chat':'agents','agent-connection':'agents',requests:'insights',request:'insights',guide:'browse',doc:'browse',article:'browse',task:'tasks',finding:'insights',recap:'insights',capture:'browse',works:'browse',work:'browse',saved:'browse',label:'browse',study:'review',appearance:'browse'};
+const routes={future:'后续功能',deck:'牌组', 'collab-sync':'协作同步演示',search:'搜索',browse:'浏览',tasks:'任务',review:'复习',insights:'洞察',reading:'阅读',favorites:'收藏',recent:'最近浏览',logs:'日志',tags:'标签',libraries:'资料库',settings:'设置',sync:'同步状态',agent:'Agents',agents:'Agents','agent-chat':'Agents 对话','agent-connection':'云端连接',requests:'更新请求',request:'请求详情',guide:'功能梳理',doc:'资料详情',article:'阅读详情',task:'任务详情',finding:'发现详情','journal-edit':'编辑日志','journal-record':'日志详情',capture:'快速记录',recap:'阶段回顾',works:'工作与专题',work:'工作详情',saved:'日志',label:'标签详情',study:'牌组复习',appearance:'外观与阅读'};
+const parent={future:'settings',deck:'review','collab-sync':'future',reading:'browse',favorites:'browse',recent:'browse',logs:'browse',tags:'browse',libraries:'browse',settings:'browse',sync:'browse',agent:'browse',agents:'browse','agent-chat':'agents','agent-connection':'agents',requests:'insights',request:'insights',guide:'browse',doc:'browse',article:'browse',task:'tasks',finding:'insights',recap:'insights','journal-edit':'logs','journal-record':'logs',capture:'browse',works:'browse',work:'browse',saved:'browse',label:'browse',study:'review',appearance:'browse'};
 Object.assign(routes,{connections:'连接总览',note:'本地笔记',card:'闪卡详情',widgets:'小组件预览'});
 Object.assign(parent,{insights:'browse',connections:'browse',note:'browse',card:'review',agent:'agents',widgets:'settings'});
 let activeRoute='', scrolls={}, sheets=new Map(), sheetSerial=0;
@@ -85,6 +85,7 @@ if(!Number.isInteger(history.state?.hubDepth))history.replaceState({hubDepth:0},
 const route=()=>{const h=location.hash.slice(1);const [p,id]=h.split('/');return routes[p]?[p,id]:['search','']};
 function go(to){
  const next=to.split('/')[0], state=history.state||{};
+ if(typeof journalEditorSession !== 'undefined' && journalEditorSession && route()[0]==='journal-edit' && to!=='journal-edit/'+journalEditorSession.id && !state.sheet){if(!journalCommitEdit(journalEditorSession.id))return;journalEditorSession=null;}
  if(!routes[next]||mobileClosingSheet)return;
  if(location.hash==='#'+to&&!state.sheet)return;
  if(route()[0]==='search'&&query&&workspaceIndex().some(item=>item.route===to))workspaceRememberQuery();
@@ -295,6 +296,8 @@ function content(p,id){
  case 'favorites':return intro('收藏','回看已收藏的笔记与阅读内容。')+searchInput('star-query','搜索收藏',starQuery)+'<div id="star-results">'+favoriteRows()+'</div>';
  case 'recent':return intro('最近浏览','回到最近打开的资料与文章。')+section('访问历史',group(st.history.map(itemRow).join(''),'还没有浏览记录。'),st.history.length?plain('清除','clear-history'):'');
  case 'logs':return journalPage();
+ case 'journal-edit':return journalRecordPage(id);
+ case 'journal-record':return journalRecordPage(id,true);
  case 'tags':return intro('标签','按标签搜索示例资料。')+searchInput('tag-query','搜索标签',tagQuery)+'<div id="tag-results">'+tagRows()+'</div>';
  case 'label':{const t=labelFromRoute(id);return t?intro(t,'具有此标签的资料与速记。')+section('资料',group(mobileTagItems(t))):missing()}
 
@@ -311,11 +314,14 @@ function render(restore=false){
  if(activeRoute!==key){workspaceRememberOpened(key);if(p!=='search')workspaceSearchActive=false;}
  activeRoute=key;document.body.dataset.view=p;
  const isStudy=p==='study'&&allReviewCards().some(c=>(st.studyDeck==='全部'||c.deck===st.studyDeck)&&!st.reviewed.includes(c.id));
- document.body.classList.toggle('focus-session',isStudy);$('#tabs').hidden=isStudy||p==='agent-chat'||p==='widgets';
+ document.body.classList.toggle('focus-session',isStudy);$('#tabs').hidden=isStudy||p==='agent-chat'||p==='widgets'||['logs','journal-edit','journal-record'].includes(p);
  const brand='<span class="brand"><img src="hub.svg" alt="">Hub <span class="sample-label">示例资料</span></span>';
  if(isTab||p==='agent')$('#header').innerHTML=mobileRootHeader(p==='agent'?'agents':p);
  else if(['agent-chat','agent-connection'].includes(p))$('#header').innerHTML=agentsHeader(p,id);
  else if(p==='study')$('#header').innerHTML=plain(history.state?.from==='widgets'?'返回小组件':'退出复习',history.state?.from==='widgets'?'back':'exit-study','back')+'<span class="top-title">'+esc(st.studyDeck==='全部'?'专注复习':st.studyDeck)+'</span>';
+ else if(p==='logs')$('#header').innerHTML=journalStudioHeader();
+ else if(p==='journal-edit')$('#header').innerHTML=journalEditorHeader(id);
+ else if(p==='journal-record')$('#header').innerHTML=iconBtn('返回日志','back','back')+'<span class="top-title">日志详情</span>'+iconBtn('记录操作','journal-menu:'+id,'more');
  else if(p==='widgets')$('#header').innerHTML=plain('返回 Hub','back','back')+brand+iconBtn('添加到手机的说明','widget-help','info');
  else if(p==='doc'||p==='note')$('#header').innerHTML=iconBtn('返回','back','back')+'<span class="top-title">'+(p==='note'?'本地笔记':'资料')+'</span><div class="top-actions">'+iconBtn('资料出处','doc-source:'+id,'link')+iconBtn('更多操作','doc-tools:'+id,'more')+'</div>';
  else $('#header').innerHTML=iconBtn('返回','back','back')+'<h1 class="top-title">'+routes[p]+'</h1>'+iconBtn('快速速记','quick-capture:note','plus');
@@ -328,13 +334,14 @@ function render(restore=false){
  mobileUpdateViewport();
  if(p==='search')workspaceRevealActiveType();
  if(typeof agentUIAfterRender==='function')agentUIAfterRender();
+ if(typeof journalStudioAfterRender==='function')journalStudioAfterRender();
 }
 function showSheet(t,html){
  const d=$('#sheet'),opened=d.open;
  if(!opened){mobileSheetFocus=document.activeElement?.closest('[data-act]')?.dataset.act||null;lockMobilePage()}
  const cardEditor=html.includes('id="card-edit-form"');
  d.innerHTML='<div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head">'+(cardEditor?plain('暂不保存','close'):'')+'<h2 id="sheet-title">'+esc(t)+'</h2>'+(cardEditor?'<button class="btn" type="submit" form="card-edit-form">保存</button>':iconBtn('关闭','close','close'))+'</div><div class="sheet-body">'+html+'</div><p id="sheet-feedback" class="info" role="status" hidden></p>';
- if(!opened)d.showModal();if(d.querySelector('#workspace-scope-form'))workspaceSyncScopeParents();mobileUpdateViewport();
+ if(!opened)d.showModal();if(typeof journalStudioAfterRender==='function')journalStudioAfterRender();if(d.querySelector('#workspace-scope-form'))workspaceSyncScopeParents();mobileUpdateViewport();
 }
 function sheet(t,html){
  if(mobileClosingSheet)return;const state=history.state||{},id=state.sheet||++sheetSerial;
@@ -343,16 +350,16 @@ function sheet(t,html){
  showSheet(t,html)
 }
 function close(){if(mobileClosingSheet)return;snapshotMobileSheet();if(history.state?.sheet){mobileClosingSheet=true;history.back()}else dismissMobileSheet(true)}
-$('#sheet').addEventListener('cancel',e=>{e.preventDefault();close()});
+$('#sheet').addEventListener('cancel',e=>{if(e.target!==e.currentTarget)return;e.preventDefault();close()});
 
 
 function changed(msg){const persisted=save();render();if(persisted)tell(msg);return persisted}
-document.addEventListener('input',e=>{if(workspaceInput(e)||taskToolsInput(e)||handleAgentInput(e))return;handleWorkflowInput(e);const el=e.target;if(el.id==='query'&&!e.isComposing){query=el.value.trim();refreshSearch()}if(el.id==='capture-text'){st.draft=el.value;save()}if(el.id==='reading-query'){readingQuery=el.value.trim();$('#reading-results').innerHTML=readingRows()}if(el.id==='star-query'){starQuery=el.value.trim();$('#star-results').innerHTML=favoriteRows()}if(el.id==='tag-query'){tagQuery=el.value.trim();$('#tag-results').innerHTML=tagRows()}if(el.id==='correction'){st.drafts['feedback-'+el.form.dataset.id]=el.value;save()}if(el.form?.id==='request-form'){st.drafts[el.form.dataset.target]=readRequest(el.form);save()}});
+document.addEventListener('input',e=>{if(typeof journalStudioInput==='function'&&journalStudioInput(e))return;if(workspaceInput(e)||taskToolsInput(e)||handleAgentInput(e))return;handleWorkflowInput(e);const el=e.target;if(el.id==='query'&&!e.isComposing){query=el.value.trim();refreshSearch()}if(el.id==='capture-text'){st.draft=el.value;save()}if(el.id==='reading-query'){readingQuery=el.value.trim();$('#reading-results').innerHTML=readingRows()}if(el.id==='star-query'){starQuery=el.value.trim();$('#star-results').innerHTML=favoriteRows()}if(el.id==='tag-query'){tagQuery=el.value.trim();$('#tag-results').innerHTML=tagRows()}if(el.id==='correction'){st.drafts['feedback-'+el.form.dataset.id]=el.value;save()}if(el.form?.id==='request-form'){st.drafts[el.form.dataset.target]=readRequest(el.form);save()}});
 document.addEventListener('focusin',e=>{if(e.target.id==='query'){if(!workspaceSearchActive)workspaceSearchEntryQuery=query;workspaceSearchActive=true;refreshSearch();}});
 document.addEventListener('compositionend',e=>{if(taskToolsInput(e))return;if(e.target.id==='query'){query=e.target.value.trim();refreshSearch()}});
-document.addEventListener('change',e=>{if(widgetChange(e)||workspaceInput(e)||taskToolsInput(e)||handleAgentChange(e))return;handleWorkflowInput(e);const f=e.target.form;if(f?.id==='request-form'){st.drafts[f.dataset.target]=readRequest(f);save()}});
+document.addEventListener('change',e=>{if(typeof journalStudioInput==='function'&&journalStudioInput(e))return;if(widgetChange(e)||workspaceInput(e)||taskToolsInput(e)||handleAgentChange(e))return;handleWorkflowInput(e);const f=e.target.form;if(f?.id==='request-form'){st.drafts[f.dataset.target]=readRequest(f);save()}});
 document.addEventListener('submit',e=>{
- const f=e.target;if(f.id==='card-edit-form'){e.preventDefault();saveCardEdit(f);return}if(f.id==='reading-filter-form'){e.preventDefault();readingSource=f.querySelector('#reading-source').value;readingView=f.querySelector('#reading-view').value;if(readingView==='继续阅读'){readingFilter='阅读中';readingView='全部内容'}close();render();mobileRememberView();return}if(widgetSubmit(f)||workspaceSubmit(f)||taskToolsSubmit(f)||handleAgentSubmit(f)){e.preventDefault();return}if(f.id==='quick-capture-form'){e.preventDefault();handleWorkflowSubmit(f);return}if(!['search-form','capture-form','correction-form','request-form','search-scope-form','sync-settings-form'].includes(f.id))return;e.preventDefault();
+ const f=e.target;if(typeof journalStudioSubmit==='function'&&journalStudioSubmit(f)){e.preventDefault();return}if(f.id==='card-edit-form'){e.preventDefault();saveCardEdit(f);return}if(f.id==='reading-filter-form'){e.preventDefault();readingSource=f.querySelector('#reading-source').value;readingView=f.querySelector('#reading-view').value;if(readingView==='继续阅读'){readingFilter='阅读中';readingView='全部内容'}close();render();mobileRememberView();return}if(widgetSubmit(f)||workspaceSubmit(f)||taskToolsSubmit(f)||handleAgentSubmit(f)){e.preventDefault();return}if(f.id==='quick-capture-form'){e.preventDefault();handleWorkflowSubmit(f);return}if(!['search-form','capture-form','correction-form','request-form','search-scope-form','sync-settings-form'].includes(f.id))return;e.preventDefault();
  if(f.id==='search-form'){query=$('#query').value.trim();workspaceRememberQuery();refreshSearch();$('#query').blur();return}
  if(f.id==='capture-form'){const val=$('#capture-text').value.trim();if(!val){tell('请输入记录内容。');return}st.notes.unshift({id:'n'+Date.now(),text:val,date:new Date().toLocaleDateString('zh-CN')});const draft=st.draft;st.draft='';if(!save()){st.notes.shift();st.draft=draft;return}go('saved');tell('已保存到此浏览器');return}
  if(f.id==='request-form'){submitRequest(f);return}
@@ -364,6 +371,7 @@ document.addEventListener('submit',e=>{
 document.addEventListener('click',e=>{
  const el=e.target.closest('[data-act]');if(!el)return;
  const [a,k,v]=el.dataset.act.split(':');
+ if(typeof journalStudioAction==='function'&&journalStudioAction(a,k))return;
  if(widgetAction(a,k)||workspaceAction(a,k,v)||taskToolsAction(a,k,v)||handleAgentAction(a,k,v)||mobileHandleAction(a,k,v)||handleWorkflowAction(a,k,v))return;
  if(a==='go'){go(k);return}
  if(a==='back'){back();return}
@@ -419,7 +427,7 @@ document.addEventListener('click',e=>{
  case 'reset-confirm':{if(attachmentBusy){tell('附件正在保存，请稍后再重置。');break}const priorState=st;const preferences=structuredClone(mobilePreferences());st=structuredClone(initial);st.preferences=preferences;st.find.f3={status:'稍后',until:new Date().setHours(24,0,0,0)};if(save()){undoTask=null;initAgents();resumeAgents();close();render();applyAppearance();void clearPrototypeAttachments();tell('演示数据已重置，外观偏好保留')}else st=priorState;break;}
  }
 });
-addEventListener('popstate',()=>{mobileClosingSheet=false;const k=route().filter(Boolean).join('/');const state=history.state||{},sheetId=state.sheet;
+addEventListener('popstate',()=>{if(typeof journalBeforePop==='function'&&journalBeforePop())return;mobileClosingSheet=false;const k=route().filter(Boolean).join('/');const state=history.state||{},sheetId=state.sheet;
  if(sheetId&&sheets.has(sheetId)){if(k!==activeRoute){scrolls[activeRoute]=pageScroll();render(true)}showSheet(...sheets.get(sheetId));return}
  // After a reload, old sheet entries have no recoverable view and should not trap Back.
  if(!$('#sheet').open&&k===activeRoute&&state.hubDepth>0){history.back();return}

@@ -13,10 +13,13 @@ const decode = value => String(value || '').replace(/&(?:amp|lt|gt|quot|#39);/g,
 const attr = (tag, name) => decode(tag.match(new RegExp('(?:^|\\s)' + name + '="([^"]*)"'))?.[1] || '');
 
 function makeElement() {
+  const handlers = new Map();
   return {
     open: false, innerHTML: '', textContent: '', hidden: false, value: '', dataset: {},
     style: { setProperty() {} }, classList: { add() {}, remove() {}, toggle() {} },
-    addEventListener() {}, focus() {}, blur() {}, querySelector() { return null; }, querySelectorAll() { return []; },
+    addEventListener(type, callback) { const values=handlers.get(type)||[];values.push(callback);handlers.set(type,values); },
+    emit(type, event) { for(const callback of handlers.get(type)||[])callback(event); },
+    focus() {}, blur() {}, querySelector() { return null; }, querySelectorAll() { return []; },
     setAttribute(name, value) { this[name] = value; }, removeAttribute(name) { delete this[name]; },
     close() { this.open = false; }, showModal() { this.open = true; },
   };
@@ -145,6 +148,15 @@ function fixture(saved = {}) {
 
 const f = fixture();
 const { context: app, run } = f;
+const sheetElement=f.element('#sheet');sheetElement.open=true;
+const closesBeforePicker=f.state.closes;
+sheetElement.emit('cancel',{target:makeElement(),currentTarget:sheetElement,preventDefault(){throw new Error('child file cancellation must remain untouched');}});
+assert.equal(sheetElement.open,true,'cancelling a child file picker preserves the open editor');
+assert.equal(f.state.closes,closesBeforePicker);
+let dialogCancelPrevented=false;
+sheetElement.emit('cancel',{target:sheetElement,currentTarget:sheetElement,preventDefault(){dialogCancelPrevented=true;}});
+assert.equal(dialogCancelPrevented,true);
+assert.equal(f.state.closes,closesBeforePicker+1,'the dialog cancellation still closes the editor once');
 const menuTypes = json(run('WORKSPACE_TYPES'));
 const allLeaves = json(run('workspaceLeaves()'));
 

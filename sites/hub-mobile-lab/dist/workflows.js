@@ -130,6 +130,7 @@ function capturePhotoStrip(photos, removable = true) {
   return capturePhotos(photos).map((p, i) => '<figure><img src="' + esc(p.src) + '" alt="' + esc(p.name || '照片') + '">' + (removable ? '<button type="button" aria-label="移除照片 ' + (i + 1) + '" data-act="capture-remove-photo:' + i + '">' + ico('close', 14) + '</button>' : '') + '</figure>').join('');
 }
 function captureNoteBody(text) {
+  if (typeof journalMarkup === 'function') return journalMarkup(text);
   const inline = value => esc(value).replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
   return text.split(/\n\s*\n/).map(p => p.split('\n').reduce((groups, line) => {
     const list = /^- /.test(line), last = groups.at(-1);
@@ -138,6 +139,7 @@ function captureNoteBody(text) {
   }, []).map(g => g.list ? '<ul>' + g.lines.map(line => '<li>' + inline(line.slice(2)) + '</li>').join('') + '</ul>' : '<p>' + g.lines.map(inline).join('<br>') + '</p>').join('')).join('');
 }
 function memoCaptureForm(draft) {
+  if (typeof journalStudioCaptureForm === 'function') return journalStudioCaptureForm(draft);
   const date = validJournalDay(draft.date) ? draft.date : localDay();
   const count = recordAttachments(draft).length + capturePhotos(draft.photos).length;
   const canSave = !attachmentBusy && (draft.text?.trim() || count);
@@ -152,10 +154,12 @@ function memoCaptureForm(draft) {
 }
 function updateCaptureSubmit(form) {
   if (!form || form.dataset.kind !== 'note') return;
-  const draft = workflowDraft('note');
-  form.querySelector('[type="submit"]').disabled = attachmentBusy || !(draft.text?.trim() || capturePhotos(draft.photos).length || recordAttachments(draft).length);
+  const draft = typeof journalDraftFor === 'function' ? journalDraftFor(form) : workflowDraft('note');
+  const submit = form.querySelector('[type="submit"]'); if (!submit) return;
+  submit.disabled = attachmentBusy || !(draft.text?.trim() || capturePhotos(draft.photos).length || recordAttachments(draft).length);
 }
 function insertCaptureText(kind) {
+  if (typeof journalRichForm === 'function' && journalRichForm()) { journalCommand(kind==='list'?'insertUnorderedList':kind); return; }
   const input = document.querySelector('#quick-text');
   if (!input) return;
   const start = input.selectionStart, end = input.selectionEnd, selected = input.value.slice(start, end);
@@ -182,8 +186,9 @@ function capturePage() {
 }
 
 function readCaptureForm(form) {
+  if (typeof journalReadEditor === 'function' && form.querySelector('[data-journal-editor]')) journalReadEditor(form);
   const kind = form.dataset.kind;
-  const draft = workflowDraft(kind);
+  const draft = typeof journalDraftFor === 'function' ? journalDraftFor(form) : workflowDraft(kind);
   for (const key of ['title', 'text', 'url', 'date']) {
     const input = form.querySelector('#quick-' + key);
     if (input) draft[key] = input.value;
@@ -250,7 +255,7 @@ function handleWorkflowSubmit(form) {
     return true;
   }
   go(kind === 'task' ? 'task/' + id : 'logs');
-  tell(kind === 'task' ? '已加入本地任务' : '已保存到当前浏览器；上传和电脑写入请在同步页演示。');
+  tell(kind === 'task' ? '已加入本地任务' : '已保存在此浏览器，将按本页设置演示同步。');
   return true;
 }
 

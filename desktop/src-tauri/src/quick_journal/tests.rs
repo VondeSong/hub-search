@@ -4,7 +4,7 @@ use futures::future::BoxFuture;
 use std::{collections::BTreeMap, sync::Mutex};
 
 #[derive(Default)]
-struct MemoryStore(Mutex<BTreeMap<String, Vec<u8>>>);
+pub(super) struct MemoryStore(Mutex<BTreeMap<String, Vec<u8>>>);
 impl Store for MemoryStore {
     fn key(&self, r: &str) -> String {
         format!("prefix/v2/{r}")
@@ -66,12 +66,12 @@ impl Store for MemoryStore {
         })
     }
 }
-struct Fixture {
-    dir: PathBuf,
-    db: PathBuf,
+pub(super) struct Fixture {
+    pub(super) dir: PathBuf,
+    pub(super) db: PathBuf,
 }
 impl Fixture {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let dir = std::env::temp_dir().join(format!("hub-quick-journal-{}", random_url_safe(12)));
         fs::create_dir_all(dir.join("vault")).unwrap();
         let db = dir.join("craft-search.sqlite3");

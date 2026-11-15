@@ -1,6 +1,7 @@
 package com.craftsearch.desktop
 
 import android.os.Bundle
+import android.content.Intent
 import android.webkit.WebView
 import java.io.File
 import androidx.activity.OnBackPressedCallback
@@ -12,10 +13,16 @@ import androidx.core.graphics.Insets
 
 class MainActivity : TauriActivity() {
   private var hubWebView: WebView? = null
+  private var pendingJournalKeyboard = false
 
   override fun onWebViewCreate(webView: WebView) {
     super.onWebViewCreate(webView)
     hubWebView = webView
+    // Keep the editor's DOM focus when Android requests focus during IME/layout changes.
+    webView.settings.setNeedInitialFocus(false)
+    onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+      override fun handleOnBackPressed() { handleHubBack() }
+    })
   }
   // Android's /data/user/0 alias must be resolved before native data-safety checks.
   override fun getDataDir(): File = super.getDataDir().canonicalFile
@@ -23,41 +30,74 @@ class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
+    rememberJournalAction(intent)
 
     val content = findViewById<android.view.View>(android.R.id.content)
-    val bottomPadding = content.paddingBottom
+    val basePadding = intArrayOf(content.paddingLeft, content.paddingTop, content.paddingRight, content.paddingBottom)
     ViewCompat.setOnApplyWindowInsetsListener(content) { view, insets ->
       // Resize once for the IME, then prevent descendants from applying it again.
       val ime = WindowInsetsCompat.Type.ime()
-      val bottom = bottomPadding + insets.getInsets(ime).bottom
-      if (view.paddingBottom != bottom) {
-        view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, bottom)
-      }
-      WindowInsetsCompat.Builder(insets).setInsets(ime, Insets.NONE).build()
+      val bars = WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+      val safe = insets.getInsets(bars)
+      view.setPadding(basePadding[0] + safe.left, basePadding[1] + safe.top,
+        basePadding[2] + safe.right, basePadding[3] + maxOf(insets.getInsets(ime).bottom, safe.bottom))
+      WindowInsetsCompat.Builder(insets).setInsets(ime, Insets.NONE).setInsets(bars, Insets.NONE).build()
     }
     ViewCompat.requestApplyInsets(content)
-    val keyboardBack = object : OnBackPressedCallback(false) {
-      override fun handleOnBackPressed() {
-        WindowInsetsControllerCompat(window, content).hide(WindowInsetsCompat.Type.ime())
+  }
+
+  private fun rememberJournalAction(incoming: Intent?) {
+    val data = incoming?.data
+    val record = if (data?.scheme == "hub" && data.host == "journal") data.lastPathSegment else null
+    val action = if (incoming?.action == JournalTileService.JOURNAL_CAPTURE_ACTION) "capture" else if (record?.matches(Regex("[a-f0-9]{32}")) == true) "record" else return
+    getSharedPreferences("journal-entry", MODE_PRIVATE).edit().putString("action", action).putString("recordId", record ?: "").commit()
+    hubWebView?.post { hubWebView?.evaluateJavascript("window.dispatchEvent(new Event('hub:journal-action-available'))", null) }
+    incoming?.action = null
+    if (action == "record") incoming?.data = null
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    rememberJournalAction(intent)
+  }
+
+  internal fun requestJournalKeyboard(done: () -> Unit) {
+    val web = hubWebView
+    if (web == null || !hasWindowFocus()) { pendingJournalKeyboard = true; done(); return }
+    pendingJournalKeyboard = false
+    web.requestFocusFromTouch()
+    web.post {
+      web.evaluateJavascript("""
+        (() => {
+          const dialogs = [...document.querySelectorAll('dialog[open]')];
+          const editor = dialogs[dialogs.length - 1]?.querySelector('.journal-rich-editor[contenteditable=true]');
+          if (!editor) return false;
+          editor.focus({preventScroll:true});
+          return document.activeElement === editor;
+        })()
+      """.trimIndent()) { editing ->
+        if (editing == "true" && hasWindowFocus()) {
+          val manager = getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+          if (!manager.isActive(web)) manager.restartInput(web)
+          WindowInsetsControllerCompat(window, web).show(WindowInsetsCompat.Type.ime())
+        }
+        done()
       }
     }
-    var keyboardVisible = false
-    content.viewTreeObserver.addOnGlobalLayoutListener {
-      val visible = ViewCompat.getRootWindowInsets(content)
-        ?.isVisible(WindowInsetsCompat.Type.ime()) == true
-      if (visible && !keyboardVisible) {
-        // Register after Tauri's WebView callback so Back dismisses the IME first.
-        keyboardBack.remove()
-        onBackPressedDispatcher.addCallback(this, keyboardBack)
-      }
-      keyboardBack.isEnabled = visible
-      keyboardVisible = visible
-    }
+  }
+
+  override fun onWindowFocusChanged(hasFocus: Boolean) {
+    super.onWindowFocusChanged(hasFocus)
+    if (hasFocus && pendingJournalKeyboard) requestJournalKeyboard {}
   }
 
   @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
   override fun onBackPressed() {
-    // Legacy Back reaches this override before AndroidX's history callback.
+    handleHubBack()
+  }
+
+  private fun handleHubBack() {
     val content = findViewById<android.view.View>(android.R.id.content)
     if (content != null && ViewCompat.getRootWindowInsets(content)
         ?.isVisible(WindowInsetsCompat.Type.ime()) == true) {
@@ -65,7 +105,23 @@ class MainActivity : TauriActivity() {
       return
     }
     val webView = hubWebView
-    if (webView?.canGoBack() == true) webView.goBack()
-    else moveTaskToBack(true)
+    if (webView == null) { moveTaskToBack(true); return }
+    webView.evaluateJavascript("""
+      (() => {
+        const event = new Event('hub:native-back', {cancelable:true});
+        if (!window.dispatchEvent(event)) return true;
+        const dialogs = [...document.querySelectorAll('dialog[open]')];
+        const dialog = dialogs[dialogs.length - 1];
+        if (!dialog) return false;
+        if (dialog.dispatchEvent(new Event('cancel', {cancelable:true}))) dialog.close();
+        return true;
+      })()
+    """.trimIndent()) { handled ->
+      // App history also includes entries opened without a WebView touch gesture.
+      if (handled != "true") {
+        if (webView.canGoBack()) webView.evaluateJavascript("window.history.back()", null)
+        else moveTaskToBack(true)
+      }
+    }
   }
 }

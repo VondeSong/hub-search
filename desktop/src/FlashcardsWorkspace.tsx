@@ -2559,7 +2559,7 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
               <span>{isAndroid ? "专注复习" : reviewLabel}</span><small>{isAndroid ? mobileReviewProgress : `还剩 ${reviewQueue.length} 张`}</small>
             </div>
             {!isAndroid && reviewActions}
-            {isAndroid && <div className="mobile-flashcard-study-intro"><h1>闪卡复习</h1><p>{reviewQueue.length} 张待复习</p></div>}
+            {isAndroid && <div className="mobile-flashcard-study-meta"><span>{decks.find(deck=>deck.id===currentCard.deckId)?.name||"当前牌组"} · 还剩 {reviewQueue.length} 张</span><button type="button" disabled={reviewingCard} onClick={()=>openGridCard(currentCard)}>编辑</button></div>}
             {isAndroid && <h2 className="mobile-flashcard-face-label">{answerVisible ? "答案" : "问题"}</h2>}
             <article data-card-type={currentCard.cardType} className={`flashcards-review-card ${answerVisible ? "revealed" : ""} ${!answerVisible && (currentCard.cardType === "qa" || currentCard.cardType === "cloze" || currentCard.cardType === "image_occlusion") ? "tap-to-reveal" : ""}`} onClick={() => { if (!answerVisible && (currentCard.cardType === "qa" || currentCard.cardType === "cloze" || currentCard.cardType === "image_occlusion")) setAnswerVisible(true); }}>
               <small>{isAndroid ? decks.find(deck => deck.id === currentCard.deckId)?.name || `${CARD_TYPE_LABELS[currentCard.cardType]}卡` : `${CARD_TYPE_LABELS[currentCard.cardType]}卡`}</small>

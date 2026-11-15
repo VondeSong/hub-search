@@ -4,7 +4,9 @@ use crate::flashcard_object_store::{OssConfig, OssStore};
 use crate::reading_sync::object_store::Store;
 use sha2::{Digest, Sha256};
 pub(crate) mod calendar;
+pub(crate) mod edits;
 mod format;
+pub(crate) mod mobile;
 use format::{Attachment, Record, MAX_ATTACHMENT};
 #[cfg(target_os = "android")]
 mod android;
@@ -27,7 +29,8 @@ fn schema(c: &Connection) -> Result<(), String> {
         seq INTEGER PRIMARY KEY AUTOINCREMENT,id TEXT UNIQUE NOT NULL,payload TEXT NOT NULL,
         namespace TEXT NOT NULL DEFAULT '',uploaded INTEGER NOT NULL DEFAULT 0,
         applied INTEGER NOT NULL DEFAULT 0,receipted INTEGER NOT NULL DEFAULT 0,library_id TEXT NOT NULL DEFAULT '',path TEXT NOT NULL DEFAULT '');")
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    edits::schema(c)
 }
 fn settings(c: &Connection) -> Result<Settings, String> {
     let raw = metadata_string(c, "quick_journal_settings");
@@ -206,9 +209,23 @@ pub(crate) fn save_quick_journal_draft(
         return Err("草稿过大".into());
     }
     if let Some(day) = slot.as_deref() {
-        let value: Record = serde_json::from_str(&draft).map_err(|_| "日历草稿格式无效")?;
-        if value.version != 1 || value.date != day || !format::hex_id(&value.id, 32) {
-            return Err("日历草稿日期或身份不一致".into());
+        if let Some(id) = day.strip_prefix("edit:") {
+            if !draft.is_empty() {
+                let value: Value = serde_json::from_str(&draft).map_err(|_| "编辑草稿格式无效")?;
+                let record: Record = serde_json::from_value(value["record"].clone())
+                    .map_err(|_| "编辑草稿内容无效")?;
+                if record.id != id
+                    || !format::hex_id(id, 32)
+                    || value["revision"].as_str().is_none()
+                {
+                    return Err("编辑草稿身份无效".into());
+                }
+            }
+        } else {
+            let value: Record = serde_json::from_str(&draft).map_err(|_| "日历草稿格式无效")?;
+            if value.version != 1 || value.date != day || !format::hex_id(&value.id, 32) {
+                return Err("日历草稿日期或身份不一致".into());
+            }
         }
     }
     let (c, _guard) = open_write_database(&database_path(&app)?)?;
@@ -330,6 +347,17 @@ fn append(path: &Path, r: &Record) -> Result<(), String> {
     if !format::blocks(&after)?.iter().any(|(id, _)| id == &r.id) {
         return Err("当天日记含未闭合的 Markdown 区块，请在 OS 中修正后重试；原文未修改".into());
     }
+    replace_diary(path, before.as_deref(), &after)?;
+    if !format::blocks(&fs::read_to_string(path).map_err(|e| e.to_string())?)?
+        .iter()
+        .any(|(id, _)| id == &r.id)
+    {
+        return Err("日记写后核验失败".into());
+    }
+    Ok(())
+}
+fn replace_diary(path: &Path, before: Option<&str>, after: &str) -> Result<(), String> {
+    let parent = path.parent().ok_or("Invalid diary path")?;
     let mut options = fs::OpenOptions::new();
     options.read(true);
     #[cfg(windows)]
@@ -399,11 +427,8 @@ fn append(path: &Path, r: &Record) -> Result<(), String> {
         #[cfg(not(windows))]
         data_portability::atomic_write(path, after.as_bytes())?;
     }
-    if !format::blocks(&fs::read_to_string(path).map_err(|e| e.to_string())?)?
-        .iter()
-        .any(|(id, _)| id == &r.id)
-    {
-        return Err("日记写后核验失败".into());
+    if fs::read(path).map_err(|e| e.to_string())? != after.as_bytes() {
+        return Err("Diary readback differs".into());
     }
     Ok(())
 }
@@ -744,6 +769,7 @@ async fn transfer(db: &PathBuf, store: &dyn Store, namespace: &str) -> Result<()
             )?;
         }
     }
+    edits::transfer(db, store, namespace).await?;
     Ok(())
 }
 fn sync_configuration(
@@ -776,7 +802,8 @@ pub(crate) struct SyncReport {
 }
 fn sync_report(db: &PathBuf) -> Result<SyncReport, String> {
     let mut report = SyncReport::default();
-    for (_, _, uploaded, applied) in queue(db)? {
+    for (record, _, uploaded, applied) in queue(db)? {
+        let (uploaded, applied) = edits::status(&open_database(db)?, &record, uploaded, applied)?;
         if !uploaded {
             report.pending_upload += 1;
         }
@@ -910,7 +937,9 @@ pub(crate) fn list_quick_journal(app: AppHandle) -> Result<Value, String> {
         if missing {
             continue;
         }
-        items.push(json!({"record":r,"body":body,"uploaded":uploaded,"applied":applied,"libraryId":library,"path":path,"namespace":namespace,"sourceError":source_error}));
+        let mut item = json!({"record":r,"body":body,"uploaded":uploaded,"applied":applied,"libraryId":library,"path":path,"namespace":namespace,"sourceError":source_error});
+        edits::decorate(&c, &mut item)?;
+        items.push(item);
     }
     Ok(json!({"items":items,"error":metadata_string(&c,"quick_journal_error")}))
 }
@@ -947,7 +976,8 @@ pub(crate) async fn export_quick_journal_attachment(
             |r| r.get(0),
         )
         .map_err(|_| "速记不存在")?;
-    let r: Record = serde_json::from_str(&payload).map_err(|e| e.to_string())?;
+    let original: Record = serde_json::from_str(&payload).map_err(|e| e.to_string())?;
+    let r = edits::projected(&open_database(&db)?, &original, false)?.0;
     let a = r
         .attachments
         .iter()

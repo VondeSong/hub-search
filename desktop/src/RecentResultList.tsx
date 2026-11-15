@@ -1,3 +1,4 @@
+import { cleanSearchSnippet } from "./ResultExcerpt";
 import "./ResultFavoriteToggle.css";
 import { Star } from "lucide-react";
 import { memo, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
@@ -102,6 +103,7 @@ const RecentResultRow = memo(function RecentResultRow({
             <span className="recent-separator" aria-hidden="true">—</span>
             <span className="recent-path" title={`${result.libraryName} / ${result.path}`}>{contextPath}</span>
           </>}
+          {isMobileLayout && result.favoriteKind!=="snippet" && result.snippet.trim() && <span className="mobile-result-summary">{cleanSearchSnippet(result.snippet).slice(0,120)}</span>}
           {isMobileLayout && <span className="mobile-recent-meta">
             {showContextPath && <span className="recent-path" title={`${result.libraryName} / ${result.path}`}>{contextPath}</span>}
             {result.modifiedAt && absoluteDate && !hideEntryDate && <time className="recent-date" dateTime={new Date(result.modifiedAt * 1000).toISOString()} title={absoluteDate}>{displayedDate}</time>}

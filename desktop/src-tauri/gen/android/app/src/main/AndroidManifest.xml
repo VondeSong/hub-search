@@ -46,7 +46,16 @@
                 
             </intent-filter>
             <!-- DEEP LINK PLUGIN. AUTO-GENERATED. DO NOT REMOVE. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="hub" android:host="journal" />
+            </intent-filter>
         </activity>
+        <service android:name=".JournalTileService" android:exported="true" android:label="记一条" android:icon="@drawable/ic_journal_tile" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>
+        </service>
 
         <activity
             android:name=".QualityDocumentExportActivity"

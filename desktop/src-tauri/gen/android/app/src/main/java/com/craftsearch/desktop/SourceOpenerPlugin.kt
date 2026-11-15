@@ -22,6 +22,9 @@ class SourceOpenArgs { lateinit var url: String }
 class QuickJournalScheduleArgs { lateinit var root: String }
 
 @InvokeArg
+class JournalShareArgs { lateinit var text: String }
+
+@InvokeArg
 class FlashcardBackupReadArgs { lateinit var uri: String; lateinit var destination: String; lateinit var operationId: String }
 
 @InvokeArg
@@ -120,6 +123,54 @@ internal object BackupCopyControl {
 
 @TauriPlugin
 class SourceOpenerPlugin(private val activity: Activity) : Plugin(activity) {
+    @Command
+    fun focusJournalEditor(invoke: Invoke) {
+        activity.runOnUiThread {
+            (activity as? MainActivity)?.requestJournalKeyboard { invoke.resolve() } ?: invoke.resolve()
+        }
+    }
+    @Command
+    fun consumeJournalAction(invoke: Invoke) {
+        val state = activity.getSharedPreferences("journal-entry", Context.MODE_PRIVATE)
+        val action = state.getString("action", "") ?: ""
+        val record = state.getString("recordId", "") ?: ""
+        if (action.isNotEmpty()) state.edit().clear().commit()
+        invoke.resolve(JSObject().put("action", action).put("recordId", record))
+    }
+    @Command
+    fun shareJournal(invoke: Invoke) {
+        try {
+            val text = invoke.parseArgs(JournalShareArgs::class.java).text
+            require(text.toByteArray(Charsets.UTF_8).size <= 100000)
+            activity.runOnUiThread {
+                try {
+                    activity.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "分享记录"))
+                    invoke.resolve()
+                } catch (e: Exception) { invoke.reject("系统分享未打开，原记录保留") }
+            }
+        } catch (e: Exception) { invoke.reject("分享内容无效，原记录保留") }
+    }
+    @Command
+    fun requestJournalTile(invoke: Invoke) {
+        if (android.os.Build.VERSION.SDK_INT < 33) {
+            invoke.resolve(JSObject().put("status", "请下拉控制中心，点编辑，将 Hub「记一条」拖到常用区域。"))
+            return
+        }
+        activity.runOnUiThread {
+            try {
+                val manager = activity.getSystemService(android.app.StatusBarManager::class.java)
+                manager.requestAddTileService(android.content.ComponentName(activity, JournalTileService::class.java), "记一条", android.graphics.drawable.Icon.createWithResource(activity, R.drawable.ic_journal_tile), activity.mainExecutor) { result ->
+                    val text = when (result) {
+                        android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED -> "已添加「记一条」到控制中心"
+                        android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED -> "控制中心已包含「记一条」"
+                        android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_NOT_ADDED -> "未添加，原草稿保留，可稍后重试"
+                        else -> "系统未完成添加，请在控制中心的编辑页手动添加 Hub「记一条」。"
+                    }
+                    invoke.resolve(JSObject().put("status", text).put("resultCode", result))
+                }
+            } catch (e: Exception) { invoke.reject("系统未完成添加，可在控制中心编辑页手动添加「记一条」") }
+        }
+    }
     @Command
     fun scheduleQuickJournal(invoke: Invoke) {
         try {

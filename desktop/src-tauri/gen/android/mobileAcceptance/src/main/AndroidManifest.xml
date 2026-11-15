@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <instrumentation android:name="androidx.test.runner.AndroidJUnitRunner"
+        android:targetPackage="com.craftsearch.desktop.acceptance" android:functionalTest="true" />
+    <application android:label="Hub mobile acceptance" android:debuggable="true" />
+</manifest>

@@ -249,7 +249,8 @@ it("mobile keeps reading controls and cloud settings while hiding source and lib
  const openCloud=vi.fn();window.addEventListener("hub:open-cloud-sync-settings",openCloud);
  try {
   invoke.mockImplementation(async(command:string)=>command==="list_collection_items"?{...initial,items:[{...lifecycleItem,cloudImported:true}],total:1,matched:1}:command==="get_collection_storage"?storage:[]);
-  await mount();await click("云同步设置");expect(openCloud).toHaveBeenCalledTimes(1);
+  HTMLDialogElement.prototype.showModal=function(){this.open=true;};HTMLDialogElement.prototype.close=function(){this.open=false;};
+  await mount();await click("阅读筛选");await act(async()=>(document.querySelector('[aria-label="云同步设置"]') as HTMLElement).click());await act(async()=>vi.advanceTimersByTimeAsync(40));expect(openCloud).toHaveBeenCalledTimes(1);
   expect(container.querySelector('[aria-label="同步与连接"]')).toBeNull();
   await act(async()=>container.querySelector<HTMLElement>(".collection-row")!.click());
   expect(container.querySelector('[aria-label="选择保存资料库"]')).toBeNull();
@@ -262,41 +263,25 @@ it("mobile keeps reading controls and cloud settings while hiding source and lib
   expect(menu.textContent).toContain("归档");
  } finally {runtimeCapabilities.mobile=previous;window.removeEventListener("hub:open-cloud-sync-settings",openCloud);}
 });
-it("uses compact mobile browsing controls with a named view menu and creation control",async()=>{
+it("keeps one mobile reading filter entrance with staged fields and reachable saved views",async()=>{
  const previous=runtimeCapabilities.mobile;runtimeCapabilities.mobile=true;
- const measure=vi.spyOn(HTMLElement.prototype,"getBoundingClientRect").mockImplementation(()=>({width:1100} as DOMRect));
- const toggleSidebar=vi.fn();
+ HTMLDialogElement.prototype.showModal=function(){this.open=true;};HTMLDialogElement.prototype.close=function(){this.open=false;};
  try {
-  await act(async()=>root.render(<CollectionViewsProvider><CollectionsWorkspace onToggleDesktopSidebar={toggleSidebar}/></CollectionViewsProvider>));
-  await act(async()=>vi.advanceTimersByTimeAsync(160));
-  expect(container.querySelector('[aria-label="切换侧边栏"]')).toBeNull();
-  expect(container.querySelector('[aria-label="切换预览侧栏"]')).toBeNull();
-  const layout=container.querySelector('[aria-label="阅读布局"]')!;
+  await mount();expect(container.querySelector('[aria-label="切换侧边栏"]')).toBeNull();
+  expect(container.querySelector('.collection-header')).toBeNull();
+  expect(container.querySelector('[aria-label="搜索阅读内容"]')).toBeTruthy();
+  expect(container.querySelector('[aria-label="阅读状态"]')).toBeTruthy();
+  await click("阅读筛选");
+  const dialog=document.querySelector('dialog[aria-label="阅读筛选"]')!;
+  expect(dialog.querySelector('[aria-label="阅读来源"]')).toBeTruthy();
+  expect(dialog.querySelector('[aria-label="阅读收集时间"]')).toBeTruthy();
+  const advanced=dialog.querySelector('details')!;await act(async()=>{advanced.open=true;});
+  const layout=dialog.querySelector('[aria-label="阅读布局"]')!;
   expect([...layout.querySelectorAll("button")].map(button=>button.textContent)).toEqual(["列表","表格","看板","画廊"]);
-  expect(container.querySelector('[aria-label="新建视图"]')).toBeTruthy();
-  expect(container.querySelectorAll(".collection-database-tabs>button:not(.collection-database-add-view)")).toHaveLength(0);
-  expect(container.querySelector('.task-secondary-actions [aria-label="筛选"]')).toBeTruthy();
-  expect(container.querySelector('.task-secondary-actions [aria-label="排序"]')).toBeTruthy();
-  const cloud=container.querySelector<HTMLButtonElement>('.collection-toolbar [aria-label="云同步设置"]')!;
-  expect(cloud).toBeTruthy();
-  expect(cloud.previousElementSibling?.getAttribute("aria-label")).toBe("搜索阅读内容");
-  expect(container.querySelector('.collection-header [aria-label="云同步设置"]')).toBeNull();
-  const sourceChips=container.querySelector('[role="group"][aria-label="阅读来源"]')!;
-  expect(sourceChips.querySelectorAll('.task-source-chip')).toHaveLength(5);
-  expect(sourceChips.querySelector('.task-source-chip[aria-pressed="true"]')?.textContent).toBe("全部 0");
-  await click("画廊");await act(async()=>vi.advanceTimersByTimeAsync(160));
-  expect(layout.querySelector('button[aria-pressed="true"]')?.textContent).toBe("画廊");
-  const cardConfig=container.querySelector<HTMLButtonElement>('.collection-view-gallery-settings .collection-card-config-wrap>button')!;
-  expect(cardConfig.querySelector("span")?.textContent).toBe("卡片配置");
-  await act(async()=>cardConfig.click());
-  expect(cardConfig.classList.contains("active")).toBe(true);
-  expect(cardConfig.querySelector("span")?.textContent).toBe("卡片配置");
-  await click("关闭卡片配置");
-  await click("搜索阅读内容");
-  expect(container.querySelector('.collection-mobile-search input[aria-label="搜索阅读内容"]')).toBeTruthy();
-  expect(container.querySelector('.task-secondary-actions input')).toBeNull();
-  expect(toggleSidebar).not.toHaveBeenCalled();
- } finally {runtimeCapabilities.mobile=previous;measure.mockRestore();}
+  expect(dialog.querySelector('[aria-label="新建视图"]')).toBeTruthy();
+  expect(dialog.querySelector('[aria-label="排序"]')).toBeTruthy();
+  expect(dialog.querySelector('[aria-label="云同步设置"]')).toBeTruthy();
+ } finally {runtimeCapabilities.mobile=previous;}
 });
 it("keeps desktop sidebar and window controls when the reading area becomes narrow",async()=>{
  const measure=vi.spyOn(HTMLElement.prototype,"getBoundingClientRect").mockImplementation(()=>({width:580} as DOMRect));
