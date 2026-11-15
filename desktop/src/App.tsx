@@ -199,6 +199,17 @@ function AppContent() {
     return () => window.removeEventListener("hub:open-cloud-sync-settings", openCloudSettings);
   }, []);
 
+  const moduleQueries = useRef<Partial<Record<DesktopSidebarView, string>>>({});
+  const selectDesktopSidebarView = useCallback((view: DesktopSidebarView) => {
+    if (view === desktopSidebarView) return;
+    moduleQueries.current[desktopSidebarView] = query;
+    setPreviewHistoryActive(false);
+    setQuery(moduleQueries.current[view] ?? "");
+    setDesktopSidebarView(view);
+    setSelectedIndex(0);
+    setSpaceMenuOpen(false);
+  }, [desktopSidebarView, query]);
+
   const openHubSearch = useCallback(() => {
     setCommandPaletteOpen(false);
     setSpaceMenuOpen(false);
@@ -206,7 +217,7 @@ function AppContent() {
     setFolderMenuOpen(false);
     setDateMenuOpen(false);
     setFlashcardsStandaloneOpen(false);
-    setDesktopSidebarView("home");
+    selectDesktopSidebarView("home");
     setSelectedSidebarTag("");
     setSelectedJournalDate("");
     setSelectedIndex(0);
@@ -215,7 +226,7 @@ function AppContent() {
       searchInput.current?.focus();
       searchInput.current?.select();
     }, 50);
-  }, [spaces.length]);
+  }, [spaces.length, selectDesktopSidebarView]);
 
   const resizePreviewPanes = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const workspace = workspaceRef.current;
@@ -885,16 +896,6 @@ useEffect(() => {
     />
   ), []);
 
-  const moduleQueries = useRef<Partial<Record<DesktopSidebarView, string>>>({});
-  const selectDesktopSidebarView = useCallback((view: DesktopSidebarView) => {
-    if (view === desktopSidebarView) return;
-    moduleQueries.current[desktopSidebarView] = query;
-    setPreviewHistoryActive(false);
-    setQuery(moduleQueries.current[view] ?? "");
-    setDesktopSidebarView(view);
-    setSelectedIndex(0);
-    setSpaceMenuOpen(false);
-  }, [desktopSidebarView, query]);
   const locateInLibrary = (result: SearchResult) => {
     setLibraryPosition({ libraryId: result.libraryId, folderId: result.folderId ?? "", documentId: result.documentId });
     previewLibraryResult(result);

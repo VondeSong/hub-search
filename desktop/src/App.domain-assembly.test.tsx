@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { LibrarySummary, SearchResult } from "./SearchTypes";
@@ -10,7 +10,11 @@ vi.mock("@tauri-apps/api/event", () => ({ listen: listenMock }));
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ onMoved: async () => () => {}, onResized: async () => () => {}, onFocusChanged: async () => () => {}, isVisible: async () => true, isMinimized: async () => false, outerPosition: async () => ({ x: 0, y: 0 }), outerSize: async () => ({ width: 1000, height: 700 }), startDragging: async () => {} }) }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), save: vi.fn() }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openPath: vi.fn(), openUrl: vi.fn() }));
-vi.mock("./CollectionsWorkspace", () => ({ CollectionsWorkspace: ({initialItemKey}:{initialItemKey?:string}) => <div data-testid="reading-search-target">{initialItemKey}</div> }));
+vi.mock("./CollectionsWorkspace", () => ({ CollectionsWorkspace: ({ initialItemKey, onSearchTargetHandled }: { initialItemKey?: string; onSearchTargetHandled?: () => void }) => {
+  const [target, setTarget] = useState(initialItemKey);
+  useEffect(() => { if (initialItemKey) { setTarget(initialItemKey); onSearchTargetHandled?.(); } }, [initialItemKey, onSearchTargetHandled]);
+  return <div data-testid="reading-search-target">{target}</div>;
+} }));
 import App from "./App";
 
 const libraries: LibrarySummary[] = ["Alpha", "Beta"].map((name, index) => ({ id: String(index), name, provider: "craft", connected: false, documentCount: 2, excludedPaths: [] }));
@@ -56,6 +60,26 @@ it("keeps the original reading module open after opening a nonempty search resul
  await act(async()=>target.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})));await advance(400);
  expect(invokeMock).toHaveBeenCalledWith("module_search_document",{kind:"reading",id:"exact"});
  expect(host.querySelector('[data-testid="reading-search-target"]')?.textContent).toBe("exact");
+});
+
+it("restores the original main-search query and scope when returning from a reading result with Ctrl+F", async () => {
+  const original = invokeMock.getMockImplementation()!;
+  const reading = { ...result, id: "reading:exact:v1", entityKey: "reading:exact", documentId: "exact", provider: "hub", contentType: "reading", sourceType: "reading", title: "Reading target", documentTitle: "Reading target" };
+  invokeMock.mockImplementation((command, args) => command === "local_search" ? Promise.resolve([reading]) : command === "module_search_document" ? Promise.resolve("Reading body") : original(command, args));
+  await act(async () => root.render(<App />)); await advance(400);
+  const input = host.querySelector<HTMLInputElement>('input[aria-label^="搜索"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "kept reading query");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  }); await advance(300);
+  const target = [...host.querySelectorAll("button")].find(button => button.textContent?.includes("Reading target"))!;
+  await act(async () => target.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))); await advance(400);
+  expect(host.querySelector('[data-testid="reading-search-target"]')?.textContent).toBe("exact");
+  await act(async () => host.dispatchEvent(new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true, cancelable: true }))); await advance(400);
+  expect(host.querySelector<HTMLInputElement>('input[aria-label^="搜索"]')?.value).toBe("kept reading query");
+  expect(host.textContent).toContain("Reading target");
+  const searches = invokeMock.mock.calls.filter(([command]) => command === "local_search");
+  expect(searches[searches.length - 1]?.[1]).toEqual(expect.objectContaining({ query: "kept reading query", spaceIds: ["1"] }));
 });
 
 it("renders the selected local library and owned result data while remote restoration is still pending", async () => {
