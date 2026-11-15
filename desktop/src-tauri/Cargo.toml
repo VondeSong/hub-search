@@ -19,6 +19,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 default = []
 custom-protocol = ["tauri/custom-protocol"]
 experimental-feishu-task-sync = []
+experimental-local-file-text = []
 # Explicit local integration executable only; never enabled in release defaults.
 integration-dida-source = []
 integration-agent-acceptance = []

@@ -20,6 +20,8 @@ mod content;
 mod database;
 mod database_maintenance_entry;
 mod file_lock;
+#[cfg(any(test, feature = "experimental-local-file-text"))]
+mod file_text;
 mod index_job_metadata;
 mod model_runtime;
 mod model_skills;
@@ -8375,6 +8377,10 @@ async fn flush_content_pipeline(
     let path = database_path(app)?;
     let blob_store = blob_store_for(app, state)?;
     let mut processed = process_pdf_jobs(&path, &blob_store).await?;
+    #[cfg(feature = "experimental-local-file-text")]
+    {
+        processed += file_text::process_jobs(&path, &blob_store).await?;
+    }
     processed += process_ocr_jobs(&path, &blob_store).await?;
     let ocr_backlog = active_enabled_ocr_job_count(&path)?;
     let download_capacity = attachment_admission_capacity(ocr_backlog);
@@ -31195,6 +31201,22 @@ async fn journal_page(
 }
 
 #[tauri::command]
+async fn journal_record_index(
+    app: AppHandle,
+    space_ids: Option<Vec<String>>,
+    query: Option<String>,
+) -> Result<Value, String> {
+    let path = database_path(&app)?;
+    tokio::task::spawn_blocking(move || {
+        let c = open_database(&path)?;
+        let scope = journal_query::visible_scope(&path, &c, space_ids)?;
+        journal_query::record_index(&c, scope, query.as_deref().unwrap_or(""))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn journal_summary(
     app: AppHandle,
     space_ids: Option<Vec<String>>,
@@ -31380,6 +31402,18 @@ fn local_document(
     let connection = open_database(&path)?;
     if hidden_library_ids(&path, &connection)?.contains(&space_id) {
         return Err("资料库已移除或停用".into());
+    }
+    #[cfg(feature = "experimental-local-file-text")]
+    if let Some(result) = result_id.as_deref() {
+        if let Some(text) = file_text::preview(
+            &connection,
+            &blob_store_for(&app, &state)?,
+            &space_id,
+            &document_id,
+            result,
+        )? {
+            return Ok(text);
+        }
     }
     let (markdown, blob_hash, provider): (String, Option<String>, String) = connection
         .query_row(
@@ -35116,6 +35150,9 @@ pub fn run() {
                 recent_documents,
                 journal_documents,
                 journal_summary,
+                journal_record_index,
+                quick_journal::calendar::capture_calendar_journal,
+                quick_journal::calendar::journal_task_destinations,
                 journal_page,
                 journal_view,
                 create_journals,
