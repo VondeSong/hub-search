@@ -45,6 +45,20 @@ it("replaces the preview layer when a search result opens a flashcard",async()=>
  expect(setters.setFlashcardsOpen).toHaveBeenLastCalledWith(false);
 });
 
+it.each(["agents", "connections"])("replaces standalone review with %s and releases its Back owner", async destination => {
+  const route = vi.fn(); await act(async () => root.render(<Harness />)); owner.bindRoute(route);
+  window.history.replaceState({ hubMobileRoute: "browse" }, "");
+  await act(async () => owner.openFlashcards());
+  const length = window.history.length;
+  await act(async () => expect(owner.openRouteFromFlashcards(destination)).toBe(true));
+  expect(window.history.length).toBe(length);
+  expect(window.history.state).toEqual({ hubMobileRoute: destination });
+  expect(setters.setFlashcardsOpen).toHaveBeenLastCalledWith(false);
+  expect(route).toHaveBeenLastCalledWith(destination);
+  await act(async () => { window.history.back(); await new Promise(resolve => setTimeout(resolve, 30)); });
+  expect(route).toHaveBeenLastCalledWith("browse");
+});
+
 it("closes capture on Android back without navigating the underlying page", async()=>{
   const route=vi.fn(); await act(async()=>root.render(<Harness captureOpen/>)); owner.bindRoute(route);
   expect(window.history.state.hubQuickCapture).toBe(true);

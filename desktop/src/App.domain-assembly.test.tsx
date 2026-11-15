@@ -4,12 +4,16 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { LibrarySummary, SearchResult } from "./SearchTypes";
 import { DEFAULT_APP_SETTINGS } from "./AppSettings";
+import { runtimeCapabilities } from "./RuntimePlatform";
 const { invokeMock, listenMock } = vi.hoisted(() => ({ invokeMock: vi.fn(), listenMock: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock, convertFileSrc: (path: string) => path }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: listenMock }));
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ onMoved: async () => () => {}, onResized: async () => () => {}, onFocusChanged: async () => () => {}, isVisible: async () => true, isMinimized: async () => false, outerPosition: async () => ({ x: 0, y: 0 }), outerSize: async () => ({ width: 1000, height: 700 }), startDragging: async () => {} }) }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), save: vi.fn() }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openPath: vi.fn(), openUrl: vi.fn() }));
+vi.mock("./FlashcardsWorkspace", () => ({ FlashcardsWorkspace: () => <div data-testid="paused-review">暂停的复习</div> }));
+vi.mock("./CloudAgents", () => ({ default: () => <div data-testid="cloud-agents">云端对话</div> }));
+vi.mock("./TaskWorkspace", () => ({ TaskWorkspace: () => <div data-testid="tasks">任务</div> }));
 vi.mock("./CollectionsWorkspace", () => ({ CollectionsWorkspace: ({ initialItemKey, onSearchTargetHandled }: { initialItemKey?: string; onSearchTargetHandled?: () => void }) => {
   const [target, setTarget] = useState(initialItemKey);
   useEffect(() => { if (initialItemKey) { setTarget(initialItemKey); onSearchTargetHandled?.(); } }, [initialItemKey, onSearchTargetHandled]);
@@ -48,6 +52,43 @@ beforeEach(() => {
   host = document.createElement("div"); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.clear(); delete (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT; });
+
+it.each(["standalone", "sidebar"].flatMap(origin => ["Agents", "搜索", "浏览", "任务"].map(destination => [origin, destination])))("leaves %s review when the mobile navigation opens %s", async (origin, destination) => {
+  const original = { ...runtimeCapabilities };
+  Object.assign(runtimeCapabilities, { mobile: origin === "standalone", desktop: origin !== "standalone" });
+  if (origin === "sidebar") localStorage.setItem("hub-desktop-sidebar-enabled-v1", "true");
+  window.history.replaceState({ hubMobileRoute: "search" }, "");
+  const navigate = async (label: string) => {
+    const button = host.querySelector<HTMLButtonElement>(`nav[aria-label="主要导航"] button[aria-label="${label}"]`)!;
+    expect(button).toBeTruthy();
+    await act(async () => button.click());
+    await advance(400);
+  };
+  try {
+    await act(async () => root.render(<App />)); await advance(400);
+    if (origin === "standalone") {
+      await navigate("复习");
+      expect(window.history.state.hubFlashcards).toBe(true);
+    } else {
+      const review = [...host.querySelectorAll<HTMLButtonElement>('nav[aria-label="浏览视图"] button')].find(button => button.textContent?.includes("闪卡复习"))!;
+      expect(review).toBeTruthy();
+      await act(async () => review.click()); await advance(400);
+      Object.assign(runtimeCapabilities, { mobile: true, desktop: false });
+      await act(async () => root.render(<App />)); await advance(400);
+    }
+    expect(host.querySelector('[data-testid="paused-review"]')).not.toBeNull();
+    await navigate(destination);
+    expect(host.querySelector('[data-testid="paused-review"]')).toBeNull();
+    expect(window.history.state.hubFlashcards).not.toBe(true);
+    if (destination === "Agents") expect(host.querySelector('[data-testid="cloud-agents"]')).not.toBeNull();
+    await navigate("复习");
+    expect(host.querySelector('[data-testid="paused-review"]')).not.toBeNull();
+    await act(async () => window.history.back()); await advance(100);
+    expect(host.querySelector('[data-testid="paused-review"]')).toBeNull();
+  } finally {
+    Object.assign(runtimeCapabilities, original);
+  }
+});
 
 it("keeps the original reading module open after opening a nonempty search result",async()=>{
  const original=invokeMock.getMockImplementation()!;

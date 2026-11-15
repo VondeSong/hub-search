@@ -44,6 +44,14 @@ export function useMobileOverlayHistory(options: Options) {
     entries.current.preview=false;window.history.replaceState({hubMobileRoute:value},"");
     latest.current.setPreviewOpen(false);route.current(value);return true;
   },[]);
+  const openRouteFromFlashcards = useCallback((value: string) => {
+    if (!latest.current.enabled || !entries.current.flashcards) return false;
+    entries.current.flashcards = false;
+    window.history.replaceState({ hubMobileRoute: value }, "");
+    latest.current.setFlashcardsOpen(false);
+    route.current(value);
+    return true;
+  }, []);
   useEffect(() => {
     if (!options.enabled) return;
     if (!window.history.state?.hubMobileRoute) window.history.replaceState({ ...(window.history.state ?? {}), hubMobileRoute: "search" }, "");
@@ -93,5 +101,5 @@ export function useMobileOverlayHistory(options: Options) {
       if (window.history.state?.hubQuickCapture) { state.closingCapture = true; window.history.back(); }
     }
   }, [options.enabled, options.captureOpen]);
-  return { openFlashcards, closeFlashcards, openPreview, closePreview, bindRoute, openRouteFromPreview };
+  return { openFlashcards, closeFlashcards, openPreview, closePreview, bindRoute, openRouteFromPreview, openRouteFromFlashcards };
 }
