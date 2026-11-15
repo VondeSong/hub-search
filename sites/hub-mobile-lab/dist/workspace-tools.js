@@ -17,6 +17,7 @@ const WORKSPACE_LIBRARIES = [
   { id: 'review', title: '闪卡', subtitle: '示例牌库与本地采用', leaves: [['review-cards', '全部牌组']] },
 ];
 let workspaceScopeDraft = null;
+let workspaceSearchActive = false, workspaceSearchEntryQuery = "";
 let workspaceTypeObserver = null, workspaceObservedStrip = null;
 function workspaceLeaves() { return WORKSPACE_LIBRARIES.flatMap(group => group.leaves.map(([id]) => id)); }
 function workspacePrefs() {
@@ -112,39 +113,68 @@ function workspaceFilterItems() {
 function workspaceFacets() {
   return workspaceFilterItems().map(item=>item.label);
 }
+function workspaceRecentQueries() {
+  return Array.isArray(st.recentSearches) ? st.recentSearches.filter(x=>typeof x==='string'&&x.trim()).slice(0,8) : [];
+}
+function workspaceRememberQuery() {
+  const term=query.trim().slice(0,200); if(!term)return;
+  const previous=st.recentSearches;
+  st.recentSearches=[term,...workspaceRecentQueries().filter(x=>x!==term)].slice(0,8);
+  if(!save())st.recentSearches=previous;
+}
+function workspaceRememberOpened(key) {
+  const item=workspaceIndex().find(x=>x.route===key); if(!item)return;
+  const previous=st.workspaceRecent;
+  const recent=Array.isArray(previous)?previous.filter(x=>typeof x==='string'):[];
+  st.workspaceRecent=[item.route,...recent.filter(x=>x!==item.route)].slice(0,20);
+  if(!save())st.workspaceRecent=previous;
+}
+function workspaceRecentItems() {
+  const index=workspaceIndex();
+  const legacy=(st.history||[]).map(key=>key.includes('/')?key:'doc/'+key);
+  const routes=[...new Set([...(Array.isArray(st.workspaceRecent)?st.workspaceRecent:[]),...legacy])];
+  return routes.map(key=>index.find(item=>item.route===key)).filter(Boolean).slice(0,5);
+}
+function workspaceTypeMenu() {
+  sheet('内容类型','<div class="search-type-menu" role="group" aria-label="选择内容类型">'+WORKSPACE_TYPES.map(type=>'<button type="button" class="type-option" data-act="workspace-type:'+type+'" aria-pressed="'+(searchType===type)+'"><span>'+esc(type)+'</span>'+(searchType===type?ico('check',19):'')+'</button>').join('')+'</div><p class="fine">选择后立即应用，保留关键词与其他条件。</p>');
+}
 function workspaceSearchPage() {
-  const facets = workspaceFilterItems(), quickType=WORKSPACE_DOCUMENT_TYPES.includes(searchType)?'资料':searchType;
-  const visibleFacets=facets.filter(item=>item.key!=='type'||WORKSPACE_DOCUMENT_TYPES.includes(searchType));
-  const scopeStatus=!workspaceLimited()&&source==='全部资料库'?'<span class="search-range-status">范围：全部资料库</span>':'';
-  const filterButton='<button type="button" class="icon-btn search-filter-button" data-act="search-scope" aria-label="筛选搜索'+(facets.length?'，已启用 '+facets.length+' 项':'')+'">'+ico('tune',20)+(facets.length?'<span class="search-filter-badge" aria-hidden="true">'+facets.length+'</span>':'')+'</button>';
-  return intro('搜索','笔记、任务、阅读和对话，在同一个地方找回。')+
-    '<form class="searchbox" id="search-form" role="search"><div class="search-input-wrap"><span class="search-icon">'+ico('search',20)+'</span><input type="search" id="query" aria-label="搜索内容" placeholder="搜索笔记、任务、阅读、对话" autocomplete="off" enterkeyhint="search" value="'+esc(query)+'"><button type="button" class="search-clear icon-btn" data-act="clear-query" aria-label="清除搜索" '+(!query?'hidden':'')+'>'+ico('close',16)+'</button></div>'+filterButton+'</form>'+
-    '<div class="filter search-kind-tabs" role="group" aria-label="内容类型">'+WORKSPACE_QUICK_TYPES.map(([key,label])=>chip(label,'workspace-type:'+key,quickType===key)).join('')+'</div>'+
-    '<div class="search-active-filters" aria-label="当前搜索范围与筛选">'+scopeStatus+visibleFacets.map(item=>'<button type="button" class="search-filter-chip" data-act="workspace-clear-filter:'+item.key+'" aria-label="'+esc(item.clear+'：'+item.label)+'"><span>'+esc(item.label)+'</span>'+ico('close',14)+'</button>').join('')+'</div>'+
-    '<div id="workspace-suggestions" class="search-suggestions" '+(query||facets.length?'hidden':'')+'><span class="search-suggestion-label">试试搜索</span><div class="filter">'+['复盘','项目','线束固定点'].map(t=>chip(t,'query:'+t,false)).join('')+'</div></div>'+
-    '<div id="results" aria-live="polite" aria-atomic="false">'+workspaceSearchResults()+'</div><div id="search-extra" '+(query||facets.length?'hidden':'')+'>'+workspaceInsightsCard()+section('接着看',group(row('留出可回看的记录','上次的想法，值得再读一遍','book','go:doc/d3','purple')+row('日志与随手记录','按天回看，随时记下一点想法','calendar','go:logs')))+'</div>';
+  const facets=workspaceFilterItems(), extra=facets.filter(item=>!['scope','type'].includes(item.key));
+  const scopeLabel=source!=='全部资料库'?source+(workspaceLimited()?' · 自定范围':''):workspaceScopeLabel();
+  const filterButton='<button type="button" class="icon-btn search-filter-button" data-act="search-scope" aria-label="更多筛选'+(extra.length?'，已启用 '+extra.length+' 项':'')+'">'+ico('tune',20)+(extra.length?'<span class="search-filter-badge" aria-hidden="true">'+extra.length+'</span>':'')+'</button>';
+  return '<div class="search-workspace">'+
+    '<form class="searchbox" id="search-form" role="search"><div class="search-input-wrap"><span class="search-icon">'+ico('search',20)+'</span><input type="search" id="query" aria-label="搜索内容" placeholder="搜索内容" autocomplete="off" enterkeyhint="search" value="'+esc(query)+'"><button type="button" class="search-clear icon-btn" data-act="clear-query" aria-label="清除关键词" '+(!query?'hidden':'')+'>'+ico('close',16)+'</button></div><button class="plain search-cancel" type="button" data-act="workspace-cancel" '+(!workspaceSearchActive?'hidden':'')+'>取消</button></form>'+
+    '<div class="search-controls" aria-label="搜索范围和内容类型"><button type="button" class="search-menu-button" data-act="search-scope:range" aria-label="资料范围：'+esc(scopeLabel)+'" aria-pressed="'+(workspaceLimited()||source!=='全部资料库')+'"><span>'+esc(scopeLabel)+'</span>'+ico('chev',14)+'</button><button type="button" class="search-menu-button type-trigger" data-act="workspace-types" aria-label="内容类型：'+esc(searchType)+'" aria-pressed="'+(searchType!=='全部类型')+'"><span>'+esc(searchType)+'</span>'+ico('chev',14)+'</button>'+filterButton+'</div>'+
+    '<div class="search-active-filters" aria-label="其他已应用筛选">'+extra.map(item=>'<button type="button" class="search-filter-chip" data-act="workspace-clear-filter:'+item.key+'" aria-label="'+esc(item.clear+'：'+item.label)+'"><span>'+esc(item.label)+'</span>'+ico('close',14)+'</button>').join('')+'</div>'+
+    '<div id="results" aria-live="polite" aria-atomic="false">'+workspaceSearchResults()+'</div></div>';
+}
+function workspaceResultRow(item) {
+  const term=query.split(/\s+/).find(t=>t&&match(item.body,t)), pos=term?item.body.toLocaleLowerCase().indexOf(term.toLocaleLowerCase()):-1;
+  const excerpt=pos>=0?(pos>20?'…':'')+item.body.slice(Math.max(0,pos-20),pos+65):item.body.slice(0,65);
+  return '<button type="button" class="row search-result" data-act="go:'+esc(item.route)+'"><span class="tile '+(item.kind==='reading'?'purple':'')+'">'+ico(item.icon,19)+'</span><span class="copy"><strong>'+marked(item.title,query.split(/\s+/).find(Boolean))+'</strong>'+(query?'<small class="result-excerpt">'+marked(excerpt,term)+'</small>':'')+'<small>'+esc(item.type+' · '+(item.type===item.source?'':item.source+' · ')+item.dateLabel)+'</small></span><span class="tail">'+ico('chev',16)+'</span></button>';
 }
 function workspaceSearchResults() {
-  const results = workspaceMatches(), active = query || workspaceFacets().length;
-  if (!results.length) return '<section class="empty-state">'+ico('search',30)+'<h2>还没有找到</h2><p>当前仅搜索本原型的示例和本机内容。试着换个关键词，或放宽资料范围。</p>'+btn('清除搜索与筛选','clear-search','secondary')+'</section>';
-  const visible = active ? results : ['task:t1','reading:r2','agent:ag-seed-harness'].map(key=>results.find(x=>x.key===key)).filter(Boolean);
-  const renderItem = item => {
-    const term = query.split(/\s+/).find(t=>t&&match(item.body,t)), pos = term?item.body.toLocaleLowerCase().indexOf(term.toLocaleLowerCase()):-1;
-    const excerpt = pos>=0 ? (pos>20?'…':'')+item.body.slice(Math.max(0,pos-20),pos+65) : item.body.slice(0,65);
-    return '<button type="button" class="row search-result" data-act="go:'+esc(item.route)+'"><span class="tile '+(item.kind==='reading'?'purple':'')+'">'+ico(item.icon,18)+'</span><span class="copy"><strong>'+marked(item.title,query.split(/\s+/).find(Boolean))+'</strong>'+(query?'<small class="result-excerpt">'+marked(excerpt,term)+'</small>':'')+'<small>'+esc(item.type+' · '+(item.type===item.source?'':item.source+' · ')+item.dateLabel)+'</small></span><span class="tail">'+ico('chev',16)+'</span></button>';
-  };
-  const summary = active ? '<p class="search-count">'+results.length+' 条结果 · '+workspacePrefs().sort+'</p>' : '';
-  if (!active) return section('跨模块找回',group(visible.map(renderItem).join('')));
-  return summary + [...new Set(visible.map(x=>x.type))].map(type=>section(type+' · '+visible.filter(x=>x.type===type).length,group(visible.filter(x=>x.type===type).map(renderItem).join('')))).join('');
+  const active=Boolean(query||workspaceFacets().length);
+  if(!query&&workspaceSearchActive){
+    const recent=workspaceRecentQueries();
+    return '<section class="section query-history"><div class="section-head"><h2>近期搜索</h2>'+(recent.length?plain('清除','workspace-clear-recent'):'')+'</div>'+(recent.length?group(recent.map(term=>row(term,'','clock','workspace-query:'+encodeURIComponent(term))).join('')):'<p class="search-empty-hint">搜索过的关键词会保存在这里。</p>')+'<div class="search-suggestions"><span class="search-suggestion-label">试试搜索</span><div class="filter">'+['复盘','项目','线束固定点'].map(t=>chip(t,'workspace-query:'+encodeURIComponent(t),false)).join('')+'</div></div></section>';
+  }
+  const results=workspaceMatches();
+  if(!active){
+    const recent=workspaceRecentItems(), visible=recent.length?recent:['task:t1','reading:r2','agent:ag-seed-harness','doc:d3'].map(key=>results.find(x=>x.key===key)).filter(Boolean);
+    return section(recent.length?'最近打开':'推荐内容 · 示例',group(visible.map(workspaceResultRow).join('')))+'<p class="search-home-note">搜索当前范围内的资料、任务、阅读和对话。</p>';
+  }
+  if(!results.length)return '<section class="empty-state">'+ico('search',30)+'<h2>没有找到匹配内容</h2><p>'+(query?'试着缩短关键词，或调整当前筛选。':'当前条件下没有内容，可以调整资料范围或类型。')+'</p><div class="actions">'+(query?btn('清除关键词','clear-query','secondary'):'')+btn('调整筛选','search-scope','outline')+(workspaceFacets().length?plain('重置筛选','clear-scope'):'')+'</div><p class="fine">仅搜索本站示例与本机内容，未连接的来源不在结果中。</p></section>';
+  return '<p class="search-count">'+results.length+' 条结果 · '+workspacePrefs().sort+'</p>'+[...new Set(results.map(x=>x.type))].map(type=>section(type+' · '+results.filter(x=>x.type===type).length,group(results.filter(x=>x.type===type).map(workspaceResultRow).join('')))).join('');
 }
 function workspaceScopeTree(selected) {
   const all = workspaceIndex();
   return WORKSPACE_LIBRARIES.map(g=>'<details class="scope-library" data-scope-library="'+g.id+'"><summary><span>'+esc(g.title)+'<small>'+esc(g.subtitle)+'</small></span><span class="scope-count" data-scope-count="'+g.id+'">'+g.leaves.filter(([id])=>selected.includes(id)).length+'/'+g.leaves.length+'</span></summary><label class="choice scope-parent"><input type="checkbox" data-scope-group="'+g.id+'" '+(g.leaves.every(([id])=>selected.includes(id))?'checked':'')+'><span>全部 '+esc(g.title)+'</span></label>'+g.leaves.map(([id,title])=>'<label class="choice scope-leaf"><input type="checkbox" name="workspace-scope" value="'+id+'" '+(selected.includes(id)?'checked':'')+'><span>'+esc(title)+'</span><small>'+all.filter(item=>item.leaf===id).length+'</small></label>').join('')+'</details>').join('');
 }
-function workspaceScopeSheet() {
+function workspaceScopeSheet(expandRange = false) {
   const legacySource=WORKSPACE_LIBRARIES.find(g=>g.title===source);
   workspaceScopeDraft = workspaceScope().filter(id=>!legacySource||legacySource.leaves.some(([leaf])=>leaf===id));
-  sheet('搜索筛选','<form id="workspace-scope-form" class="workspace-filter-form"><div class="workspace-filter-scroll"><p class="fine workspace-filter-intro">设置会保留，搜索时无需再次确认。仅筛选本机内容，不会授权给 Agents。</p><div class="workspace-filter-fields">'+selectField('workspace-type','内容类型',WORKSPACE_TYPES,searchType)+selectField('workspace-date','日期范围',WORKSPACE_DATES,searchDate)+selectField('workspace-sort','排序',['相关优先','最近优先'],workspacePrefs().sort)+(searchFolder!=='全部分组'?selectField('workspace-folder','资料标签',['全部分组',...allMobileLabels()],searchFolder):'')+'</div><details class="workspace-scope-picker"><summary><span class="scope-summary-copy"><strong>资料范围</strong><small id="workspace-scope-summary">'+esc(workspaceScopeLabel(workspaceScopeDraft))+'</small></span>'+ico('chev',18)+'</summary><div class="scope-toolbar">'+plain('全选','workspace-scope-all:yes')+plain('全不选','workspace-scope-all:no')+'</div><fieldset class="scope-tree" aria-label="选择资料库和分组">'+workspaceScopeTree(workspaceScopeDraft)+'</fieldset></details><p class="fine">任务按截止日，对话按更新日，资料按记录日；没有日期的阅读与闪卡在日期筛选后不显示。月份示例属于 2026 年。</p></div><div class="workspace-filter-footer"><p id="workspace-filter-summary" class="fine" aria-live="polite"></p><p id="workspace-filter-error" class="capture-error" role="alert"></p><div class="actions">'+btn('重置','workspace-scope-reset','outline')+'<button type="submit" class="btn">应用筛选</button></div></div></form>');
+  sheet('搜索筛选','<form id="workspace-scope-form" class="workspace-filter-form"><div class="workspace-filter-scroll"><p class="fine workspace-filter-intro">设置会保留，搜索时无需再次确认。仅筛选本机内容，不会授权给 Agents。</p><div class="workspace-filter-fields">'+selectField('workspace-type','内容类型',WORKSPACE_TYPES,searchType)+selectField('workspace-date','日期范围',WORKSPACE_DATES,searchDate)+selectField('workspace-sort','排序',['相关优先','最近优先'],workspacePrefs().sort)+(searchFolder!=='全部分组'?selectField('workspace-folder','资料标签',['全部分组',...allMobileLabels()],searchFolder):'')+'</div><details class="workspace-scope-picker"'+(expandRange?' open':'')+'><summary><span class="scope-summary-copy"><strong>资料范围</strong><small id="workspace-scope-summary">'+esc(workspaceScopeLabel(workspaceScopeDraft))+'</small></span>'+ico('chev',18)+'</summary><div class="scope-toolbar">'+plain('全选','workspace-scope-all:yes')+plain('全不选','workspace-scope-all:no')+'</div><fieldset class="scope-tree" aria-label="选择资料库和分组">'+workspaceScopeTree(workspaceScopeDraft)+'</fieldset></details><p class="fine">任务按截止日，对话按更新日，资料按记录日；没有日期的阅读与闪卡在日期筛选后不显示。月份示例属于 2026 年。</p></div><div class="workspace-filter-footer"><p id="workspace-filter-summary" class="fine" aria-live="polite"></p><p id="workspace-filter-error" class="capture-error" role="alert"></p><div class="actions">'+btn('重置','workspace-scope-reset','outline')+'<button type="submit" class="btn">应用筛选</button></div></div></form>');
   workspaceSyncScopeParents();
 }
 function workspaceSyncScopeParents() {
@@ -236,6 +266,7 @@ function workspaceSubmit(form) {
     const selected=[...form.querySelectorAll('[name="workspace-scope"]:checked')].map(el=>el.value),old=structuredClone(st.workspaceSearch),previous=[source,searchFolder,searchDate,searchType];
     st.workspaceSearch={scope:selected.length===workspaceLeaves().length?null:selected,sort:form.querySelector('#workspace-sort').value};source='全部资料库';searchFolder=form.querySelector('#workspace-folder')?.value||'全部分组';searchDate=form.querySelector('#workspace-date').value;searchType=form.querySelector('#workspace-type').value;
     if(!workspacePersistFilters()){st.workspaceSearch=old;[source,searchFolder,searchDate,searchType]=previous;const error=form.querySelector('#workspace-filter-error');if(error)error.textContent='筛选尚未保存，原条件未改变。请保留当前选择后重试。';return true;}
+    workspaceSearchActive=false;
     if(route()[0]==='libraries')go('search');else{close();render();}mobileRememberView();tell('筛选已应用，之后搜索将沿用');return true;
   }
   if(form.id!=='workspace-note-form')return false;
@@ -248,8 +279,8 @@ function workspaceSubmit(form) {
 }
 function workspaceAction(action,key,value) {
   if(action==='workspace-type'){
-    if(!WORKSPACE_QUICK_TYPES.some(([type])=>type===key))return true;
-    if(workspaceUpdateFilter(()=>searchType=key))requestAnimationFrame(()=>document.querySelector('[data-act="workspace-type:'+key+'"]')?.focus({preventScroll:true}));
+    if(!WORKSPACE_TYPES.includes(key))return true;
+    if(workspaceUpdateFilter(()=>searchType=key)){workspaceSearchActive=false;refreshSearch();if($('#sheet').open)close();else requestAnimationFrame(()=>document.querySelector('[data-act="workspace-types"]')?.focus({preventScroll:true}));}
     return true;
   }
   if(action==='workspace-clear-filter'){
@@ -257,7 +288,11 @@ function workspaceAction(action,key,value) {
     workspaceUpdateFilter(()=>{if(key==='scope')workspacePrefs().scope=null;else if(key==='source')source='全部资料库';else if(key==='folder')searchFolder='全部分组';else if(key==='date')searchDate='不限日期';else searchType='全部类型';});
     return true;
   }
-  if(action==='search-scope'){workspaceScopeSheet();return true;}
+  if(action==='workspace-types'){workspaceTypeMenu();return true;}
+  if(action==='workspace-cancel'){workspaceSearchActive=false;query=workspaceSearchEntryQuery;render();mobileRememberView();return true;}
+  if(action==='workspace-query'){try{query=decodeURIComponent(key)}catch{return true;}workspaceSearchActive=true;workspaceRememberQuery();render();return true;}
+  if(action==='workspace-clear-recent'){const prior=st.recentSearches;st.recentSearches=[];if(save())refreshSearch();else st.recentSearches=prior;return true;}
+  if(action==='search-scope'){workspaceScopeSheet(key==='range');return true;}
   if(action==='workspace-scope-reset'){workspaceResetScopeDraft();return true;}
   if(action==='clear-scope'||action==='clear-search'){workspaceClearSearch(action==='clear-search');return true;}
   if(action==='workspace-scope-all'){const form=document.querySelector('#workspace-scope-form');form?.querySelectorAll('[name="workspace-scope"]').forEach(el=>el.checked=key==='yes');workspaceSyncScopeParents();snapshotMobileSheet();return true;}

@@ -1,0 +1,80 @@
+/* Shared mobile hierarchy. Control layers are quiet; content remains solid. */
+body:is([data-view="search"], [data-view="browse"], [data-view="tasks"], [data-view="review"], [data-view="agents"], [data-view="agent"]) .top {
+  min-height: calc(56px + env(safe-area-inset-top, 0px));
+  padding: calc(4px + env(safe-area-inset-top, 0px)) 16px 4px;
+  gap: 8px;
+}
+.root-heading { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.space-button { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; border: 0; border-radius: 12px; padding: 8px; background: transparent; }
+.space-button img { width: 28px; height: 28px; }
+.root-title { min-width: 0; font-size: 22px; font-weight: 680; line-height: 1.3; letter-spacing: -.025em; }
+.root-heading .sample-label { flex: 0 0 auto; padding: 2px 6px; border-radius: 5px; background: var(--surface); font-size: 11px; }
+.header-create.btn { min-height: 44px; padding: 8px 4px 8px 8px; border-radius: 12px; background: transparent; color: var(--blue); font-size: 14px; gap: 5px; }
+.top > h1.top-title { font-size: 18px; color: var(--ink); font-weight: 650; }
+.space-description { margin: 0 2px 18px; color: var(--muted); font-size: 14px; }
+.space-menu { margin-bottom: 16px; }
+.space-menu .row { min-height: 56px; padding: 12px; }
+.space-menu .row .tile { background: transparent; }
+body:is([data-view="search"], [data-view="browse"], [data-view="tasks"], [data-view="review"], [data-view="agents"], [data-view="agent"]) main { padding-top: 8px; }
+
+/* Search: input first, one control row, then actual content. */
+.search-workspace .searchbox { margin: 0 0 8px; gap: 8px; align-items: center; }
+.search-workspace .search-input-wrap { min-height: 48px; border-radius: 14px; background: var(--surface); }
+.search-workspace .search-input-wrap input { min-height: 48px; padding-block: 10px; font-size: 16px; }
+.search-workspace .search-icon { flex: 0 0 20px; }
+.search-workspace .search-clear { min-height: 44px; width: 44px; flex-basis: 44px; }
+.search-cancel { flex: 0 0 auto; min-height: 44px; padding-inline: 2px; font-size: 14px; }
+.search-controls { display: flex; align-items: center; gap: 4px; min-width: 0; margin: 0 0 14px; }
+.search-menu-button { display: inline-flex; align-items: center; gap: 5px; min-height: 44px; padding: 8px 5px; min-width: 0; border: 0; border-radius: 9px; background: transparent; color: var(--muted); text-align: left; font-size: 13px; line-height: 1.5; }
+.search-menu-button:first-child { flex: 1 1 auto; }
+.search-menu-button > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-menu-button > svg { flex-shrink: 0; transform: rotate(90deg); }
+.search-menu-button[aria-pressed="true"] { color: var(--blue); }
+.type-trigger { flex: 0 1 auto; max-width: 36%; }
+.search-controls .search-filter-button.icon-btn { flex: 0 0 44px; width: 44px; min-height: 44px; height: 44px; border-radius: 10px; background: transparent; }
+.search-controls .search-filter-badge { top: 1px; right: 0; }
+.search-workspace .search-active-filters { margin-bottom: 12px; }
+.search-workspace .search-active-filters:empty { display: none; }
+.search-workspace .section { margin-top: 20px; }
+.search-workspace #results > .section:first-child { margin-top: 0; }
+.search-workspace .section-head { min-height: 24px; margin-bottom: 8px; }
+.search-workspace .section-head h2 { font-size: 16px; font-weight: 650; }
+.search-workspace .group { background: transparent; border-radius: 0; }
+.search-workspace .row { min-height: 72px; padding: 13px 2px; gap: 11px; }
+.search-workspace .row .tile { flex-basis: 29px; width: 29px; height: 32px; background: transparent; color: var(--blue); }
+.search-workspace .row strong { font-size: 15px; line-height: 1.5; font-weight: 550; }
+.search-workspace .row small { margin-top: 3px; font-size: 12px; line-height: 1.55; }
+.search-workspace .search-count { margin: 6px 2px 16px; font-size: 12px; }
+.search-workspace .empty-state { margin-top: 24px; padding-inline: 12px; }
+.search-workspace .empty-state .fine { margin-top: 22px; font-size: 12px; }
+.search-workspace .empty-state .actions { justify-content: center; }
+.search-home-note { margin: 24px 2px 0; font-size: 12px; color: var(--muted); }
+.query-history .row { min-height: 52px; }
+.search-empty-hint { padding: 10px 2px 4px; font-size: 14px; color: var(--muted); }
+.search-type-menu { display: grid; gap: 2px; margin: 0 0 14px; }
+.type-option { display: flex; justify-content: space-between; align-items: center; min-height: 48px; padding: 10px 12px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font-size: 16px; text-align: left; }
+.type-option[aria-pressed="true"] { background: var(--selected); color: var(--blue); font-weight: 600; }
+
+/* Browse keeps directories light, with meaningful counts or statuses on the right. */
+.browse-directory .group { background: transparent; border-radius: 0; }
+.browse-directory .row { min-height: 56px; padding: 12px 2px; gap: 12px; }
+.browse-directory .row .tile { flex-basis: 30px; width: 30px; height: 30px; background: transparent; color: var(--blue); }
+.browse-directory .row strong { font-size: 16px; font-weight: 550; }
+.browse-directory .row small { margin-top: 3px; font-size: 12px; }
+.directory-meta { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+.browse-directory .section { margin-top: 28px; }
+.browse-directory .section-head { margin-bottom: 6px; }
+.browse-directory .section-head h2 { font-size: 15px; font-weight: 650; }
+.review-sections { margin-top: 0; }
+body[data-view="tasks"] .task-summary { margin-top: 2px; }
+body[data-view="review"] .review-progress { margin-top: 16px; }
+
+@media (hover: hover) {
+  .space-button:hover, .search-menu-button:hover, .type-option:hover { background: var(--surface-hover); }
+}
+@media (max-width: 350px) {
+  body:is([data-view="search"], [data-view="browse"], [data-view="tasks"], [data-view="review"], [data-view="agents"], [data-view="agent"]) .top { padding-inline: 12px; }
+  .root-heading { gap: 5px; }
+  .root-title { font-size: 21px; }
+  .search-menu-button { font-size: 12px; }
+}

@@ -208,7 +208,17 @@ assert.equal(context.taskToolsDateMatches({ date: context.taskToolsDay(6) }, '�
 assert.equal(context.taskToolsDateMatches({ date: context.taskToolsDay(7) }, '未来7天'), false);
 context.taskToolsAction('task-reset');
 assert.ok(context.taskToolsPage().includes('搜索任务、说明和来源'));
-assert.ok(context.taskToolsPage().includes('task-new'));
+const taskHeader = vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../dist/mobile.js'), 'utf8') + '\nmobileRootHeader("tasks");', {
+  routes: { tasks: '任务' }, esc: html, btn: context.btn, iconBtn: context.iconBtn,
+});
+assert.equal((taskHeader.match(/data-act="task-new"/g) || []).length, 1, 'task creation has one primary action in the compact shell');
+assert.ok(taskHeader.includes('新任务'));
+assert.ok(!taskHeader.includes('quick-capture:task'), 'the shell keeps the full task editor instead of the legacy quick-capture task form');
+assert.ok(!context.taskToolsPage().includes('task-tools-heading'), 'the task body no longer duplicates the shell title and create action');
+const beforePrimaryCreate = context.st.customTasks.length;
+assert.equal(context.taskToolsAction('task-new'), true);
+assert.ok(lastSheet.includes('新建任务') && lastSheet.includes('task-tools-editor'), 'the moved action still opens the existing draft-safe editor');
+assert.equal(context.st.customTasks.length, beforePrimaryCreate, 'opening the editor does not create a task before submission');
 assert.equal(context.taskToolsNormalizeContext({ kind: 'doc', id: 'd1', title: 'x', route: 'javascript:alert(1)' }).route, '');
 assert.equal(context.taskToolsAction('not-a-task-action'), false);
 assert.equal(context.taskToolsSubmit({ id: 'not-a-task-form' }), false);

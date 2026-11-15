@@ -3,9 +3,9 @@
   "site": "mobile",
   "project_id": "appgprj_6af1d2dc12308191acc37e5566699c2d",
   "site_url": "https://hub-mobile-lab-von11.song02211368537057.chatgpt.site",
-  "source_commit": "412919de19ce8313df109258f2981573506f4186",
-  "published_version": 11,
-  "deployment_id": "appgdep_6af99b6679dc81918ab6e7f9833a041a",
+  "source_commit": "a7c8e91a7b63e3744f8ee0ea65f53fc3dbef945f",
+  "published_version": 12,
+  "deployment_id": "appgdep_6af9c43227f481918074c14a66ac5b54",
   "files": {
     ".openai/hosting.json": {
       "sha256": "543a776095c0181cc870f784c075ab4f263fb739e3649cd8db74f493fb5b4ca3",
@@ -23,9 +23,9 @@
       "bytes": 4282
     },
     "README.md": {
-      "sha256": "40f1dfae0f62c41e638219cfb0cc4e48ef29b26230bfee657f44fdb108808e2b",
+      "sha256": "a0edc25ca7358541ace1580b1a78fbaa247008ff9d5e8c3216f4ddcc42130abe",
       "mode": "100644",
-      "bytes": 12647
+      "bytes": 15467
     },
     "checks/agents-enhancements-checks.cjs": {
       "sha256": "163158e85484b74bb6b0798565cd71cfed692ada30485369eaa9dbf7afbd02d5",
@@ -38,14 +38,14 @@
       "bytes": 6298
     },
     "checks/search-interactions-checks.cjs": {
-      "sha256": "4f829cdd23349c2eb0d28b387ff34e326241db7038a486f40dc2aa62acb44d65",
+      "sha256": "3e995084be263e55c40b3c89079838a77f60e4f34679dcc6a0d8369c023bc96e",
       "mode": "100644",
-      "bytes": 20498
+      "bytes": 36353
     },
     "checks/task-tools-checks.cjs": {
-      "sha256": "3e00d81dbe4f3de9c7efa7902431897542f36455f154af58b5f1106c6e94ae63",
+      "sha256": "644141fd418f71c586a3a34d53b9616ba2b1b847d49ceefa3f0f157cd133db8a",
       "mode": "100644",
-      "bytes": 12468
+      "bytes": 13501
     },
     "checks/widget-checks.cjs": {
       "sha256": "0ef59e92d55ed4aff330fa00f30acd4d186459b0dcdcac18df399cad39f6676e",
@@ -53,9 +53,9 @@
       "bytes": 3783
     },
     "checks/workspace-checks.cjs": {
-      "sha256": "bb6a8130d4eb06a92fe77c772d225e556f02b2069c51a0365bf131129c2e2603",
+      "sha256": "e281e9d0240822a476ea0b637fe25d262323ac9cc02e1192eb230d70b5548f59",
       "mode": "100644",
-      "bytes": 7612
+      "bytes": 7664
     },
     "dist/agents-runtime.js": {
       "sha256": "279f9eeb690178731955e9e05a438ca15c1660a62ceec4a1f6f27734cbc650de",
@@ -63,19 +63,19 @@
       "bytes": 29678
     },
     "dist/agents-ui.js": {
-      "sha256": "e2e546ee641b8bf61d422b6dc23978bcfacc5f07a069d87ccace29cb614605b4",
+      "sha256": "9e898f3528780890c9c010a1f710c0d2857c58909edd586f3d1a6497f4eee363",
       "mode": "100644",
-      "bytes": 64903
+      "bytes": 66417
     },
     "dist/agents.css": {
-      "sha256": "42a0a1f6d4884906add3ac2d6238567456410c9865ccdbca29ea276ba9cca675",
+      "sha256": "e2bc1dec7cb21e872091e849c0131edf3b78b42374c2c801de94c36bffc1a143",
       "mode": "100644",
-      "bytes": 32526
+      "bytes": 33311
     },
     "dist/app.js": {
-      "sha256": "aeae2a4636dd653d3ab0f445229cd4604feb05de1566d454361949e9dd092fc4",
+      "sha256": "6f46f3360d8986819dd1c60eff5b0fdd0d809d9fad7825fb24b221d0d9cc38de",
       "mode": "100644",
-      "bytes": 61028
+      "bytes": 61353
     },
     "dist/hub.svg": {
       "sha256": "a7229c43b74d0dba3e1441f0d14c62320e441a8c16df9c1f2378f88ffbe172b1",
@@ -83,19 +83,24 @@
       "bytes": 254
     },
     "dist/index.html": {
-      "sha256": "7459504af940490eb3fbaf1a8e1e3a1247ff5eb98bd2caccd3e78b3cfa3d1cf7",
+      "sha256": "1f9f3ade08a9878806707251991b85579ea2f4309c577adbc84ab72f6b8655bf",
       "mode": "100644",
-      "bytes": 1349
+      "bytes": 1398
     },
     "dist/mobile-features.js": {
-      "sha256": "a4fa34e1023b9daf7c9445b271faa4e162f4ffb881ef5e5aed1a6ffbf64883ea",
+      "sha256": "b5ec2aba545140488957caf71bd1525b5ed6e27eec9bd8c93ab7c101d7ecbcd5",
       "mode": "100644",
-      "bytes": 27526
+      "bytes": 27548
+    },
+    "dist/mobile-polish.css": {
+      "sha256": "b22f5990a47273977c6a6b3d85243c7aa9c792adafc07ed4e5552df03e302be9",
+      "mode": "100644",
+      "bytes": 6112
     },
     "dist/mobile.js": {
-      "sha256": "b646022fa8f939b67fe7f8682812715a1b3306a2745dc130c6a53a7649861137",
+      "sha256": "ec5b6e8dc512c62b710719e88ce60ff51a0412b853120dc2245255d4899f74a4",
       "mode": "100644",
-      "bytes": 14874
+      "bytes": 16088
     },
     "dist/style.css": {
       "sha256": "b97c2863349fd0a517dc86bb5b3f2cc7b575601a79b95888a1e92ce327269b72",
@@ -108,9 +113,9 @@
       "bytes": 3142
     },
     "dist/task-tools.js": {
-      "sha256": "f3b39bfc6dab7c45ea72deb52057ac7297f8f599d7c07e42c26556b74d430641",
+      "sha256": "bb0b0ebf672da96e1ea90b5c2ff0ebffbdb412ddb1455e465a5abaa9da36652a",
       "mode": "100644",
-      "bytes": 28421
+      "bytes": 28240
     },
     "dist/widgets.css": {
       "sha256": "dab718c6ffea193c3317de835b1dcdd3a2ea118de57057687014ace3ab505df9",
@@ -133,9 +138,9 @@
       "bytes": 12325
     },
     "dist/workspace-tools.js": {
-      "sha256": "67d03d14a139448a55be8e5994d38083e597dd66f2285bd0cef74a13f786bf57",
+      "sha256": "5bf30afb8a70b2ed1e7bae082331c43d71fb0e13fb85fe318d3989d1eabf5a2e",
       "mode": "100644",
-      "bytes": 30776
+      "bytes": 33891
     },
     "docs/agents-32.md": {
       "sha256": "a4f3eb6917abc89147a0a9dd216484da3d3a5eeb5f9ab48af49c69c412398dcc",
@@ -151,6 +156,36 @@
       "sha256": "6af966bffee53c0456ab4a379f2695418d6bfba22fc958f91795c9ee5407145c",
       "mode": "100644",
       "bytes": 54635
+    },
+    "docs/images/interaction-2026-11-15/agents.jpg": {
+      "sha256": "8500e1b1d50752aa59761c023802db3076c455d72d881b12abea59fdafb2f0c4",
+      "mode": "100644",
+      "bytes": 38563
+    },
+    "docs/images/interaction-2026-11-15/browse.jpg": {
+      "sha256": "e78278ff5bdf4878891a8d10ef1fd624b1cc20b1dc3c5f138d349d30351c3b53",
+      "mode": "100644",
+      "bytes": 21729
+    },
+    "docs/images/interaction-2026-11-15/search.jpg": {
+      "sha256": "fd6b8b6017e481a9ba6cfd90d519c2fb6321b7509be61187b71ad8bbcca0de34",
+      "mode": "100644",
+      "bytes": 30329
+    },
+    "docs/images/interaction-2026-11-15/short-filter.jpg": {
+      "sha256": "c7c2504e7037e23f96949dc03a562279cd54c91cd3b12e908455966bc6c5f99f",
+      "mode": "100644",
+      "bytes": 32758
+    },
+    "docs/interaction-qa-2026-11-15.md": {
+      "sha256": "50ff7cfdea430a62fa065925b0328664f2658532e72d2f5dc0e4069d405f1703",
+      "mode": "100644",
+      "bytes": 8433
+    },
+    "docs/interaction-review-2026-11-15.md": {
+      "sha256": "cf93271a44d10c7965390bddb65a05854a2a1fe97d2eb7b23e5664f916d2a931",
+      "mode": "100644",
+      "bytes": 31988
     },
     "docs/mobile-insights-v3.png": {
       "sha256": "428c32f3126b9157ada5806bf0055eec5be879dc3c092324abee01726750d8a7",
@@ -178,5 +213,5 @@
       "bytes": 3301
     }
   },
-  "imported_at": "2026-11-15T11:46:16.985201+00:00"
+  "imported_at": "2026-11-15T14:40:14.893530+00:00"
 }

@@ -207,10 +207,11 @@ function syncJournalDemo() {
   }, st.syncError ? '演示上传失败；记录和附件保留，恢复连接后可重试。' : '本轮同步演示已完成，请查看记录状态。');
 }
 function mobileBrowsePage() {
-  return intro('浏览','从记录、阅读和收藏接着往下走。') +
-    section('你的内容',group(row('日志','按天回看速记与日记','calendar','go:logs')+row('阅读','X、Telegram 与滴答稍后读','book','go:reading')+row('收藏','保存的页面与内容','star','go:favorites')+row('最近浏览','回到刚打开的资料','clock','go:recent')+row('标签','查找资料与新写的速记','tag','go:tags'))) +
-    section('发现与回看',group(row('洞察','有依据的发现、核对与下一步 · 演示','spark','go:insights','purple'))) +
-    section('数据',group(row('资料库','多选资料库、空间与分组','folder','go:libraries')+row('连接总览','内容同步和 Agents 会话分别查看','cloud','go:connections')));
+  const tail=text=>'<span class="directory-meta">'+esc(text)+'</span><span class="tail">'+ico('chev',16)+'</span>';
+  const count=Object.keys(findings).filter(id=>status(id)==='待关注'||pending(id)).length;
+  return '<div class="browse-directory">'+group(row('日志','','calendar','go:logs','',tail('按天'))+row('阅读','','book','go:reading','',tail('稍后读'))+row('收藏','','star','go:favorites')+row('最近浏览','','clock','go:recent')+row('标签','','tag','go:tags'))+
+    section('资料来源',group(row('资料库','Craft、Obsidian 与本地记录','folder','go:libraries')+row('连接总览','内容同步与 Agents 会话','cloud','go:connections')))+
+    section('发现与回看',group(row('洞察','','spark','go:insights','',tail(count+' 条示例'))))+'</div>';
 }
 function futurePage() {
   return intro('后续功能','桌面协作与阶段回顾保留交互演示。') + section('尚未接入本原型的真实服务',group(row('阶段回顾','查看既有交互演示；不运行真实分析','spark','go:recap')+row('桌面协作与工作专题','提交、等待和回执的历史演示','chat','go:works')+row('桌面成果同步演示','查看原有请求和桌面离线流程','sync','go:collab-sync'))) + '<p class="settings-note">洞察现可从浏览直接进入；Agents 是独立主入口。本站仍只演示交互，不代表 Android / VPS 的同名功能已接通。</p>';

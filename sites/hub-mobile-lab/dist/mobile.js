@@ -37,7 +37,15 @@ function settingsPage() {
     section('关于', group(row('后续功能', '桌面协作、工作专题与历史演示', 'spark', 'go:future') + row('功能与边界', '已实现交互、演示能力与后续验收', 'info', 'go:guide'))) +
     '<p class="settings-note">手机交互原型。记录与附件保存在当前浏览器，不读取实际云连接，不写入个人 OS。</p><div class="actions">' + plain('重置演示数据','reset') + '</div>';
 }
+function mobileRootHeader(page) {
+  const action=page==='tasks'?btn('新任务','task-new','header-create','plus'):page==='agents'?btn('新对话','agent-new','header-create','plus'):iconBtn('快速速记','quick-capture:note','plus');
+  return '<div class="root-heading"><button type="button" class="space-button" data-act="mobile-space" aria-label="打开空间菜单"><img src="hub.svg" alt=""></button><h1 class="root-title">'+esc(routes[page])+'</h1><span class="sample-label">示例</span></div><div class="top-actions">'+action+'</div>';
+}
+function mobileSpaceSheet() {
+  sheet('Hub · 示例空间','<p class="space-description">在同一个地方找回内容、记下想法，接着处理手头的事。</p><div class="space-menu">'+group(row('快速速记','保留当前草稿与附件','plus','quick-capture:note')+row('资料库','','folder','go:libraries')+row('连接总览','','cloud','go:connections')+row('外观与阅读','','settings','go:appearance')+row('设置','','more','go:settings')+row('功能与边界','','info','go:guide'))+'</div><p class="fine">本原型使用示例资料；本机记录保存在当前浏览器。</p>');
+}
 function mobileHandleAction(a, k) {
+  if(a==='mobile-space'){mobileSpaceSheet();return true;}
   if (a === 'theme' || a === 'accent') {
     const allowed = a === 'theme' ? ['light', 'dark', 'paper'] : ['blue', 'sage', 'violet'];
     if (!allowed.includes(k)) return true;

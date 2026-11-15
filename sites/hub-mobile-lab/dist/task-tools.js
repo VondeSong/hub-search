@@ -169,8 +169,7 @@ function taskToolsPage() {
   const all = taskToolsTasks(), today = all.filter(task => taskToolsDueDay(task) === taskToolsDay());
   const finished = today.filter(done).length, overdue = all.filter(task => taskToolsDateMatches(task, '已逾期')).length;
   const filters = [taskDate, taskToolsSource, taskToolsSort].filter(value => !['所有日期', '全部来源', '日期优先'].includes(value));
-  return '<div class="task-tools-heading"><div>' + intro('任务', '把下一步写清楚，一件一件来。') + '</div>' + btn('新建', 'task-new', 'secondary', 'plus') + '</div>' +
-    '<div class="task-summary"><div class="inline"><strong>今天</strong><span class="fine">已完成 ' + finished + ' / ' + today.length + (overdue ? ' · ' + overdue + ' 项逾期' : '') + '</span></div>' +
+  return '<div class="task-summary"><div class="inline"><strong>今天</strong><span class="fine">已完成 ' + finished + ' / ' + today.length + (overdue ? ' · ' + overdue + ' 项逾期' : '') + '</span></div>' +
     '<div class="task-progress" role="progressbar" aria-label="今天的任务进度" aria-valuemin="0" aria-valuemax="' + Math.max(1, today.length) + '" aria-valuenow="' + finished + '"><span style="width:' + (today.length ? Math.round(finished / today.length * 100) : 0) + '%"></span></div></div>' +
     '<div class="filter">' + ['待办', '已完成', '全部'].map(value => chip(value, 'taskfilter:' + value, taskFilter === value)).join('') + '</div>' +
     '<div class="task-tools-search"><div class="task-tools-query">' + ico('search', 19) + '<input type="search" id="task-tools-query" aria-label="搜索任务、说明和来源" placeholder="搜索任务、说明、来源" value="' + esc(taskToolsQuery) + '" enterkeyhint="search" autocomplete="off"><button type="button" class="icon-btn" id="task-tools-query-clear" aria-label="清除任务搜索" data-act="task-clear-query"' + (!taskToolsQuery ? ' hidden' : '') + '>' + ico('close', 16) + '</button></div>' + iconBtn('筛选与排序' + (filters.length ? '，已启用 ' + filters.length + ' 项' : ''), 'task-tools-filters', 'tune') + '</div>' +

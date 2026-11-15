@@ -42,19 +42,29 @@ function agentUiFeedback(result, success) {
 function agentUiAccessBlock() {
   return '<section class="agent-access-block"><span class="tile">' + ico('info', 26) + '</span><h2>这台手机已失去访问权限</h2><p>云端会话暂不可查看，也不会继续发送。重新配对后，再回到原来的会话。</p>' + btn('查看连接与设备', 'go:agent-connection', 'secondary') + '<p class="agent-demo-note">交互演示 · 未连接真实服务</p></section>';
 }
-function agentUiConnectionCard() {
+function agentUiConnectionCard(compact = false) {
   const c = agentUiConnection(), warning = c.network !== 'online' || c.server !== 'online' || c.auth !== 'valid' || c.quota === 'exhausted' || c.device !== 'active';
+  if (compact) return '<button type="button" class="agent-connection-card is-compact' + (warning ? ' is-warning' : '') + '" data-act="go:agent-connection" aria-label="' + esc('查看连接与设备。' + (warning ? '演示状态：' + agentUiConnectionLabel() : '本机演示，未连接真实服务')) + '"><span class="agent-status-dot" aria-hidden="true"></span><span class="agent-connection-copy"><strong>' + esc(warning ? '演示状态 · ' + agentUiConnectionLabel() : '本机演示 · 未连接云端') + '</strong>' + (warning ? '<small>草稿保留，点击查看恢复方式</small>' : '') + '</span><span class="agent-connection-link">连接</span>' + ico('chev', 15) + '</button>';
   return '<button type="button" class="agent-connection-card' + (warning ? ' is-warning' : '') + '" data-act="go:agent-connection"><span class="agent-status-dot" aria-hidden="true"></span><span class="agent-connection-copy"><strong>' + esc(agentUiConnectionLabel()) + '</strong><small>' + (warning ? '查看状态与恢复方式' : 'ChatGPT 订阅 · Windows 可关机') + '</small></span>' + ico('chev', 17) + '</button>';
 }
 function agentThreadRows() {
+  const search = agentListQuery.trim().toLocaleLowerCase();
   const threads = [...st.agents.threads].sort((a, b) => b.updatedAt - a.updatedAt).filter(thread =>
     (agentListScope === 'all' || Boolean(thread.archivedAt) === (agentListScope === 'archived')) &&
-    (thread.title + ' ' + thread.messages.map(m => m.text || '').join(' ')).toLowerCase().includes(agentListQuery.toLowerCase()));
-  if (!threads.length) return '<div class="empty-state">' + ico('chat', 28) + '<h2>' + (agentListScope === 'archived' && !agentListQuery ? '还没有归档会话' : '没有找到这段对话') + '</h2><p>' + (agentListScope === 'archived' ? '归档只收起会话，不删除消息或材料。' : '换一个词，或切换到“全部”查找归档会话。') + '</p>' + (agentListScope !== 'all' ? plain('查看全部会话', 'agent-list-scope:all', 'search') : btn('新建对话', 'agent-new', 'secondary', 'plus')) + '</div>';
+    (thread.title + ' ' + thread.messages.map(m => m.text || '').join(' ')).toLocaleLowerCase().includes(search));
+  if (!threads.length) {
+    const title = search ? '没有匹配会话' : agentListScope === 'archived' ? '还没有归档会话' : '还没有会话';
+    const copy = search ? '试试标题或消息中的其他词，也可以查看全部会话。' : agentListScope === 'archived' ? '归档只收起会话，不删除消息或材料。' : '写下一个问题，开始新的对话。';
+    const actions = (search ? plain('清除搜索', 'agent-list-clear', 'close') : agentListScope !== 'archived' ? btn('新建对话', 'agent-new', 'secondary', 'plus') : '') + (agentListScope !== 'all' ? plain('查看全部会话', 'agent-list-scope:all', 'search') : '');
+    return '<div class="empty-state">' + ico('chat', 28) + '<h2>' + title + '</h2><p>' + copy + '</p><div class="actions">' + actions + '</div></div>';
+  }
   return threads.map(thread => {
-    const last = thread.messages.at(-1), run = agentUiRun(thread);
-    const preview = agentUiRunning(run) ? agentPhaseLabel(run) : (last?.text || thread.draft || (thread.attachments.length ? '已选好材料，写下你的问题。' : '从一个问题开始。'));
-    return '<button type="button" class="agent-thread-row" data-act="go:agent-chat/' + esc(thread.id) + '"><span class="agent-thread-icon">' + ico(thread.id.includes('harness') ? 'folder' : thread.id.includes('reading') ? 'book' : 'chat', 20) + '</span><span class="agent-thread-copy"><strong>' + esc(thread.title) + '</strong><small>' + esc(preview.replace(/\s+/g, ' ').slice(0, 58)) + '</small></span><span class="agent-thread-meta"><time>' + esc(agentUiStamp(thread.updatedAt)) + '</time>' + (thread.archivedAt ? '<span class="agent-phase">已归档</span>' : agentUiRunning(run) ? '<span class="agent-phase">' + esc(agentPhaseLabel(run)) + '</span>' : ico('chev', 15)) + '</span></button>';
+    const last = thread.messages.at(-1), run = agentUiRun(thread), running = agentUiRunning(run);
+    const draft = (thread.draft || '').trim(), hasDraft = Boolean(draft || thread.attachments.length);
+    const preview = (!running && draft) || last?.text || (running ? '本轮消息与材料已保留' : thread.attachments.length ? '已选好材料，写下你的问题。' : '从一个问题开始。');
+    const state = thread.archivedAt ? '已归档' : running ? agentPhaseLabel(run) : run?.phase === 'failed' ? '待重试' : hasDraft ? '草稿' : '';
+    const phaseClass = !thread.archivedAt && run && (running || run.phase === 'failed') ? ' is-' + run.phase : '';
+    return '<button type="button" class="agent-thread-row" data-act="go:agent-chat/' + esc(thread.id) + '"><span class="agent-thread-icon" aria-hidden="true">' + ico(thread.id.includes('harness') ? 'folder' : thread.id.includes('reading') ? 'book' : 'chat', 19) + '</span><span class="agent-thread-copy"><span class="agent-thread-heading"><strong>' + esc(thread.title) + '</strong><time>' + esc(agentUiStamp(thread.updatedAt)) + '</time></span><span class="agent-thread-preview"><small>' + esc(preview.replace(/\s+/g, ' ').slice(0, 120)) + '</small>' + (state ? '<span class="agent-phase' + esc(phaseClass) + '">' + esc(state) + '</span>' : '') + '</span></span></button>';
   }).join('');
 }
 function agentUiListScopes() {
@@ -63,8 +73,8 @@ function agentUiListScopes() {
     .map(([id, label, count]) => chip(label + ' ' + count, 'agent-list-scope:' + id, agentListScope === id)).join('');
 }
 function agentsPage() {
-  if (agentUiRevoked()) return '<div class="agents-page">' + intro('Agents', '你的云端对话') + agentUiAccessBlock() + '</div>';
-  return '<div class="agents-page"><div class="agents-heading"><h1>Agents</h1><span class="fine">交互原型</span></div><p class="lede">在手机上开始，随时接着聊。</p><div id="agent-list-connection">' + agentUiConnectionCard() + '</div><p class="agent-demo-note">交互演示 · 对话与附件保存在当前浏览器</p><div class="agent-list-search">' + ico('search', 19) + '<input type="search" id="agent-list-query" aria-label="搜索会话标题与消息" placeholder="搜索标题或消息" value="' + esc(agentListQuery) + '"></div><div class="filter" id="agent-list-scopes" aria-label="会话范围">' + agentUiListScopes() + '</div>' + section('会话', '<div id="agent-thread-list">' + agentThreadRows() + '</div>', plain('新对话', 'agent-new', 'plus')) + '<p class="settings-note">这里展示新建云端会话的使用方式。已有桌面聊天和资料库不会自动迁入。归档会话可在“已归档”或“全部”中搜索、查看与恢复。</p></div>';
+  if (agentUiRevoked()) return '<div class="agents-page">' + agentUiAccessBlock() + '</div>';
+  return '<div class="agents-page"><div id="agent-list-connection">' + agentUiConnectionCard(true) + '</div><div class="agent-list-search">' + ico('search', 19) + '<input type="search" id="agent-list-query" aria-label="搜索会话标题与消息" placeholder="搜索会话标题或消息" enterkeyhint="search" value="' + esc(agentListQuery) + '"></div><div class="filter agent-list-scopes" id="agent-list-scopes" role="group" aria-label="会话范围">' + agentUiListScopes() + '</div><section class="agent-conversation-list" aria-label="会话"><div id="agent-thread-list">' + agentThreadRows() + '</div></section><p class="settings-note agent-list-footnote">对话、草稿与附件仅保存在当前浏览器，未调用真实模型。已有桌面聊天不会自动迁入。</p></div>';
 }
 function agentsHeader(page, id) {
   if (page === 'agent-chat') {
@@ -341,7 +351,8 @@ function handleAgentAction(action, key, value) {
   if (!action.startsWith('agent-')) return false;
   const thread = agentThread(key);
   if (action === 'agent-new') { const result = agentCreateThread(); if (agentUiFeedback(result)) go('agent-chat/' + result.threadId); return true; }
-  if (action === 'agent-list-scope') { if (['active', 'archived', 'all'].includes(key)) { agentListScope = key; render(); } return true; }
+  if (action === 'agent-list-scope') { if (['active', 'archived', 'all'].includes(key)) { agentListScope = key; refreshAgentView(); document.querySelector('[data-act="agent-list-scope:' + key + '"]')?.focus({ preventScroll: true }); } return true; }
+  if (action === 'agent-list-clear') { agentListQuery = ''; const input = document.querySelector('#agent-list-query'); if (input) { input.value = ''; input.focus({ preventScroll: true }); } refreshAgentView(); return true; }
   if (action === 'agent-rename') { agentUiRenameSheet(key); return true; }
   if (action === 'agent-archive') {
     if (thread && !agentUiRevoked()) sheet('归档这段会话？', '<p class="prose">' + esc(thread.title) + '</p><p class="info">只从“当前”列表收起。消息、材料与成果完整保留，可从“已归档”或“全部”找到并恢复。进行中或待发送的请求需先完成、停止或撤回。</p><div class="actions">' + btn('确认归档', 'agent-archive-confirm:' + key, 'secondary') + btn('取消', 'close', 'outline') + '</div>');
@@ -513,7 +524,7 @@ function refreshAgentView() {
     if (!document.querySelector('#agent-thread-list')) { render(); return; }
     const list = document.querySelector('#agent-thread-list'); if (list) { const html = agentThreadRows(); if (list.innerHTML !== html) list.innerHTML = html; }
     const scopes = document.querySelector('#agent-list-scopes'); if (scopes) { const html = agentUiListScopes(); if (scopes.innerHTML !== html) scopes.innerHTML = html; }
-    const card = document.querySelector('#agent-list-connection'); if (card) { const html = agentUiConnectionCard(); if (card.innerHTML !== html) card.innerHTML = html; }
+    const card = document.querySelector('#agent-list-connection'); if (card) { const html = agentUiConnectionCard(true); if (card.innerHTML !== html) card.innerHTML = html; }
     return;
   }
   if (page !== 'agent-chat') return;

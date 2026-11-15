@@ -60,7 +60,8 @@ run("query='';st.workspaceSearch={scope:['reading-telegram'],sort:'相关优先'
 assert.deepEqual(Array.from(context.workspaceMatches(),item=>item.key),['reading:r2']);
 run("st.workspaceSearch.scope=[]");
 assert.equal(context.workspaceMatches().length,0);
-assert.ok(context.searchResults().includes('清除搜索与筛选'));
+assert.ok(context.searchResults().includes('调整筛选'));
+assert.ok(context.searchResults().includes('重置筛选'));
 canSave=false;
 context.workspaceClearSearch(true);
 assert.equal(context.workspaceMatches().length,0,'failed reset rolls back saved scope');

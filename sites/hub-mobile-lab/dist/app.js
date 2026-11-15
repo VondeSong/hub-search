@@ -71,7 +71,7 @@ const tag=(t,c='')=>'<span class="tag '+c+'">'+esc(t)+'</span>';
 const row=(t,d,i,a,c='',end='')=>'<button type="button" class="row" data-act="'+a+'"><span class="tile '+c+'">'+ico(i,18)+'</span><span class="copy"><strong>'+esc(t)+'</strong>'+(d?'<small>'+esc(d)+'</small>':'')+'</span>'+(end||'<span class="tail">'+ico('chev',16)+'</span>')+'</button>';
 const section=(t,body,action='')=>'<section class="section"><div class="section-head"><h2>'+esc(t)+'</h2>'+action+'</div>'+body+'</section>';
 const group=(content,empty='暂无项目。')=>'<div class="group">'+(content||'<p class="empty">'+esc(empty)+'</p>')+'</div>';
-const intro=(t,d)=>'<h1>'+esc(t)+'</h1><p class="lede">'+esc(d)+'</p>';
+const intro=(t,d)=>t===routes[route()[0]]&&!['doc','note','article','task','finding','work','deck','study','widgets'].includes(route()[0])?'':'<h1>'+esc(t)+'</h1><p class="lede">'+esc(d)+'</p>';
 const detail=(t,badge,body)=>'<article class="detail">'+badge+'<h1>'+esc(t)+'</h1>'+body+'</article>';
 const sourceRow=(id)=>row(docs[id].t,docs[id].s+' · '+docs[id].tag,'note','go:doc/'+id);
 const routes={future:'后续功能',deck:'牌组', 'collab-sync':'协作同步演示',search:'搜索',browse:'浏览',tasks:'任务',review:'复习',insights:'洞察',reading:'阅读',favorites:'收藏',recent:'最近浏览',logs:'日志',tags:'标签',libraries:'资料库',settings:'设置',sync:'同步状态',agent:'Agents',agents:'Agents','agent-chat':'Agents 对话','agent-connection':'云端连接',requests:'更新请求',request:'请求详情',guide:'功能梳理',doc:'资料详情',article:'阅读详情',task:'任务详情',finding:'发现详情',capture:'快速记录',recap:'阶段回顾',works:'工作与专题',work:'工作详情',saved:'日志',label:'标签详情',study:'牌组复习',appearance:'外观与阅读'};
@@ -87,6 +87,7 @@ function go(to){
  const next=to.split('/')[0], state=history.state||{};
  if(!routes[next]||mobileClosingSheet)return;
  if(location.hash==='#'+to&&!state.sheet)return;
+ if(route()[0]==='search'&&query&&workspaceIndex().some(item=>item.route===to))workspaceRememberQuery();
  scrolls[activeRoute]=pageScroll();
  const tab=navs.some(x=>x[0]===next)?next:state.tab||tabFor(route()[0]);
  const ns={hubDepth:(state.hubDepth||0)+(state.sheet?0:1),tab,from:route().filter(Boolean).join('/')};
@@ -103,7 +104,7 @@ function marked(text,q){const i=q?text.toLowerCase().indexOf(q.toLowerCase()):-1
 function searchInput(id,label,value=''){return '<div class="field"><label for="'+id+'">'+esc(label)+'</label><input type="search" id="'+id+'" value="'+esc(value)+'" placeholder="'+esc(label)+'"></div>'}
 function searchPage(){return workspaceSearchPage()}
 function searchResults(){return workspaceSearchResults()}
-function refreshSearch(){ $('#results').innerHTML=searchResults();const active=Boolean(query||workspaceFacets().length);$('#search-extra').hidden=active;const suggestions=$('#workspace-suggestions');if(suggestions)suggestions.hidden=active;const clear=$('.search-clear');if(clear)clear.hidden=!query;mobileRememberView() }
+function refreshSearch(){const results=$('#results');if(results)results.innerHTML=searchResults();const clear=$('.search-clear');if(clear)clear.hidden=!query;const cancel=$('.search-cancel');if(cancel)cancel.hidden=!workspaceSearchActive;mobileRememberView()}
 
 function selectField(id,label,items,current){return '<div class="field"><label for="'+id+'">'+esc(label)+'</label><select id="'+id+'">'+items.map(x=>'<option '+(x===current?'selected':'')+'>'+esc(x)+'</option>').join('')+'</select></div>'}
 
@@ -309,16 +310,17 @@ function render(restore=false){
  const widgetScenarios=document.querySelector('.widget-scenarios');if(widgetScenarios)widgetScenariosOpen=widgetScenarios.open;
  const [p,id]=route(),key=p+(id?'/'+id:'');const isTab=navs.some(x=>x[0]===p);
  if((((p==='doc'||p==='note')&&(docs[id]||st.notes.some(n=>n.id===id)))||p==='article')&&activeRoute!==key){const item=p==='article'?'article/'+id:p==='note'||!docs[id]?'note/'+id:id;st.history=[item,...st.history.filter(x=>x!==item)].slice(0,12);save()}
+ if(activeRoute!==key){workspaceRememberOpened(key);if(p!=='search')workspaceSearchActive=false;}
  activeRoute=key;document.body.dataset.view=p;
  const isStudy=p==='study'&&allReviewCards().some(c=>(st.studyDeck==='全部'||c.deck===st.studyDeck)&&!st.reviewed.includes(c.id));
  document.body.classList.toggle('focus-session',isStudy);$('#tabs').hidden=isStudy||p==='agent-chat'||p==='widgets';
  const brand='<span class="brand"><img src="hub.svg" alt="">Hub <span class="sample-label">示例资料</span></span>';
- if(['agent','agents','agent-chat','agent-connection'].includes(p))$('#header').innerHTML=agentsHeader(p==='agent'?'agents':p,id);
- else if(isTab)$('#header').innerHTML=brand+'<div class="top-actions">'+iconBtn('外观与设置','go:settings','settings')+iconBtn('快速速记','quick-capture:note','plus')+'</div>';
+ if(isTab||p==='agent')$('#header').innerHTML=mobileRootHeader(p==='agent'?'agents':p);
+ else if(['agent-chat','agent-connection'].includes(p))$('#header').innerHTML=agentsHeader(p,id);
  else if(p==='study')$('#header').innerHTML=plain(history.state?.from==='widgets'?'返回小组件':'退出复习',history.state?.from==='widgets'?'back':'exit-study','back')+'<span class="top-title">'+esc(st.studyDeck==='全部'?'专注复习':st.studyDeck)+'</span>';
  else if(p==='widgets')$('#header').innerHTML=plain('返回 Hub','back','back')+brand+iconBtn('添加到手机的说明','widget-help','info');
  else if(p==='doc'||p==='note')$('#header').innerHTML=iconBtn('返回','back','back')+'<span class="top-title">'+(p==='note'?'本地笔记':'资料')+'</span><div class="top-actions">'+iconBtn('资料出处','doc-source:'+id,'link')+iconBtn('更多操作','doc-tools:'+id,'more')+'</div>';
- else $('#header').innerHTML=iconBtn('返回','back','back')+'<span class="top-title">'+routes[p]+'</span>'+iconBtn('快速新建','quick-capture:note','plus');
+ else $('#header').innerHTML=iconBtn('返回','back','back')+'<h1 class="top-title">'+routes[p]+'</h1>'+iconBtn('快速速记','quick-capture:note','plus');
  const selected=['agent','agents','agent-chat','agent-connection'].includes(p)?'agents':isTab?p:history.state?.tab||tabFor(p);
  $('#tabs').innerHTML=navs.map(([k,t,i])=>'<button type="button" class="tab" data-act="tab:'+k+'" '+(k===selected?'aria-current="page"':'')+'><span class="tab-icon">'+ico(i,21)+'</span><span>'+t+'</span></button>').join('');
  $('#content').innerHTML=(['insights','works','work','recap','requests','request','finding','collab-sync'].includes(p)?'<div class="future-banner">示例交互 · 未连接真实分析或桌面服务 '+plain('功能边界','go:guide')+'</div>':'')+content(p,id);
@@ -347,11 +349,12 @@ $('#sheet').addEventListener('cancel',e=>{e.preventDefault();close()});
 
 function changed(msg){const persisted=save();render();if(persisted)tell(msg);return persisted}
 document.addEventListener('input',e=>{if(workspaceInput(e)||taskToolsInput(e)||handleAgentInput(e))return;handleWorkflowInput(e);const el=e.target;if(el.id==='query'&&!e.isComposing){query=el.value.trim();refreshSearch()}if(el.id==='capture-text'){st.draft=el.value;save()}if(el.id==='reading-query'){readingQuery=el.value.trim();$('#reading-results').innerHTML=readingRows()}if(el.id==='star-query'){starQuery=el.value.trim();$('#star-results').innerHTML=favoriteRows()}if(el.id==='tag-query'){tagQuery=el.value.trim();$('#tag-results').innerHTML=tagRows()}if(el.id==='correction'){st.drafts['feedback-'+el.form.dataset.id]=el.value;save()}if(el.form?.id==='request-form'){st.drafts[el.form.dataset.target]=readRequest(el.form);save()}});
+document.addEventListener('focusin',e=>{if(e.target.id==='query'){if(!workspaceSearchActive)workspaceSearchEntryQuery=query;workspaceSearchActive=true;refreshSearch();}});
 document.addEventListener('compositionend',e=>{if(taskToolsInput(e))return;if(e.target.id==='query'){query=e.target.value.trim();refreshSearch()}});
 document.addEventListener('change',e=>{if(widgetChange(e)||workspaceInput(e)||taskToolsInput(e)||handleAgentChange(e))return;handleWorkflowInput(e);const f=e.target.form;if(f?.id==='request-form'){st.drafts[f.dataset.target]=readRequest(f);save()}});
 document.addEventListener('submit',e=>{
  const f=e.target;if(widgetSubmit(f)||workspaceSubmit(f)||taskToolsSubmit(f)||handleAgentSubmit(f)){e.preventDefault();return}if(f.id==='quick-capture-form'){e.preventDefault();handleWorkflowSubmit(f);return}if(!['search-form','capture-form','correction-form','request-form','search-scope-form','sync-settings-form'].includes(f.id))return;e.preventDefault();
- if(f.id==='search-form'){query=$('#query').value.trim();refreshSearch();$('#query').blur();return}
+ if(f.id==='search-form'){query=$('#query').value.trim();workspaceRememberQuery();refreshSearch();$('#query').blur();return}
  if(f.id==='capture-form'){const val=$('#capture-text').value.trim();if(!val){tell('请输入记录内容。');return}st.notes.unshift({id:'n'+Date.now(),text:val,date:new Date().toLocaleDateString('zh-CN')});const draft=st.draft;st.draft='';if(!save()){st.notes.shift();st.draft=draft;return}go('saved');tell('已保存到此浏览器');return}
  if(f.id==='request-form'){submitRequest(f);return}
  if(f.id==='sync-settings-form'){st.cloudEnabled=$('#sync-insight').checked;st.readingSync=$('#sync-reading').checked;st.reviewSync=$('#sync-review').checked;if(save()){close();render();tell('已保存本设备同步范围')}return}
