@@ -5,6 +5,7 @@ html[data-runtime-platform="android"] .flashcard-rhythm-day { width: 100%; displ
 html[data-runtime-platform="android"] .flashcard-rhythm-day[aria-pressed="true"] { outline: 2px solid var(--flashcards-action); outline-offset: 2px; }
 html[data-runtime-platform="android"] .flashcard-study-detail,html[data-runtime-platform="android"] .flashcard-study-forecast > p { color: var(--flashcards-secondary); font-size: .8125rem; line-height: 1.6; }
 html[data-runtime-platform="android"] .flashcards-review-actions { flex-wrap: wrap; }
+html[data-runtime-platform="android"] .flashcards-review { min-height: 0; }
 html[data-runtime-platform="android"] .flashcards-review-actions button { min-height: 44px; }
 html[data-runtime-platform="android"] .flashcards-review-card { padding-bottom: 24px; }
 html[data-runtime-platform="android"] .flashcards-review > .flashcards-ratings,html[data-runtime-platform="android"] .flashcards-review > .flashcards-reveal { position: static; flex: 0 0 auto; width: auto; margin: 10px; padding-bottom: env(safe-area-inset-bottom,0px); }
