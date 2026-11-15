@@ -5,7 +5,7 @@ import type { IndexStatus } from "./IndexStatusTypes";
 
 export type JournalSummary = {
   count: number;
-  dates: Array<{ date: string; sources: number }>;
+  dates: Array<{ date: string; sources: number; count?:number }>;
 };
 
 type JournalView = { summary: JournalSummary; items: unknown };

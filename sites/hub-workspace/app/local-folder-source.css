@@ -1,0 +1,5 @@
+.lf-source{padding:22px 0;margin:12px 0 22px;border-bottom:1px solid var(--line)}
+.lf-heading{display:flex;align-items:center;gap:12px}.lf-heading>div{flex:1;min-width:0}.lf-heading h3{font-size:14px;font-weight:600}.lf-heading p{margin-top:4px;font-size:12px;color:var(--muted)}
+.lf-source .lf-note{font-size:12px;line-height:1.8;color:var(--muted);max-width:66ch;margin:16px 0;overflow-wrap:anywhere}
+.lf-summary{margin:16px 0;font-size:12px;line-height:1.8}.lf-summary>div{display:grid;grid-template-columns:80px minmax(0,1fr);gap:12px;padding:5px 0}.lf-summary dt{color:var(--muted)}.lf-summary dd{margin:0;overflow-wrap:anywhere}.lf-actions{display:flex;gap:18px;align-items:center}.lf-source h4{font-size:13px;margin:14px 0}.lf-source .cs-connect-form{max-width:560px}.lf-source .cs-check{align-items:center}.lf-source input[type=checkbox]{accent-color:var(--accent)}
+@media(max-width:480px){.lf-summary>div{grid-template-columns:62px minmax(0,1fr)}.lf-source .cs-form-actions{flex-wrap:wrap}.lf-heading{align-items:flex-start}}

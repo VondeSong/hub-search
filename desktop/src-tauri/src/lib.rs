@@ -31201,6 +31201,22 @@ async fn journal_page(
 }
 
 #[tauri::command]
+async fn journal_record_index(
+    app: AppHandle,
+    space_ids: Option<Vec<String>>,
+    query: Option<String>,
+) -> Result<Value, String> {
+    let path = database_path(&app)?;
+    tokio::task::spawn_blocking(move || {
+        let c = open_database(&path)?;
+        let scope = journal_query::visible_scope(&path, &c, space_ids)?;
+        journal_query::record_index(&c, scope, query.as_deref().unwrap_or(""))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn journal_summary(
     app: AppHandle,
     space_ids: Option<Vec<String>>,
@@ -35134,6 +35150,9 @@ pub fn run() {
                 recent_documents,
                 journal_documents,
                 journal_summary,
+                journal_record_index,
+                quick_journal::calendar::capture_calendar_journal,
+                quick_journal::calendar::journal_task_destinations,
                 journal_page,
                 journal_view,
                 create_journals,

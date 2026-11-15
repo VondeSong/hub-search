@@ -3,6 +3,7 @@ use super::*;
 use crate::flashcard_object_store::{OssConfig, OssStore};
 use crate::reading_sync::object_store::Store;
 use sha2::{Digest, Sha256};
+pub(crate) mod calendar;
 mod format;
 use format::{Attachment, Record, MAX_ATTACHMENT};
 #[cfg(target_os = "android")]
@@ -196,18 +197,31 @@ pub(crate) fn stage_quick_journal_attachment(
     })
 }
 #[tauri::command]
-pub(crate) fn save_quick_journal_draft(app: AppHandle, draft: String) -> Result<(), String> {
+pub(crate) fn save_quick_journal_draft(
+    app: AppHandle,
+    draft: String,
+    slot: Option<String>,
+) -> Result<(), String> {
     if draft.len() > 200_000 {
         return Err("草稿过大".into());
     }
+    if let Some(day) = slot.as_deref() {
+        let value: Record = serde_json::from_str(&draft).map_err(|_| "日历草稿格式无效")?;
+        if value.version != 1 || value.date != day || !format::hex_id(&value.id, 32) {
+            return Err("日历草稿日期或身份不一致".into());
+        }
+    }
     let (c, _guard) = open_write_database(&database_path(&app)?)?;
-    meta(&c, "quick_journal_draft", &draft)
+    meta(&c, &calendar::key(slot.as_deref())?, &draft)
 }
 #[tauri::command]
-pub(crate) fn get_quick_journal_draft(app: AppHandle) -> Result<String, String> {
+pub(crate) fn get_quick_journal_draft(
+    app: AppHandle,
+    slot: Option<String>,
+) -> Result<String, String> {
     Ok(metadata_string(
         &open_database(&database_path(&app)?)?,
-        "quick_journal_draft",
+        &calendar::key(slot.as_deref())?,
     ))
 }
 fn enqueue(db: &PathBuf, r: &Record) -> Result<(), String> {

@@ -22,6 +22,13 @@ pub(super) struct GuidanceRef {
 fn hash(v: &Value) -> String {
     format!("{:x}", Sha256::digest(v.to_string().as_bytes()))
 }
+
+pub(in crate::agent_work::runner) fn project_request(material: Value) -> Value {
+    // Direct calls have no retained context: references must resolve inside this request.
+    let mut guidance = GuidanceRef::new(&material["knowledgeRules"]);
+    guidance.project_initial(material)
+}
+
 impl GuidanceRef {
     fn resolve(&self, reference: &Value) -> Option<&Base> {
         self.bases
@@ -304,6 +311,79 @@ impl GuidanceRef {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn direct_request_keeps_rules_and_latest_work_without_duplicate_rule_text() {
+        let rules = json!({"libraryId":"engineering","documentId":"notes","fingerprint":"v1",
+            "entries":[{"instructions":"Do not call a proposed move completed. ".repeat(500)}]});
+        let material = json!({"knowledgeRules":[rules.clone()],
+            "observations":[{"evidenceId":"e1","knowledgeRules":rules}],
+            "conversation":{"currentRequest":"Keep two steps, not three.","messages":[{"role":"assistant","text":"The two steps are not executed."}]},
+            "quoteCatalog":[{"quoteId":"e1:q1","text":"Original source words"}],
+            "businessActionRecords":[{"state":"unknown"}],"capabilities":{"allowed":false}});
+        let wire = project_request(material.clone());
+        assert!(wire.to_string().len() + 10_000 < material.to_string().len());
+        assert_eq!(wire["knowledgeRules"], material["knowledgeRules"]);
+        assert_eq!(
+            wire["observations"][0]["knowledgeRulesRef"]["location"],
+            "initialContext.knowledgeRules/0"
+        );
+        for field in [
+            "conversation",
+            "quoteCatalog",
+            "businessActionRecords",
+            "capabilities",
+        ] {
+            assert_eq!(wire[field], material[field]);
+        }
+        let mut recovery = GuidanceRef::new(&material["knowledgeRules"]);
+        recovery.invalidate();
+        assert_eq!(recovery.restore_replay(wire.clone()).unwrap(), material);
+        assert_eq!(project_request(material), wire);
+    }
+
+    #[test]
+    fn direct_request_never_references_another_scope_or_a_previous_request_version() {
+        let rule = |library: &str, version: i64| {
+            json!({"libraryId":library,"documentId":"notes",
+            "version":version,"entries":[{"scope":{"libraryId":library},"version":version,"instructions":"Keep source facts distinct from suggestions. ".repeat(50)}]})
+        };
+        let first = rule("engineering", 1);
+        let next = rule("engineering", 2);
+        let other = rule("another-project", 1);
+        let _ = project_request(json!({"knowledgeRules":[first.clone()]}));
+        let material = json!({"knowledgeRules":[next.clone()],"observations":[
+            {"knowledgeRules":first},{"knowledgeRules":other},{"knowledgeRules":next}]});
+        let wire = project_request(material.clone());
+        assert_eq!(wire["knowledgeRules"], material["knowledgeRules"]);
+        assert_eq!(wire["observations"][0], material["observations"][0]);
+        assert_eq!(wire["observations"][1], material["observations"][1]);
+        assert_eq!(
+            wire["observations"][2]["knowledgeRulesRef"]["sha256"],
+            hash(&next)
+        );
+    }
+
+    #[test]
+    fn direct_request_citation_references_resolve_in_the_same_request() {
+        let catalog = json!([{"quoteId":"e1:q1","text":"Actual source words. ".repeat(100)}]);
+        let material = json!({"knowledgeRules":[],"quoteCatalog":catalog,
+            "observations":[{"quoteCatalog":catalog,"evidenceId":"e1"}],
+            "sharedMemory":{"enabled":false},"sources":{"exactNotes":["selected-note"]}});
+        let wire = project_request(material.clone());
+        assert_eq!(wire["quoteCatalog"], material["quoteCatalog"]);
+        assert_eq!(
+            wire["observations"][0]["quoteCatalogRef"]["location"],
+            "initialContext.quoteCatalog"
+        );
+        assert_eq!(wire["sharedMemory"], material["sharedMemory"]);
+        assert_eq!(wire["sources"], material["sources"]);
+        let mut recovery = GuidanceRef::new(&material["knowledgeRules"]);
+        recovery.project_initial(material.clone());
+        recovery.invalidate();
+        assert_eq!(recovery.restore_replay(wire).unwrap(), material);
+    }
+
     #[test]
     fn compaction_invalidates_reference_and_restores_cached_reply_without_reexecution() {
         let initial = json!({"libraryInstructions":["有效规则".repeat(400)]});
