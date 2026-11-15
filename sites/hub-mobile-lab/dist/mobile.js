@@ -33,7 +33,7 @@ function appearancePage() {
 function settingsPage() {
   return intro('设置', '连接、数据与阅读偏好。') +
     section('数据', group(row('连接总览', '内容同步与 Agents 会话分别查看', 'cloud', 'go:connections') + row('同步状态与范围', '速记、阅读、闪卡与异常重试', 'sync', 'go:sync') + row('资料库', '资料库、空间与分组的多选范围', 'folder', 'go:libraries'))) +
-    section('偏好', group(row('外观与阅读', '页面底色、字号与透明效果', 'settings', 'go:appearance'))) +
+    section('偏好', group(row('外观与阅读', '页面底色、字号与透明效果', 'settings', 'go:appearance') + row('小组件预览', '在桌面和负一屏体验回顾、复习与速记', 'cards', 'go:widgets'))) +
     section('关于', group(row('后续功能', '桌面协作、工作专题与历史演示', 'spark', 'go:future') + row('功能与边界', '已实现交互、演示能力与后续验收', 'info', 'go:guide'))) +
     '<p class="settings-note">手机交互原型。记录与附件保存在当前浏览器，不读取实际云连接，不写入个人 OS。</p><div class="actions">' + plain('重置演示数据','reset') + '</div>';
 }

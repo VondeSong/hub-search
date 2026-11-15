@@ -4,6 +4,14 @@
 
 主仓已有 Android → Hub VPS → Codex app-server 的基础接入实现；“本 Site 未连接”不表示 Android/VPS 基线尚未接入。真实服务能力、部署状态与实机验收应查阅主仓对应源码和记录，不能用本网页的演示在线状态替代。
 
+## 2026-11-15 小组件预览
+
+沿用原手机站点，在 [小组件预览](https://hub-mobile-lab-von11.song02211368537057.chatgpt.site/#widgets) 比较「回顾一条 + 记一条」与「今日复习 + 记一条」。也可从「设置 → 小组件预览」或「复习 → 管理」进入，不增加底部主标签。
+
+支持负一屏/桌面布局示意、适用尺寸、浅深色、回顾范围及离线/空内容/首次使用状态。回顾正文打开同一条资料，复习复用现有会话，记一条恢复已有草稿。网页交互不写真实系统小组件，不证明 Android 或小米真机兼容。
+
+检查命令：`node checks/widget-checks.cjs`、`node checks/mobile-checks.cjs`、`node checks/workspace-checks.cjs`。本轮的浏览器路径、响应式检查、存储失败修复及真实验证边界见 [验收记录](docs/widgets-qa-2026-11-15.md)。后续原生自测与开发计划继续在 [Issue #53](https://github.com/VondeSong/hub-search/issues/53) 跟进。
+
 ## 2026-11-13 当前入口与闭环
 
 主导航为 **搜索、浏览、Agents、任务、复习**。洞察不是底部标签：保留在浏览入口，并通过搜索首页“值得留意”卡片进入。加号仍直接打开 flomo 风格速记，不把速记重新拆为任务、链接等分类。
