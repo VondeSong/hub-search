@@ -236,12 +236,10 @@ function docPage(id,localOnly=false){const local=localOnly||!docs[id]?st.notes.f
 }
 
 const rstatus=(x)=>st.reading[x.id]||x.status;
-function readingRows(){return group(reading.filter(x=>(readingFilter==='全部'||rstatus(x)===readingFilter)&&(readingSource==='全部来源'||x.src===readingSource)&&(readingView!=='继续阅读'||rstatus(x)==='阅读中')&&(readingView!=='离线内容'||st.cache[x.id])&&match(x.t+' '+x.blurb,readingQuery)).map(r=>row(r.t,r.src+' · '+rstatus(r)+(st.cache[r.id]?' · 已缓存':'')+' · '+r.blurb,'book','go:article/'+r.id,'purple')).join(''),'没有符合条件的阅读内容。')}
-function readingPage(){return intro('阅读','在碎片时间接着读，返回保留筛选与位置。')+
- searchInput('reading-query','搜索阅读',readingQuery)+
- '<div class="filter">'+['全部内容','继续阅读','离线内容'].map(t=>chip(t,'readview:'+t,readingView===t)).join('')+'</div>'+
- '<div class="filter">'+['全部','未读','阅读中','已读'].map(t=>chip(t,'readfilter:'+t,readingFilter===t)).join('')+'</div>'+
- group(row(readingSource,'切换阅读来源','tune','read-source'))+'<div id="reading-results" class="result-gap">'+readingRows()+'</div>'}
+function readingMatches(){return reading.filter(x=>(readingFilter==='全部'||rstatus(x)===readingFilter)&&(readingSource==='全部来源'||x.src===readingSource)&&(readingView!=='继续阅读'||rstatus(x)==='阅读中')&&(readingView!=='离线内容'||st.cache[x.id])&&match(x.t+' '+x.blurb+' '+x.src,readingQuery))}
+function readingRows(){const items=readingMatches();return '<p class="reading-count" role="status">'+items.length+' 篇 · 示例内容</p>'+group(items.map(r=>'<button type="button" class="row reading-result" data-act="go:article/'+r.id+'"><span class="copy"><strong>'+esc(r.t)+'</strong><span class="reading-excerpt">'+esc(r.blurb)+'</span><small>'+esc(r.src+' · '+rstatus(r)+(st.cache[r.id]?' · 离线标记（示例）':''))+'</small></span><span class="tail">'+ico('chev',16)+'</span></button>').join(''),'没有符合条件的文章。可以更换关键词，或在筛选中放宽条件。')}
+function readingPage(){const limited=readingSource!=='全部来源'||readingView!=='全部内容';return '<div class="reading-workspace"><div class="reading-search">'+searchInput('reading-query','搜索阅读',readingQuery)+iconBtn('筛选阅读'+(limited?'，有已选条件':''),'read-source','tune')+'</div><div class="filter reading-status" aria-label="阅读状态">'+['全部','未读','阅读中','已读'].map(t=>chip(t,'readfilter:'+t,readingFilter===t)).join('')+'</div><div class="reading-conditions" aria-label="已选阅读条件">'+(readingSource!=='全部来源'?plain(readingSource+' ×','read-clear:source'):'')+(readingView!=='全部内容'?plain(readingView+' ×','read-clear:view'):'')+'</div><div id="reading-results">'+readingRows()+'</div></div>'}
+function readingFilterSheet(){sheet('筛选阅读','<form id="reading-filter-form">'+selectField('reading-source','来源',['全部来源',...new Set(reading.map(x=>x.src))],readingSource)+selectField('reading-view','内容范围',['全部内容','继续阅读','离线内容'],readingView)+'<p class="fine">“继续阅读”只看阅读中的文章；离线标记仅供本原型演示。</p><div class="actions">'+btn('重置','read-reset','outline')+'<button class="btn" type="submit">应用筛选</button></div></form>')}
 function article(id){
  const r=reading.find(x=>x.id===id);if(!r)return missing();const starred=Boolean(st.stars['article/'+id]);
  return '<article class="reader"><p class="eyebrow">'+esc(r.src)+'</p><h1>'+esc(r.t)+'</h1><div class="reader-meta"><span>'+esc(rstatus(r))+'</span><span>'+(st.cache[id]?'已加入离线示例':'示例正文')+'</span></div><p class="reader-intro">'+esc(r.blurb)+'</p><div class="reader-body">'+readerBody(r.body)+'</div><div class="reader-toolbar">'+plain(starred?'已收藏':'收藏','star:article/'+id,'star')+plain('原文出处','reading-original:'+id,'link')+plain('更多','reading-manage:'+id,'settings')+'</div><div class="actions workspace-reading-actions">'+btn('记下想法','workspace-note:reading:'+id,'secondary','note')+btn('带进 Agents','workspace-agent:reading:'+id,'outline','chat')+plain('转成任务','workspace-task:reading:'+id,'task')+'</div><div class="actions">'+btn(rstatus(r)==='已读'?'恢复未读':'标记已读','read:'+id+':'+(rstatus(r)==='已读'?'未读':'已读'),'','check')+btn('稍后接着读','read:'+id+':阅读中','outline')+'</div></article>';
@@ -259,8 +257,8 @@ function review(){return mobileReviewPage()}
 function study(){const deck=st.studyDeck,list=allReviewCards().filter(c=>deck==='全部'||c.deck===deck),todo=list.filter(c=>!st.reviewed.includes(c.id)),card=todo[cardIndex%todo.length];if(!list.length)return missing();
  if(!todo.length)return intro('复习完成',deck+' · 已完成 '+list.length+' 张')+section('本次记录',group(list.map(c=>row(c.q,st.grades[c.id]||'已复习','check','go:doc/'+c.doc,'green')).join('')))+'<div class="actions">'+btn('返回复习首页','go:review')+'</div>';
  const choices=card.id==='c3'&&!face?'<div class="actions">'+btn('写一句与问题的关系','flip','outline')+btn('只收藏链接','wrong-choice','outline')+'</div>':'';
- return intro(deck==='全部'?'闪卡复习':deck,todo.length+' 张待复习')+section(face?'答案':'问题',group('<div class="review-card review-focus-card">'+tag(card.deck,'blue')+'<p>'+esc(face?card.a:card.q)+'</p></div>'))+
- (face?'<div class="ratings">'+[['重来','1 分钟'],['困难','10 分钟'],['记得','1 天'],['轻松','4 天']].map(([t,delay])=>'<button class="btn outline" data-act="grade:'+card.id+':'+t+'"><span>'+t+'</span><small>'+delay+'</small></button>').join('')+'</div><p class="fine">间隔为演示。选“重来”会保留在本轮。</p>'+section('来源',group(sourceRow(card.doc))):choices||'<div class="actions">'+btn('显示答案','flip')+'</div>')}
+ return '<div class="study-context"><span>'+esc(card.deck)+' · 还剩 '+todo.length+' 张</span>'+plain('编辑','edit-card:'+card.id)+'</div><section class="study-content" aria-label="'+(face?'答案':'问题')+'"><p class="study-face">'+(face?'答案':'问题')+'</p><div class="review-card review-focus-card"><p>'+esc(face?card.a:card.q)+'</p></div></section>'+
+ (face?'<div class="study-source">'+plain('查看来源','go:doc/'+card.doc,'link')+'</div><div class="study-actions"><div class="ratings">'+[['重来','1 分钟'],['困难','10 分钟'],['记得','1 天'],['轻松','4 天']].map(([t,delay],i)=>'<button class="btn outline grade-'+i+'" data-act="grade:'+card.id+':'+t+'"><span>'+t+'</span><small>'+delay+'</small></button>').join('')+'</div><p class="fine">间隔为演示 · “重来”留在本轮</p></div>':'<div class="study-actions">'+(choices||'<div class="actions">'+btn('显示答案','flip','wide')+'</div>')+'</div>')}
 
 let agentDoc='';
 function works(){return intro('工作与专题','查看桌面成果及其对应的原工作。')+
@@ -334,7 +332,8 @@ function render(restore=false){
 function showSheet(t,html){
  const d=$('#sheet'),opened=d.open;
  if(!opened){mobileSheetFocus=document.activeElement?.closest('[data-act]')?.dataset.act||null;lockMobilePage()}
- d.innerHTML='<div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h2 id="sheet-title">'+esc(t)+'</h2>'+iconBtn('关闭','close','close')+'</div><div class="sheet-body">'+html+'</div><p id="sheet-feedback" class="info" role="status" hidden></p>';
+ const cardEditor=html.includes('id="card-edit-form"');
+ d.innerHTML='<div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head">'+(cardEditor?plain('暂不保存','close'):'')+'<h2 id="sheet-title">'+esc(t)+'</h2>'+(cardEditor?'<button class="btn" type="submit" form="card-edit-form">保存</button>':iconBtn('关闭','close','close'))+'</div><div class="sheet-body">'+html+'</div><p id="sheet-feedback" class="info" role="status" hidden></p>';
  if(!opened)d.showModal();if(d.querySelector('#workspace-scope-form'))workspaceSyncScopeParents();mobileUpdateViewport();
 }
 function sheet(t,html){
@@ -353,7 +352,7 @@ document.addEventListener('focusin',e=>{if(e.target.id==='query'){if(!workspaceS
 document.addEventListener('compositionend',e=>{if(taskToolsInput(e))return;if(e.target.id==='query'){query=e.target.value.trim();refreshSearch()}});
 document.addEventListener('change',e=>{if(widgetChange(e)||workspaceInput(e)||taskToolsInput(e)||handleAgentChange(e))return;handleWorkflowInput(e);const f=e.target.form;if(f?.id==='request-form'){st.drafts[f.dataset.target]=readRequest(f);save()}});
 document.addEventListener('submit',e=>{
- const f=e.target;if(widgetSubmit(f)||workspaceSubmit(f)||taskToolsSubmit(f)||handleAgentSubmit(f)){e.preventDefault();return}if(f.id==='quick-capture-form'){e.preventDefault();handleWorkflowSubmit(f);return}if(!['search-form','capture-form','correction-form','request-form','search-scope-form','sync-settings-form'].includes(f.id))return;e.preventDefault();
+ const f=e.target;if(f.id==='card-edit-form'){e.preventDefault();saveCardEdit(f);return}if(f.id==='reading-filter-form'){e.preventDefault();readingSource=f.querySelector('#reading-source').value;readingView=f.querySelector('#reading-view').value;if(readingView==='继续阅读'){readingFilter='阅读中';readingView='全部内容'}close();render();mobileRememberView();return}if(widgetSubmit(f)||workspaceSubmit(f)||taskToolsSubmit(f)||handleAgentSubmit(f)){e.preventDefault();return}if(f.id==='quick-capture-form'){e.preventDefault();handleWorkflowSubmit(f);return}if(!['search-form','capture-form','correction-form','request-form','search-scope-form','sync-settings-form'].includes(f.id))return;e.preventDefault();
  if(f.id==='search-form'){query=$('#query').value.trim();workspaceRememberQuery();refreshSearch();$('#query').blur();return}
  if(f.id==='capture-form'){const val=$('#capture-text').value.trim();if(!val){tell('请输入记录内容。');return}st.notes.unshift({id:'n'+Date.now(),text:val,date:new Date().toLocaleDateString('zh-CN')});const draft=st.draft;st.draft='';if(!save()){st.notes.shift();st.draft=draft;return}go('saved');tell('已保存到此浏览器');return}
  if(f.id==='request-form'){submitRequest(f);return}
@@ -377,8 +376,10 @@ document.addEventListener('click',e=>{
  case 'reading-original':sheet('原文出处','<p class="prose">'+esc(reading.find(r=>r.id===k).src)+' · '+esc(reading.find(r=>r.id===k).t)+'</p><p class="info">这条内容为示例，未提供可打开的真实链接。</p>');break;
  case 'reading-manage':readingManagement(k);break;
  case 'reading-cache':st.cache[k]=!st.cache[k];close();changed(st.cache[k]?'已加入离线示例':'已移除离线示例');break;
- case 'readfilter':readingFilter=k;render();break;
- case 'read-source':sheet('阅读来源',group(['全部来源',...reading.map(x=>x.src)].map(t=>row(t,t===readingSource?'已选':'','book','readscope:'+t)).join('')));break;
+ case 'readfilter':readingFilter=k;if(readingView==='继续阅读')readingView='全部内容';render();mobileRememberView();break;
+ case 'read-source':readingFilterSheet();break;
+ case 'read-clear':if(k==='source')readingSource='全部来源';else readingView='全部内容';render();mobileRememberView();break;
+ case 'read-reset':$('#reading-source').value='全部来源';$('#reading-view').value='全部内容';snapshotMobileSheet();break;
  case 'readscope':readingSource=k;close();render();break;
  case 'taskdate':taskDate=k;render();break;
  case 'undo-task':if(undoTask){const prior=st.tasks[undoTask.id];st.tasks[undoTask.id]=undoTask.was;if(!save()){st.tasks[undoTask.id]=prior;tell('撤销尚未保存，请重试');break}undoTask=null;render();tell('已撤销任务状态')}break;
@@ -420,6 +421,8 @@ document.addEventListener('click',e=>{
 });
 addEventListener('popstate',()=>{mobileClosingSheet=false;const k=route().filter(Boolean).join('/');const state=history.state||{},sheetId=state.sheet;
  if(sheetId&&sheets.has(sheetId)){if(k!==activeRoute){scrolls[activeRoute]=pageScroll();render(true)}showSheet(...sheets.get(sheetId));return}
+ // After a reload, old sheet entries have no recoverable view and should not trap Back.
+ if(!$('#sheet').open&&k===activeRoute&&state.hubDepth>0){history.back();return}
  const wasOpen=$('#sheet').open;dismissMobileSheet(wasOpen);if(k!==activeRoute){scrolls[activeRoute]=pageScroll();render(true)}mobileRememberView();
 });
 initAgents();

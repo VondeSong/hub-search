@@ -140,6 +140,8 @@ function mobileUpdateViewport() {
   document.documentElement.style.setProperty('--viewport-height', height + 'px');
   document.documentElement.style.setProperty('--viewport-bottom', bottom + 'px');
   document.body.classList.toggle('keyboard-open', Boolean(editable && mobileViewportBaseline - height > 140));
+  const studyActions=document.querySelector('.study-actions');
+  if(studyActions)document.documentElement.style.setProperty('--study-actions-height',Math.ceil(studyActions.getBoundingClientRect().height)+'px');
   if(typeof workspaceRevealActiveType==='function'){workspaceRevealActiveType();requestAnimationFrame(workspaceRevealActiveType);}
 }
 function mobileRememberView() {

@@ -216,7 +216,20 @@ function mobileBrowsePage() {
 function futurePage() {
   return intro('后续功能','桌面协作与阶段回顾保留交互演示。') + section('尚未接入本原型的真实服务',group(row('阶段回顾','查看既有交互演示；不运行真实分析','spark','go:recap')+row('桌面协作与工作专题','提交、等待和回执的历史演示','chat','go:works')+row('桌面成果同步演示','查看原有请求和桌面离线流程','sync','go:collab-sync'))) + '<p class="settings-note">洞察现可从浏览直接进入；Agents 是独立主入口。本站仍只演示交互，不代表 Android / VPS 的同名功能已接通。</p>';
 }
-function allReviewCards() { return [...cards, ...(st.customCards || [])]; }
+function allReviewCards() { return [...cards, ...(st.customCards || [])].map(c=>({...c,...(st.cardEdits?.[c.id]||{})})); }
+function cardEditSheet(id) {
+  const card=allReviewCards().find(c=>c.id===id);if(!card)return;
+  const draft=st.drafts?.['card-'+id]||card;
+  sheet('编辑闪卡','<form id="card-edit-form" data-id="'+esc(id)+'"><p class="fine">'+esc(card.deck)+' · 只修改本浏览器副本，来源和评分保留。</p><div class="field"><label for="card-question">问题</label><textarea id="card-question" name="q" maxlength="10000" required>'+esc(draft.q)+'</textarea></div><div class="field"><label for="card-answer">答案与解释</label><textarea id="card-answer" name="a" maxlength="10000" required>'+esc(draft.a)+'</textarea></div><p id="card-edit-feedback" class="fine" role="status">关闭后可继续草稿；点“保存”才会替换卡片。</p></form>');
+}
+function saveCardEdit(form) {
+  const id=form.dataset.id,q=form.querySelector('[name="q"]').value.trim(),a=form.querySelector('[name="a"]').value.trim(),feedback=form.querySelector('#card-edit-feedback');
+  if(!allReviewCards().some(c=>c.id===id)||!q||!a||q.length>10000||a.length>10000){feedback.textContent='问题和答案都要填写，每项最多一万字。';return false;}
+  const oldEdits=st.cardEdits,oldDraft=st.drafts?.['card-'+id];
+  st.cardEdits={...oldEdits,[id]:{q,a}};st.drafts||={};delete st.drafts['card-'+id];
+  if(!save()){st.cardEdits=oldEdits;st.drafts['card-'+id]=oldDraft||{q,a};feedback.textContent='没有保存成功，原卡片未改变。请保留当前输入并重试。';return false;}
+  close();render();tell('已保存此浏览器的卡片副本');return true;
+}
 function reviewDecks() { return [...new Set(allReviewCards().map(c=>c.deck))]; }
 function mobileReviewPage() {
   const all = allReviewCards(), left = all.filter(c=>!st.reviewed.includes(c.id));
@@ -230,7 +243,7 @@ function mobileReviewPage() {
 function deckPage(index) {
   const deck = reviewDecks()[Number(index)];
   if (!deck) return missing();
-  return intro(deck,'查看问题、答案和原始资料。')+'<div class="actions">'+btn('复习这个牌组','start:'+deck,'','cards')+'</div>'+allReviewCards().filter(c=>c.deck===deck).map(c=>'<details class="deck-card"><summary>'+esc(c.q)+'</summary><p class="prose">'+esc(c.a)+'</p>'+plain('查看来源','go:doc/'+c.doc,'link')+'</details>').join('');
+  return intro(deck,'查看问题、答案和原始资料。')+'<div class="actions">'+btn('复习这个牌组','start:'+deck,'','cards')+'</div>'+allReviewCards().filter(c=>c.deck===deck).map(c=>'<details class="deck-card"><summary>'+esc(c.q)+'</summary><p class="prose">'+esc(c.a)+'</p><div class="actions">'+plain('查看来源','go:doc/'+c.doc,'link')+plain(st.drafts?.['card-'+c.id]?'继续编辑草稿':'编辑','edit-card:'+c.id)+'</div></details>').join('');
 }
 function readingManagement(id) {
   const item = reading.find(r=>r.id===id);
@@ -238,6 +251,7 @@ function readingManagement(id) {
   sheet('本文管理','<p class="prose">'+esc(item.t)+'</p>'+group(row('正文',st.cache[id]?'已标记离线示例':'可以标记为离线示例','note','reading-cache:'+id)+row('原文出处',item.src+' · 示例未提供真实外链','link','reading-original:'+id)) + (id==='r3'?section('附件',group(sourceRow('d7'))+'<p class="fine">本示例提供 PDF 文字摘录，暂不提供原文件。</p>'):'<p class="fine">这篇示例没有附件。</p>') + '<p class="settings-note">此处演示正文与附件的缓存状态，不能作为实际离线可用的确认。</p>');
 }
 function mobileFeatureAction(action,key) {
+  if (action === 'edit-card') { cardEditSheet(key);return true; }
   if (action === 'journal-reset') { journalQuery='';journalTag='';journalPeriod='all';render();return true; }
   if (action === 'journal-period') { journalPeriod=key;render();return true; }
   if (action === 'journal-tag') { journalTag=decodeURIComponent(key);go('logs');render();return true; }
@@ -261,11 +275,16 @@ function mobileFeatureAction(action,key) {
   if (action === 'review-backup') {
     sheet('原型备份与恢复','<p class="prose">导出或合并恢复本站的自定义卡片与评分。此 JSON 仅供手机原型使用，与安卓备份格式不同。</p><div class="actions">'+btn('导出原型备份','export-review')+btn('选择原型备份','pick-review-backup','outline')+'</div><input id="review-restore" type="file" accept="application/json,.json" hidden>');return true;
   }
-  if (action === 'export-review') { downloadBlob(new Blob([JSON.stringify({kind:'hub-mobile-review-demo',version:1,reviewed:st.reviewed,grades:st.grades,customCards:st.customCards||[],inboxStatus:st.inboxStatus||{}},null,2)],{type:'application/json'}),'Hub-手机原型-闪卡备份.json');return true; }
+  if (action === 'export-review') { downloadBlob(new Blob([JSON.stringify({kind:'hub-mobile-review-demo',version:1,reviewed:st.reviewed,grades:st.grades,customCards:st.customCards||[],cardEdits:st.cardEdits||{},inboxStatus:st.inboxStatus||{}},null,2)],{type:'application/json'}),'Hub-手机原型-闪卡备份.json');return true; }
   if (action === 'pick-review-backup') { document.querySelector('#review-restore')?.click();return true; }
   return false;
 }
 document.addEventListener('input',event=>{
+  const form=event.target.form;
+  if(form?.id==='card-edit-form'){
+    st.drafts||={};st.drafts['card-'+form.dataset.id]={q:form.querySelector('[name="q"]').value,a:form.querySelector('[name="a"]').value};
+    form.querySelector('#card-edit-feedback').textContent=save()?'编辑草稿已保留；点“保存”才会替换卡片。':'草稿暂未存入浏览器，请保持页面并重试。';
+  }
   if(event.target.id==='journal-query'){journalQuery=event.target.value;document.querySelector('#journal-feed').innerHTML=journalFeed();void hydrateAttachmentImages();}
 });
 document.addEventListener('change',event=>{
@@ -285,12 +304,14 @@ async function restoreReviewBackup(input) {
     if(new Set(data.customCards.map(c=>c?.id)).size!==data.customCards.length||data.customCards.length>1000||data.customCards.some(c=>!c||typeof c.id!=='string'||!/^demo-card-[a-zA-Z0-9-]{1,100}$/.test(c.id)||!['q','a','deck'].every(k=>typeof c[k]==='string'&&c[k].length>0&&c[k].length<=10000)||!Object.hasOwn(docs,c.doc)))throw new Error('备份中的卡片不完整，未导入。');
     if(data.inboxStatus && (typeof data.inboxStatus!=='object'||Array.isArray(data.inboxStatus)||Object.entries(data.inboxStatus).some(([id,state])=>!inboxExamples.some(c=>c.id===id)||!['accepted','dismissed'].includes(state))))throw new Error('备份草稿状态无法识别，未导入。');
     const ids=new Set([...cards,...(st.customCards||[]),...data.customCards].map(c=>c.id));
+    if(data.cardEdits&&(typeof data.cardEdits!=='object'||Array.isArray(data.cardEdits)||Object.entries(data.cardEdits).some(([id,c])=>!ids.has(id)||!c||!['q','a'].every(k=>typeof c[k]==='string'&&c[k].trim().length>0&&c[k].length<=10000)||Object.keys(c).some(k=>!['q','a'].includes(k)))))throw new Error('备份中的卡片修改无法识别，未导入。');
     if(data.reviewed.some(id=>typeof id!=='string'||!ids.has(id))||Object.entries(data.grades).some(([id,v])=>!ids.has(id)||!['重来','困难','记得','轻松'].includes(v)))throw new Error('备份评分无法识别，未导入。');
     close();
     commitMobile(()=>{
       const existing=new Set((st.customCards||[]).map(c=>c.id));
       st.customCards=[...(st.customCards||[]),...data.customCards.filter(c=>!existing.has(c.id)).map(({id,q,a,deck,doc})=>({id,q,a,deck,doc}))];
       st.reviewed=[...new Set([...st.reviewed,...data.reviewed])];st.grades={...data.grades,...st.grades};
+      st.cardEdits={...(data.cardEdits||{}),...(st.cardEdits||{})};
       st.inboxStatus||={};for(const [id,state] of Object.entries(data.inboxStatus||{}))if(state==='dismissed'&&!st.inboxStatus[id])st.inboxStatus[id]='dismissed';for(const c of inboxExamples)if(st.customCards.some(x=>x.id===c.id))st.inboxStatus[c.id]='accepted';
     },'原型备份已合并恢复，现有进度保留');
   }catch(error){tell(error.message||'无法读取备份，原进度保留。');}finally{input.value='';}

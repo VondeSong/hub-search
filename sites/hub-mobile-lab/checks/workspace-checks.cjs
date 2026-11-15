@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const crypto = require('node:crypto').webcrypto;
-let canSave = true, destination = '', renders = 0, lastSheet = '';
+let canSave = true, destination = '', renders = 0, lastSheet = '', backCalls = 0;
+const lifecycle = {};
 const storage = new Map();
 const elements = new Map();
 const element = selector => {
@@ -13,11 +14,11 @@ const element = selector => {
 const context = {
   crypto, structuredClone, Blob, URL, URLSearchParams, console,
   setTimeout(){return 1;},clearTimeout(){},setInterval(){return 1;},clearInterval(){},requestAnimationFrame(){},
-  location:{hash:'#search'}, history:{state:{hubDepth:0},replaceState(value){this.state=value;},pushState(value){this.state=value;},back(){}},
+  location:{hash:'#search'}, history:{state:{hubDepth:0},replaceState(value){this.state=value;},pushState(value){this.state=value;},back(){backCalls++;}},
   localStorage:{getItem(key){return storage.get(key)||null;},setItem(key,value){if(!canSave)throw new Error('quota');storage.set(key,value);}},
   sessionStorage:{getItem(key){return storage.get(key)||null;},setItem(key,value){storage.set(key,value);}},
   document:{addEventListener(){},querySelector:element,querySelectorAll(){return[];},body:element('body'),documentElement:element('html')},
-  navigator:{},window:{scrollY:0,scrollTo(){},addEventListener(){}},innerHeight:844,addEventListener(){},matchMedia(){return{matches:false};},
+  navigator:{},window:{scrollY:0,scrollTo(){},addEventListener(){}},innerHeight:844,addEventListener(type,fn){(lifecycle[type]||=[]).push(fn);},matchMedia(){return{matches:false};},
 };
 vm.createContext(context);
 const run = code => vm.runInContext(code,context);
@@ -121,4 +122,19 @@ assert.ok(context.mobileBrowsePage().includes('go:insights'));
 assert.ok(context.workspaceConnectionsPage().includes('两条独立通道'));
 assert.ok(!fs.readFileSync('dist/agents-ui.js','utf8').match(/close\(\);\s*go\(/),'sheet navigation must not race history.back');
 assert.ok(renders>0);
+run("readingQuery='';readingSource='X 书签';readingFilter='未读';readingView='全部内容'");
+assert.deepEqual(Array.from(context.readingMatches(),x=>x.id),['r1']);
+run("readingView='离线内容'");
+assert.equal(context.readingMatches().length,0);
+run("st.cache.r1=true");
+assert.deepEqual(Array.from(context.readingMatches(),x=>x.id),['r1']);
+run("readingSource='全部来源';readingFilter='全部';readingView='全部内容';readingQuery='Telegram'");
+assert.deepEqual(Array.from(context.readingMatches(),x=>x.id),['r2']);
+const ambiguous=context.workspaceResultRow({key:'doc:date',title:'2026.11.15',body:'留下事情发生的日期与上下文',type:'笔记',source:'Obsidian',dateLabel:'今天',route:'doc/date',icon:'note'});
+assert.ok(ambiguous.includes('留下事情发生的日期与上下文'));
+// Refreshing a sheet must not leave a duplicate page that consumes the next Back.
+context.location.hash='#reading';context.history.state={hubDepth:2,sheet:999};
+run("activeRoute='reading'");
+for(const fn of lifecycle.popstate)fn();
+assert.equal(backCalls,1);
 console.log('PASS: typed cross-module search, edited tasks, multi-scope filters and rollback, date semantics, safe reading-note drafts and origin, source task/Agent handoff, five-tab routes');

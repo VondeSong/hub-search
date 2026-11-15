@@ -140,6 +140,7 @@ button.agent-header-main { min-height: 48px; padding-inline: 2px; border: 0; bor
 .agent-composer-hint { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 3px 2px 0; color: var(--muted); font-size: 11px; line-height: 1.55; text-align: center; }
 .agent-composer-hint small { font-size: inherit; }
 #agent-draft-attachments:empty { display: none; }
+.agent-material-count { margin: 2px 7px 7px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .agent-attachments { display: flex; align-items: stretch; gap: 7px; max-width: 100%; margin: 1px 0 7px; padding: 0 0 5px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
 .agent-attachment { position: relative; display: flex; align-items: center; gap: 8px; flex: 0 0 auto; min-width: 120px; max-width: 250px; min-height: 56px; padding: 5px 4px 5px 7px; border: 1px solid var(--line-soft); border-radius: 14px; background: var(--surface-raised); color: var(--ink); }
 .agent-attachment-open { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; min-height: 48px; padding: 0; border: 0; border-radius: 9px; background: transparent; color: inherit; text-align: left; }
