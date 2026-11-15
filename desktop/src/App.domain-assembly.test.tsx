@@ -12,7 +12,7 @@ vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ onMoved: a
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), save: vi.fn() }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openPath: vi.fn(), openUrl: vi.fn() }));
 vi.mock("./FlashcardsWorkspace", () => ({ FlashcardsWorkspace: () => <div data-testid="paused-review">暂停的复习</div> }));
-vi.mock("./CloudAgents", () => ({ default: () => <div data-testid="cloud-agents">云端对话</div> }));
+vi.mock("./CloudAgents", () => ({ default: ({ onClose }: { onClose: () => void }) => <div data-testid="cloud-agents">云端对话<button onClick={onClose} aria-label="关闭云端 Agents">关闭</button></div> }));
 vi.mock("./TaskWorkspace", () => ({ TaskWorkspace: () => <div data-testid="tasks">任务</div> }));
 vi.mock("./CollectionsWorkspace", () => ({ CollectionsWorkspace: ({ initialItemKey, onSearchTargetHandled }: { initialItemKey?: string; onSearchTargetHandled?: () => void }) => {
   const [target, setTarget] = useState(initialItemKey);
@@ -88,6 +88,31 @@ it.each(["standalone", "sidebar"].flatMap(origin => ["Agents", "搜索", "浏览
   } finally {
     Object.assign(runtimeCapabilities, original);
   }
+});
+
+it.each(["revisited-agents", "expanded-search"])("closes the Agents page explicitly after %s", async scenario => {
+  const original = { ...runtimeCapabilities };
+  Object.assign(runtimeCapabilities, { mobile: true, desktop: false });
+  window.history.replaceState({ hubMobileRoute: "search" }, "");
+  const navigate = async (label: string) => {
+    const button = host.querySelector<HTMLButtonElement>(`nav[aria-label="主要导航"] button[aria-label="${label}"]`)!;
+    expect(button).toBeTruthy();
+    await act(async () => button.click()); await advance(400);
+  };
+  try {
+    await act(async () => root.render(<App />)); await advance(400);
+    if (scenario === "expanded-search") await navigate("搜索");
+    await navigate("Agents");
+    if (scenario === "revisited-agents") { await navigate("复习"); await navigate("Agents"); }
+    const close = host.querySelector<HTMLButtonElement>('button[aria-label="关闭云端 Agents"]')!;
+    expect(close).toBeTruthy();
+    await act(async () => close.click()); await advance(400);
+    expect(host.querySelector('[data-testid="cloud-agents"]')).toBeNull();
+    expect(host.querySelector('[data-testid="paused-review"]')).toBeNull();
+    expect(window.history.state.hubMobileRoute).toBe("search");
+    expect(window.history.state.hubMobileSearch).not.toBe(true);
+    expect(host.querySelector('button[aria-label="设置"]')).not.toBeNull();
+  } finally { Object.assign(runtimeCapabilities, original); }
 });
 
 it("keeps the original reading module open after opening a nonempty search result",async()=>{
