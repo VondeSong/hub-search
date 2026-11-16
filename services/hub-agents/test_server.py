@@ -16,7 +16,7 @@ from types import SimpleNamespace
 from urllib.parse import quote
 
 from codex import CodexError, provider_error
-from server import Handler, RequestError, Store, Worker, digest
+from server import Handler, RequestError, Store, Worker, digest, validate_turn
 
 
 class MemorySocket:
@@ -52,6 +52,7 @@ for line in sys.stdin:
     result = {}
     if method == "account/read": result = {"account":{"type":"chatgpt","planType":"pro"}}
     if method == "account/rateLimits/read": result = {"rateLimits":{"primary":{"usedPercent":17}}}
+    if method == "model/list": result = {"data":[{"model":name,"displayName":name,"isDefault":name=="test-model","defaultReasoningEffort":"low","supportedReasoningEfforts":[{"reasoningEffort":"low"},{"reasoningEffort":"high"}],"inputModalities":["text","image"]} for name in ("test-model","other-model")]}
     if method in ("thread/start", "thread/resume"):
         if method == "thread/resume": assert params["threadId"] == "native-thread"
         assert params["config"]["model_reasoning_summary"] == "detailed"
@@ -63,6 +64,8 @@ for line in sys.stdin:
         for image in (v for v in inputs if v["type"]=="localImage"):
             assert Path(image["path"]).read_bytes().startswith(b"\\xff\\xd8\\xff")
         msg = inputs[0]["text"]
+        if msg == "pick1": assert params["model"] == "other-model" and params["effort"] == "low"
+        if msg == "pick2": assert params["model"] == "test-model" and params["effort"] == "high"
         if msg in ("用技能", "继续技能"):
             attached = json.loads(inputs[1]["text"].split("\\n", 1)[1])
             assert attached["files"]["references/rules.md"]["text"] == "核对同一份参考。"
@@ -329,7 +332,7 @@ class ConversationManagementTest(unittest.TestCase):
         token = secrets.token_urlsafe(32)
         with closing(self.store.connect()) as db, db:
             db.execute("INSERT INTO devices VALUES('device','test',?)", (digest(token.encode()),))
-        gateway = SimpleNamespace(store=self.store, worker=SimpleNamespace(account={"state": "ready"}, wake=threading.Event()))
+        gateway = SimpleNamespace(store=self.store, worker=SimpleNamespace(account={"state": "ready"}, catalog={"state":"ready","models":[]}, wake=threading.Event()))
 
         def call(method, route, data=None, auth=token):
             body = json.dumps(data).encode() if data is not None else b""

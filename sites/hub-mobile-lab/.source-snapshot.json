@@ -3,9 +3,9 @@
   "site": "mobile",
   "project_id": "appgprj_6af1d2dc12308191acc37e5566699c2d",
   "site_url": "https://hub-mobile-lab-von11.song02211368537057.chatgpt.site",
-  "source_commit": "5a9c42fa2471c2fc6838455bb591480503c2aefe",
-  "published_version": 18,
-  "deployment_id": "appgdep_6afa8952c5f881919b325aa9a85069f5",
+  "source_commit": "2e05bffcc9c160b67cacfe38ff0693c3a7b02af7",
+  "published_version": 20,
+  "deployment_id": "appgdep_6afaa83521188191ad7b79ffe611f002",
   "files": {
     ".openai/hosting.json": {
       "sha256": "543a776095c0181cc870f784c075ab4f263fb739e3649cd8db74f493fb5b4ca3",
@@ -13,9 +13,9 @@
       "bytes": 106
     },
     "DESIGN.md": {
-      "sha256": "777e98d6e122192aa50f117b316bd37c0020a6b3d6e8038a3fbcfeff996fbf8c",
+      "sha256": "dc1d504055581a741352d39aac00ffae4f23b9292a959d88c6ac7ad34d80d11e",
       "mode": "100644",
-      "bytes": 11610
+      "bytes": 11853
     },
     "PRODUCT.md": {
       "sha256": "625d08288c336b4d82c1d9640ac7f1ebf0f487a1975a8631b29c5c95af71207a",
@@ -28,9 +28,9 @@
       "bytes": 15922
     },
     "checks/agents-enhancements-checks.cjs": {
-      "sha256": "163158e85484b74bb6b0798565cd71cfed692ada30485369eaa9dbf7afbd02d5",
+      "sha256": "e608e3a945a1cc57a0e2031e7879ad293821262e32f1845e85690d35ad97a818",
       "mode": "100644",
-      "bytes": 15424
+      "bytes": 16029
     },
     "checks/journal-feed-tools-checks.cjs": {
       "sha256": "bb33b1befaa2417666a539c5a411d7c62d289631d952cb67e8ec39de50ab77d9",
@@ -67,20 +67,25 @@
       "mode": "100644",
       "bytes": 8826
     },
+    "dist/agents-preferences.js": {
+      "sha256": "eefaffef84fbefb6227dc5e067c4581cf109ddf012db28d5a11d385fee0ba2ad",
+      "mode": "100644",
+      "bytes": 7912
+    },
     "dist/agents-runtime.js": {
       "sha256": "279f9eeb690178731955e9e05a438ca15c1660a62ceec4a1f6f27734cbc650de",
       "mode": "100644",
       "bytes": 29678
     },
     "dist/agents-ui.js": {
-      "sha256": "55fba42ec6452b0f7ec8c9392d462ff1bf9f842fdbfe432802c7a647929580cf",
+      "sha256": "8c8e5d95d003d815146f784afd46cccef18fbb0f6063a56c55db789fe08917ed",
       "mode": "100644",
-      "bytes": 66576
+      "bytes": 67059
     },
     "dist/agents.css": {
-      "sha256": "cc679c4a217d50a8eca21a1945a1b4a5c4e75b96776e7d3e00c6f310eebcafa8",
+      "sha256": "2f1b080fc45cb1cadc3fc8ad6e04af0f1a7eb32285a0cb5366447be2f963563d",
       "mode": "100644",
-      "bytes": 33414
+      "bytes": 37403
     },
     "dist/app.js": {
       "sha256": "2d2b7e4acb9fe140655f3b2ef66cfd8dd6c28ea41b284e106ae9d62face995ec",
@@ -93,9 +98,9 @@
       "bytes": 254
     },
     "dist/index.html": {
-      "sha256": "102c0b987fc29c86f533d5a227401a8cc53d19706e1c58498e3c1086fc94b821",
+      "sha256": "c5caa63ac1b6f63760c7b0c90a4bb928fa5dd785a4c77fa5bc7468b062fadbf1",
       "mode": "100644",
-      "bytes": 1568
+      "bytes": 1620
     },
     "dist/journal-feed-tools.js": {
       "sha256": "ed01aea95517f3975fa63274e539b375e8c102b76e68ce919ec07c235dbae4e4",
@@ -171,6 +176,11 @@
       "sha256": "a4f3eb6917abc89147a0a9dd216484da3d3a5eeb5f9ab48af49c69c412398dcc",
       "mode": "100644",
       "bytes": 10105
+    },
+    "docs/agents-interactions-2026-11-16.md": {
+      "sha256": "511a7be8554b46483a63a0b5a9e30fb81524b383772ac2e243583961b5f9b0ad",
+      "mode": "100644",
+      "bytes": 4065
     },
     "docs/gemini-chat-materials-after.jpg": {
       "sha256": "482240fc952349592b3946c69a94faa3e6e501d91574e5d9ec9cd81931186308",
@@ -273,5 +283,5 @@
       "bytes": 3301
     }
   },
-  "imported_at": "2026-11-16T04:41:59.787557+00:00"
+  "imported_at": "2026-11-16T06:53:23.664450+00:00"
 }

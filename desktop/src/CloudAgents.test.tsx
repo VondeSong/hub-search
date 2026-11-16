@@ -237,3 +237,54 @@ it("shows real cloud materials, completed results and the public process in the 
   expect(node.querySelector(".cloud-agents-compose")).not.toBeNull();
   expect(invoke.mock.calls.some(([, args]) => args.action.op === "send")).toBe(false);
 });
+
+
+it("persists the chosen model in the outbox and reuses it with the original turn on retry", async () => {
+  runtimeCapabilities.mobile = true;
+  const previous = invoke.getMockImplementation()!;
+  const catalog = [{model:"gpt-test",displayName:"Test",isDefault:true,defaultReasoningEffort:"low",supportedReasoningEfforts:[{reasoningEffort:"low"}]},{model:"gpt-other",displayName:"Other",defaultReasoningEffort:"high",supportedReasoningEfforts:[{reasoningEffort:"high"}]}];
+  invoke.mockImplementation(async (command,args) => {
+    const action=args.action;
+    if(action.op==="list") return {threads:[],account:{state:"ready"},modelSelection:true,modelCatalog:{state:"ready",models:catalog}};
+    if(action.op==="read") return {thread:null};
+    if(action.op==="send") return {delivery:"unknown"};
+    return previous(command,args);
+  });
+  await render(); await click("新对话");
+  await type(node.querySelector("textarea")!,"Retain this pending message");
+  await click("选择模型"); await click("GPT-other");
+  expect(node.querySelector("textarea")?.value).toBe("Retain this pending message");
+  expect(invoke.mock.calls.some(([,args])=>args.action.op==="send")).toBe(false);
+  await click("发送");
+  const first=invoke.mock.calls.find(([,args])=>args.action.op==="send")![1].action;
+  expect(first.message.selection).toEqual({model:"gpt-other",effort:"high"});
+  expect(vi.mocked(outbox).mock.calls.some(([,draft])=>draft && draft.turn===first.turn && draft.selection?.model==="gpt-other")).toBe(true);
+  await click("用原编号重试");
+  const sent=invoke.mock.calls.filter(([,args])=>args.action.op==="send").map(([,args])=>args.action);
+  expect(sent).toHaveLength(2); expect(sent[1]).toEqual(sent[0]);
+});
+
+it("keeps a draft unsent if the gateway no longer accepts model selections", async () => {
+  runtimeCapabilities.mobile = true;
+  const previous=invoke.getMockImplementation()!; let compatible=true;
+  invoke.mockImplementation(async (command,args)=> args.action.op==="list" ? {threads:[],account:{state:"ready"},modelSelection:compatible,modelCatalog:{state:"ready",models:[{model:"gpt-test",displayName:"Test",isDefault:true,defaultReasoningEffort:"low",supportedReasoningEfforts:[{reasoningEffort:"low"}]}]}} : previous(command,args));
+  await render(); await click("新对话"); await type(node.querySelector("textarea")!,"Unsent after service change");
+  compatible=false; await click("发送");
+  expect(node.querySelector("textarea")?.value).toBe("Unsent after service change");
+  expect(node.textContent).toContain("当前云端不支持模型切换");
+  expect(invoke.mock.calls.some(([,args])=>args.action.op==="send")).toBe(false);
+  expect(vi.mocked(outbox).mock.calls.some(([,draft])=>Boolean(draft))).toBe(false);
+});
+
+it("returns to the list on the first attempt when another visit left stale chat history flags", async () => {
+  runtimeCapabilities.mobile=true;
+  window.history.replaceState({hubMobileRoute:"browse",hubCloudAgentChat:true},"");
+  window.history.pushState({hubMobileRoute:"agents",hubCloudAgentChat:true},"");
+  await render();
+  await act(async()=>node.querySelector<HTMLButtonElement>(".cloud-agents-thread")!.click());
+  expect(node.querySelector("textarea")).not.toBeNull();
+  await click("返回会话列表");
+  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,30));});
+  expect(node.querySelector(".cloud-agents-home")).not.toBeNull();
+  expect(node.querySelector("textarea")).toBeNull();
+});

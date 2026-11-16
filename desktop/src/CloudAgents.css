@@ -263,6 +263,67 @@ html[data-runtime-platform="android"] .app-shell.mobile-app-shell .main-content-
 .cloud-agents-picker-rows small,.cloud-agents-model-current small { display: block; color: var(--cloud-muted); font-size: 11px; }
 .cloud-agents-model-current { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px; border-radius: 14px; background: var(--cloud-fill); font-size: 14px; }
 .cloud-agents-model-current svg { flex: none; color: var(--cloud-accent); }
+.cloud-agents-sheet-layer { position: fixed; inset: 0; z-index: 10; }
+.cloud-agents-sheet > header { min-height: 44px; gap: 8px; }
+.cloud-agents-sheet > header h2 { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 17px; line-height: 1.4; font-weight: 640; }
+.cloud-agents .cloud-agents-sheet .cloud-sheet-close, .cloud-agents .cloud-agents-sheet .cloud-sheet-back { flex: none; min-width: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 50%; background: transparent; }
+.cloud-agents-sheet:has(.cloud-preferences-body) { gap: 10px; overflow: hidden; }
+.cloud-agents.is-mobile .cloud-agents-sheet.is-expanded { height: min(86dvh,760px); max-height: min(86dvh,760px); }
+.cloud-preferences-body { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 2px; font-size: 14px; line-height: 1.65; }
+.cloud-agents-sheet.is-expanded .cloud-preferences-body { flex: 1; }
+.cloud-preferences-note { flex: none; margin: 4px 0; color: var(--cloud-muted); font-size: 12px; line-height: 1.6; }
+.cloud-preferences-options { display: flex; flex-direction: column; gap: 2px; }
+.cloud-agents .cloud-preferences-options > button { flex: none; width: 100%; min-height: 56px; justify-content: space-between; gap: 14px; padding: 11px 12px; border: 0; border-radius: 12px; background: transparent; text-align: start; }
+.cloud-agents .cloud-preferences-options > button[aria-pressed="true"] { background: var(--cloud-fill,#edf3ff); }
+.cloud-preferences-options button > span { min-width: 0; }
+.cloud-preferences-options strong { display: block; font-size: 16px; font-weight: 560; }
+.cloud-preferences-options small { display: block; margin-top: 3px; color: var(--cloud-muted); font-size: 12px; line-height: 1.5; }
+.cloud-preferences-options svg { flex: none; color: var(--cloud-accent); }
+.cloud-preferences-links { flex: none; display: grid; border-top: 1px solid var(--cloud-line); padding-top: 4px; }
+.cloud-agents .cloud-preferences-links button { width: 100%; justify-content: flex-start; padding: 10px; border: 0; border-radius: 12px; background: transparent; font-size: 14px; }
+.cloud-preferences-links button > span { flex: 1; text-align: start; }
+.cloud-preferences-links small { color: var(--cloud-muted); font-size: 12px; }
+.cloud-usage-window { margin: 20px 0; }
+.cloud-usage-window > div { display: flex; justify-content: space-between; gap: 12px; }
+.cloud-usage-window strong { font-variant-numeric: tabular-nums; }
+.cloud-usage-window progress { width: 100%; height: 5px; margin: 8px 0; accent-color: var(--cloud-accent); border: 0; border-radius: 5px; overflow: hidden; background: var(--cloud-fill,#edf3ff); }
+.cloud-usage-window progress::-webkit-progress-bar { background: var(--cloud-fill,#edf3ff); }
+.cloud-usage-window progress::-webkit-progress-value { background: var(--cloud-accent); border-radius: 5px; }
+.cloud-usage-window small { color: var(--cloud-muted); }
+.cloud-skill-search { display: flex; align-items: center; gap: 8px; flex: none; min-height: 44px; padding-inline: 11px; border: 1px solid var(--cloud-line); border-radius: 12px; color: var(--cloud-muted); }
+.cloud-agents-sheet .cloud-skill-search input { flex: 1; width: 100%; padding: 8px 0; min-height: 42px; border: 0; border-radius: 0; background: transparent; font-size: 15px; outline-offset: 1px; }
+.cloud-agents .cloud-skill-search button { padding: 0; border: 0; min-width: 44px; min-height: 44px; background: transparent; }
+.cloud-agents .cloud-skill-list button { display: flex; justify-content: space-between; gap: 14px; width: 100%; padding: 14px 4px; border: 0; background: transparent; text-align: start; }
+.cloud-skill-list button > span { min-width: 0; }
+.cloud-skill-list strong { display: block; font-size: 16px; font-weight: 550; overflow-wrap: anywhere; }
+.cloud-skill-list button > span > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin-top: 4px; font-size: 13px; line-height: 1.6; color: var(--cloud-muted); }
+.cloud-skill-list small { display: block; margin-top: 5px; color: var(--cloud-muted); font-size: 12px; }
+.cloud-skill-list svg { flex: none; color: var(--cloud-muted); }
+.cloud-skill-row { display: flex; gap: 8px; }
+.cloud-skill-row > button:first-child { flex: 1; min-width: 0; }
+.cloud-agents .cloud-skill-row .cloud-skill-info { flex: none; align-self: center; width: 44px; min-height: 44px; padding: 0; justify-content: center; }
+.cloud-preferences-heading { margin: 8px 0 14px; font-size: 15px; }
+.cloud-skill-description { margin: 0 0 24px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cloud-skill-resources summary, .cloud-skill-version summary { min-height: 44px; padding-block: 10px; cursor: pointer; font-size: 13px; }
+.cloud-skill-files { display: flex; flex-direction: column; }
+.cloud-skill-files label { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 2px; font-size: 14px; }
+.cloud-skill-fixed-file { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 2px; font-size: 14px; }
+.cloud-skill-fixed-file > span { flex: 1; }
+.cloud-skill-fixed-file > svg { flex: none; color: var(--cloud-accent); }
+.cloud-agents-sheet .cloud-skill-files input[type="checkbox"] { flex: none; width: 20px; height: 20px; min-height: 20px; margin: 0; padding: 0; accent-color: var(--cloud-accent); }
+.cloud-skill-files span { min-width: 0; overflow-wrap: anywhere; }
+.cloud-skill-files small { display: block; margin-top: 3px; font-size: 11px; color: var(--cloud-muted); }
+.cloud-skill-version p, .cloud-skill-bound-files { overflow-wrap: anywhere; font-size: 12px; color: var(--cloud-muted); }
+.cloud-agents-sheet .cloud-preferences-footer { flex-direction: column; align-items: stretch; gap: 10px; padding-top: 8px; }
+.cloud-agents .cloud-preferences-footer > button { width: 100%; border-radius: 18px; min-height: 46px; }
+.cloud-agents-skill-chip { display: flex; align-items: center; width: fit-content; max-width: 100%; border-radius: 11px; background: var(--cloud-fill,#edf3ff); }
+.cloud-agents .cloud-agents-skill-chip button { border: 0; min-height: 36px; padding: 5px 8px; background: transparent; font-size: 12px; }
+.cloud-agents .cloud-agents-skill-chip button:first-child { min-width: 0; }
+.cloud-agents-skill-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cloud-agents-skill-chip small { flex: none; color: var(--cloud-muted); }
 @media (prefers-reduced-transparency: reduce) {
   .cloud-agents.is-mobile .cloud-agents-compose { background: var(--cloud-control); backdrop-filter: none; }
 }
+
+.cloud-agents.is-mobile .cloud-agents-compose textarea:focus-visible { outline: none; }
+.cloud-agents.is-mobile .cloud-agents-compose:focus-within { border-color: var(--cloud-accent); }

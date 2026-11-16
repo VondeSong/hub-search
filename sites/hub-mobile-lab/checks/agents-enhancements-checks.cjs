@@ -25,7 +25,7 @@ const context = {
   tell: text => { lastToast = text; }, go: route => { destination = route; },
   render() {}, close() {}, route: () => ['none'],
   sheet: (title, html) => { lastSheet = { title, html }; },
-  document: { querySelector: selector => elements[selector] || null },
+  document: { addEventListener() {}, querySelector: selector => elements[selector] || null },
   window: { scrollTo() {} }, scrolls: {}, innerHeight: 800,
   esc, ico: () => '<svg></svg>', iconBtn: () => '',
   plain: (label, action) => '<button data-act="' + esc(action) + '">' + esc(label) + '</button>',
@@ -37,7 +37,7 @@ const context = {
   workspaceTaskFromAgent: (threadId, messageId) => { taskCall = { threadId, messageId }; }
 };
 vm.createContext(context);
-for (const file of ['dist/agents-runtime.js', 'dist/agents-ui.js']) vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), context, { filename: file });
+for (const file of ['dist/agents-runtime.js', 'dist/agents-preferences.js', 'dist/agents-ui.js']) vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), context, { filename: file });
 const run = code => vm.runInContext(code, context);
 const snapshot = () => JSON.stringify(context.st);
 const thread = id => context.agentThread(id);
@@ -219,9 +219,16 @@ async function check() {
 
   const limits = context.agentUiInputLimits();
   for (const label of ['最多 6 张', '4 MiB', '12 MiB', '30 秒', '最多 3 张', '2 MiB', '合成关键帧']) assert.ok(limits.includes(label), label);
-  context.handleAgentAction('agent-model');
-  assert.ok(lastSheet.html.includes('固定示例回复'));
-  assert.ok(lastSheet.html.includes('非实时模型列表'));
+  context.handleAgentAction('agent-model', completed.threadId);
+  assert.ok(lastSheet.html.includes('网页未连接模型'));
+  context.handleAgentAction('agent-model-pick', completed.threadId, 'gpt-6-astra');
+  assert.equal(context.agentThread(completed.threadId).uiModel, 'gpt-6-astra');
+  assert.equal(context.agentThread(completed.threadId).uiEffort, 'medium');
+  context.handleAgentAction('agent-skill-detail', completed.threadId);
+  assert.ok(lastSheet.html.includes('添加到消息'));
+  assert.equal(context.agentThread(completed.threadId).uiSkill, undefined);
+  context.handleAgentAction('agent-skill-pick', completed.threadId, 'log');
+  assert.equal(context.agentThread(completed.threadId).uiSkill, 'log');
   assert.equal(networkCalls, 0);
   assert.ok(saved > 0);
   console.log('PASS: service/demo constraint separation, transparent model information, zero network calls');

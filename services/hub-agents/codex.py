@@ -116,7 +116,37 @@ class AppServer:
         self.reader.join(timeout=2)
         self.process.stdout.close()
 
-    def run(self, workspace, thread, prompt, images, save_thread, save_output, cancelled, account_status, skill=None):
+    def models(self):
+        models, cursor, seen = [], None, set()
+        for _ in range(10):
+            page = self.rpc("model/list", {"limit": 100, "cursor": cursor, "includeHidden": False})
+            for model in page["data"]:
+                if not model.get("hidden") and model["model"] not in seen:
+                    seen.add(model["model"])
+                    models.append({key: model.get(key) for key in (
+                        "model", "displayName", "description", "defaultReasoningEffort",
+                        "supportedReasoningEfforts", "inputModalities", "isDefault")})
+            cursor = page.get("nextCursor")
+            if not cursor:
+                return models
+        raise CodexError("runtime", "模型目录未能完整读取，请稍后重试。")
+
+    def metadata(self):
+        self.rpc("initialize", {"clientInfo": {"name": "hub_cloud_agents", "version": "1.0"}})
+        self.send({"method": "initialized", "params": {}})
+        account = self.rpc("account/read", {"refreshToken": False}).get("account") or {}
+        if account.get("type") != "chatgpt":
+            raise CodexError("login", "请在 VPS 上用 ChatGPT 账号登录 Codex。")
+        status = {"state": "ready", "plan": account.get("planType")}
+        try:
+            limits = self.rpc("account/rateLimits/read", timeout=5).get("rateLimits") or {}
+            status["limits"] = [{key: window.get(key) for key in ("usedPercent", "windowDurationMins", "resetsAt")}
+                                for name in ("primary", "secondary") if (window := limits.get(name))]
+        except CodexError:
+            pass
+        return status, self.models()
+
+    def run(self, workspace, thread, prompt, images, save_thread, save_output, cancelled, account_status, skill=None, selection=None):
         execution = [f"云端已准备 {len(images)} 张选定图片。"] if images else ["云端已收到本轮文字。"]
         save_output("", [], execution.copy())
         self.rpc("initialize", {"clientInfo": {"name": "hub_cloud_agents", "version": "1.0"}})
@@ -128,6 +158,14 @@ class AppServer:
 
         status = {"state": "ready", "plan": account.get("planType")}
         account_status(status)
+
+        if selection:
+            model = next((item for item in self.models() if item["model"] == selection["model"]), None)
+            if not model or selection.get("effort") and selection["effort"] not in {
+                    option["reasoningEffort"] for option in model["supportedReasoningEfforts"]}:
+                raise CodexError("model", "所选模型或推理强度已不可用，请重新选择后发送。")
+            if images and "image" not in (model["inputModalities"] or []):
+                raise CodexError("model", "所选模型不支持图片，请更换模型后发送。")
         execution.append("已连接 Codex，并确认订阅登录。")
         save_output("", [], execution.copy())
         try:
@@ -154,12 +192,14 @@ class AppServer:
         }
         if thread:
             params.update(threadId=thread, excludeTurns=True)
+        if selection:
+            params["model"] = selection["model"]
         started = self.rpc("thread/resume" if thread else "thread/start", params)
         thread_id = started["thread"]["id"]
         if thread and thread_id != thread:
             raise CodexError("runtime", "Codex 返回的会话与记录不一致。")
         save_thread(thread_id)
-        account_status({**status, "model": started.get("model")})
+        account_status({**status, "model": selection["model"] if selection else started.get("model")})
         execution.append("已恢复原对话。" if thread else "已建立本次对话。")
         save_output("", [], execution.copy())
 
@@ -174,7 +214,12 @@ class AppServer:
                 inputs.append({"type": "text", "text": f"下面的关键帧取自视频 {seconds:.2f} 秒。"})
             inputs.append({"type": "localImage", "path": str(path)})
         # Ask per turn; the selected runtime may still omit public summaries.
-        turn = self.rpc("turn/start", {"threadId": thread_id, "input": inputs, "summary": "detailed"}, keep_events=True)["turn"]["id"]
+        turn_params = {"threadId": thread_id, "input": inputs, "summary": "detailed"}
+        if selection:
+            turn_params.update(selection)
+        turn = self.rpc("turn/start", turn_params, keep_events=True)["turn"]["id"]
+        if selection:
+            execution.append("本轮模型：" + selection["model"] + (" · " + selection["effort"] if selection.get("effort") else ""))
         execution.append("Codex 已接收本轮请求。")
         save_output("", [], execution.copy())
         pieces = {}

@@ -5,13 +5,15 @@ import {localJournalDate} from './JournalViews';
 import {useModalFocus} from './useModalFocus';
 import {QUICK_JOURNAL_UPDATED} from './QuickJournalEvents';
 import {runtimeCapabilities} from './RuntimePlatform';
+import {ArrowLeft,X} from 'lucide-react';
 
 const call=<T,>(op:string,fields:Record<string,unknown>={})=>invoke<T>('cloud_agents',{action:{op,...fields}});
 type Key={kind:string;id:string;libraryId:string|null};
 type Candidate={key:Key;title:string;source:string;chars:number;preview:string};
-export function CloudAgentSheet({title,onClose,children,busy=false,compact=false}:{title:string;onClose:()=>void;children:React.ReactNode;busy?:boolean;compact?:boolean}){
+export function CloudAgentSheet({title,onClose,children,busy=false,compact=false,expanded=false,onBack}:{title:string;onClose:()=>void;children:React.ReactNode;busy?:boolean;compact?:boolean;expanded?:boolean;onBack?:()=>void}){
  const ref=useRef<HTMLElement>(null);
  const dismiss=useRef(onClose),locked=useRef(busy);dismiss.current=onClose;locked.current=busy;
+ const previous=useRef(onBack);previous.current=onBack;
  const mounted=useRef(false),entry=useRef<{id:string;parent:Record<string,unknown>|null}|null>(null);
  useEffect(()=>{
   if(!runtimeCapabilities.mobile)return;
@@ -21,8 +23,8 @@ export function CloudAgentSheet({title,onClose,children,busy=false,compact=false
   if(window.history.state?.hubCloudDialog!==id)push();
   const back=(event:PopStateEvent)=>{
    if(event.state?.hubCloudDialog===id)return;
-   if(event.state?.hubMobileRoute===parent?.hubMobileRoute&&event.state?.hubCloudAgentChat===parent?.hubCloudAgentChat)event.stopImmediatePropagation();
-   if(locked.current)push();else dismiss.current();
+   if(event.state?.hubMobileRoute===parent?.hubMobileRoute&&event.state?.hubCloudAgentOwner===parent?.hubCloudAgentOwner&&event.state?.hubCloudAgentChat===parent?.hubCloudAgentChat)event.stopImmediatePropagation();
+   if(locked.current)push();else if(previous.current){push();previous.current();}else dismiss.current();
   };
   window.addEventListener('popstate',back,true);
   return()=>{
@@ -31,8 +33,8 @@ export function CloudAgentSheet({title,onClose,children,busy=false,compact=false
    queueMicrotask(()=>{if(!mounted.current&&window.history.state?.hubCloudDialog===id)window.history.back();});
   };
  },[]);
- useModalFocus({active:true,containerRef:ref,onDismiss:onClose});
- return <section className={`cloud-agents-sheet${compact?' is-compact':''}`} role="dialog" aria-modal="true" aria-label={title} ref={ref} tabIndex={-1}><header><h2>{title}</h2><button type="button" onClick={onClose} disabled={busy}>关闭</button></header>{children}</section>;
+ useModalFocus({active:true,containerRef:ref,onDismiss:onBack||onClose,suspended:busy});
+ return <div className="cloud-agents-sheet-layer" onPointerDown={event=>{if(event.target===event.currentTarget&&!busy)onClose();}}><section className={`cloud-agents-sheet${compact?' is-compact':''}${expanded?' is-expanded':''}`} role="dialog" aria-modal="true" aria-label={title} ref={ref} tabIndex={-1}><header>{onBack&&<button type="button" className="cloud-sheet-back" aria-label="返回上一级" onClick={onBack} disabled={busy}><ArrowLeft size={20}/></button>}<h2>{title}</h2><button type="button" className="cloud-sheet-close" aria-label="关闭" onClick={onClose} disabled={busy}><X size={20}/></button></header>{children}</section></div>;
 }
 export function CloudMaterialPicker({onClose,onConfirm,embedded=false}:{onClose:()=>void;onConfirm:(value:MaterialSnapshot)=>void;embedded?:boolean}){
  const [kind,setKind]=useState('document'),[query,setQuery]=useState(''),[offset,setOffset]=useState(0),[rows,setRows]=useState<Candidate[]>([]),[more,setMore]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[preview,setPreview]=useState<MaterialSnapshot>();

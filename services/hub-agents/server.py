@@ -130,8 +130,15 @@ def validate_turn(data):
         except UnicodeError:
             raise RequestError(400, "资料文字编码无效。") from None
         identity.append({"material": material})
+    selection = data.get("selection")
+    if "selection" in data:
+        if (not isinstance(selection, dict) or not {"model"} <= set(selection) <= {"model", "effort"}
+                or not isinstance(selection["model"], str) or not re.fullmatch(r"[A-Za-z0-9._-]{1,120}", selection["model"])
+                or "effort" in selection and selection["effort"] not in ("none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra")):
+            raise RequestError(400, "模型选择格式无效。")
+        identity.append({"selection": selection})
     fingerprint = digest(json.dumps(identity, ensure_ascii=False, sort_keys=True).encode())
-    return text, attachments, fingerprint, skill, material
+    return text, attachments, fingerprint, skill, material, selection
 
 
 class Store:
@@ -171,6 +178,8 @@ class Store:
                 db.execute("ALTER TABLE threads ADD COLUMN archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0,1))")
             if "progress" not in {row[1] for row in db.execute("PRAGMA table_info(turns)")}:
                 db.execute("ALTER TABLE turns ADD COLUMN progress TEXT NOT NULL DEFAULT '{}'")
+            if "selection" not in {row[1] for row in db.execute("PRAGMA table_info(turns)")}:
+                db.execute("ALTER TABLE turns ADD COLUMN selection TEXT")
 
     def connect(self):
         db = sqlite3.connect(self.root / "agents.sqlite3", timeout=6)
@@ -182,8 +191,8 @@ class Store:
         with closing(self.connect()) as db:
             return db.execute("SELECT 1 FROM devices WHERE token_hash=?", (digest(token.encode()),)).fetchone() is not None
 
-    def submit(self, thread, turn, data):
-        text, attachments, fingerprint, skill, material = validate_turn(data)
+    def submit(self, thread, turn, data, models=None):
+        text, attachments, fingerprint, skill, material, selection = validate_turn(data)
         now = int(time.time() * 1000)
         title = " ".join(text.split())[:48] or "附件对话"
         with closing(self.connect()) as db, db:
@@ -193,6 +202,15 @@ class Store:
                 if (old["thread"], old["fingerprint"]) != (thread, fingerprint):
                     raise RequestError(409, "这条消息的发送编号已用于其他内容。")
                 return
+            if selection:
+                if models is None:
+                    raise RequestError(503, "暂时无法核对模型目录，请稍后重试；消息尚未执行。")
+                model = next((item for item in models if item["model"] == selection["model"]), None)
+                if not model or selection.get("effort") and selection["effort"] not in {
+                        option["reasoningEffort"] for option in model["supportedReasoningEfforts"]}:
+                    raise RequestError(400, "所选模型或推理强度不可用，请刷新目录后重新选择。")
+                if attachments and "image" not in (model["inputModalities"] or []):
+                    raise RequestError(400, "所选模型不支持图片，请更换模型。")
             if db.execute("SELECT 1 FROM threads WHERE id=? AND archived=1", (thread,)).fetchone():
                 raise RequestError(409, "此对话已归档，请先恢复再发送。")
             if db.execute("SELECT count(*) FROM turns WHERE status='queued'").fetchone()[0] >= 8:
@@ -207,7 +225,8 @@ class Store:
                     raise RequestError(409, "此会话已固定一份技能及配套文件。请新建对话使用其他版本。")
                 if bound is None:
                     db.execute("INSERT INTO thread_skills VALUES(?,?)", (thread, payload))
-            db.execute("INSERT INTO turns(id,thread,fingerprint,text,status,created) VALUES(?,?,?,?,'queued',?)", (turn, thread, fingerprint, text, now))
+            db.execute("INSERT INTO turns(id,thread,fingerprint,text,status,created,selection) VALUES(?,?,?,?,'queued',?,?)",
+                       (turn, thread, fingerprint, text, now, json.dumps(selection) if selection else None))
             if material is not None:
                 db.execute("INSERT INTO turn_materials VALUES(?,?)", (turn, json.dumps(material, ensure_ascii=False)))
             db.executemany("INSERT INTO attachments VALUES(?,?,?,?,?,?,?)", [
@@ -263,17 +282,20 @@ class Store:
             entry = db.execute("SELECT id,title,updated,archived FROM threads WHERE id=?", (thread,)).fetchone()
             if entry is None:
                 raise RequestError(404, "尚未找到此对话。")
-            rows = db.execute("SELECT seq,id,text,status,answer,error,code,created,progress FROM turns WHERE thread=? AND seq<? ORDER BY seq DESC LIMIT 31", (thread, before)).fetchall()
+            rows = db.execute("SELECT seq,id,text,status,answer,error,code,created,progress,selection FROM turns WHERE thread=? AND seq<? ORDER BY seq DESC LIMIT 31", (thread, before)).fetchall()
             turns = []
             for row in reversed(rows[:30]):
                 attachments = db.execute("SELECT id,name,mime,seconds,length(data) AS bytes FROM attachments WHERE turn=? ORDER BY position", (row["id"],))
                 material = db.execute("SELECT payload FROM turn_materials WHERE turn=?", (row["id"],)).fetchone()
                 turns.append({**dict(row), "attachments": [dict(value) for value in attachments],
                               "progress": json.loads(row["progress"]),
+                              "selection": json.loads(row["selection"]) if row["selection"] else None,
                               "material": json.loads(material["payload"]) if material else None})
             bound = db.execute("SELECT payload FROM thread_skills WHERE thread=?", (thread,)).fetchone()
             skill = json.loads(bound["payload"]) if bound else None
+            selection = db.execute("SELECT selection FROM turns WHERE thread=? AND selection IS NOT NULL ORDER BY seq DESC LIMIT 1", (thread,)).fetchone()
             return {**dict(entry), "turns": turns, "before": turns[0]["seq"] if len(rows) > 30 else None,
+                    "selection": json.loads(selection["selection"]) if selection else None,
                     "skill": {"name": skill["name"], "version": skill["version"], "paths": list(skill["files"])} if skill else None}
 
     def stop(self, thread, turn):
@@ -318,6 +340,8 @@ class Worker:
     def __init__(self, store, command, adapter=AppServer):
         self.store, self.command, self.adapter = store, command, adapter
         self.account = {"state": "unknown"}
+        self.catalog = {"state": "loading", "models": []}
+        self.metadata_at = 0
         self.wake = threading.Event()
         self.shutdown = threading.Event()
         with closing(store.connect()) as db, db:
@@ -339,6 +363,17 @@ class Worker:
                 if row:
                     self.run(row)
                     continue
+                if time.monotonic() >= self.metadata_at:
+                    self.metadata_at = time.monotonic() + 30
+                    try:
+                        with self.adapter(self.command, self.store.workspaces) as adapter:
+                            self.account, models = adapter.metadata()
+                        self.catalog = {"state": "ready", "models": models, "updatedAt": int(time.time() * 1000)}
+                        self.metadata_at = time.monotonic() + 300
+                    except (CodexError, OSError, KeyError, TypeError, ValueError) as error:
+                        self.catalog = {"state": "error", "models": [], "error": "暂时无法读取执行端模型，请稍后重试。"}
+                        if isinstance(error, CodexError) and error.code in ("login", "quota"):
+                            self.account = {"state": error.code}
             except sqlite3.Error:
                 logging.exception("Could not process Hub Agents queue")
             self.wake.wait(1)
@@ -371,6 +406,7 @@ class Worker:
                     previous = db.execute("SELECT codex_thread FROM threads WHERE id=?", (thread,)).fetchone()[0]
                     bound = db.execute("SELECT payload FROM thread_skills WHERE thread=?", (thread,)).fetchone()
                     material = db.execute("SELECT payload FROM turn_materials WHERE turn=?", (turn,)).fetchone()
+                    selection = db.execute("SELECT selection FROM turns WHERE id=?", (turn,)).fetchone()[0]
                     for index, file in enumerate(db.execute("SELECT mime,seconds,data FROM attachments WHERE turn=? ORDER BY position", (turn,))):
                         path = workspace / (str(index) + TYPES[file["mime"]])
                         path.write_bytes(file["data"])
@@ -387,6 +423,7 @@ class Worker:
                         publish,
                         stopped, status,
                         **({"skill": validate_skill(json.loads(bound["payload"]))} if bound else {}),
+                        **({"selection": json.loads(selection)} if selection else {}),
                     )
                 progress["finishedAt"] = int(time.time() * 1000)
                 self.update("UPDATE turns SET status=?,answer=?,progress=? WHERE id=?",
@@ -465,7 +502,8 @@ class Handler(BaseHTTPRequestHandler):
             queries = parse_qs(url.query, keep_blank_values=True).get("q", [""])
             if len(queries) != 1:
                 raise RequestError(400, "搜索参数无效。")
-            self.send(200, {"threads": store.threads(queries[0]), "account": worker.account, "skillPackages": True, "threadManagement": True, "materials": True, "answerNotes": True})
+            self.send(200, {"threads": store.threads(queries[0]), "account": worker.account, "modelCatalog": worker.catalog,
+                            "modelSelection": True, "skillPackages": True, "threadManagement": True, "materials": True, "answerNotes": True})
             return
         if len(parts) >= 3 and parts[:2] == ["v1", "threads"] and UUID.fullmatch(parts[2]):
             thread = parts[2]
@@ -486,7 +524,7 @@ class Handler(BaseHTTPRequestHandler):
                 if len(parts) == 6 and parts[5] == "stop":
                     store.stop(thread, turn)
                 elif len(parts) == 5:
-                    store.submit(thread, turn, self.read_json())
+                    store.submit(thread, turn, self.read_json(), worker.catalog["models"] if worker.catalog["state"] == "ready" else None)
                 else:
                     raise RequestError(404, "此请求不存在。")
                 worker.wake.set()

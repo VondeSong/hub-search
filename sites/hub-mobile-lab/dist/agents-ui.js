@@ -174,7 +174,7 @@ function agentUiSendControl(thread) {
 }
 function agentUiComposer(thread) {
   if (thread.archivedAt) return '<div id="agent-composer" class="agent-composer agent-archived-composer"><span>已归档 · 内容完整保留</span>' + btn('恢复并继续', 'agent-restore:' + thread.id, 'secondary', 'sync') + '</div>';
-  return '<div id="agent-composer" class="agent-composer"><div id="agent-draft-attachments">' + agentUiDraftMaterials(thread) + '</div><form id="agent-send-form" data-thread="' + esc(thread.id) + '"><label class="agent-sr-only" for="agent-prompt">给 Agents 的消息</label><textarea id="agent-prompt" name="message" rows="2" maxlength="6000" placeholder="问一个问题，或接着聊…" enterkeyhint="enter">' + esc(thread.draft || '') + '</textarea><div class="agent-composer-tools">' + iconBtn('添加照片或资料', 'agent-attach:' + thread.id, 'plus') + '<button type="button" class="agent-model-trigger" data-act="agent-model" aria-label="查看模型与原型说明"><span>Codex</span><small>演示说明</small>' + ico('info', 13) + '</button><div id="agent-send-control">' + agentUiSendControl(thread) + '</div></div></form><div class="agent-composer-hint"><span id="agent-draft-status">' + (thread.draft ? '草稿已保留' : '交互演示 · 未调用模型') + '</span></div></div>';
+  return '<div id="agent-composer" class="agent-composer"><div id="agent-skill-chip-container">' + agentUiSkillChip(thread) + '</div><div id="agent-draft-attachments">' + agentUiDraftMaterials(thread) + '</div><form id="agent-send-form" data-thread="' + esc(thread.id) + '"><label class="agent-sr-only" for="agent-prompt">给 Agents 的消息</label><textarea id="agent-prompt" name="message" rows="2" maxlength="6000" placeholder="问一个问题，或接着聊…" enterkeyhint="enter">' + esc(thread.draft || '') + '</textarea><div class="agent-composer-tools">' + iconBtn('添加照片或资料', 'agent-attach:' + thread.id, 'plus') + iconBtn('技能', 'agent-skills:' + thread.id, 'spark') + '<button type="button" class="agent-model-trigger" data-act="agent-model:' + esc(thread.id) + '" aria-label="选择模型"><span>' + esc(agentUiModelLabel(thread)) + '</span>' + ico('info', 13) + '</button><div id="agent-send-control">' + agentUiSendControl(thread) + '</div></div></form><div class="agent-composer-hint"><span id="agent-draft-status">' + (thread.draft ? '草稿已保留' : '交互演示 · 未调用模型') + '</span></div></div>';
 }
 function agentChatPage(id) {
   const thread = agentThread(id);
@@ -351,6 +351,7 @@ function agentUiFrames(threadId) {
 function handleAgentAction(action, key, value) {
   if (!action.startsWith('agent-')) return false;
   const thread = agentThread(key);
+  if (agentPreferenceAction(action, key, value)) return true;
   if (action === 'agent-new') { const result = agentCreateThread(); if (agentUiFeedback(result)) go('agent-chat/' + result.threadId); return true; }
   if (action === 'agent-list-scope') { if (['active', 'archived', 'all'].includes(key)) { agentListScope = key; refreshAgentView(); document.querySelector('[data-act="agent-list-scope:' + key + '"]')?.focus({ preventScroll: true }); } return true; }
   if (action === 'agent-list-clear') { agentListQuery = ''; const input = document.querySelector('#agent-list-query'); if (input) { input.value = ''; input.focus({ preventScroll: true }); } refreshAgentView(); return true; }
@@ -531,6 +532,8 @@ function refreshAgentView() {
   if (page !== 'agent-chat') return;
   const thread = agentThread(id); if (!thread) return;
   if (agentUiRevoked()) { if (!document.querySelector('.agent-access-block')) render(); return; }
+  const modelLabel = document.querySelector('.agent-model-trigger span'); if(modelLabel) modelLabel.textContent=agentUiModelLabel(thread);
+  const skillChip = document.querySelector('#agent-skill-chip-container'); if(skillChip) skillChip.innerHTML=agentUiSkillChip(thread);
   const composer = document.querySelector('#agent-composer');
   if (composer && Boolean(thread.archivedAt) !== composer.classList.contains('agent-archived-composer')) { render(); return; }
   const messages = document.querySelector('#agent-messages');
