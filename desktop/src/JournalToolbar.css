@@ -167,3 +167,20 @@
 .journal-filter-save-actions>button:hover:enabled{filter:brightness(.95)}
 .journal-filter-save-actions>button:disabled{opacity:.5;cursor:default}
 @media(pointer:coarse){.journal-filter-save-actions>button{min-height:44px}.journal-filter-save-state>button{min-height:32px}}
+
+/* The toolbar icon toggles this row; only row controls open property editors. */
+.journal-toolbar-actions .journal-filter-trigger{width:31px;padding:0}
+.journal-toolbar-actions .journal-filter-trigger[aria-pressed="true"]{background:transparent;color:var(--accent)}
+.journal-toolbar-conditions{min-height:43px;padding-top:3px;align-items:center}
+.journal-filter-chip.is-active{border-color:transparent;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.journal-filter-chip.is-active>button{border-radius:999px;color:var(--accent)}
+.journal-filter-chip.is-active>button>svg{color:currentColor}
+.journal-filter-chip.is-active>.journal-chip-clear{border-radius:999px}
+.journal-toolbar-conditions>.journal-date-filter-placeholder{display:inline-flex;flex:none;align-items:center;gap:6px;min-height:27px;padding:4px 6px;border:0;border-radius:5px;background:transparent;color:var(--subtle);font-size:12px;white-space:nowrap}
+.journal-date-filter-placeholder:hover{background:var(--surface-2)}
+.journal-filter-properties>.journal-clear-filters{min-height:32px;margin-top:4px;border-top:1px solid var(--line);border-radius:0;color:var(--subtle);font-size:11px}
+@media(pointer:coarse){.journal-toolbar-conditions>.journal-date-filter-placeholder{min-height:44px}}
+
+.journal-filter-chip>.journal-chip-clear{display:none}
+.journal-filter-chip:is(:hover,:focus-within)>.journal-chip-clear{display:inline-flex}
+@media(pointer:coarse){.journal-filter-chip>.journal-chip-clear{display:inline-flex}}

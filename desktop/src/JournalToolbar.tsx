@@ -1,5 +1,5 @@
 import {useEffect,useId,useRef,useState,type ReactNode} from "react";
-import {ArrowLeft,CalendarDays,Check,ChevronDown,ChevronRight,Layers,ListFilter,Plus,Search,SlidersHorizontal,Trash2,X} from "lucide-react";
+import {ArrowLeft,CalendarDays,Check,ChevronDown,ChevronRight,Layers,ListFilter,Plus,Search,Trash2,X} from "lucide-react";
 import {journalRecordFilters,type JournalRecordFilter} from "./JournalRecords";
 import {JournalViewManager} from "./JournalViewManager";
 import {journalLayouts,localJournalDate,shiftJournalDay,type JournalViewConfig,type JournalViewStore} from "./JournalViews";
@@ -45,6 +45,9 @@ export function JournalToolbar({store,libraries,resultCount,taskCount=0,loading=
   const libraryName=(id:string)=>{const library=libraries.find(value=>value.id===id);const providerNames:Record<string,string>={craft:"Craft",obsidian:"Obsidian",dida365:"滴答清单"};return library?`${library.name} · ${providerNames[library.provider]||library.provider}`:`未连接资料库 ${unknownIds.indexOf(id)+1}`;};
   const previousView=useRef(store.activeId);
   const filterCount=Number(view.period!=="all")+Number(view.libraries!==null)+Number((view.recordFilter||"all")!=="all");
+  const [filterBarOpen,setFilterBarOpen]=useState(filterCount>0);
+  const filterKey=JSON.stringify([view.period,view.day,view.month,view.libraries,view.recordFilter]);
+  useEffect(()=>{if(filterCount>0)setFilterBarOpen(true);},[filterKey]);
   const showSearch=searchExpanded||!!view.query;
   const currentMonth=localJournalDate().slice(0,7);
   const periodLabel=view.period==="day"?dateLabel(view.day):view.month===currentMonth?`${Number(view.month.slice(5))}月 · 本月`:monthLabel(view.month);
@@ -89,8 +92,9 @@ export function JournalToolbar({store,libraries,resultCount,taskCount=0,loading=
     }
     if(property==="libraries")setExtraLibraryIds((view.libraries||[]).filter(id=>!knownLibraryIds.has(id)));
   }
+  function toggleFilterBar(){closeFilters(false);setFilterBarOpen(open=>!open);}
   function openPanel(trigger:HTMLElement,next:FilterStage="properties"){
-    filterReturn.current=trigger;
+    setFilterBarOpen(true);filterReturn.current=trigger;
     if(next!=="properties")prepareEditor(next);
     setStage(next);
     requestPanelFocus(next==="properties"?'[data-property="period"]':'[data-editor-initial]');
@@ -168,8 +172,8 @@ export function JournalToolbar({store,libraries,resultCount,taskCount=0,loading=
   function chooseDateEditor(mode:Exclude<DateEditor,null>){setDateEditor(mode);requestPanelFocus(mode==="month"?'[data-date-input="month"]':'[data-date-input="day"]');}
   function chip(property:FilterProperty,label:string,icon:ReactNode,title=label){
     const description=`${propertyLabels[property]}：${title}`;
-    return <div className="journal-filter-chip" title={description}>
-      <button type="button" onClick={event=>openPanel(event.currentTarget,property)} aria-haspopup="dialog" aria-controls={filterId} aria-expanded={filtersOpen&&stage===property} aria-label={`编辑筛选：${description}`}>{icon}<span>{label}</span><ChevronDown size={12}/></button>
+    return <div className="journal-filter-chip is-active" title={description}>
+      <button type="button" onClick={event=>openPanel(event.currentTarget,property)} aria-haspopup="dialog" aria-controls={filterId} aria-expanded={filtersOpen&&stage===property} aria-label={`编辑筛选：${description}`}>{icon}<span>{propertyLabels[property]}：{label}</span><ChevronDown size={12}/></button>
       <button type="button" className="journal-chip-clear" aria-label={`移除筛选：${description}`} onClick={()=>removeProperty(property)}><X size={12}/></button>
     </div>;
   }
@@ -189,18 +193,19 @@ export function JournalToolbar({store,libraries,resultCount,taskCount=0,loading=
           }}/>
           <button type="button" aria-label={view.query?"清空并关闭日志搜索":"关闭日志搜索"} title={view.query?"清空并关闭搜索":"关闭搜索"} onClick={closeSearch}><X size={14}/></button>
         </label>:<button ref={searchButton} type="button" className="journal-search-trigger" aria-label="搜索日志" title="搜索日志" aria-expanded="false" onClick={openSearch}><Search size={16}/></button>}
-        <button ref={filterButton} type="button" className={`journal-filter-trigger ${filterCount?"has-filters":""}`} aria-label={`筛选日志${filterCount?`，${filterCount}项条件`:""}`} title="添加或编辑筛选条件" aria-haspopup="dialog" aria-controls={filterId} aria-expanded={filtersOpen} onClick={event=>openPanel(event.currentTarget)}>
-          <SlidersHorizontal size={15}/><span>筛选</span>{filterCount>0&&<span className="journal-filter-count">{filterCount}</span>}
+        <button ref={filterButton} type="button" className={`journal-filter-trigger ${filterCount?"has-filters":""}`} aria-label={`筛选日志${filterCount?`，${filterCount}项条件`:""}`} title={filterBarOpen?"收起筛选条件栏":"展开筛选条件栏"} aria-controls={conditionsId} aria-expanded={filterBarOpen} aria-pressed={filterBarOpen} onClick={toggleFilterBar}>
+          <ListFilter size={18}/>
         </button>
         {onCreate&&<button type="button" className="journal-toolbar-create" onClick={event=>onCreate(event.currentTarget)} aria-label="写日志" title="写日志"><Plus size={15}/><span>写日志</span></button>}
       </div>
     </div>
-    {filterCount>0&&<div id={conditionsId} className="journal-toolbar-conditions" aria-label="已生效的日志筛选">
+    {filterBarOpen&&<div id={conditionsId} className="journal-toolbar-conditions" aria-label="日志筛选条件栏">
       {view.period!=="all"&&chip("period",periodLabel,<CalendarDays size={13}/>)}
       {view.libraries!==null&&chip("libraries",sourceLabel,<Layers size={13}/>,sourceTitle)}
       {(view.recordFilter||"all")!=="all"&&chip("record",journalRecordFilters[view.recordFilter||"all"],<ListFilter size={13}/>)}
-      <button type="button" className="journal-add-filter" aria-haspopup="dialog" aria-controls={filterId} onClick={event=>openPanel(event.currentTarget)}><Plus size={13}/><span>添加筛选</span></button>
-      <button type="button" className="journal-clear-filters" onClick={clearFilters} title="移除全部筛选条件，保留临时搜索词">清除全部</button>
+      {view.period==="all"&&<button type="button" className="journal-date-filter-placeholder" aria-label="设置日期筛选" aria-haspopup="dialog" aria-controls={filterId} onClick={event=>openPanel(event.currentTarget,"period")}><CalendarDays size={14}/><span>日期</span><ChevronDown size={12}/></button>}
+      <button type="button" className="journal-add-filter" aria-haspopup="dialog" aria-controls={filterId} onClick={event=>openPanel(event.currentTarget)}><Plus size={13}/><span>筛选</span></button>
+
     </div>}
 
     <div ref={filterPanel} id={filterId} data-stage={stage} className="journal-filter-popover" data-hub-keyboard-scope="journal-filter" data-keyboard-open={filtersOpen} popover="auto" role="dialog" aria-label={stage==="properties"?"选择筛选属性":`编辑${propertyLabels[stage]}筛选`} onToggle={event=>{
@@ -216,6 +221,7 @@ export function JournalToolbar({store,libraries,resultCount,taskCount=0,loading=
           const Icon=propertyIcons[property],active=propertyActive(property);
           return <button key={property} type="button" data-property={property} onClick={()=>editProperty(property)} aria-label={`${propertyLabels[property]}${active?`，已添加：${propertyValue(property)}`:""}`}><Icon size={16}/><span><strong>{propertyLabels[property]}</strong>{active&&<small>{propertyValue(property)}</small>}</span>{active&&<span className="journal-filter-added"><Check size={12}/><span>已添加</span></span>}<ChevronRight size={13}/></button>;
         })}
+        {filterCount>0&&<button type="button" className="journal-clear-filters" onClick={clearFilters} title="移除全部筛选条件，保留临时搜索词"><Trash2 size={14}/><span>清除全部</span></button>}
       </div>:<>
         {stage==="period"&&<div className="journal-filter-editor journal-date-editor">
           <div className="journal-date-presets" role="group" aria-label="日期快捷选择">
