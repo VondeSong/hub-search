@@ -91,3 +91,71 @@ it("retains a disconnected saved library option until it is explicitly removed",
  const field=host.querySelector<HTMLInputElement>('.journal-library-options label:last-child input')!;expect(field.checked).toBe(true);
  await act(async()=>field.click());expect(store.view.libraries).toEqual([]);expect(host.textContent).toContain("未连接资料库");
 });
+
+it("saves temporary filter changes from the editor without saving the search or closing the panel",async()=>{
+ await act(async()=>store.save("已有视图"));
+ await click('.journal-filter-trigger');await click('[data-property="libraries"]');
+ const save=()=>host.querySelector<HTMLButtonElement>('.journal-filter-save-current')!;
+ expect(save().disabled).toBe(true);
+ await act(async()=>host.querySelector<HTMLInputElement>('.journal-library-options input')!.click());
+ await act(async()=>store.update({query:"临时搜索"}));
+ expect(host.querySelector('.journal-filter-save-state')?.textContent).toContain("尚未保存");
+ expect(store.saved[0].config.libraries).toBeNull();expect(save().disabled).toBe(false);
+ await click('.journal-filter-save-current');
+ expect(store.saved[0].config.libraries).toEqual(["os"]);expect(store.saved[0].config.query).toBe("");expect(store.view.query).toBe("临时搜索");
+ expect(save().disabled).toBe(true);expect(host.querySelector('.journal-filter-save-state')?.textContent).toContain("已保存到当前视图");
+ expect(host.querySelector('.journal-filter-popover')?.hasAttribute('data-open')).toBe(true);
+});
+
+it("restores the saved filters in the panel while preserving the current search",async()=>{
+ await act(async()=>store.save("原有视图"));await click('.journal-filter-trigger');
+ await act(async()=>store.update({libraries:[],query:"当前查找"}));
+ await click('.journal-filter-save-state button');
+ expect(store.view.libraries).toBeNull();expect(store.view.query).toBe("当前查找");expect(store.modified).toBe(false);
+ expect(host.querySelector('.journal-filter-popover')?.getAttribute('data-stage')).toBe("properties");
+});
+
+it("opens a naming dialog from the filter panel and returns focus without overwriting on cancel",async()=>{
+ await click('.journal-filter-trigger');expect(host.querySelector('.journal-filter-save-current')).toBeNull();
+ await click('.journal-filter-save-as');expect(host.querySelector('dialog')?.hasAttribute('open')).toBe(true);
+ expect(host.querySelector('.journal-filter-popover')?.hasAttribute('data-open')).toBe(false);
+ await click('[aria-label="关闭新建视图"]');expect(store.saved).toHaveLength(0);
+ expect(document.activeElement).toBe(host.querySelector('.journal-filter-trigger'));
+});
+
+it("creates a separate named view from the editor without changing the original view definition",async()=>{
+ await act(async()=>store.save("保留原视图"));const original=JSON.stringify(store.saved[0]);
+ await click('.journal-filter-trigger');await click('[data-property="libraries"]');
+ await act(async()=>host.querySelector<HTMLInputElement>('.journal-library-options input')!.click());
+ await click('.journal-filter-save-as');await input('[aria-label="新视图名称"]',"新条件视图");
+ await act(async()=>host.querySelector('.journal-save-view-dialog form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ expect(store.saved).toHaveLength(2);expect(JSON.stringify(store.saved[0])).toBe(original);expect(store.active?.name).toBe("新条件视图");
+ expect(store.active?.config.libraries).toEqual(["os"]);expect(store.modified).toBe(false);
+});
+
+it("keeps quick date choices and library reset open for explicit saving",async()=>{
+ await act(async()=>store.save("月份视图"));await click('.journal-filter-trigger');await click('[data-property="period"]');
+ await act(async()=>host.querySelectorAll<HTMLButtonElement>('.journal-date-presets button')[1].click());
+ expect(store.view.period).toBe("day");expect(store.saved[0].config.period).toBe("month");
+ expect(host.querySelector<HTMLInputElement>('[aria-label="筛选日期"]')?.value).toBe(store.view.day);
+ expect(host.querySelector('.journal-filter-popover')?.hasAttribute('data-open')).toBe(true);
+ await click('.journal-filter-back');await click('[data-property="libraries"]');await click('.journal-all-libraries');
+ expect(host.querySelector('.journal-filter-popover')?.hasAttribute('data-open')).toBe(true);
+});
+
+it("offers removal and saving together and respects the saved view limit",async()=>{
+ await act(async()=>store.update({libraries:["os"]}));await click('.journal-filter-trigger');await click('[data-property="libraries"]');
+ await click('.journal-filter-remove');expect(store.view.libraries).toBeNull();
+ expect(host.querySelector('.journal-filter-popover')?.getAttribute('data-stage')).toBe("properties");
+ expect(host.querySelector('.journal-filter-popover')?.hasAttribute('data-open')).toBe(true);
+ await act(async()=>{for(let i=0;i<30;i++)store.save(`视图${i}`);});
+ expect(host.querySelector<HTMLButtonElement>('.journal-filter-save-as')?.disabled).toBe(true);
+});
+
+it("collapses the editor without claiming that temporary changes were saved",async()=>{
+ await act(async()=>store.save("原条件"));await click('.journal-filter-trigger');await click('[data-property="libraries"]');
+ await act(async()=>host.querySelector<HTMLInputElement>('.journal-library-options input')!.click());
+ expect(host.querySelector('.journal-filter-done')?.textContent).toBe("收起");await click('.journal-filter-done');
+ expect(host.querySelector('.journal-filter-popover')?.hasAttribute('data-open')).toBe(false);
+ expect(store.view.libraries).toEqual(["os"]);expect(store.saved[0].config.libraries).toBeNull();expect(store.modified).toBe(true);
+});

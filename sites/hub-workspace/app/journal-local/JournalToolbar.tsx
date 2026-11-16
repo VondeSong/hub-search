@@ -96,11 +96,11 @@ export function JournalToolbar({store,resultCount,taskCount=0,onUpdate,onCreate}
     filterPanel.current?.hidePopover();
     if(restoreFocus)focusFilterTrigger();
   }
-  function removeProperty(property:FilterProperty){
+  function removeProperty(property:FilterProperty,keepOpen=false){
     const patch:Partial<JournalViewConfig>=property==="period"?{period:"all",day:""}:property==="libraries"?{libraries:null}:{recordFilter:"all"};
     onUpdate(patch);
-    closeFilters(false);
-    requestAnimationFrame(()=>filterButton.current?.focus({preventScroll:true}));
+    if(keepOpen){setStage("properties");requestPanelFocus(`[data-property="${property}"]`);}
+    else{closeFilters(false);requestAnimationFrame(()=>filterButton.current?.focus({preventScroll:true}));}
   }
   function clearFilters(){
     onUpdate({period:"all",day:"",libraries:null,recordFilter:"all"});
@@ -133,13 +133,18 @@ export function JournalToolbar({store,resultCount,taskCount=0,onUpdate,onCreate}
 
   function openSearch(){setSearchExpanded(true);requestAnimationFrame(()=>searchInput.current?.focus({preventScroll:true}));}
   function closeSearch(){onUpdate({query:""});setSearchExpanded(false);requestAnimationFrame(()=>searchButton.current?.focus({preventScroll:true}));}
-  function startSave(){
-    saveReturn.current=document.activeElement instanceof HTMLElement?document.activeElement:null;
+  function startSave(returnTarget?:HTMLElement|null){
+    saveReturn.current=returnTarget?.isConnected?returnTarget:document.activeElement instanceof HTMLElement?document.activeElement:null;
     const base=journalLayouts[view.layout];let name:string=base,index=2;
     while(store.saved.some(saved=>saved.name===name))name=`${base} ${index++}`;
     setSaveName(name);setSaveError("");saveDialog.current?.showModal();
     requestAnimationFrame(()=>{saveInput.current?.focus();saveInput.current?.select();});
   }
+  function saveFilterAsView(){
+    const trigger=filterReturn.current?.isConnected?filterReturn.current:filterButton.current;
+    closeFilters(false);startSave(trigger);
+  }
+  function restoreFilters(){store.select(store.activeId);setStage("properties");requestPanelFocus('[data-property="period"]');}
   function closeSave(){
     saveDialog.current?.close();
     requestAnimationFrame(()=>saveReturn.current?.isConnected?saveReturn.current.focus({preventScroll:true}):filterButton.current?.focus({preventScroll:true}));
@@ -202,8 +207,8 @@ export function JournalToolbar({store,resultCount,taskCount=0,onUpdate,onCreate}
       </div>:<>
         {stage==="period"&&<div className="journal-filter-editor journal-date-editor">
           <div className="journal-date-presets" role="group" aria-label="日期快捷选择">
-            <button data-editor-initial type="button" aria-pressed={view.period==="month"&&view.month===currentMonth} onClick={()=>{onUpdate({period:"month",month:currentMonth,day:""});closeFilters();}}>本月{view.period==="month"&&view.month===currentMonth&&<Check size={13}/>}</button>
-            <button type="button" aria-pressed={view.period==="day"&&view.day===localJournalDate()} onClick={()=>{onUpdate({period:"day",day:localJournalDate(),month:currentMonth});closeFilters();}}>今天{view.period==="day"&&view.day===localJournalDate()&&<Check size={13}/>}</button>
+            <button data-editor-initial type="button" aria-pressed={view.period==="month"&&view.month===currentMonth} onClick={()=>{onUpdate({period:"month",month:currentMonth,day:""});setDateEditor("month");setDraftMonth(currentMonth);setDraftDay("");}}>本月{view.period==="month"&&view.month===currentMonth&&<Check size={13}/>}</button>
+            <button type="button" aria-pressed={view.period==="day"&&view.day===localJournalDate()} onClick={()=>{onUpdate({period:"day",day:localJournalDate(),month:currentMonth});setDateEditor("day");setDraftDay(localJournalDate());setDraftMonth("");}}>今天{view.period==="day"&&view.day===localJournalDate()&&<Check size={13}/>}</button>
           </div>
           <div className="journal-date-mode" role="group" aria-label="选择日期条件">
             <button type="button" aria-pressed={dateEditor==="month"} onClick={()=>chooseDateEditor("month")}>指定月份</button>
@@ -220,15 +225,25 @@ export function JournalToolbar({store,resultCount,taskCount=0,onUpdate,onCreate}
           {!dateEditor&&<p className="journal-filter-help">选择一个日期或月份。</p>}
         </div>}
         {stage==="libraries"&&<div className="journal-filter-editor">
-          <button data-editor-initial type="button" className="journal-all-libraries" aria-pressed={view.libraries===null} onClick={()=>{onUpdate({libraries:null});closeFilters();}}><span>全部资料库</span>{view.libraries===null&&<Check size={15}/>}</button>
+          <button data-editor-initial type="button" className="journal-all-libraries" aria-pressed={view.libraries===null} onClick={()=>{onUpdate({libraries:null});}}><span>全部资料库</span>{view.libraries===null&&<Check size={15}/>}</button>
           <div className="journal-library-options" role="group" aria-label="选择资料库，可多选">{libraryOptions.map(library=><label key={library.id}><input type="checkbox" checked={view.libraries?.includes(library.id)||false} onChange={()=>toggleLibrary(library.id)}/><span>{library.label}</span></label>)}</div>
           {view.libraries?.length===0?<p className="journal-filter-empty-selection" role="status">未选择资料库，当前不会显示记录。</p>:view.libraries===null?<p className="journal-filter-help">当前不限资料库。勾选后只看所选范围。</p>:<p className="journal-filter-help">可选择多个资料库。</p>}
         </div>}
         {stage==="record"&&<div className="journal-filter-editor">
           <div className="journal-record-options" role="group" aria-label="日志内容类型" onKeyDown={event=>{if(event.key==="Enter"&&!event.nativeEvent.isComposing){event.preventDefault();event.stopPropagation();closeFilters();}}}>{Object.entries(journalRecordFilters).map(([key,label])=><label key={key}><input data-editor-initial={view.recordFilter===key?true:undefined} type="radio" name={`${uid}-record-type`} checked={view.recordFilter===key} onChange={()=>onUpdate({recordFilter:key as JournalRecordFilter})}/><span>{label}</span></label>)}</div>
         </div>}
-        <footer><button type="button" className="journal-filter-remove" disabled={!propertyActive(stage)} onClick={()=>removeProperty(stage)}><Trash2 size={13}/><span>移除此条件</span></button><button type="button" className="journal-filter-done" onClick={()=>closeFilters()}>完成</button></footer>
+        <footer><button type="button" className="journal-filter-remove" disabled={!propertyActive(stage)} onClick={()=>removeProperty(stage,true)}><Trash2 size={13}/><span>移除此条件</span></button><button type="button" className="journal-filter-done" onClick={()=>closeFilters()}>收起</button></footer>
       </>}
+      <div className="journal-filter-persistence">
+        <div className="journal-filter-save-state">
+          <span role="status" aria-live="polite">{store.active?(store.modified?"临时调整，尚未保存":"已保存到当前视图"):"当前条件仅临时生效"}</span>
+          {store.active&&store.modified&&<button type="button" onClick={restoreFilters}>恢复已保存条件</button>}
+        </div>
+        <div className="journal-filter-save-actions">
+          {store.active&&<button type="button" className="journal-filter-save-current" disabled={!store.modified} onClick={()=>store.updateSaved()} title={`保存筛选及显示设置到“${store.active.name}”，不保存搜索词`}><Check size={13}/><span>保存到当前视图</span></button>}
+          <button type="button" className="journal-filter-save-as" disabled={store.saved.length>=30} onClick={saveFilterAsView}>另存为新视图</button>
+        </div>
+      </div>
     </div>
 
     <dialog ref={saveDialog} id={saveId} className="journal-save-view-dialog" aria-labelledby={`${saveId}-title`} onCancel={event=>{event.preventDefault();closeSave();}}>
