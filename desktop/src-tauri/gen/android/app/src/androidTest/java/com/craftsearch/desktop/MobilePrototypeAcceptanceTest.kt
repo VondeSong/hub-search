@@ -75,10 +75,22 @@ class MobilePrototypeAcceptanceTest {
     }
     private fun systemClick(texts: List<String>) {
         var node: AccessibilityNodeInfo? = null
-        until("system confirmation button") { node = systemNode { it.text?.toString() in texts && it.isEnabled }; node != null }
+        until("system confirmation button") { node = systemNode { it.text?.toString() in texts && it.isEnabled && it.isVisibleToUser }; node != null }
         var target = node!!
         while (!target.isClickable && target.parent != null) target = target.parent
         check(target.performAction(AccessibilityNodeInfo.ACTION_CLICK)) { "System confirmation did not accept the action" }
+    }
+    private fun clickJournalTile() {
+        shell("cmd statusbar expand-settings")
+        val metrics = activity.resources.displayMetrics
+        repeat(4) {
+            if (systemNode { it.text?.toString() == "记一条" && it.isVisibleToUser } != null) {
+                systemClick(listOf("记一条"))
+                return
+            }
+            shell("input swipe ${metrics.widthPixels * 8 / 10} ${metrics.heightPixels / 2} ${metrics.widthPixels / 10} ${metrics.heightPixels / 2} 300")
+        }
+        error("Journal tile is not visible in Quick Settings")
     }
     private fun findWeb(v: View): WebView? {
         if (v is WebView) return v
@@ -279,14 +291,14 @@ class MobilePrototypeAcceptanceTest {
             click("[data-record-id='$captureId'] button[aria-label^='记录操作']")
             clickText("删除", "dialog button"); clickText("移到回收站", "dialog button")
             until("record in trash") { own(captureId)?.optBoolean("deleted") == true && !dom("dialog[open]") }
-            click("[aria-label='日志导航']"); clickText("回收站", "dialog button")
+            click(".mobile-journal-scope"); clickContaining("回收站", "dialog button")
             until("trash view") { !dom("dialog[open]") && dom("[data-record-id='$captureId']") }
-            clickText("恢复记录")
+            clickText("恢复记录", "[data-record-id='$captureId'] button")
             until("record restored from trash") { own(captureId)?.optBoolean("deleted") == false }
             checkResult("trash restores the same record", list().length() == baseline + 1)
-            click("[aria-label='日志导航']"); clickText("日志", "dialog button")
+            click(".mobile-journal-scope"); clickContaining("全部记录", "dialog button")
             until("all records view") { !dom("dialog[open]") && dom("[data-record-id='$captureId']") }
-            click("[aria-label='速记同步状态']"); waitDom(".mobile-journal-sync")
+            click("[aria-label='日志设置']"); click("[aria-label='速记同步状态']"); waitDom(".mobile-journal-sync")
             checkResult("journal sync has a local retry entrance", js("document.querySelector('.mobile-journal-sync').textContent.includes('同步 / 重试')") == true)
             clickText("同步 / 重试", "dialog button")
             until("manual sync finished", 150) { js("!document.querySelector('.mobile-journal-sync button')?.disabled") == true }
@@ -329,7 +341,7 @@ class MobilePrototypeAcceptanceTest {
             until("linked editor keyboard is visible") { keyboard() && js("document.querySelector('dialog[open] .journal-rich-editor')?.isContentEditable===true") == true }
             hideKeyboard(); back(); until("linked editor closed") { !dom("dialog[open]") }
 
-            click("[aria-label='日志导航']"); clickText("返回 Hub 浏览", "dialog button")
+            click("[aria-label='返回浏览']")
             waitDom(".mobile-browse-screen")
             clickContaining("阅读", ".mobile-browse-group button")
             waitDom(".mobile-reading-controls")
@@ -377,7 +389,16 @@ class MobilePrototypeAcceptanceTest {
         try {
             native("save_quick_journal_settings", JSONObject().put("value", JSONObject(originalSettings.toString()).put("sync", false)))
             val today = java.time.LocalDate.now().toString()
-            ids.forEachIndexed { i, id -> native("capture_quick_journal", JSONObject().put("record", JSONObject().put("version", 1).put("id", id).put("date", today).put("text", "Hub 日志视频验收 $runId $i #视频验收 https://example.com").put("attachments", JSONArray()))) }
+            ids.forEachIndexed { i, id ->
+                val attachments=JSONArray()
+                if(i==0) for(index in 0..2){
+                    val bitmap=Bitmap.createBitmap(80+index*20,360+index*50,Bitmap.Config.ARGB_8888);bitmap.eraseColor(android.graphics.Color.rgb(70+index*50,120,180))
+                    val bytes=java.io.ByteArrayOutputStream();bitmap.compress(Bitmap.CompressFormat.PNG,100,bytes);bitmap.recycle()
+                    attachments.put(native("stage_quick_journal_attachment",JSONObject().put("name","竖图$index.png").put("content",android.util.Base64.encodeToString(bytes.toByteArray(),android.util.Base64.NO_WRAP))))
+                }
+                val text="Hub 日志视频验收 $runId $i #视频验收 https://example.com"+(if(i==0) "\n长记录与多图预览检查。".repeat(18) else "")
+                native("capture_quick_journal",JSONObject().put("record",JSONObject().put("version",1).put("id",id).put("date",today).put("text",text).put("attachments",attachments)))
+            }
             asyncJs("const {userProfileStorage:s}=await import(new URL('/src/UserProfileStorage.ts',location.href).href);s.setItem('hub.mobile.appearance.v1',JSON.stringify({theme:'white',accent:'blue'}));return true")
             if (!dom(".mobile-journal-feed")) {
                 click("nav[aria-label='主要导航'] button[aria-label='浏览']"); waitDom(".mobile-browse-screen"); clickContaining("日志", ".mobile-browse-group button")
@@ -391,11 +412,29 @@ class MobilePrototypeAcceptanceTest {
             checkResult("create button sits within 32 CSS pixels of the available bottom", geometry.getDouble("feedBottom")-geometry.getDouble("buttonBottom") in 8.0..32.0)
             checkResult("white cards are visibly separated from the gray journal canvas", geometry.getString("page") != geometry.getString("card") && geometry.getString("gap") == "12px")
             screenshot("01-light-card-feed")
-            click(".mobile-journal-title"); waitDom(".journal-view-dialog"); click(".mobile-journal-view-options summary")
+            val mediaSelector="[data-record-id='${ids[0]}']"
+            until("three tall fixture photos loaded") { js("[...document.querySelectorAll(\"$mediaSelector .mobile-journal-photos img\")].filter(e=>e.complete&&e.naturalWidth>0).length===3") == true }
+            val media=js("(()=>{const c=document.querySelector(\"$mediaSelector\"),photos=[...c.querySelectorAll('.mobile-journal-photos img')];window.__journalCardCopy=c.querySelector('.mobile-journal-copy');return{card:c.getBoundingClientRect().height,text:c.querySelector('.mobile-journal-copy').getBoundingClientRect().height,photos:photos.map(p=>p.getBoundingClientRect().height)}})()") as JSONObject
+            evidence.put("compactMedia",media)
+            checkResult("long text and three portrait photos share a compact collapsed card",media.getDouble("card")<430&&media.getDouble("text")<=137&&(0 until media.getJSONArray("photos").length()).all { media.getJSONArray("photos").getDouble(it)<=89 })
+            click("$mediaSelector .mobile-journal-expand")
+            checkResult("expanded card retains its body node and offers top and bottom collapse",js("document.querySelector(\"$mediaSelector .mobile-journal-copy\")===window.__journalCardCopy&&document.querySelector(\"$mediaSelector .mobile-journal-collapse-top\")&&document.querySelectorAll(\"$mediaSelector .mobile-journal-expand\").length===2") == true)
+            click("$mediaSelector .mobile-journal-photos button");waitDom(".mobile-journal-photo-view");screenshot("01a-original-photo")
+            clickText("保存原图", "dialog button")
+            until("Android save destination picker") { instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString() == "com.google.android.documentsui" }
+            back(); until("cancelled export returns to the photo") { dom(".mobile-journal-photo-view") && activity.hasWindowFocus() }
+            checkResult("cancelling original photo export retains the record and attachment", own(ids[0])?.getJSONObject("record")?.getJSONArray("attachments")?.length() == 3)
+            back();until("photo viewer closes"){!dom("dialog[open]")}
+            click("$mediaSelector .mobile-journal-expand:not(.mobile-journal-collapse-top)")
+            checkResult("collapse returns to the same card and keeps all originals",js("(()=>{const c=document.querySelector(\"$mediaSelector\"),r=c.getBoundingClientRect(),s=c.closest('.mobile-journal-scroll').getBoundingClientRect();return !c.querySelector('.is-expanded')&&c.querySelectorAll('.mobile-journal-photos img').length===3&&r.top>=s.top-14})()") == true)
+            screenshot("01b-compact-media-after-collapse")
+            click(".mobile-journal-scope");waitDom("dialog[aria-label='日志范围']");checkResult("scope exposes seven real filters separately from settings",js("document.querySelectorAll('dialog .mobile-journal-menu-list>button[aria-pressed]').length===7") == true);back();until("scope closes"){!dom("dialog[open]")}
+
+            click("[aria-label='日志设置']"); waitDom(".journal-view-dialog"); click(".mobile-journal-view-options summary")
             checkResult("all four sort directions are reachable", js("document.querySelectorAll('.mobile-journal-view-options details button').length===4") == true)
             clickText("记录日期，从旧到新", ".mobile-journal-view-options button"); until("sort menu closes") { !dom("dialog[open]") }
             checkResult("sort preference is persisted in the real user profile", asyncJs("const {userProfileStorage:s}=await import(new URL('/src/UserProfileStorage.ts',location.href).href);return s.getItem('hub.journal.sort.v1')") == "\"date-asc\"")
-            click(".mobile-journal-title"); clickText("选择笔记"); until("selection heading") { dom(".mobile-journal-selection-heading") }
+            click("[aria-label='日志设置']"); clickText("选择笔记"); until("selection heading") { dom(".mobile-journal-selection-heading") }
             ids.forEach { id -> click("[data-record-id='$id'] .mobile-journal-card-selector") }
             checkResult("multi-select counts only the two tapped cards", js("document.querySelector('.mobile-journal-selection-heading').textContent.includes('已选中 2 条')") == true)
             screenshot("02-multi-select")
@@ -461,7 +500,7 @@ class MobilePrototypeAcceptanceTest {
         val appearance = if (profile.has("hub.mobile.appearance.v1")) profile.getString("hub.mobile.appearance.v1") else null
         val display = shell("wm size"); val override = Regex("Override size: (\\d+x\\d+)").find(display)?.groupValues?.get(1)
         try {
-            if (dom(".mobile-journal-feed")) { click("[aria-label='日志导航']"); clickText("返回 Hub 浏览", "dialog button"); waitDom(".mobile-browse-screen") }
+            if (dom(".mobile-journal-feed")) { click("[aria-label='返回浏览']"); waitDom(".mobile-browse-screen") }
             else { click("nav[aria-label='主要导航'] button[aria-label='浏览']"); waitDom(".mobile-browse-screen") }
             clickContaining("日志", ".mobile-browse-group button"); waitDom(".mobile-journal-feed")
             asyncJs("const {userProfileStorage:s}=await import(new URL('/src/UserProfileStorage.ts',location.href).href);s.setItem('hub.mobile.appearance.v1',JSON.stringify({theme:'white',accent:'blue'}));return true")
@@ -512,6 +551,8 @@ class MobilePrototypeAcceptanceTest {
     @Test
     fun nativeTileRequestsAndWarmEntry() {
         shell("cmd statusbar collapse")
+        shell("cmd statusbar remove-tile $tileComponent")
+        until("previous tile removed") { !shell("settings get secure sysui_qs_tiles").contains("com.craftsearch.desktop") }
         launchMain()
         val originalActivity = activity
         val originalDraft = native("get_quick_journal_draft") as String
@@ -519,14 +560,12 @@ class MobilePrototypeAcceptanceTest {
         val before = list()
         val ids = (0 until before.length()).map { before.getJSONObject(it).getJSONObject("record").getString("id") }.toSet()
         try {
-            shell("cmd statusbar remove-tile $tileComponent")
-            until("previous tile removed") { !shell("settings get secure sysui_qs_tiles").contains("com.craftsearch.desktop") }
             if (systemNode { it.text?.contains("wants to add") == true } != null) { back(); SystemClock.sleep(250) }
             if (!dom(".mobile-journal-feed")) {
                 click("nav[aria-label='主要导航'] button[aria-label='浏览']"); waitDom(".mobile-browse-screen")
                 clickContaining("日志", ".mobile-browse-group button"); waitDom(".mobile-journal-feed")
             }
-            click("[aria-label='日志导航']"); clickText("添加「记一条」到控制中心", "dialog button")
+            click("[aria-label='日志设置']"); clickContaining("控制中心入口", "dialog button")
             until("system tile prompt") { systemNode { it.text?.toString() == "记一条" } != null }
             screenshot("01-tile-system-request")
             systemClick(listOf("Don't add", "Don’t add", "Do not add tile", "Cancel", "取消", "不添加"))
@@ -539,12 +578,12 @@ class MobilePrototypeAcceptanceTest {
             checkResult("system confirms the tile was added", tileResult().contains("已添加"))
             requestTile(); checkResult("adding the same tile is idempotent", tileResult().contains("已包含"))
             js("(()=>{window.__tileFocusLog=[];for(const type of ['focusin','focusout','hub:journal-capture-focus'])window.addEventListener(type,()=>window.__tileFocusLog.push({type,tag:document.activeElement?.tagName,cls:document.activeElement?.className,time:performance.now()}),true);return true})()")
-            shell("cmd statusbar expand-settings"); shell("cmd statusbar click-tile $tileComponent")
+            clickJournalTile()
             resumedMain()
             waitDom("dialog[aria-label='速记'][open] .journal-rich-editor")
             until("app visible after tile") { instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString() == "com.craftsearch.desktop" }
             screenshot("02-tile-warm-entry")
-            shell("cmd statusbar expand-settings"); shell("cmd statusbar click-tile $tileComponent")
+            clickJournalTile()
             resumedMain()
             until("app visible after repeated tile") { instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString() == "com.craftsearch.desktop" }
             checkResult("repeated tile clicks keep one composer", (js("document.querySelectorAll('dialog[aria-label=速记][open]').length") as Number).toInt() == 1)
@@ -558,7 +597,7 @@ class MobilePrototypeAcceptanceTest {
             checkResult("tile focuses the real journal input and keyboard", js("document.activeElement?.matches('.journal-rich-editor')") == true)
             check(instrumentation.uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME))
             until("Hub moved to the background") { instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString() != "com.craftsearch.desktop" }
-            shell("cmd statusbar expand-settings"); shell("cmd statusbar click-tile $tileComponent")
+            clickJournalTile()
             resumedMain()
             until("background tile returns to the active editor") { instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString() == "com.craftsearch.desktop" && keyboard() && js("document.activeElement?.matches('.journal-rich-editor')") == true }
             checkResult("background tile reuses the same activity and single composer", activity === originalActivity && (js("document.querySelectorAll('dialog[aria-label=速记][open]').length") as Number).toInt() == 1)
@@ -630,10 +669,99 @@ class MobilePrototypeAcceptanceTest {
             until("WebView reload completes", 90) { (js("performance.timeOrigin") as Number).toDouble() > origin && dom(".mobile-app-shell") && !dom("dialog[aria-label='速记'][open]") }
             checkResult("a consumed tile action never reopens on refresh", !dom("dialog[aria-label='速记'][open]"))
             checkResult("native draft survives full WebView reload", native("get_quick_journal_draft") == draft)
+            val count = list().length()
+            js("(()=>{window.dispatchEvent(new Event('hub:open-quick-journal'));return true})()")
+            waitDom("dialog[aria-label='速记'][open] .journal-rich-editor")
+            until("native draft has loaded into the composer") { js("document.querySelector('.journal-rich-editor').textContent.includes('保留格式')&&document.querySelectorAll('.quick-journal-draft-files>li').length===2") == true }
+            until("restored draft photo decoded") { js("document.querySelector('.quick-journal-draft-files img')?.naturalWidth===32") == true }
+            checkResult("restarted draft restores formatted text and both attachments into the real composer", js("document.querySelector('.journal-rich-editor').textContent.includes('保留格式')&&document.querySelectorAll('.journal-rich-editor li').length===2&&document.querySelectorAll('.quick-journal-draft-files>li').length===2") == true)
+            screenshot("02-restarted-rich-draft")
+            hideKeyboard(); back(); until("restored draft closes without saving") { !dom("dialog[aria-label='速记'][open]") }
+            checkResult("reopening the draft creates no journal record", list().length() == count)
             screenshot("01-after-cold-reload")
             evidence.put("completed", true)
         } catch (failure: Throwable) { evidence.put("failure", failure.toString()); if (::web.isInitialized) screenshot("failure"); throw failure }
         finally { File(directory, "result.json").writeText(evidence.toString(2), Charsets.UTF_8) }
+    }
+
+    @Test
+    fun journalScopesAndShortcuts() {
+        launchMain()
+        try {
+            click("nav[aria-label='主要导航'] button[aria-label='浏览']"); waitDom(".mobile-browse-screen")
+            clickContaining("日志", ".mobile-browse-group button"); waitDom(".mobile-journal-feed")
+            val all = list(); val items = (0 until all.length()).map { all.getJSONObject(it) }
+            val profile = (native("load_user_profile") as JSONObject).getJSONObject("values")
+            val pins = JSONArray(profile.optString("hub.journal.record-pins.v1", "[]"))
+            val pinned = (0 until pins.length()).map { pins.getString(it) }.toSet()
+            val today = java.time.LocalDate.now().toString()
+            for (label in listOf("今天", "置顶", "有附件", "待同步", "回收站", "全部记录")) {
+                click(".mobile-journal-scope"); waitDom("dialog[aria-label='日志范围']")
+                clickContaining(label, "dialog .mobile-journal-menu-list>button")
+                until("range selected: $label") { !dom("dialog[open]") && js("document.querySelector('.mobile-journal-scope').textContent.includes(${JSONObject.quote(label)})") == true }
+                val expected = items.filter { item ->
+                    val record = item.getJSONObject("record")
+                    if (label == "回收站") item.optBoolean("deleted") else !item.optBoolean("deleted") && when (label) {
+                        "今天" -> record.getString("date") == today
+                        "置顶" -> record.getString("id") in pinned
+                        "有附件" -> record.getJSONArray("attachments").length() > 0
+                        "待同步" -> !item.optBoolean("applied")
+                        else -> true
+                    }
+                }.map { it.getJSONObject("record").getString("id") }.toSet()
+                val visible = js("[...document.querySelectorAll('.mobile-journal-card')].map(e=>e.dataset.recordId)") as JSONArray
+                checkResult("scope $label shows matching actual records", visible.length() == minOf(200, expected.size) && (0 until visible.length()).all { visible.getString(it) in expected })
+            }
+            click(".mobile-journal-scope"); clickContaining("无标签", "dialog .mobile-journal-menu-list>button")
+            until("untagged scope closes") { !dom("dialog[open]") }
+            checkResult("untagged scope has no active inline tag", js("document.querySelectorAll('.mobile-journal-inline-tag').length===0") == true)
+            click(".mobile-journal-scope"); clickContaining("全部记录", "dialog .mobile-journal-menu-list>button")
+            until("all range restored") { !dom("dialog[open]") }
+            clickText("每日回顾", ".mobile-journal-shortcuts button"); waitDom("dialog[aria-label='每日回顾']")
+            checkResult("daily review is a separate view of earlier actual records", js("document.querySelector('dialog[open]').textContent.includes('重温以前的真实记录')") == true)
+            back(); until("review closes") { !dom("dialog[open]") }
+            clickText("AI 洞察", ".mobile-journal-shortcuts button"); waitDom(".insights-workspace")
+            checkResult("AI insight shortcut opens the existing insights workspace", dom(".insights-workspace"))
+            back(); waitDom(".mobile-journal-feed")
+            checkResult("returning from insights restores the journal", dom(".mobile-journal-title"))
+            evidence.put("completed", true)
+        } catch (failure: Throwable) { evidence.put("failure",failure.toString()); screenshot("failure"); throw failure }
+        finally { File(directory,"result.json").writeText(evidence.toString(2),Charsets.UTF_8) }
+    }
+
+    @Test
+    fun voiceConnectionSettingsRoundTrip() {
+        launchMain()
+        val draft = native("get_quick_journal_draft") as String
+        val voice = native("quick_journal_voice_draft") as String
+        val count = list().length()
+        try {
+            js("(()=>{window.dispatchEvent(new Event('hub:open-quick-journal'));return true})()")
+            waitDom("dialog[aria-label='速记'][open] .journal-rich-editor")
+            click("[aria-label='进入录音模式']")
+            waitDom("dialog[aria-label='语音速记']")
+            until("voice service check finishes", 90) { js("document.querySelector('.journal-voice-service small')?.textContent!=='检查中'") == true }
+            checkResult("voice distinguishes local recording from transcription and exposes connection setup", js("(()=>{const b=document.querySelector('.journal-voice-boundary').textContent;return document.querySelector('.journal-voice-connection-status').textContent.includes('服务密钥在哪里设置')&&document.querySelector('.journal-voice-dialog header').textContent.includes('原音保留在本机')&&(b.includes('识别文字需确认')||b.includes('连接并选择补转写后'))})()") == true)
+            clickText("连接设置", ".journal-voice-connection-status button")
+            waitDom("dialog[aria-label='个人云端连接设置'] input[type=password]")
+            checkResult("voice connection setup opens the actual device connection form", js("document.querySelectorAll('dialog[aria-label=个人云端连接设置] input').length===2") == true)
+            screenshot("01-voice-connection-settings")
+            clickText("返回语音速记", "dialog[aria-label='个人云端连接设置'] button")
+            until("connection return button restores voice") { !dom("dialog[aria-label='个人云端连接设置']") && dom("dialog[aria-label='语音速记']") }
+            checkResult("connection form return button does not open a chat list", !dom(".cloud-agents-home"))
+            until("voice service recheck finishes", 90) { js("document.querySelector('.journal-voice-service small')?.textContent!=='检查中'") == true }
+            clickText("连接设置", ".journal-voice-connection-status button")
+            waitDom("dialog[aria-label='个人云端连接设置'] input[type=password]")
+            hideKeyboard(); back(); until("connection sheet returns to voice") { !dom("dialog[aria-label='个人云端连接设置']") && dom("dialog[aria-label='语音速记']") }
+            click("[aria-label='保留语音草稿并关闭']")
+            until("voice sheet closes") { !dom("dialog[aria-label='语音速记']") }
+            checkResult("voice setup never saves a journal or changes the text draft", list().length() == count && native("get_quick_journal_draft") == draft)
+            evidence.put("completed", true)
+        } catch (failure: Throwable) { evidence.put("failure", failure.toString()); screenshot("failure"); throw failure }
+        finally {
+            native("quick_journal_voice_draft", JSONObject().put("value", voice))
+            File(directory,"result.json").writeText(evidence.toString(2),Charsets.UTF_8)
+        }
     }
 
     private fun field(selector: String, value: String) {

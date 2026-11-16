@@ -47,3 +47,11 @@
 .journal-transcript-actions {display:flex;gap:12px;justify-content:flex-end;}
 .journal-transcript-actions button,.journal-voice-replay {font:inherit;font-size:13px;color:var(--mobile-accent,#2863b8);background:transparent;border:0;min-height:44px;padding:8px;}
 .journal-transcript-actions button:disabled {opacity:.55;}
+
+.journal-voice-connection {position:fixed;inset:0;width:100%;max-width:560px;height:90dvh;max-height:90dvh;padding:0;border:0;border-radius:20px;background:var(--mobile-surface,#fff);color:var(--mobile-ink,#24262a);overflow:auto;}
+.journal-voice-connection::backdrop {background:rgba(20,25,35,.3);}
+.journal-voice-connection-status {font-size:12px;line-height:1.65;padding:10px 0;color:var(--mobile-secondary,#626974);}
+.journal-voice-connection-status p {margin:4px 0;overflow-wrap:anywhere;}
+.journal-voice-connection-status>div {display:flex;gap:18px;}
+.journal-voice-connection-status button {padding:0;border:0;background:transparent;color:var(--mobile-accent,#2863b8);font-size:13px;}
+.journal-voice-connection-status summary {cursor:pointer;min-height:36px;display:list-item;align-content:center;}

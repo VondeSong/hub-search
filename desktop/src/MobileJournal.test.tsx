@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {act} from "react";import{createRoot,type Root}from"react-dom/client";import{beforeEach,afterEach,it,expect,vi}from"vitest";
-import{MobileJournal}from"./MobileJournal";import type{QuickJournalItem}from"./JournalRecords";
+import{MobileJournal}from"./MobileJournal";import{QUICK_JOURNAL_UPDATED}from"./QuickJournalEvents";import type{QuickJournalItem}from"./JournalRecords";
 const invoke=vi.fn(),saved=new Map<string,string>();
 vi.mock("@tauri-apps/api/core",()=>({invoke:(...args:unknown[])=>invoke(...args)}));
 vi.mock("./UserProfileStorage",()=>({userProfileStorage:{getItem:(key:string)=>saved.get(key)||null,setItem:(key:string,value:string)=>saved.set(key,value)}}));
@@ -18,6 +18,19 @@ beforeEach(()=>{(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;node=document.
 afterEach(async()=>{await act(async()=>{root.unmount();await wait();});node.remove();vi.restoreAllMocks();vi.unstubAllGlobals();delete(globalThis as any).IS_REACT_ACT_ENVIRONMENT;});
 async function render(){await act(async()=>root.render(<MobileJournal onBack={()=>{}} onInsights={()=>{}}/>));}
 async function edit(){await act(async()=>(document.querySelector('[aria-label="编辑这条记录"]') as HTMLElement).click());await act(async()=>wait());}
+it("expands and collapses a measured long card in place, retaining its content through refresh",async()=>{
+ vi.spyOn(HTMLElement.prototype,"scrollHeight","get").mockImplementation(function(this:HTMLElement){return this.classList.contains("mobile-journal-copy")?400:0;});
+ vi.spyOn(HTMLElement.prototype,"clientHeight","get").mockImplementation(function(this:HTMLElement){return this.classList.contains("mobile-journal-copy")?136:0;});
+ items[0].record.text="原记录的长正文。".repeat(50);await render();
+ const copy=node.querySelector('.mobile-journal-copy')!,paragraph=copy.querySelector('p');
+ for(let i=0;i<3;i++){
+  await act(async()=>button("展开").click());expect(copy.classList.contains("is-collapsed")).toBe(false);expect(button("收起全文")).toBeTruthy();
+  await act(async()=>button("收起全文").click());expect(copy.classList.contains("is-collapsed")).toBe(true);expect(button("展开")).toBeTruthy();
+ }
+ await act(async()=>window.dispatchEvent(new Event(QUICK_JOURNAL_UPDATED)));
+ expect(copy.querySelector('p')).toBe(paragraph);expect(document.querySelector('[aria-label="编辑日志"]')).toBeNull();
+ expect(invoke.mock.calls.some(c=>c[0]==="update_quick_journal")).toBe(false);
+});
 it("renders saved voice as an audio row in the editor and removes only that attachment",async()=>{
  vi.spyOn(HTMLMediaElement.prototype,"pause").mockImplementation(()=>{});vi.spyOn(HTMLMediaElement.prototype,"load").mockImplementation(()=>{});
  items[0].record.attachments=[{hash:"d".repeat(64),name:"语音-5秒.m4a",size:1200,image:false}];
@@ -37,7 +50,7 @@ it("can leave a loading old-record editor without clearing or submitting its ret
  expect(invoke.mock.calls.some(c=>["save_quick_journal_draft","update_quick_journal"].includes(c[0]))).toBe(false);
 });
 it("keeps sync and retry on the journal page and exposes all twelve record actions",async()=>{
- await render();await act(async()=>button("速记同步状态").click());expect(document.querySelector("dialog")?.textContent).toContain("保存后自动尝试上传");await act(async()=>button("同步 / 重试").click());expect(invoke).toHaveBeenCalledWith("sync_quick_journal");
+ await render();await act(async()=>button("日志设置").click());await act(async()=>button("速记同步状态").click());expect(document.querySelector("dialog")?.textContent).toContain("保存后自动尝试上传");await act(async()=>button("同步 / 重试").click());expect(invoke).toHaveBeenCalledWith("sync_quick_journal");
  await act(async()=>{button("关闭").click();await wait();});await act(async()=>button("记录操作 2026-11-15").click());
  for(const label of ["分享","编辑","复制","置顶","加入浮窗","相关笔记","查看详情","历史版本","复制链接","批注","设定日期","删除"])expect(button(label)).toBeTruthy();
 });
@@ -105,11 +118,38 @@ it("preserves failed batch selections and does not resubmit already updated reco
  const second={...structuredClone(items[0]),record:{...items[0].record,id:"d".repeat(32),text:"第二条",date:"2026-11-14"}};items.push(second);
  const original=invoke.getMockImplementation()!;let rejectSecond=true;
  invoke.mockImplementation(async(cmd:string,args:any)=>{if(cmd!=="update_quick_journal")return original(cmd,args);if(args.id===second.record.id&&rejectSecond)throw new Error("版本已变化");const target=items.findIndex(i=>i.record.id===args.id);expect(args.expectedRevision).toBe(items[target].revision);items[target]={...items[target],record:args.record,revision:"new-"+args.id,deleted:args.deleted};});
- await render();await act(async()=>button("日志").click());await act(async()=>{button("选择笔记").click();await wait();});
+ await render();await act(async()=>button("日志设置").click());await act(async()=>{button("选择笔记").click();await wait();});
  await act(async()=>button("选择记录 2026-11-15").click());await act(async()=>button("选择记录 2026-11-14").click());await act(async()=>button("添加标签").click());
  const form=document.querySelector<HTMLFormElement>('dialog form')!;form.querySelector<HTMLInputElement>('[name="tags"]')!.value="#批量";
  await act(async()=>{form.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));await wait();});
  expect(items[0].record.text).toContain("#批量");expect(items[1].record.text).toBe("第二条");expect(document.querySelector("dialog")?.textContent).toContain("版本已变化");
  rejectSecond=false;await act(async()=>{form.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));await wait();});
  expect(invoke.mock.calls.filter(c=>c[0]==="update_quick_journal"&&c[1].id===items[0].record.id)).toHaveLength(1);expect(items[1].record.text).toBe("第二条\n#批量");expect(items).toHaveLength(2);
+});
+
+it("keeps compact media previews, exposes all attachments after expansion and opens the original photo",async()=>{
+ items[0].record.attachments=Array.from({length:4},(_,i)=>({hash:String(i+1).repeat(64),name:`照片${i}.png`,size:10,image:true}));
+ await render();const card=node.querySelector('.mobile-journal-card')!;
+ expect(card.querySelectorAll('.mobile-journal-photos>button')).toHaveLength(4);expect(card.textContent).toContain('共 4 个附件');
+ await act(async()=>button('展开').click());expect(card.querySelector('.mobile-journal-card-content')?.classList.contains('is-expanded')).toBe(true);
+ await act(async()=>(card.querySelector('.mobile-journal-photos>button') as HTMLButtonElement).click());expect(document.querySelector('.mobile-journal-photo-view')).not.toBeNull();
+ await act(async()=>button('关闭').click());await act(async()=>button('收起全文').click());expect(card.querySelector('.mobile-journal-card-content')?.classList.contains('is-expanded')).toBe(false);
+});
+it("matches the prototype header and separates scope from settings",async()=>{
+ const back=vi.fn();await act(async()=>root.render(<MobileJournal onBack={back} onInsights={()=>{}}/>));
+ expect(button('返回浏览')).toBeTruthy();expect(button('日志设置')).toBeTruthy();expect(button('日志导航')).toBeUndefined();
+ await act(async()=>button('切换日志范围，当前：全部记录').click());expect(document.querySelector('[aria-label="日志范围"]')).not.toBeNull();
+ expect(document.querySelector('dialog')?.textContent).toContain('全部记录');await act(async()=>button('关闭').click());
+ await act(async()=>button('返回浏览').click());expect(back).toHaveBeenCalledOnce();
+});
+
+it("daily review opens earlier actual records instead of filtering the feed to today",async()=>{
+ await render();await act(async()=>button('每日回顾').click());expect(document.querySelector('[aria-label="每日回顾"]')?.textContent).toContain('重温以前的真实记录');
+ expect(document.querySelector('[aria-label="每日回顾"]')?.textContent).toContain('原记录');
+});
+
+it("uses inline tags to filter without opening the editor or duplicating footer chips",async()=>{
+ await render();const card=node.querySelector('.mobile-journal-card')!;expect(card.querySelector('footer')).toBeNull();
+ await act(async()=>card.querySelector<HTMLButtonElement>('.mobile-journal-inline-tag')!.click());
+ expect(node.querySelector('.mobile-journal-scope')?.textContent).toContain('#日常');expect(document.querySelector('[aria-label="编辑日志"]')).toBeNull();
 });

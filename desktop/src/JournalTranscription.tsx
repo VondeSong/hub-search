@@ -10,16 +10,25 @@ export const providerName=(id:string)=>id==="openai"?"OpenAI":"阿里";
 export function useJournalTranscription({ready,recordId,sessions,onChange}:{ready:boolean;recordId:string;sessions:Transcript[];onChange:(value:Transcript)=>Promise<void>}) {
  const [providers,setProviders]=useState<Provider[]>([]),[connectionError,setConnectionError]=useState("");
  const [binding,setBinding]=useState("");
+ const [connectionState,setConnectionState]=useState<"checking"|"missing"|"offline"|"ready">("checking"),[endpoint,setEndpoint]=useState("");
+ const connectionGeneration=useRef(0);
  const latest=useRef({sessions,onChange,binding,recordId});latest.current={sessions,onChange,binding,recordId};
  const alive=useRef(true),working=useRef<Promise<void>|null>(null),halted=useRef(new Set<string>()),creating=useRef(new Set<string>());
  const accepting=useRef(true);
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
- useEffect(()=>{if(!ready)return;let cancelled=false;void (async()=>{
-   const config=await invoke<{binding:string}|null>("cloud_agents",{action:{op:"config"}});
-   if(!config)throw new Error("在 Agents 连接你的 VPS 后即可转写；现在仍可录音和回听。");
+ const recheck=async()=>{
+  const generation=++connectionGeneration.current;setConnectionState("checking");setConnectionError("");setProviders([]);
+  try{
+   const config=await invoke<{binding:string;endpoint?:string}|null>("cloud_agents",{action:{op:"config"}});
+   if(!alive.current||generation!==connectionGeneration.current)return;
+   setEndpoint(config?.endpoint||"");setBinding(config?.binding||"");
+   if(!config){setConnectionState("missing");return;}
    const value=await speech<{providers:Provider[]}>({action:"providers"});
-   if(!cancelled){setBinding(config.binding);setProviders(value.providers);setConnectionError("");}
-  })().catch(e=>{if(!cancelled)setConnectionError(String(e));});return()=>{cancelled=true;};},[ready]);
+   if(!alive.current||generation!==connectionGeneration.current)return;
+   setProviders(value.providers);setConnectionState("ready");
+  }catch(e){if(alive.current&&generation===connectionGeneration.current){setConnectionState("offline");setConnectionError(String(e).replace(/^(?:Error:\s*)+/i,""));}}
+ };
+ useEffect(()=>{if(ready)void recheck();return()=>{connectionGeneration.current++;};},[ready]);
  const change=async(value:Transcript)=>{
   if(!alive.current||!accepting.current||value.recordId!==latest.current.recordId)return;
   const current=latest.current;
@@ -72,7 +81,7 @@ export function useJournalTranscription({ready,recordId,sessions,onChange}:{read
    const deadline=Date.now()+10000;
    while(Date.now()<deadline&&latest.current.sessions.some(s=>!s.replay&&["running","connecting"].includes(s.state)&&!halted.current.has(s.id))){await new Promise(resolve=>setTimeout(resolve,150));await pump();}
  };
- return {providers,connectionError,binding,begin,retry,cancel,flush,suspend:()=>{accepting.current=false;},resume:()=>{accepting.current=true;}};
+ return {providers,connectionError,connectionState,endpoint,recheck,binding,begin,retry,cancel,flush,suspend:()=>{accepting.current=false;},resume:()=>{accepting.current=true;}};
 }
 
 export function JournalTranscript({value,onChange,onApply,onRetry,onCancel}:{value:Transcript;onChange:(value:Transcript)=>void;onApply:()=>void;onRetry:()=>void;onCancel:()=>void}) {

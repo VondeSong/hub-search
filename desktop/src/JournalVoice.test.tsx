@@ -31,6 +31,14 @@ it("long press opens voice once and suppresses the following text click",async()
  await act(async()=>{button.dispatchEvent(new MouseEvent("pointerdown",{bubbles:true,button:0}));vi.advanceTimersByTime(501);button.dispatchEvent(new MouseEvent("pointerup",{bubbles:true}));button.click();});
  expect(voice).toHaveBeenCalledOnce();window.removeEventListener("hub:journal-voice",voice);
 });
+it("allows local recording without cloud service and labels it without attempting transcription",async()=>{
+ const original=vi.mocked(invoke).getMockImplementation()!;
+ vi.mocked(invoke).mockImplementation((c,a:any)=>c==="quick_journal_voice"&&a.action==="start"?Promise.resolve(status={state:"recording",elapsed:0,token:"f".repeat(32)}):original(c,a));
+ await act(async()=>root.render(<JournalVoiceCapture request={{}} onClose={vi.fn()}/>));await click("开始录音");
+ expect(document.body.textContent).toContain("正在仅录音");expect(document.body.textContent).toContain("连接恢复后再补转写");
+ expect(document.body.textContent).toContain("服务密钥在哪里设置");expect(document.querySelector('[role="alert"]')).toBeNull();
+ expect(vi.mocked(invoke).mock.calls.some(([c,a]:any)=>c==="cloud_agents"&&a?.action?.request?.action==="start")).toBe(false);
+});
 it("persists a staged original before acknowledgement and updates the same revision",async()=>{
  status={state:"ready",elapsed:5000,token:"c".repeat(32)};
  await act(async()=>root.render(<JournalVoiceCapture request={{record,revision:"old-revision"}} onClose={vi.fn()}/>));

@@ -37,9 +37,9 @@ body[data-view="logs"] .top { display: grid; grid-template-columns: minmax(0,1fr
 .journal-studio-card > header { display: flex; align-items: center; gap: 7px; margin-bottom: 11px; font-size: 12px; color: var(--muted); min-height: 24px; }
 .journal-studio-card > header .icon-btn { width: 32px; height: 28px; min-height: 28px; flex: 0 0 32px; padding: 4px; margin-right: -8px; }
 .journal-studio-card > header .journal-state { margin-left: auto; font-size: 11px; }
-.journal-card-copy,.journal-reader-copy,.journal-detail-text { font-size: 16px; line-height: 1.85; overflow-wrap: anywhere; }
+.journal-card-copy,.journal-reader-copy,.journal-detail-text { font-size: 16px; line-height: 1.7; overflow-wrap: anywhere; }
 .journal-card-copy { cursor: text; }
-.journal-card-copy.is-collapsed { max-height: 230px; overflow: hidden; }
+.journal-card-copy.is-collapsed { max-height: 8.5em; overflow: hidden; }
 .journal-card-copy > div { min-height: 1.6em; }
 .journal-card-copy ul,.journal-card-copy ol,.journal-rich-editor ul,.journal-rich-editor ol { padding-left: 23px; margin: 5px 0; }
 .journal-card-copy mark { background: #fbf3ab; color: var(--ink); padding: 1px 2px; }
@@ -203,3 +203,7 @@ body:is([data-view="journal-edit"],[data-view="journal-record"]) #content { padd
 }
 :is(.journal-back,.journal-scope-trigger,.journal-setting-row,.journal-scope-option,.journal-search-clear):active, .journal-view-options summary:active, .journal-view-options details button:active { background: var(--surface-pressed); }
 .journal-shortcuts .plain:active { background: var(--surface-pressed); }
+
+.journal-studio-card {overflow-anchor:none;}
+.journal-studio-card>.journal-collapse-top {display:block;margin-left:auto;padding-top:0;min-height:36px;}
+.journal-studio-card>.journal-collapse-top[hidden] {display:none;}

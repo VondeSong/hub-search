@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Mic, Pause, Play, Plus, Square, X, Check } from "lucide-react";
 import type { QuickJournalItem } from "./JournalRecords";
@@ -8,6 +8,12 @@ import { QUICK_JOURNAL_UPDATED, openQuickJournalCapture } from "./QuickJournalEv
 import { userProfileStorage } from "./UserProfileStorage";
 import "./JournalVoice.css";
 import {JournalTranscript,useJournalTranscription,type Transcript} from "./JournalTranscription";
+
+const ConnectionSettings=lazy(()=>import("./CloudAgents"));
+function VoiceConnectionSettings({onClose}:{onClose:()=>void}){
+ const ref=useRef<HTMLDialogElement>(null);useEffect(()=>{ref.current?.showModal();return()=>ref.current?.close();},[]);
+ return createPortal(<dialog ref={ref} className="journal-voice-connection" aria-label="个人云端连接设置" onCancel={e=>{e.preventDefault();onClose();}}><Suspense fallback={<p role="status">正在打开连接设置…</p>}><ConnectionSettings initialSettings onClose={onClose}/></Suspense></dialog>,document.body);
+}
 
 type Record = QuickJournalItem["record"];
 type Attachment = Record["attachments"][number];
@@ -58,6 +64,7 @@ export function JournalVoiceHost({onOpen}:{onOpen:()=>void}) {
 export function JournalVoiceCapture({request,onClose}:{request:VoiceRequest;onClose:()=>void}) {
   const ref=useRef<HTMLDialogElement>(null),latest=useRef<Draft>(emptyDraft()),busyRef=useRef(false),alive=useRef(true);
   const [draft,setDraft]=useState(latest.current),[status,setStatus]=useState<Status>({state:"idle",elapsed:0,token:""}),[ready,setReady]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+  const [connectionOpen,setConnectionOpen]=useState(false);
   const [provider,setProvider]=useState(()=>userProfileStorage.getItem("hub.voice.provider")||"aliyun");
   const persist=async(value:Draft)=>{
     latest.current=value;setDraft(value);
@@ -116,15 +123,19 @@ export function JournalVoiceCapture({request,onClose}:{request:VoiceRequest;onCl
     await invoke("quick_journal_voice_draft",{value:""});
     onClose();
   });}
+  const canTranscribe=transcription.connectionState==="ready"&&transcription.providers.some(p=>p.id===provider&&p.configured);
+  const connectionLabel=transcription.connectionState==="checking"?"检查中":transcription.connectionState==="missing"?"未连接云端":transcription.connectionState==="offline"?"云端暂不可用":canTranscribe?"可转写":"云端未配置此服务";
+  const transcribing=canTranscribe&&Boolean(draft.transcripts?.some(s=>s.source===status.token&&!s.error&&["connecting","running","sending","finishing"].includes(s.state)));
   const active=status.state==="recording"||status.state==="paused";
-  return createPortal(<dialog ref={ref} className="journal-voice-dialog" aria-label="语音速记" onCancel={e=>{e.preventDefault();leave();}}><header><div><h2>{draft.revision?"继续录入":"语音速记"}</h2><span>{draft.record.date} · 原音保留在本机</span></div><button type="button" aria-label="保留语音草稿并关闭" disabled={busy} onClick={leave}><X size={22}/></button></header><div className="journal-voice-body">
-    <div className="journal-voice-service"><Mic size={17}/><span>实时转写</span><select aria-label="转写服务" value={provider} disabled={active||busy} onChange={e=>{try{userProfileStorage.setItem("hub.voice.provider",e.target.value);setProvider(e.target.value);}catch(err){setError(String(err));}}}><option value="aliyun">阿里</option><option value="openai">OpenAI</option></select><small>{transcription.providers.some(p=>p.id===provider&&p.configured)?"已配置":"未连接"}</small></div>
-    <div className={`journal-voice-clock ${active?"is-active":""}`}><span>{status.state==="recording"?"正在录音":status.state==="paused"?"已暂停":status.state==="ready"?"原音待加入草稿":"准备好就开始"}</span><strong>{audioTime(status.elapsed/1000)}</strong><p>{active?"说下来，之后再慢慢整理。":"长按＋，也能直接进入录音。"}</p></div>
-    <div className="journal-voice-controls">{active?<><button type="button" disabled={busy} onClick={()=>void run(async()=>setStatus(await native(status.state==="paused"?"resume":"pause")))}>{status.state==="paused"?<Play size={23}/>:<Pause size={23}/>}<span>{status.state==="paused"?"继续录音":"暂停"}</span></button><button type="button" className="voice-stop" disabled={busy} onClick={()=>void finish()}><Square size={20}/><span>完成本段</span></button></>:<button type="button" className="voice-start" disabled={busy||!ready} onClick={()=>void run(async()=>{if(status.state==="ready")await stage();if(latest.current.record.attachments.length>=9)throw new Error("每条最多9个附件，请先保存当前记录。");const current=await native("start");setStatus(current);setNotice("");if(current.state==="recording")await transcription.begin(provider,current.token);})}><Mic size={27}/><span>{status.state==="ready"?"保留原音并继续":draft.record.attachments.length?"继续录入":"开始录音"}</span></button>}</div>
+  return <>{connectionOpen&&<VoiceConnectionSettings onClose={()=>{setConnectionOpen(false);void transcription.recheck();}}/>}{createPortal(<dialog ref={ref} className="journal-voice-dialog" aria-label="语音速记" onCancel={e=>{e.preventDefault();leave();}}><header><div><h2>{draft.revision?"继续录入":"语音速记"}</h2><span>{draft.record.date} · 原音保留在本机</span></div><button type="button" aria-label="保留语音草稿并关闭" disabled={busy} onClick={leave}><X size={22}/></button></header><div className="journal-voice-body">
+    <div className="journal-voice-service"><Mic size={17}/><span>录音与转写</span><select aria-label="转写服务" value={provider} disabled={active||busy} onChange={e=>{try{userProfileStorage.setItem("hub.voice.provider",e.target.value);setProvider(e.target.value);}catch(err){setError(String(err));}}}><option value="aliyun">阿里</option><option value="openai">OpenAI</option></select><small role="status">{connectionLabel}</small></div>
+    <section className="journal-voice-connection-status"><p>{canTranscribe?"已连接个人云端，可使用所选服务转写。":"可先录音并保存原音，连接恢复后再补转写。"}</p><div><button type="button" disabled={active||busy||transcription.connectionState==="checking"} onClick={()=>void transcription.recheck()}>重新检查</button><button type="button" disabled={active||busy} onClick={()=>setConnectionOpen(true)}>连接设置</button></div><details><summary>服务密钥在哪里设置？</summary><p>阿里和 OpenAI 的服务密钥由个人云端管理，手机不用重复填写。这里复用 Agents 的云端地址和设备密钥；设备密钥与供应商 API 密钥不同。</p>{transcription.endpoint&&<p>当前地址：{transcription.endpoint}</p>}{transcription.connectionError&&<p>连接信息：{transcription.connectionError}</p>}</details></section>
+    <div className={`journal-voice-clock ${active?"is-active":""}`}><span>{status.state==="recording"?(transcribing?"正在录音并转写":"正在仅录音"):status.state==="paused"?"已暂停":status.state==="ready"?"原音待加入草稿":"准备好就开始"}</span><strong>{audioTime(status.elapsed/1000)}</strong><p>{active?(transcribing?"原音保留在本机，识别文字可校对。":"原音保留在本机，连接后可补转写。"):"轻点开始录音；完成后可回听、校对并保存。"}</p></div>
+    <div className="journal-voice-controls">{active?<><button type="button" disabled={busy} onClick={()=>void run(async()=>setStatus(await native(status.state==="paused"?"resume":"pause")))}>{status.state==="paused"?<Play size={23}/>:<Pause size={23}/>}<span>{status.state==="paused"?"继续录音":"暂停"}</span></button><button type="button" className="voice-stop" disabled={busy} onClick={()=>void finish()}><Square size={20}/><span>完成本段</span></button></>:<button type="button" className="voice-start" disabled={busy||!ready} onClick={()=>void run(async()=>{if(status.state==="ready")await stage();if(latest.current.record.attachments.length>=9)throw new Error("每条最多9个附件，请先保存当前记录。");const current=await native("start");setStatus(current);setNotice("");if(current.state==="recording"){if(canTranscribe)await transcription.begin(provider,current.token);else setNotice("正在仅录音。完成后可保存原音，连接恢复后再补转写。");}})}><Mic size={27}/><span>{status.state==="ready"?"保留原音并继续":draft.record.attachments.length?"继续录入":"开始录音"}</span></button>}</div>
     {(error||status.error)&&<p className="journal-voice-error" role="alert">{error||status.error}</p>}{status.state==="ready"&&error&&<button type="button" disabled={busy} onClick={()=>void run(async()=>{setStatus(await native("acknowledge",status.token));setNotice("原文件已归档保留，可以重新录音。");})}>保留异常原文件并重新录音</button>}{notice&&<p className="journal-voice-notice" role="status">{notice}</p>}
-    {!!draft.record.attachments.length&&<section className="journal-voice-segments" aria-label="已保留的录音">{draft.record.attachments.filter(a=>isJournalAudio(a.name)).map((a,i)=><div key={`${a.hash}-${i}`}><JournalAudio attachment={a}/><button type="button" className="journal-voice-replay" disabled={busy||active} onClick={()=>void run(()=>transcription.begin(provider,a.hash,true))}>用{provider==="openai"?"OpenAI":"阿里"}补转写</button></div>)}</section>}
+    {!!draft.record.attachments.length&&<section className="journal-voice-segments" aria-label="已保留的录音">{draft.record.attachments.filter(a=>isJournalAudio(a.name)).map((a,i)=><div key={`${a.hash}-${i}`}><JournalAudio attachment={a}/><button type="button" className="journal-voice-replay" disabled={busy||active||!canTranscribe} onClick={()=>void run(()=>transcription.begin(provider,a.hash,true))}>用{provider==="openai"?"OpenAI":"阿里"}补转写</button></div>)}</section>}
     {draft.transcripts?.map(value=><JournalTranscript key={value.id} value={value} onChange={next=>{void persist({...latest.current,transcripts:latest.current.transcripts?.map(s=>s.id===next.id?next:s)}).catch(e=>setError(String(e)));}} onApply={()=>void run(async()=>{const current=latest.current,session=current.transcripts?.find(s=>s.id===value.id);if(!session||session.applied)return;const text=session.edited??session.text;await persist({...current,record:{...current.record,text:[current.record.text,text].filter(Boolean).join("\n\n")},transcripts:current.transcripts?.map(s=>s.id===session.id?{...s,applied:true}:s)});})} onRetry={()=>void run(()=>transcription.retry(value))} onCancel={()=>void run(()=>transcription.cancel(value))}/>)}
     <label className="journal-voice-text">补充文字<textarea aria-label="录音补充文字" value={draft.record.text} placeholder="记下要点，或稍后再补充…" disabled={!ready||busy} onChange={e=>{void persist({...latest.current,record:{...latest.current.record,text:e.target.value}}).catch(err=>setError(String(err)));}}/></label>
-    <p className="journal-voice-boundary">{transcription.connectionError||"录音会发往所选转写服务，经你的 VPS 转接。识别后可校对并加入文字。"} 可先保存原音，稍后从这条录音继续查看转写。离开应用会结束并保留本段。</p>
-    </div><footer><button type="button" disabled={!ready||busy||active} className="voice-save" onClick={()=>void save()}><Check size={18}/>保存</button></footer></dialog>,document.body);
+    <p className="journal-voice-boundary">{canTranscribe?"转写时，录音经个人云端发送给所选服务。识别文字需确认后才加入正文。":"当前仅保存本机原音；连接并选择补转写后，才会发送录音进行识别。"} 离开应用会结束并保留本段。</p>
+    </div><footer><button type="button" disabled={!ready||busy||active} className="voice-save" onClick={()=>void save()}><Check size={18}/>保存</button></footer></dialog>,document.body)}</>;
 }

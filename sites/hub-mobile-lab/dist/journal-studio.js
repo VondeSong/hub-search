@@ -57,9 +57,9 @@ function journalFiltered() {
   return journalStudioRecords(mode==='trash').filter(n => (mode==='trash'?Boolean(j.trash[n.id]):!j.trash[n.id]) && (mode!=='pinned'||j.pins.includes(n.id)) && (mode!=='attachments'||recordAttachments(n).length||capturePhotos(n.photos).length) && (mode!=='untagged'||!journalTags(n.text).length) && (!q||(n.text+' '+recordAttachments(n).map(a=>a.name).join(' ')).toLocaleLowerCase().includes(q)) && (!journalTag||journalTags(n.text).includes(journalTag)) && (journalPeriod==='all'||journalPeriod==='today'&&n.date===localDay()||journalPeriod==='pending'&&!n.demo&&n.syncState!=='written'));
 }
 function journalStudioCard(n) {
-  const j = journalStore(), long = n.text.length>240 || n.text.split('\n').length>8, expanded = journalExpanded.has(n.id);
+  const j = journalStore(), long = n.text.length>120 || n.text.split('\n').length>4, expanded = journalExpanded.has(n.id);
   const selecting=route()[0]==='journal-select',picked=selecting&&journalPicked.has(n.id);
-  return '<article class="journal-memo journal-studio-card'+(picked?' is-selected':'')+'" data-record-id="'+esc(n.id)+'">'+(selecting?'<button class="journal-card-selector" type="button" aria-label="选择记录 '+esc(n.date)+'" aria-pressed="'+picked+'" data-act="journal-pick:'+esc(n.id)+'">'+(picked?ico('check',16):'')+'</button>':'')+'<header><span>'+(j.pins.includes(n.id)?'<span class="journal-pin">置顶 · </span>':'')+esc(n.date||'日期未记录')+'</span><span class="journal-state" data-journal-state="'+esc(n.id)+'">'+esc(n.syncState==='written'?'':journalStatus(n))+'</span>'+iconBtn('记录操作','journal-menu:'+n.id,'more')+'</header><div class="journal-card-copy'+(long&&!expanded?' is-collapsed':'')+'" role="button" tabindex="0" data-act="'+(selecting?'journal-pick:':'journal-edit:')+esc(n.id)+'" aria-label="'+(selecting?'选择这条记录':'编辑这条记录')+'">'+journalMarkup(n.text,true)+'</div><div class="saved-capture-photos">'+attachmentMarkup(n)+'</div>'+(long?plain(expanded?'收起':'展开','journal-expand:'+n.id):'')+(j.trash[n.id]?plain('恢复记录','journal-restore:'+n.id):'')+'</article>';
+  return '<article class="journal-memo journal-studio-card'+(picked?' is-selected':'')+'" data-record-id="'+esc(n.id)+'">'+(selecting?'<button class="journal-card-selector" type="button" aria-label="选择记录 '+esc(n.date)+'" aria-pressed="'+picked+'" data-act="journal-pick:'+esc(n.id)+'">'+(picked?ico('check',16):'')+'</button>':'')+'<header><span>'+(j.pins.includes(n.id)?'<span class="journal-pin">置顶 · </span>':'')+esc(n.date||'日期未记录')+'</span><span class="journal-state" data-journal-state="'+esc(n.id)+'">'+esc(n.syncState==='written'?'':journalStatus(n))+'</span>'+iconBtn('记录操作','journal-menu:'+n.id,'more')+'</header>'+(long?'<button type="button" class="plain journal-collapse-top" data-act="journal-expand:'+esc(n.id)+'" '+(!expanded?'hidden':'')+'>收起全文</button>':'')+'<div class="journal-card-copy'+(long&&!expanded?' is-collapsed':'')+'" role="button" tabindex="0" data-act="'+(selecting?'journal-pick:':'journal-edit:')+esc(n.id)+'" aria-label="'+(selecting?'选择这条记录':'编辑这条记录')+'">'+journalMarkup(n.text,true)+'</div><div class="saved-capture-photos">'+attachmentMarkup(n)+'</div>'+(long?plain(expanded?'收起':'展开','journal-expand:'+n.id):'')+(j.trash[n.id]?plain('恢复记录','journal-restore:'+n.id):'')+'</article>';
 }
 function journalStudioHeader() {
   return '<button type="button" class="journal-back" data-act="go:browse" aria-label="返回浏览">'+ico('back',20)+'</button><h1 class="journal-page-title">日志</h1><div class="journal-header-actions">'+iconBtn('搜索日志','journal-search','search')+'<button type="button" class="icon-btn" data-act="journal-filters" aria-label="日志设置" aria-haspopup="dialog">'+ico('more',21)+'</button></div>';
@@ -251,6 +251,16 @@ function journalDetails(id) {
   void hydrateAttachmentImages();
 }
 function journalStudioAction(a,key) {
+  if(a==='journal-expand'){
+    const card=Array.from(document.querySelectorAll('.journal-studio-card')).find(el=>el.dataset.recordId===key);
+    if(!card)return false;
+    const copy=card.querySelector('.journal-card-copy'),wasExpanded=journalExpanded.has(key),top=card.getBoundingClientRect().top+window.scrollY;
+    wasExpanded?journalExpanded.delete(key):journalExpanded.add(key);copy.classList.toggle('is-collapsed',wasExpanded);
+    card.querySelectorAll('[data-act]').forEach(button=>{if(button.dataset.act==='journal-expand:'+key){button.setAttribute('aria-expanded',String(!wasExpanded));if(button.classList.contains('journal-collapse-top'))button.hidden=wasExpanded;else button.textContent=wasExpanded?'展开':'收起';}});
+    if(wasExpanded&&top<window.scrollY)window.scrollTo({top:Math.max(0,top-12),behavior:'instant'});
+    return true;
+  }
+
   if(typeof journalFeedToolsAction==='function'&&journalFeedToolsAction(a,key))return true;
   if(a==='journal-photo'){sheet('照片','<div class="journal-photo-view"><img data-local-image="'+esc(key)+'" alt="照片原图" hidden><span class="attachment-loading">照片加载中</span></div>'+plain('保存原图','download-attachment:'+key));void hydrateAttachmentImages();return true;}
   if(a==='journal-version'||a==='journal-version-restore'){

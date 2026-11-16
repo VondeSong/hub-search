@@ -55,3 +55,16 @@ context.st.offline=true;assert.equal(context.journalRunSync(true),false);
 context.st.offline=false;context.st.desktopOnline=false;assert(context.journalRunSync(true));assert.equal(context.st.notes[0].syncState,'uploaded');
 context.st.desktopOnline=true;assert(context.journalRunSync(true));assert.equal(context.st.notes[0].syncState,'written');
 console.log('journal studio: identity, history, conflict, rollback, drafts, date, trash, annotations and sync passed');
+
+let collapsed=true,rendered=0;
+const topButton={dataset:{act:'journal-expand:note-1'},classList:{contains:()=>true},setAttribute(){},hidden:true};
+const bottomButton={dataset:{act:'journal-expand:note-1'},classList:{contains:()=>false},setAttribute(){},textContent:'展开'};
+const copy={classList:{toggle:(name,value)=>{collapsed=value;}}};
+const card={dataset:{recordId:'note-1'},getBoundingClientRect:()=>({top:-50}),querySelector:()=>copy,querySelectorAll:()=>[topButton,bottomButton]};
+context.document.querySelectorAll=()=>[card];context.window.scrollY=100;context.window.scrollTo=()=>{};context.render=()=>rendered++;
+for(let i=0;i<3;i++){
+ assert(context.journalStudioAction('journal-expand','note-1'));assert.equal(collapsed,false);assert.equal(topButton.hidden,false);assert.equal(bottomButton.textContent,'收起');
+ assert(context.journalStudioAction('journal-expand','note-1'));assert.equal(collapsed,true);assert.equal(topButton.hidden,true);assert.equal(bottomButton.textContent,'展开');
+}
+assert.equal(rendered,0,'Expanding must not rebuild the feed or reload its media');
+console.log('PASS in-place expand/collapse, both controls and no feed rerender');

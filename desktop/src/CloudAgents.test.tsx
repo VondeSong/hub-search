@@ -65,6 +65,15 @@ it("opens the real conversation list with summaries, dates and archive counts", 
   expect(node.textContent).toContain("已归档的记录");
   expect(node.textContent).not.toContain("已找到参考依据");
 });
+it("opens connection settings directly without restoring a chat or submitting credentials",async()=>{
+ const close=vi.fn();await act(async()=>root.render(<CloudAgents initialSettings onClose={close}/>));
+ expect(node.querySelector('input[type="url"]')?.getAttribute("type")).toBe("url");
+ expect(node.querySelector<HTMLInputElement>('input[type="url"]')?.value).toBe("https://example.test");
+ expect(node.querySelector<HTMLInputElement>('input[type="password"]')?.value).toBe("");
+ expect(node.textContent).toContain("设备密钥");expect(outbox).not.toHaveBeenCalled();
+ expect(invoke.mock.calls.some(c=>["connect","send"].includes(c[1].action.op))).toBe(false);
+ await click("返回语音速记");expect(close).toHaveBeenCalledOnce();expect(node.querySelector(".cloud-agents-home")).toBeNull();
+});
 
 it("searches real message matches and preserves query, scroll and chat drafts on return", async () => {
   await render();

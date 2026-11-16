@@ -3,9 +3,9 @@
   "site": "mobile",
   "project_id": "appgprj_6af1d2dc12308191acc37e5566699c2d",
   "site_url": "https://hub-mobile-lab-von11.song02211368537057.chatgpt.site",
-  "source_commit": "f6dd7b4f4b6beb7671978d89fbcc3190c16105ca",
-  "published_version": 28,
-  "deployment_id": "appgdep_6afb10bf33588191b8c1fcfbaa1ad6d5",
+  "source_commit": "102ce00ea0652f2ea22f94cda6e92f2c3e2ca003",
+  "published_version": 29,
+  "deployment_id": "appgdep_6afb17805884819198c18d9c78fe5715",
   "files": {
     ".openai/hosting.json": {
       "sha256": "543a776095c0181cc870f784c075ab4f263fb739e3649cd8db74f493fb5b4ca3",
@@ -38,9 +38,9 @@
       "bytes": 6261
     },
     "checks/journal-studio-checks.cjs": {
-      "sha256": "6aff7d2581698330f02f5bb20f25c0d2e3ced05fda44b60a0f6095e4ef4942c6",
+      "sha256": "55d2173f717fcdc236a2ee968d9762ad13df6e0b4f5abb29e8b60803557e8c25",
       "mode": "100644",
-      "bytes": 5405
+      "bytes": 6579
     },
     "checks/mobile-checks.cjs": {
       "sha256": "066272d5a7554026a4e0d17812d5a6910bfdce3d47f5167d4f1a7f5cb7b960ee",
@@ -113,14 +113,14 @@
       "bytes": 15786
     },
     "dist/journal-studio.css": {
-      "sha256": "88b53223308e6f3926dd5fa34a57283913c0c7656fbd7fa2534e5214d268f8d5",
+      "sha256": "38eff90163dc0ea99e7df343bb465c385581321fd8475d61aec242e19db81205",
       "mode": "100644",
-      "bytes": 23666
+      "bytes": 23885
     },
     "dist/journal-studio.js": {
-      "sha256": "5dc640fd95dd7c21371826d7dac8f0a786053694bd19334852b27acfbacb609b",
+      "sha256": "867d36eb0f270c42ac05e868b9fd5b4d2ee39302eb65923401cc7a867a0a5077",
       "mode": "100644",
-      "bytes": 38820
+      "bytes": 39840
     },
     "dist/mobile-features.js": {
       "sha256": "d685ec8f46b95de02649c2dc3e164e7fcab7bd425e6a72ffddbb1b6f3fc10da1",
@@ -158,9 +158,9 @@
       "bytes": 3909
     },
     "dist/voice.js": {
-      "sha256": "4ee847c2dc1d3e983c82b7769fe9c49b060368feeb6d0d5114741fa92c85f08d",
+      "sha256": "1f9e19ab629d03f159405036bf29832337488479bd4f1aa06c9b7abf5e53e9f2",
       "mode": "100644",
-      "bytes": 17594
+      "bytes": 17995
     },
     "dist/widgets.css": {
       "sha256": "dab718c6ffea193c3317de835b1dcdd3a2ea118de57057687014ace3ab505df9",
@@ -328,5 +328,5 @@
       "bytes": 3301
     }
   },
-  "imported_at": "2026-11-16T14:19:12.875260+00:00"
+  "imported_at": "2026-11-16T15:28:14.148585+00:00"
 }

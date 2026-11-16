@@ -36,6 +36,18 @@ it("persists identity before starting and finishes exactly the acknowledged audi
  expect(items[0]!.text).toBe("最终文字");expect(items[0]!.state).toBe("completed");
  expect(invoke).toHaveBeenCalledWith("cloud_agents",{action:{op:"voice",request:{action:"finish",job:items[0]!.id,bytes:2}}});
 });
+it("distinguishes an unavailable cloud from missing service keys and can recheck without starting a job",async()=>{
+ const original=vi.mocked(invoke).getMockImplementation()!;let offline=true;
+ vi.mocked(invoke).mockImplementation((command,args:any)=>args?.action?.request?.action==="providers"&&offline?Promise.reject(new Error("暂时无法连接个人云端。")):original(command,args));
+ await act(async()=>root.render(<Harness/>));expect(api.connectionState).toBe("offline");expect(api.connectionError).toBe("暂时无法连接个人云端。");
+ expect(api.providers).toEqual([]);expect(events).toEqual([]);
+ offline=false;await act(async()=>api.recheck());expect(api.connectionState).toBe("ready");expect(api.providers.every(p=>p.configured)).toBe(true);expect(events).toEqual([]);
+});
+it("reports an absent cloud connection without claiming either provider is unconfigured",async()=>{
+ const original=vi.mocked(invoke).getMockImplementation()!;
+ vi.mocked(invoke).mockImplementation((command,args:any)=>args?.action?.op==="config"?Promise.resolve(null):original(command,args));
+ await act(async()=>root.render(<Harness/>));expect(api.connectionState).toBe("missing");expect(api.providers).toEqual([]);expect(events).toEqual([]);
+});
 it("creation failure keeps the same identity for explicit retry",async()=>{
  const original=vi.mocked(invoke).getMockImplementation()!;let first=true;
  vi.mocked(invoke).mockImplementation(async(command,args:any)=>{if(args?.action?.request?.action==="start"&&first){first=false;throw new Error("连接中断");}return original(command,args);});

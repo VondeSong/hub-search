@@ -82,12 +82,12 @@ function RunProgress({ turn, waitingToStop }: { turn: Turn; waitingToStop: boole
   </>;
 }
 
-export default function CloudAgents({ onClose }: { onClose?: () => void }) {
+export default function CloudAgents({ onClose, initialSettings = false }: { onClose?: () => void; initialSettings?: boolean }) {
   const mobile = runtimeCapabilities.mobile;
   const [connection, setConnection] = useState<Connection | null>();
   const [endpoint, setEndpoint] = useState("");
   const [token, setToken] = useState("");
-  const [settings, setSettings] = useState(false);
+  const [settings, setSettings] = useState(initialSettings);
   const [chatOpen, setChatOpen] = useState(false);
   const [view, setView] = useState<ChatView>("chat");
   const [sheet, setSheet] = useState<"attachments" | "model" | "effort" | "usage" | "skills">();
@@ -186,7 +186,7 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
   }, []);
 
   useEffect(() => {
-    if (!binding) return;
+    if (!binding || initialSettings) return;
     let live = true;
     void outbox(binding).then(saved => {
       if (live && saved) { setPending(saved); select(saved.thread); }
@@ -298,6 +298,7 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
   }
 
   function closeSettings() {
+    if (initialSettings) { onClose?.(); return; }
     setSettings(false);
     if (mobile && window.history.state?.hubCloudAgentOwner === historyOwner.current && window.history.state?.hubCloudAgentSettings) window.history.back();
     refresh(value => value + 1);
@@ -570,7 +571,7 @@ export default function CloudAgents({ onClose }: { onClose?: () => void }) {
     {connection === undefined ? <p className="cloud-agents-empty" role="status">正在读取连接…</p> : !connection || settings ? <form className="cloud-agents-connect" onSubmit={event => void connect(event)}>
       <h2><Cloud size={22} /> 连接与设备</h2>
       {connection && <><p role="status">{connectionLabel}</p><p>{connection.endpoint}</p>{network && <p role="alert">{network}</p>}<small>{checkedAt ? `最近成功读取 ${new Date(checkedAt).toLocaleString()}` : "尚未取得本次连接状态"}</small>
-        <button type="button" onClick={() => setSheet("usage")}>订阅用量</button>{pending && <p>有一条消息待核对。恢复连接后会查询原请求。</p>}<button type="button" onClick={closeSettings}>返回并重新读取</button>
+        <button type="button" onClick={() => setSheet("usage")}>订阅用量</button>{pending && <p>有一条消息待核对。恢复连接后会查询原请求。</p>}<button type="button" onClick={closeSettings}>{initialSettings ? "返回语音速记" : "返回并重新读取"}</button>
       </>}
       <label>服务地址<input type="url" value={endpoint} onChange={event => setEndpoint(event.target.value)} placeholder="https://agents.example.com" required autoCapitalize="none" /></label>
       <label>设备密钥<input type="password" value={token} onChange={event => setToken(event.target.value)} autoComplete="off" required /></label>
