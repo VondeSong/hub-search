@@ -375,6 +375,7 @@ document.addEventListener('submit',e=>{
 document.addEventListener('click',e=>{
  const el=e.target.closest('[data-act]');if(!el)return;
  const [a,k,v]=el.dataset.act.split(':');
+ if(typeof voiceAction==='function'&&voiceAction(a,k))return;
  if(typeof journalStudioAction==='function'&&journalStudioAction(a,k))return;
  if(widgetAction(a,k)||workspaceAction(a,k,v)||taskToolsAction(a,k,v)||handleAgentAction(a,k,v)||mobileHandleAction(a,k,v)||handleWorkflowAction(a,k,v))return;
  if(a==='go'){go(k);return}

@@ -3,9 +3,9 @@
   "site": "mobile",
   "project_id": "appgprj_6af1d2dc12308191acc37e5566699c2d",
   "site_url": "https://hub-mobile-lab-von11.song02211368537057.chatgpt.site",
-  "source_commit": "2e05bffcc9c160b67cacfe38ff0693c3a7b02af7",
-  "published_version": 20,
-  "deployment_id": "appgdep_6afaa83521188191ad7b79ffe611f002",
+  "source_commit": "8077fac727be5c4081d46ee92ad13068fce07beb",
+  "published_version": 21,
+  "deployment_id": "appgdep_6afaace56f508191b01bf0427f824c82",
   "files": {
     ".openai/hosting.json": {
       "sha256": "543a776095c0181cc870f784c075ab4f263fb739e3649cd8db74f493fb5b4ca3",
@@ -23,9 +23,9 @@
       "bytes": 4282
     },
     "README.md": {
-      "sha256": "dfc857278c72195b9d54ade8379027877d91bb9ba415815d49534685615539b4",
+      "sha256": "2795905b8fd7e6f7a147d8ff8fe4b81d4d530962fa979bbfda66c6da628e5804",
       "mode": "100644",
-      "bytes": 15922
+      "bytes": 16334
     },
     "checks/agents-enhancements-checks.cjs": {
       "sha256": "e608e3a945a1cc57a0e2031e7879ad293821262e32f1845e85690d35ad97a818",
@@ -56,6 +56,11 @@
       "sha256": "644141fd418f71c586a3a34d53b9616ba2b1b847d49ceefa3f0f157cd133db8a",
       "mode": "100644",
       "bytes": 13501
+    },
+    "checks/voice-checks.cjs": {
+      "sha256": "503e06cc8f971f29f7625531f076709720e69e467943c5bbafa02921fe9aa7bb",
+      "mode": "100644",
+      "bytes": 4715
     },
     "checks/widget-checks.cjs": {
       "sha256": "0ef59e92d55ed4aff330fa00f30acd4d186459b0dcdcac18df399cad39f6676e",
@@ -88,9 +93,9 @@
       "bytes": 37403
     },
     "dist/app.js": {
-      "sha256": "2d2b7e4acb9fe140655f3b2ef66cfd8dd6c28ea41b284e106ae9d62face995ec",
+      "sha256": "5cf75d6733cb4a6851128a9043512a7af7e4ab6868701b46d60470d704c0a09a",
       "mode": "100644",
-      "bytes": 65547
+      "bytes": 65609
     },
     "dist/hub.svg": {
       "sha256": "a7229c43b74d0dba3e1441f0d14c62320e441a8c16df9c1f2378f88ffbe172b1",
@@ -98,9 +103,9 @@
       "bytes": 254
     },
     "dist/index.html": {
-      "sha256": "c5caa63ac1b6f63760c7b0c90a4bb928fa5dd785a4c77fa5bc7468b062fadbf1",
+      "sha256": "6a1c2e555904deaae9b3471e3cb4d716a485958f2b41e789616caccdce7faa2f",
       "mode": "100644",
-      "bytes": 1620
+      "bytes": 1700
     },
     "dist/journal-feed-tools.js": {
       "sha256": "ed01aea95517f3975fa63274e539b375e8c102b76e68ce919ec07c235dbae4e4",
@@ -113,14 +118,14 @@
       "bytes": 16361
     },
     "dist/journal-studio.js": {
-      "sha256": "3b8887a1fda7d60db985d354464ed7090d57aa169d7758c9a4c9fc81c6f1cf9c",
+      "sha256": "4ba4833843ab9e1f57dad7c3518551b5122672a51306a0f3510643868b857ce7",
       "mode": "100644",
-      "bytes": 34625
+      "bytes": 34775
     },
     "dist/mobile-features.js": {
-      "sha256": "e0ad1f354d30cab44046010d228599f1e299b282119737fba38640a6eb1f20c5",
+      "sha256": "684c8ebe3336610b8e9140b81504dbc2f5262158c9500d74ddd174594ae89109",
       "mode": "100644",
-      "bytes": 30832
+      "bytes": 31107
     },
     "dist/mobile-polish.css": {
       "sha256": "e26d3a79ff7bdd13fe80631241161ea9eb5e8026acee68a4fbf4c67fef22219f",
@@ -146,6 +151,16 @@
       "sha256": "bb0b0ebf672da96e1ea90b5c2ff0ebffbdb412ddb1455e465a5abaa9da36652a",
       "mode": "100644",
       "bytes": 28240
+    },
+    "dist/voice.css": {
+      "sha256": "7dcd75425867a7a3835da565c7fa629624862d32642d76f4791f84a1e10b6cb8",
+      "mode": "100644",
+      "bytes": 2822
+    },
+    "dist/voice.js": {
+      "sha256": "9d91eaf001aaf357ae1d2d68850bc01de5466a2d8a337893e6e17b8cfc3d2688",
+      "mode": "100644",
+      "bytes": 16129
     },
     "dist/widgets.css": {
       "sha256": "dab718c6ffea193c3317de835b1dcdd3a2ea118de57057687014ace3ab505df9",
@@ -272,6 +287,11 @@
       "mode": "100644",
       "bytes": 6022
     },
+    "docs/voice-prototype-2026-11-16.md": {
+      "sha256": "2503860d3df96623343c7fa01268df16decf415c1766803a074d8b54e6615b60",
+      "mode": "100644",
+      "bytes": 2893
+    },
     "docs/widgets-preview-2026-11-15.jpg": {
       "sha256": "3fe4e5e960d051b33cba1fe939dc9c98e871dedf072e987a0cdd5485f070246a",
       "mode": "100644",
@@ -283,5 +303,5 @@
       "bytes": 3301
     }
   },
-  "imported_at": "2026-11-16T06:53:23.664450+00:00"
+  "imported_at": "2026-11-16T07:13:10.382741+00:00"
 }

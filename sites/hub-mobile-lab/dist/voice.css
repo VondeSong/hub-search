@@ -1,0 +1,31 @@
+.voice-panel { color:var(--ink); padding:0 2px 6px; }
+.voice-context { color:var(--muted); margin:0 0 20px; font-size:13px; }
+.voice-provider { display:flex; align-items:center; justify-content:space-between; gap:12px; font-weight:600; }
+.voice-provider select { max-width:65%; min-height:44px; padding:8px 12px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--ink); font:inherit; font-size:14px; }
+.voice-model { overflow-wrap:anywhere; margin:6px 0 0; }
+.voice-clock { display:flex; flex-direction:column; align-items:center; gap:10px; padding:24px 0 18px; }
+.voice-clock strong { font-size:40px; line-height:1.2; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+.voice-clock>span:last-child { color:var(--muted); font-size:14px; }
+.voice-indicator { color:var(--muted); }
+.voice-indicator.is-recording { color:var(--blue); }
+.voice-intro { font-size:20px; font-weight:600; margin:12px 0; text-align:center; }
+.voice-actions { display:flex; flex-wrap:wrap; gap:12px; margin:22px 0 14px; }
+.voice-actions>button { flex:1; min-height:46px; justify-content:center; }
+.voice-transcript { min-height:130px; max-height:28vh; overflow:auto; padding:16px; border-radius:12px; background:var(--surface); }
+.voice-transcript h3 { font-size:13px; color:var(--muted); font-weight:500; margin:0 0 14px; }
+.voice-transcript p { font-size:16px; line-height:1.7; margin:0 0 12px; }
+.voice-partial { color:var(--muted); }
+.voice-notice:empty { display:none; }
+.voice-notice { padding:12px; margin:0 0 16px; border-radius:12px; background:var(--warn-surface); color:var(--warn); font-size:14px; line-height:1.6; }
+.voice-edit-label { display:block; font-weight:600; font-size:15px; margin:18px 0 10px; }
+#voice-edit { width:100%; min-height:130px; resize:vertical; box-sizing:border-box; padding:14px; border:1px solid var(--line); border-radius:12px; color:var(--ink); background:var(--surface); font:inherit; line-height:1.7; caret-color:var(--blue); }
+#voice-edit::placeholder { color:var(--muted); }
+.voice-original,.voice-scenarios { margin-top:14px; color:var(--muted); font-size:14px; }
+.voice-original p { white-space:pre-wrap; line-height:1.7; color:var(--ink); }
+.voice-panel summary { cursor:pointer; min-height:44px; padding:10px 0; }
+.voice-footnote { font-size:12px; line-height:1.6; color:var(--muted); margin:22px 0 0; }
+.voice-playback audio { width:100%; height:44px; }
+.voice-attachment { display:flex; gap:10px; align-items:center; width:100%; min-height:54px; color:var(--ink); text-align:left; }
+.voice-attachment small { display:block; margin-top:4px; color:var(--muted); }
+.voice-panel :focus-visible { outline:2px solid var(--blue); outline-offset:3px; }
+@media(max-width:360px) { .voice-actions { gap:8px; } .voice-clock { padding:18px 0; } }
