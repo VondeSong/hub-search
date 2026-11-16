@@ -21,7 +21,7 @@ const paths = {
  calendar:'M4 6h16v14H4Zm0 4h16M8 3v5m8-5v5', tag:'M3 4h8l10 10-7 7L3 10Zm4 3h.01', star:'m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.4l6.1-.9Z',
  sync:'M20 7v5h-5M4 17v-5h5m-4-3a8 8 0 0 1 13-3l2 3M4 15l2 3a8 8 0 0 0 13-3', info:'M12 11v5m0-8h.01m9 4a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z', check:'m5 12 4 4L19 6',
  link:'M13 5h6v6m0-6-9 9m-1-9H5v14h14v-4', money:'M4 6h16v12H4Zm8 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM7 12h.01m10 0h.01',
- chat:'M4 5h16v12H9l-5 4Z', settings:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M19 5l-1.5 1.5m-11 11L5 19'
+ chat:'M4 5h16v12H9l-5 4Z', settings:'M10.06 4.76L10.61 2.10L13.39 2.10L13.94 4.76L15.75 5.50L18.02 4.01L19.99 5.98L18.50 8.25L19.24 10.06L21.90 10.61L21.90 13.39L19.24 13.94L18.50 15.75L19.99 18.02L18.02 19.99L15.75 18.50L13.94 19.24L13.39 21.90L10.61 21.90L10.06 19.24L8.25 18.50L5.98 19.99L4.01 18.02L5.50 15.75L4.76 13.94L2.10 13.39L2.10 10.61L4.76 10.06L5.50 8.25L4.01 5.98L5.98 4.01L8.25 5.50ZM15 12a3 3 0 1 0-6 0 3 3 0 0 0 6 0Z'
 };
 const ico=(name,n=21)=>'<svg width="'+n+'" height="'+n+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+(paths[name]||paths.note)+'"/></svg>';
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -318,7 +318,7 @@ function render(restore=false){
  activeRoute=key;document.body.dataset.view=p;
  const isStudy=p==='study'&&allReviewCards().some(c=>(st.studyDeck==='全部'||c.deck===st.studyDeck)&&!st.reviewed.includes(c.id));
  document.body.classList.toggle('focus-session',isStudy);$('#tabs').hidden=isStudy||p==='agent-chat'||p==='widgets'||['logs','journal-search','journal-select','journal-edit','journal-record'].includes(p);
- const brand='<span class="brand"><img src="hub.svg" alt="">Hub <span class="sample-label">示例资料</span></span>';
+ const brand='<span class="brand">Hub <span class="sample-label">示例资料</span></span>';
  if(isTab||p==='agent')$('#header').innerHTML=mobileRootHeader(p==='agent'?'agents':p);
  else if(['agent-chat','agent-connection'].includes(p))$('#header').innerHTML=agentsHeader(p,id);
  else if(p==='study')$('#header').innerHTML=plain(history.state?.from==='widgets'?'返回小组件':'退出复习',history.state?.from==='widgets'?'back':'exit-study','back')+'<span class="top-title">'+esc(st.studyDeck==='全部'?'专注复习':st.studyDeck)+'</span>';

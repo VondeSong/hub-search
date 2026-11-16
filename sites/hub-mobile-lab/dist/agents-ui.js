@@ -82,7 +82,7 @@ function agentsHeader(page, id) {
     return iconBtn('返回', 'back', 'back') + '<button type="button" class="agent-header-main" data-act="go:agent-connection" aria-label="查看云端连接与设备"><span class="agent-header-title">' + esc(agentUiRevoked() ? 'Agents' : thread?.title || '对话') + '</span><span class="agent-header-subtitle">交互演示 · ' + esc(agentUiConnectionLabel()) + '</span></button>' + iconBtn('会话选项', 'agent-thread-menu:' + id, 'more');
   }
   if (page === 'agent-connection') return iconBtn('返回', 'back', 'back') + '<span class="top-title">连接与设备</span><span class="agent-header-spacer" aria-hidden="true"></span>';
-  return '<span class="brand"><img src="hub.svg" alt="">Hub <span class="sample-label">示例资料</span></span><div class="top-actions">' + iconBtn('外观与设置', 'go:settings', 'settings') + iconBtn('新建对话', 'agent-new', 'plus') + '</div>';
+  return '<span class="brand">Hub <span class="sample-label">示例资料</span></span><div class="top-actions">' + iconBtn('外观与设置', 'go:settings', 'settings') + iconBtn('新建对话', 'agent-new', 'plus') + '</div>';
 }
 function agentUiBanner(thread) {
   const c = agentUiConnection(), run = agentUiRun(thread);

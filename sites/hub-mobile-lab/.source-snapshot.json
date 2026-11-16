@@ -3,9 +3,9 @@
   "site": "mobile",
   "project_id": "appgprj_6af1d2dc12308191acc37e5566699c2d",
   "site_url": "https://hub-mobile-lab-von11.song02211368537057.chatgpt.site",
-  "source_commit": "8a7864d32263a63a55dc77a4583fed545d267476",
-  "published_version": 26,
-  "deployment_id": "appgdep_6afb06c65db08191876b8e1c8f53a3fd",
+  "source_commit": "f6dd7b4f4b6beb7671978d89fbcc3190c16105ca",
+  "published_version": 28,
+  "deployment_id": "appgdep_6afb10bf33588191b8c1fcfbaa1ad6d5",
   "files": {
     ".openai/hosting.json": {
       "sha256": "543a776095c0181cc870f784c075ab4f263fb739e3649cd8db74f493fb5b4ca3",
@@ -83,9 +83,9 @@
       "bytes": 29678
     },
     "dist/agents-ui.js": {
-      "sha256": "8c8e5d95d003d815146f784afd46cccef18fbb0f6063a56c55db789fe08917ed",
+      "sha256": "23cea54d2e484aecace3c2ba4bdfa90a56f6bc4f8d8842471e2546935defef21",
       "mode": "100644",
-      "bytes": 67059
+      "bytes": 67033
     },
     "dist/agents.css": {
       "sha256": "2f1b080fc45cb1cadc3fc8ad6e04af0f1a7eb32285a0cb5366447be2f963563d",
@@ -93,9 +93,9 @@
       "bytes": 37403
     },
     "dist/app.js": {
-      "sha256": "4cdf0429741b67fb31dee9dee26cffdbe9d4b3b479659e1d7e2aabce50ce0af1",
+      "sha256": "001d108870fe7ebe3bf6cb8560125cc8528629398a12fa129a0c2d35d01ed90f",
       "mode": "100644",
-      "bytes": 65834
+      "bytes": 66092
     },
     "dist/hub.svg": {
       "sha256": "a7229c43b74d0dba3e1441f0d14c62320e441a8c16df9c1f2378f88ffbe172b1",
@@ -103,9 +103,9 @@
       "bytes": 254
     },
     "dist/index.html": {
-      "sha256": "a21aeb3e4f33e384a02e76407dac9e9060258ee1e7fca5a7470c315f63520d04",
+      "sha256": "fd2741f87eee6a74ade0bbaac1e2a68498b5f235ff6b3625957f95bdb9fa22a1",
       "mode": "100644",
-      "bytes": 1700
+      "bytes": 1715
     },
     "dist/journal-feed-tools.js": {
       "sha256": "7f2051ff3a51da56eda688e5747a5325a8559765bd8a5a2b42b778d9c9b4e58b",
@@ -113,14 +113,14 @@
       "bytes": 15786
     },
     "dist/journal-studio.css": {
-      "sha256": "c9030c1c3694b87fe9089a6cedb0a69f2ae7f1e8adc8236bf3f170f14b18f60e",
+      "sha256": "88b53223308e6f3926dd5fa34a57283913c0c7656fbd7fa2534e5214d268f8d5",
       "mode": "100644",
-      "bytes": 23636
+      "bytes": 23666
     },
     "dist/journal-studio.js": {
-      "sha256": "21291983637d123b98c9004b6216cdb4be164adf418178bb945ef5b5985ad03c",
+      "sha256": "5dc640fd95dd7c21371826d7dac8f0a786053694bd19334852b27acfbacb609b",
       "mode": "100644",
-      "bytes": 38839
+      "bytes": 38820
     },
     "dist/mobile-features.js": {
       "sha256": "d685ec8f46b95de02649c2dc3e164e7fcab7bd425e6a72ffddbb1b6f3fc10da1",
@@ -128,14 +128,14 @@
       "bytes": 31140
     },
     "dist/mobile-polish.css": {
-      "sha256": "e26d3a79ff7bdd13fe80631241161ea9eb5e8026acee68a4fbf4c67fef22219f",
+      "sha256": "a984623585fdd6dddccc93fd2776319bf7ddbe08633b21e4c587571a98a0c74e",
       "mode": "100644",
-      "bytes": 10815
+      "bytes": 10738
     },
     "dist/mobile.js": {
-      "sha256": "4fd691009715a2f355f44e0c1c2e6a78f5ab5af1ba94b838a8a82e0e84efc1f8",
+      "sha256": "fb102fc304968fc416dfd28cff48163f1d951255777fe71f49ce591b4ab256b8",
       "mode": "100644",
-      "bytes": 16299
+      "bytes": 16218
     },
     "dist/style.css": {
       "sha256": "b97c2863349fd0a517dc86bb5b3f2cc7b575601a79b95888a1e92ce327269b72",
@@ -287,6 +287,11 @@
       "mode": "100644",
       "bytes": 3056
     },
+    "docs/mobile-header-cleanup-2026-11-16.md": {
+      "sha256": "87bd37577f1e833b6d88fdf63ba72a2831b3a271b15ff090a06af8c453f8addc",
+      "mode": "100644",
+      "bytes": 2025
+    },
     "docs/mobile-insights-v3.png": {
       "sha256": "428c32f3126b9157ada5806bf0055eec5be879dc3c092324abee01726750d8a7",
       "mode": "100644",
@@ -323,5 +328,5 @@
       "bytes": 3301
     }
   },
-  "imported_at": "2026-11-16T13:37:34.872499+00:00"
+  "imported_at": "2026-11-16T14:19:12.875260+00:00"
 }
