@@ -92,6 +92,11 @@ internal object JournalVoiceRecorder {
         check(recorder == null || token != preferences(context).getString("token", "")) { "正在录音，暂不清理分段" }
         val folder = File(context.filesDir, "journal-voice/saved")
         check(File(folder, "$token.m4a").length() > 0) { "请先保留原音" }
+        val media = android.media.MediaMetadataRetriever()
+        try {
+            media.setDataSource(File(folder, "$token.m4a").absolutePath)
+            check((media.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0) > 0) { "原音需要核对，保留 PCM 以便恢复" }
+        } finally { media.release() }
         val pcm = File(folder, "$token.pcm")
         check(!pcm.exists() || pcm.delete()) { "临时分段清理未完成，压缩原音仍保留" }
         return JSObject().put("released", true)

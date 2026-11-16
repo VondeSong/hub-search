@@ -377,7 +377,8 @@ class Manager:
             source.write_bytes(audio)
             try:
                 decoded = subprocess.run(['ffmpeg', '-v', 'error', '-nostdin', '-threads', '1',
-                    '-protocol_whitelist', 'file,pipe', '-i', str(source), '-vn', '-t', '1800.1',
+                    '-protocol_whitelist', 'file,pipe', '-format_whitelist', 'wav,mov,mp3,ogg,matroska,webm,aac,flac,amr',
+                    '-i', str(source), '-vn', '-t', '1800.1',
                     '-ac', '1', '-ar', str(RATE), '-f', 's16le', 'pipe:1'], capture_output=True, timeout=60)
             except (OSError, subprocess.TimeoutExpired):
                 raise SpeechError('decode', 'VPS 未能解码原音，原附件仍保留。', 503) from None

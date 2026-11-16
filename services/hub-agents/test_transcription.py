@@ -7,6 +7,8 @@ import time
 import unittest
 import uuid
 import secrets
+import shutil
+import wave
 from types import SimpleNamespace
 from contextlib import closing
 from pathlib import Path
@@ -145,6 +147,21 @@ class SpeechTests(unittest.TestCase):
         response = get(other, '/v1/voice/jobs/' + self.job)
         self.assertIn(b'404 Not Found', response)
         self.assertNotIn(self.job.encode(), response)
+
+    @unittest.skipUnless(shutil.which('ffmpeg'), 'requires the replay decoder')
+    def test_playlist_cannot_read_other_files_as_an_audio_attachment(self):
+        private = Path(self.folder.name) / 'private.wav'
+        with wave.open(str(private), 'wb') as audio:
+            audio.setnchannels(1); audio.setsampwidth(2); audio.setframerate(RATE); audio.writeframes(b'\0' * 4800)
+        playlist = ("ffconcat version 1.0\nfile '" + private.as_posix() + "'\n").encode()
+        self.manager.create(self.owner, self.job, {'provider': 'aliyun', 'source': hashlib.sha256(playlist).hexdigest(), 'audio': base64.b64encode(playlist).decode()})
+        for _ in range(200):
+            result = self.manager.read(self.owner, self.job)
+            if result['state'] == 'failed':break
+            time.sleep(.01)
+        self.assertEqual(result['state'], 'failed')
+        self.assertEqual(result['code'], 'decode')
+        self.assertEqual(FakeStream.calls[0].parts, [])
 
 
 if __name__ == '__main__':

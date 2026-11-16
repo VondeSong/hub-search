@@ -5,11 +5,11 @@ import {afterEach,beforeEach,expect,it,vi} from "vitest";
 import {invoke} from "@tauri-apps/api/core";
 import {JournalTranscript,useJournalTranscription,type Transcript} from "./JournalTranscription";
 vi.mock("@tauri-apps/api/core",()=>({invoke:vi.fn()}));
-let root:Root,host:HTMLDivElement,api:ReturnType<typeof useJournalTranscription>,items:Transcript[],remote:Transcript,events:string[],connection="original";
+let root:Root,host:HTMLDivElement,api:ReturnType<typeof useJournalTranscription>,items:Transcript[],remote:Transcript,events:string[],connection="original",reset:(value:Transcript[])=>void;
 const source="a".repeat(32);
-function Harness({initial=[]}:{initial?:Transcript[]}){
- const [sessions,setSessions]=useState(initial);items=sessions;
- api=useJournalTranscription({ready:true,recordId:"record",sessions,onChange:async v=>{events.push("persist:"+v.id);setSessions(old=>old.some(s=>s.id===v.id)?old.map(s=>s.id===v.id?v:s):[...old,v]);}});
+function Harness({initial=[],recordId="record"}:{initial?:Transcript[];recordId?:string}){
+ const [sessions,setSessions]=useState(initial);items=sessions;reset=setSessions;
+ api=useJournalTranscription({ready:true,recordId,sessions,onChange:async v=>{events.push("persist:"+v.id);setSessions(old=>old.some(s=>s.id===v.id)?old.map(s=>s.id===v.id?v:s):[...old,v]);}});
  return null;
 }
 beforeEach(async()=>{
@@ -55,4 +55,15 @@ it("completed text can be corrected and an applied transcript cannot be added tw
  await act(async()=>root.render(<JournalTranscript value={value} onApply={apply} onChange={change} onRetry={vi.fn()} onCancel={vi.fn()}/>));
  expect(host.querySelector("textarea")!.value).toBe("校对后的文字");expect(host.querySelector("textarea")!.readOnly).toBe(true);
  expect(host.querySelector("button")!.disabled).toBe(true);await act(async()=>host.querySelector("button")!.click());expect(apply).not.toHaveBeenCalled();
+});
+it("a late creation response cannot put the previous recording into the next draft",async()=>{
+ const original=vi.mocked(invoke).getMockImplementation()!;let release!:(value:Transcript)=>void;
+ vi.mocked(invoke).mockImplementation((command,args:any)=>args?.action?.request?.action==="start"?new Promise(resolve=>{release=resolve;}):original(command,args));
+ await act(async()=>root.render(<Harness/>));
+ let pending!:Promise<void>;
+ await act(async()=>{pending=api.begin("aliyun",source);});
+ const previous=items[0]!;
+ await act(async()=>{reset([]);root.render(<Harness recordId="next-record"/>);});
+ await act(async()=>{release({...previous,state:"running",text:"上一条的迟到结果"});await pending;});
+ expect(items).toEqual([]);expect(events.filter(e=>e.startsWith("persist:"))).toHaveLength(1);
 });

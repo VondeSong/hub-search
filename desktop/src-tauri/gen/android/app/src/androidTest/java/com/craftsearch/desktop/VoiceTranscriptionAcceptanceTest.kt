@@ -49,6 +49,9 @@ class VoiceTranscriptionAcceptanceTest {
         check(!result.has("error")) { result.optString("error") }; return result.opt("value")
     }
     private fun click(expression: String) {
+        until("target app owns input focus") {
+            var focused = false; instrumentation.runOnMainSync { focused = activity.hasWindowFocus() }; focused
+        }
         js("(()=>{const e=$expression;if(!e)throw Error('Missing control');e.scrollIntoView({block:'center',behavior:'instant'});return true})()")
         SystemClock.sleep(250)
         val rect = js("(()=>{const e=$expression;if(!e||e.disabled||!e.checkVisibility())throw Error('Unavailable control');const r=e.getBoundingClientRect();const top=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);if(!(e===top||e.contains(top)))throw Error('Control covered');return {x:r.x+r.width/2,y:r.y+r.height/2,dpr:devicePixelRatio}})()") as JSONObject
@@ -61,13 +64,71 @@ class VoiceTranscriptionAcceptanceTest {
     private fun selector(value: String) = "document.querySelector(${JSONObject.quote(value)})"
     private fun button(text: String) = "[...document.querySelectorAll('.journal-voice-dialog button')].find(b=>b.textContent.trim()===${JSONObject.quote(text)})"
     private fun checkResult(name: String, passed: Boolean) { checks.put(JSONObject().put("name", name).put("passed", passed)); File(directory, "checks.json").writeText(checks.toString(2)); check(passed) { name } }
-    private fun screenshot(name: String) { instrumentation.waitForIdleSync(); instrumentation.uiAutomation.takeScreenshot()?.let { image -> File(directory, "$name.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }; image.recycle() } }
+    private fun screenshot(name: String) {
+        val drawn = CountDownLatch(1)
+        instrumentation.runOnMainSync {
+            web.postVisualStateCallback(SystemClock.uptimeMillis(), object : WebView.VisualStateCallback() {
+                override fun onComplete(requestId: Long) { web.postOnAnimation { web.postOnAnimation { drawn.countDown() } } }
+            })
+        }
+        check(drawn.await(12, TimeUnit.SECONDS)); instrumentation.waitForIdleSync()
+        instrumentation.uiAutomation.takeScreenshot()?.let { image -> File(directory, "$name.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }; image.recycle() }
+    }
+    private fun visibleHeader(): Boolean = js("(()=>{const d=document.querySelector('.journal-voice-dialog'),h=d.querySelector(':scope>header'),x=d.querySelector('[aria-label=\"保留语音草稿并关闭\"]'),p=d.getBoundingClientRect(),r=h.getBoundingClientRect(),b=x.getBoundingClientRect(),top=document.elementFromPoint(b.x+b.width/2,b.y+b.height/2);return r.height>0&&r.top>=p.top-1&&b.top>=p.top&&b.bottom<=p.bottom&&(top===x||x.contains(top))})()") == true
 
-    @Test fun voiceAsrRoundTrip() {
+    private fun launch() {
         instrumentation.targetContext.startActivity(Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         until("activity") { instrumentation.runOnMainSync { ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).firstOrNull { it is MainActivity }?.let { activity = it } }; ::activity.isInitialized }
         until("WebView") { instrumentation.runOnMainSync { find(activity.window.decorView)?.let { web = it } }; ::web.isInitialized }
         until("application", 90) { js("!!document.querySelector('.mobile-app-shell')") == true }
+    }
+
+    @Test fun restoreOriginalVoiceDraft() {
+        val previous = InstrumentationRegistry.getArguments().getString("recoveryRunId") ?: error("Explicit prior run required")
+        check(previous.matches(Regex("voice-asr-[0-9]{8}-[0-9]{6}")))
+        val original = File(instrumentation.targetContext.getExternalFilesDir(null), "voice-asr-acceptance/$previous/original-draft.json").readText()
+        launch()
+        val status = native("quick_journal_voice", JSONObject().put("action", "status")) as JSONObject
+        check(status.getString("state") == "idle") { "A pending original must be handled first" }
+        native("quick_journal_voice_draft", JSONObject().put("value", original))
+        checkResult("prior draft recovered exactly after blocked permission flow", native("quick_journal_voice_draft") == original)
+    }
+
+    @Test fun voiceLongTranscriptLayout() {
+        val previous = InstrumentationRegistry.getArguments().getString("replayRunId") ?: error("Explicit completed run required")
+        check(previous.matches(Regex("voice-asr-[0-9]{8}-[0-9]{6}")))
+        val identity = JSONObject(File(instrumentation.targetContext.getExternalFilesDir(null), "voice-asr-acceptance/$previous/result.json").readText()).getString("recordId")
+        launch()
+        val original = native("quick_journal_voice_draft") as String
+        File(directory, "original-draft.json").writeText(original)
+        try {
+            val archived = JSONArray(native("quick_journal_voice_draft", JSONObject().put("recordId", identity)) as String)
+            check(archived.length() == 2 && archived.getJSONObject(0).getString("state") == "completed")
+            val source = File(instrumentation.targetContext.getExternalFilesDir(null), "voice-asr-input.wav")
+            val attachment = native("stage_quick_journal_attachment", JSONObject().put("name", "转写验收语音.wav").put("content", android.util.Base64.encodeToString(source.readBytes(), android.util.Base64.NO_WRAP))) as JSONObject
+            val record = JSONObject().put("version", 1).put("id", identity).put("date", "2026-11-16").put("text", "本轮转写验收：已有结果的长内容检查。").put("attachments", JSONArray().put(attachment))
+            native("quick_journal_voice_draft", JSONObject().put("value", JSONObject().put("record", record).put("stagedTokens", JSONArray()).put("transcripts", archived).toString()))
+            js("window.dispatchEvent(new CustomEvent('hub:journal-voice',{detail:{}}))")
+            until("archived cards") { js("document.querySelectorAll('.journal-transcript').length===2") == true }
+            js("document.querySelectorAll('.journal-transcript')[1].scrollIntoView({block:'end',behavior:'instant'})")
+            screenshot("long-content-header")
+            File(directory, "geometry.json").writeText(js("(()=>{const d=document.querySelector('.journal-voice-dialog');return{dialog:d.getBoundingClientRect().toJSON(),header:d.querySelector(':scope>header').getBoundingClientRect().toJSON(),scrollTop:d.scrollTop,overflow:getComputedStyle(d).overflow}})()").toString())
+            checkResult("long content keeps header inside its clipping parent and close actually clickable", visibleHeader())
+        } finally {
+            if (js("!!document.querySelector('.journal-voice-dialog[open]')") == true) {
+                click(selector("[aria-label='保留语音草稿并关闭']"))
+                until("voice closes") { js("!document.querySelector('.journal-voice-dialog[open]')") == true }
+            }
+            native("quick_journal_voice_draft", JSONObject().put("value", original))
+            checkResult("layout check restores user's exact previous draft", native("quick_journal_voice_draft") == original)
+            File(directory, "result.json").writeText(JSONObject().put("checks", checks).put("reusedExistingServiceResults", true).toString(2))
+        }
+    }
+
+    @Test fun voiceAsrRoundTrip() {
+        // Prepare this emulator's runtime permission; never wait on a system dialog in a parked IPC.
+        instrumentation.uiAutomation.grantRuntimePermission(instrumentation.targetContext.packageName, android.Manifest.permission.RECORD_AUDIO)
+        launch()
         val status = native("quick_journal_voice", JSONObject().put("action", "status")) as JSONObject
         check(status.getString("state") == "idle") { "An existing recording is pending; leave it untouched" }
         val original = native("quick_journal_voice_draft") as String
@@ -75,6 +136,7 @@ class VoiceTranscriptionAcceptanceTest {
         val recordId = java.util.UUID.randomUUID().toString().replace("-", "")
         val jobs = mutableListOf<String>()
         var opened = false
+        var originalProvider = ""
         try {
             val source = File(instrumentation.targetContext.getExternalFilesDir(null), "voice-asr-input.wav")
             check(source.isFile && source.length() in 1..(20L * 1024 * 1024)) { "Explicit controlled audio fixture required" }
@@ -83,6 +145,7 @@ class VoiceTranscriptionAcceptanceTest {
             native("quick_journal_voice_draft", JSONObject().put("value", JSONObject().put("record", record).put("stagedTokens", JSONArray()).toString()))
             js("window.dispatchEvent(new CustomEvent('hub:journal-voice',{detail:{}}))"); opened = true
             until("services configured") { js("document.querySelector('.journal-voice-service small')?.textContent==='已配置'") == true }
+            originalProvider = InstrumentationRegistry.getArguments().getString("restoreVoiceProvider") ?: js("document.querySelector('[aria-label=\"转写服务\"]').value").toString()
             screenshot("01-ready")
             for (provider in listOf("aliyun", "openai")) {
                 js("(()=>{const e=document.querySelector('[aria-label=\"转写服务\"]');e.value=${JSONObject.quote(provider)};e.dispatchEvent(new Event('change',{bubbles:true}));return true})()")
@@ -99,6 +162,7 @@ class VoiceTranscriptionAcceptanceTest {
                 File(directory, "$provider.json").writeText(result.toString(2))
                 screenshot("02-$provider-result")
             }
+            checkResult("header and close control remain visible with two long transcripts", visibleHeader())
             js("(()=>{const e=document.querySelector('.journal-transcript textarea');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'已校对：保留原音和已有文字。');e.dispatchEvent(new Event('input',{bubbles:true}));return true})()")
             click(button("加入补充文字"))
             until("corrected text applied") { js("document.querySelector('[aria-label=\"录音补充文字\"]').value.includes('已校对：保留原音和已有文字。')") == true }
@@ -114,12 +178,28 @@ class VoiceTranscriptionAcceptanceTest {
             until("original staged", 90) { (native("quick_journal_voice", JSONObject().put("action", "status")) as JSONObject).getString("state") == "idle" }
             val finalDraft = JSONObject(native("quick_journal_voice_draft") as String)
             checkResult("new microphone original retained beside fixture", finalDraft.getJSONObject("record").getJSONArray("attachments").length() == 2)
+            val captured = finalDraft.getJSONObject("record").getJSONArray("attachments").getJSONObject(1)
+            val playback = native("quick_journal_audio", JSONObject().put("hash", captured.getString("hash"))) as String
+            val originalAudio = File(directory, "microphone-original.m4a")
+            originalAudio.writeBytes(android.util.Base64.decode(playback.substringAfter(','), android.util.Base64.DEFAULT))
+            val extractor = android.media.MediaExtractor()
+            try {
+                extractor.setDataSource(originalAudio.absolutePath)
+                val format = extractor.getTrackFormat(0)
+                checkResult("captured original is playable mono AAC at 24 kHz", format.getInteger(android.media.MediaFormat.KEY_SAMPLE_RATE) == 24000 && format.getInteger(android.media.MediaFormat.KEY_CHANNEL_COUNT) == 1 && format.getString(android.media.MediaFormat.KEY_MIME) == "audio/mp4a-latm")
+                File(directory, "microphone-format.json").writeText(JSONObject().put("sampleRate", 24000).put("channels", 1).put("durationUs", format.getLong(android.media.MediaFormat.KEY_DURATION)).put("size", originalAudio.length()).toString(2))
+            } finally { extractor.release() }
             val archived = JSONArray(native("quick_journal_voice_draft", JSONObject().put("recordId", recordId)) as String)
             checkResult("transcript receipts remain attached to the same saved-record identity", archived.length() == 2 && archived.getJSONObject(0).optString("edited").startsWith("已校对"))
             screenshot("03-microphone-retained")
         } finally {
             if (opened) {
-                runCatching { click(selector("[aria-label='保留语音草稿并关闭']")); until("voice closes", 90) { js("!document.querySelector('.journal-voice-dialog[open]')") == true } }
+                if (originalProvider in listOf("aliyun", "openai")) {
+                    js("(()=>{const e=document.querySelector('[aria-label=\"转写服务\"]');e.value=${JSONObject.quote(originalProvider)};e.dispatchEvent(new Event('change',{bubbles:true}));return true})()")
+                    checkResult("original service preference restored", js("document.querySelector('[aria-label=\"转写服务\"]').value===${JSONObject.quote(originalProvider)}") == true)
+                }
+                click(selector("[aria-label='保留语音草稿并关闭']"))
+                until("voice closes", 90) { js("!document.querySelector('.journal-voice-dialog[open]')") == true }
             }
             // No new record is submitted; restore the user's previous draft byte-for-byte.
             native("quick_journal_voice_draft", JSONObject().put("value", original))
