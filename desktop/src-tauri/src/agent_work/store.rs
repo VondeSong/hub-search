@@ -164,7 +164,7 @@ pub(super) fn create_on(
         &id,
         None,
         "conversationCreated",
-        &json!({"createdAt":created_at}),
+        &json!({"createdAt":created_at,"presentation":super::skills::request_presentation(&goal)}),
     )?;
     Ok(id)
 }

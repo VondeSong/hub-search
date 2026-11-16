@@ -540,3 +540,13 @@
 .ha-panel :is(.ha-skill-management-group,.ha-skill-management-help) summary{font-size:12px;color:var(--muted);cursor:pointer}
 .ha-skill-management-help{padding:8px 4px}
 @container hub-assistant (max-width:360px){.ha-panel .ha-detail-body{padding-inline-start:15px}.ha-panel .ha-detail-connections>div{grid-template-columns:1fr;gap:2px}.ha-panel .ha-message-actions>button{padding-inline:6px}}
+
+/* Compact selections retain their identity before and after sending. */
+.ha-tokens{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:9px;text-align:start}
+.ha-composer .ha-tokens{margin-top:0}.ha-composer-context{overflow:visible;max-block-size:none}
+.ha-token{position:relative;display:inline-flex;align-items:center;max-width:100%;min-height:30px;border-radius:7px;background:var(--surface-2);color:var(--muted);font-size:13px}
+.ha-token summary{display:flex;align-items:center;gap:6px;min-width:0;max-width:240px;padding:6px 9px;list-style:none;cursor:pointer}.ha-token summary::-webkit-details-marker{display:none}.ha-token summary>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ha-token svg{flex-shrink:0}.ha-token summary:focus-visible,.ha-token button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ha-token-remove,.ha-token-detail button,.ha-token-more{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}.ha-token-remove{display:grid;place-items:center;width:26px;min-height:30px;padding:0}.ha-token-detail{position:absolute;z-index:40;right:0;top:calc(100% + 7px);width:min(320px,calc(100vw - 64px));padding:14px;border-radius:12px;background:var(--surface);color:var(--text);box-shadow:0 8px 28px #0002;overflow-wrap:anywhere}.ha-token-detail header{display:flex;align-items:flex-start;gap:14px;justify-content:space-between}.ha-token-detail header button{padding:0}.ha-token-detail p{margin:10px 0;font-size:13px;white-space:normal}.ha-token-detail small{font-size:12px;color:var(--muted)}.ha-token-detail>button{padding:6px 0;color:var(--accent)}.ha-token-more{padding:6px;font-size:12px}.ha-composer .ha-token-detail{top:auto;bottom:calc(100% + 7px)}.ha-edit-message{display:block;margin:8px 0 0 auto;padding:3px 0;border:0;background:transparent;color:var(--muted);font-size:12px;cursor:pointer}
+@media(pointer:coarse){.ha-token summary,.ha-token-remove{min-height:44px}.ha-token-remove{width:36px}}
+
+.ha-token summary{min-height:30px;line-height:18px;box-sizing:border-box;padding-block:5px}

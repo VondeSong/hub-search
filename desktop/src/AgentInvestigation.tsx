@@ -14,7 +14,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { AgentActivity, type ActivityRun } from "./AgentActivity";
 import { AgentNativeInput, type NativeInput } from "./AgentNativeInput";
-import { AgentSkills, skillTitle } from "./AgentSkills";
+import { AgentSkills, skillTitle, skillPurpose } from "./AgentSkills";
 import { AgentTopics, type TopicWorkSource } from "./AgentTopics";
 import { useAgentPopover } from "./useAgentPopover";
 import { useAgentPanelResize } from "./useAgentPanelResize";
@@ -57,7 +57,8 @@ import { AgentGoalAssessment, type GoalAssessment } from "./AgentGoalAssessment"
 import { AgentTaskTree, type TaskTree } from "./AgentTaskTree";
 import { AgentGoalRevision, type GoalRevision } from "./AgentGoalRevision";
 import { AgentLifecycle, lifecycleRequest, acceptLifecycleSnapshot, canRunMode, type Lifecycle } from "./AgentLifecycle";
-import type { ConversationMessage } from "./AgentDelivery";
+import type { ConversationMessage, MessageMaterial } from "./AgentDelivery";
+import {requestPresentation} from "./AgentRequestContent";
 import type { ArchiveAction, FlashcardAction } from "./AgentActionTypes";
 import { AgentMaterialBudget, type MaterialBudget } from "./AgentMaterialBudget";
 import { AgentContextCompaction, type NativeCompaction } from "./AgentContextCompaction";
@@ -354,7 +355,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   useEffect(() => {
     if (!open) return;
     const dismiss = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented || isInsideKeyboardDialog(event.target)) return;
+      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented || isInsideKeyboardDialog(event.target) || (event.target instanceof Element && event.target.closest(".agent-token-disclosure"))) return;
       event.preventDefault();
       event.stopPropagation();
       closePanel();
@@ -528,7 +529,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     catch(reason) { if(alive.current)setError(String(reason)); }
     finally { if(alive.current){setBusy(false);setLoadingConversation(false);} }
   };
-  const openCitation = async (runId: string, evidenceIndex: number, quote: string, inline = false) => {
+  const openSource = async (args:Record<string,unknown>, quote:string) => {
     if (!view || view.work.state === "revoked" || businessInFlight.current || businessChecks.current.has(view.work.id)) return;
     const ticket=++sourceSequence.current;
     const requestScope=sourceScopeKey; sourceScope.current=requestScope;
@@ -539,15 +540,26 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     onPreviewCitation?.(null);
     setSourcePreview(null); setSourceError(""); setSourceLoading(true);
     try {
-      const value=await call<{excerpt:Evidence}>({action:"source",id:view.work.id,runId,evidenceIndex,quote});
+      const value=await call<{excerpt:Evidence}>({...args,id:view.work.id});
       if(alive.current && ticket===sourceSequence.current && sourceScope.current===requestScope) {
-        if (onPreviewCitation && !inline) {
+        if (onPreviewCitation) {
           setReportReading(false); setSourceVisible(true);
           onPreviewCitation({...value,quote,onReturn:()=>{if(alive.current && ticket===sourceSequence.current && sourceScope.current===requestScope)returnFromCitation();}});
         } else setSourcePreview({...value,quote});
       }
     } catch(reason) { if(alive.current && ticket===sourceSequence.current) setSourceError(String(reason)); }
     finally { if(alive.current && ticket===sourceSequence.current) setSourceLoading(false); }
+  };
+  const openCitation = (runId:string,evidenceIndex:number,quote:string)=>openSource({action:"source",runId,evidenceIndex,quote},quote);
+  const openMaterial = (item:MessageMaterial)=>item.locator&&openSource({action:"messageMaterialSource",locator:item.locator},"");
+  const editMessage = (message:ConversationMessage)=>{
+    if(busy||active)return;
+    if(goal.trim()||materials.length||dropped.length||snippets.length){setError("请先发送或保留当前草稿，再编辑这条消息。");return;}
+    const selection=requestPresentation(message);
+    setGoal(selection.skills.map(skill=>"$"+skill.name+" ").join("")+selection.body);
+    setMaterials((message.materials||[]).flatMap(item=>item.available&&item.locator?.kind==="note"?[{locator:item.locator,title:item.title,path:item.sourcePath||"",libraryName:""}]:[]));
+    setDropped((message.materials||[]).flatMap(item=>item.available&&item.locator&&item.locator.kind!=="note"?[{locator:item.locator,title:item.title}]:[]));
+    setError("");goalInput.current?.focus();
   };
   useEffect(() => {
     if (!open || !visible || (!active && !view?.watch?.enabled) || !view) return;
@@ -1056,7 +1068,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
           return;
         }
         if(event.dataTransfer.files?.length){event.preventDefault();event.stopPropagation();setReportReading(false);void addFiles(Array.from(event.dataTransfer.files));return;}const data=event.dataTransfer.getData("application/x-hub-agent-source");if(!data)return;event.preventDefault();event.stopPropagation();setReportReading(false);try{if(data.length>65536)throw new Error();addExternalMaterial(JSON.parse(data));}catch{setError("无法识别拖入的资料，请重新拖入。");}}} onKeyDown={event => {
-      if (event.key === "Escape" && !event.nativeEvent.isComposing && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); const menu=(!reportReading && event.currentTarget.querySelector<HTMLDetailsElement>(".agent-composer details[open]")) || (detailsMenu.current?.open ? detailsMenu.current : null); if(menu){menu.open=false;menu.querySelector("summary")?.focus();}else if(citationOpen){returnFromCitation();}else if(reportReading){setReportReading(false);event.currentTarget.querySelector<HTMLButtonElement>('.agent-header-end button[aria-label="对话详情"]')?.focus();}else closePanel(); }
+      if (event.key === "Escape" && !event.nativeEvent.isComposing && !event.defaultPrevented && !(event.target instanceof Element && event.target.closest(".agent-token-disclosure"))) { event.preventDefault(); event.stopPropagation(); const menu=(!reportReading && event.currentTarget.querySelector<HTMLDetailsElement>(".agent-composer details[open]")) || (detailsMenu.current?.open ? detailsMenu.current : null); if(menu){menu.open=false;menu.querySelector("summary")?.focus();}else if(citationOpen){returnFromCitation();}else if(reportReading){setReportReading(false);event.currentTarget.querySelector<HTMLButtonElement>('.agent-header-end button[aria-label="对话详情"]')?.focus();}else closePanel(); }
     }}>
       <header className="agent-panel-header">
         <div className="agent-header-start">
@@ -1127,7 +1139,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         {!view.conversation && <p className="agent-goal">{view.work.goal}</p>}
         {(view.validity || view.run?.error) && <p className="agent-notice">{view.validity || view.run?.error}</p>}
         {view.run?.error && ["failed","interrupted"].includes(view.work.state) && <section className="agent-notice" aria-label="本轮恢复说明"><p>问题与资料选择保留在本对话中。可从输入框下方的“资料”核对范围，处理失败原因后再继续；不会自动反复重试。</p>{view.activity?.some(run=>run.runId===view.run?.id && run.events.some(event=>event.kind==="unpublishedAnswer")) && <p>模型答复已保留在本轮工作过程中，但尚未完成交付核验，不能当作已保存成果。</p>}</section>}
-        {view.conversation && <AgentConversation workId={view.work.id} recordVersion={view.recordVersion} conversation={view.conversation} revoked={view.work.state==="revoked"} onOpenCitation={(...args)=>void openCitation(...args)} onLoadEarlier={()=>void loadEarlier()} earlierLoading={historyLoadingScope===historyScope.current} earlierError={historyNotice?.scope===historyScope.current ? historyNotice.text : ""} renderAfter={inlineOutcomes} renderActions={message=>message.role==="assistant"&&message.report&&message.runId&&view&&<AgentAnswerSave workId={view.work.id} runId={message.runId} current={saveTarget} disabled={businessDisabled||!!active||!!view.lifecycle?.requiresExplicitResume||message.artifactState==="unavailable"} records={view.answerSaves} onChanged={()=>void refresh(view.work.id)}/>} activity={view.activity}/> }
+        {view.conversation && <AgentConversation workId={view.work.id} recordVersion={view.recordVersion} conversation={view.conversation} revoked={view.work.state==="revoked"} onOpenCitation={(...args)=>void openCitation(...args)} onOpenMaterial={item=>void openMaterial(item)} onEdit={!busy&&!active?editMessage:undefined} onLoadEarlier={()=>void loadEarlier()} earlierLoading={historyLoadingScope===historyScope.current} earlierError={historyNotice?.scope===historyScope.current ? historyNotice.text : ""} renderAfter={inlineOutcomes} renderActions={message=>message.role==="assistant"&&message.report&&message.runId&&view&&<AgentAnswerSave workId={view.work.id} runId={message.runId} current={saveTarget} disabled={businessDisabled||!!active||!!view.lifecycle?.requiresExplicitResume||message.artifactState==="unavailable"} records={view.answerSaves} onChanged={()=>void refresh(view.work.id)}/>} activity={view.activity}/> }
         {view.work.state!=="revoked" && view.activity?.filter(run=>!view.conversation?.messages.some(message=>message.runId===run.runId || message.revision===run.revision)).map(run=><AgentActivity key={run.runId} value={run}/>)}
         {view.work.state!=="revoked" && view.nativeInputs?.map(input=><AgentNativeInput key={input.key} value={input} disabled={busy||stopping||(!running&&input.delivery!=="async")} onAnswer={async(answers,cancel)=>{
           const ticket=sequence.current;
@@ -1197,12 +1209,13 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         {!view && publicUrl && <div className="agent-pending-materials"><AgentMaterialCard kind="link" title={publicUrl} removeLabel="移除公共链接" disabled={busy} onRemove={()=>setPublicUrl("")}/></div>}
         {(!view && pageAttached || materials.length>0) && <div className="agent-pending-materials" aria-label="待发送资料">
           {!view && pageAttached && <AgentMaterialCard kind={anchor?.kind==="reading"?"reading":anchor?.kind==="task"?"task":"page"} title={pageTitle||currentObjectLabel} subtitle={wholeLibrary?`${libraryName} · 整个资料库`:undefined} disabled={busy} openLabel="查看本次资料范围" onOpen={()=>{setAddPage("scope");if(materialPopover.ref.current)materialPopover.ref.current.open=true;}} removeLabel="移除当前页面" onRemove={()=>{setPageAttached(false);setWholeLibrary(false);goalInput.current?.focus();}}/>}
-          {materials.map(item=><AgentMaterialCard key={materialKey(item.locator)} kind="page" title={item.title} subtitle={item.totalChars!==undefined?`文本附件 · 共 ${item.totalChars.toLocaleString()} 字符 · 待发送`:`页面 · ${item.libraryName}`} disabled={busy||filePreparing} onRemove={()=>{setMaterials(current=>current.filter(note=>materialKey(note.locator)!==materialKey(item.locator)));goalInput.current?.focus();}}/>)}
+          {materials.map(item=><AgentMaterialCard key={materialKey(item.locator)} kind="page" title={item.title} subtitle={item.totalChars!==undefined?`文本附件 · 共 ${item.totalChars.toLocaleString()} 字符 · 待发送`:item.path||item.libraryName} disabled={busy||filePreparing} onRemove={()=>{setMaterials(current=>current.filter(note=>materialKey(note.locator)!==materialKey(item.locator)));goalInput.current?.focus();}}/>)}
         </div>}
+          {!!selectedSkills.length && <div className="agent-selected-skills" aria-label="本次指定技能">{selectedSkills.map(token=><AgentMaterialCard key={token} kind="skill" title={skillTitle(token.slice(1))} identifier={token.slice(1)} subtitle={skillPurpose(token.slice(1))} disabled={busy} removeLabel={`移除技能 ${skillTitle(token.slice(1))}`} onRemove={()=>setGoal(selectedSkills.filter(item=>item!==token).map(item=>item+" ").join("")+questionText)}/>)}</div>}
         </div>
         {view?.work.state !== "revoked" && <form onSubmit={event=>void create(event)}>
           {tagSuggestion&&<button type="button" className="agent-tag-open" disabled={busy||!!active} onClick={()=>prepareTagTask(tagSuggestion)}>准备标签任务 · {tagTaskNames[tagSuggestion]}</button>}<AgentTagReferences value={tagPreparation} mode={tagMode} disabled={busy||!!active} onChange={setTagPreparation} searchOpen={tagSearchOpen} onSearchClose={()=>setTagSearchOpen(false)}/><AgentTagRelated tags={[...tagPreparation.references,...(tagMode&&tagPreparation.tag?[tagPreparation.tag]:[])]} grant={researchGrant(manualResearchGrant(),research?.topic.grant,research?.includeManual)} disabled={busy||!!active} onAdd={item=>setMaterials(items=>items.some(m=>materialKey(m.locator)===materialKey(item.locator))?items:[...items,item])}/>
-          {!!selectedSkills.length && <div className="agent-selected-skills" aria-label="本次指定技能">{selectedSkills.map(token=><span key={token}><WandSparkles size={13} aria-hidden="true"/>{skillTitle(token.slice(1))}<button type="button" aria-label={`移除技能 ${skillTitle(token.slice(1))}`} disabled={busy} onClick={()=>setGoal(selectedSkills.filter(item=>item!==token).map(item=>item+" ").join("")+questionText)}><X size={13}/></button></span>)}</div>}
+
           {suggestedQuestion&&usedQuestion!==suggestedQuestion.id&&view?.work.id===initialWorkId&&<div className="agent-note"><p>关联核对提问已准备，不会自动发送。{goal.trim()?"先保留当前输入，再使用这条提问。":"可先检查资料范围，再开始核对。"}</p><button type="button" disabled={busy||!!active||!!goal.trim()} onClick={()=>{setGoal(suggestedQuestion.text);setUsedQuestion(suggestedQuestion.id);goalInput.current?.focus();}}>使用关联核对提问</button><button type="button" onClick={()=>setUsedQuestion(suggestedQuestion.id)}>忽略这条提问</button></div>}
           <label className="agent-question"><span className="agent-visually-hidden">{view ? "继续对话" : "希望助手做什么"}</span><textarea rows={2} ref={goalInput} name="investigationGoal" value={questionText} maxLength={(view?4000:2000)-skillPrefix.length} disabled={busy} onChange={event => setGoal(skillPrefix+event.target.value)} placeholder={view?"继续追问，或告诉我接下来做什么…":hasDraftSources?"询问 Hub 助手…":"询问 Hub 助手…"} onKeyDown={event => {
             if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }

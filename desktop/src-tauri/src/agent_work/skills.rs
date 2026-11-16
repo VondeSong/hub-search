@@ -37,6 +37,36 @@ const BUILTINS: &[&str] = &[
     include_str!("skills/hub-statistics/SKILL.md"),
 ];
 
+// Store selection labels separately; the original request remains the runtime input.
+pub(super) fn request_presentation(request: &str) -> Value {
+    let mut body = request;
+    let mut selected = Vec::<Value>::new();
+    while let Some(rest) = body.strip_prefix('$') {
+        let end = rest.find(char::is_whitespace).unwrap_or(rest.len());
+        let name = &rest[..end];
+        if name.is_empty()
+            || name.len() > 64
+            || name.starts_with('-')
+            || name.ends_with('-')
+            || name.contains("--")
+            || !name
+                .bytes()
+                .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == b'-')
+        {
+            break;
+        }
+        if !selected.iter().any(|item| item["name"] == name) {
+            let builtin = BUILTINS
+                .iter()
+                .filter_map(|doc| parse(doc, "", None).ok())
+                .find(|skill| skill.name == name);
+            selected.push(json!({"name":name,"title":builtin.as_ref().map(|skill|skill.title.as_str()).unwrap_or(name),"description":builtin.as_ref().map(|skill|skill.description.as_str()).unwrap_or("")}));
+        }
+        body = rest[end..].trim_start();
+    }
+    json!({"text":body,"skills":selected})
+}
+
 // The same table serves actual reads and the paths disclosed on load.
 const BUILTIN_REFERENCES: &[(&str, &str, &str)] = &[(
     "hub-flashcards",

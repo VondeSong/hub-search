@@ -29,7 +29,7 @@ export function AssistantHeader({ tagMode, menu, setMenu, title, topicName, hasS
   onHistoryChange: (id: string, change: HistoryChange) => void; hasReport: boolean; reading: boolean; onReading: () => void; messageCount: number; materialCount: number; libraryCount: number; taskStatus?: 'running' | 'paused'; modePanel: ReactNode;
 }) {
   const toggle = (value: AssistantMenu) => setMenu(menu === value ? null : value);
-  const modeLabel = tagMode ? '标签' : topicName ? '专题' : hasSkills ? '技能' : '标准';
+  const modeLabel = tagMode ? '标签' : topicName ? '专题' : '标准';
   return <header className="ha-header">
     <div className="ha-header-start"><button type="button" className="ha-icon" title="对话历史" aria-label="对话历史" aria-expanded={menu === 'history'} onClick={() => toggle('history')}><Menu size={18}/></button><button type="button" className="ha-icon" title="新对话" aria-label="新对话" disabled={disabled} onClick={onNew}><Plus size={19}/></button></div>
     <button type="button" className="ha-chat-title ha-mode-trigger" data-topic={!tagMode && !!topicName || undefined} title={tagMode ? '标签助手' : topicName ? '当前专题：' + topicName : title} aria-label={!tagMode && topicName ? '当前专题：' + topicName : '任务模式'} aria-description={'当前模式：' + modeLabel} aria-expanded={menu === 'mode' || menu === 'topics' || menu === 'topic-review'} onClick={() => setMenu(menu === 'mode' || menu === 'topics' || menu === 'topic-review' ? null : 'mode')}>{tagMode ? <Tags size={14} aria-hidden="true"/> : topicName && <FolderBookmark size={14} aria-hidden="true"/>}<span>{tagMode ? '标签助手' : topicName || title}</span><small className="ha-mode-label" aria-hidden="true">{modeLabel}</small><ChevronDown size={13}/></button>

@@ -11,6 +11,7 @@ import { parseTagRequest, tagIntents, tagPrompt, tagRuleLibrary, type TagReviewM
 import { cleanTagStarter, prepareTagTask } from './tag-task';
 import { TagContext, TagPicker, TagReviewCard, TagTaskSelector } from './TagAssistant';
 import { AssistantInsert } from './AssistantInsert';
+import { AssistantTokens } from './AssistantTokens';
 import type { PageInsertion } from './assistant-insert';
 import { MaterialScopeButton, readTopics, readWorkPins, researchPolicies, researchSources, resolveTopicSources, topicStorageKey, workPinsKey, type ResearchPolicy, type ResearchTopic, type WorkPins } from './AssistantResearch';
 import { ActiveTopicChip, AssistantTaskModes, AssistantTopicReview } from './AssistantTaskModes';
@@ -534,7 +535,6 @@ function AssistantConversation({
   const [resources, setResources] = useState(initial.resources || emptyResources());
   const [activeTopic, setActiveTopic] = useState(initial.activeTopic);
   const [dropReady, setDropReady] = useState(false);
-  const [sourcePreview, setSourcePreview] = useState<{ item: AssistantEvidence; number: number | undefined; trigger: HTMLButtonElement; scrollTop: number } | null>(null);
   const [reading, setReading] = useState(false), [copied, setCopied] = useState<string | null>(null), [jump, setJump] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
@@ -600,17 +600,8 @@ function AssistantConversation({
   const dialog = useRef<HTMLDivElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const composing = useRef(false);
-  function closeSourcePreview() {
-    if (!sourcePreview) return;
-    setSourcePreview(null);
-    requestAnimationFrame(() => {
-      if (scrollArea.current) scrollArea.current.scrollTop = sourcePreview.scrollTop;
-      if (sourcePreview.trigger.isConnected) sourcePreview.trigger.focus({ preventScroll: true });
-      else composer.current?.focus({ preventScroll: true });
-    });
-  }
-  const callback = useRef({ onClose, draft, contextOpen, sourcesOpen, menu, reading, sourcePreview, closeSourcePreview });
-  callback.current = { onClose, draft, contextOpen, sourcesOpen, menu, reading, sourcePreview, closeSourcePreview };
+  const callback = useRef({ onClose, draft, contextOpen, sourcesOpen, menu, reading });
+  callback.current = { onClose, draft, contextOpen, sourcesOpen, menu, reading };
   const contextBlocked = !canUseContext(context);
   const turnResources = resourcesForTurn(resources, activeTopic);
   const useManualSources = !activeTopic || activeTopic.useManualOnce;
@@ -624,7 +615,6 @@ function AssistantConversation({
   const readableContexts = contexts.filter(item => canUseContext(item));
   const title = contextBlocked ? '来源不可用' : context?.workTitle || (context?.workId ? initial.title : '自由讨论');
   const material = context && !contextBlocked && !activeTopic && context.id !== omittedId && !resources.pages.some(item => item.id === context.id) ? context : null;
-  const previewPage = sourcePreview && sourceAvailable(sourcePreview.item) ? sourceText(sourcePreview.item) : null;
   const hasDraftSources = !!material || !!turnResources.pages.length || !!turnResources.libraryIds.length || !!turnResources.images.length || !!turnResources.url || !!turnAttachments.length;
   const evidence = collectEvidence(readableContexts);
   const running = session.active?.status === 'running';
@@ -665,14 +655,13 @@ function AssistantConversation({
     const element = document.activeElement as HTMLElement | null;
     const timer = setTimeout(() => composer.current?.focus({ preventScroll: true }), 80);
     const keys = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.isComposing || event.defaultPrevented) return;
+      if (event.key !== 'Escape' || event.isComposing || event.defaultPrevented || (event.target instanceof Element && event.target.closest('.ha-token'))) return;
       event.preventDefault();
       event.stopPropagation();
       if (callback.current.draft) setDraft(null);
       else if (callback.current.menu || callback.current.sourcesOpen || callback.current.contextOpen) {
         setMenu(null); setTopicEdit(null); setSourcesOpen(false); setContextOpen(false); composer.current?.focus();
-      } else if (callback.current.sourcePreview) callback.current.closeSourcePreview();
-      else if (callback.current.reading) setReading(false);
+      } else if (callback.current.reading) setReading(false);
       else callback.current.onClose();
     };
     document.addEventListener('keydown', keys);
@@ -912,7 +901,6 @@ function AssistantConversation({
 
   function openEvidence(id: string) {
     if (!onOpenSource) return;
-    setSourcePreview(null);
     onOpenSource(id);
     onClose();
   }
@@ -921,13 +909,6 @@ function AssistantConversation({
     return canUseContext({ id: item.id, title: item.title, excerpt: item.excerpt || '' });
   }
 
-  function sourceText(item: AssistantEvidence) {
-    const page = catalog.find(candidate => candidate.id === item.id);
-    if (page && !canUseContext(page)) return null;
-    const content = page?.excerpt.trim();
-    return { body: content || item.excerpt?.trim() || '', label: content ? '来源正文' : '对话中的引用摘录',
-      location: [page?.libraryName || item.source, page?.path].filter(Boolean).join(' · ') };
-  }
 
   function referenceButton(item: AssistantEvidence) {
     if (!sourceAvailable(item)) return <span key={item.id} className="ha-source-unavailable"><FileText size={14} />来源不可用</span>;
@@ -942,10 +923,8 @@ function AssistantConversation({
       const number = citations.numbers.get(item.id);
       const available = sourceAvailable(item);
       const label = '引用 ' + number + '：' + (available ? item.title : '来源当前不可用');
-      const canPreview = available && !!sourceText(item)?.body;
       return <span key={item.id} className="ha-citation-pair">
         <button type="button" className="ha-inline-citation" disabled={!available || !onOpenSource} aria-label={label} title={available ? '打开来源页面：' + item.title : label} onClick={() => openEvidence(item.id)}>{number}</button>
-        {canPreview && <button type="button" className="ha-citation-preview" aria-label={'预览原文：' + item.title} title="在助手内预览原文" onClick={event => setSourcePreview({ item, number, trigger: event.currentTarget, scrollTop: scrollArea.current?.scrollTop || 0 })}><BookOpen size={12} aria-hidden="true"/></button>}
       </span>;
     })}</p></div>)}
       {!!citations.unplaced.length && <details className="ha-unplaced-references"><summary>相关资料（{citations.unplaced.length}）</summary>{citations.unplaced.map(referenceButton)}</details>}
@@ -1070,19 +1049,7 @@ function AssistantConversation({
         onPin={onPin} onSkill={id => { setResources(value => ({ ...value, skills: [...new Set([...value.skills, id])] })); changeMenu(null); }}
         onGeneral={() => { setTagMode(false); changeMenu(null); }}
         onTopic={topic => { setTopicReview({ id: topic.id, from: menu === 'topics' ? 'topics' : 'mode' }); changeMenu('topic-review'); }} onAllTopics={() => changeMenu(menu === 'topics' ? 'mode' : 'topics')} onUsage={() => changeMenu('usage')} onClose={() => changeMenu(null)}/>} taskStatus={session.active?.status} menu={menu} setMenu={changeMenu} title={chatTitle} settings={settings} setSettings={value => { if (!session.active) setSettings(value); }} expanded={expanded} onExpand={onExpand} onClose={onClose} history={history} currentId={workKey} onNew={onNew} onSelect={onSelect} onHistoryChange={onHistoryChange} disabled={!!session.active} hasReport={session.messages.some(item => item.role === 'assistant' && canUseContext(item.context))} reading={reading} onReading={() => setReading(value => !value)} messageCount={session.messages.length} materialCount={turnResources.pages.length + Number(!!material)} libraryCount={turnResources.libraryIds.length}/>
-      {sourcePreview && <section className="ha-source-reading" aria-label="引用原文预览">
-        <div className="ha-source-preview-bar">
-          <button type="button" autoFocus onClick={closeSourcePreview}>← 返回对话</button>
-          {previewPage && onOpenSource && <button type="button" onClick={() => openEvidence(sourcePreview.item.id)}>打开来源页面 <ArrowUpRight size={12}/></button>}
-        </div>
-        {previewPage ? <article>
-          <small>{sourcePreview.number ? '引用 ' + sourcePreview.number + ' · ' : ''}{previewPage.label}</small>
-          <h2>{sourcePreview.item.title}</h2>
-          {previewPage.location && <small>{previewPage.location}</small>}
-          <p>{previewPage.body || '此页没有可预览的文本。'}</p>
-        </article> : <p role="status">该来源当前不可用。</p>}
-      </section>}
-      <div className="ha-workspace" hidden={!!sourcePreview}>
+      <div className="ha-workspace">
         <div className="ha-conversation">
           {tagIntent&&!reading&&!contextBlocked&&<TagTaskSelector intent={tagIntent} onChange={prepareTag} onCancel={()=>{setTagIntent(null);setTagError('');composer.current?.focus({preventScroll:true});}}/>}
           <div className="ha-messages" ref={scrollArea} role="log" aria-label="助手讨论记录" aria-live="polite" aria-relevant="additions" tabIndex={0} onScroll={event => { const el = event.currentTarget; setJump(el.scrollHeight - el.scrollTop - el.clientHeight > 80); }}>
@@ -1099,12 +1066,11 @@ function AssistantConversation({
 
             {session.messages.map(message => !canUseContext(message.context) ? <article key={message.id} className="ha-message ha-message-unavailable"><FileText size={14}/><span>这段记录的来源当前不可用，内容已隐藏。</span></article> : <article key={message.id} data-latest-answer={message.id === session.messages.filter(item => item.role === 'assistant' && canUseContext(item.context)).at(-1)?.id || undefined} className={'ha-message ha-' + message.role}>
               {message.role === 'user' ? <>
-                {message.context && <div className="ha-message-reference"><FileText size={11} /><span>{message.context.title}</span></div>}
-                <div className="ha-user-bubble">{message.text}</div>
+                <div className="ha-user-bubble"><div>{message.text}</div><AssistantTokens context={message.context} resources={message.resources||emptyResources()} canShowPage={canUseContext} onOpenSource={onOpenSource}/></div>
+                {!session.active&&<button className="ha-edit-message" type="button" onClick={()=>{if(input.trim()){notify('请先发送或保留当前草稿，再编辑这条消息');return;}setInput(message.text);setInputContext(message.context||null);setResources({...message.resources||emptyResources(),pages:[...new Map([...(message.context?[message.context]:[]),...(message.resources?.pages||[])].map(page=>[page.id,page])).values()]});setAttachmentNames(message.attachmentNames||[]);setOmittedId(context?.id||null);composer.current?.focus();}}>编辑</button>}
                 {!!message.attachmentNames?.length && <div className="ha-message-files">{message.attachmentNames.map(name => <span key={name}><Paperclip size={10} />{name}</span>)}</div>}
               </> : <>
                 {answerBody(message)}
-                {message.id === 'source-demo-answer' && <p className="ha-citation-demo-note">点引用编号打开来源页面，点旁边的 <BookOpen size={12} aria-label="书本"/> 在助手内预览。</p>}
                 {message.tagResult && <>
                   {message.tagResult.next && <div className="ha-message-actions">
                     {message.tagResult.next === 'scope' && <button type="button" onClick={() => changeMenu('materials')}>调整资料范围</button>}
@@ -1139,7 +1105,6 @@ function AssistantConversation({
               <div className="ha-composer-context">
                 {!tagIntent&&tagRefs.map(name=><TagContext key={name} tag={name} open={menu==='tags'&&tag===name} onOpen={()=>{setTag(name);if(menu==='tags'&&tag===name)changeMenu(null);else openTagPicker('references');}} onRemove={()=>{setTagRefs(refs=>refs.filter(value=>value!==name));if(tag===name)setTag(tagRefs.find(value=>value!==name)||'');setTagError('');}}/> )}
                 {tagMode&&!tagIntent&&!tagRefs.length&&<TagContext tag="" open={menu==='tags'} onOpen={()=>openTagPicker('references')} onRemove={()=>{}}/>}
-                {material && <div className="ha-material-wrap"><div className="ha-context-chip"><button type="button" className="ha-context-toggle" aria-expanded={contextOpen} onClick={() => { setContextOpen(value => !value); setSourcesOpen(false); }}><span className="ha-context-document" aria-hidden="true"/><span className="ha-context-name"><strong>{material.title}</strong><small>{material.kind === 'note' ? '当前文档' : material.kind === 'task' ? '当前任务' : '当前资料'}</small></span></button><button type="button" className="ha-chip-remove" aria-label="移除当前引用资料" title="移除本轮引用" onClick={() => { setOmittedId(material.id); setContextOpen(false); composer.current?.focus(); }}><X size={13} aria-hidden="true"/></button></div>{contextOpen && <div className="ha-context-preview"><strong>引用到下一轮讨论{material.libraryName ? ' · ' + material.libraryName : ''}</strong><p>{concise(material.excerpt, 500) || material.title}</p></div>}</div>}
               {activeTopic && topicSources && <ActiveTopicChip key={activeTopic.id} name={activeTopicName || activeTopic.name} sources={topicSources} pages={topicPages.length} libraries={topicLibraries.length} skills={activeTopic.scope.skills} disabled={!!session.active} onCancel={cancelActiveTopic}
                 onRemoveSource={session.active ? undefined : source => setActiveTopic(value => value && ({ ...value, scope: { ...value.scope, pages: source.kind === '页面' ? value.scope.pages.filter(page => page.id !== source.id) : value.scope.pages, libraryIds: source.kind === '资料库' ? value.scope.libraryIds.filter(id => id !== source.id) : value.scope.libraryIds } }))}
                 onRemoveSkill={session.active ? undefined : id => setActiveTopic(value => value && ({ ...value, scope: { ...value.scope, skills: value.scope.skills.filter(skill => skill !== id) } }))}
@@ -1147,7 +1112,7 @@ function AssistantConversation({
               {activeTopic && manualSourceCount > 0 && <p className="ha-link-policy-note">手选资料 · {activeTopic.useManualOnce ? '下一条消息会一并使用' : '已保留，未额外纳入专题范围'}</p>}
               {scopeTooLarge && <p className="ha-link-policy-note" role="status">本轮资料超过上限，请减少已选资料。</p>}
               {resourcesBlocked && <p role="status">部分本轮资料已不可用，移除后再发送。</p>}
-              <ResourceChips resources={resources} canShowPage={canUseContext} onChange={setResources}/>
+              <AssistantTokens resources={resources} context={material} canShowPage={canUseContext} onChange={setResources} onOpenSource={onOpenSource} onRemoveContext={()=>{setOmittedId(material!.id);composer.current?.focus();}}/>
               {!!attachmentNames.length && !inputBlocked && !contextBlocked && <div className="ha-attachment-list" aria-label="附件名称，文件内容未上传">{attachmentNames.map(name => <span key={name}><Paperclip size={10} /><span title={name}>{name}</span><button type="button" className="ha-chip-remove" aria-label={'移除附件 ' + name} onClick={() => setAttachmentNames(previous => previous.filter(item => item !== name))}><X size={10} /></button></span>)}</div>}
               </div>
               {tagIntent && <section className="ha-tag-task" aria-label="标签任务准备">

@@ -4,7 +4,7 @@ import { policyNames, type ResearchTopic } from "./AgentResearch";
 import { Check, ChevronDown, FolderBookmark, PinOff, Sparkles, Tags, X } from "lucide-react";
 import { useAgentPopover } from "./useAgentPopover";
 
-export function AgentTaskMode({ title, disabled, selectedSkills = [], tagMode = false, activeTopic, onGeneral, onTag, onTopics, onUsage, onTopic, onUnpinTopic }: {
+export function AgentTaskMode({ title, disabled, tagMode = false, activeTopic, onGeneral, onTag, onTopics, onUsage, onTopic, onUnpinTopic }: {
   title: string; disabled: boolean; selectedSkills?: string[]; tagMode?: boolean;
   onGeneral: () => void; onTag: () => void;
   activeTopic?: ResearchTopic; onUnpinTopic?: (topic:ResearchTopic)=>Promise<void>;
@@ -15,8 +15,8 @@ export function AgentTaskMode({ title, disabled, selectedSkills = [], tagMode = 
   const [error,setError]=useState("");
   const choose = (action: () => void) => { popover.close(); action(); };
   return <details ref={popover.ref} className="agent-task-mode" name="hub-agent-header" onToggle={event=>{if(event.target===event.currentTarget&&event.currentTarget.open){setError("");void invoke<{topics:ResearchTopic[]}>("agent_investigation",{args:{action:"researchTopics"}}).then(v=>setTopics(Array.isArray(v?.topics)?v.topics:[])).catch(e=>{setTopics([]);setError(String(e));});}}}>
-    <summary aria-label="任务模式" title={tagMode ? "标签助手" : activeTopic?.title || title} aria-description={`当前模式：${tagMode?"标签":activeTopic?"专题":selectedSkills.length?"技能":"标准"}`}>
-      {tagMode ? <Tags size={15}/> : activeTopic ? <FolderBookmark size={15}/> : null}<span className="agent-mode-title">{tagMode ? "标签助手" : activeTopic?.title || title}</span><small className="agent-mode-badge">{tagMode?"标签":activeTopic?"专题":selectedSkills.length?"技能":"标准"}</small><ChevronDown size={13}/>
+    <summary aria-label="任务模式" title={tagMode ? "标签助手" : activeTopic?.title || title} aria-description={`当前模式：${tagMode?"标签":activeTopic?"专题":"标准"}`}>
+      {tagMode ? <Tags size={15}/> : activeTopic ? <FolderBookmark size={15}/> : null}<span className="agent-mode-title">{tagMode ? "标签助手" : activeTopic?.title || title}</span><small className="agent-mode-badge">{tagMode?"标签":activeTopic?"专题":"标准"}</small><ChevronDown size={13}/>
     </summary>
     <section className="agent-mode-menu" aria-label="任务模式">
       <div className="agent-mode-heading"><strong>任务模式</strong><button type="button" aria-label="关闭任务模式" onClick={() => popover.close(true)}><X size={16}/></button></div>

@@ -123,6 +123,7 @@ pub(in crate::agent_work) fn message_on(
         return Err("当前要求已达核对容量；未追加新要求，已有成果和预算保留".into());
     }
     let mut body = json!({"text":content,"author":"user","revision":work.revision+1,"clientMessageId":client_id,"addNotes":additions,"removeNotes":removals,"addImages":add_images,"removeImages":remove_images});
+    body["presentation"] = crate::agent_work::skills::request_presentation(&content);
     if let Some(ids) = &library_ids {
         body["setLibraryIds"] = json!(ids);
     }
@@ -262,13 +263,17 @@ fn page_on_cached(
     let next_cursor = has_earlier.then(|| rows.last().unwrap().0.clone());
     rows.reverse();
     let created_at: i64 = c.query_row("SELECT COALESCE(json_extract(body_json,'$.createdAt'),0) FROM agent_records WHERE work_id=?1 AND kind='conversationCreated' ORDER BY rowid LIMIT 1", [&work.id], |r| r.get(0)).optional().map_err(|e|e.to_string())?.unwrap_or(0);
+    let initial_presentation: Option<String> = c.query_row("SELECT json_extract(body_json,'$.presentation') FROM agent_records WHERE work_id=?1 AND kind='conversationCreated' ORDER BY rowid LIMIT 1",[&work.id],|r|r.get(0)).optional().map_err(|e|e.to_string())?.flatten();
+    let initial_presentation = initial_presentation
+        .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+        .unwrap_or_else(|| crate::agent_work::skills::request_presentation(&work.goal));
     let initial_materials = super::materials::grant_at(c, work, 1)
         .map(|grant| {
             super::materials::message_cards(c, work, &super::materials::explicit_locators(&grant))
         })
         .unwrap_or(json!([]));
     let mut messages = vec![
-        json!({"id":format!("{}-goal",work.id),"role":"user","text":work.goal,"createdAt":created_at,"revision":1,"kind":"request","materials":initial_materials}),
+        json!({"id":format!("{}-goal",work.id),"role":"user","text":work.goal,"displayText":initial_presentation["text"],"skills":initial_presentation["skills"],"createdAt":created_at,"revision":1,"kind":"request","materials":initial_materials}),
     ];
     for (id, kind, raw, created_at, run_id, authorization, revision) in rows {
         let body: Value = serde_json::from_str(&raw).map_err(|_| "对话记录损坏")?;
@@ -284,7 +289,10 @@ fn page_on_cached(
                 serde_json::from_value(body.get("addNotes").cloned().unwrap_or(json!([])))
                     .map_err(|_| "对话资料身份损坏")?;
             let materials = super::materials::message_cards(c, work, &attachments);
-            messages.push(json!({"id":id,"role":"user","text":body["text"],"createdAt":created_at,"revision":body["revision"],"kind":if scope_only {"scope"} else if kind=="userDecision" {"decision"} else {"request"},"materials":materials}));
+            let presentation = body.get("presentation").cloned().unwrap_or_else(|| {
+                crate::agent_work::skills::request_presentation(body["text"].as_str().unwrap_or(""))
+            });
+            messages.push(json!({"id":id,"role":"user","text":body["text"],"displayText":presentation["text"],"skills":presentation["skills"],"createdAt":created_at,"revision":body["revision"],"kind":if scope_only {"scope"} else if kind=="userDecision" {"decision"} else {"request"},"materials":materials}));
             continue;
         }
         let verified = (|| {

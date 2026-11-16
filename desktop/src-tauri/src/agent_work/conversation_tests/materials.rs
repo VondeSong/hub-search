@@ -2,6 +2,79 @@ use super::*;
 use crate::source_evidence::analysis;
 
 #[test]
+fn message_selections_keep_labels_separate_and_preserve_literal_commands() {
+    let f = Fixture::new();
+    let original = "$hub-archive 自己评估一下，正文保留 $record-to-log 和 `price=$value`。";
+    let id = store::create(
+        &f.root,
+        original.into(),
+        String::new(),
+        None,
+        Grant::default(),
+    )
+    .unwrap();
+    let page = ui(&f.root, &json!({"action":"status","id":id})).unwrap()["conversation"].clone();
+    let first = &page["messages"][0];
+    assert_eq!(first["text"], original);
+    assert_eq!(first["skills"][0]["title"], "阅读材料归档");
+    assert_eq!(first["skills"][0]["name"], "hub-archive");
+    assert_eq!(
+        first["displayText"],
+        "自己评估一下，正文保留 $record-to-log 和 `price=$value`。"
+    );
+    let saved: String = f
+        .c()
+        .query_row(
+            "SELECT body_json FROM agent_records WHERE work_id=?1 AND kind='conversationCreated'",
+            [&id],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(saved.contains("阅读材料归档"));
+    assert_eq!(
+        crate::agent_work::skills::request_presentation("```sh\n$hub-archive\n```")["text"],
+        "```sh\n$hub-archive\n```"
+    );
+    ui(&f.root,&json!({"action":"message","id":id,"text":"$hub-research 下一条","clientMessageId":"labels","expectedRevision":1})).unwrap();
+    let page = ui(&f.root, &json!({"action":"status","id":id})).unwrap()["conversation"].clone();
+    let last = page["messages"].as_array().unwrap().last().unwrap();
+    assert_eq!(last["displayText"], "下一条");
+    assert_eq!(last["skills"][0]["title"], "资料分析与核对");
+}
+
+#[test]
+fn message_material_opening_is_explicit_and_checks_current_authorization() {
+    let f = Fixture::new();
+    f.note("notes", "selected", "selected source");
+    f.note("notes", "other", "outside source");
+    let locator = json!({"kind":"note","libraryId":"notes","documentId":"selected","pageId":null});
+    let id = store::create(
+        &f.root,
+        "核对".into(),
+        String::new(),
+        None,
+        Grant {
+            notes: vec![serde_json::from_value(locator.clone()).unwrap()],
+            ..Grant::default()
+        },
+    )
+    .unwrap();
+    let opened = ui(
+        &f.root,
+        &json!({"action":"messageMaterialSource","id":id,"locator":locator}),
+    )
+    .unwrap();
+    assert_eq!(opened["excerpt"]["content"], "selected source");
+    assert!(ui(&f.root,&json!({"action":"messageMaterialSource","id":id,"locator":{"kind":"note","libraryId":"notes","documentId":"other","pageId":null}})).is_err());
+    ui(&f.root,&json!({"action":"message","id":id,"text":"移除资料","clientMessageId":"remove-selected","expectedRevision":1,"removeNotes":[locator]})).unwrap();
+    assert!(ui(
+        &f.root,
+        &json!({"action":"messageMaterialSource","id":id,"locator":locator})
+    )
+    .is_err());
+}
+
+#[test]
 fn skill_only_followup_targets_its_attached_page_and_keeps_message_materials() {
     let f = Fixture::new();
     f.note(

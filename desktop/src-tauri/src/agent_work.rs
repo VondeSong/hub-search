@@ -447,6 +447,9 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
                 &text(args, "quote", 4000)?,
             )
         }
+        "messageMaterialSource" => {
+            store::materials::source(root, &text(args, "id", 150)?, &args["locator"])
+        }
         "skills" => skills::view(root),
         "skillSourceFile" => {
             skills::source_file(root, &text(args, "name", 100)?, args["reveal"] == true)

@@ -15,6 +15,22 @@ pub(super) fn explicit_locators(grant: &Grant) -> Vec<EvidenceLocator> {
     values
 }
 
+pub(in crate::agent_work) fn source(
+    root: &Path,
+    id: &str,
+    locator: &Value,
+) -> Result<Value, String> {
+    let c = read(root)?;
+    let work = load(&c, id)?;
+    let locator: EvidenceLocator =
+        serde_json::from_value(locator.clone()).map_err(|_| "资料身份无效")?;
+    if work.state == "revoked" || !work.grant.contains(&locator) {
+        return Err("资料已不在当前授权范围".into());
+    }
+    let excerpt = work.grant.reader(root)?.read(&locator, 0, 6000, None)?;
+    Ok(json!({"excerpt":excerpt}))
+}
+
 // Message attachments describe the user's selection, never evidence that it was read.
 pub(super) fn message_cards(c: &Connection, work: &Work, locators: &[EvidenceLocator]) -> Value {
     json!(locators.iter().map(|locator| {

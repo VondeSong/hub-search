@@ -1504,9 +1504,37 @@ it("keeps sent page cards alongside the skill request without removal controls",
   invoke.mockImplementation(async(_,{args})=>args.action==='list'?{works:[{id:current.work.id,goal:current.work.goal,state:current.work.state}]}:current);
   await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
   const message=document.querySelector('.agent-message-user')!;
-  expect(message.textContent).toContain("$record-to-log");expect(message.textContent).toContain("2023-05-06");
-  expect(message.querySelector('.agent-material-card button')).toBeNull();
+  expect(message.querySelector(".agent-user-message-content>p")).toBeNull();expect(message.querySelector('[data-material-kind="skill"] .agent-token-title')?.textContent).toBe("record-to-log");expect(message.textContent).toContain("2023-05-06");
+  expect(message.querySelector('.agent-token-remove')).toBeNull();
   expect(invoke.mock.calls.some(([,p])=>['respond','message','revoke'].includes(p?.args?.action))).toBe(false);
+});
+it("restores message text, materials and Chinese skill labels without overwriting a draft",async()=>{
+  const attached=[0,1,2].map(index=>({kind:"page",title:`页面${index}`,sourcePath:`Resources/完整路径/页面${index}.md`,available:true,locator:{kind:"note",libraryId:"notes",documentId:`page${index}`,pageId:null}}));
+  current={...makeView(),conversation:{messages:[{id:"request",role:"user",text:"$hub-archive 自己评估一下，保留 $value",createdAt:1,materials:attached}],hasEarlier:false}} as unknown as typeof current;
+  invoke.mockImplementation(async(_,{args})=>args.action==='list'?{works:[{id:current.work.id,goal:current.work.goal,state:current.work.state}]}:current);
+  await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
+  expect(document.querySelector('.agent-user-message-content>p')?.textContent).toBe("自己评估一下，保留 $value");
+  expect(document.querySelectorAll('.agent-message-user .agent-token-title')).toHaveLength(3);
+  await click("另 1 项");expect(document.querySelectorAll('.agent-message-user .agent-token-title')).toHaveLength(4);
+  await click("编辑");
+  expect(document.querySelector<HTMLTextAreaElement>('[name="investigationGoal"]')!.value).toBe("自己评估一下，保留 $value");
+  expect(document.querySelector('.agent-selected-skills .agent-token-title')?.textContent).toBe("阅读材料归档");
+  expect(document.querySelectorAll('.agent-composer-materials [data-material-kind="page"]')).toHaveLength(3);
+  await fill("investigationGoal","手写草稿");await click("编辑");
+  expect(document.querySelector<HTMLTextAreaElement>('[name="investigationGoal"]')!.value).toBe("手写草稿");expect(document.body.textContent).toContain("请先发送或保留当前草稿");
+  expect(invoke.mock.calls.some(([,p])=>['create','respond','message','revoke'].includes(p?.args?.action))).toBe(false);
+});
+it("opens an attached page from its compact details through the authorized source action",async()=>{
+  const locator={kind:"note",libraryId:"notes",documentId:"page",pageId:null};
+  current={...makeView(),conversation:{messages:[{id:"request",role:"user",text:"自己评估一下",createdAt:1,materials:[{kind:"page",title:"project-steward",sourcePath:"Resources/完整路径/project-steward.md",available:true,locator}]}],hasEarlier:false}} as unknown as typeof current;
+  const show=vi.fn();invoke.mockImplementation(async(_,{args})=>args.action==='list'?{works:[{id:current.work.id,goal:current.work.goal,state:current.work.state}]}:args.action==='messageMaterialSource'?{excerpt:makeView().evidence[0]}:current);
+  await act(async()=>root.render(<AgentCitationContext.Provider value={{value:null,show}}><StandaloneInvestigation initiallyOpen/></AgentCitationContext.Provider>));
+  const detail=document.querySelector<HTMLDetailsElement>('.agent-message-user details')!;expect(detail.open).toBe(false);
+  await act(async()=>detail.querySelector('summary')!.click());expect(detail.open).toBe(true);
+  await click("打开原页面");
+  expect(invoke.mock.calls.some(([,p])=>p?.args?.action==='messageMaterialSource'&&JSON.stringify(p.args.locator)===JSON.stringify(locator))).toBe(true);
+  expect(show.mock.calls.some(([value])=>value?.excerpt?.title===makeView().evidence[0].title)).toBe(true);
+  expect(invoke.mock.calls.some(([,p])=>['create','respond','message'].includes(p?.args?.action))).toBe(false);
 });
 it.each([false,true])("requires input for a skill alone while accepting an explicitly attached page (%s)",async page=>{
   if(page)await open();else await act(async()=>root.render(<StandaloneInvestigation initiallyOpen startFresh/>));
@@ -1514,27 +1542,16 @@ it.each([false,true])("requires input for a skill alone while accepting an expli
   expect(invoke.mock.calls.filter(([,p])=>p?.args?.action==='create')).toHaveLength(page?1:0);
   if(!page){expect(document.body.textContent).toContain("请添加要处理的资料");expect(document.querySelector('.agent-selected-skills')?.textContent).toContain("record-to-log");}
 });
-it("opens the book preview in the visible assistant area even when the Hub page preview exists",async()=>{
-  current={...makeView(),conversation:{messages:[{id:"answer",role:"assistant",runId:"saved-citation",report:{...report,prose:{markdown:"保留原设计 [1](#hub-citation-1)",citations:[{evidenceId:"e1",quote:"保持 M6"}]}},evidence:makeView().evidence,createdAt:1}],hasEarlier:false}};
-  let finish:(value:unknown)=>void=()=>{};
-  const show=vi.fn();
-  invoke.mockImplementation(async(_,{args})=>args.action==='list'?{works:[{id:current.work.id,goal:current.work.goal,state:current.work.state}]}:args.action==='source'?new Promise(resolve=>{finish=resolve;}):current);
-  await act(async()=>root.render(<AgentCitationContext.Provider value={{value:null,show}}><StandaloneInvestigation initiallyOpen/></AgentCitationContext.Provider>));
-  await fill("investigationGoal","未发送的核对问题");
-  const conversation=document.querySelector<HTMLElement>('.agent-conversation')!;
-  conversation.scrollTop=317;
-  const book=document.querySelector<HTMLButtonElement>('.agent-citation-book')!;
-  book.focus();await act(async()=>book.click());
-  expect(document.querySelector('.agent-conversation-wrap > .agent-source-preview')).not.toBeNull();
-  expect(conversation.hidden).toBe(true);
-  expect(document.activeElement).toBe(button("关闭引用原文"));
-  await act(async()=>finish({excerpt:makeView().evidence[0]}));
-  expect(document.querySelector('.agent-source-preview mark')?.textContent).toBe("保持 M6");
-  expect(show.mock.calls.every(([value])=>value===null)).toBe(true);
-  await click("关闭引用原文");
-  expect(conversation.hidden).toBe(false);expect(conversation.scrollTop).toBe(317);
-  expect(document.activeElement).toBe(book);
-  expect(document.querySelector<HTMLTextAreaElement>('[name="investigationGoal"]')!.value).toBe("未发送的核对问题");
+it("keeps the numbered source navigation and removes the duplicate book preview",async()=>{
+ current={...makeView(),conversation:{messages:[{id:"answer",role:"assistant",runId:"saved-citation",report:{...report,prose:{markdown:"保留原设计 [1](#hub-citation-1)",citations:[{evidenceId:"e1",quote:"保持 M6"}]}},evidence:makeView().evidence,createdAt:1}],hasEarlier:false}};
+ const show=vi.fn();invoke.mockImplementation(async(_,{args})=>args.action==='list'?{works:[{id:current.work.id,goal:current.work.goal,state:current.work.state}]}:args.action==='source'?{excerpt:makeView().evidence[0]}:current);
+ await act(async()=>root.render(<AgentCitationContext.Provider value={{value:null,show}}><StandaloneInvestigation initiallyOpen/></AgentCitationContext.Provider>));
+ await fill("investigationGoal","未发送的核对问题");
+ expect(document.querySelector('.agent-citation-book')).toBeNull();
+ await act(async()=>document.querySelector<HTMLButtonElement>('.agent-inline-citation')!.click());
+ const opened=show.mock.calls.map(([value])=>value).find(value=>value?.quote==="保持 M6");expect(opened?.excerpt.title).toBe(makeView().evidence[0].title);
+ await act(async()=>opened.onReturn());
+ expect(document.querySelector<HTMLTextAreaElement>('[name="investigationGoal"]')!.value).toBe("未发送的核对问题");
 });
 it.each([false,true])("local citation dismissal invalidates pending/error state without closing the assistant (error=%s)",async(error)=>{
   current={...makeView(),work:{...makeView().work,anchor:null},conversation:{messages:[{id:"answer",role:"assistant",runId:"saved-citation",report,evidence:makeView().evidence,createdAt:1}],hasEarlier:false}} as unknown as typeof current;
@@ -1939,7 +1956,7 @@ it("adds a dragged task to a follow-up and ignores duplicate drops",async()=>{
  const task:SearchResult={...result,provider:"dida365",contentType:"task",taskSourceId:"task-1",documentId:"task-1",title:"待办资料"};
  for(let i=0;i<2;i++)await act(async()=>{const event=new Event("drop",{bubbles:true,cancelable:true});Object.defineProperty(event,"dataTransfer",{value:{getData:()=>JSON.stringify({result:task})}});document.querySelector(".agent-panel-header")!.dispatchEvent(event);});
  expect(document.querySelectorAll('[aria-label="移除材料 待办资料"]')).toHaveLength(1);
- expect(button('移除材料 待办资料').classList.contains('agent-context-remove')).toBe(true);
+ expect(button('移除材料 待办资料').disabled).toBe(false);
  await fill("investigationGoal","结合待办继续处理");await act(async()=>document.querySelector<HTMLFormElement>(".agent-composer form")!.requestSubmit());
  expect(invoke.mock.calls.find(([,p])=>p?.args?.action==="message")?.[1].args.addSources).toEqual([investigationAnchor(task)]);
 });

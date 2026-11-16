@@ -518,6 +518,26 @@ body.agent-sidebar-open > #root { width:calc(100% - min(var(--agent-panel-width,
 .agent-composer-materials { display:flex; flex-wrap:wrap; gap:8px; max-height:160px; overflow-y:auto; overscroll-behavior:contain; padding:7px 6px 0; margin-inline:-6px; }
 .agent-composer-materials:empty { display:none; }
 .agent-composer-materials > .agent-pending-materials { display:contents; }
+.agent-message-references { display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-top:10px; }
+.agent-body .agent-reference-token.agent-material-card { position:relative; display:inline-flex; align-items:center; gap:0; min-height:30px; max-width:100%; padding:0; border:0; border-radius:7px; background:var(--hub-control-fill); color:var(--hub-text-secondary); box-shadow:none; font-size:13px; font-weight:400; }
+.agent-body .agent-token-disclosure { border:0; border-radius:0; background:transparent; padding:0; margin:0; min-width:0; }
+.agent-body .agent-token-disclosure>summary { display:flex; align-items:center; gap:6px; max-width:240px; min-height:30px; box-sizing:border-box; padding:5px 9px; border:0; border-radius:7px; font:inherit; line-height:18px; color:inherit; list-style:none; cursor:pointer; }
+.agent-token-disclosure>summary::-webkit-details-marker { display:none; }
+.agent-body .agent-reference-token .agent-token-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; font-weight:400; }
+.agent-token-disclosure svg { flex-shrink:0; }
+.agent-body .agent-token-remove { display:grid; place-items:center; width:26px; min-height:30px; padding:0; border:0; border-radius:6px; background:transparent; color:inherit; cursor:pointer; }
+.agent-body .agent-token-detail { position:absolute; z-index:40; inset-inline-end:0; top:calc(100% + 7px); width:min(320px,calc(100vw - 64px)); box-sizing:border-box; padding:14px; border-radius:12px; background:var(--hub-content-surface); color:var(--hub-text-primary); box-shadow:0 8px 28px #0002; overflow-wrap:anywhere; font-size:13px; }
+.agent-token-detail header { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; }
+.agent-body .agent-token-detail header button { width:24px; height:24px; padding:0; border:0; background:transparent; color:var(--hub-text-secondary); cursor:pointer; }
+.agent-body .agent-token-detail p { margin:10px 0; white-space:normal; line-height:1.6; }
+.agent-token-detail small { font-size:12px; color:var(--hub-text-secondary); }
+.agent-body .agent-token-detail>button { padding:5px 0; border:0; background:transparent; color:var(--hub-accent); cursor:pointer; font:inherit; }
+.agent-composer .agent-token-detail { top:auto; bottom:calc(100% + 7px); }
+.agent-body .agent-composer-materials { overflow:visible; max-height:none; }
+.agent-composer-materials .agent-selected-skills { display:contents; }
+.agent-body .agent-token-more,.agent-body .agent-edit-message { display:inline-flex; align-items:center; gap:5px; border:0; background:transparent; color:var(--hub-text-secondary); padding:4px 6px; font:inherit; font-size:12px; cursor:pointer; }
+.agent-token-disclosure summary:focus-visible,.agent-token-remove:focus-visible { outline:2px solid var(--hub-accent); outline-offset:2px; }
+@media(pointer:coarse) { .agent-body .agent-token-disclosure>summary,.agent-body .agent-token-remove { min-height:44px; } .agent-body .agent-token-remove { width:36px; } }
 @media (hover:none) { .agent-history-actions { opacity:1; } }
 
 

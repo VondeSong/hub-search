@@ -42,9 +42,9 @@ it("updates changed saved prose while preserving table and citation behavior", a
   await act(async () => host.querySelector<HTMLButtonElement>(".agent-inline-citation")!.click());expect(latest).toHaveBeenCalledTimes(1);
 });
 
-it("keeps source navigation and assistant preview distinct and gates both on source availability",async()=>{
+it("keeps only numbered source navigation and gates it on source availability",async()=>{
  const open=vi.fn();await render(conversation(),open);const ref=saved.report.prose!.citations[0];
- await act(async()=>host.querySelector<HTMLButtonElement>('.agent-citation-book')!.click());expect(open).toHaveBeenLastCalledWith(saved.runId,Number(ref.evidenceId.slice(1))-1,ref.quote,true);
- const denied=conversation();denied.messages[0].evidence=[];await render(denied,open,2);expect([...host.querySelectorAll<HTMLButtonElement>('.agent-citation-book')].every(button=>button.disabled)).toBe(true);
+ expect(host.querySelector('.agent-citation-book')).toBeNull();await act(async()=>host.querySelector<HTMLButtonElement>('.agent-inline-citation')!.click());expect(open).toHaveBeenLastCalledWith(saved.runId,Number(ref.evidenceId.slice(1))-1,ref.quote);
+ const denied=conversation();denied.messages[0].evidence=[];await render(denied,open,2);expect([...host.querySelectorAll<HTMLButtonElement>('.agent-inline-citation')].every(button=>button.disabled)).toBe(true);
  await render(denied,open,3,true);expect(host.querySelector('.agent-citation-book')).toBeNull();
 });

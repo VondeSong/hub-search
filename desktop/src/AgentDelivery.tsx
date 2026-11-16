@@ -1,5 +1,7 @@
-import { BookOpen } from "lucide-react";
-import { AgentMaterialCard, type MaterialKind } from "./AgentMaterialCard";
+import { PencilLine } from "lucide-react";
+import { type MaterialKind } from "./AgentMaterialCard";
+import {AgentRequestContent, requestPresentation, type MessageSkill} from "./AgentRequestContent";
+import type {InvestigationLocator} from "./AgentInvestigation";
 import { AgentWebSources, type WebSource } from "./AgentWebSources";
 import { AgentAnswerActions } from "./AgentAnswerActions";
 import { AgentArtifactRevision } from "./AgentArtifactRevision";
@@ -15,15 +17,15 @@ export type ArtifactReference = { artifactId: string; revision: number; currentR
 type Reopening = { workId?: string; recordVersion?: number };
 type ArtifactBinding = { artifactRefs?: ArtifactReference[]; artifactState?: "current" | "stale" | "unavailable" };
 export type HistoricalDelivery = ArtifactBinding & { runId: string; createdAt: number; report: Report | null; evidence: Evidence[]; validity: string };
-export type MessageMaterial = {kind:MaterialKind;title:string;sourcePath?:string|null;available:boolean};
-export type ConversationMessage = ArtifactBinding & { materials?: MessageMaterial[]; revision?: number; id: string; role: "user" | "assistant"; text?: string; kind?: "request" | "decision" | "scope"; runId?: string; report?: Report | null; evidence?: Evidence[]; validity?: string; createdAt: number };
+export type MessageMaterial = {kind:MaterialKind;title:string;sourcePath?:string|null;locator?:InvestigationLocator;available:boolean};
+export type ConversationMessage = ArtifactBinding & { displayText?:string;skills?:MessageSkill[];materials?: MessageMaterial[]; revision?: number; id: string; role: "user" | "assistant"; text?: string; kind?: "request" | "decision" | "scope"; runId?: string; report?: Report | null; evidence?: Evidence[]; validity?: string; createdAt: number };
 export type Conversation = { messages: ConversationMessage[]; hasEarlier: boolean; nextCursor?: string | null };
 export function prependConversation(current: Conversation, older: Conversation): Conversation {
   const known = new Set(current.messages.map(message => message.id));
   const additional = older.messages.filter(message => !known.has(message.id));
   return { ...current, messages: current.messages.length ? [current.messages[0], ...additional, ...current.messages.slice(1)] : additional, hasEarlier: older.hasEarlier, nextCursor: older.nextCursor };
 }
-export type CitationOpening = (runId: string, evidenceIndex: number, quote: string, inline?: boolean) => void;
+export type CitationOpening = (runId: string, evidenceIndex: number, quote: string) => void;
 
 const ReportCitationContext = createContext<{ citations: Citation[]; evidence: Evidence[]; runId?: string; onOpenCitation?: CitationOpening }>({ citations: [], evidence: [] });
 function ReportLink({ href, children }: { href?: string; children?: ReactNode }) {
@@ -33,7 +35,7 @@ function ReportLink({ href, children }: { href?: string; children?: ReactNode })
     const citation = citations[Number(index) - 1];
     const sourceIndex = Number(citation?.evidenceId.slice(1)) - 1;
     const source = evidence[sourceIndex];
-    return citation ? <span className="agent-citation-actions"><button type="button" className="agent-inline-citation" title={source?.title || "查看引用原文"} aria-label={"查看引用 " + index + "：" + (source?.title || citation.evidenceId)} disabled={!source || !runId || !onOpenCitation} onClick={() => runId && onOpenCitation?.(runId, sourceIndex, citation.quote)}>{children}</button><button type="button" className="agent-citation-book" aria-label={"在助手内预览引用 " + index} title="在助手内预览原文" disabled={!source || !runId || !onOpenCitation} onClick={() => runId && onOpenCitation?.(runId, sourceIndex, citation.quote, true)}><BookOpen size={13} aria-hidden="true"/></button></span> : <span>{children}</span>;
+    return citation ? <button type="button" className="agent-inline-citation" title={source?.title || "查看引用原文"} aria-label={"查看引用 " + index + "：" + (source?.title || citation.evidenceId)} disabled={!source || !runId || !onOpenCitation} onClick={() => runId && onOpenCitation?.(runId, sourceIndex, citation.quote)}>{children}</button> : <span>{children}</span>;
   }
   return <a href={href} target="_blank" rel="noreferrer">{children}</a>;
 }
@@ -119,7 +121,7 @@ export function AgentDelivery({ report, evidence, progress, history = [], runnin
   </>;
 }
 
-export function AgentConversation({ conversation, revoked, onOpenCitation, renderAfter, renderActions, activity=[], workId, recordVersion, onLoadEarlier, earlierLoading=false, earlierError="" }: Reopening & { conversation: Conversation; revoked: boolean; onOpenCitation: CitationOpening; onLoadEarlier?: () => void; earlierLoading?: boolean; earlierError?: string; renderAfter?: (message: ConversationMessage) => ReactNode; renderActions?: (message:ConversationMessage)=>ReactNode; activity?:ActivityRun[] }) {
+export function AgentConversation({ conversation, revoked, onOpenCitation, onOpenMaterial, onEdit, renderAfter, renderActions, activity=[], workId, recordVersion, onLoadEarlier, earlierLoading=false, earlierError="" }: Reopening & { conversation: Conversation; revoked: boolean; onOpenCitation: CitationOpening; onOpenMaterial?:(item:MessageMaterial)=>void; onEdit?:(message:ConversationMessage)=>void; onLoadEarlier?: () => void; earlierLoading?: boolean; earlierError?: string; renderAfter?: (message: ConversationMessage) => ReactNode; renderActions?: (message:ConversationMessage)=>ReactNode; activity?:ActivityRun[] }) {
   if (revoked) return null;
   return <div className="agent-messages" aria-label="对话记录">
     {conversation.hasEarlier && (onLoadEarlier && conversation.nextCursor ? <button type="button" disabled={earlierLoading} onClick={onLoadEarlier}>{earlierLoading ? "正在读取更早记录…" : "查看更早记录"}</button> : <p className="agent-note">这里只显示最近的对话，较早记录仍已保存。</p>)}
@@ -137,9 +139,10 @@ export function AgentConversation({ conversation, revoked, onOpenCitation, rende
           && !conversation.messages.slice(index + 1).some(item => item.revision === message.revision))
         .map(run => <AgentActivity key={`run:${run.runId}`} value={run}/>);
       const body = <section key={`message:${message.id}`} className={`agent-message agent-message-${message.role}`} aria-label={message.role === "user" ? "你的消息" : "助手回答"}>
-      {message.role === "user" ? <><div className="agent-user-message-content">{!!message.materials?.length&&<div className="agent-message-materials" aria-label="本轮附带资料">{message.materials.map((item,index)=><AgentMaterialCard key={index} kind={item.kind} title={item.title} subtitle={item.available?item.sourcePath||"本轮资料":"已不在当前资料范围"}/>)}</div>}{message.kind === "decision" && <small>已确认的决定</small>}<p>{message.text}</p></div><div className="agent-user-message-actions">
+      {message.role === "user" ? <><div className="agent-user-message-content"><AgentRequestContent message={message} onOpenMaterial={onOpenMaterial}/></div><div className="agent-user-message-actions">
         {Number.isFinite(message.createdAt)&&message.createdAt>0&&!Number.isNaN(new Date(message.createdAt).getTime())&&<time dateTime={new Date(message.createdAt).toISOString()} title={new Date(message.createdAt).toLocaleString("zh-CN",{hour12:false})}>{new Date(message.createdAt).toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit",hour12:false})}</time>}
-        <AgentAnswerActions text={message.text || ""} label="消息"/>
+        <AgentAnswerActions text={requestPresentation(message).body || requestPresentation(message).skills.map(skill=>skill.title).join("、")} label="消息"/>
+        {onEdit&&message.kind!=="scope"&&<button type="button" className="agent-edit-message" title="恢复正文和引用为新消息，不修改历史记录" disabled={message.materials?.some(item=>!item.available)} onClick={()=>onEdit(message)}><PencilLine size={13}/>编辑</button>}
       </div></> : <>
         {message.validity && <p className="agent-note">{revisedText ? "此前回答" : message.validity}</p>}
         {message.report && <BoundReport workId={workId} recordVersion={recordVersion} value={message} report={message.report} evidence={message.evidence || []} runId={message.runId} onOpenCitation={onOpenCitation} keepHistoricalTextVisible={revisedText} actions={renderActions?.(message)}/>}
