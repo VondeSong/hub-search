@@ -23,7 +23,7 @@ beforeEach(()=>{
   return "";
  });
 });
-afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.clearAllMocks();vi.restoreAllMocks();vi.useRealTimers();delete(globalThis as any).IS_REACT_ACT_ENVIRONMENT;});
+afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.clearAllMocks();vi.restoreAllMocks();vi.unstubAllGlobals();vi.useRealTimers();delete(globalThis as any).IS_REACT_ACT_ENVIRONMENT;});
 const click=async(text:string)=>{const b=[...document.querySelectorAll("button")].find(b=>b.textContent===text)!;expect(b).toBeTruthy();await act(async()=>b.click());};
 it("long press opens voice once and suppresses the following text click",async()=>{
  vi.useFakeTimers({toFake:["setTimeout","clearTimeout"]});const voice=vi.fn();window.addEventListener("hub:journal-voice",voice);
@@ -52,12 +52,15 @@ it("does not acknowledge or save when the durable audio draft fails",async()=>{
  vi.mocked(invoke).mockImplementation(original);await click("保存");
  expect(invoke).toHaveBeenCalledWith("capture_quick_journal",{record:{...record,attachments:[attachment]}});
 });
-it("save next retains the saved identity and opens a fresh empty draft",async()=>{
- await act(async()=>root.render(<JournalVoiceCapture request={{record}} onClose={vi.fn()}/>));await click("保存并录下一条");
+it("ordinary save closes without creating or reopening another recording draft",async()=>{
+ const close=vi.fn();
+ await act(async()=>root.render(<JournalVoiceCapture request={{record}} onClose={close}/>));await click("保存");
  expect(invoke).toHaveBeenCalledWith("capture_quick_journal",{record});
  const writes=vi.mocked(invoke).mock.calls.filter(([c,a]:any)=>c==="quick_journal_voice_draft"&&a?.value);
  const last=JSON.parse((writes[writes.length-1]![1] as any).value);
- expect(last.record.id).not.toBe(record.id);expect(last.record.attachments).toEqual([]);expect(last.record.text).toBe("");
+ expect(last.record.id).toBe(record.id);expect(last.record.text).toBe(record.text);
+ expect(close).toHaveBeenCalledOnce();
+ expect(document.body.textContent).not.toContain("保存并录下一条");
 });
 
 it("short tap opens text and dragging cancels the long press",async()=>{
@@ -71,11 +74,21 @@ it("short tap opens text and dragging cancels the long press",async()=>{
 
 it("plays the custom audio control and pauses when the document hides",async()=>{
  const play=vi.spyOn(HTMLMediaElement.prototype,"play").mockResolvedValue();
+ const revoke=vi.fn(),create=vi.fn((_value:Blob)=>"blob:local-audio");vi.stubGlobal("URL",{createObjectURL:create,revokeObjectURL:revoke});
  vi.mocked(invoke).mockResolvedValue("data:audio/mp4;base64,AAAA");
  await act(async()=>root.render(<JournalAudio attachment={attachment}/>));
  await act(async()=>host.querySelector("button")!.click());
  expect(play).toHaveBeenCalledOnce();expect(HTMLMediaElement.prototype.pause).not.toHaveBeenCalled();
+ expect(host.querySelector("audio")?.getAttribute("src")).toBe("blob:local-audio");expect(create.mock.calls[0][0]).toBeInstanceOf(Blob);
  vi.spyOn(document,"hidden","get").mockReturnValue(true);
  await act(async()=>document.dispatchEvent(new Event("visibilitychange")));
  expect(HTMLMediaElement.prototype.pause).toHaveBeenCalledOnce();
+ await act(async()=>root.render(null));expect(revoke).toHaveBeenCalledWith("blob:local-audio");
+});
+it("does not retain audio loaded after the card has closed",async()=>{
+ const create=vi.fn();vi.stubGlobal("URL",{createObjectURL:create,revokeObjectURL:vi.fn()});
+ let finish!:(value:string)=>void;vi.mocked(invoke).mockImplementation(()=>new Promise<string>(resolve=>{finish=resolve;}));
+ await act(async()=>root.render(<JournalAudio attachment={attachment}/>));await act(async()=>host.querySelector("button")!.click());
+ await act(async()=>root.render(null));await act(async()=>finish("data:audio/mp4;base64,AAAA"));
+ expect(create).not.toHaveBeenCalled();
 });

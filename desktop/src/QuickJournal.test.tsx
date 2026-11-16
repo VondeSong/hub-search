@@ -133,6 +133,17 @@ const mobileSettings = () => {
   invoke.mockImplementation((cmd:string,args:unknown)=>cmd === "get_quick_journal_settings" ? Promise.resolve({settings:{libraryId:"",folder:"Journals",sync:true},mobile:true,cloudEnabled:true,autoSync:true}) : original(cmd,args));
 };
 const renderComposer=async(onSaved=vi.fn())=>{await act(async()=>root.render(<QuickJournal libraries={[]} scope={null} view={defaultJournalView()} dataVersion="mobile" mode="compose" onSaved={onSaved}/>));return onSaved;};
+it("keeps a mobile voice draft in a full row with independent playback and removal",async()=>{
+ mobileSettings();const original=invoke.getMockImplementation()!;
+ const audio={hash:"b".repeat(64),name:"语音-5秒.m4a",size:1200,image:false};
+ invoke.mockImplementation((cmd:string,args:unknown)=>cmd==="get_quick_journal_draft"?Promise.resolve(JSON.stringify({...record,attachments:[audio]})):original(cmd,args));
+ vi.spyOn(HTMLMediaElement.prototype,"pause").mockImplementation(()=>{});vi.spyOn(HTMLMediaElement.prototype,"load").mockImplementation(()=>{});
+ await renderComposer();const row=node.querySelector('.quick-journal-draft-audio')!;
+ expect(row.querySelector('.journal-audio')).not.toBeNull();expect(row.querySelector('[aria-label="播放原音"]')).not.toBeNull();
+ await act(async()=>row.querySelector<HTMLButtonElement>('[aria-label^="移除附件"]')!.click());
+ expect(node.querySelector('.quick-journal-draft-audio')).toBeNull();expect(journalEditorText(node.querySelector('[role="textbox"]')!)).toBe(record.text);
+ vi.restoreAllMocks();
+});
 it("explains a paused automatic sync without promising background upload",async()=>{
   const original=invoke.getMockImplementation()!;
   invoke.mockImplementation((cmd:string,args:unknown)=>cmd==="get_quick_journal_settings"?Promise.resolve({settings:{libraryId:"",folder:"Journals",sync:true},mobile:true,cloudEnabled:true,autoSync:false}):original(cmd,args));
