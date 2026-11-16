@@ -1,4 +1,5 @@
 import { BookOpen } from "lucide-react";
+import { AgentMaterialCard, type MaterialKind } from "./AgentMaterialCard";
 import { AgentWebSources, type WebSource } from "./AgentWebSources";
 import { AgentAnswerActions } from "./AgentAnswerActions";
 import { AgentArtifactRevision } from "./AgentArtifactRevision";
@@ -14,7 +15,8 @@ export type ArtifactReference = { artifactId: string; revision: number; currentR
 type Reopening = { workId?: string; recordVersion?: number };
 type ArtifactBinding = { artifactRefs?: ArtifactReference[]; artifactState?: "current" | "stale" | "unavailable" };
 export type HistoricalDelivery = ArtifactBinding & { runId: string; createdAt: number; report: Report | null; evidence: Evidence[]; validity: string };
-export type ConversationMessage = ArtifactBinding & { revision?: number; id: string; role: "user" | "assistant"; text?: string; kind?: "request" | "decision" | "scope"; runId?: string; report?: Report | null; evidence?: Evidence[]; validity?: string; createdAt: number };
+export type MessageMaterial = {kind:MaterialKind;title:string;sourcePath?:string|null;available:boolean};
+export type ConversationMessage = ArtifactBinding & { materials?: MessageMaterial[]; revision?: number; id: string; role: "user" | "assistant"; text?: string; kind?: "request" | "decision" | "scope"; runId?: string; report?: Report | null; evidence?: Evidence[]; validity?: string; createdAt: number };
 export type Conversation = { messages: ConversationMessage[]; hasEarlier: boolean; nextCursor?: string | null };
 export function prependConversation(current: Conversation, older: Conversation): Conversation {
   const known = new Set(current.messages.map(message => message.id));
@@ -135,7 +137,7 @@ export function AgentConversation({ conversation, revoked, onOpenCitation, rende
           && !conversation.messages.slice(index + 1).some(item => item.revision === message.revision))
         .map(run => <AgentActivity key={`run:${run.runId}`} value={run}/>);
       const body = <section key={`message:${message.id}`} className={`agent-message agent-message-${message.role}`} aria-label={message.role === "user" ? "你的消息" : "助手回答"}>
-      {message.role === "user" ? <><div className="agent-user-message-content">{message.kind === "decision" && <small>已确认的决定</small>}<p>{message.text}</p></div><div className="agent-user-message-actions">
+      {message.role === "user" ? <><div className="agent-user-message-content">{!!message.materials?.length&&<div className="agent-message-materials" aria-label="本轮附带资料">{message.materials.map((item,index)=><AgentMaterialCard key={index} kind={item.kind} title={item.title} subtitle={item.available?item.sourcePath||"本轮资料":"已不在当前资料范围"}/>)}</div>}{message.kind === "decision" && <small>已确认的决定</small>}<p>{message.text}</p></div><div className="agent-user-message-actions">
         {Number.isFinite(message.createdAt)&&message.createdAt>0&&!Number.isNaN(new Date(message.createdAt).getTime())&&<time dateTime={new Date(message.createdAt).toISOString()} title={new Date(message.createdAt).toLocaleString("zh-CN",{hour12:false})}>{new Date(message.createdAt).toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit",hour12:false})}</time>}
         <AgentAnswerActions text={message.text || ""} label="消息"/>
       </div></> : <>

@@ -1,5 +1,137 @@
 use super::*;
 use crate::source_evidence::analysis;
+
+#[test]
+fn skill_only_followup_targets_its_attached_page_and_keeps_message_materials() {
+    let f = Fixture::new();
+    f.note(
+        "notes",
+        "journal",
+        "原记录日期为2023-05-06。这里是新的日志材料，不能重复旧输入。",
+    );
+    f.c()
+        .execute(
+            "UPDATE documents SET title='2023-05-06' WHERE space_id='notes' AND id='journal'",
+            [],
+        )
+        .unwrap();
+    let id = store::create(
+        &f.root,
+        "$record-to-log 上一条不同的口述".into(),
+        String::new(),
+        None,
+        Grant::default(),
+    )
+    .unwrap();
+    let added = ui(&f.root,&json!({"action":"message","id":id,"text":"$record-to-log","clientMessageId":"skill-with-page","expectedRevision":1,"addNotes":[{"kind":"note","libraryId":"notes","documentId":"journal","pageId":null}]})).unwrap();
+    let messages = added["conversation"]["messages"].as_array().unwrap();
+    assert_eq!(messages[0]["materials"], json!([]));
+    let message = messages.last().unwrap();
+    assert_eq!(message["materials"][0]["title"], "2023-05-06");
+    assert!(message["materials"][0].get("content").is_none());
+    let work = store::load(&f.c(), &id).unwrap();
+    let context = store::conversation::context(&f.root, &work).unwrap();
+    assert_eq!(context["currentRequestMaterials"][0]["title"], "2023-05-06");
+    let request = context["currentRequest"].as_str().unwrap();
+    assert!(request.starts_with("$record-to-log\n"));
+    assert!(request.contains("本轮明确附带的资料") && request.contains("不把整理当天"));
+    assert!(!request.contains("上一条不同的口述"));
+    ui(&f.root,&json!({"action":"message","id":id,"text":"$record-to-log","clientMessageId":"reuse-page","expectedRevision":2})).unwrap();
+    let context =
+        store::conversation::context(&f.root, &store::load(&f.c(), &id).unwrap()).unwrap();
+    assert_eq!(context["currentRequestMaterials"][0]["title"], "2023-05-06");
+    let removed=ui(&f.root,&json!({"action":"message","id":id,"text":"移除资料","clientMessageId":"remove-page","expectedRevision":3,"removeNotes":[{"kind":"note","libraryId":"notes","documentId":"journal","pageId":null}]})).unwrap();
+    let original = removed["conversation"]["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|message| message["id"] == messages.last().unwrap()["id"])
+        .unwrap();
+    assert_eq!(original["materials"][0]["available"], false);
+    assert_eq!(original["materials"][0]["title"], "资料已移除");
+}
+
+#[test]
+fn skill_only_without_current_materials_requests_input_without_reusing_old_content() {
+    let f = Fixture::new();
+    let id = store::create(
+        &f.root,
+        "$record-to-log".into(),
+        String::new(),
+        None,
+        Grant::default(),
+    )
+    .unwrap();
+    let work = store::load(&f.c(), &id).unwrap();
+    let context = store::conversation::context(&f.root, &work).unwrap();
+    assert!(context["currentRequest"]
+        .as_str()
+        .unwrap()
+        .contains("先请用户补充本轮要处理的内容"));
+}
+
+#[test]
+#[ignore = "explicit daily Work, revision and output path required; calls the configured model without saving source content"]
+fn daily_skill_only_page_retry() {
+    let root = std::path::PathBuf::from(
+        std::env::var("HUB_DAILY_ASSISTANT_ROOT").expect("explicit daily data root"),
+    );
+    let id = std::env::var("HUB_DAILY_ASSISTANT_WORK").expect("explicit existing Work");
+    let revision: i64 = std::env::var("HUB_DAILY_ASSISTANT_REVISION")
+        .expect("expected revision")
+        .parse()
+        .unwrap();
+    let output = std::env::var("HUB_DAILY_ASSISTANT_OUTPUT").expect("private local output");
+    assert!(root.join("craft-search.sqlite3").is_file());
+    let before = store::load(
+        &crate::source_evidence::open_read_database(&root).unwrap(),
+        &id,
+    )
+    .unwrap();
+    assert_eq!(before.revision, revision);
+    assert_eq!(before.state, "completed");
+    assert!(
+        before.active_run.is_none()
+            && before.grant.library_ids.is_empty()
+            && before.grant.sources.is_empty()
+            && before.grant.reading_item_keys.is_empty()
+            && before.grant.images.is_empty()
+    );
+    assert_eq!(before.grant.notes.len(), 1);
+    let locator = &before.grant.notes[0];
+    let reader = before.grant.reader(&root).unwrap();
+    let source = reader.read(locator, 0, 1, None).unwrap();
+    let date = source.title.clone();
+    assert!(date.len() == 10 && date.as_bytes()[4] == b'-' && date.as_bytes()[7] == b'-');
+    let changed=ui(&root,&json!({"action":"message","id":id,"text":"$record-to-log","clientMessageId":format!("source-skill-check-{}",revision),"expectedRevision":revision})).unwrap();
+    let fresh = store::load(
+        &crate::source_evidence::open_read_database(&root).unwrap(),
+        &id,
+    )
+    .unwrap();
+    let context = store::conversation::context(&root, &fresh).unwrap();
+    assert_eq!(context["currentRequestMaterials"][0]["title"], date);
+    assert!(context["currentRequest"]
+        .as_str()
+        .unwrap()
+        .contains("本轮明确附带的资料"));
+    let result = ui(&root, &json!({"action":"respond","id":id,"mode":"quick"}));
+    let after = ui(&root, &json!({"action":"status","id":id})).unwrap();
+    let current_source = reader.read(locator, 0, 1, None).unwrap();
+    let record = json!({"workId":id,"beforeRevision":revision,"request":changed,"result":result,"after":after,"sourceUnchanged":source.version==current_source.version});
+    std::fs::write(output, serde_json::to_vec_pretty(&record).unwrap()).unwrap();
+    assert_eq!(source.version, current_source.version);
+    assert_eq!(after["work"]["state"], "completed");
+    let body = after["work"]["report"]["prose"]["markdown"]
+        .as_str()
+        .expect("published draft");
+    assert!(
+        body.contains(&date) && body.chars().count() > 120,
+        "must organize the selected dated page rather than repeat the former short input"
+    );
+    assert!(after["run"]["usage"]["entitiesRead"].as_u64().unwrap_or(0) > 0);
+    println!("daily selected page: dated draft delivered, source version unchanged");
+}
 #[test]
 fn library_scope_changes_are_explicit_versioned_and_idempotent() {
     let f = Fixture::new();

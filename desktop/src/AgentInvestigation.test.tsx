@@ -1499,6 +1499,21 @@ it.each(["Escape","close button"])("local standalone citation returns to its ori
   expect(conversation.scrollTop).toBe(317);expect(document.activeElement).toBe(citation);
   expect(invoke.mock.calls.some(([,v])=>['create','respond','submitObsidianEdit'].includes(v?.args?.action))).toBe(false);
 });
+it("keeps sent page cards alongside the skill request without removal controls",async()=>{
+  current={...makeView(),conversation:{messages:[{id:"request",role:"user",text:"$record-to-log",createdAt:1,materials:[{kind:"page",title:"2023-05-06",sourcePath:"Journal/2023-05-06.md",available:true}]}],hasEarlier:false}} as unknown as typeof current;
+  invoke.mockImplementation(async(_,{args})=>args.action==='list'?{works:[{id:current.work.id,goal:current.work.goal,state:current.work.state}]}:current);
+  await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
+  const message=document.querySelector('.agent-message-user')!;
+  expect(message.textContent).toContain("$record-to-log");expect(message.textContent).toContain("2023-05-06");
+  expect(message.querySelector('.agent-material-card button')).toBeNull();
+  expect(invoke.mock.calls.some(([,p])=>['respond','message','revoke'].includes(p?.args?.action))).toBe(false);
+});
+it.each([false,true])("requires input for a skill alone while accepting an explicitly attached page (%s)",async page=>{
+  if(page)await open();else await act(async()=>root.render(<StandaloneInvestigation initiallyOpen startFresh/>));
+  await fill("investigationGoal","$record-to-log");await click("开始调查");
+  expect(invoke.mock.calls.filter(([,p])=>p?.args?.action==='create')).toHaveLength(page?1:0);
+  if(!page){expect(document.body.textContent).toContain("请添加要处理的资料");expect(document.querySelector('.agent-selected-skills')?.textContent).toContain("record-to-log");}
+});
 it("opens the book preview in the visible assistant area even when the Hub page preview exists",async()=>{
   current={...makeView(),conversation:{messages:[{id:"answer",role:"assistant",runId:"saved-citation",report:{...report,prose:{markdown:"保留原设计 [1](#hub-citation-1)",citations:[{evidenceId:"e1",quote:"保持 M6"}]}},evidence:makeView().evidence,createdAt:1}],hasEarlier:false}};
   let finish:(value:unknown)=>void=()=>{};

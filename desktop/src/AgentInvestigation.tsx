@@ -205,7 +205,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const [worksError, setWorksError] = useState("");
   const [goal, setGoal] = useState(initialDraft||"");
   const [usedQuestion,setUsedQuestion]=useState("");
-  const skillPrefix = goal.match(/^(?:\$[a-z0-9]+(?:-[a-z0-9]+)*\s+)+/)?.[0] || "";
+  const skillPrefix = goal.match(/^(?:\$[a-z0-9]+(?:-[a-z0-9]+)*(?:\s+|$))+/)?.[0] || "";
   const selectedSkills = [...new Set(skillPrefix.match(/\$[a-z0-9]+(?:-[a-z0-9]+)*/g) || [])];
   const questionText = goal.slice(skillPrefix.length);
   const [wholeLibrary, setWholeLibrary] = useState(false);
@@ -719,6 +719,9 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     const effectiveGrant=researchGrant(manual,research?.topic.grant,research?.includeManual);
     let sendMaterials=materials,sendDropped=dropped,sendLibraryDraft=libraryDraft;
     const requestedSkills=research?research.includeManual?[...new Set([...research.topic.skills,...selectedSkills.map(s=>s.slice(1))])]:research.topic.skills:selectedSkills.map(s=>s.slice(1));
+    if(requestedSkills.length && !questionText.trim() && !tagMode && !effectiveGrant.notes.length && !effectiveGrant.sources?.length && !effectiveGrant.readingItemKeys.length && !selectedImages.length && !snippets.length){
+      setError("请添加要处理的资料，或输入本轮需要处理的内容。");goalInput.current?.focus();return;
+    }
     const submittedText=research?[...requestedSkills.map(s=>"$"+s),questionText.trim()].join(" "):goal.trim();
     let tagIntent:Record<string,unknown>|null=null;
     if(!active&&(tagMode||tagPreparation.references.length)){

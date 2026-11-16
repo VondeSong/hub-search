@@ -262,8 +262,13 @@ fn page_on_cached(
     let next_cursor = has_earlier.then(|| rows.last().unwrap().0.clone());
     rows.reverse();
     let created_at: i64 = c.query_row("SELECT COALESCE(json_extract(body_json,'$.createdAt'),0) FROM agent_records WHERE work_id=?1 AND kind='conversationCreated' ORDER BY rowid LIMIT 1", [&work.id], |r| r.get(0)).optional().map_err(|e|e.to_string())?.unwrap_or(0);
+    let initial_materials = super::materials::grant_at(c, work, 1)
+        .map(|grant| {
+            super::materials::message_cards(c, work, &super::materials::explicit_locators(&grant))
+        })
+        .unwrap_or(json!([]));
     let mut messages = vec![
-        json!({"id":format!("{}-goal",work.id),"role":"user","text":work.goal,"createdAt":created_at,"revision":1,"kind":"request"}),
+        json!({"id":format!("{}-goal",work.id),"role":"user","text":work.goal,"createdAt":created_at,"revision":1,"kind":"request","materials":initial_materials}),
     ];
     for (id, kind, raw, created_at, run_id, authorization, revision) in rows {
         let body: Value = serde_json::from_str(&raw).map_err(|_| "对话记录损坏")?;
@@ -275,7 +280,11 @@ fn page_on_cached(
                 continue;
             }
             let scope_only = is_scope_confirmation(&kind, &body);
-            messages.push(json!({"id":id,"role":"user","text":body["text"],"createdAt":created_at,"revision":body["revision"],"kind":if scope_only {"scope"} else if kind=="userDecision" {"decision"} else {"request"}}));
+            let attachments: Vec<EvidenceLocator> =
+                serde_json::from_value(body.get("addNotes").cloned().unwrap_or(json!([])))
+                    .map_err(|_| "对话资料身份损坏")?;
+            let materials = super::materials::message_cards(c, work, &attachments);
+            messages.push(json!({"id":id,"role":"user","text":body["text"],"createdAt":created_at,"revision":body["revision"],"kind":if scope_only {"scope"} else if kind=="userDecision" {"decision"} else {"request"},"materials":materials}));
             continue;
         }
         let verified = (|| {
@@ -422,7 +431,7 @@ pub(in crate::agent_work) fn context(root: &Path, work: &Work) -> Result<Value, 
             continue;
         }
         let mut item = if message["role"] == "user" {
-            json!({"role":"user","kind":message["kind"],"text":message["text"]})
+            json!({"role":"user","kind":message["kind"],"text":message["text"],"materials":message["materials"]})
         } else if message["report"].is_object()
             && message["artifactRefs"]
                 .as_array()
@@ -462,15 +471,42 @@ pub(in crate::agent_work) fn context(root: &Path, work: &Work) -> Result<Value, 
         messages.push(item);
     }
     messages.reverse();
-    let request = conversation["messages"]
+    let latest_request = conversation["messages"]
         .as_array()
         .into_iter()
         .flatten()
         .rev()
-        .find(|m| m["role"] == "user" && m["kind"] != "scope")
+        .find(|m| m["role"] == "user" && m["kind"] != "scope");
+    let request = latest_request
         .and_then(|m| m["text"].as_str())
         .unwrap_or(&work.goal);
-    let mut context = json!({"currentRequest":request,"goalState":super::goal::completion::context_on(root,&c,&current)?,"goalBinding":super::goal::binding_on(&c, &current)?,"messages":messages,"earlierMessagesOmitted":omitted,"historyCursor":conversation["nextCursor"],"handoffPolicy":"当前目标和最新修订以goalState为准；进度与问题见capabilities.workingState，保存以businessActionRecords为准。历史不完整时可调用conversationHistory按页或recordId补读；不得把摘要、助手旧回答或准备中的草稿当作完成事实。","policy":"普通用户消息是本轮要求，不自动成为确认事实或长期记忆；助手历史回答本身不是事实证据。Hub 笔记的精确编号引用只能选择本轮 quoteCatalog，并核验当前授权和版本，不能沿用历史编号。公开网页来源可复用同一原生会话中已实际读取且仍适用的内容，以具名 HTTPS 链接引用；总结、解释和启示类追问材料足够时直接回答，不为重复引用而联网。新增事实、时效变化、证据冲突、上下文缺失或用户要求复核时再查证。普通延伸追问不等于否定此前事实。"});
+    let mut request_materials = latest_request
+        .map(|m| m["materials"].clone())
+        .unwrap_or(json!([]));
+    let request = if super::materials::skill_only(request) {
+        if request_materials
+            .as_array()
+            .is_none_or(|items| items.is_empty())
+        {
+            request_materials = super::materials::message_cards(
+                &c,
+                &current,
+                &super::materials::explicit_locators(&current.grant),
+            );
+        }
+        if request_materials
+            .as_array()
+            .is_none_or(|items| !items.iter().any(|item| item["available"] == true))
+            && current.grant.images.is_empty()
+        {
+            format!("{request}\n本轮未附带页面或原图。若当前另有明确的任务对象（如已选择的标签），按该对象处理；否则先请用户补充本轮要处理的内容，不要重复以前不同输入的成稿。")
+        } else {
+            format!("{request}\n请使用上述技能处理本轮明确附带的资料（见 currentRequestMaterials、hostSelectedRead 与 originalImages）；以这些资料为处理对象，保留原记录的日期、事实与不确定性。历史回答仅作对话背景，不能直接作为本轮成稿。资料超出已读取部分时按需补读，不把整理当天当作原记录的发生日期。")
+        }
+    } else {
+        request.to_owned()
+    };
+    let mut context = json!({"currentRequest":request,"currentRequestMaterials":request_materials,"goalState":super::goal::completion::context_on(root,&c,&current)?,"goalBinding":super::goal::binding_on(&c, &current)?,"messages":messages,"earlierMessagesOmitted":omitted,"historyCursor":conversation["nextCursor"],"handoffPolicy":"当前目标和最新修订以goalState为准；进度与问题见capabilities.workingState，保存以businessActionRecords为准。历史不完整时可调用conversationHistory按页或recordId补读；不得把摘要、助手旧回答或准备中的草稿当作完成事实。","policy":"普通用户消息是本轮要求，不自动成为确认事实或长期记忆；助手历史回答本身不是事实证据。Hub 笔记的精确编号引用只能选择本轮 quoteCatalog，并核验当前授权和版本，不能沿用历史编号。公开网页来源可复用同一原生会话中已实际读取且仍适用的内容，以具名 HTTPS 链接引用；总结、解释和启示类追问材料足够时直接回答，不为重复引用而联网。新增事实、时效变化、证据冲突、上下文缺失或用户要求复核时再查证。普通延伸追问不等于否定此前事实。"});
     super::report_continuation::context_on(root, &c, &current, &mut context)?;
     Ok(context)
 }

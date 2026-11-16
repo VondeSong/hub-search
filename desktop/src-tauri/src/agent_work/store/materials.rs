@@ -1,6 +1,53 @@
 //! Explicit host scope changes. A model interpretation cannot call this.
 use super::*;
 
+pub(super) fn explicit_locators(grant: &Grant) -> Vec<EvidenceLocator> {
+    let mut values = grant.notes.clone();
+    values.extend(grant.sources.clone());
+    values.extend(
+        grant
+            .reading_item_keys
+            .iter()
+            .map(|key| EvidenceLocator::Reading {
+                item_key: key.clone(),
+            }),
+    );
+    values
+}
+
+// Message attachments describe the user's selection, never evidence that it was read.
+pub(super) fn message_cards(c: &Connection, work: &Work, locators: &[EvidenceLocator]) -> Value {
+    json!(locators.iter().map(|locator| {
+        let (kind, fallback) = match locator {
+            EvidenceLocator::Note { .. } => ("page", "页面"),
+            EvidenceLocator::Reading { .. } => ("reading", "阅读条目"),
+            EvidenceLocator::Task { .. } => ("task", "任务"),
+            _ => ("page", "资料"),
+        };
+        let available = work.state != "revoked" && work.grant.contains(locator);
+        let metadata = if available {
+            if let EvidenceLocator::Note { library_id, document_id, page_id } = locator {
+                c.query_row("SELECT COALESCE(NULLIF(ci.page_title,''),d.title),d.path FROM documents d JOIN libraries l ON l.id=d.space_id LEFT JOIN content_items ci ON ci.space_id=d.space_id AND ci.document_id=d.id AND ci.page_id=?3 WHERE d.space_id=?1 AND d.id=?2 AND l.enabled=1 AND (?3 IS NULL OR ci.page_id IS NOT NULL) LIMIT 1",params![library_id,document_id,page_id],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?))).optional().ok().flatten()
+            } else { None }
+        } else { None };
+        let title = if available { metadata.as_ref().map(|m|m.0.as_str()).unwrap_or(fallback) } else { "资料已移除" };
+        json!({"kind":kind,"title":title,"sourcePath":metadata.as_ref().map(|m|&m.1),"locator":locator,"available":available})
+    }).collect::<Vec<_>>())
+}
+
+pub(super) fn skill_only(request: &str) -> bool {
+    !request.trim().is_empty()
+        && request.split_whitespace().all(|token| {
+            token.strip_prefix('$').is_some_and(|name| {
+                !name.is_empty()
+                    && name.len() <= 64
+                    && name
+                        .bytes()
+                        .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == b'-')
+            })
+        })
+}
+
 pub(super) fn additions(value: &Value) -> Result<Vec<EvidenceLocator>, String> {
     let mut notes = selected(value, "addNotes")?;
     let sources: Vec<EvidenceLocator> =
