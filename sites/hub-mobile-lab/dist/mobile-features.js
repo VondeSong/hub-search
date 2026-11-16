@@ -70,7 +70,7 @@ function recordAttachments(record) {
 }
 function attachmentMarkup(record, removable = false) {
   const legacy = capturePhotoStrip(record.photos, removable);
-  const files = recordAttachments(record).map(a => '<figure class="capture-file">' +
+  const files = recordAttachments(record).map(a => '<figure class="capture-file'+(a.voice?' capture-voice':'')+'">' +
     (a.voice ? '<button type="button" class="voice-attachment" data-act="voice-open:'+esc(a.id)+'">'+voiceMic()+'<span>'+esc(a.name)+'<small>'+voiceTime(a.voice.elapsed)+' · '+(a.voice.mode==='demo'?'转录演示': '本机原音 · 文字待转写')+'</small></span></button>' : a.image ? '<button type="button" class="journal-photo-open" aria-label="查看照片 '+esc(a.name)+'" data-act="journal-photo:'+esc(a.id)+'"><img data-local-image="' + esc(a.id) + '" alt="' + esc(a.name) + '" hidden><span class="attachment-loading">照片加载中</span></button>' : '<button type="button" data-act="download-attachment:'+esc(a.id)+'">'+ico('note',25)+' '+esc(a.name)+'</button>') +
     (removable ? '<span class="file-name">' + esc(a.name) + '</span><button type="button" aria-label="移除附件 ' + esc(a.name) + '" data-act="capture-remove-file:' + esc(a.id) + '">' + ico('close',14) + '</button>' : '') + '</figure>').join('');
   return legacy + files;

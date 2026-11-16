@@ -29,6 +29,12 @@
 .capture-file .voice-attachment { display:flex; gap:14px; align-items:center; width:100%; min-height:66px; padding:14px 16px; border:0; border-radius:14px; background:var(--surface); color:var(--ink); text-align:left; font:inherit; font-size:15px; }
 .voice-attachment>svg { flex:none; width:24px; height:24px; color:var(--blue); }
 .voice-attachment>span { flex:1; }
+.capture-photos:has(.capture-voice) { flex-wrap:wrap; overflow-x:visible; }
+.capture-photos figure.capture-voice { flex:1 0 100%; width:100%; min-width:0; padding:0; }
+.capture-photos .capture-voice>.voice-attachment { position:static; display:flex; width:100%; height:auto; min-height:76px; border:0; border-radius:14px; padding:14px 48px 14px 16px; }
+.capture-voice>.voice-attachment>span { min-width:0; overflow-wrap:anywhere; }
+.capture-voice>.file-name { display:none; }
+.capture-photos .capture-voice>button[data-act^="capture-remove-file:"] { top:8px; right:8px; width:28px; height:28px; min-height:28px; }
 .voice-attachment::after { content:'查看'; color:var(--blue); font-size:13px; }
 .voice-attachment:hover { background:var(--surface-hover); }
 .voice-attachment small { display:block; margin-top:4px; color:var(--muted); }

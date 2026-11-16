@@ -3,9 +3,9 @@
   "site": "mobile",
   "project_id": "appgprj_6af1d2dc12308191acc37e5566699c2d",
   "site_url": "https://hub-mobile-lab-von11.song02211368537057.chatgpt.site",
-  "source_commit": "e0bacffa1d7432e80cfdc211f1297b5cbc7475bc",
-  "published_version": 24,
-  "deployment_id": "appgdep_6afad52a42188191ae6310a2df8d5b81",
+  "source_commit": "61c31875f5e11a7c341ae969a43e1e84a1de9896",
+  "published_version": 25,
+  "deployment_id": "appgdep_6afb0129fb4c8191b8a017013e7ff8ad",
   "files": {
     ".openai/hosting.json": {
       "sha256": "543a776095c0181cc870f784c075ab4f263fb739e3649cd8db74f493fb5b4ca3",
@@ -58,9 +58,9 @@
       "bytes": 13501
     },
     "checks/voice-checks.cjs": {
-      "sha256": "503e06cc8f971f29f7625531f076709720e69e467943c5bbafa02921fe9aa7bb",
+      "sha256": "3dcc9546b4e3fcb32f8994cd113e80e154344dba722177191440a74b358dcb37",
       "mode": "100644",
-      "bytes": 4715
+      "bytes": 5918
     },
     "checks/widget-checks.cjs": {
       "sha256": "0ef59e92d55ed4aff330fa00f30acd4d186459b0dcdcac18df399cad39f6676e",
@@ -123,9 +123,9 @@
       "bytes": 34775
     },
     "dist/mobile-features.js": {
-      "sha256": "684c8ebe3336610b8e9140b81504dbc2f5262158c9500d74ddd174594ae89109",
+      "sha256": "d685ec8f46b95de02649c2dc3e164e7fcab7bd425e6a72ffddbb1b6f3fc10da1",
       "mode": "100644",
-      "bytes": 31107
+      "bytes": 31140
     },
     "dist/mobile-polish.css": {
       "sha256": "e26d3a79ff7bdd13fe80631241161ea9eb5e8026acee68a4fbf4c67fef22219f",
@@ -153,14 +153,14 @@
       "bytes": 28240
     },
     "dist/voice.css": {
-      "sha256": "a89687fbd50832fa584804ca13c4244bee5411c061ca6a2d88efb00cd836857c",
+      "sha256": "1b4fedb9969a123360998089d5883b1cf6ade8db2f2e63223cfa444c143b144a",
       "mode": "100644",
-      "bytes": 3295
+      "bytes": 3909
     },
     "dist/voice.js": {
-      "sha256": "2b206857fac80e7ec0a92439101c4717359532698a80c5b9825ee24f6512d4ff",
+      "sha256": "4ee847c2dc1d3e983c82b7769fe9c49b060368feeb6d0d5114741fa92c85f08d",
       "mode": "100644",
-      "bytes": 18167
+      "bytes": 17594
     },
     "dist/widgets.css": {
       "sha256": "dab718c6ffea193c3317de835b1dcdd3a2ea118de57057687014ace3ab505df9",
@@ -292,6 +292,11 @@
       "mode": "100644",
       "bytes": 6022
     },
+    "docs/voice-card-fix-2026-11-16.md": {
+      "sha256": "5a58fe0c7d1bd4da4877d55cd2e3fa31419ecedaf581b8bf104fb7c9a85fdfce",
+      "mode": "100644",
+      "bytes": 1022
+    },
     "docs/voice-prototype-2026-11-16.md": {
       "sha256": "2503860d3df96623343c7fa01268df16decf415c1766803a074d8b54e6615b60",
       "mode": "100644",
@@ -308,5 +313,5 @@
       "bytes": 3301
     }
   },
-  "imported_at": "2026-11-16T10:07:50.168416+00:00"
+  "imported_at": "2026-11-16T13:12:31.397796+00:00"
 }

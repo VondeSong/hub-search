@@ -139,13 +139,11 @@ async function voiceAttach() {
     voiceBlob=null;
     if(v.attached&&v.inDraft&&!v.target){quickCapture('note');tell('校对稿已保存在语音附件内，正文保持不变。');}
     else if(v.attached){close();render();tell('校对稿已保存，原正文保持不变。');}
-    else if(v.target){if(journalCommitEdit(v.target)){voiceOpen();voiceNotice('已保存到原记录，可以继续录入。');}else{close();go('journal-edit/'+v.target);tell('追加已保留在原记录草稿，请核对后保存。');}}
-    else {quickCapture('note');voiceShowContinue();}
+    else if(v.target){if(journalCommitEdit(v.target)){close();render();tell('已保存到原记录。');}else{close();go('journal-edit/'+v.target);tell('追加已保留在原记录草稿，请核对后保存。');}}
+    else {quickCapture('note');}
   }catch(e){voiceNotice(e.message);}finally{voiceBusy=false;}
 }
-function voiceShowContinue(){const form=document.querySelector('#quick-capture-form');if(form){const b=document.createElement('button');b.type='button';b.className='plain';b.textContent='保存并继续录入';b.dataset.act='voice-save-next';form.append(b);}}
 function voiceAction(a,key) {
-  if(a==='voice-save-next'){const form=document.querySelector('#quick-capture-form');if(form){const count=st.notes.length;handleWorkflowSubmit(form);if(st.notes.length>count){voiceOpen();voiceNotice('上一条已保存，准备好即可录下一条。');}}return true;}
   if(a==='voice-continue'){
     const previous=st.voiceDraft;if(!previous?.attached||!previous.target)return true;
     st.voiceDraft=voiceNew(previous.target);voicePersist();voiceShow();return true;
