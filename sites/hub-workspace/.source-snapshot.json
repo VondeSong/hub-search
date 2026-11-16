@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "d9a362c57a10d5eafb1c19d55226546a51c91f05",
-  "published_version": 102,
-  "deployment_id": "appgdep_6afaa0c64f24819194ebedbc3b4c0259",
+  "source_commit": "1d52d6bcdcd45c889909b40c7cbcc624dae12ca3",
+  "published_version": 103,
+  "deployment_id": "appgdep_6afab51b2ec08191949b8c82476fbae1",
   "files": {
     ".gitignore": {
       "sha256": "5ca3c39bdc1288c108a1931b3f6bc5795464b6253e9457390617774259deed0c",
@@ -363,24 +363,24 @@
       "bytes": 10594
     },
     "app/journal-local/JournalToolbar.css": {
-      "sha256": "50f04adf4d62c0af6140ff83eecbc1d45378c76cf23eb82711ff8d0aeeeb9d96",
+      "sha256": "e55c0787167a5fae419cbf4134d98f29f73699fed9ef60dfdbc6c79773582640",
       "mode": "100644",
-      "bytes": 17106
+      "bytes": 18012
     },
     "app/journal-local/JournalToolbar.tsx": {
-      "sha256": "722905ed415a2ff9c6014bd037576d4333ebb6347083449fa5fcf794d911375f",
+      "sha256": "f23308107f934fdb28761b1d67791145bdcfb4464d367782c0fa5f804d58cb08",
       "mode": "100644",
-      "bytes": 14152
+      "bytes": 21253
     },
     "app/journal-local/JournalViewManager.tsx": {
-      "sha256": "835c04917e18f7f7875340bc1b092f87c83d0b1cb6cc25fdc9bff97b6fc15fcb",
+      "sha256": "28dad09357fac4ffa5f101adb87cf62f3140a30c499d94428f289cd2d3a3cc05",
       "mode": "100644",
-      "bytes": 6403
+      "bytes": 7167
     },
     "app/journal-local/JournalViews.tsx": {
-      "sha256": "8d11ad7ca3d2c2dd527da211dcbf8801befaa31e87bbd37ebe607d2975554632",
+      "sha256": "92e1e9975e947cb17f12a0c758c4da20f01044483d3315386a2c7a2dd3c59535",
       "mode": "100644",
-      "bytes": 9115
+      "bytes": 9881
     },
     "app/journal-local/JournalWorkspace.css": {
       "sha256": "0877c83261ac8b8804e90e82ffaec75716bf7a7b2de9c795ec131a39572ea810",
@@ -922,6 +922,11 @@
       "mode": "100644",
       "bytes": 6485
     },
+    "docs/journal-notion-filters-20261116.md": {
+      "sha256": "27a230e2638c59260f3a3327d2d8f589a647514596f9d5ddb7a1dd853ba310d4",
+      "mode": "100644",
+      "bytes": 5897
+    },
     "docs/journal-toolbar-20261116.md": {
       "sha256": "b884d8d4a36cf6ddc3b274d6e576aa1a519f58e699801da7170f76f31eda8423",
       "mode": "100644",
@@ -1183,9 +1188,9 @@
       "bytes": 9015
     },
     "scripts/journal-filter-check.mjs": {
-      "sha256": "32dc571c91c051378a6b8f19ce5dae27ae93fcccb89627691ec8987177f558d0",
+      "sha256": "5aa7e49b4847b02b2dec25367b843027a1f473d640a8903c09d5060c9cc586f3",
       "mode": "100644",
-      "bytes": 3670
+      "bytes": 5688
     },
     "scripts/library-browser-check.mjs": {
       "sha256": "c9a33372ea2f3f216856b5f20c14ac6d001e6e970558e86eb203650ef6f3944a",
@@ -1288,5 +1293,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-16T06:21:23.246989+00:00"
+  "imported_at": "2026-11-16T07:48:14.703606+00:00"
 }
