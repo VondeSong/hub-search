@@ -104,6 +104,24 @@ describe("saved journal views", () => {
     await render(); await act(async () => { for (let i = 0; i < 35; i++) store.save(`View ${i}`); });
     expect(store.saved).toHaveLength(30); expect(new Set(store.saved.map(s => s.id)).size).toBe(30);
   });
+  it("treats search as temporary across save, update, restore, copy and default view",async()=>{
+    await render();await act(async()=>store.update({query:"初始搜索",period:"all",libraries:["os"]}));
+    await act(async()=>store.save("工作日志"));const id=store.activeId;
+    expect(store.saved[0].config.query).toBe("");expect(store.view.query).toBe("初始搜索");expect(store.modified).toBe(false);
+    await act(async()=>store.update({query:"临时搜索"}));expect(store.modified).toBe(false);
+    await act(async()=>store.update({libraries:[]}));expect(store.modified).toBe(true);
+    await act(async()=>store.updateSaved());expect(store.saved[0].config.libraries).toEqual([]);expect(store.saved[0].config.query).toBe("");
+    await act(async()=>store.update({libraries:null}));await act(async()=>store.select(id));expect(store.view.libraries).toEqual([]);expect(store.view.query).toBe("临时搜索");
+    await act(async()=>store.save("工作副本"));expect(store.saved[1].config.query).toBe("");
+    await act(async()=>store.reset());expect(store.view.query).toBe("临时搜索");expect(store.view.libraries).toBeNull();
+  });
+  it("reads an old saved search without erasing the historical saved field",async()=>{
+    const config={...defaultJournalView(),query:"旧词"};
+    localStorage.setItem(JOURNAL_VIEWS_KEY,JSON.stringify({version:1,view:{...config,query:"当前词"},activeId:"old",saved:[{id:"old",name:"旧视图",config,hidden:false}]}));
+    await render();expect(store.modified).toBe(false);expect(store.saved[0].config.query).toBe("旧词");
+    await act(async()=>store.select("old"));expect(store.view.query).toBe("当前词");
+    expect(JSON.parse(localStorage.getItem(JOURNAL_VIEWS_KEY)!).saved[0].config.query).toBe("旧词");
+  });
   it("keeps the navigator on the filtered date or month instead of an old anchor",async()=>{
     await render();await act(async()=>store.navigate("2026-11-16"));
     await act(async()=>store.update({month:"2026-09"}));expect(store.anchor).toBe("");expect(store.view.month).toBe("2026-09");

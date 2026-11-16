@@ -69,6 +69,10 @@ export function normalizeJournalView(value: unknown): JournalViewConfig {
     ...Object.fromEntries((["ascending", "compact", "summary", "source", "modified"] as const).map(k => [k, typeof v[k] === "boolean" ? v[k] : base[k]])),
   };
 }
+// A lookup belongs to the current session, not the saved layout and filters.
+export function journalSavedConfig(config:JournalViewConfig):JournalViewConfig{return {...config,query:""};}
+export function journalViewModified(saved:JournalViewConfig,current:JournalViewConfig){return JSON.stringify(journalSavedConfig(saved))!==JSON.stringify(journalSavedConfig(current));}
+export function journalSelectConfig(saved:JournalViewConfig,query:string):JournalViewConfig{return {...saved,query};}
 type JournalState = { view: JournalViewConfig; saved: SavedJournalView[]; activeId: string; anchor: string };
 export function parseJournalViews(raw: string | null): JournalState {
   const base = { view: defaultJournalView(), saved: [] as SavedJournalView[], activeId: "", anchor: "" };
@@ -99,7 +103,7 @@ export function useJournalViewStore() {
     return {...s,view,anchor};
   });
   return {
-    ...state, active, modified: !!active && JSON.stringify(active.config) !== JSON.stringify(state.view), update,
+    ...state, active, modified: !!active && journalViewModified(active.config,state.view), update,
     navigate: (date: string) => {
       const target = date || localJournalDate();
       if (!validDay(target)) return;
@@ -107,15 +111,15 @@ export function useJournalViewStore() {
     },
     select: (id: string) => setState(s => {
       const saved = s.saved.find(v => v.id === id && !v.hidden);
-      return saved ? { ...s, activeId: id, view: saved.config, anchor: "" } : s;
+      return saved ? { ...s, activeId: id, view: journalSelectConfig(saved.config,s.view.query), anchor: "" } : s;
     }),
-    reset: () => setState(s => ({ ...s, activeId: "", view: defaultJournalView(), anchor: "" })),
+    reset: () => setState(s => ({ ...s, activeId: "", view: journalSelectConfig(defaultJournalView(),s.view.query), anchor: "" })),
     save: (name: string) => {
       if (!name.trim()) return;
       const id = crypto.randomUUID();
-      setState(s => s.saved.length >= 30 ? s : { ...s, activeId: id, saved: [...s.saved, { id, name: name.trim().slice(0, 60), hidden: false, config: s.view }] });
+      setState(s => s.saved.length >= 30 ? s : { ...s, activeId: id, saved: [...s.saved, { id, name: name.trim().slice(0, 60), hidden: false, config: journalSavedConfig(s.view) }] });
     },
-    updateSaved: () => setState(s => ({ ...s, saved: s.saved.map(v => v.id === s.activeId ? { ...v, config: s.view } : v) })),
+    updateSaved: () => setState(s => ({ ...s, saved: s.saved.map(v => v.id === s.activeId ? { ...v, config: journalSavedConfig(s.view) } : v) })),
     rename: (id: string, name: string) => { if (name.trim()) setState(s => ({ ...s, saved: s.saved.map(v => v.id === id ? { ...v, name: name.trim().slice(0, 60) } : v) })); },
     hide: (id: string, hidden: boolean) => setState(s => ({ ...s, activeId: hidden && s.activeId === id ? "" : s.activeId, saved: s.saved.map(v => v.id === id ? { ...v, hidden } : v) })),
     remove: (id: string) => setState(s => ({ ...s, activeId: s.activeId === id ? "" : s.activeId, saved: s.saved.filter(v => v.id !== id) })),
