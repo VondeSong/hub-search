@@ -3,6 +3,71 @@
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Value};
 
+#[cfg(test)]
+mod performance_tests {
+    use super::*;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+
+    #[test]
+    fn history_discovery_reads_preferences_once_at_conversation_scale() {
+        let f = crate::source_evidence::tests::Fixture::new();
+        let c = f.c();
+        c.execute_batch("BEGIN").unwrap();
+        let mut ids = Vec::new();
+        for i in 0..150 {
+            let id = super::super::create_on(
+                &c,
+                format!("历史 {i}"),
+                String::new(),
+                None,
+                crate::agent_work::Grant::default(),
+            )
+            .unwrap();
+            for _ in 0..50 {
+                super::super::insert(
+                    &c,
+                    &id,
+                    None,
+                    "diagnostic",
+                    &json!({"text":"不参与历史列表的记录"}),
+                )
+                .unwrap();
+            }
+            ids.push(id);
+        }
+        for (id, preference) in [
+            (&ids[0], json!({"deleted":true})),
+            (&ids[0], json!({"deleted":false,"pinned":true})),
+            (&ids[1], json!({"deleted":true})),
+            (&ids[2], json!({"archived":true})),
+        ] {
+            super::super::insert(&c, id, None, "historyPreference", &preference).unwrap();
+        }
+        c.execute_batch("COMMIT").unwrap();
+        let steps = Arc::new(AtomicUsize::new(0));
+        let observed = steps.clone();
+        // Bound database work, independent of machine speed. The former
+        // correlated scan exceeds this budget before returning its first page.
+        c.progress_handler(
+            1000,
+            Some(move || observed.fetch_add(1, Ordering::Relaxed) >= 1000),
+        );
+        let page = list_on(&c, "null", None, None, None).unwrap();
+        assert_eq!(page["works"][0]["id"], ids[0]);
+        assert_eq!(page["works"].as_array().unwrap().len(), 20);
+        assert!(page["works"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|row| row["id"] != ids[1] && row["id"] != ids[2]));
+        assert!(steps.load(Ordering::Relaxed) < 1000);
+        c.progress_handler(0, None::<fn() -> bool>);
+    }
+}
+
 pub(super) fn list_on(
     c: &Connection,
     anchor: &str,
@@ -65,14 +130,19 @@ pub(super) fn list_on(
         .transpose()?;
     // Filter the complete stored history before keyset pagination. Search is
     // deliberately limited to titles; withdrawn answer bodies are not read.
+    // Materialize preferences once: correlated latest-row reads otherwise scan
+    // all records again for each filter, sort key and conversation.
     let mut q = c
         .prepare(
-            "WITH history AS (
-            SELECT agent_works.*, COALESCE((
-                SELECT body_json FROM agent_records p
-                WHERE p.work_id=agent_works.id AND p.kind='historyPreference'
-                ORDER BY rowid DESC LIMIT 1
-            ),'{}') AS preference FROM agent_works
+            "WITH preferences AS MATERIALIZED (
+            SELECT work_id,MAX(rowid) AS latest FROM agent_records NOT INDEXED
+            WHERE kind='historyPreference' GROUP BY work_id
+        ), history AS MATERIALIZED (
+            SELECT w.id,w.goal,w.state,w.updated_at,w.anchor_json,
+                COALESCE(p.body_json,'{}') AS preference
+            FROM agent_works w
+            LEFT JOIN preferences h ON h.work_id=w.id
+            LEFT JOIN agent_records p ON p.rowid=h.latest
         ), visible AS (
             SELECT *, COALESCE(json_extract(preference,'$.pinned'),0) AS pinned,
                 COALESCE(json_extract(preference,'$.archived'),0) AS archived
@@ -81,15 +151,17 @@ pub(super) fn list_on(
             SELECT *, CASE WHEN ?5 THEN 0 ELSE pinned END AS sort_pinned
             FROM visible WHERE (?1='null' OR anchor_json=?1) AND archived=?5
                 AND (?6='' OR instr(lower(goal),lower(?6))>0)
+        ), page AS MATERIALIZED (
+            SELECT * FROM matching
+            WHERE (?2 IS NULL OR sort_pinned<?4 OR (sort_pinned=?4
+                AND (updated_at<?2 OR (updated_at=?2 AND id>?3))))
+            ORDER BY sort_pinned DESC,updated_at DESC,id LIMIT 21
         )
         SELECT id,goal,state,updated_at,
-            1+(SELECT COUNT(*) FROM agent_records r WHERE r.work_id=matching.id
+            1+(SELECT COUNT(*) FROM agent_records r WHERE r.work_id=page.id
                AND r.kind IN ('userMessage','userDecision','steering','delivery')),
             pinned,archived
-        FROM matching
-        WHERE (?2 IS NULL OR sort_pinned<?4 OR (sort_pinned=?4
-            AND (updated_at<?2 OR (updated_at=?2 AND id>?3))))
-        ORDER BY sort_pinned DESC,updated_at DESC,id LIMIT 21",
+        FROM page ORDER BY sort_pinned DESC,updated_at DESC,id",
         )
         .map_err(|e| e.to_string())?;
     let mut rows = q

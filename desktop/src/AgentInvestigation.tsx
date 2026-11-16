@@ -32,7 +32,7 @@ import { AgentMaterials, materialKey, type AgentMaterial } from "./AgentMaterial
 import {AgentLibraryScope,libraryDragType,readLibraryDrop,type AgentLibrary} from "./AgentLibraryScope";
 import { AgentSourceScope, type SourceSelection } from "./AgentSourceScope";
 import { AgentScopeCoverage } from "./AgentScopeCoverage";
-import { useContext, useEffect, useId, useRef, useState } from "react";
+import { useContext, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronDown, ChevronRight, WandSparkles, FileText, ListChecks, Maximize2, Menu, MessageSquare, Minimize2, PanelRight, PanelsTopLeft, MoreHorizontal, Quote, Plus, Search, X } from "lucide-react";
 import type { SearchResult } from "./SearchTypes";
@@ -388,7 +388,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     if(latest)element.scrollTop+=latest.getBoundingClientRect().top-element.getBoundingClientRect().top;
     element.focus();
   },[reportReading,citationOpen]);
-  useEffect(() => { if(!onPreviewCitation && (sourcePreview || sourceError || sourceLoading)) sourcePreviewElement.current?.scrollIntoView?.({block:"nearest"}); },[sourcePreview,sourceError,sourceLoading]);
+  useLayoutEffect(() => { if(sourcePreview || sourceError || sourceLoading) sourcePreviewElement.current?.querySelector<HTMLButtonElement>("button")?.focus({preventScroll:true}); },[sourcePreview,sourceError,sourceLoading]);
   useEffect(() => { if (!open && loaded.current && accountVisible) floatingLauncher.current?.focus(); }, [open, accountVisible]);
   useEffect(() => { if (open && (!view || initialDraft) && !busy && !detailsMenu.current?.open) goalInput.current?.focus(); }, [open, view?.work.id, busy, initialDraft]);
   const latestAction = view?.actions?.items[0];
@@ -511,12 +511,22 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     if(busy || active)throw new Error("请等待当前操作结束后再修改对话历史");setBusy(true);setWorksError("");
     try{
       await call({action:"setHistoryPreference",id:work.id,...change});
-      if(change.deleted===true)setWorks(current=>current.filter(item=>item.id!==work.id));
-      else if(change.deleted===false)setWorks(current=>current.some(item=>item.id===work.id)?current:[work,...current]);
-      await reloadWorks();
+      const updated={...work,...change};
+      if(change.deleted===true || !!updated.archived!==historyFilter.current.archived)setWorks(current=>current.filter(item=>item.id!==work.id));
+      else setWorks(current=>current.some(item=>item.id===work.id)?current.map(item=>item.id===work.id?updated:item):[updated,...current]);
       if(!alive.current)return;
       if(change.deleted && view?.work.id===work.id)newInvestigation(true);
+      void reloadWorks();
     }catch(reason){if(alive.current)setWorksError(String(reason));throw reason;}finally{if(alive.current)setBusy(false);}
+  };
+  const openHistoryWork = async (work: WorkSummary) => {
+    if(detailsMenu.current)detailsMenu.current.open=false;
+    if(work.id===view?.work.id)return;
+    setLibraryDraft(null);setError("");setGoal("");setMaterials([]);setDropped([]);setSnippets([]);setImageDraft(null);setRemovals([]);clearSourcePreview();
+    setBusy(true);setLoadingConversation(true);
+    try { await refresh(work.id); }
+    catch(reason) { if(alive.current)setError(String(reason)); }
+    finally { if(alive.current){setBusy(false);setLoadingConversation(false);} }
   };
   const openCitation = async (runId: string, evidenceIndex: number, quote: string, inline = false) => {
     if (!view || view.work.state === "revoked" || businessInFlight.current || businessChecks.current.has(view.work.id)) return;
@@ -1049,7 +1059,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         <div className="agent-header-start">
         <details ref={detailsMenu} data-history={historyExpanded} className="agent-dialogue-details" data-task-status={taskStatusOnly} onClickCapture={event=>{const menu=event.currentTarget;if(!menu.open&&(event.target as Element).closest("summary")===menu.firstElementChild){detailsReturn.current=menu.firstElementChild as HTMLElement;setHistoryExpanded(true);setTaskStatusOnly(false);}}} onToggle={event=>{if(event.target!==event.currentTarget)return;const menu=event.currentTarget;if(!menu.open&&detailsReturn.current?.isConnected&&(menu.contains(document.activeElement)||document.activeElement===document.body))detailsReturn.current.focus();}}><summary aria-label="对话历史" title="对话历史"><Menu size={18} aria-hidden="true"/></summary><div className="agent-details-content" role="region" aria-label={historyExpanded?"对话历史":taskStatusOnly?"任务状态":"对话详情"}>
           <div hidden={!historyExpanded} className="agent-history-container">
-      <AgentConversationHistory query={historyQuery} archived={historyArchived} onQueryChange={query=>filterHistory(query,historyFilter.current.archived)} onArchivedChange={archived=>filterHistory(historyFilter.current.query,archived)} works={works} currentId={view?.work.id} disabled={busy||!!active} more={!!worksCursor} loading={worksLoading} error={worksError} states={states} onRetry={()=>void reloadWorks()} onClose={()=>{if(detailsMenu.current)detailsMenu.current.open=false;}} onMore={()=>void loadEarlierWorks()} onChange={changeHistory} onOpen={work=>{setLibraryDraft(null);setError("");setGoal("");setMaterials([]);setDropped([]);setSnippets([]);setImageDraft(null);setRemovals([]);clearSourcePreview();void refresh(work.id).then(()=>{if(detailsMenu.current)detailsMenu.current.open=false;}).catch(reason=>setError(String(reason)));}}/>
+      <AgentConversationHistory query={historyQuery} archived={historyArchived} onQueryChange={query=>filterHistory(query,historyFilter.current.archived)} onArchivedChange={archived=>filterHistory(historyFilter.current.query,archived)} works={works} currentId={view?.work.id} disabled={busy||!!active} more={!!worksCursor} loading={worksLoading} error={worksError} states={states} onRetry={()=>void reloadWorks()} onClose={()=>{if(detailsMenu.current)detailsMenu.current.open=false;}} onMore={()=>void loadEarlierWorks()} onChange={changeHistory} onOpen={work=>void openHistoryWork(work)}/>
           </div>
           <div className="agent-details-sections" hidden={historyExpanded}>
           <div className="agent-details-heading"><strong>{taskStatusOnly?"任务状态":"对话详情"}</strong><button type="button" aria-label={taskStatusOnly?"关闭任务状态":"关闭对话详情"} onClick={()=>{detailsPopover.close();detailsReturn.current?.focus();}}><X size={16}/></button></div>
@@ -1095,20 +1105,21 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         </div>
       </header>
       <div className="agent-body">
-      <div className="agent-conversation-wrap">
-      <div className="agent-conversation" ref={conversationScroll.element} tabIndex={0} aria-label="对话与报告" onScroll={conversationScroll.onScroll} onClickCapture={event=>{if((event.target as Element).closest(".agent-activity-toggle,details > summary"))conversationScroll.holdPosition();}}>
+      <div className="agent-conversation-wrap" aria-busy={loadingConversation || sourceLoading}>
+      {loadingConversation && <div className="agent-conversation-loading" role="status" aria-label="正在打开对话"><span/><span/><span/></div>}
+      <div className="agent-conversation" hidden={loadingConversation || (sourceScope.current===sourceScopeKey && (!!sourcePreview || !!sourceError || sourceLoading))} ref={conversationScroll.element} tabIndex={0} aria-label="对话与报告" onScroll={conversationScroll.onScroll} onClickCapture={event=>{if((event.target as Element).closest(".agent-activity-toggle,details > summary"))conversationScroll.holdPosition();}}>
       <div className="agent-conversation-content" ref={conversationScroll.content}>
 
       {controlsNeedAttention && view?.work.state!=="revoked" && <div className="agent-task-notice" role="status"><span>{view?.materialBudget?.preflight?.allowed===false || !!view?.materialBudget?.overrunBytes ? "资料处理容量不足" : view?.lifecycle?.requiresExplicitResume ? "任务已暂停，需手动恢复" : view?.lifecycle?.usageCompleteness==="incomplete" ? "部分模型用量尚未返回" : "任务状态需要处理"}</span><button type="button" onClick={()=>{setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current){workControls.current.open=true;workControls.current.querySelector("summary")?.focus();setTimeout(()=>workControls.current?.querySelector("summary")?.focus(),0);}}}>查看任务详情</button></div>}
 
       {newSource && <div className="agent-notice"><p>正在讨论「{sourceTitle || currentObjectLabel}」。当前浏览：{newSource.title}</p><button type="button" disabled={busy || !!active} onClick={newSource.use}>用当前材料新建对话</button></div>}
       {tagMode&&<AgentTagWorkspace value={tagPreparation} disabled={busy||!!active} onChange={setTagPreparation} onCancel={()=>setTagMode(false)}/>}
-      {!view && !tagMode && <div className="agent-welcome">
+      {!view && !tagMode && !loadingConversation && <div className="agent-welcome">
         <h2>{hasDraftSources?"从这份材料开始":"有什么可以帮你？"}</h2><p>{hasDraftSources?"提一个问题，或试试下面的建议。":"直接提问，或从＋添加需要使用的资料。"}</p>
         {hasDraftSources && <div className="agent-suggestions">{suggestions.map(({ label, icon: Icon, prompt }) => <button key={label} type="button" disabled={busy} onClick={() => { setGoal(prompt); goalInput.current?.focus(); }}><Icon size={18} aria-hidden="true" /><span>{label}</span></button>)}</div>}
       </div>}
       {!view && canEditNote && <button type="button" disabled={busy || !!active} onClick={() => void openNoteEditor()}>修改这篇 Obsidian 笔记</button>}
-      <p ref={statusElement} tabIndex={-1} role="status" className="agent-status" hidden={!!view && (view.work.state === "completed" || (view.work.state === "investigating" && !!view.activity?.length && !stopping)) && !businessCheck?.uncertain && !acting && !latestAction}>{view ? (businessCheck?.uncertain ? "结果待核对，已暂停再次提交" : stopping && active ? "正在停止，已有进展会保留" : acting ? pendingLabel : `${states[view.work.state] || view.work.state}${latestAction?.state === "prepared" ? ` · ${actionLabel}草稿已准备，待你确认` : latestAction?.state === "verified" ? ` · ${actionLabel}结果已核验` : latestAction?.state === "unknown" || latestAction?.state === "partial" ? ` · ${actionLabel}结果待核对` : ""}`) : loadingConversation ? "正在恢复对话…" : busy ? "正在发送…" : ""}</p>
+      <p ref={statusElement} tabIndex={-1} role="status" className="agent-status" hidden={!!view && (view.work.state === "completed" || (view.work.state === "investigating" && !!view.activity?.length && !stopping)) && !businessCheck?.uncertain && !acting && !latestAction}>{view ? (businessCheck?.uncertain ? "结果待核对，已暂停再次提交" : stopping && active ? "正在停止，已有进展会保留" : acting ? pendingLabel : `${states[view.work.state] || view.work.state}${latestAction?.state === "prepared" ? ` · ${actionLabel}草稿已准备，待你确认` : latestAction?.state === "verified" ? ` · ${actionLabel}结果已核验` : latestAction?.state === "unknown" || latestAction?.state === "partial" ? ` · ${actionLabel}结果待核对` : ""}`) : loadingConversation ? "" : busy ? "正在发送…" : ""}</p>
       {view && !businessCheck?.scopeChanging && <>
         {!view.conversation && <p className="agent-goal">{view.work.goal}</p>}
         {(view.validity || view.run?.error) && <p className="agent-notice">{view.validity || view.run?.error}</p>}
@@ -1142,7 +1153,6 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         <AgentSleepDatasets workId={view.work.id} recordVersion={view.recordVersion} items={(view.sleepDatasets || []).filter(dataset => !(view.analysisArtifacts || []).some(chart => chart.content?.data.extractionDataset?.datasetId === dataset.datasetId && chart.content?.data.extractionDataset?.revision === dataset.revision))} revoked={view.work.state === "revoked"} />
         <AgentDelivery workId={view.work.id} recordVersion={view.recordVersion} report={view.conversation ? null : report ?? null} evidence={view.evidence} progress={view.activity?.length || (view.conversation && report) ? null : view.progress} history={view.conversation ? [] : view.history} running={!!running} revoked={view.work.state === "revoked"} runId={view.run?.id} onOpenCitation={(...args)=>void openCitation(...args)}/>
         {!view.conversation&&report&&view.run?.id&&<AgentAnswerSave workId={view.work.id} runId={view.run.id} current={saveTarget} disabled={businessDisabled||!!active||!!view.lifecycle?.requiresExplicitResume} records={view.answerSaves} onChanged={()=>void refresh(view.work.id)}/>}
-        {sourceScope.current===sourceScopeKey && view.work.state!=="revoked" && (sourcePreview || sourceError || sourceLoading) && <section ref={sourcePreviewElement} className="agent-source-preview" aria-label="引用原文"><header><strong>{sourcePreview?.excerpt.title || (sourceLoading?"正在核对引用来源…":"引用暂不可读取")}</strong><button type="button" aria-label="关闭引用原文" onClick={returnFromCitation}>关闭</button></header>{sourceLoading ? <p role="status">正在读取当前版本的原文…</p> : sourceError ? <p role="alert">{sourceError}。可核对来源后重新打开引用。</p> : sourcePreview && <><p className="agent-note">{sourcePreview.excerpt.sourcePath} · 第 {sourcePreview.excerpt.startChar+1}–{sourcePreview.excerpt.endChar} 字符{sourcePreview.excerpt.truncated?"（原文节选）":""}</p><blockquote>{sourcePreview.excerpt.content.includes(sourcePreview.quote)?<>{sourcePreview.excerpt.content.slice(0,sourcePreview.excerpt.content.indexOf(sourcePreview.quote))}<mark>{sourcePreview.quote}</mark>{sourcePreview.excerpt.content.slice(sourcePreview.excerpt.content.indexOf(sourcePreview.quote)+sourcePreview.quote.length)}</>:sourcePreview.excerpt.content}</blockquote></>}</section>}
         {outcomes(view.actions?.items.filter(a=>a.kind!=="tagProposal" && (!view.conversation || a.baseRevision===undefined || !view.conversation.messages.some(m=>m.revision===a.baseRevision))) || [])}
         {view.draftRequest && !active && <button type="button" disabled={businessDisabled} onClick={()=>void businessAction({action:"prepareResponse",runId:view.draftRequest!.runId})}>继续准备本轮草稿</button>}
         {(!active && ["ready","interrupted","failed","expired"].includes(view.work.state) || view.work.state==="revoked") && <div className="agent-actions">
@@ -1152,7 +1162,8 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       </>}
       </div>
       </div>
-      {conversationScroll.showLatest && !reportReading && <button type="button" className="agent-jump-latest" onClick={conversationScroll.scrollToLatest}><ArrowDown size={14} aria-hidden="true"/>回到最新内容</button>}
+      {view && !businessCheck?.scopeChanging && sourceScope.current===sourceScopeKey && view.work.state!=="revoked" && (sourcePreview || sourceError || sourceLoading) && <section ref={sourcePreviewElement} className="agent-source-preview" aria-label="引用原文"><header><strong>{sourcePreview?.excerpt.title || (sourceLoading?"正在核对引用来源…":"引用暂不可读取")}</strong><button type="button" aria-label="关闭引用原文" onClick={returnFromCitation}>关闭</button></header>{sourceLoading ? <p role="status">正在读取当前版本的原文…</p> : sourceError ? <p role="alert">{sourceError}。可核对来源后重新打开引用。</p> : sourcePreview && <><p className="agent-note">{sourcePreview.excerpt.sourcePath} · 第 {sourcePreview.excerpt.startChar+1}–{sourcePreview.excerpt.endChar} 字符{sourcePreview.excerpt.truncated?"（原文节选）":""}</p><blockquote>{sourcePreview.excerpt.content.includes(sourcePreview.quote)?<>{sourcePreview.excerpt.content.slice(0,sourcePreview.excerpt.content.indexOf(sourcePreview.quote))}<mark>{sourcePreview.quote}</mark>{sourcePreview.excerpt.content.slice(sourcePreview.excerpt.content.indexOf(sourcePreview.quote)+sourcePreview.quote.length)}</>:sourcePreview.excerpt.content}</blockquote></>}</section>}
+      {conversationScroll.showLatest && !reportReading && !citationOpen && <button type="button" className="agent-jump-latest" onClick={conversationScroll.scrollToLatest}><ArrowDown size={14} aria-hidden="true"/>回到最新内容</button>}
       </div>
       {businessCheck?.uncertain && <section className="agent-notice" aria-label="操作结果待核对" role="alert">
         <strong>结果待核对</strong><p>这次操作可能已经完成。为避免重复保存，已暂停再次提交；请先核对当前结果。</p>

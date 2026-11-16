@@ -98,10 +98,17 @@ body.resizing-agent-panel * { cursor: col-resize !important; user-select: none !
 @media (hover:none) { .agent-user-message-actions { opacity:1; pointer-events:auto; } }
 .agent-message-user p { margin: 0; white-space: pre-wrap; }
 .agent-message-user small { display: block; margin-bottom: 4px; color: var(--hub-text-secondary); }
-.agent-source-preview { border: 1px solid var(--hub-separator); border-radius: 10px; padding: 12px; margin-block: 14px; }
+.agent-source-preview { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; gap: 10px; min-height: 0; padding: 12px; background: var(--hub-content-surface); border-radius: 10px; }
+.agent-source-preview > p { flex: 0 0 auto; margin: 0; }
+.agent-source-preview > header { flex: 0 0 auto; }
+.agent-conversation-loading { position: absolute; inset: 20px 12px auto; pointer-events: none; opacity: 0; animation: agent-loading-reveal 0s 180ms forwards; }
+.agent-conversation-loading > span { display: block; width: 90%; height: 12px; margin-block: 14px; border-radius: 5px; background: var(--hub-control-fill); }
+.agent-conversation-loading > span:first-child { width: 42%; }
+.agent-conversation-loading > span:last-child { width: 70%; }
+@keyframes agent-loading-reveal { to { opacity: 1; } }
 .agent-source-preview header { display: flex; align-items: start; gap: 12px; }
 .agent-source-preview header strong { flex: 1; }
-.agent-source-preview blockquote { margin: 0; max-height: 360px; overflow-y: auto; white-space: pre-wrap; }
+.agent-source-preview blockquote { flex: 1; min-height: 0; margin: 0; overflow-y: auto; white-space: pre-wrap; }
 .agent-source-preview mark { color: var(--hub-search-mark-text); background: var(--hub-search-mark); }
 .agent-body .agent-mode { display: block; margin: 0; min-width: 0; }
 .agent-mode select { padding: 5px 8px; font-size: 12px; }

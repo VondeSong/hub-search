@@ -173,6 +173,49 @@ function deferred<T>() {
 }
 
 describe("assistant refinement integration", () => {
+  it("closes history immediately and keeps old output hidden while opening another chat", async () => {
+    const pending = deferred<ReturnType<typeof makeView>>();
+    list = async () => ({works:[{id:current.work.id,goal:current.work.goal,state:"ready"},{id:"other",goal:"另一段对话",state:"ready"}],nextCursor:null});
+    const base = native;
+    invoke.mockImplementation((command,payload) => payload?.args?.action === "status" && payload.args.id === "other" ? pending.promise : base(command,payload));
+    await render(<StandaloneInvestigation initiallyOpen/>);
+    await openHistory();
+    await activate(select<HTMLButtonElement>('[data-work-id="other"]'));
+    expect(select<HTMLDetailsElement>('.agent-dialogue-details').open).toBe(false);
+    expect(select<HTMLTextAreaElement>('[name="investigationGoal"]').disabled).toBe(true);
+    expect(select<HTMLElement>('.agent-conversation').hidden).toBe(true);
+    expect(select('.agent-conversation-loading').getAttribute('role')).toBe('status');
+    expect(document.body.textContent).not.toContain("正在恢复对话");
+    await act(async () => pending.resolve({...makeView("另一段对话"),work:{...makeView().work,id:"other",goal:"另一段对话"}}));
+    expect(select<HTMLTextAreaElement>('[name="investigationGoal"]').disabled).toBe(false);
+    expect(select('.agent-task-mode').textContent).toContain("另一段对话");
+  });
+  it("returns to the original conversation when another conversation cannot be read", async () => {
+    list = async () => ({works:[{id:current.work.id,goal:current.work.goal,state:"ready"},{id:"unavailable",goal:"无法读取的对话",state:"ready"}],nextCursor:null});
+    invoke.mockImplementation((command,payload) => payload?.args?.action === "status" && payload.args.id === "unavailable" ? Promise.reject(new Error("暂时无法读取所选对话")) : native(command,payload));
+    await render(<StandaloneInvestigation initiallyOpen/>);
+    await openHistory();await activate(select<HTMLButtonElement>('[data-work-id="unavailable"]'));
+    expect(select('.agent-task-mode').textContent).toContain(current.work.goal);
+    expect(select<HTMLElement>('.agent-conversation').hidden).toBe(false);
+    expect(select<HTMLTextAreaElement>('[name="investigationGoal"]').disabled).toBe(false);
+    expect(document.body.textContent).toContain("暂时无法读取所选对话");
+  });
+  it("finishes deletion and offers undo without waiting for a history refresh", async () => {
+    const pending = deferred<Page>();
+    list = async () => ({works:[{id:current.work.id,goal:current.work.goal,state:"ready"}],nextCursor:null});
+    invoke.mockImplementation((command,payload) => payload?.args?.action === "setHistoryPreference" ? Promise.resolve({}) : native(command,payload));
+    await render(<StandaloneInvestigation initiallyOpen/>);
+    await openHistory();
+    list = () => pending.promise;
+    await activate(select<HTMLButtonElement>('.agent-history-actions button'));
+    await activate(select<HTMLButtonElement>('.agent-history-delete'));
+    expect(document.querySelector('[data-work-id="new-work"]')).toBeNull();
+    const undo = select<HTMLButtonElement>('.agent-history-undo button');
+    expect(undo.disabled).toBe(false);
+    expect(select<HTMLTextAreaElement>('[name="investigationGoal"]').disabled).toBe(false);
+    expect(select('.agent-task-mode').textContent).toContain("新聊天");
+    await act(async () => pending.resolve({works:[],nextCursor:null}));
+  });
   it("waits for the admitted run before enabling stop and refreshes its control identity before cancelling",async()=>{
     const pending=deferred<ReturnType<typeof makeView>>();
     const lifecycle=(activeRunId:string|null,controlRevision:number,state="running")=>({schemaVersion:1,controlRevision,workRevision:current.work.revision,activeRunId,state,requiresExplicitResume:false,canResume:false,recoveryMode:"fresh",runsUsed:1,runLimit:null,unresolvedActions:0,reason:"",recordedUsage:{}});

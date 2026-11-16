@@ -1,4 +1,4 @@
-import { AgentPanelProvider, StandaloneAgentLauncher,AgentFlashcardMaterial,AgentCitationBody,AgentBrowsingContext } from "./StandaloneAgentLauncher";
+import { AgentPanelProvider, StandaloneAgentLauncher,AgentFlashcardMaterial,AgentCitationBody,AgentBrowsingContext,AgentCitationContext } from "./StandaloneAgentLauncher";
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -1498,6 +1498,28 @@ it.each(["Escape","close button"])("local standalone citation returns to its ori
   expect(document.body.querySelector('.agent-source-preview')).toBeNull();
   expect(conversation.scrollTop).toBe(317);expect(document.activeElement).toBe(citation);
   expect(invoke.mock.calls.some(([,v])=>['create','respond','submitObsidianEdit'].includes(v?.args?.action))).toBe(false);
+});
+it("opens the book preview in the visible assistant area even when the Hub page preview exists",async()=>{
+  current={...makeView(),conversation:{messages:[{id:"answer",role:"assistant",runId:"saved-citation",report:{...report,prose:{markdown:"保留原设计 [1](#hub-citation-1)",citations:[{evidenceId:"e1",quote:"保持 M6"}]}},evidence:makeView().evidence,createdAt:1}],hasEarlier:false}};
+  let finish:(value:unknown)=>void=()=>{};
+  const show=vi.fn();
+  invoke.mockImplementation(async(_,{args})=>args.action==='list'?{works:[{id:current.work.id,goal:current.work.goal,state:current.work.state}]}:args.action==='source'?new Promise(resolve=>{finish=resolve;}):current);
+  await act(async()=>root.render(<AgentCitationContext.Provider value={{value:null,show}}><StandaloneInvestigation initiallyOpen/></AgentCitationContext.Provider>));
+  await fill("investigationGoal","未发送的核对问题");
+  const conversation=document.querySelector<HTMLElement>('.agent-conversation')!;
+  conversation.scrollTop=317;
+  const book=document.querySelector<HTMLButtonElement>('.agent-citation-book')!;
+  book.focus();await act(async()=>book.click());
+  expect(document.querySelector('.agent-conversation-wrap > .agent-source-preview')).not.toBeNull();
+  expect(conversation.hidden).toBe(true);
+  expect(document.activeElement).toBe(button("关闭引用原文"));
+  await act(async()=>finish({excerpt:makeView().evidence[0]}));
+  expect(document.querySelector('.agent-source-preview mark')?.textContent).toBe("保持 M6");
+  expect(show.mock.calls.every(([value])=>value===null)).toBe(true);
+  await click("关闭引用原文");
+  expect(conversation.hidden).toBe(false);expect(conversation.scrollTop).toBe(317);
+  expect(document.activeElement).toBe(book);
+  expect(document.querySelector<HTMLTextAreaElement>('[name="investigationGoal"]')!.value).toBe("未发送的核对问题");
 });
 it.each([false,true])("local citation dismissal invalidates pending/error state without closing the assistant (error=%s)",async(error)=>{
   current={...makeView(),work:{...makeView().work,anchor:null},conversation:{messages:[{id:"answer",role:"assistant",runId:"saved-citation",report,evidence:makeView().evidence,createdAt:1}],hasEarlier:false}} as unknown as typeof current;
