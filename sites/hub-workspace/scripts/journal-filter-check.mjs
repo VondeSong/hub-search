@@ -53,4 +53,36 @@ test('旧多资料库、空选择和表格布局配置保留明确语义', () =>
   assert.equal(views.normalizeJournalView({ layout: 'table' }).layout, 'list');
   assert.equal(views.normalizeJournalView({ libraries: null }).libraries, null);
 });
+test('临时搜索不把保存视图标记为已修改', () => {
+  const saved = { ...base, query: '旧关键词' };
+  for (const query of ['', 'Hub', '不存在的词']) {
+    assert.equal(views.journalViewModified(saved, { ...base, query }), false);
+  }
+});
+test('真实筛选变化仍会标记保存视图已修改', () => {
+  for (const patch of [{ libraries: [] }, { recordFilter: 'pinned' }, { period: 'all' }, { layout: 'calendar' }]) {
+    assert.equal(views.journalViewModified(base, { ...base, ...patch, query: 'Hub' }), true);
+  }
+});
+test('保存视图排除临时搜索并保留全部筛选及显示配置', () => {
+  const current = { ...base, query: '临时查找', libraries: ['Car', 'OS'], recordFilter: 'attachments', compact: true };
+  const snapshot = views.journalSavedConfig(current);
+  assert.equal(snapshot.query, '');
+  assert.deepEqual({ ...snapshot, query: current.query }, current);
+  assert.equal(current.query, '临时查找');
+});
+test('切换或恢复视图保留当前查找而不复活旧搜索词', () => {
+  const saved = { ...base, query: '旧词', libraries: ['OS'], period: 'day', day: '2026-11-08' };
+  assert.deepEqual(views.journalSelectConfig(saved, 'Hub'), { ...saved, query: 'Hub' });
+  assert.equal(views.journalSelectConfig(saved, '').query, '');
+  assert.equal(saved.query, '旧词');
+});
+test('旧视图存储继续接受历史搜索及明确空资料库选择', () => {
+  const restored = views.parseJournalViews(JSON.stringify({ version: 1, view: { ...base, query: '会话查找' }, activeId: 'saved', saved: [{ id: 'saved', name: '原有视图', hidden: false, config: { ...base, query: '旧词', libraries: [] } }] }));
+  assert.equal(restored.activeId, 'saved');
+  assert.equal(restored.view.query, '会话查找');
+  assert.equal(restored.saved[0].config.query, '旧词');
+  assert.deepEqual(restored.saved[0].config.libraries, []);
+  assert.equal(views.journalViewModified(restored.saved[0].config, { ...restored.saved[0].config, query: '新词' }), false);
+});
 console.log(`${count} 项日志筛选回归通过。`);
