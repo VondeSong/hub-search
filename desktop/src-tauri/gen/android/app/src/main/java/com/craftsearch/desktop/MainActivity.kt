@@ -62,6 +62,12 @@ class MainActivity : TauriActivity() {
     rememberJournalAction(intent)
   }
 
+  override fun onStop() {
+    // No foreground service in this phase: finalize rather than silently lose background audio.
+    runCatching { JournalVoiceRecorder.stop(this) }
+    super.onStop()
+  }
+
   internal fun requestJournalKeyboard(done: () -> Unit) {
     val web = hubWebView
     if (web == null || !hasWindowFocus()) { pendingJournalKeyboard = true; done(); return }

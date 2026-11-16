@@ -14,6 +14,12 @@ import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.Plugin
 import java.io.Closeable
+import app.tauri.annotation.Permission
+import app.tauri.annotation.PermissionCallback
+import app.tauri.PermissionState
+
+@InvokeArg
+class JournalVoiceArgs { lateinit var action: String; var token: String = "" }
 
 @InvokeArg
 class SourceOpenArgs { lateinit var url: String }
@@ -121,8 +127,36 @@ internal object BackupCopyControl {
     }
 }
 
-@TauriPlugin
+@TauriPlugin(permissions = [Permission(strings = [android.Manifest.permission.RECORD_AUDIO], alias = "microphone")])
 class SourceOpenerPlugin(private val activity: Activity) : Plugin(activity) {
+    @Command
+    fun journalVoice(invoke: Invoke) {
+        val args = invoke.parseArgs(JournalVoiceArgs::class.java)
+        if (args.action == "start" && getPermissionState("microphone") != PermissionState.GRANTED) {
+            requestPermissionForAlias("microphone", invoke, "journalVoicePermission")
+            return
+        }
+        activity.runOnUiThread {
+            try {
+                val result = when (args.action) {
+                    "start" -> JournalVoiceRecorder.start(activity)
+                    "pause" -> JournalVoiceRecorder.pause(activity)
+                    "resume" -> JournalVoiceRecorder.resume(activity)
+                    "stop" -> JournalVoiceRecorder.stop(activity)
+                    "status" -> JournalVoiceRecorder.status(activity)
+                    "read" -> JournalVoiceRecorder.read(activity, args.token)
+                    "acknowledge" -> JournalVoiceRecorder.acknowledge(activity, args.token)
+                    else -> throw IllegalArgumentException("不支持的录音操作")
+                }
+                invoke.resolve(result)
+            } catch (e: Exception) { invoke.reject(e.message ?: "录音操作未完成，原音仍保留") }
+        }
+    }
+    @PermissionCallback
+    fun journalVoicePermission(invoke: Invoke) {
+        if (getPermissionState("microphone") == PermissionState.GRANTED) journalVoice(invoke)
+        else invoke.reject("未允许麦克风，请在系统应用权限中允许后重试；原草稿保留。")
+    }
     @Command
     fun focusJournalEditor(invoke: Invoke) {
         activity.runOnUiThread {

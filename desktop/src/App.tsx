@@ -1,3 +1,4 @@
+import { JournalVoiceHost } from "./JournalVoice";
 import { MobileJournal } from "./MobileJournal";
 import { MobileHeader } from "./MobileHeader";
 import { invoke } from "@tauri-apps/api/core";
@@ -1461,6 +1462,7 @@ useEffect(() => {
       /> : undefined,
     },
     settingsDialog: <>
+      {isMobileLayout && <JournalVoiceHost onOpen={() => setQuickCaptureOpen(false)} />}
       {isMobileLayout && quickCaptureOpen && <Suspense fallback={null}><LazyMobileQuickCapture onClose={() => setQuickCaptureOpen(false)} onSaved={savedMobileCapture} onSyncSettings={openCaptureSyncSettings} /></Suspense>}
       {showConnection ? (
       <Suspense fallback={<div className="connection-overlay"><div className="settings-lazy-loading">正在打开设置…</div></div>}>

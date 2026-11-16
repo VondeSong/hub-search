@@ -7,6 +7,7 @@ pub(crate) mod calendar;
 pub(crate) mod edits;
 mod format;
 pub(crate) mod mobile;
+pub(crate) mod voice;
 use format::{Attachment, Record, MAX_ATTACHMENT};
 #[cfg(target_os = "android")]
 mod android;

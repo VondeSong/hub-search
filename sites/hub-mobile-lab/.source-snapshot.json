@@ -3,9 +3,9 @@
   "site": "mobile",
   "project_id": "appgprj_6af1d2dc12308191acc37e5566699c2d",
   "site_url": "https://hub-mobile-lab-von11.song02211368537057.chatgpt.site",
-  "source_commit": "8077fac727be5c4081d46ee92ad13068fce07beb",
-  "published_version": 21,
-  "deployment_id": "appgdep_6afaace56f508191b01bf0427f824c82",
+  "source_commit": "250eaf594c66e43c030c74faf12498dbdccbaeca",
+  "published_version": 23,
+  "deployment_id": "appgdep_6afab4118d488191ab7aa5b4f83351f5",
   "files": {
     ".openai/hosting.json": {
       "sha256": "543a776095c0181cc870f784c075ab4f263fb739e3649cd8db74f493fb5b4ca3",
@@ -153,14 +153,14 @@
       "bytes": 28240
     },
     "dist/voice.css": {
-      "sha256": "7dcd75425867a7a3835da565c7fa629624862d32642d76f4791f84a1e10b6cb8",
+      "sha256": "a89687fbd50832fa584804ca13c4244bee5411c061ca6a2d88efb00cd836857c",
       "mode": "100644",
-      "bytes": 2822
+      "bytes": 3295
     },
     "dist/voice.js": {
-      "sha256": "9d91eaf001aaf357ae1d2d68850bc01de5466a2d8a337893e6e17b8cfc3d2688",
+      "sha256": "23a3a4371ffe5c415a6f8c62c37b5c230e41fa2e3256a833d60b85366c10cd76",
       "mode": "100644",
-      "bytes": 16129
+      "bytes": 18104
     },
     "dist/widgets.css": {
       "sha256": "dab718c6ffea193c3317de835b1dcdd3a2ea118de57057687014ace3ab505df9",
@@ -303,5 +303,5 @@
       "bytes": 3301
     }
   },
-  "imported_at": "2026-11-16T07:13:10.382741+00:00"
+  "imported_at": "2026-11-16T07:43:43.116745+00:00"
 }

@@ -18,6 +18,7 @@ function voiceOpen(id) {
     const n=journalStudioRecords(true).find(n=>recordAttachments(n).some(a=>a.id===id));
     const a=draftAttachment||(n&&recordAttachments(n).find(a=>a.id===id));
     if(!a?.voice)return;
+    if(st.voiceDraft&&st.voiceDraft.state==='ready'&&!st.voiceDraft.elapsed&&!voiceText(st.voiceDraft)&&!st.voiceDraft.edited){st.voiceDraft=null;}
     if(st.voiceDraft&&st.voiceDraft.id!==id){tell('请先完成当前语音草稿，再打开其他录音。');return;}
     voiceBlob=null;
     st.voiceDraft={...structuredClone(a.voice),id,target:draftAttachment?(form.dataset.editId||''):n.id,state:'review',attached:true,inDraft:Boolean(draftAttachment)};
@@ -38,7 +39,7 @@ function voiceShow() {
     '<div id="voice-notice" class="voice-notice" role="status">'+esc(v.failure)+'</div>'+
     (ready?'<p class="voice-intro">说下来，再慢慢校对。</p><p class="fine">可直接体验完整流程；也可以使用麦克风录一段，只保存在此浏览器。</p><div class="voice-actions">'+btn('体验实时转录','voice-demo')+plain('使用麦克风录音','voice-real')+'</div>':'')+
     (active?'<div class="voice-transcript"><h3>'+(v.mode==='demo'?'实时文字 · 演示':'文字待转写')+'</h3><div id="voice-final">'+voiceParagraphs(v)+'</div><p id="voice-partial" class="voice-partial">'+esc(v.partial||(!v.segments.length?'说出的内容将在这里逐段出现…':''))+'</p></div><div class="voice-actions">'+btn(v.state==='paused'?'继续录音':'暂停录音','voice-pause','outline')+btn('完成录音','voice-finish')+'</div>'+(v.mode==='demo'?'<details class="voice-scenarios"><summary>体验异常与恢复</summary><div class="actions">'+plain('模拟断网','voice-fail:断网')+plain('模拟额度不足','voice-fail:额度不足')+(v.failure?plain('恢复转写演示','voice-retry'):'')+'</div></details>':''):'')+
-    (review?'<div class="voice-playback">'+(v.mode==='real'?'<audio id="voice-audio" controls aria-label="原音回听"></audio><p id="voice-audio-state" class="fine">正在读取本机原音…</p>':'<p class="fine">流程演示未使用麦克风，没有原音文件。</p>')+'</div><label class="voice-edit-label" for="voice-edit">校对后的文字</label><textarea id="voice-edit" rows="5" placeholder="可以手动补充文字">'+esc(v.editedByUser?v.edited:voiceText(v))+'</textarea><details class="voice-original"><summary>查看识别原文'+(v.mode==='demo'?'（演示）':'')+'</summary><p>'+esc(voiceText(v)||'尚无识别结果')+'</p></details>'+(v.failure&&v.mode==='demo'?plain('补转缺失文字（演示）','voice-retry'):'')+'<p class="fine">'+(v.target?'保留同一条记录；补转原文不会覆盖你已有的正文。':'确认后回到原速记草稿，文字和录音一起保存。')+'</p><div class="voice-actions">'+btn(v.attached?'保存校对':'加入速记草稿','voice-attach')+(v.mode==='real'?plain('下载原音','voice-download'):'')+'</div>':'')+
+    (review?'<div class="voice-playback">'+(v.mode==='real'?'<audio id="voice-audio" controls aria-label="原音回听"></audio><p id="voice-audio-state" class="fine">正在读取本机原音…</p>':'<p class="fine">流程演示未使用麦克风，没有原音文件。</p>')+'</div><label class="voice-edit-label" for="voice-edit">校对后的文字</label><textarea id="voice-edit" rows="5" placeholder="可以手动补充文字">'+esc(v.editedByUser?v.edited:voiceText(v))+'</textarea><details class="voice-original"><summary>查看识别原文'+(v.mode==='demo'?'（演示）':'')+'</summary><p>'+esc(voiceText(v)||'尚无识别结果')+'</p></details>'+(v.failure&&v.mode==='demo'?plain('补转缺失文字（演示）','voice-retry'):'')+'<p class="fine">'+(v.target?'保留同一条记录；补转原文不会覆盖你已有的正文。':'确认后回到原速记草稿，文字和录音一起保存。')+'</p><div class="voice-actions">'+btn(v.attached?'保存校对':'加入速记草稿','voice-attach')+(v.mode==='real'?plain('下载原音','voice-download'):'')+(v.attached&&v.target?plain('继续追加录音','voice-continue'):'')+'</div>':'')+
     (review&&v.mode==='real'&&!v.audioSaved&&!voiceBlob?plain('重新录制','voice-retake'):'')+
     '<p class="voice-footnote">阿里与 OpenAI 均未连接，不产生识别费用。网页不保证锁屏或后台持续录音。</p></section>');
   if(review&&v.mode==='real')void voiceLoadAudio(v);
@@ -138,11 +139,17 @@ async function voiceAttach() {
     voiceBlob=null;
     if(v.attached&&v.inDraft&&!v.target){quickCapture('note');tell('校对稿已保存在语音附件内，正文保持不变。');}
     else if(v.attached){close();render();tell('校对稿已保存，原正文保持不变。');}
-    else if(v.target){close();render();tell('已加入同一条记录的编辑草稿。');}
-    else quickCapture('note');
+    else if(v.target){if(journalCommitEdit(v.target)){voiceOpen();voiceNotice('已保存到原记录，可以继续录入。');}else{close();go('journal-edit/'+v.target);tell('追加已保留在原记录草稿，请核对后保存。');}}
+    else {quickCapture('note');voiceShowContinue();}
   }catch(e){voiceNotice(e.message);}finally{voiceBusy=false;}
 }
+function voiceShowContinue(){const form=document.querySelector('#quick-capture-form');if(form){const b=document.createElement('button');b.type='button';b.className='plain';b.textContent='保存并继续录入';b.dataset.act='voice-save-next';form.append(b);}}
 function voiceAction(a,key) {
+  if(a==='voice-save-next'){const form=document.querySelector('#quick-capture-form');if(form){const count=st.notes.length;handleWorkflowSubmit(form);if(st.notes.length>count){voiceOpen();voiceNotice('上一条已保存，准备好即可录下一条。');}}return true;}
+  if(a==='voice-continue'){
+    const previous=st.voiceDraft;if(!previous?.attached||!previous.target)return true;
+    st.voiceDraft=voiceNew(previous.target);voicePersist();voiceShow();return true;
+  }
   if(a==='journal-voice'){voiceOpen();return true;}
   if(a==='voice-open'){voiceOpen(key);return true;}
   if(!a.startsWith('voice-'))return false;
@@ -164,3 +171,12 @@ document.addEventListener('click',e=>{if(e.target.closest?.('[data-act="close"]'
 document.addEventListener('visibilitychange',()=>{if(document.hidden)void voiceFinish();});
 window.addEventListener('popstate',()=>{if(st.voiceDraft?.state==='requesting'){st.voiceDraft.state='ready';voicePersist();}if(['recording','paused'].includes(st.voiceDraft?.state))void voiceFinish();});
 window.addEventListener('beforeunload',e=>{if(voiceRecorder||voiceBlob&&!st.voiceDraft?.audioSaved){e.preventDefault();e.returnValue='';}});
+let voiceHoldTimer=null,voiceHoldOrigin=null,voiceHoldFired=false;
+document.addEventListener('pointerdown',e=>{
+  const button=e.target.closest?.('[data-act="quick-capture:note"]');if(!button||e.button!==0)return;
+  voiceHoldFired=false;voiceHoldOrigin={x:e.clientX,y:e.clientY};
+  voiceHoldTimer=setTimeout(()=>{voiceHoldFired=true;voiceOpen();},500);
+});
+document.addEventListener('pointermove',e=>{if(voiceHoldOrigin&&Math.hypot(e.clientX-voiceHoldOrigin.x,e.clientY-voiceHoldOrigin.y)>12)clearTimeout(voiceHoldTimer);});
+for(const name of ['pointerup','pointercancel'])document.addEventListener(name,()=>{clearTimeout(voiceHoldTimer);voiceHoldOrigin=null;});
+document.addEventListener('click',e=>{if(voiceHoldFired&&e.target.closest?.('[data-act="quick-capture:note"]')){e.preventDefault();e.stopImmediatePropagation();voiceHoldFired=false;}},true);

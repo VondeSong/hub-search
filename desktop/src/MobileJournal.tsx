@@ -1,7 +1,8 @@
+import { JournalCaptureButton, JournalAudio, isJournalAudio, openJournalVoice } from "./JournalVoice";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, Check, ChevronDown, Cloud, Copy, Hash, ImagePlus, Menu, MoreHorizontal, Paperclip, Plus, Search, Share2, Sparkles, Clock3, Tag, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Cloud, Copy, Hash, ImagePlus, Menu, MoreHorizontal, Paperclip, Search, Share2, Sparkles, Clock3, Tag, Trash2, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -9,7 +10,7 @@ import { Image, tagsFor } from "./QuickJournal";
 import type { QuickJournalItem } from "./JournalRecords";
 import { JournalRichEditor, type JournalRichEditorHandle } from "./JournalRichEditor";
 import { localJournalDate } from "./JournalViews";
-import { QUICK_JOURNAL_UPDATED, openQuickJournalCapture } from "./QuickJournalEvents";
+import { QUICK_JOURNAL_UPDATED } from "./QuickJournalEvents";
 import { userProfileStorage } from "./UserProfileStorage";
 import { openCloudSyncSettings } from "./CloudSyncEvents";
 import { compareJournalItems, emptyJournalScope, journalSearchActive, journalSearchMatches, journalSortLabels, JournalFilterForm, JournalQuickSearch, JournalSearchFilterBar, JournalSearchHeader, JournalViewMenu, withJournalTags, type JournalSearchScope, type JournalSort } from "./MobileJournalTools";
@@ -99,14 +100,14 @@ export function MobileJournal({onBack,onInsights,targetId,onTargetHandled}:{onBa
   {error&&<p role="alert" className="mobile-journal-error">{error}<button onClick={()=>void refresh()}>重新读取</button></p>}{notice&&<p role="status" className="mobile-journal-notice">{notice}</p>}
   {loading?<p role="status">正在读取记录…</p>:showResults&&filtered.slice(0,200).map(item=><article className={`mobile-journal-card${selecting&&picked.has(item.record.id)?" is-selected":""}`} key={item.record.id} data-record-id={item.record.id} onClickCapture={e=>{if(selecting){e.preventDefault();e.stopPropagation();togglePicked(item.record.id);}}}><header>{selecting&&<button className="mobile-journal-card-selector" aria-label={`选择记录 ${item.record.date}`} aria-pressed={picked.has(item.record.id)}>{picked.has(item.record.id)&&<Check size={15}/>}</button>}<span>{pins.includes(item.record.id)?"置顶 · ":""}{item.record.date}</span><small>{stamp(item)}</small>{!selecting&&<button aria-label={`记录操作 ${item.record.date}`} onClick={()=>setPanel({kind:"menu",item})}><MoreHorizontal size={19}/></button>}</header>
     <div className={`mobile-journal-copy${!expanded.has(item.record.id)&&(item.record.text.length>240||item.record.text.split("\n").length>8)?" is-collapsed":""}`} role="button" tabIndex={0} aria-label={selecting?"选择这条记录":"编辑这条记录"} onClick={e=>{if(!selecting&&!(e.target as HTMLElement).closest("a,button"))setEditing(item);}} onKeyDown={e=>{if(e.key==="Enter"){if(selecting)togglePicked(item.record.id);else setEditing(item);}}}><Body text={item.record.text}/></div>
-    <div className="mobile-journal-photos">{item.record.attachments.map(a=>a.image?<button key={a.hash} aria-label={`查看照片 ${a.name}`} onClick={()=>setPanel({kind:"photo",item,version:{record:{...item.record,attachments:[a]},revision:item.revision||"",createdAt:null,deleted:false}})}><Image hash={a.hash} name={a.name}/></button>:<button key={a.hash} onClick={()=>void run(async()=>{await invoke("export_quick_journal_attachment",{id:item.record.id,hash:a.hash,destination:""});})}><Paperclip size={18}/>{a.name}</button>)}</div>
+    <div className="mobile-journal-photos">{item.record.attachments.map(a=>a.image?<button key={a.hash} aria-label={`查看照片 ${a.name}`} onClick={()=>setPanel({kind:"photo",item,version:{record:{...item.record,attachments:[a]},revision:item.revision||"",createdAt:null,deleted:false}})}><Image hash={a.hash} name={a.name}/></button>:isJournalAudio(a.name)?<JournalAudio key={a.hash} attachment={a} onContinue={!item.deleted&&item.revision?()=>openJournalVoice({record:item.record,revision:item.revision}):undefined}/>:<button key={a.hash} onClick={()=>void run(async()=>{await invoke("export_quick_journal_attachment",{id:item.record.id,hash:a.hash,destination:""});})}><Paperclip size={18}/>{a.name}</button>)}</div>
     {(item.record.text.length>240||item.record.text.split("\n").length>8)&&<button className="mobile-journal-expand" aria-expanded={expanded.has(item.record.id)} onClick={()=>setExpanded(v=>{const n=new Set(v);n.has(item.record.id)?n.delete(item.record.id):n.add(item.record.id);return n;})}>{expanded.has(item.record.id)?"收起":"展开"}</button>}
     {!!tagsFor(item.record.text).length&&<footer>{[...new Set(tagsFor(item.record.text))].map(t=><button key={t} onClick={()=>setTag(t)}>#{t}</button>)}</footer>}
     {item.deleted&&<button onClick={()=>void run(async()=>{await mutate(item,item.record,false);})}>恢复记录</button>}{item.sourceError&&<div role="alert"><p>{item.sourceError}</p><button onClick={()=>void action("history",item)}>查看未同步修改</button></div>}
   </article>)}
   {showResults&&!loading&&!filtered.length&&<div className="mobile-journal-empty"><h2>{search||filter!=="all"?"没有符合条件的记录":"记下一点新的想法"}</h2><p>{search?"试试调整关键词或筛选。":"点下方的＋开始写，也可以调整筛选。"}</p></div>}
   {showResults&&filtered.length>200&&<p>请使用日期、标签或搜索缩小范围，当前显示前200条。</p>}</div>
-  {!search&&!selecting&&<div className="mobile-journal-create"><button aria-label="记一条" onClick={openQuickJournalCapture}><Plus size={30}/></button></div>}
+  {!search&&!selecting&&<div className="mobile-journal-create"><JournalCaptureButton/></div>}
   {selecting&&<div className="mobile-journal-batch-dock"><button disabled={!picked.size||busy} onClick={()=>setPanel({kind:"batch-tag"})}><Tag size={20}/>添加标签</button><button disabled={!picked.size||busy} onClick={()=>void run(()=>copy(items.filter(i=>picked.has(i.record.id)).map(i=>i.record.text).join("\n\n---\n\n")))}><Copy size={20}/>复制全部</button><button disabled={!picked.size||busy} onClick={()=>setPanel({kind:"batch-delete"})}><Trash2 size={20}/>删除</button></div>}
   {floating&&items.find(i=>i.record.id===floating)&&<aside className="mobile-journal-floating"><button onClick={()=>setEditing(items.find(i=>i.record.id===floating)!)}>{items.find(i=>i.record.id===floating)!.record.text.slice(0,28)}</button><button aria-label="关闭便览" onClick={()=>setFloating("")}><X size={17}/></button></aside>}
   {panel&&<Dialog title={panelTitles[panel.kind]||(panel.kind==="menu"?"记录操作":panel.kind==="sync"?"速记同步":panel.kind==="nav"?"日志":panel.kind==="history"?"历史版本":panel.kind==="version"?"历史版本详情":panel.kind==="date"?"设定日期":panel.kind==="delete"?"删除记录":panel.kind==="annotate"?"添加批注":panel.kind==="related"?"相关笔记":"记录详情")} className={panel.kind==="menu"?"journal-menu-dialog":panel.kind==="views"?"journal-view-dialog":""} onClose={closePanel}>

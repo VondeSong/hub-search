@@ -25,7 +25,12 @@
 .voice-panel summary { cursor:pointer; min-height:44px; padding:10px 0; }
 .voice-footnote { font-size:12px; line-height:1.6; color:var(--muted); margin:22px 0 0; }
 .voice-playback audio { width:100%; height:44px; }
-.voice-attachment { display:flex; gap:10px; align-items:center; width:100%; min-height:54px; color:var(--ink); text-align:left; }
+.capture-file:has(.voice-attachment) { width:100%; margin:4px 0; border:0; background:none; }
+.capture-file .voice-attachment { display:flex; gap:14px; align-items:center; width:100%; min-height:66px; padding:14px 16px; border:0; border-radius:14px; background:var(--surface); color:var(--ink); text-align:left; font:inherit; font-size:15px; }
+.voice-attachment>svg { flex:none; width:24px; height:24px; color:var(--blue); }
+.voice-attachment>span { flex:1; }
+.voice-attachment::after { content:'查看'; color:var(--blue); font-size:13px; }
+.voice-attachment:hover { background:var(--surface-hover); }
 .voice-attachment small { display:block; margin-top:4px; color:var(--muted); }
 .voice-panel :focus-visible { outline:2px solid var(--blue); outline-offset:3px; }
 @media(max-width:360px) { .voice-actions { gap:8px; } .voice-clock { padding:18px 0; } }

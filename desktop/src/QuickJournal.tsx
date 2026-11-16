@@ -1,6 +1,7 @@
+import { openJournalVoice } from "./JournalVoice";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bold, CalendarDays, ExternalLink, Hash, ImagePlus, List, ListOrdered, Quote, SquareCheck, Pin, Copy, MoreHorizontal, Paperclip, Plus, RefreshCw, Send, X } from "lucide-react";
+import { Mic, Bold, CalendarDays, ExternalLink, Hash, ImagePlus, List, ListOrdered, Quote, SquareCheck, Pin, Copy, MoreHorizontal, Paperclip, Plus, RefreshCw, Send, X } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -224,7 +225,7 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
     requestAnimationFrame(() => { input.focus({ preventScroll: true }); input.setSelectionRange(start + (kind === "bold" ? 2 : value.length), start + value.length - (kind === "bold" ? 2 : 0)); });
   }
   const compose = <form className={`quick-journal-compose ${mobile ? "is-mobile" : ""}`} onSubmit={e => { e.preventDefault(); void save(); }}>
-    {mode==="compose"&&mobile?<JournalRichEditor ref={richInput} value={draft.text} onChange={text=>persist({...draftLatest.current,text})} disabled={!ready||saving||uploading} onPhotos={()=>photoInput.current?.click()} onMore={()=>setMoreOpen(!moreOpen)} moreOpen={moreOpen} onSubmit={()=>void save()} actions={<button type="submit" className="journal-rich-send" aria-label="保存记录" disabled={!ready||saving||uploading||(!draft.text.trim()&&!draft.attachments.length)}><Send size={20}/></button>}/>:<>
+    {mode==="compose"&&mobile?<JournalRichEditor ref={richInput} value={draft.text} onChange={text=>persist({...draftLatest.current,text})} disabled={!ready||saving||uploading} onPhotos={()=>photoInput.current?.click()} onMore={()=>setMoreOpen(!moreOpen)} moreOpen={moreOpen} onSubmit={()=>void save()} actions={<><button type="button" aria-label="进入录音模式" disabled={!ready||saving||uploading} onClick={()=>void draftWrites.then(()=>openJournalVoice({record:draftLatest.current,sourceDraft:true})).catch(e=>setError(message(e)))}><Mic size={21}/></button><button type="submit" className="journal-rich-send" aria-label="保存记录" disabled={!ready||saving||uploading||(!draft.text.trim()&&!draft.attachments.length)}><Send size={20}/></button></>}/>:<>
     <label className="sr-only" htmlFor="quick-journal-text">此刻的想法</label>
     <textarea ref={textInput} id="quick-journal-text" placeholder="现在的想法是…" value={draft.text} disabled={!ready || saving} maxLength={100000} onChange={e => persist({ ...draftLatest.current, text: e.target.value })} onKeyDown={e => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); void save(); } }} />
     </>}
