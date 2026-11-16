@@ -18,6 +18,15 @@ beforeEach(()=>{(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;node=document.
 afterEach(async()=>{await act(async()=>{root.unmount();await wait();});node.remove();vi.restoreAllMocks();vi.unstubAllGlobals();delete(globalThis as any).IS_REACT_ACT_ENVIRONMENT;});
 async function render(){await act(async()=>root.render(<MobileJournal onBack={()=>{}} onInsights={()=>{}}/>));}
 async function edit(){await act(async()=>(document.querySelector('[aria-label="编辑这条记录"]') as HTMLElement).click());await act(async()=>wait());}
+it("renders saved voice as an audio row in the editor and removes only that attachment",async()=>{
+ vi.spyOn(HTMLMediaElement.prototype,"pause").mockImplementation(()=>{});vi.spyOn(HTMLMediaElement.prototype,"load").mockImplementation(()=>{});
+ items[0].record.attachments=[{hash:"d".repeat(64),name:"语音-5秒.m4a",size:1200,image:false}];
+ await render();await edit();const row=document.querySelector('.mobile-journal-editor-audio')!;
+ expect(row.querySelector('.journal-audio')).not.toBeNull();expect(row.querySelector('[aria-label="播放原音"]')).not.toBeNull();
+ await act(async()=>row.querySelector<HTMLButtonElement>('[aria-label^="移除附件"]')!.click());
+ expect(document.querySelector('.mobile-journal-editor-audio')).toBeNull();expect(drafts.get(`edit:${items[0].record.id}`)).toContain('原记录 #日常');
+ expect(invoke.mock.calls.some(c=>c[0]==="update_quick_journal")).toBe(false);
+});
 it("can leave a loading old-record editor without clearing or submitting its retained draft",async()=>{
  const retained=JSON.stringify({record:{...items[0].record,text:"尚未读完的原草稿"},revision:items[0].revision});drafts.set(`edit:${items[0].record.id}`,retained);
  const original=invoke.getMockImplementation()!;let complete!:(value:string)=>void;

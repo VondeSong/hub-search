@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Mic, Pause, Play, Plus, Square, X, Check, ChevronRight } from "lucide-react";
+import { Mic, Pause, Play, Plus, Square, X, Check } from "lucide-react";
 import type { QuickJournalItem } from "./JournalRecords";
 import { localJournalDate } from "./JournalViews";
 import { QUICK_JOURNAL_UPDATED, openQuickJournalCapture } from "./QuickJournalEvents";
@@ -35,15 +35,16 @@ export function JournalCaptureButton({label="记一条",size=30}:{label?:string;
 }
 
 export function JournalAudio({attachment,onContinue}:{attachment:Attachment;onContinue?:()=>void}) {
-  const ref=useRef<HTMLAudioElement>(null),[url,setUrl]=useState(""),[busy,setBusy]=useState(false),[playing,setPlaying]=useState(false),[error,setError]=useState("");
+  const ref=useRef<HTMLAudioElement>(null),objectUrl=useRef(""),mounted=useRef(true),[url,setUrl]=useState(""),[busy,setBusy]=useState(false),[playing,setPlaying]=useState(false),[error,setError]=useState("");
   const [duration,setDuration]=useState(Number(attachment.name.match(/语音-(\d+)秒/)?.[1]||0)),[position,setPosition]=useState(0);
   useEffect(()=>{
-    const audio=ref.current;
+    mounted.current=true;const audio=ref.current;
     const hide=()=>{if(document.hidden)audio?.pause();};
     document.addEventListener("visibilitychange",hide);
-    return()=>{document.removeEventListener("visibilitychange",hide);audio?.pause();audio?.removeAttribute("src");audio?.load();};
+    return()=>{mounted.current=false;document.removeEventListener("visibilitychange",hide);audio?.pause();audio?.removeAttribute("src");audio?.load();if(objectUrl.current)URL.revokeObjectURL(objectUrl.current);};
   },[]);
-  async function play(){try{setError("");if(!url){setBusy(true);const data=await invoke<string>("quick_journal_audio",{hash:attachment.hash});setUrl(data);}else if(ref.current?.paused)await ref.current.play();else ref.current?.pause();}catch(e){setError(String(e));}finally{setBusy(false);}}
+  // Release media CSP allows blob URLs for local audio, but excludes data URLs.
+  async function play(){try{setError("");if(!url){setBusy(true);const data=await invoke<string>("quick_journal_audio",{hash:attachment.hash});if(!mounted.current)return;const match=/^data:((?:audio\/[\w.+-]+|video\/(?:mp4|webm)));base64,([A-Za-z0-9+/=\r\n]+)$/.exec(data);if(!match)throw new Error("原音格式暂不支持");const bytes=Uint8Array.from(atob(match[2]),c=>c.charCodeAt(0));objectUrl.current=URL.createObjectURL(new Blob([bytes],{type:match[1]}));setUrl(objectUrl.current);}else if(ref.current?.paused)await ref.current.play();else ref.current?.pause();}catch(e){setError(String(e));}finally{setBusy(false);}}
   useEffect(()=>{if(url)void ref.current?.play().catch(e=>setError(String(e)));},[url]);
   return <div className="journal-audio"><div className="journal-audio-row"><button type="button" className="journal-audio-play" aria-label={playing?"暂停原音":"播放原音"} disabled={busy} onClick={()=>void play()}>{playing?<Pause size={20}/>:<Play size={20}/>}</button><div className="journal-audio-track"><strong>语音记录</strong><input aria-label="播放进度" type="range" min={0} max={duration||1} step={0.1} value={position} disabled={!url} onChange={e=>{if(ref.current){ref.current.currentTime=Number(e.target.value);setPosition(Number(e.target.value));}}}/><small>{busy?"读取原音…":`${audioTime(position)} / ${audioTime(duration)}`}</small></div>{onContinue&&<button type="button" className="journal-audio-continue" onClick={onContinue}><Mic size={16}/><span>继续录入</span></button>}</div><audio ref={ref} src={url||undefined} preload="none" onPlay={()=>setPlaying(true)} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)} onDurationChange={()=>{if(Number.isFinite(ref.current?.duration))setDuration(ref.current!.duration);}} onTimeUpdate={()=>setPosition(ref.current?.currentTime||0)}/>{error&&<p role="alert">{error}</p>}</div>;
 }
@@ -100,7 +101,7 @@ export function JournalVoiceCapture({request,onClose}:{request:VoiceRequest;onCl
   };
   const finish=()=>run(async()=>{await stage();setNotice("原音已保留，可以回听、补充文字或继续录入。");});
   const leave=()=>void run(async()=>{await stage();transcription.suspend();await draftWrites;onClose();});
-  async function save(next:boolean){await run(async()=>{
+  async function save(){await run(async()=>{
     await stage();await draftWrites;
     const value=latest.current;if(!value.record.text.trim()&&!value.record.attachments.length)throw new Error("请先录一段声音或写下文字。");
     if(value.revision){const receipt=await invoke<{revision:string}>("update_quick_journal",{id:value.record.id,expectedRevision:value.revision,record:value.record,deleted:false});await persist({...value,revision:receipt.revision});}
@@ -113,8 +114,7 @@ export function JournalVoiceCapture({request,onClose}:{request:VoiceRequest;onCl
     if(value.sourceDraft){const raw=await invoke<string>("get_quick_journal_draft");if(raw&&JSON.parse(raw).id===value.record.id)await invoke("save_quick_journal_draft",{draft:""});}
     transcription.suspend();await draftWrites;
     await invoke("quick_journal_voice_draft",{value:""});
-    if(next){await persist(emptyDraft());transcription.resume();setStatus({state:"idle",elapsed:0,token:""});setNotice("上一条已保存。点麦克风，继续录下一条。");}
-    else onClose();
+    onClose();
   });}
   const active=status.state==="recording"||status.state==="paused";
   return createPortal(<dialog ref={ref} className="journal-voice-dialog" aria-label="语音速记" onCancel={e=>{e.preventDefault();leave();}}><header><div><h2>{draft.revision?"继续录入":"语音速记"}</h2><span>{draft.record.date} · 原音保留在本机</span></div><button type="button" aria-label="保留语音草稿并关闭" disabled={busy} onClick={leave}><X size={22}/></button></header><div className="journal-voice-body">
@@ -126,5 +126,5 @@ export function JournalVoiceCapture({request,onClose}:{request:VoiceRequest;onCl
     {draft.transcripts?.map(value=><JournalTranscript key={value.id} value={value} onChange={next=>{void persist({...latest.current,transcripts:latest.current.transcripts?.map(s=>s.id===next.id?next:s)}).catch(e=>setError(String(e)));}} onApply={()=>void run(async()=>{const current=latest.current,session=current.transcripts?.find(s=>s.id===value.id);if(!session||session.applied)return;const text=session.edited??session.text;await persist({...current,record:{...current.record,text:[current.record.text,text].filter(Boolean).join("\n\n")},transcripts:current.transcripts?.map(s=>s.id===session.id?{...s,applied:true}:s)});})} onRetry={()=>void run(()=>transcription.retry(value))} onCancel={()=>void run(()=>transcription.cancel(value))}/>)}
     <label className="journal-voice-text">补充文字<textarea aria-label="录音补充文字" value={draft.record.text} placeholder="记下要点，或稍后再补充…" disabled={!ready||busy} onChange={e=>{void persist({...latest.current,record:{...latest.current.record,text:e.target.value}}).catch(err=>setError(String(err)));}}/></label>
     <p className="journal-voice-boundary">{transcription.connectionError||"录音会发往所选转写服务，经你的 VPS 转接。识别后可校对并加入文字。"} 可先保存原音，稍后从这条录音继续查看转写。离开应用会结束并保留本段。</p>
-    </div><footer><button type="button" disabled={!ready||busy||active} onClick={()=>void save(false)}><Check size={18}/>保存</button><button type="button" className="voice-save-next" disabled={!ready||busy||active} onClick={()=>void save(true)}>保存并录下一条<ChevronRight size={18}/></button></footer></dialog>,document.body);
+    </div><footer><button type="button" disabled={!ready||busy||active} className="voice-save" onClick={()=>void save()}><Check size={18}/>保存</button></footer></dialog>,document.body);
 }

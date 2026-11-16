@@ -20,7 +20,7 @@
 .journal-voice-controls .voice-stop {background:var(--mobile-fill,#f1f3f6);color:var(--mobile-accent,#2863b8);}
 .journal-voice-dialog footer {display:flex;gap:12px;padding:16px 22px max(18px,env(safe-area-inset-bottom));background:var(--mobile-surface,#fff);border-top:1px solid var(--mobile-border,#e7e9ec);flex:none;}
 .journal-voice-dialog footer button {display:flex;justify-content:center;align-items:center;gap:6px;border:0;border-radius:12px;padding:11px 16px;background:var(--mobile-fill,#f1f3f6);color:inherit;}
-.journal-voice-dialog .voice-save-next {flex:1;background:var(--mobile-accent,#2863b8);color:white;}
+.journal-voice-dialog .voice-save {flex:1;background:var(--mobile-accent,#2863b8);color:white;}
 .journal-voice-dialog button:disabled {opacity:.45;cursor:default;}
 .journal-voice-text {display:block;font-size:14px;font-weight:500;margin:18px 0 0;}
 .journal-voice-text textarea {box-sizing:border-box;width:100%;margin-top:10px;min-height:88px;padding:12px;border:0;border-radius:12px;background:var(--mobile-fill,#f1f3f6);color:inherit;resize:vertical;font:inherit;line-height:1.65;}
