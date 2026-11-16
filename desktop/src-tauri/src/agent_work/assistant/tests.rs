@@ -1146,6 +1146,9 @@ fn native_stream_updates_are_durable_monotonic_and_rejected_after_stop() {
         json!({"id":"reasoning-1:0","kind":"reasoning","text":"核对原文","state":"running"});
     store::stream(&f.root, &w, &run, &event, &control).unwrap();
     let first = store::view(&f.root, &id).unwrap();
+    let initial_time = first["activity"][0]["events"][0]["createdAt"].clone();
+    let initial_sequence = first["activity"][0]["events"][0]["sequence"].clone();
+    store::stream(&f.root,&w,&run,&json!({"id":"later-command","kind":"tool","operation":"command","text":"运行命令","state":"completed"}),&control).unwrap();
     let mut updated = event.clone();
     updated["text"] = json!("核对原文后再检查草稿");
     updated["state"] = json!("completed");
@@ -1160,6 +1163,17 @@ fn native_stream_updates_are_durable_monotonic_and_rejected_after_stop() {
         .collect::<Vec<_>>();
     assert_eq!(stream.len(), 1);
     assert_eq!(stream[0]["label"], "核对原文后再检查草稿");
+    assert_eq!(stream[0]["createdAt"], initial_time);
+    assert_eq!(stream[0]["sequence"], initial_sequence);
+    assert!(stream[0]["finishedAt"].as_i64().unwrap() >= initial_time.as_i64().unwrap());
+    let ordered = second["activity"][0]["events"].as_array().unwrap();
+    assert!(ordered[0]["sequence"].as_i64().unwrap() < ordered[1]["sequence"].as_i64().unwrap());
+    store::stream(&f.root, &w, &run, &event, &control).unwrap();
+    let after_late_start = store::view(&f.root, &id).unwrap();
+    assert_eq!(
+        after_late_start["activity"][0]["events"],
+        second["activity"][0]["events"]
+    );
     assert!(store::stream(
         &f.root,
         &w,
@@ -1172,6 +1186,48 @@ fn native_stream_updates_are_durable_monotonic_and_rejected_after_stop() {
     assert!(store::stream(&f.root, &w, &run, &event, &control).is_err());
     store::fail(&f.root, &w, &run, "stopped").unwrap();
     assert!(store::stream(&f.root, &w, &run, &event, &Control::default()).is_err());
+}
+
+#[test]
+fn display_retention_does_not_stop_execution_or_final_delivery_records() {
+    let (f, id, w, run) = setup();
+    let control = Control::default();
+    let pending = json!({"id":"pending","kind":"tool","operation":"command","text":"尚在运行","state":"running"});
+    store::stream(&f.root, &w, &run, &pending, &control).unwrap();
+    for index in 0..24 {
+        store::stream(&f.root,&w,&run,&json!({"id":format!("display-{index}"),"kind":"message","text":"x".repeat(30_000),"state":"completed"}),&control).unwrap();
+    }
+    store::stream(&f.root, &w, &run, &pending, &control).unwrap();
+    let during = store::view(&f.root, &id).unwrap();
+    let pending_event = during["activity"][0]["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["label"] == "尚在运行")
+        .unwrap();
+    assert!(pending_event["finishedAt"].is_null());
+    let mut completed = pending.clone();
+    completed["state"] = json!("completed");
+    store::stream(&f.root, &w, &run, &completed, &control).unwrap();
+    store::record(
+        &f.root,
+        &run,
+        "nativeFinal",
+        &json!({"text":"最后答复仍可完整保存"}),
+    )
+    .unwrap();
+    let view = store::view(&f.root, &id).unwrap();
+    assert!(view["activity"][0]["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|e| e["origin"] == "hub-display-limit" && e["truncated"] == true));
+    assert!(
+        store::records(&f.root, &id, "nativeFinal", 1).unwrap()[0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("完整保存")
+    );
 }
 
 #[test]

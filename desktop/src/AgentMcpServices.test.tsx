@@ -63,7 +63,7 @@ it("cn07c2 discovers and selects a second service without replacing the first gr
   await render({model:null,autoFlashcardInbox:false,webSearch:"cached",mcpServices:[openai]});
   invoke.mockResolvedValueOnce(contextCatalog);await click("发现 / 刷新Context7");
   expect(invoke).toHaveBeenCalledExactlyOnceWith("agent_investigation",{args:{action:"discoverMcpService",server:"context7"}});
-  await act(async()=>host.querySelectorAll("fieldset")[1].querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+  await act(async()=>host.querySelectorAll("fieldset")[1].querySelector<HTMLInputElement>('fieldset input[type="checkbox"]')!.click());
   expect(save).not.toHaveBeenCalled();await click("应用到本对话");
   expect(save).toHaveBeenCalledExactlyOnceWith({model:null,autoFlashcardInbox:false,webSearch:"cached",mcpServices:[openai,{server:"context7",catalogSha256:contextCatalog.catalogSha256,tools:["query-docs"]}]});
 });
@@ -73,14 +73,14 @@ it("cn07c2 revokes only the selected service and its stale catalog cannot inheri
   await render({model:null,autoFlashcardInbox:false,mcpServices:[openai,context]});
   invoke.mockResolvedValueOnce(contextCatalog);await click("发现 / 刷新Context7");
   expect(host.querySelectorAll("fieldset")[1].textContent).toContain("服务目录已改变");
-  expect(host.querySelectorAll("fieldset")[1].querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked).toBe(false);
+  expect(host.querySelectorAll("fieldset")[1].querySelector<HTMLInputElement>('fieldset input[type="checkbox"]')!.checked).toBe(false);
   await click("撤销本对话的Context7");await click("应用到本对话");
   expect(save).toHaveBeenCalledExactlyOnceWith({model:null,autoFlashcardInbox:false,mcpServices:[openai]});
 });
 it("cn07c discovers without granting and applies exactly selected tools",async()=>{
   await render();expect(invoke).not.toHaveBeenCalled();await click("发现 / 刷新");expect(save).not.toHaveBeenCalled();
   expect(invoke).toHaveBeenCalledExactlyOnceWith("agent_investigation",{args:{action:"discoverMcpService",server:"openai_docs"}});
-  await act(async()=>host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());expect(save).not.toHaveBeenCalled();
+  await act(async()=>host.querySelector<HTMLInputElement>('fieldset input[type="checkbox"]')!.click());expect(save).not.toHaveBeenCalled();
   await click("应用到本对话");expect(save).toHaveBeenCalledExactlyOnceWith({model:null,autoFlashcardInbox:false,mcpServices:[{server:catalog.server,catalogSha256:catalog.catalogSha256,tools:["search_openai_docs"]}]});
 });
 it("cn07c stages revocation and preserves other conversation options",async()=>{

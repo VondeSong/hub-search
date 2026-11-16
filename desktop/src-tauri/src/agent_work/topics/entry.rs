@@ -316,6 +316,7 @@ pub(super) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
             None,
             "assistantOptions",
             &json!(options::Options {
+                native_capabilities: Default::default(),
                 model: Some(crate::model_runtime::Settings::default()),
                 research_policy: None,
                 auto_flashcard_inbox: false,

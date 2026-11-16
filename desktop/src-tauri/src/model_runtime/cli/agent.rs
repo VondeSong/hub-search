@@ -3,6 +3,7 @@
 use super::*;
 use sha2::Digest;
 mod authentication;
+pub(crate) mod capabilities;
 mod compaction;
 pub(crate) mod compute;
 pub(crate) mod interaction;
@@ -27,6 +28,7 @@ pub(crate) struct Request<'a> {
     pub compact_before_turn: bool,
     pub external_mcp: bool,
     pub web_search: web::Mode,
+    pub native_capabilities: capabilities::NativeCapabilities,
 }
 
 pub(crate) fn authentication_identity() -> Result<String, String> {
@@ -194,10 +196,14 @@ fn spawn(
     effort: &str,
     fast: bool,
     control: &Control,
+    native_capabilities: capabilities::NativeCapabilities,
 ) -> Result<Process, String> {
     control.check()?;
     prepared.verify(authentication_identity)?;
     let exe = executable_control(false, control)?;
+    if native_capabilities.workspace && exe.version < (0, 169, 0) {
+        return Err("原生工作区需要已验证的 Codex 0.169.0 或更新版本；未回退到宽权限环境".into());
+    }
     let home = directory.join("home");
     let workspace = directory.join("workspace");
     std::fs::create_dir_all(&home)
@@ -233,6 +239,12 @@ fn spawn(
         "shell_tool",
     ]);
     configure_investigation_mode(&mut command, true);
+    if native_capabilities.workspace {
+        command.args(["--enable", "shell_tool", "--enable", "unified_exec"]);
+    }
+    if native_capabilities.multi_agent {
+        command.args(["--enable", "multi_agent"]);
+    }
     // Native dynamic tools require the tool host, even with code_mode off.
     // All actual capabilities remain scoped callbacks owned by Hub.
     command.args(["--enable", "code_mode_host"]);
@@ -269,6 +281,28 @@ fn spawn(
         }
     };
     let input = child.stdin.take().expect("piped stdin");
+    #[cfg(windows)]
+    if native_capabilities.workspace {
+        use windows::Win32::System::JobObjects::*;
+        let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+            | JOB_OBJECT_LIMIT_JOB_MEMORY
+            | JOB_OBJECT_LIMIT_ACTIVE_PROCESS;
+        limits.JobMemoryLimit = 2 * 1024 * 1024 * 1024;
+        limits.BasicLimitInformation.ActiveProcessLimit = 32;
+        let limited = unsafe {
+            SetInformationJobObject(
+                group.as_ref().ok_or("原生工作区进程保护缺失")?.0,
+                JobObjectExtendedLimitInformation,
+                &limits as *const _ as _,
+                std::mem::size_of_val(&limits) as u32,
+            )
+        };
+        if limited.is_err() {
+            stop_child(&mut child);
+            return Err("无法设置原生工作区资源上限".into());
+        }
+    }
     let output = child.stdout.take().expect("piped stdout");
     let mut errors = child.stderr.take().expect("piped stderr");
     let (send, receive) = mpsc::sync_channel(64);
@@ -396,6 +430,7 @@ fn thread_params(request: &Request<'_>, model: &str) -> Value {
             request.tools.clone()
         };
     }
+    request.native_capabilities.thread_config(&mut params);
     params
 }
 
@@ -453,6 +488,10 @@ pub(crate) fn run(
     mut host: impl FnMut(&str, &Value) -> Result<Value, String>,
 ) -> Result<Value, String> {
     let clock = Instant::now();
+    request
+        .native_capabilities
+        .validate(request.external_mcp, false)?;
+    request.native_capabilities.configure(request.directory)?;
     if request.external_mcp && (request.thread.is_some() || request.compact_before_turn) {
         return Err("本轮MCP需要同事项的新上下文，不复用旧动态工具线程或压缩续跑".into());
     }
@@ -474,6 +513,7 @@ pub(crate) fn run(
         effort,
         fast,
         control,
+        request.native_capabilities,
     )?;
     host(
         "timing",
@@ -604,6 +644,7 @@ pub(crate) fn run(
     let mut final_items = HashSet::new();
     let mut web_events = web::Events::default();
     let mut first_event = true;
+    let mut child_threads = HashSet::new();
     loop {
         if let Some(b) = bridge.as_mut() {
             b.poll(&mut host)?;
@@ -671,6 +712,24 @@ pub(crate) fn run(
             }
             let method = event["method"].as_str().unwrap_or_default();
             let p = &event["params"];
+            if request.native_capabilities.multi_agent
+                && method == "thread/started"
+                && p["thread"]["parentThreadId"] == thread_id
+            {
+                if let Some(child) = p["thread"]["id"]
+                    .as_str()
+                    .filter(|id| !id.is_empty() && id.len() <= 150)
+                {
+                    if child_threads.len() < 16 {
+                        child_threads.insert(child.to_owned());
+                        host(
+                            "event",
+                            &json!({"id":format!("native-agent-{child}"),"kind":"tool","operation":"delegate","text":"子代理处理工作区任务","state":"running","origin":"codex-native","agentIds":[child],"agentStates":{(child):{"status":"running"}}}),
+                        )?;
+                    }
+                }
+                continue;
+            }
             if first_event
                 && !method.is_empty()
                 && p["threadId"] == thread_id
@@ -702,6 +761,10 @@ pub(crate) fn run(
                             .send(json!({"id":id,"error":{"code":-32602,"message":error}}))?,
                     }
                 } else if method == "item/tool/call" && !request.external_mcp {
+                    if request.native_capabilities.multi_agent && p["threadId"] != thread_id {
+                        process.send(json!({"id":id,"result":{"success":false,"contentItems":[{"type":"inputText","text":"子代理仅能处理独立工作区任务；Hub 资料和业务工具由主代理调用。"}]}}))?;
+                        continue;
+                    }
                     if p["threadId"] != thread_id || p["turnId"] != turn_id {
                         return Err("Agent 工具请求身份不匹配".into());
                     }
@@ -720,6 +783,55 @@ pub(crate) fn run(
                 }
                 continue;
             }
+            if request.native_capabilities.multi_agent
+                && p["threadId"] == thread_id
+                && p["item"]["type"] == "collabAgentToolCall"
+            {
+                for child in p["item"]["receiverThreadIds"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                {
+                    if child.len() <= 150 && child_threads.len() < 16 {
+                        child_threads.insert(child.to_owned());
+                    }
+                }
+            }
+            if request.native_capabilities.multi_agent
+                && p["threadId"] == thread_id
+                && p["item"]["type"] == "subAgentActivity"
+            {
+                if let Some(child) = p["item"]["agentThreadId"]
+                    .as_str()
+                    .filter(|id| id.len() <= 150)
+                {
+                    if child_threads.len() < 16 {
+                        child_threads.insert(child.to_owned());
+                    }
+                }
+            }
+            if child_threads.contains(p["threadId"].as_str().unwrap_or_default()) {
+                if method == "thread/tokenUsage/updated" {
+                    host(
+                        "childUsage",
+                        &json!({"threadId":p["threadId"],"tokenUsage":p["tokenUsage"]}),
+                    )?;
+                }
+                if method == "turn/completed" {
+                    let child = p["threadId"].as_str().unwrap();
+                    let state = match p["turn"]["status"].as_str() {
+                        Some("completed") => "completed",
+                        Some("interrupted") => "interrupted",
+                        _ => "failed",
+                    };
+                    host(
+                        "event",
+                        &json!({"id":format!("native-agent-{child}"),"kind":"tool","operation":"delegate","text":if state=="completed"{"子代理本轮已结束"}else{"子代理本轮未完成"},"state":state,"origin":"codex-native","agentIds":[child],"agentStates":{(child):{"status":state}}}),
+                    )?;
+                }
+                continue;
+            }
             // Compression can use a separate turn on this exact thread. Only
             // its typed public lifecycle crosses this boundary; tool/public
             // message filters below remain unchanged.
@@ -731,6 +843,13 @@ pub(crate) fn run(
             // reasoning/textDelta, raw Responses events, stderr or auth events.
             if !belongs_to_turn(p, &thread_id, &turn_id) {
                 continue;
+            }
+            if matches!(method, "item/started" | "item/completed") {
+                if let Some(event) = capabilities::activity(&p["item"], method == "item/completed")
+                {
+                    flush(&mut items, &mut host)?;
+                    host("event", &event)?;
+                }
             }
             if matches!(method, "item/started" | "item/completed")
                 && p["item"]["type"] == "webSearch"
@@ -918,10 +1037,26 @@ fn append(
     kind: &str,
     delta: &str,
 ) -> Result<(), String> {
-    if id.is_empty() || id.len() > 256 || (!items.contains_key(id) && items.len() >= 128) {
+    if id.is_empty() || id.len() > 256 {
         return Err("Agent 消息身份或数量超过容量".into());
     }
-    let order = items.len();
+    if !items.contains_key(id) && items.len() >= 128 {
+        let finished = items
+            .iter()
+            .filter(|(_, item)| item.finished)
+            .min_by_key(|(_, item)| item.order)
+            .map(|(id, _)| id.clone());
+        if let Some(id) = finished {
+            items.remove(&id);
+        } else {
+            return Err("同时进行的公开消息超过容量".into());
+        }
+    }
+    let order = items
+        .values()
+        .map(|item| item.order)
+        .max()
+        .map_or(0, |n| n + 1);
     let item = items.entry(id.to_string()).or_insert_with(|| PublicItem {
         order,
         ..Default::default()
@@ -939,6 +1074,21 @@ fn append(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn completed_public_items_leave_room_for_a_longer_legal_turn() {
+        let mut items = HashMap::new();
+        let mut events = Vec::new();
+        for n in 0..140 {
+            complete_public(&mut items, &format!("message-{n}"), "message", "公开进展").unwrap();
+            flush(&mut items, &mut |_, event| {
+                events.push(event.clone());
+                Ok(Value::Null)
+            })
+            .unwrap();
+        }
+        assert_eq!(events.len(), 140);
+        assert!(items.len() <= 128);
+    }
     #[test]
     #[ignore = "installed runtime startup only; stops before turn/start, requires explicit report path"]
     fn cn07a_installed_startup_stops_before_model_dispatch() {
@@ -970,6 +1120,7 @@ mod tests {
                 compact_before_turn: false,
                 external_mcp: false,
                 web_search: web::Mode::Disabled,
+                native_capabilities: Default::default(),
             },
             "",
             "",
@@ -1024,6 +1175,7 @@ mod tests {
                     compact_before_turn: false,
                     external_mcp,
                     web_search: web::Mode::Disabled,
+                    native_capabilities: Default::default(),
                 };
                 let params = thread_params(&request, "selected-model");
                 assert!(params.get("baseInstructions").is_none());

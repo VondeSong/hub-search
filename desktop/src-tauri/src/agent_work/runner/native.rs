@@ -184,6 +184,9 @@ pub(super) fn investigate(
     let mut binding = json!({"charts":chart_binding,"protocol":5,"skills":skill_fingerprint,"selection":session.selection,"grant":work.grant,"authorizationVersion":work.authorization_version,"tools":tool_specs,"sharedMemory":memory});
     binding["webSearch"] = json!(web_search);
     binding["researchPolicy"] = json!(options.research_policy);
+    if !options.native_capabilities.disabled() {
+        binding["nativeCapabilities"] = json!(options.native_capabilities);
+    }
     if !options.mcp_services.is_empty() {
         binding["mcpServices"] = json!(options.mcp_services);
     }
@@ -316,7 +319,11 @@ pub(super) fn investigate(
             control,
         )?;
     }
-    let directory = root.join("agent-runtime").join(&work.id);
+    let mut directory = root.join("agent-runtime").join(&work.id);
+    if options.native_capabilities.workspace {
+        // A narrower grant must never inherit files produced with an older grant.
+        directory = options::workspace_directory(root, work, &options);
+    }
     let mut material = input::material(
         context,
         session,
@@ -406,12 +413,13 @@ pub(super) fn investigate(
     let mut answer_preview: Option<String> = None;
     let mut thread_id = String::new();
     let mut token_usage = Value::Null;
+    let mut child_usage = std::collections::BTreeMap::<String, Value>::new();
     let mut archived = 0usize;
     store::record(
         root,
         run,
         "nativeRuntime",
-        &json!({"protocol":1,"runtime":"codex-app-server","resumed":thread.is_some(),"webSearch":web_search}),
+        &json!({"protocol":1,"runtime":"codex-app-server","resumed":thread.is_some(),"webSearch":web_search,"nativeCapabilities":options.native_capabilities}),
     )?;
     store::record(root, run, "nativeGuidanceBinding", &guidance.binding())?;
     if !image_input.is_empty() {
@@ -435,7 +443,7 @@ pub(super) fn investigate(
     let result = loop {
         let compact_this_turn = std::mem::take(&mut compact_before_turn);
         let provider_started = std::time::Instant::now();
-        let result=operation.run_agent(crate::model_runtime::AgentRequest{directory:&directory,authentication_identity:&authentication_identity,auth_root:Some(root),auth_selection:operation.codex_account_selection(),thread:next_thread.as_deref(),instructions:&instructions,input:&next_input,image_input:&next_images,tools:wire_tools.clone(),compact_before_turn:compact_this_turn,external_mcp,web_search},|kind,value| {
+        let result=operation.run_agent(crate::model_runtime::AgentRequest{directory:&directory,authentication_identity:&authentication_identity,auth_root:Some(root),auth_selection:operation.codex_account_selection(),thread:next_thread.as_deref(),instructions:&instructions,input:&next_input,image_input:&next_images,tools:wire_tools.clone(),compact_before_turn:compact_this_turn,external_mcp,web_search,native_capabilities:options.native_capabilities},|kind,value| {
         let callback_started = std::time::Instant::now();
         let callback_received_epoch = chrono::Utc::now().timestamp_millis();
         let outcome = (|| {
@@ -709,6 +717,7 @@ pub(super) fn investigate(
             }
             "transportBytes"=>{let n=value["bytes"].as_u64().and_then(|n|usize::try_from(n).ok()).ok_or("MCP计量无效")?;let instruction=value["instructionBytes"].as_u64().unwrap_or(0) as usize;if instruction>n{return Err("MCP指令分项超过总量".into());}material_bytes.instructions=material_bytes.instructions.checked_add(instruction).ok_or("MCP计量溢出")?;material_bytes.protocol=material_bytes.protocol.checked_add(n-instruction).ok_or("MCP计量溢出")?;context.usage.request_bytes=material_bytes.total();store::record(root,run,"nativeMaterialUsage",&material_bytes.snapshot("mcpFraming"))?;store::usage(root,run,&context.usage())?;material_bytes.check()?;Ok(Value::Null)}
             "protocol"=>{store::record(root,run,"nativeProtocol",value)?;Ok(Value::Null)}
+            "childUsage"=>{if let Some(id)=value["threadId"].as_str(){child_usage.insert(id.to_owned(),value["tokenUsage"].clone());}Ok(Value::Null)}
             "finalMessage"=>{store::record(root,run,"nativeFinal",value)?;Ok(Value::Null)}
             _=>Ok(Value::Null),
         }
@@ -816,6 +825,8 @@ pub(super) fn investigate(
     // Cancellation may already have closed this Run. Never revive it for telemetry,
     // and preserve the original failure if recording partial telemetry is rejected.
     measured["materialBytes"] = material_bytes.snapshot("providerReturned");
+    measured["childThreadUsage"] = json!(child_usage);
+    measured["childUsageScope"] = json!("Separate observed child cumulative counters; root turnTokens exclude children. Missing counters are unknown, not zero.");
     let measurement_saved = store::record(root, run, "nativeMeasurement", &measured);
     if result.is_ok() {
         measurement_saved?;

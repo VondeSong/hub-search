@@ -33,7 +33,16 @@ pub(crate) fn run(material: &Value, script: &str, control: &Control) -> Result<V
         bytes,
         identity: identity.clone(),
     };
-    let mut process = spawn(&directory, &identity, prepared, "", "", false, control)?;
+    let mut process = spawn(
+        &directory,
+        &identity,
+        prepared,
+        "",
+        "",
+        false,
+        control,
+        Default::default(),
+    )?;
     #[cfg(windows)]
     unsafe {
         use windows::Win32::System::JobObjects::*;

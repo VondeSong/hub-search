@@ -401,6 +401,7 @@ mod tests {
             compact_before_turn: false,
             external_mcp: false,
             web_search: Default::default(),
+            native_capabilities: Default::default(),
         };
         let config = super::super::thread_params(&request, "");
         assert_eq!(

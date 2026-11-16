@@ -189,6 +189,7 @@ fn connect(
         "",
         false,
         control,
+        Default::default(),
     )?;
     process.rpc("initialize","initialize",json!({"clientInfo":{"name":"hub_mcp_client","version":env!("CARGO_PKG_VERSION")},"capabilities":{"experimentalApi":true}}),control)?;
     process.send(json!({"method":"initialized"}))?;

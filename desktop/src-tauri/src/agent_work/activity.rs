@@ -77,7 +77,7 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
         if authorization != w.authorization_version {
             continue;
         }
-        let mut query=c.prepare("SELECT rowid,kind,body_json,created_at,id FROM agent_records WHERE run_id=?1 AND kind IN ('nativeMeasurement','libraryRules','agentStream','activity','intent','toolCall','toolResult','evidence','selectedMaterialReadError','autoInboxReceipt','workingState','nativeContextLifecycle','nativeFinal','delivery','nativeImages') ORDER BY rowid LIMIT 256").map_err(|e|e.to_string())?;
+        let mut query=c.prepare("SELECT rowid,kind,body_json,created_at,id FROM agent_records WHERE run_id=?1 AND kind IN ('nativeMeasurement','nativeRuntime','libraryRules','agentStream','activity','intent','toolCall','toolResult','evidence','selectedMaterialReadError','autoInboxReceipt','workingState','nativeContextLifecycle','nativeFinal','delivery','nativeImages') ORDER BY rowid LIMIT 4096").map_err(|e|e.to_string())?;
         let rows = query
             .query_map([&run], |r| {
                 Ok((
@@ -104,9 +104,11 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
             .unwrap_or_else(|_| w.grant.clone())
             .reader(root)?;
         let mut measurement = Value::Null;
+        let mut runtime_capabilities = Value::Null;
         let mut has_delivery = false;
         for row in rows {
             let (sequence, kind, raw, time, record_id) = row.map_err(|e| e.to_string())?;
+            let before_events = events.len();
             let body: Value = serde_json::from_str(&raw).map_err(|_| "助手活动记录损坏")?;
             match kind.as_str() {
                 "nativeContextLifecycle" => {
@@ -115,7 +117,10 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
                         if !key.0.is_empty() && !key.1.is_empty() && !key.2.is_empty() {
                             if let Some(event)=compression_event(sequence,time,&body,active_run(w,&run,&state)) {
                                 if let Some(index)=compressions.get(&key).copied() {
-                                    if events[index]["state"]!="completed" { events[index]=event; }
+                                    if events[index]["state"]!="completed" {
+                                        let started=events[index]["createdAt"].clone();let order=events[index]["sequence"].clone();
+                                        events[index]=event;events[index]["createdAt"]=started;events[index]["sequence"]=order;
+                                    }
                                 } else { compressions.insert(key,events.len()); events.push(event); }
                             }
                         }
@@ -123,6 +128,7 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
                 }
                 "workingState" => events.push(json!({"id":sequence.to_string(),"kind":"context","state":"completed","origin":"hub-working-state","label":format!("已保存工作记录（第{}版）",body["revision"]),"createdAt":time,"finishedAt":time})),
                 "nativeMeasurement" => measurement = body,
+                "nativeRuntime" if body.get("nativeCapabilities").is_some() => runtime_capabilities = body,
                 "libraryRules" => {
                     let mut seen = std::collections::HashSet::new();
                     if let Some(bundles) = body.as_array() {
@@ -145,7 +151,7 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
                 "agentStream" if body["kind"]=="contextUsage" => {},
                 "agentStream" => {
                     if body["text"].as_str().is_some_and(|s| !s.trim().is_empty()) {
-                        events.push(json!({"id":sequence.to_string(),"kind":body["kind"],"state":body["state"],"label":body["text"],"url":body["url"],"createdAt":time,"origin":body["origin"].as_str().unwrap_or("codex-app-server"),
+                        events.push(json!({"id":sequence.to_string(),"kind":body["kind"],"state":body["state"],"label":body["text"],"url":body["url"],"createdAt":time,"sequence":sequence,"updatedAt":body["updatedAt"],"finishedAt":body["finishedAt"],"operation":body["operation"],"detail":body["detail"],"agentIds":body["agentIds"],"agentStates":body["agentStates"],"origin":body["origin"].as_str().unwrap_or("codex-app-server"),
                             "truncated":body["truncated"]==true,"action":body["action"],"queries":body["queries"],"pattern":body["pattern"],"sourceRefs":body["sourceRefs"],"resultCount":body["resultCount"],"errorCount":body["errorCount"],"errors":body["errors"],"omittedSourceCount":body["omittedSourceCount"]}));
                     }
                 }
@@ -172,7 +178,7 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
                         .unwrap_or_else(|| sequence.to_string());
                     steps.insert(id, events.len());
                     events.push(json!({"id":sequence.to_string(),"kind":"tool","state":"running","label":title(&body,&mut title_catalog),
-                        "detail":body["query"].as_str().map(|s|s.chars().take(200).collect::<String>()),"createdAt":time}));
+                        "operation":body["operation"],"toolName":body["name"],"serviceId":body["server"],"detail":body["query"].as_str().map(|s|s.chars().take(200).collect::<String>()),"createdAt":time}));
                 }
                 "selectedMaterialReadError" => {
                     events.push(json!({"id":sequence.to_string(),"kind":"context","state":"failed","origin":"hub-context",
@@ -348,6 +354,9 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
                 }
                 _ => (),
             }
+            for event in events.iter_mut().skip(before_events) {
+                event["sequence"] = json!(sequence);
+            }
         }
         let active = w.active_run.as_deref() == Some(run.as_str()) && state == "investigating";
         let complete_unpublished = events.iter().any(|e| e["kind"] == "unpublishedAnswer");
@@ -360,6 +369,15 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
             }
             if event["state"] == "running" && !active {
                 event["state"] = json!("interrupted");
+            }
+            if !active {
+                if let Some(states) = event["agentStates"].as_object_mut() {
+                    for state in states.values_mut() {
+                        if matches!(state["status"].as_str(), Some("running" | "pendingInit")) {
+                            state["status"] = json!("interrupted");
+                        }
+                    }
+                }
             }
         }
         // Finished model waits are replaced by the public progress message or
@@ -375,7 +393,7 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
         let native:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM agent_records WHERE run_id=?1 AND kind='nativeRuntime')",[&run],|r|r.get(0)).map_err(|e|e.to_string())?;
         let can_steer = active && can_steer_on(c, &run)?;
         result.push(json!({"workId":w.id,"currentWorkRevision":w.revision,"authorizationVersion":w.authorization_version,"runId":run,"revision":revision,"state":state,"running":active,"startedAt":started,
-            "finishedAt":finished,"measurement":measurement,"steps":count,"events":events,"native":native,"canSteer":can_steer,"validity":if valid{""}else{"来源已变化，这轮的过程正文已隐藏"}}));
+            "finishedAt":finished,"capabilities":runtime_capabilities,"measurement":measurement,"steps":count,"events":events,"native":native,"canSteer":can_steer,"validity":if valid{""}else{"来源已变化，这轮的过程正文已隐藏"}}));
     }
     Ok(json!(result))
 }

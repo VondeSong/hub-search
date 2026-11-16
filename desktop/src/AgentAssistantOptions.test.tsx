@@ -23,6 +23,17 @@ it("shows the actual default level while resetting preserves an omitted override
  await click("跟随模型默认");expect(save).toHaveBeenLastCalledWith(options);
 });
 async function click(text:string){await act(async()=>button(text).click());}
+it("grants workspace and delegation only after applying and revokes them together",async()=>{
+ await render("connection");
+ const fields=()=>[...host.querySelectorAll<HTMLInputElement>('.agent-connection-explanation input[type="checkbox"]')];
+ expect(fields()).toHaveLength(2);expect(fields()[1].disabled).toBe(true);
+ await act(async()=>fields()[0].click());expect(save).not.toHaveBeenCalled();
+ await act(async()=>fields()[1].click());await click("应用到本对话");
+ expect(save).toHaveBeenLastCalledWith({...defaultAssistantOptions,nativeCapabilities:{workspace:true,multiAgent:true}});
+ await render("connection",true,{...defaultAssistantOptions,nativeCapabilities:{workspace:true,multiAgent:true}});
+ await act(async()=>fields()[0].click());await click("应用到本对话");
+ expect(save).toHaveBeenLastCalledWith(defaultAssistantOptions);
+});
 async function open(which:"model"|"effort"="model"){await act(async()=>{const d=host.querySelector<HTMLDetailsElement>(`.agent-option-${which}`)||host.querySelector("details")!;d.open=true;d.dispatchEvent(new Event("toggle"));});}
 it("preloads the actual catalog and reuses it on opening, then saves only this conversation",async()=>{
  await render();expect(modelSummary().textContent).toContain("actual-global");expect(invoke).toHaveBeenCalledTimes(2);
@@ -67,6 +78,16 @@ it("MCP remains explicit and absent from the regular model picker",async()=>{
  await render();expect(host.textContent).not.toContain("工具连接");await render("connection");
  const select=host.querySelector("select")!;await act(async()=>{select.value="mcp";select.dispatchEvent(new Event("change",{bubbles:true}));});
  expect(save).not.toHaveBeenCalled();expect(host.textContent).toContain("累计预算");await click("应用到本对话");expect(save).toHaveBeenLastCalledWith({model:null,autoFlashcardInbox:false,externalMcp:true});
+});
+it("revokes native grants in the draft when selecting the alternative MCP channel",async()=>{
+ await render("connection",true,{...defaultAssistantOptions,nativeCapabilities:{workspace:true,multiAgent:true}});
+ const select=host.querySelector("select")!;
+ await act(async()=>{select.value="mcp";select.dispatchEvent(new Event("change",{bubbles:true}));});
+ expect(save).not.toHaveBeenCalled();
+ expect([...host.querySelectorAll<HTMLInputElement>('.agent-connection-explanation input')].every(field=>!field.checked&&field.disabled)).toBe(true);
+ await click("应用到本对话");expect(save).toHaveBeenLastCalledWith({...defaultAssistantOptions,externalMcp:true});
+ await act(async()=>{select.value="native";select.dispatchEvent(new Event("change",{bubbles:true}));});
+ expect([...host.querySelectorAll<HTMLInputElement>('.agent-connection-explanation input')].every(field=>!field.checked)).toBe(true);
 });
 it("returns to inherited settings without replacing other options",async()=>{
  await render("model",true,{model:{model:"local",provider:"codex",reasoningEffort:"high",fast:false,maxConcurrent:2},autoFlashcardInbox:true,externalMcp:true});

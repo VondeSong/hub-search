@@ -286,6 +286,7 @@ fn mcp_cannot_resume_an_old_thread_before_any_process_or_provider_call() {
             compact_before_turn: false,
             external_mcp: true,
             web_search: Default::default(),
+            native_capabilities: Default::default(),
         },
         "",
         "",

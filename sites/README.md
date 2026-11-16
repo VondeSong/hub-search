@@ -25,6 +25,8 @@
 
 这些 SHA 是各自 Sites 源码仓库的提交，与 `hub-search` 的提交编号不同。每个目录的 `.source-snapshot.json` 保存当前导入来源、发布版本、部署 ID，以及所有原始文件的 SHA256、模式和大小；本表的 v6/v80 保留为首次导入记录，后续状态以快照为准。
 
+2026-11-17 工作台沿原项目发布 **v108**：补充助手工作过程的语义图标、网站标识、分组/部分失败及子任务演示（#56）。类型、构建与原型交互检查通过；263 个来源文件已导回，实际源提交为 `5475054ad9d5bfe7ece65e98179ce165506c5527`，部署为 `appgdep_6afb343e910081918e7fe7dec521433e`。示例不等于真实运行；桌面原生接入与验收见 [验收记录](../desktop/docs/AGENTS_NATIVE_ACTIVITY_ACCEPTANCE_20261117.md)。
+
 ## 在 Claude Code / Codex 中继续编辑
 
 连接私有仓库 `VondeSong/hub-search`，先读取根 `AGENTS.md`、本目录 [AGENTS.md](AGENTS.md)，再进入所需目录。普通 Claude 的 GitHub 文件上下文与 Claude Code 的仓库编辑流程是不同能力；实际改代码可使用 Claude Code 本地或云端仓库任务。

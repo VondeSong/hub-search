@@ -165,6 +165,7 @@ mod tests {
             "",
             false,
             &control,
+            Default::default(),
         );
         let error = match refused {
             Ok(_) => panic!("changed credentials must not start a provider"),

@@ -14,6 +14,7 @@ mod conversation_tests;
 mod daily_tag_acceptance;
 #[cfg(test)]
 mod delivery_tests;
+mod icons;
 mod images;
 mod insights;
 #[cfg(test)]
@@ -234,6 +235,7 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
         account_binding::pin(root, args)?;
     }
     match args["action"].as_str().unwrap_or("status") {
+        "nativeWorkspacePath" => options::workspace_path(root, &text(args, "id", 150)?),
         action if action.starts_with("insight") => insights::ui(root, args),
         "authorizeCodexConversation" => account_binding::authorize(root, args),
         action if action.starts_with("topic") => topics::ui(root, args),
@@ -568,6 +570,9 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
 }
 
 pub(crate) async fn ui_app(app: tauri::AppHandle, args: Value) -> Result<Value, String> {
+    if args["action"] == "websiteIcon" {
+        return icons::load(&crate::active_data_root(&app)?, &args).await;
+    }
     if args["action"] == "syncAgentSkills" {
         return skills::sync_agent_skills(app).await;
     }

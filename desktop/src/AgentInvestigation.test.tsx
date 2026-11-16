@@ -263,7 +263,8 @@ it("shows an acknowledged compaction as waiting rather than completed",async()=>
 it("reading investigations grant only the explicit item and do not assume a note or whole library", async () => {
   await act(async () => root.render(<ReadingInvestigation itemKey="reading-1" />));
   expect(invoke).not.toHaveBeenCalled(); await click("调查这篇阅读材料");
-  expect(document.body.querySelector('[type="checkbox"]')).toBeNull();
+  expect(document.body.textContent).not.toContain("授权整个资料库");
+  expect([...document.body.querySelectorAll<HTMLInputElement>('[type="checkbox"]')].some(input=>input.checked)).toBe(false);
   await fill("investigationGoal", "核对这份阅读材料"); await click("开始调查");
   const create = invoke.mock.calls.find(([, { args }]) => args.action === "create")![1].args;
   expect(create.anchor).toEqual({ kind: "reading", itemKey: "reading-1" });
@@ -2153,6 +2154,19 @@ it.each(["codex","deepseek"])("new chats apply remembered model preferences and 
  await fill("investigationGoal","测试记忆设置");await click("开始调查");
  const configured=invoke.mock.calls.find(([,p])=>p?.args?.action==="configureAssistant")?.[1].args.options;
  expect(configured).toEqual({researchPolicy:"material-first",model,webSearch:provider==="codex"?"live":"disabled",autoFlashcardInbox:false});
+});
+it("removes the conversation native grant on an explicit switch to DeepSeek",async()=>{
+ const {loadCodexSuiteModels}=await import("./CodexSuite");
+ vi.mocked(loadCodexSuiteModels).mockImplementation(async provider=>provider==="deepseek"?[{id:"test-deepseek",name:"测试 DeepSeek",reasoningLevels:[],defaultReasoning:""}]:[]);
+ Object.assign(current,{assistantOptions:{model:null,autoFlashcardInbox:false,nativeCapabilities:{workspace:true,multiAgent:true}}});
+ invoke.mockImplementation(async(_,{args})=>args.action==="list"?{works:[{id:"work-1",goal:current.work.goal,state:current.work.state}]}:current);
+ try {
+  await open();
+  await act(async()=>{const menu=document.body.querySelector<HTMLDetailsElement>(".agent-option-model")!;menu.open=true;menu.dispatchEvent(new Event("toggle"));});
+  await click("测试 DeepSeek");
+  const options=invoke.mock.calls.find(([,p])=>p?.args?.action==="configureAssistant")?.[1].args.options;
+  expect(options.model.provider).toBe("deepseek");expect(options.webSearch).toBe("disabled");expect(options.nativeCapabilities).toBeUndefined();
+ } finally {vi.mocked(loadCodexSuiteModels).mockResolvedValue([]);}
 });
 it("new chat enables live search while restoring an old chat does not change its settings",async()=>{
  await open();await fill("investigationGoal","新问题");await click("开始调查");

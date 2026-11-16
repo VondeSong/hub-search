@@ -11,6 +11,7 @@ import { parseTagRequest, tagIntents, tagPrompt, tagRuleLibrary, type TagReviewM
 import { cleanTagStarter, prepareTagTask } from './tag-task';
 import { TagContext, TagPicker, TagReviewCard, TagTaskSelector } from './TagAssistant';
 import { AssistantInsert } from './AssistantInsert';
+import { AssistantProcess } from './AssistantProcess';
 import { AssistantTokens } from './AssistantTokens';
 import type { PageInsertion } from './assistant-insert';
 import { MaterialScopeButton, readTopics, readWorkPins, researchPolicies, researchSources, resolveTopicSources, topicStorageKey, workPinsKey, type ResearchPolicy, type ResearchTopic, type WorkPins } from './AssistantResearch';
@@ -1077,10 +1078,10 @@ function AssistantConversation({
                     {message.tagResult.next === 'definition' && message.tagTask && <button type="button" onClick={() => { setTagMode(true); setTag(message.tagTask!.tag); setTagRefs(refs=>[...new Set([...refs,message.tagTask!.tag])]); prepareTag('definition'); }}>先起草定义</button>}
                   </div>}
                   {message.tagResult.ids.map(id => tagModel.suggestions.find(item => item.id === id)).map(item => item && <TagReviewCard key={item.id} item={item} model={tagModel} onOpenQueue={onOpenTagQueue}/>)}
-                  {!!message.tagResult.process?.length&&<details className="ha-activity"><summary>工作过程 · 演示</summary><ol>{message.tagResult.process.map((step,index)=><li key={index}>{step}</li>)}</ol><p>预置样本演示，未调用真实模型。</p></details>}
+                  {!!message.tagResult.process?.length&&<AssistantProcess steps={message.tagResult.process}/>}
                 </>}
                 {message.tagTask && !message.tagResult && <div className="ha-message-actions"><button type="button" onClick={() => { setTagMode(true); setTag(message.tagTask!.tag); setTagRefs(refs=>[...new Set([...refs,message.tagTask!.tag])]); prepareTag(message.tagTask!.intent); }}>在标签助手继续</button></div>}
-                {!message.tagTask && !message.tagResult && <><details className="ha-activity"><summary>工作过程 · 演示</summary><ol><li>核对所选资料范围</li><li>整理示例材料</li><li>准备可编辑结果</li></ol><p>未调用真实模型或工具。</p></details>
+                {!message.tagTask && !message.tagResult && <><AssistantProcess webEnabled={settings.webSearch!=='disabled'}/>
                 <div className="ha-message-actions"><button type="button" className="ha-copy-answer" aria-label={copied === message.id ? '已复制回答' : '复制回答'} title={copied === message.id ? '已复制' : '复制回答'} onClick={async () => { try { await navigator.clipboard.writeText([message.text, ...(message.sections || []).map(item => item.heading + '\n' + item.body)].join('\n\n')); setCopied(message.id); } catch { notify('复制失败，请重试或选择正文复制。'); } }}>{copied === message.id ? <Check size={16}/> : <Copy size={16}/>}</button>{onInsertPage && <button type="button" onClick={() => setInsertion({ body: [message.text, ...(message.sections || []).map(item => item.heading + '\n' + item.body)].join('\n\n'), source: message.context || null })}><FilePlus2 size={14}/>插入页面</button>}<button type="button" title="将回答另存为独立笔记" onClick={() => prepare(message, 'note')}><PencilLine size={14}/>新建笔记</button><button type="button" title="将回答转为可编辑的待办草稿" onClick={() => prepare(message, 'task')}><ListPlus size={14}/>创建任务</button></div></>}
               </>}
             </article>)}

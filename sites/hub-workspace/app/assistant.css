@@ -550,3 +550,19 @@
 @media(pointer:coarse){.ha-token summary,.ha-token-remove{min-height:44px}.ha-token-remove{width:36px}}
 
 .ha-token summary{min-height:30px;line-height:18px;box-sizing:border-box;padding-block:5px}
+
+/* #56: reference-aligned activity identities; every prototype event is labelled. */
+.ha-process-demo>summary,.ha-process-group>summary{display:flex;align-items:center;gap:8px;list-style:none;min-height:24px;cursor:pointer}
+.ha-process-demo summary::-webkit-details-marker{display:none}
+.ha-process-demo svg,.ha-process-demo img{flex-shrink:0}
+.ha-process-demo summary>svg:last-child{margin-left:auto;transition:transform .15s}
+.ha-process-group:not([open])>summary>svg:last-child{transform:rotate(-90deg)}
+.ha-process-commentary{margin-block:16px;color:var(--text);line-height:1.7;font-size:13px}
+.ha-process-row{display:flex;align-items:flex-start;gap:8px;margin-block:8px;line-height:1.6}
+.ha-process-group{margin-block:12px}
+.ha-process-group>div{padding-block:4px}
+.ha-process-sites{display:inline-flex;gap:4px;flex-shrink:0}
+.ha-process-sites img{width:16px;height:16px;object-fit:contain}
+.ha-process-demo>.ha-process-row:last-of-type>svg{color:#68a5dd}
+@media(prefers-color-scheme:dark){.ha-process-sites img{filter:invert(1)}}
+@media(prefers-reduced-motion:reduce){.ha-process-demo summary>svg:last-child{transition:none}}

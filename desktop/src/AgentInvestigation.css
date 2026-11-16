@@ -323,6 +323,9 @@ body.resizing-agent-panel * { cursor: col-resize !important; user-select: none !
 .agent-add-section > label, .agent-connection-settings label { display: flex; flex-direction: column; gap: 6px; }
 .agent-connection-settings .agent-mcp-service { min-width: 0; overflow-wrap: anywhere; }
 .agent-connection-settings .agent-mcp-service label:has(input[type="checkbox"]) { flex-direction: row; align-items: flex-start; }
+.agent-connection-settings .agent-connection-explanation > label:has(input[type="checkbox"]) { flex-direction:row; align-items:flex-start; margin-block:10px 6px; }
+.agent-connection-settings .agent-connection-explanation > label > input[type="checkbox"] { flex:0 0 auto; margin:3px 0 0; }
+.agent-connection-explanation .agent-connection-facts > div { grid-template-columns:80px minmax(0,1fr); }
 .agent-connection-settings .agent-mcp-service input[type="url"] { width: 100%; min-width: 0; box-sizing: border-box; }
 .agent-model-list { border-block: 1px solid var(--hub-separator); padding-block: 7px; }
 .agent-model-heading { display: block; padding: 3px 8px; color: var(--hub-text-secondary); font-size: 12px; }
@@ -592,6 +595,14 @@ body.agent-sidebar-open > #root { width:calc(100% - min(var(--agent-panel-width,
 .agent-activity .agent-commentary { margin-block:18px; font-size:14px; line-height:1.7; }
 .agent-activity summary { min-height:24px; }
 .agent-activity .agent-activity-step { margin-block:2px; }
+.agent-activity-identities { display:inline-flex; align-items:center; gap:4px; flex:0 0 auto; color:var(--hub-text-tertiary); }
+.agent-operation-group > summary > .agent-activity-identities { overflow:visible; white-space:normal; }
+.agent-site-icon,.agent-service-icon { display:inline-flex; width:16px; height:16px; flex:0 0 16px; align-items:center; justify-content:center; }
+.agent-site-icon img,.agent-service-icon img { display:block; width:16px; height:16px; object-fit:contain; }
+.agent-activity-step > .agent-activity-identities { margin-block-start:3px; }
+.agent-activity-identities small { font-size:10px; }
+.agent-avatar { flex-shrink:0; }
+[data-theme="dark"] .agent-service-icon img { filter:invert(1); }
 .agent-activity .agent-reasoning, .agent-activity .agent-live-status { font-size:13px; }
 .agent-operation-group { margin-block:14px; min-width:0; }
 .agent-operation-group > summary { display:flex; align-items:center; gap:8px; list-style:none; cursor:pointer; min-width:0; }

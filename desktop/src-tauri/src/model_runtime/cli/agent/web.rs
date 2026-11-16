@@ -49,7 +49,26 @@ impl Events {
             return Ok(None);
         }
         if !self.items.contains_key(&id) && self.items.len() >= 64 {
-            return Err("本轮联网事件超过容量，已有记录保留".into());
+            if let Some(old) = self
+                .items
+                .iter()
+                .find(|(_, v)| v["state"] == "completed")
+                .map(|(key, _)| key.clone())
+            {
+                self.items.remove(&old);
+            }
+        }
+        if !self.items.contains_key(&id) && self.items.len() >= 64 {
+            let finished = self
+                .items
+                .iter()
+                .find(|(_, event)| event["state"] == "completed")
+                .map(|(key, _)| key.clone());
+            if let Some(key) = finished {
+                self.items.remove(&key);
+            } else {
+                return Err("同时进行的联网事件超过容量，已有记录保留".into());
+            }
         }
         let action = match item["action"]["type"].as_str() {
             Some("search") => "search",
@@ -165,6 +184,14 @@ fn public_text(value: &Value, limit: usize) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn completed_web_items_do_not_end_an_authorized_long_turn() {
+        let mut events = Events::default();
+        for n in 0..70 {
+            assert!(events.receive(&json!({"id":format!("web-{n}"),"action":{"type":"search","query":"actual task"}}),true,Mode::Live,"turn").unwrap().is_some());
+        }
+        assert!(events.items.len() <= 64);
+    }
     #[test]
     fn web_activity_real_batch_metadata_preserves_errors_sources_and_find_pattern() {
         let cases: Vec<Value> =
@@ -294,6 +321,7 @@ fn cn04_web_modes_reach_start_resume_and_legacy_short_tasks_stay_off() {
                 compact_before_turn: false,
                 external_mcp: false,
                 web_search: mode,
+                native_capabilities: Default::default(),
             };
             let params = thread_params(&request, "selected");
             assert_eq!(params["config"]["web_search"], json!(mode));

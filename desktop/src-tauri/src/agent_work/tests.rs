@@ -222,7 +222,7 @@ fn rejected_delivery_gets_bounded_host_feedback_without_new_authority_or_a_new_r
             calls += 1;
             if calls > 1 {
                 assert!(prompt.contains("reportRejected"));
-                assert!(prompt.contains("No report facts were accepted"));
+                assert!(prompt.contains("No report accepted."));
             }
             let mut response = report(prompt, "检查配合条件");
             if !recover || calls == 1 {

@@ -306,7 +306,7 @@ pub(super) fn insert(
         return Err("单条调查记录过大".into());
     }
     if let Some(run) = run {
-        let (count,bytes):(i64,i64)=c.query_row("SELECT COUNT(*),COALESCE(SUM(length(CAST(body_json AS BLOB))),0) FROM agent_records WHERE run_id=?1",[run],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|e|e.to_string())?;
+        let (count,bytes):(i64,i64)=c.query_row("SELECT COUNT(*),COALESCE(SUM(length(CAST(body_json AS BLOB))),0) FROM agent_records WHERE run_id=?1 AND kind!='agentStream'",[run],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|e|e.to_string())?;
         let assistant:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM agent_records WHERE run_id=?1 AND kind='agentProtocol')",[run],|r|r.get(0)).map_err(|e|e.to_string())?;
         if count >= if assistant { 256 } else { 64 }
             || bytes + encoded.len() as i64 > if assistant { 1_048_576 } else { 262_144 }
@@ -347,13 +347,12 @@ pub(super) fn stream(
         .ok_or("过程消息身份无效")?;
     if !matches!(
         value["kind"].as_str(),
-        Some("message" | "answer" | "reasoning" | "plan" | "webSearch" | "contextUsage")
+        Some("message" | "answer" | "reasoning" | "plan" | "webSearch" | "contextUsage" | "tool")
     ) || value["text"].as_str().is_none_or(|s| s.len() > 32_768)
     {
         return Err("过程消息超出公开通道合同".into());
     }
     let id = format!("stream-{run}-{:x}", Sha256::digest(key.as_bytes()));
-    let raw = encode(value)?;
     write(root, |c| {
         control.check()?;
         let current = load(c, &work.id)?;
@@ -363,21 +362,67 @@ pub(super) fn stream(
         {
             return Err("过程消息所属运行已失效".into());
         }
-        let old: Option<i64> = c
+        let old: Option<(i64, Option<i64>, String)> = c
             .query_row(
-                "SELECT length(CAST(body_json AS BLOB)) FROM agent_records WHERE id=?1",
+                "SELECT length(CAST(body_json AS BLOB)),json_extract(body_json,'$.finishedAt'),COALESCE(json_extract(body_json,'$.state'),'') FROM agent_records WHERE id=?1",
                 [&id],
-                |r| r.get(0),
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
             )
             .optional()
             .map_err(|e| e.to_string())?;
-        let (count,bytes):(i64,i64)=c.query_row("SELECT COUNT(*),COALESCE(SUM(length(CAST(body_json AS BLOB))),0) FROM agent_records WHERE run_id=?1",[run],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|e|e.to_string())?;
-        if (old.is_none() && count >= 220) || bytes - old.unwrap_or(0) + raw.len() as i64 > 900_000
+        // A delayed start cannot reopen a completed item. A child may genuinely
+        // start another turn under its stable identity, so delegation is exempt.
+        if value["state"] == "running"
+            && value["operation"] != "delegate"
+            && old
+                .as_ref()
+                .is_some_and(|v| matches!(v.2.as_str(), "completed" | "failed" | "interrupted"))
         {
-            return Err("本轮过程记录预算已用尽".into());
+            return Ok(());
         }
+        let (count,bytes):(i64,i64)=c.query_row("SELECT COUNT(*),COALESCE(SUM(length(CAST(body_json AS BLOB))),0) FROM agent_records WHERE run_id=?1 AND kind='agentStream'",[run],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|e|e.to_string())?;
         let updated = current.updated_at.saturating_add(1).max(stamp());
-        c.execute("INSERT INTO agent_records(id,work_id,run_id,kind,body_json,created_at) VALUES(?1,?2,?3,'agentStream',?4,?5) ON CONFLICT(id) DO UPDATE SET body_json=excluded.body_json,created_at=excluded.created_at",params![id,work.id,run,raw,updated]).map_err(|e|e.to_string())?;
+        let mut body = value.clone();
+        body["updatedAt"] = json!(updated);
+        if matches!(
+            value["state"].as_str(),
+            Some("completed" | "failed" | "interrupted")
+        ) {
+            body["finishedAt"] = json!(old.as_ref().and_then(|v| v.1).unwrap_or(updated));
+        }
+        let raw = encode(&body)?;
+        if (old.is_none() && count >= 1024)
+            || bytes - old.as_ref().map_or(0, |v| v.0) + raw.len() as i64 > 524_288
+            || trace_budget::insert_on(
+                c,
+                &work.id,
+                "agentStream",
+                raw.len()
+                    .saturating_sub(old.as_ref().map_or(0, |v| v.0 as usize))
+                    + 16_384,
+            )
+            .is_err()
+        {
+            // Display retention must not abort otherwise authorized execution.
+            let marker = json!({"id":"display-limit","kind":"message","text":"过程记录达到显示上限，后续活动未逐条展示；任务仍按原授权与执行预算继续。","state":"completed","truncated":true,"origin":"hub-display-limit"});
+            c.execute("INSERT OR IGNORE INTO agent_records(id,work_id,run_id,kind,body_json,created_at) VALUES(?1,?2,?3,'agentStream',?4,?5)",params![format!("stream-limit-{run}"),work.id,run,encode(&marker)?,updated]).map_err(|e|e.to_string())?;
+            if old.is_some() {
+                let terminal = matches!(
+                    value["state"].as_str(),
+                    Some("completed" | "failed" | "interrupted")
+                );
+                let finished =
+                    terminal.then_some(old.as_ref().and_then(|v| v.1).unwrap_or(updated));
+                c.execute("UPDATE agent_records SET body_json=json_set(body_json,'$.state',?2,'$.finishedAt',?3,'$.updatedAt',?4,'$.truncated',json('true')) WHERE id=?1",params![id,value["state"].as_str().unwrap_or("running"),finished,updated]).map_err(|e|e.to_string())?;
+            }
+            c.execute(
+                "UPDATE agent_works SET updated_at=?2 WHERE id=?1",
+                params![work.id, updated],
+            )
+            .map_err(|e| e.to_string())?;
+            return Ok(());
+        }
+        c.execute("INSERT INTO agent_records(id,work_id,run_id,kind,body_json,created_at) VALUES(?1,?2,?3,'agentStream',?4,?5) ON CONFLICT(id) DO UPDATE SET body_json=excluded.body_json",params![id,work.id,run,raw,updated]).map_err(|e|e.to_string())?;
         c.execute(
             "UPDATE agent_works SET updated_at=?2 WHERE id=?1",
             params![work.id, updated],
@@ -760,7 +805,7 @@ pub(super) fn view(root: &Path, id: &str) -> Result<Value, String> {
     phase!("datasets");
     let record_version: i64 = c
         .query_row(
-            "SELECT COALESCE(MAX(created_at),0) FROM agent_records WHERE work_id=?1",
+            "SELECT MAX(updated_at,COALESCE((SELECT MAX(created_at) FROM agent_records WHERE work_id=?1),0)) FROM agent_works WHERE id=?1",
             [id],
             |r| r.get(0),
         )

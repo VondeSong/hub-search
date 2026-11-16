@@ -67,8 +67,17 @@ fn core_auth_cleanup_child() {
         .unwrap();
         let identity = prepared.identity.clone();
         let control = crate::model_runtime::Control::bounded(Duration::from_secs(25));
-        let mut p =
-            super::super::spawn(&root, &identity, prepared, "", "", false, &control).unwrap();
+        let mut p = super::super::spawn(
+            &root,
+            &identity,
+            prepared,
+            "",
+            "",
+            false,
+            &control,
+            Default::default(),
+        )
+        .unwrap();
         p.rpc(
             "initialize",
             "initialize",

@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "ef677729c6339dbbdd9726f56abb3f50e5012eba",
-  "published_version": 107,
-  "deployment_id": "appgdep_6afb24d8c1d48191b8e9983b5855e0cf",
+  "source_commit": "5475054ad9d5bfe7ece65e98179ce165506c5527",
+  "published_version": 108,
+  "deployment_id": "appgdep_6afb343e910081918e7fe7dec521433e",
   "files": {
     ".gitignore": {
       "sha256": "5ca3c39bdc1288c108a1931b3f6bc5795464b6253e9457390617774259deed0c",
@@ -28,9 +28,9 @@
       "bytes": 31055
     },
     "app/Assistant.tsx": {
-      "sha256": "0f2990eb5b9357e61a987aae31423a574dda685ba68368728d51a4e65227db93",
+      "sha256": "aaede972ca1463e7661aa7fb70b8c284cd9c3de6ec2b5cdb3e2f7a11aabfaf5c",
       "mode": "100644",
-      "bytes": 105161
+      "bytes": 104891
     },
     "app/AssistantChrome.tsx": {
       "sha256": "5a2d240fb2cf5f3896f1e8689a30f16c9842115cc53b23b0fb751a204553c81b",
@@ -61,6 +61,11 @@
       "sha256": "cd6260eb60f8681c67680551a54848bf06c53822f705033714654021c93ca244",
       "mode": "100644",
       "bytes": 5700
+    },
+    "app/AssistantProcess.tsx": {
+      "sha256": "44c9e09636bd716e7aa8da3e317dda02a68095fddbddb96e7651b2f9f97d0b32",
+      "mode": "100644",
+      "bytes": 2633
     },
     "app/AssistantResearch.tsx": {
       "sha256": "a6dc82be00285f6c1913085c9bf7948eb093e473c2cd21796b948fb57e51c8c4",
@@ -228,9 +233,9 @@
       "bytes": 1644
     },
     "app/assistant.css": {
-      "sha256": "8739385ab2fa5c361107041a2164dbdd11026186b5fc74a1a3c250c481129655",
+      "sha256": "d4d0c933d2ccb96c09437d9e8f0c887c0a21fc1a10fe88aa14e6a680bc645eea",
       "mode": "100644",
-      "bytes": 57860
+      "bytes": 58993
     },
     "app/calendar-period.ts": {
       "sha256": "fb67e7bd1f4e04ccfd14ffb7ef8bb59fb448b0ed2080a698e9b331fe12b1224d",
@@ -1067,6 +1072,16 @@
       "mode": "100644",
       "bytes": 94
     },
+    "public/agent-icons/github.svg": {
+      "sha256": "3bf8cceead820aec50d4ee825a3fd02c5a1cd6665cc9cf4cbf3d9c8861a204bb",
+      "mode": "100644",
+      "bytes": 822
+    },
+    "public/agent-icons/notion.svg": {
+      "sha256": "b17d2a2b592a06252efef522d5205f0c7a958f748d40df1011ed081417e42f85",
+      "mode": "100644",
+      "bytes": 978
+    },
     "public/brands/deepseek.ico": {
       "sha256": "30a4420e6e4dcb17fd7de560c5004346c2bc8cd971d2d5f5ee15326603e51321",
       "mode": "100644",
@@ -1308,5 +1323,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-16T15:45:22.765111+00:00"
+  "imported_at": "2026-11-16T16:51:11.441544+00:00"
 }

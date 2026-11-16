@@ -1,6 +1,32 @@
 //! Per-conversation choices, saved by explicit UI actions. The runtime remains
 //! the only owner of provider credentials, admission and global preferences.
 use super::*;
+use sha2::Digest;
+
+pub(super) fn workspace_directory(root: &Path, work: &Work, options: &Options) -> PathBuf {
+    let scope = json!({"grant":work.grant,"authorizationVersion":work.authorization_version,"researchPolicy":options.research_policy,"webSearch":options.effective_web_search(),"mcpServices":options.mcp_services});
+    root.join("agent-runtime").join(&work.id).join(format!(
+        "scope-{:x}",
+        sha2::Sha256::digest(scope.to_string().as_bytes())
+    ))
+}
+
+pub(super) fn workspace_path(root: &Path, id: &str) -> Result<Value, String> {
+    let c = crate::source_evidence::open_read_database(root)?;
+    let work = store::load(&c, id)?;
+    let options = load_on(&c, id)?;
+    if work.state == "revoked" || !options.native_capabilities.workspace {
+        return Err("本对话未授权独立工作区".into());
+    }
+    let base = workspace_directory(root, &work, &options);
+    let path = base.join("workspace");
+    let canonical = std::fs::canonicalize(&path).map_err(|_| "工作区尚未建立，请先运行一轮")?;
+    let canonical_base = std::fs::canonicalize(base).map_err(|_| "工作区不可用")?;
+    if !canonical.starts_with(canonical_base) {
+        return Err("工作区路径已改变".into());
+    }
+    Ok(json!({"path":canonical}))
+}
 
 #[derive(Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -12,6 +38,11 @@ pub(super) struct Options {
     pub auto_flashcard_inbox: bool,
     #[serde(default, skip_serializing_if = "disabled")]
     pub external_mcp: bool,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::model_runtime::NativeCapabilities::disabled"
+    )]
+    pub native_capabilities: crate::model_runtime::NativeCapabilities,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub mcp_services: Vec<crate::model_runtime::mcp_services::Grant>,
     #[serde(
@@ -66,6 +97,16 @@ pub(super) fn configure(root: &Path, args: &Value) -> Result<Value, String> {
         crate::model_runtime::check_settings(model)?;
     }
     crate::model_runtime::mcp_services::validate(&options.mcp_services)?;
+    options
+        .native_capabilities
+        .validate(options.external_mcp, false)?;
+    if !options.native_capabilities.disabled()
+        && !crate::model_runtime::native_agent_provider(
+            &crate::model_runtime::selected_settings(root, options.model.clone())?.provider,
+        )
+    {
+        return Err("原生工作区仅支持 Codex；未更换提供方".into());
+    }
     if !options.mcp_services.is_empty()
         && !crate::model_runtime::native_agent_provider(
             &crate::model_runtime::selected_settings(root, options.model.clone())?.provider,
@@ -118,6 +159,20 @@ pub(super) fn preflight(
     let c = crate::source_evidence::open_read_database(root)?;
     let w = store::load(&c, id)?;
     let settings = crate::model_runtime::selected_settings(root, load_on(&c, id)?.model)?;
+    let options = load_on(&c, id)?;
+    options.native_capabilities.validate(
+        options.external_mcp,
+        store::provider_budget::configured_on(&c, &w)?
+            || store::material_budget::load_on(&c, id)?.is_some(),
+    )?;
+    if options.native_capabilities.workspace && store::material_budget::load_on(&c, id)?.is_some() {
+        return Err("原生命令输出尚未纳入冻结材料额度；未创建运行或预留额度".into());
+    }
+    if !options.native_capabilities.disabled()
+        && (!prepare_drafts || !crate::model_runtime::native_agent_provider(&settings.provider))
+    {
+        return Err("当前入口不支持原生工作区；未创建运行或预留额度".into());
+    }
     let services = load_on(&c, id)?.mcp_services;
     crate::model_runtime::mcp_services::validate(&services)?;
     if !services.is_empty()

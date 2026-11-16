@@ -172,6 +172,56 @@ pub(crate) fn save_on(c: &Connection, post: &Post) -> Result<String, String> {
     Ok(key)
 }
 
+/// Small, inert website metadata. Every redirect is revalidated and IP-pinned;
+/// no browser cookies, proxy credentials, referrer or source URL query is sent.
+pub(crate) async fn icon_asset(
+    raw: &str,
+    accept: &str,
+    limit: usize,
+) -> Result<(reqwest::Url, Vec<u8>), String> {
+    let mut target = url(raw)?;
+    for _ in 0..=3 {
+        let host = target.host_str().ok_or("图标域名缺失")?;
+        let mut addresses: Vec<_> = tokio::net::lookup_host((host, 443))
+            .await
+            .map_err(|_| "图标域名解析失败")?
+            .take(33)
+            .collect();
+        if needs_public_dns(&addresses)? {
+            addresses = public_dns(host).await?;
+        }
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .resolve_to_addrs(host, &addresses)
+            .redirect(reqwest::redirect::Policy::none())
+            .retry(reqwest::retry::never())
+            .referer(false)
+            .timeout(Duration::from_secs(3))
+            .build()
+            .map_err(|_| "图标连接不可用")?;
+        let response = client
+            .get(target.clone())
+            .header("Accept", accept)
+            .send()
+            .await
+            .map_err(|_| "图标连接失败")?;
+        if response.status().is_redirection() {
+            let next = response
+                .headers()
+                .get(reqwest::header::LOCATION)
+                .and_then(|v| v.to_str().ok())
+                .ok_or("图标跳转无目标")?;
+            target = url(target.join(next).map_err(|_| "图标跳转格式无效")?.as_str())?;
+            continue;
+        }
+        if !response.status().is_success() {
+            return Err("图标不可用".into());
+        }
+        return Ok((target, crate::http_body::bytes(response, limit).await?));
+    }
+    Err("图标跳转过多".into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
