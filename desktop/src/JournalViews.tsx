@@ -63,7 +63,7 @@ export function normalizeJournalView(value: unknown): JournalViewConfig {
     query: typeof v.query === "string" ? v.query.slice(0, 500) : "",
     libraries: Array.isArray(v.libraries) ? [...new Set(v.libraries.filter((id): id is string => typeof id === "string" && Boolean(id.trim())))].sort() : null,
     period: v.period === "all" || (v.period === "day" && day) ? v.period : "month",
-    month: validMonth(v.month) ? v.month : base.month,
+    month: v.period === "day" && day ? day.slice(0,7) : validMonth(v.month) ? v.month : base.month,
     day,
     sort: v.sort === "modified" ? "modified" : "date",
     ...Object.fromEntries((["ascending", "compact", "summary", "source", "modified"] as const).map(k => [k, typeof v[k] === "boolean" ? v[k] : base[k]])),
@@ -93,7 +93,11 @@ export function useJournalViewStore() {
     catch { /* Session remains usable when storage is unavailable. */ }
   }, [state]);
   const active = state.saved.find(s => s.id === state.activeId);
-  const update = (patch: Partial<JournalViewConfig>) => setState(s => ({ ...s, view: normalizeJournalView({ ...s.view, ...patch }) }));
+  const update = (patch: Partial<JournalViewConfig>) => setState(s => {
+    const view=normalizeJournalView({...s.view,...patch});
+    const anchor=patch.day!==undefined&&view.period==="day"?view.day:view.month!==s.view.month?"":s.anchor;
+    return {...s,view,anchor};
+  });
   return {
     ...state, active, modified: !!active && JSON.stringify(active.config) !== JSON.stringify(state.view), update,
     navigate: (date: string) => {

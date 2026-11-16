@@ -81,6 +81,7 @@ export function DesktopAppLayout(props: AppLayoutProps) {
       filterBarProps, workspaceProps, footerStatusProps, settingsDialog, mainContent, desktopSidebarProps,
     } = props;
     const insightsLayout = desktopSidebarProps.activeView === "insights";
+    const journalLayout = desktopSidebarProps.activeView === "journals";
     const librariesLayout = Boolean(mainContent) && desktopSidebarProps.activeView === "libraries";
     const integratedHeader = Boolean(mainContent) && (desktopSidebarProps.activeView === "collections" || insightsLayout || librariesLayout);
     return (
@@ -122,7 +123,7 @@ export function DesktopAppLayout(props: AppLayoutProps) {
         /></>}
         <div className={`desktop-main-layout ${filtersOpen ? "filters-open" : ""}`}>
           <AgentCitationBody/>
-          {!integratedHeader && <WorkspaceChrome search={!mainContent && <SearchHeader {...headerProps} hideLibrarySwitcher hidePreviewToggle />} actions={!mainContent && <button className={`workspace-preview-toggle ${headerProps.showPreviewPane ? "active" : ""}`} aria-label="显示预览窗格" title="显示预览窗格" aria-pressed={headerProps.showPreviewPane} onClick={() => headerProps.setPreviewOpen(value => !value)}><PanelRight size={17} /></button>} mode={sidebarMode} onModeChange={changeMode} onTogglePanel={togglePanel} panelExpanded={panelExpanded} view={desktopSidebarProps.activeView} spaces={desktopSidebarProps.spaces} selectedLibraryIds={desktopSidebarProps.selectedLibraryIds} onToggleLibrary={desktopSidebarProps.onToggleLibrary} onSelectAll={desktopSidebarProps.onSelectAllLibrariesOnly ?? desktopSidebarProps.onToggleAllLibraries} onManage={desktopSidebarProps.onManageLibraries} />}
+          {!integratedHeader && !journalLayout && <WorkspaceChrome search={!mainContent && <SearchHeader {...headerProps} hideLibrarySwitcher hidePreviewToggle />} actions={!mainContent && <button className={`workspace-preview-toggle ${headerProps.showPreviewPane ? "active" : ""}`} aria-label="显示预览窗格" title="显示预览窗格" aria-pressed={headerProps.showPreviewPane} onClick={() => headerProps.setPreviewOpen(value => !value)}><PanelRight size={17} /></button>} mode={sidebarMode} onModeChange={changeMode} onTogglePanel={togglePanel} panelExpanded={panelExpanded} view={desktopSidebarProps.activeView} spaces={desktopSidebarProps.spaces} selectedLibraryIds={desktopSidebarProps.selectedLibraryIds} onToggleLibrary={desktopSidebarProps.onToggleLibrary} onSelectAll={desktopSidebarProps.onSelectAllLibrariesOnly ?? desktopSidebarProps.onToggleAllLibraries} onManage={desktopSidebarProps.onManageLibraries} />}
           {mainContent ? <><div className="main-content-override"><WorkspaceHeaderContext.Provider value={integratedHeader ? {
             actions: librariesLayout ? null : <WorkspaceModeControl mode={sidebarMode} onModeChange={changeMode} />,
             onMouseDown: startWindowDrag,
@@ -132,9 +133,9 @@ export function DesktopAppLayout(props: AppLayoutProps) {
               title="拖动调整资料库导航宽度；双击恢复默认"
               onPointerDown={resizeSidebar} onDoubleClick={resetSidebarWidth} onKeyDown={resizeSidebarWithKeyboard} /> : undefined,
           } : null}>{mainContent}</WorkspaceHeaderContext.Provider></div><FooterStatus {...footerStatusProps} /></> : <>
-            <SearchFilterReveal open={filtersOpen}><FilterBar {...filterBarProps} visible={filtersOpen} /></SearchFilterReveal>
-            {(desktopSidebarProps.activeView === "home" || headerProps.query.trim()) && <SearchFilterSummary {...filterBarProps} />}
-            <DesktopWorkspace {...workspaceProps} />
+            {!journalLayout&&<SearchFilterReveal open={filtersOpen}><FilterBar {...filterBarProps} visible={filtersOpen} /></SearchFilterReveal>}
+            {(!journalLayout&&(desktopSidebarProps.activeView === "home" || headerProps.query.trim())) && <SearchFilterSummary {...filterBarProps} />}
+            <WorkspaceHeaderContext.Provider value={journalLayout?{actions:<><WorkspaceModeControl mode={sidebarMode} onModeChange={changeMode}/><button className={`workspace-preview-toggle ${headerProps.showPreviewPane ? "active" : ""}`} aria-label="显示预览窗格" aria-pressed={headerProps.showPreviewPane} onClick={()=>headerProps.setPreviewOpen(value=>!value)}><PanelRight size={17}/></button></>,onMouseDown:startWindowDrag}:null}><DesktopWorkspace {...workspaceProps}/></WorkspaceHeaderContext.Provider>
             <FooterStatus {...footerStatusProps} />
           </>}
         </div>

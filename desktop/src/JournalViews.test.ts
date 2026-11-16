@@ -104,6 +104,12 @@ describe("saved journal views", () => {
     await render(); await act(async () => { for (let i = 0; i < 35; i++) store.save(`View ${i}`); });
     expect(store.saved).toHaveLength(30); expect(new Set(store.saved.map(s => s.id)).size).toBe(30);
   });
+  it("keeps the navigator on the filtered date or month instead of an old anchor",async()=>{
+    await render();await act(async()=>store.navigate("2026-11-16"));
+    await act(async()=>store.update({month:"2026-09"}));expect(store.anchor).toBe("");expect(store.view.month).toBe("2026-09");
+    await act(async()=>store.update({period:"day",day:"2024-02-29"}));expect(store.anchor).toBe("2024-02-29");expect(store.view.month).toBe("2024-02");
+    await act(async()=>store.update({query:"正文"}));expect(store.anchor).toBe("2024-02-29");
+  });
   it("remains usable when browser storage is unavailable", async () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("blocked"); });
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("full"); });

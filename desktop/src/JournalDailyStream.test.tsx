@@ -50,7 +50,7 @@ beforeEach(() => {
   listen.mockReset(); listen.mockResolvedValue(vi.fn());
   invoke.mockReset(); invoke.mockImplementation(async (command, args) => {
     if (command === "journal_page") {
-      const items = logs.filter(log => log.journalDate! >= args.options.from && log.journalDate! <= args.options.to);
+      const items = logs.filter(log => (!args.options.from||log.journalDate! >= args.options.from) && (!args.options.to||log.journalDate! <= args.options.to));
       return { items, total: items.length, days: new Set(items.map(item => item.journalDate)).size, libraries: items.length ? 1 : 0, revision: "v1" };
     }
     if (command === "list_unified_tasks") return { tasks, syncReviews: [], syncEnabled: false, backgroundSyncIntervalMinutes: 15, lastSyncFailed: 0 };
@@ -91,12 +91,12 @@ it("starts at today and preserves all seven empty date blocks without older logs
   expect(taskReadCalls()).toHaveLength(1);
   expect(container.querySelector(".journal-daily-completed-trigger")).toBeNull();
 });
-it("extends both directions across months without querying the shared task source again", async () => {
-  await render(currentStore, "2026-10-29"); expect(rows()[0]).toBe("2026-10-29"); expect(last(rows())).toBe("2026-11-04");
-  await click(button("显示前几天")); expect(rows()).toHaveLength(14); expect(rows()[0]).toBe("2026-10-22");
-  await click(button("显示后几天")); expect(rows()).toHaveLength(21); expect(last(rows())).toBe("2026-11-11");
+it("stops monthly continuous days at the month boundary and reuses the shared task source", async () => {
+  await render(currentStore, "2026-10-29"); expect(rows()[0]).toBe("2026-10-29"); expect(last(rows())).toBe("2026-10-31");
+  await click(button("显示前几天")); expect(rows()).toHaveLength(10); expect(rows()[0]).toBe("2026-10-22");
+  await click(button("显示后几天")); expect(rows()).toHaveLength(10); expect(last(rows())).toBe("2026-10-31"); expect(button("显示后几天").hasAttribute("disabled")).toBe(true);
   const request = last(invoke.mock.calls.filter(([command]) => command === "journal_page"))![1];
-  expect(request.options).toEqual(expect.objectContaining({ from: "2026-10-22", to: "2026-11-11", offset: 0 }));
+  expect(request.options).toEqual(expect.objectContaining({ from: "2026-10-22", to: "2026-10-31", offset: 0 }));
   expect(taskReadCalls()).toHaveLength(1);
 });
 it("resets to an outside date or single-day filter while reusing the same tasks", async () => {
@@ -320,4 +320,16 @@ it("closes a completion dialog when the shared source removes its last completio
     await new Promise(resolve => setTimeout(resolve, 220));
   });
   expect(completedTrigger()).toBeNull(); expect(modal()).toBeNull();
+});
+
+it("shows a historical match outside the current writing week under monthly search",async()=>{
+ logs=[journal("2026-10-02")]; await render(store({query:"历史"}));
+ expect(rows()).toEqual(["2026-10-02"]);
+ expect(container.querySelector(".journal-daily-previous")).toBeNull();
+ expect(invoke.mock.calls.some(([cmd,args])=>cmd==="journal_page"&&args.options.from==="2026-10-01"&&args.options.to==="2026-10-31")).toBe(true);
+});
+it("shows all-date results across months without empty days or a writing-week bound",async()=>{
+ logs=[journal("2026-08-01"),journal("2026-10-02")]; await render(store({period:"all"}));
+ expect(rows()).toEqual(["2026-08-01","2026-10-02"]);
+ expect(invoke.mock.calls.some(([cmd,args])=>cmd==="journal_page"&&args.options.from===null&&args.options.to===null)).toBe(true);
 });

@@ -4,6 +4,13 @@ import { canHandleSearchWorkspaceKeyboard, isInsideKeyboardDialog } from "./AppK
 
 afterEach(() => { document.body.replaceChildren(); });
 
+it("keeps body-retargeted Escape inside an open journal popover until it closes", () => {
+  document.body.innerHTML='<div data-hub-keyboard-scope="journal-filter" data-keyboard-open="true"></div>';
+  expect(isInsideKeyboardDialog(document.body)).toBe(true);
+  document.body.firstElementChild!.setAttribute("data-keyboard-open","false");
+  expect(isInsideKeyboardDialog(document.body)).toBe(false);
+});
+
 function captureSearch(workspaceActive: boolean, searchAction: (event: KeyboardEvent) => void) {
   const listener = (event: KeyboardEvent) => {
     if (!canHandleSearchWorkspaceKeyboard(event, workspaceActive)) return;

@@ -16,7 +16,7 @@ let container:HTMLDivElement,root:Root,store:JournalViewStore;
 const preview=vi.fn(),open=vi.fn(),create=vi.fn(),favorite=vi.fn();
 function Fixture(){store=useJournalViewStore();return <JournalViewsContext.Provider value={store}><JournalWorkspace libraries={[{id:"Car",name:"Car",provider:"craft",connected:true,documentCount:1,excludedPaths:[]}]} scope={null} dataVersion="v1" selectedDate="" onPreview={preview} onOpen={open} onCreate={create} onFavorite={favorite} favoriteIds={new Set([pageFavoriteKey(items[0])])} renderIcon={()=>null}/></JournalViewsContext.Provider>;}
 async function click(selector:string){await act(async()=>container.querySelector<HTMLButtonElement>(selector)!.click());}
-beforeEach(()=>{(globalThis as unknown as {IS_REACT_ACT_ENVIRONMENT:boolean}).IS_REACT_ACT_ENVIRONMENT=true;localStorage.clear();vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date(2026,9,13,12));container=document.createElement("div");document.body.appendChild(container);root=createRoot(container);preview.mockClear();open.mockClear();create.mockClear();favorite.mockClear();});
+beforeEach(()=>{(globalThis as unknown as {IS_REACT_ACT_ENVIRONMENT:boolean}).IS_REACT_ACT_ENVIRONMENT=true;localStorage.clear();Object.defineProperty(HTMLDialogElement.prototype,"showModal",{configurable:true,value:function(){this.setAttribute("open","");}});Object.defineProperty(HTMLDialogElement.prototype,"close",{configurable:true,value:function(){this.removeAttribute("open");}});vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date(2026,9,13,12));container=document.createElement("div");document.body.appendChild(container);root=createRoot(container);preview.mockClear();open.mockClear();create.mockClear();favorite.mockClear();});
 afterEach(async()=>{await act(async()=>root.unmount());container.remove();vi.useRealTimers();});
 describe("Journal database workspace",()=>{
  it("keeps same-day sources separate and previews the original page; favorite uses page identity",async()=>{
@@ -36,8 +36,8 @@ describe("Journal database workspace",()=>{
  it("creates a saved view without touching source pages and restores its layout",async()=>{
   await act(async()=>root.render(<Fixture/>));await act(async()=>store.update({layout:"table",source:false,summary:false}));
   await click('[aria-label="新建日志视图"]');
-  await act(async()=>{const input=container.querySelector<HTMLInputElement>('.journal-db-save-form input')!;Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'工作日志');input.dispatchEvent(new Event('input',{bubbles:true}));});
-  await act(async()=>container.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+  await act(async()=>{const input=container.querySelector<HTMLInputElement>('.journal-save-view-dialog input')!;Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'工作日志');input.dispatchEvent(new Event('input',{bubbles:true}));});
+  await act(async()=>container.querySelector('.journal-save-view-dialog form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
   expect(store.saved[0].name).toBe("工作日志");expect(store.saved[0].config.layout).toBe("table");
   await act(async()=>{store.update({layout:"list"});});expect(store.modified).toBe(true);
   await act(async()=>store.select(store.saved[0].id));expect(store.view.layout).toBe("table");
