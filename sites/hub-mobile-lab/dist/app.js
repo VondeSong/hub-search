@@ -1,6 +1,7 @@
 'use strict';
 const $ = (s) => document.querySelector(s);
 const paths = {
+ pin:'M8 3h8l-1 6 4 4v2H5v-2l4-4-1-6ZM12 15v6', trash:'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7', mic:'M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0V5ZM6 10v2a6 6 0 0 0 12 0v-2M12 18v4m-4 0h8', filter:'M4 5h16M7 12h10M10 19h4',
  hash:'M4 9h16M3 15h16M10 3 8 21M17 3l-2 18', image:'M3 3h18v18H3ZM3 16l5-5 5 5 3-3 5 5M8 7h.01', bold:'M6 4h7a4 4 0 0 1 0 8H6Zm0 8h8a4 4 0 0 1 0 8H6Z', list:'M9 6h12M9 12h12M9 18h12M3 6h.01M3 12h.01M3 18h.01', send:'m22 2-7 20-4-9-9-4 20-7ZM22 2 11 13',
  cloud:'M7 18h11a4 4 0 0 0 .6-7.95A6 6 0 0 0 7 8a5 5 0 0 0 0 10Z',
  arrowUp:'M12 20V4m-7 7 7-7 7 7', stop:'M7 7h10v10H7Z',

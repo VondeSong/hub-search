@@ -3,9 +3,9 @@
   "site": "mobile",
   "project_id": "appgprj_6af1d2dc12308191acc37e5566699c2d",
   "site_url": "https://hub-mobile-lab-von11.song02211368537057.chatgpt.site",
-  "source_commit": "61c31875f5e11a7c341ae969a43e1e84a1de9896",
-  "published_version": 25,
-  "deployment_id": "appgdep_6afb0129fb4c8191b8a017013e7ff8ad",
+  "source_commit": "8a7864d32263a63a55dc77a4583fed545d267476",
+  "published_version": 26,
+  "deployment_id": "appgdep_6afb06c65db08191876b8e1c8f53a3fd",
   "files": {
     ".openai/hosting.json": {
       "sha256": "543a776095c0181cc870f784c075ab4f263fb739e3649cd8db74f493fb5b4ca3",
@@ -23,9 +23,9 @@
       "bytes": 4282
     },
     "README.md": {
-      "sha256": "2795905b8fd7e6f7a147d8ff8fe4b81d4d530962fa979bbfda66c6da628e5804",
+      "sha256": "ecc30cb67f99b4f9d55708dc1db99f2e7d0e5b68a507f494595f3a53e90b2303",
       "mode": "100644",
-      "bytes": 16334
+      "bytes": 16938
     },
     "checks/agents-enhancements-checks.cjs": {
       "sha256": "e608e3a945a1cc57a0e2031e7879ad293821262e32f1845e85690d35ad97a818",
@@ -33,9 +33,9 @@
       "bytes": 16029
     },
     "checks/journal-feed-tools-checks.cjs": {
-      "sha256": "bb33b1befaa2417666a539c5a411d7c62d289631d952cb67e8ec39de50ab77d9",
+      "sha256": "b75013978e8dc0346acc969592783c311c5d7a47519aad49aead50970a15c0d1",
       "mode": "100644",
-      "bytes": 2536
+      "bytes": 6261
     },
     "checks/journal-studio-checks.cjs": {
       "sha256": "6aff7d2581698330f02f5bb20f25c0d2e3ced05fda44b60a0f6095e4ef4942c6",
@@ -93,9 +93,9 @@
       "bytes": 37403
     },
     "dist/app.js": {
-      "sha256": "5cf75d6733cb4a6851128a9043512a7af7e4ab6868701b46d60470d704c0a09a",
+      "sha256": "4cdf0429741b67fb31dee9dee26cffdbe9d4b3b479659e1d7e2aabce50ce0af1",
       "mode": "100644",
-      "bytes": 65609
+      "bytes": 65834
     },
     "dist/hub.svg": {
       "sha256": "a7229c43b74d0dba3e1441f0d14c62320e441a8c16df9c1f2378f88ffbe172b1",
@@ -103,24 +103,24 @@
       "bytes": 254
     },
     "dist/index.html": {
-      "sha256": "6a1c2e555904deaae9b3471e3cb4d716a485958f2b41e789616caccdce7faa2f",
+      "sha256": "a21aeb3e4f33e384a02e76407dac9e9060258ee1e7fca5a7470c315f63520d04",
       "mode": "100644",
       "bytes": 1700
     },
     "dist/journal-feed-tools.js": {
-      "sha256": "ed01aea95517f3975fa63274e539b375e8c102b76e68ce919ec07c235dbae4e4",
+      "sha256": "7f2051ff3a51da56eda688e5747a5325a8559765bd8a5a2b42b778d9c9b4e58b",
       "mode": "100644",
-      "bytes": 12140
+      "bytes": 15786
     },
     "dist/journal-studio.css": {
-      "sha256": "5d757a3d93df68532d16ab217f55b28964422792465c202ad3cce618884e7152",
+      "sha256": "c9030c1c3694b87fe9089a6cedb0a69f2ae7f1e8adc8236bf3f170f14b18f60e",
       "mode": "100644",
-      "bytes": 16361
+      "bytes": 23636
     },
     "dist/journal-studio.js": {
-      "sha256": "4ba4833843ab9e1f57dad7c3518551b5122672a51306a0f3510643868b857ce7",
+      "sha256": "21291983637d123b98c9004b6216cdb4be164adf418178bb945ef5b5985ad03c",
       "mode": "100644",
-      "bytes": 34775
+      "bytes": 38839
     },
     "dist/mobile-features.js": {
       "sha256": "d685ec8f46b95de02649c2dc3e164e7fcab7bd425e6a72ffddbb1b6f3fc10da1",
@@ -262,6 +262,11 @@
       "mode": "100644",
       "bytes": 32758
     },
+    "docs/images/journal-navigation-2026-11-16/widths-and-dark.jpg": {
+      "sha256": "94eeaae369b623987a128864022a3c049b7881401b3ae7bf7e0ca45121dbb25f",
+      "mode": "100644",
+      "bytes": 109037
+    },
     "docs/interaction-qa-2026-11-15.md": {
       "sha256": "50ff7cfdea430a62fa065925b0328664f2658532e72d2f5dc0e4069d405f1703",
       "mode": "100644",
@@ -271,6 +276,11 @@
       "sha256": "cf93271a44d10c7965390bddb65a05854a2a1fe97d2eb7b23e5664f916d2a931",
       "mode": "100644",
       "bytes": 31988
+    },
+    "docs/journal-navigation-2026-11-16.md": {
+      "sha256": "71817187bcaee25d952848e61fc449d2e2cc64e5132d66dc38df9526faf4150d",
+      "mode": "100644",
+      "bytes": 8476
     },
     "docs/journal-video-2026-11-16.md": {
       "sha256": "335e552e3b66b17521ed360be7def9bd223160b2580023bbb7da3fd18e548d70",
@@ -313,5 +323,5 @@
       "bytes": 3301
     }
   },
-  "imported_at": "2026-11-16T13:12:31.397796+00:00"
+  "imported_at": "2026-11-16T13:37:34.872499+00:00"
 }

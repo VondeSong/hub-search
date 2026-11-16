@@ -1,6 +1,6 @@
 'use strict';
 
-let journalPicked = new Set(), journalAdvanced = {period:'all',start:'',end:'',tagMode:'all',tags:[],more:[]}, journalSearched = false;
+let journalPicked = new Set(), journalAdvanced = {period:'all',start:'',end:'',tagMode:'all',tags:[],more:[]}, journalSearched = false, journalSearchQuery = '', journalSearchScope = null;
 const journalSortLabels = {'date-desc':'记录日期，从新到旧','date-asc':'记录日期，从旧到新','edit-desc':'编辑时间，从新到旧','edit-asc':'编辑时间，从旧到新'};
 function journalCompare(a,b) {
   const key=journalStore().sort||'date-desc', direction=key.endsWith('asc')?1:-1;
@@ -15,21 +15,30 @@ function journalAdvancedMatches(n) {
     (f.tagMode!=='include'||f.tags.some(t=>tags.includes(t))) && (f.tagMode!=='exclude'||!f.tags.some(t=>tags.includes(t))) && f.more.every(key=>key==='images'?attachments.some(a=>a.image)||capturePhotos(n.photos).length:key==='links'?/https?:\/\//i.test(n.text):attachments.some(a=>/\.(mp3|wav|m4a|aac|ogg|opus|flac)$/i.test(a.name)));
 }
 function journalViews() {
-  sheet('日志视图','<div class="journal-view-options">'+plain('选择笔记','journal-select-start','check')+'<details><summary>排序方式<span>'+esc(journalSortLabels[journalStore().sort||'date-desc'])+'</span></summary>'+Object.entries(journalSortLabels).map(([key,label])=>'<button type="button" data-act="journal-sort:'+key+'" aria-pressed="'+String((journalStore().sort||'date-desc')===key)+'">'+esc(label)+((journalStore().sort||'date-desc')===key?ico('check',16):'')+'</button>').join('')+'</details><p class="fine">未记录编辑时间的旧记录按记录日期排列。</p></div>');
+  const s=journalSyncSummary();
+  const action=(label,detail,key,icon)=>'<button type="button" class="journal-setting-row" data-act="'+key+'">'+ico(icon,20)+'<span><strong>'+label+'</strong><small>'+esc(detail)+'</small></span>'+ico('chev',16)+'</button>';
+  sheet('日志设置','<div class="journal-view-options"><div class="journal-settings-actions">'+action('选择笔记','批量添加标签、复制或移到回收站','journal-select-start','check')+'</div><details class="journal-sort-options"><summary>排序方式<span>'+esc(journalSortLabels[journalStore().sort||'date-desc'])+'</span></summary>'+Object.entries(journalSortLabels).map(([key,label])=>'<button type="button" data-act="journal-sort:'+key+'" aria-pressed="'+String((journalStore().sort||'date-desc')===key)+'">'+esc(label)+((journalStore().sort||'date-desc')===key?ico('check',16):'')+'</button>').join('')+'<p class="fine">置顶记录优先；没有编辑时间的旧记录按记录日期排列。</p></details><div class="journal-menu-status">'+action(s.label,s.detail,'journal-sync-status',s.icon)+'</div>'+action('控制中心入口','快速打开“记一条”的原型演示','journal-shortcut','plus')+'</div>');
+}
+function journalSearchHasConditions() {return Boolean(journalSearched||journalSearchQuery.trim()||journalAdvanced.period!=='all'||journalAdvanced.tagMode!=='all'||journalAdvanced.more.length);}
+function journalSearchCandidates() {
+  const scope=journalSearchScope;
+  if(!scope)return journalStudioRecords();
+  return journalStudioRecords(scope.filter==='trash').filter(n=>journalScopeMatches(n,scope.filter)&&(!scope.tag||journalTags(n.text).includes(scope.tag))&&(scope.period==='all'||journalScopeMatches(n,scope.period))&&(!scope.query||(n.text+' '+recordAttachments(n).map(a=>a.name).join(' ')).toLocaleLowerCase().includes(scope.query.toLocaleLowerCase())));
 }
 function journalSearchHeader() {
-  return '<form id="journal-search-form" class="journal-search-heading"><label>'+ico('search',19)+'<input id="journal-detail-query" type="search" aria-label="搜索日志正文" placeholder="搜索" value="'+esc(journalQuery)+'">'+iconBtn('展开日志筛选','journal-search-filters','filter')+'</label><button type="button" data-act="back">取消</button></form>';
+  return '<form id="journal-search-form" class="journal-search-heading"><label>'+ico('search',19)+'<input id="journal-detail-query" type="search" aria-label="搜索日志正文、标签或附件" placeholder="搜索日志、标签或附件" autocomplete="off" enterkeyhint="search" value="'+esc(journalSearchQuery)+'"><button type="button" class="journal-search-clear icon-btn" data-act="journal-search-clear" aria-label="清除搜索词"'+(journalSearchQuery?'':' hidden')+'>'+ico('close',17)+'</button></label><button type="button" class="icon-btn" data-act="journal-search-filters" aria-label="显示日志筛选" aria-pressed="'+Boolean(journalStore().searchFilters)+'">'+ico('filter',20)+'</button><button type="button" data-act="back">取消</button></form>';
 }
 function journalSearchPage() {
-  const active=journalSearched||journalQuery||journalAdvanced.period!=='all'||journalAdvanced.tagMode!=='all'||journalAdvanced.more.length;
-  return '<section class="journal-studio journal-search-page">'+(journalStore().searchFilters?'<div class="journal-search-filters">'+['日期','标签','更多'].map((label,i)=>'<button type="button" data-act="journal-search-filter:'+['date','tags','more'][i]+'">'+label+ico('chevronDown',13)+'</button>').join('')+'</div>':'')+'<div class="journal-quick-search"><p>快捷搜索</p><div>'+[['无标签','untagged','tag'],['有链接','links','link'],['有图片','images','image'],['有语音','audio','mic'],['那年今日','anniversary','calendar']].map(([label,key,icon])=>plain(label,'journal-search-quick:'+key,icon)).join('')+'</div></div><div id="journal-search-results">'+(active?journalSearchResults():'')+'</div></section>';
+  const f=journalAdvanced, dateLabels={all:'日期',week:'本周',month:'本月',custom:'自定日期',anniversary:'那年今日'}, tagLabels={all:'标签',untagged:'无标签',include:'包含标签',exclude:'排除标签'};
+  return '<section class="journal-studio journal-search-page"><p class="journal-search-context">搜索范围：'+esc(journalSearchScope?.label||'全部记录')+'</p>'+(journalStore().searchFilters?'<div class="journal-search-filters">'+[[dateLabels[f.period]||'日期','date',f.period!=='all'],[tagLabels[f.tagMode]||'标签','tags',f.tagMode!=='all'],[f.more.length?'附件与链接 · '+f.more.length:'更多','more',f.more.length>0]].map(([label,key,active])=>'<button type="button" data-act="journal-search-filter:'+key+'" aria-haspopup="dialog" aria-pressed="'+active+'">'+label+ico('chevronDown',13)+'</button>').join('')+'</div>':'')+'<div class="journal-quick-search"><p>快捷搜索</p><div>'+[['无标签','untagged','tag'],['有链接','links','link'],['有图片','images','image'],['有语音','audio','mic'],['那年今日','anniversary','calendar']].map(([label,key,icon])=>plain(label,'journal-search-quick:'+key,icon)).join('')+'</div></div><div id="journal-search-results">'+(journalSearchHasConditions()?journalSearchResults():'')+'</div></section>';
 }
 function journalSearchResults() {
-  const q=journalQuery.toLocaleLowerCase(),found=journalStudioRecords().filter(n=>(n.text+' '+recordAttachments(n).map(a=>a.name).join(' ')).toLocaleLowerCase().includes(q)&&journalAdvancedMatches(n));
-  return '<div class="journal-search-result-summary"><span>'+found.length+' 条记录</span>'+plain('清除条件','journal-search-reset')+'</div><div id="journal-search-feed">'+(found.map(journalStudioCard).join('')||'<p class="empty-state">没有符合条件的记录</p>')+'</div>';
+  const q=journalSearchQuery.trim().toLocaleLowerCase(),found=journalSearchCandidates().filter(n=>(n.text+' '+recordAttachments(n).map(a=>a.name).join(' ')).toLocaleLowerCase().includes(q)&&journalAdvancedMatches(n));
+  const f=journalAdvanced,summary=[f.period!=='all'&&({week:'本周',month:'本月',anniversary:'那年今日',custom:[f.start||'不限',f.end||'不限'].join(' 至 ')}[f.period]),f.tagMode==='untagged'&&'无标签',['include','exclude'].includes(f.tagMode)&&(f.tagMode==='include'?'包含 ':'排除 ')+f.tags.map(t=>'#'+t).join('、'),...f.more.map(key=>({images:'有图片',links:'有链接',audio:'有语音'}[key]))].filter(Boolean);
+  return '<div class="journal-search-result-summary"><span role="status">'+found.length+' 条记录</span>'+plain('清除条件','journal-search-reset')+'</div>'+(summary.length?'<p class="journal-search-context">'+esc(summary.join(' · '))+'</p>':'')+'<div id="journal-search-feed">'+(found.map(journalStudioCard).join('')||'<p class="empty-state">没有符合条件的记录<br>试试其他关键词或清除条件。</p>')+'</div>';
 }
 function journalSearchFilter(kind) {
-  const f=journalAdvanced, tags=[...new Set(journalStudioRecords().flatMap(n=>journalTags(n.text)))];
+  const f=journalAdvanced, tags=[...new Set(journalSearchCandidates().flatMap(n=>journalTags(n.text)))];
   let body='';
   if(kind==='date')body='<div class="journal-filter-choices">'+[['all','不限时间'],['week','本周'],['month','本月']].map(([key,label])=>'<label><input type="radio" name="period" value="'+key+'"'+(f.period===key?' checked':'')+'>'+label+'</label>').join('')+'</div><div class="journal-filter-dates"><label>开始日期<input type="date" name="start" value="'+esc(f.start)+'"></label><span>—</span><label>结束日期<input type="date" name="end" value="'+esc(f.end)+'"></label></div>';
   if(kind==='tags')body='<div class="journal-filter-choices">'+[['all','全部内容'],['untagged','无标签'],['include','包含指定标签'],['exclude','排除指定标签']].map(([key,label])=>'<label><input type="radio" name="tagMode" value="'+key+'"'+(f.tagMode===key?' checked':'')+'>'+label+'</label>').join('')+'</div><fieldset class="journal-filter-tags"><legend>指定标签</legend>'+tags.map(t=>'<label><input type="checkbox" name="tags" value="'+esc(t)+'"'+(f.tags.includes(t)?' checked':'')+'>#'+esc(t)+'</label>').join('')+'</fieldset>';
@@ -58,13 +67,14 @@ function journalBatchUpdate(kind,text='') {
 }
 function journalFeedToolsAction(a,key) {
   if(a==='journal-filters'){journalViews();return true;}
-  if(a==='journal-sort'){if(journalTransaction(()=>journalStore().sort=key)){close();render();}return true;}
+  if(a==='journal-sort'){if(Object.hasOwn(journalSortLabels,key)&&journalTransaction(()=>journalStore().sort=key)){close();render();}return true;}
   if(a==='journal-select-start'){journalPicked=new Set();go('journal-select');return true;}
   if(a==='journal-pick'){journalPicked.has(key)?journalPicked.delete(key):journalPicked.add(key);const y=pageScroll();render();window.scrollTo(0,y);return true;}
-  if(a==='journal-search'){journalQuery='';journalAdvanced={period:'all',start:'',end:'',tagMode:'all',tags:[],more:[]};journalSearched=false;go('journal-search');requestAnimationFrame(()=>document.querySelector('#journal-detail-query')?.focus());return true;}
+  if(a==='journal-search'){journalSearchScope={filter:journalStore().filter||'all',tag:journalTag,period:journalPeriod,query:journalQuery,label:journalScopeDescription()};journalSearchQuery='';journalAdvanced={period:'all',start:'',end:'',tagMode:'all',tags:[],more:[]};journalSearched=false;go('journal-search');requestAnimationFrame(()=>document.querySelector('#journal-detail-query')?.focus());return true;}
+  if(a==='journal-search-clear'){journalSearchQuery='';journalSearched=false;const input=document.querySelector('#journal-detail-query');if(input){input.value='';input.focus();}journalRefreshSearchResults();return true;}
   if(a==='journal-search-filters'){journalStore().searchFilters=!journalStore().searchFilters;render();return true;}
   if(a==='journal-search-filter'){document.activeElement?.blur();journalSearchFilter(key);return true;}
-  if(a==='journal-search-reset'){journalQuery='';journalAdvanced={period:'all',start:'',end:'',tagMode:'all',tags:[],more:[]};journalSearched=false;render();return true;}
+  if(a==='journal-search-reset'){journalSearchQuery='';journalAdvanced={period:'all',start:'',end:'',tagMode:'all',tags:[],more:[]};journalSearched=false;render();return true;}
   if(a==='journal-search-quick'){journalAdvanced={period:key==='anniversary'?'anniversary':'all',start:'',end:'',tagMode:key==='untagged'?'untagged':'all',tags:[],more:['images','links','audio'].includes(key)?[key]:[]};journalSearched=true;document.activeElement?.blur();render();return true;}
   if(a==='journal-batch'){
     if(!journalPicked.size)return true;
@@ -76,7 +86,13 @@ function journalFeedToolsAction(a,key) {
   if(a==='journal-batch-delete'){if(journalBatchUpdate('delete')){journalPicked.clear();go('logs');tell('已移到回收站');}return true;}
   return false;
 }
-document.addEventListener('input',event=>{if(event.target.id==='journal-detail-query'){journalQuery=event.target.value;journalSearched=Boolean(journalQuery);document.querySelector('#journal-search-results').innerHTML=journalSearched?journalSearchResults():'';void hydrateAttachmentImages();}});
+function journalRefreshSearchResults() {
+  const results=document.querySelector('#journal-search-results');if(results)results.innerHTML=journalSearchHasConditions()?journalSearchResults():'';
+  const clear=document.querySelector('.journal-search-clear');if(clear)clear.hidden=!journalSearchQuery;
+  void hydrateAttachmentImages();
+}
+document.addEventListener('input',event=>{if(event.target.id==='journal-detail-query'){journalSearchQuery=event.target.value;journalSearched=Boolean(journalSearchQuery.trim());if(!event.isComposing)journalRefreshSearchResults();}});
+document.addEventListener('compositionend',event=>{if(event.target.id==='journal-detail-query'){journalSearchQuery=event.target.value;journalSearched=Boolean(journalSearchQuery.trim());journalRefreshSearchResults();}});
 document.addEventListener('click',event=>{const card=event.target.closest('.journal-studio-card');if(route()[0]==='journal-select'&&card){event.preventDefault();event.stopImmediatePropagation();journalFeedToolsAction('journal-pick',card.dataset.recordId);}},true);
 document.addEventListener('change',event=>{
   const form=event.target.closest('#journal-search-filter-form');if(!form||form.dataset.kind!=='date')return;
