@@ -1,8 +1,9 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
-import {Plus,Search,X,ArrowLeft,ListFilter,Pencil} from "lucide-react";
-import {JournalViewsContext,useJournalViewStore,journalLayouts,journalMonthDays,shiftJournalDay,localJournalDate} from "./journal-local/JournalViews";
-import {JournalViewManager} from "./journal-local/JournalViewManager";
+import {Plus,X,ArrowLeft,Pencil,SearchX} from "lucide-react";
+import {JournalViewsContext,useJournalViewStore,journalMonthDays,shiftJournalDay,localJournalDate} from "./journal-local/JournalViews";
+import {JournalToolbar} from "./journal-local/JournalToolbar";
+import {journalDateInRange,journalMatchesQuery,journalUsesResultDays,journalStreamDates} from "./journal-filter";
 import {JournalNavigation} from "./journal-local/JournalNavigation";
 import {useDidaTasks} from "./useDidaTasks";
 import {didaTasks,taskDate,taskStatus,taskProject} from "./task-data";
@@ -10,7 +11,6 @@ import QuickMemo,{QuickMemoComposer} from "./QuickMemo";
 import {sampleMemos,journalRecordMatches,journalRecordFilters,type JournalRecordFilter,type MemoRecord,type MemoScope} from "./memo-data";
 import {journalActivity,journalHeatLevel} from "./layout-data";
 import {splitJournalCapture,type JournalCaptureTask} from "./journal-capture";
-import {calendarPeriodKey} from "./calendar-period";
 import type {HubItem} from "./data";
 const KEY="hub-journal-prototype-records-v1";
 type RecordEntry=MemoRecord;
@@ -38,7 +38,7 @@ export default function JournalSite({onOpenSettings,onOpenCloud,items,onTaskOpen
  const [dailyDrafts,setDailyDrafts]=useState<Record<string,CaptureDraft>>({}),[minimized,setMinimized]=useState<DailyEditor|null>(null);
  const editorTrigger=useRef<HTMLElement|null>(null),editorPanel=useRef<HTMLElement>(null),draftDock=useRef<HTMLDivElement>(null);
  const store=useJournalViewStore(),{view}=store,shared=useDidaTasks();
- const [ready,setReady]=useState(false),[records,setRecords]=useState<RecordEntry[]>([]),[text,setText]=useState(""),[date,setDate]=useState(today),[files,setFiles]=useState<string[]>([]),[filters,setFilters]=useState(false),[selected,setSelected]=useState<RecordEntry|null>(null),[mobileDetail,setMobileDetail]=useState(false),[days,setDays]=useState(7),[completedDate,setCompletedDate]=useState(""),[notice,setNotice]=useState(""),[saveName,setSaveName]=useState(""),[savingView,setSavingView]=useState(false),[chosenDay,setChosenDay]=useState("");
+ const [ready,setReady]=useState(false),[records,setRecords]=useState<RecordEntry[]>([]),[text,setText]=useState(""),[date,setDate]=useState(today),[files,setFiles]=useState<string[]>([]),[selected,setSelected]=useState<RecordEntry|null>(null),[mobileDetail,setMobileDetail]=useState(false),[days,setDays]=useState(7),[completedDate,setCompletedDate]=useState(""),[notice,setNotice]=useState(""),[chosenDay,setChosenDay]=useState("");
  const dialog=useRef<HTMLDialogElement>(null),completedTrigger=useRef<HTMLButtonElement|null>(null);
  useEffect(()=>{
   try{
@@ -75,15 +75,17 @@ export default function JournalSite({onOpenSettings,onOpenCloud,items,onTaskOpen
  useEffect(()=>{if(ready)try{localStorage.setItem(KEY,JSON.stringify({...JSON.parse(localStorage.getItem(KEY)||"{}"),records,draft:{text,date,files,editingId:editingMemo},dailyDrafts}));}catch{}},[ready,records,text,date,files,editingMemo,dailyDrafts]);
  useEffect(()=>{if(completedDate)dialog.current?.showModal();},[completedDate]);
  useEffect(()=>{const layout=new URLSearchParams(window.location.search).get("layout");if(layout==="records")store.update({layout:"records",period:"all",libraries:null});else if(layout==="stream")store.update({layout:"stream"});else if(layout==="calendar")store.update({layout:"calendar",period:"month"});},[]);
- const source=view.libraries?.[0]||"all";
  const memoScope:MemoScope=view.recordFilter==="pinned"?{kind:"pinned"}:{kind:"all"};
  const entries:RecordEntry[]=[...records,...items.filter(i=>i.kind==="journal").map(i=>({id:i.id,date:i.date,tags:i.tags,text:i.sections.map(s=>s.text||s.items?.join("\n")).join("\n\n"),files:[],library:i.source==="obsidian"?"OS":i.source==="craft"?"Car":"Hub"}))];
- const activity=journalActivity(entries),counts=new Map(activity.map(day=>[day.date,day.count]));
- const scopedEntries=entries.filter(e=>(view.period==="all"||(view.period==="day"?e.date===view.day:e.date.startsWith(view.month)))&&[e.text,...e.files].join(" ").toLowerCase().includes(view.query.trim().toLowerCase())&&(view.libraries===null||view.libraries.includes(e.library||"OS")));
+ const activity=journalActivity(entries);
+ const scopedEntries=entries.filter(e=>journalDateInRange(e.date,view)&&journalMatchesQuery(e,view.query)&&(view.libraries===null||view.libraries.includes(e.library||"OS")));
  const filtered=scopedEntries.filter(e=>journalRecordMatches(e,view.recordFilter)).sort((a,b)=>view.ascending?a.date.localeCompare(b.date):b.date.localeCompare(a.date));
+ const counts=new Map(journalActivity(filtered).map(day=>[day.date,day.count]));
+ const calendarMonths=new Map<string,number>();
+ for(const entry of filtered){const month=entry.date.slice(0,7);calendarMonths.set(month,(calendarMonths.get(month)||0)+1);}
  const filterCounts=Object.fromEntries(Object.keys(journalRecordFilters).map(key=>[key,scopedEntries.filter(e=>journalRecordMatches(e,key as JournalRecordFilter)).length])) as Record<JournalRecordFilter,number>;
  const applyRecordFilter=(recordFilter:JournalRecordFilter)=>{store.update({recordFilter});setSelected(null);setMobileDetail(false);};
- const selectQuickFilter=(recordFilter:JournalRecordFilter)=>{applyRecordFilter(view.recordFilter===recordFilter?"all":recordFilter);setFilters(true);if(window.innerWidth<1100&&navigationOpen)onToggleNavigation();};
+ const selectQuickFilter=(recordFilter:JournalRecordFilter)=>{applyRecordFilter(view.recordFilter===recordFilter?"all":recordFilter);if(window.innerWidth<1100&&navigationOpen)onToggleNavigation();};
  const pick=(e:RecordEntry)=>{setSelected(e);setMobileDetail(true);if(window.innerWidth<1100&&navigationOpen)onToggleNavigation();};
  const openEditor=(next:DailyEditor,trigger:HTMLElement|null)=>{
   editorTrigger.current=trigger;setEditor(next);setMobileDetail(false);setSelected(null);
@@ -110,13 +112,17 @@ export default function JournalSite({onOpenSettings,onOpenCloud,items,onTaskOpen
  const tasks=[
   ...didaTasks.map(n=>({id:n.id,title:n.title,description:n.description,project:taskProject(n.id),library:"dida",sharedDemo:true,date:taskDate(n.id,shared.dates),completed:taskStatus(n.id,shared.checks,shared.status)==="done",completedOn:shared.completed[n.id]})),
   ...items.filter(n=>n.kind==="task"&&n.due&&(n.source==="hub"||n.source==="ticktick"&&n.id.startsWith("journal-task-"))).map(n=>({id:n.id,title:n.title,description:n.excerpt,project:n.source==="ticktick"?"滴答清单 · "+(n.project||"收件箱"):n.project||"个人",library:n.source==="ticktick"?"dida":"Hub",sharedDemo:false,date:n.due||"",completed:n.taskState==="done",completedOn:n.completedOn||n.due}))
- ].filter(t=>(view.libraries===null||view.libraries.includes(t.library))&&[t.title,t.description].join(" ").toLowerCase().includes(view.query.trim().toLowerCase()));
- const dailyTasks=(day:string)=>tasks.filter(t=>t.date===day),completed=(day:string)=>tasks.filter(t=>t.completed&&t.completedOn===day);
+ ].filter(t=>view.recordFilter==="all"&&(view.libraries===null||view.libraries.includes(t.library))&&[t.title,t.description].join(" ").toLowerCase().includes(view.query.trim().toLowerCase()));
+ const scopedTasks=tasks.filter(t=>journalDateInRange((t.completed?t.completedOn:undefined)||t.date,view));
+ const dailyTasks=(day:string)=>scopedTasks.filter(t=>t.date===day),completed=(day:string)=>scopedTasks.filter(t=>t.completed&&(t.completedOn||t.date)===day);
  const taskRow=(t:typeof tasks[number])=><div className={"journal-daily-task "+(t.completed?"is-completed":"")} key={t.id}><input type="checkbox" aria-label={"日志中完成任务 "+t.title} checked={t.completed} onChange={()=>t.sharedDemo?shared.setStatus(t.id,t.completed?"todo":"done"):onUpdateTask(t.id,{taskState:t.completed?"todo":"done"})}/><button onClick={()=>onTaskOpen(t.id)}><span className="task-title">{t.title}</span><span className="task-library">{t.project}</span></button></div>;
  const entryCard=(e:RecordEntry)=><article className="quick-journal-card" key={e.id}><header><span>{e.date}</span><span>{records.some(r=>r.id===e.id)?(e.library==="OS"?"Obsidian · OS":"已保存到此浏览器"):"来源日志 · 示例"}</span></header><button className="js-record-open" aria-label={"预览日志 "+e.date} onClick={()=>pick(e)}><p>{e.text.slice(0,350)}</p></button>{e.files.length>0&&<p>{e.files.join(" · ")} · 附件名称示例</p>}</article>;
  const dayTitle=(day:string)=>`${Number(day.slice(5,7))}月${Number(day.slice(8))}日`;
- const anchor=store.anchor||(view.month===today.slice(0,7)?today:view.month+"-01");
- const streamDates=Array.from({length:view.period==="day"?1:days},(_,i)=>view.period==="day"?view.day:shiftJournalDay(anchor,i)).filter(day=>!!calendarPeriodKey(Number(day.slice(0,4)),Number(day.slice(5,7))));
+ const anchor=view.period==="day"?view.day:store.anchor&&store.anchor.startsWith(view.month+"-")?store.anchor:(view.month===today.slice(0,7)?today:view.month+"-01");
+ const resultDays=journalUsesResultDays(view);
+ const streamDates=journalStreamDates(view,anchor,days,[...filtered.map(e=>e.date),...scopedTasks.map(t=>(t.completed?t.completedOn:undefined)||t.date)]);
+ const canShowLater=!resultDays&&view.period!=="day"&&days<35&&journalDateInRange(shiftJournalDay(anchor,days),view);
+ useEffect(()=>{setDays(7);setSelected(null);setMobileDetail(false);setChosenDay("");},[store.activeId,view.layout,view.period,view.month,view.day,view.query,view.recordFilter,JSON.stringify(view.libraries)]);
  function closeCompleted(){dialog.current?.close();setCompletedDate("");completedTrigger.current?.focus();}
  function changeMemoScope(scope:MemoScope){store.update({recordFilter:scope.kind==="pinned"?"pinned":"all",query:scope.kind==="tag"?"#"+scope.value:"",period:scope.kind==="day"?"day":"all",day:scope.kind==="day"?scope.value||"":"",libraries:null});setSelected(null);setMobileDetail(false);if(window.innerWidth<1100&&navigationOpen)onToggleNavigation();}
  function saveRecord(day:string,draft:CaptureDraft,id?:string){
@@ -161,23 +167,18 @@ export default function JournalSite({onOpenSettings,onOpenCloud,items,onTaskOpen
   setNotice(dayTitle(editor.day)+"："+destinations+"（原型演示）"+(editor.id&&!hasJournal?"。原日志未修改":"")+(view.query||view.recordFilter!=="all"||view.libraries!==null?"。若未显示，可检查当前筛选。":"。"));
   finishCreation();
  }
- const renderMemo=(rows:RecordEntry[],embedded=false,showComposer=true)=><QuickMemo records={rows} embedded={embedded} showComposer={showComposer} summary={view.summary} showSource={view.source} allRecords={records} scope={embedded?{kind:"all"}:memoScope} onScope={scope=>{if(embedded&&scope.kind==="tag"){store.update({query:"#"+scope.value});setFilters(true);}else changeMemoScope(scope);}} query={embedded?"":view.query} onQuery={query=>store.update({query})} text={text} onText={setText} date={date} onDate={setDate} files={files} onFiles={setFiles} editingId={editingMemo} onEdit={id=>{setEditingMemo(id);setSelected(null);setMobileDetail(false);}} onEditRecord={embedded?(record,trigger)=>write(record.date,trigger,record):undefined} onSave={saveMemo} onCancel={()=>{setEditingMemo("");setText("");setFiles([]);}} onPin={id=>setRecords(old=>old.map(r=>r.id===id?{...r,pinned:!r.pinned}:r))} onExamples={()=>setRecords(old=>[...old,...sampleMemos.filter(r=>!old.some(e=>e.id===r.id))])} onPreview={pick} periodLabel={[view.period==="month"?view.month:view.period==="day"?view.day:"",view.libraries?.length?"资料库："+view.libraries.join("、"):""].filter(Boolean).join(" · ")} onClearRange={()=>store.update({period:"all",libraries:null,recordFilter:"all"})} settings={<details className="memo-storage-settings"><summary>保存位置与同步设置</summary><p>记录仅保存在当前浏览器。保存位置与云同步分别管理。</p><button onClick={onOpenSettings}>配置速记保存位置</button><button onClick={onOpenCloud}>查看云同步状态</button></details>}/>;
+ const renderMemo=(rows:RecordEntry[],embedded=false,showComposer=true)=><QuickMemo records={rows} hideToolbar embedded={embedded} showComposer={showComposer} summary={view.summary} showSource={view.source} allRecords={records} scope={embedded?{kind:"all"}:memoScope} onScope={scope=>{if(embedded&&scope.kind==="tag"){store.update({query:"#"+scope.value});}else changeMemoScope(scope);}} query={embedded?"":view.query} onQuery={query=>store.update({query})} text={text} onText={setText} date={date} onDate={setDate} files={files} onFiles={setFiles} editingId={editingMemo} onEdit={id=>{setEditingMemo(id);setSelected(null);setMobileDetail(false);}} onEditRecord={embedded?(record,trigger)=>write(record.date,trigger,record):undefined} onSave={saveMemo} onCancel={()=>{setEditingMemo("");setText("");setFiles([]);}} onPin={id=>setRecords(old=>old.map(r=>r.id===id?{...r,pinned:!r.pinned}:r))} onExamples={()=>setRecords(old=>[...old,...sampleMemos.filter(r=>!old.some(e=>e.id===r.id))])} onPreview={pick} periodLabel={[view.period==="month"?view.month:view.period==="day"?view.day:"",view.libraries?.length?"资料库："+view.libraries.join("、"):""].filter(Boolean).join(" · ")} onClearRange={()=>store.update({period:"all",libraries:null,recordFilter:"all"})} settings={<details className="memo-storage-settings"><summary>保存位置与同步设置</summary><p>记录仅保存在当前浏览器。保存位置与云同步分别管理。</p><button onClick={onOpenSettings}>配置速记保存位置</button><button onClick={onOpenCloud}>查看云同步状态</button></details>}/>;
  if(!ready)return <div className="js-loading">正在准备日志视图…</div>;
  return <JournalViewsContext.Provider value={store}><div className={"journal-site "+"js-memo-integrated "+(navigationOpen?"js-nav-open ":"")+(mobileDetail?"js-mobile-detail":"")}>
   <aside id="hub-module-navigation" className="js-navigation"><header><h1>日志</h1><button className="tw-mobile-close" aria-label="关闭日志导航" onClick={onToggleNavigation}><X size={16}/></button></header><JournalNavigation dates={activity} selectedDate={anchor} onSelectDate={navigate} filterCounts={filterCounts} onFilter={selectQuickFilter}/><p className="js-demo-note">日志交互 · 示例数据<br/>先在这里确认交互，再修改桌面端</p></aside>{navigationResizer}{navigationOpen&&<button className="tw-scrim" aria-label="关闭日志导航遮罩" onClick={onToggleNavigation}/>}
   <main className={"journal-database results-pane "+(view.layout==="stream"?"is-daily ":"")+(view.compact?"is-compact ":"")+(view.layout==="records"?"is-memo":"")}>
-   <div className="journal-db-toolbar">
-    <JournalViewManager store={store} onNew={()=>{setSavingView(true);setSaveName(journalLayouts[view.layout]);}}/>
-    <div className="journal-db-tools"><button type="button" aria-label="筛选日志" aria-expanded={filters} onClick={()=>setFilters(!filters)}><ListFilter size={17}/></button>{(view.layout==="list"||view.layout==="calendar")&&<button type="button" onClick={e=>write(anchor,e.currentTarget)}><Plus size={16}/>写日志</button>}</div>
-   </div>
-   {savingView&&<form className="journal-db-save-form" onSubmit={e=>{e.preventDefault();if(!saveName.trim())return;store.save(saveName);setSavingView(false);}}><label>新视图名称<input aria-label="新视图名称" value={saveName} onChange={e=>setSaveName(e.target.value)} maxLength={60}/></label><button type="submit" disabled={!saveName.trim()}>保存</button><button type="button" onClick={()=>setSavingView(false)}>取消</button></form>}
-   {store.modified&&<div className="journal-db-filter-summary"><span>当前视图已修改</span><button onClick={store.updateSaved}>更新视图</button><button onClick={()=>{setSavingView(true);setSaveName("");}}>另存为</button></div>}
-   {filters&&<div className="journal-db-filters"><label><Search size={15}/>搜索日志<input aria-label="搜索日志内容" value={view.query} onChange={e=>store.update({query:e.target.value})}/></label><label>日期范围<select value={view.period} onChange={e=>store.update({period:e.target.value as typeof view.period,day:anchor})}><option value="month">当前月份</option><option value="all">全部日期</option><option value="day">指定日期</option></select></label>{view.period==="day"&&<input type="date" value={view.day} onChange={e=>store.update({day:e.target.value})}/>}<label>资料库<select value={source} onChange={e=>store.update({libraries:e.target.value==="all"?null:[e.target.value]})}><option value="all">全部资料库</option><option value="OS">OS</option><option value="Car">Car · Craft</option><option value="Hub">Hub · 示例</option><option value="dida">滴答清单 · 当天任务</option></select></label><label>内容类型<select aria-label="日志内容类型" value={view.recordFilter} onChange={e=>applyRecordFilter(e.target.value as JournalRecordFilter)}>{Object.entries(journalRecordFilters).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label></div>}
+   <JournalToolbar store={store} resultCount={filtered.length} taskCount={view.layout==="stream"?scopedTasks.length:undefined} onUpdate={store.update} onCreate={view.layout==="list"||view.layout==="calendar"?trigger=>write(anchor,trigger):undefined}/>
    {notice&&<div className="js-notice" role="status">{notice}<button aria-label="关闭日志提示" onClick={()=>setNotice("")}><X size={13}/></button></div>}
-   {view.recordFilter!=="all"&&<div className="journal-record-filter-summary"><span>{journalRecordFilters[view.recordFilter]} · {filtered.length} 条</span><button onClick={()=>applyRecordFilter("all")}>清除内容筛选<X size={12}/></button></div>}
+
    <div className="journal-db-body">
     {view.layout==="stream"&&<div className="journal-daily-stream">
-     <button className="journal-daily-previous" onClick={()=>navigate(shiftJournalDay(anchor,-7))}>↑ 显示前几天</button>
+     {!resultDays&&view.period!=="day"&&<button className="journal-daily-previous" onClick={()=>navigate(shiftJournalDay(anchor,-7))}>↑ 显示前几天</button>}
+     {resultDays&&!streamDates.length&&<div className="journal-search-empty" role="status"><SearchX size={26}/><h2>没有符合条件的记录</h2><p>试试其他关键词，或扩大日期和资料库范围。</p><button onClick={()=>store.update({query:"",period:"all",day:"",libraries:null,recordFilter:"all"})}>查看全部记录</button></div>}
      {streamDates.map(day=>{
       const rows=filtered.filter(e=>e.date===day),relative=day===today?"今天":day===shiftJournalDay(today,1)?"明天":day===shiftJournalDay(today,-1)?"昨天":"";
       const dayCompleted=completed(day);
@@ -196,10 +197,10 @@ export default function JournalSite({onOpenSettings,onOpenCloud,items,onTaskOpen
        </div>
       </section>;
      })}
-     <button className="journal-daily-next" disabled={days>=35} onClick={()=>setDays(n=>n+7)}>↓ 显示后几天</button>
+     {canShowLater&&<button className="journal-daily-next" onClick={()=>setDays(n=>n+7)}>↓ 显示后几天</button>}
     </div>}
     {view.layout==="records"&&renderMemo(filtered)}
-    {view.layout==="calendar"&&<div className="journal-db-calendar"><div className="journal-month-week">{"日一二三四五六".split("").map(d=><span key={d}>{d}</span>)}</div><div className="journal-month-grid">{journalMonthDays(view.month,true).map(day=><section data-heat={journalHeatLevel(counts.get(day)||0)} title={day+" · "+(counts.get(day)||0)+" 条记录（不含任务）"} className={"journal-month-cell "+(day===chosenDay?"selected ":"")+(day.slice(0,7)!==view.month?"outside-month":"")} key={day}><button className="journal-month-date" onClick={()=>setChosenDay(day)}>{Number(day.slice(8))}</button>{!!counts.get(day)&&<span className="journal-month-count">{counts.get(day)} 条</span>}{filtered.filter(e=>e.date===day).map(e=><button className="journal-month-entry" key={e.id} onClick={()=>pick(e)}><span>{e.text.slice(0,30)||"附件记录"}</span></button>)}</section>)}</div>{chosenDay&&<section className="journal-day-agenda"><header><strong>{chosenDay}</strong><button aria-label="关闭当天日志" onClick={()=>setChosenDay("")}><X size={16}/></button></header>{filtered.filter(e=>e.date===chosenDay).map(entryCard)}<button onClick={e=>write(chosenDay,e.currentTarget)}><Plus size={14}/>写这一天</button><button onClick={()=>{store.update({period:"day",day:chosenDay,layout:"list"});}}>仅看这一天</button></section>}</div>}
+    {view.layout==="calendar"&&<div className="journal-db-calendar">{view.period==="all"&&[...calendarMonths.keys()].some(month=>month!==view.month)&&<nav className="journal-result-months" aria-label="有匹配日志的月份"><span>匹配月份</span>{[...calendarMonths].map(([month,count])=><button type="button" key={month} aria-pressed={month===view.month} onClick={()=>store.update({month})}>{month.slice(0,4)}年{Number(month.slice(5))}月 <small>{count} 条</small></button>)}</nav>}<div className="journal-month-week">{"日一二三四五六".split("").map(d=><span key={d}>{d}</span>)}</div><div className="journal-month-grid">{journalMonthDays(view.month,true).map(day=><section data-heat={journalHeatLevel(counts.get(day)||0)} title={day+" · "+(counts.get(day)||0)+" 条匹配日志（不含任务）"} className={"journal-month-cell "+(day===chosenDay?"selected ":"")+(day.slice(0,7)!==view.month?"outside-month":"")} key={day}><button className="journal-month-date" onClick={()=>setChosenDay(day)}>{Number(day.slice(8))}</button>{!!counts.get(day)&&<span className="journal-month-count">{counts.get(day)} 条</span>}{filtered.filter(e=>e.date===day).map(e=><button className="journal-month-entry" key={e.id} onClick={()=>pick(e)}><span>{e.text.slice(0,30)||"附件记录"}</span></button>)}</section>)}</div>{chosenDay&&<section className="journal-day-agenda"><header><strong>{chosenDay}</strong><button aria-label="关闭当天日志" onClick={()=>setChosenDay("")}><X size={16}/></button></header>{filtered.filter(e=>e.date===chosenDay).map(entryCard)}<button onClick={e=>write(chosenDay,e.currentTarget)}><Plus size={14}/>写这一天</button><button onClick={()=>{store.update({period:"day",day:chosenDay,layout:"list"});}}>仅看这一天</button></section>}</div>}
     {view.layout==="list"&&<div className="journal-db-list">{[...new Set(filtered.map(e=>e.date))].map(day=><section className="journal-list-day" key={day}><header>{dayTitle(day)}</header>{filtered.filter(e=>e.date===day).map(e=><div className="journal-list-row" key={e.id}><button onClick={()=>pick(e)}><span><strong>{e.text.slice(0,35)||"附件记录"}</strong>{view.summary&&<small>{e.text.slice(35,160)}</small>}</span>{view.source&&<em>{records.some(r=>r.id===e.id)?"OS":"来源示例"}</em>}</button></div>)}</section>)}</div>}
     {!filtered.length&&!["records","stream","calendar"].includes(view.layout)&&<p className="js-empty">当前范围暂无日志，可以调整日期或资料库。</p>}
    </div>

@@ -94,7 +94,23 @@ export function useJournalViewStore() {
     catch { /* Session remains usable when storage is unavailable. */ }
   }, [state]);
   const active = state.saved.find(s => s.id === state.activeId);
-  const update = (patch: Partial<JournalViewConfig>) => setState(s => ({ ...s, view: normalizeJournalView({ ...s.view, ...patch }) }));
+  const update = (patch: Partial<JournalViewConfig>) => setState(s => {
+    const view = normalizeJournalView({ ...s.view, ...patch });
+    let anchor = s.anchor;
+    // Only an explicit, valid date change moves the viewport. Clearing a day
+    // or editing a search/filter must not jump back to a previously saved day.
+    if (validDay(patch.day)) {
+      view.month = patch.day.slice(0, 7);
+      anchor = patch.day;
+    } else if (validMonth(patch.month)) {
+      if (!anchor.startsWith(patch.month)) anchor = `${patch.month}-01`;
+      if (view.period === "day" && !view.day.startsWith(patch.month)) {
+        view.period = "month";
+        view.day = "";
+      }
+    }
+    return { ...s, view, anchor };
+  });
   return {
     ...state, active, modified: !!active && JSON.stringify(active.config) !== JSON.stringify(state.view), update,
     navigate: (date: string) => {
@@ -114,8 +130,8 @@ export function useJournalViewStore() {
     },
     updateSaved: () => setState(s => ({ ...s, saved: s.saved.map(v => v.id === s.activeId ? { ...v, config: s.view } : v) })),
     rename: (id: string, name: string) => { if (name.trim()) setState(s => ({ ...s, saved: s.saved.map(v => v.id === id ? { ...v, name: name.trim().slice(0, 60) } : v) })); },
-    hide: (id: string, hidden: boolean) => setState(s => ({ ...s, activeId: hidden && s.activeId === id ? "" : s.activeId, saved: s.saved.map(v => v.id === id ? { ...v, hidden } : v) })),
-    remove: (id: string) => setState(s => ({ ...s, activeId: s.activeId === id ? "" : s.activeId, saved: s.saved.filter(v => v.id !== id) })),
+    hide: (id: string, hidden: boolean) => setState(s => ({ ...s, ...(hidden && s.activeId === id ? { activeId: "", view: defaultJournalView(), anchor: "" } : {}), saved: s.saved.map(v => v.id === id ? { ...v, hidden } : v) })),
+    remove: (id: string) => setState(s => ({ ...s, ...(s.activeId === id ? { activeId: "", view: defaultJournalView(), anchor: "" } : {}), saved: s.saved.filter(v => v.id !== id) })),
     move: (id: string, by: number) => setState(s => {
       const saved = [...s.saved], i = saved.findIndex(v => v.id === id), j = i + Math.trunc(by);
       if (i < 0 || !Number.isFinite(j) || j < 0 || j >= saved.length) return s;

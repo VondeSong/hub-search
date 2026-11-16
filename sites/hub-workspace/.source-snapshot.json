@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "c120064c34ccc5d9dabf24329dac50b346735c99",
-  "published_version": 101,
-  "deployment_id": "appgdep_6af956edb1a88191857e9e0c91ef0e9c",
+  "source_commit": "d9a362c57a10d5eafb1c19d55226546a51c91f05",
+  "published_version": 102,
+  "deployment_id": "appgdep_6afaa0c64f24819194ebedbc3b4c0259",
   "files": {
     ".gitignore": {
       "sha256": "5ca3c39bdc1288c108a1931b3f6bc5795464b6253e9457390617774259deed0c",
@@ -138,9 +138,9 @@
       "bytes": 67883
     },
     "app/JournalSite.tsx": {
-      "sha256": "2515aa7b3e872fed9628115f6e3253bb2b38061fad3a39ceadbb901a101286d1",
+      "sha256": "6670adb602aace72509978526e8effcd3c786e4f504bab974124ca8b01295a53",
       "mode": "100644",
-      "bytes": 25893
+      "bytes": 24776
     },
     "app/LibraryBrowser.tsx": {
       "sha256": "f00538db810752dfc4cbc0c7442500d3c80d58aeffbf00588c1c730c14394672",
@@ -163,9 +163,9 @@
       "bytes": 5509
     },
     "app/QuickMemo.tsx": {
-      "sha256": "3a436caa81177ca63f1b3b31e7ff180eae60fe053188a3ace34410536ebf4842",
+      "sha256": "2e9c57cf7d14a014454d6dd4cb09d8839ffc5491d92c27fd504013d445c82742",
       "mode": "100644",
-      "bytes": 10994
+      "bytes": 11502
     },
     "app/RecentOpen.tsx": {
       "sha256": "4e2c836608ac63e44638665f0bfb389322cc147c8481da7373e01430826f9d16",
@@ -337,6 +337,11 @@
       "mode": "100644",
       "bytes": 1354
     },
+    "app/journal-filter.ts": {
+      "sha256": "124b09bbb1dfa2abd79e448e968075ea9de512328fd13c84d4a099e6d4f90476",
+      "mode": "100644",
+      "bytes": 1636
+    },
     "app/journal-local/JournalDaily.css": {
       "sha256": "9b99cebbf3b34d04f766665c4b4289e677f5f5986fea0975dc5a0b43203960a7",
       "mode": "100644",
@@ -357,15 +362,25 @@
       "mode": "100644",
       "bytes": 10594
     },
-    "app/journal-local/JournalViewManager.tsx": {
-      "sha256": "3ed78f9be4d9baca9a618479ba042967eac6353385313f93ab56db842f5ad9e7",
+    "app/journal-local/JournalToolbar.css": {
+      "sha256": "50f04adf4d62c0af6140ff83eecbc1d45378c76cf23eb82711ff8d0aeeeb9d96",
       "mode": "100644",
-      "bytes": 6294
+      "bytes": 17106
+    },
+    "app/journal-local/JournalToolbar.tsx": {
+      "sha256": "722905ed415a2ff9c6014bd037576d4333ebb6347083449fa5fcf794d911375f",
+      "mode": "100644",
+      "bytes": 14152
+    },
+    "app/journal-local/JournalViewManager.tsx": {
+      "sha256": "835c04917e18f7f7875340bc1b092f87c83d0b1cb6cc25fdc9bff97b6fc15fcb",
+      "mode": "100644",
+      "bytes": 6403
     },
     "app/journal-local/JournalViews.tsx": {
-      "sha256": "4c5b22acff15f8dfae1084a978c8c60c360b00f4fa0eebbe6b42173026cd1b8e",
+      "sha256": "8d11ad7ca3d2c2dd527da211dcbf8801befaa31e87bbd37ebe607d2975554632",
       "mode": "100644",
-      "bytes": 8453
+      "bytes": 9115
     },
     "app/journal-local/JournalWorkspace.css": {
       "sha256": "0877c83261ac8b8804e90e82ffaec75716bf7a7b2de9c795ec131a39572ea810",
@@ -383,9 +398,9 @@
       "bytes": 1376
     },
     "app/layout.tsx": {
-      "sha256": "e7a70112a233274560e2de7b0fb78e7304aa5a53fc1ebfdefbe95e38fbac74cc",
+      "sha256": "15b2c91584304579703521750dbf195dd8fe401d650592eae536f49220b9799f",
       "mode": "100644",
-      "bytes": 919
+      "bytes": 964
     },
     "app/library-browser.css": {
       "sha256": "6db05cedd61d12fa1dec4ecf64864167c04835231d6b38e0a248654379320ae6",
@@ -907,6 +922,11 @@
       "mode": "100644",
       "bytes": 6485
     },
+    "docs/journal-toolbar-20261116.md": {
+      "sha256": "b884d8d4a36cf6ddc3b274d6e576aa1a519f58e699801da7170f76f31eda8423",
+      "mode": "100644",
+      "bytes": 2645
+    },
     "docs/library-browser-prototype.md": {
       "sha256": "f01f0abdef85a505adb3f652b56654cdfa2f21dde1401dd2a09d5059cf92aeaa",
       "mode": "100644",
@@ -1162,6 +1182,11 @@
       "mode": "100755",
       "bytes": 9015
     },
+    "scripts/journal-filter-check.mjs": {
+      "sha256": "32dc571c91c051378a6b8f19ce5dae27ae93fcccb89627691ec8987177f558d0",
+      "mode": "100644",
+      "bytes": 3670
+    },
     "scripts/library-browser-check.mjs": {
       "sha256": "c9a33372ea2f3f216856b5f20c14ac6d001e6e970558e86eb203650ef6f3944a",
       "mode": "100644",
@@ -1263,5 +1288,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-15T06:54:38.640991+00:00"
+  "imported_at": "2026-11-16T06:21:23.246989+00:00"
 }
