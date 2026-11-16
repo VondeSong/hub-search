@@ -71,3 +71,36 @@ it("keeps a remotely rejected edit readable and copyable without replacing the O
  expect(button("恢复此版本")).toBeUndefined();expect(invoke.mock.calls.some(c=>c[0]==="update_quick_journal")).toBe(false);
  vi.unstubAllGlobals();
 });
+it("opens a separate search view with no feed until a query or preset is selected, then returns to the feed",async()=>{
+ await render();await act(async()=>button("搜索日志").click());
+ expect(document.querySelector('[aria-label="搜索日志正文"]')).not.toBeNull();expect(document.querySelectorAll(".mobile-journal-card")).toHaveLength(0);
+ await act(async()=>button("无标签").click());expect(document.querySelectorAll(".mobile-journal-card")).toHaveLength(0);
+ await act(async()=>{button("取消").click();await wait();});expect(document.querySelector('[aria-label="搜索日志正文"]')).toBeNull();expect(document.querySelectorAll(".mobile-journal-card")).toHaveLength(1);
+ expect(invoke.mock.calls.some(c=>c[0]==="update_quick_journal")).toBe(false);
+});
+it("rejects reversed dates before applying a search filter",async()=>{
+ await render();await act(async()=>button("搜索日志").click());await act(async()=>button("展开日志筛选").click());await act(async()=>button("日期").click());
+ const form=document.querySelector<HTMLFormElement>(".mobile-journal-filter-form")!;
+ form.querySelector<HTMLInputElement>('[name="start"]')!.value="2026-11-17";form.querySelector<HTMLInputElement>('[name="end"]')!.value="2026-11-15";
+ await act(async()=>form.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
+ expect(form.querySelector('[role="alert"]')?.textContent).toContain("结束日期不能早于");expect(invoke.mock.calls.some(c=>c[0]==="update_quick_journal")).toBe(false);
+});
+it("replaces a custom date range when a preset is selected",async()=>{
+ await render();await act(async()=>button("搜索日志").click());await act(async()=>button("展开日志筛选").click());await act(async()=>button("日期").click());
+ const form=document.querySelector<HTMLFormElement>(".mobile-journal-filter-form")!;
+ form.querySelector<HTMLInputElement>('[name="start"]')!.value="2026-11-01";form.querySelector<HTMLInputElement>('[name="end"]')!.value="2026-11-15";
+ await act(async()=>form.querySelector<HTMLInputElement>('input[value="month"]')!.click());
+ expect(form.querySelector<HTMLInputElement>('[name="start"]')!.value).toBe("");expect(form.querySelector<HTMLInputElement>('[name="end"]')!.value).toBe("");
+});
+it("preserves failed batch selections and does not resubmit already updated records",async()=>{
+ const second={...structuredClone(items[0]),record:{...items[0].record,id:"d".repeat(32),text:"第二条",date:"2026-11-14"}};items.push(second);
+ const original=invoke.getMockImplementation()!;let rejectSecond=true;
+ invoke.mockImplementation(async(cmd:string,args:any)=>{if(cmd!=="update_quick_journal")return original(cmd,args);if(args.id===second.record.id&&rejectSecond)throw new Error("版本已变化");const target=items.findIndex(i=>i.record.id===args.id);expect(args.expectedRevision).toBe(items[target].revision);items[target]={...items[target],record:args.record,revision:"new-"+args.id,deleted:args.deleted};});
+ await render();await act(async()=>button("日志").click());await act(async()=>{button("选择笔记").click();await wait();});
+ await act(async()=>button("选择记录 2026-11-15").click());await act(async()=>button("选择记录 2026-11-14").click());await act(async()=>button("添加标签").click());
+ const form=document.querySelector<HTMLFormElement>('dialog form')!;form.querySelector<HTMLInputElement>('[name="tags"]')!.value="#批量";
+ await act(async()=>{form.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));await wait();});
+ expect(items[0].record.text).toContain("#批量");expect(items[1].record.text).toBe("第二条");expect(document.querySelector("dialog")?.textContent).toContain("版本已变化");
+ rejectSecond=false;await act(async()=>{form.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));await wait();});
+ expect(invoke.mock.calls.filter(c=>c[0]==="update_quick_journal"&&c[1].id===items[0].record.id)).toHaveLength(1);expect(items[1].record.text).toBe("第二条\n#批量");expect(items).toHaveLength(2);
+});

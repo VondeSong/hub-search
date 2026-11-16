@@ -3,9 +3,9 @@
   "site": "mobile",
   "project_id": "appgprj_6af1d2dc12308191acc37e5566699c2d",
   "site_url": "https://hub-mobile-lab-von11.song02211368537057.chatgpt.site",
-  "source_commit": "28d4d38156821077b030c9d9fd1e8ad7ad91c878",
-  "published_version": 16,
-  "deployment_id": "appgdep_6afa17330e48819195c3f3fc11210e9d",
+  "source_commit": "5a9c42fa2471c2fc6838455bb591480503c2aefe",
+  "published_version": 18,
+  "deployment_id": "appgdep_6afa8952c5f881919b325aa9a85069f5",
   "files": {
     ".openai/hosting.json": {
       "sha256": "543a776095c0181cc870f784c075ab4f263fb739e3649cd8db74f493fb5b4ca3",
@@ -31,6 +31,11 @@
       "sha256": "163158e85484b74bb6b0798565cd71cfed692ada30485369eaa9dbf7afbd02d5",
       "mode": "100644",
       "bytes": 15424
+    },
+    "checks/journal-feed-tools-checks.cjs": {
+      "sha256": "bb33b1befaa2417666a539c5a411d7c62d289631d952cb67e8ec39de50ab77d9",
+      "mode": "100644",
+      "bytes": 2536
     },
     "checks/journal-studio-checks.cjs": {
       "sha256": "6aff7d2581698330f02f5bb20f25c0d2e3ced05fda44b60a0f6095e4ef4942c6",
@@ -78,9 +83,9 @@
       "bytes": 33414
     },
     "dist/app.js": {
-      "sha256": "7829ea19e2532cae6dc54aaa8e9334c0e9305b09c0458d83742e82d0dd9107de",
+      "sha256": "2d2b7e4acb9fe140655f3b2ef66cfd8dd6c28ea41b284e106ae9d62face995ec",
       "mode": "100644",
-      "bytes": 65124
+      "bytes": 65547
     },
     "dist/hub.svg": {
       "sha256": "a7229c43b74d0dba3e1441f0d14c62320e441a8c16df9c1f2378f88ffbe172b1",
@@ -88,19 +93,24 @@
       "bytes": 254
     },
     "dist/index.html": {
-      "sha256": "d254ca448c42713559b2fe066980ac98d5a83cf6baead01801dd75267e775dd8",
+      "sha256": "102c0b987fc29c86f533d5a227401a8cc53d19706e1c58498e3c1086fc94b821",
       "mode": "100644",
-      "bytes": 1496
+      "bytes": 1568
+    },
+    "dist/journal-feed-tools.js": {
+      "sha256": "ed01aea95517f3975fa63274e539b375e8c102b76e68ce919ec07c235dbae4e4",
+      "mode": "100644",
+      "bytes": 12140
     },
     "dist/journal-studio.css": {
-      "sha256": "4ea9f3b6b8dcb371a67f336399b360f7e02aeec7d927c67221a3ebab0d62753d",
+      "sha256": "5d757a3d93df68532d16ab217f55b28964422792465c202ad3cce618884e7152",
       "mode": "100644",
-      "bytes": 10314
+      "bytes": 16361
     },
     "dist/journal-studio.js": {
-      "sha256": "cfcf6ae6a2433499cbd0e4cef6efac7b90cf7c8f2f4ffe26cc039d2a404c27b5",
+      "sha256": "3b8887a1fda7d60db985d354464ed7090d57aa169d7758c9a4c9fc81c6f1cf9c",
       "mode": "100644",
-      "bytes": 33927
+      "bytes": 34625
     },
     "dist/mobile-features.js": {
       "sha256": "e0ad1f354d30cab44046010d228599f1e299b282119737fba38640a6eb1f20c5",
@@ -232,6 +242,11 @@
       "mode": "100644",
       "bytes": 31988
     },
+    "docs/journal-video-2026-11-16.md": {
+      "sha256": "335e552e3b66b17521ed360be7def9bd223160b2580023bbb7da3fd18e548d70",
+      "mode": "100644",
+      "bytes": 3056
+    },
     "docs/mobile-insights-v3.png": {
       "sha256": "428c32f3126b9157ada5806bf0055eec5be879dc3c092324abee01726750d8a7",
       "mode": "100644",
@@ -258,5 +273,5 @@
       "bytes": 3301
     }
   },
-  "imported_at": "2026-11-15T20:35:19.157194+00:00"
+  "imported_at": "2026-11-16T04:41:59.787557+00:00"
 }

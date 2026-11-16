@@ -363,6 +363,139 @@ class MobilePrototypeAcceptanceTest {
         }
     }
 
+    @Test
+    fun journalFeedVideoAndLayout() {
+        launchMain()
+        val originalDraft = native("get_quick_journal_draft") as String
+        val originalSettings = (native("get_quick_journal_settings") as JSONObject).getJSONObject("settings")
+        val profile = (native("load_user_profile") as JSONObject).getJSONObject("values")
+        val keys = listOf("hub.journal.sort.v1", "hub.journal.record-pins.v1", "hub.mobile.appearance.v1")
+        val before = JSONObject(); keys.forEach { if (profile.has(it)) before.put(it, profile.get(it)) }
+        val display = shell("wm size"); val override = Regex("Override size: (\\d+x\\d+)").find(display)?.groupValues?.get(1)
+        val ids = listOf(java.util.UUID.randomUUID().toString().replace("-", ""), java.util.UUID.randomUUID().toString().replace("-", ""))
+        File(directory, "recovery.json").writeText(JSONObject().put("settings", originalSettings).put("profile", before).put("ids", JSONArray(ids)).toString(2))
+        try {
+            native("save_quick_journal_settings", JSONObject().put("value", JSONObject(originalSettings.toString()).put("sync", false)))
+            val today = java.time.LocalDate.now().toString()
+            ids.forEachIndexed { i, id -> native("capture_quick_journal", JSONObject().put("record", JSONObject().put("version", 1).put("id", id).put("date", today).put("text", "Hub 日志视频验收 $runId $i #视频验收 https://example.com").put("attachments", JSONArray()))) }
+            asyncJs("const {userProfileStorage:s}=await import(new URL('/src/UserProfileStorage.ts',location.href).href);s.setItem('hub.mobile.appearance.v1',JSON.stringify({theme:'white',accent:'blue'}));return true")
+            if (!dom(".mobile-journal-feed")) {
+                click("nav[aria-label='主要导航'] button[aria-label='浏览']"); waitDom(".mobile-browse-screen"); clickContaining("日志", ".mobile-browse-group button")
+            }
+            waitDom(".mobile-journal-feed")
+            js("(()=>{window.dispatchEvent(new Event('hub:quick-journal-updated'));return true})()")
+            waitDom("[data-record-id='${ids[0]}']")
+            val geometry = js("(()=>{const feed=document.querySelector('.mobile-journal-feed'),main=feed.closest('.main-content-override'),button=feed.querySelector('.mobile-journal-create button'),r=feed.getBoundingClientRect(),m=main.getBoundingClientRect(),b=button.getBoundingClientRect();return{viewport:innerHeight,feedBottom:r.bottom,mainBottom:m.bottom,buttonBottom:b.bottom,padding:getComputedStyle(main).paddingBottom,page:getComputedStyle(feed).backgroundColor,card:getComputedStyle(feed.querySelector('.mobile-journal-card')).backgroundColor,gap:getComputedStyle(feed.querySelector('.mobile-journal-card')).marginBottom}})()") as JSONObject
+            evidence.put("lightGeometry", geometry)
+            checkResult("journal fills its parent without the obsolete bottom navigation reservation", geometry.getString("padding") == "0px" && kotlin.math.abs(geometry.getDouble("feedBottom")-geometry.getDouble("viewport")) < 2)
+            checkResult("create button sits within 32 CSS pixels of the available bottom", geometry.getDouble("feedBottom")-geometry.getDouble("buttonBottom") in 8.0..32.0)
+            checkResult("white cards are visibly separated from the gray journal canvas", geometry.getString("page") != geometry.getString("card") && geometry.getString("gap") == "12px")
+            screenshot("01-light-card-feed")
+            click(".mobile-journal-title"); waitDom(".journal-view-dialog"); click(".mobile-journal-view-options summary")
+            checkResult("all four sort directions are reachable", js("document.querySelectorAll('.mobile-journal-view-options details button').length===4") == true)
+            clickText("记录日期，从旧到新", ".mobile-journal-view-options button"); until("sort menu closes") { !dom("dialog[open]") }
+            checkResult("sort preference is persisted in the real user profile", asyncJs("const {userProfileStorage:s}=await import(new URL('/src/UserProfileStorage.ts',location.href).href);return s.getItem('hub.journal.sort.v1')") == "\"date-asc\"")
+            click(".mobile-journal-title"); clickText("选择笔记"); until("selection heading") { dom(".mobile-journal-selection-heading") }
+            ids.forEach { id -> click("[data-record-id='$id'] .mobile-journal-card-selector") }
+            checkResult("multi-select counts only the two tapped cards", js("document.querySelector('.mobile-journal-selection-heading').textContent.includes('已选中 2 条')") == true)
+            screenshot("02-multi-select")
+            clickText("添加标签", ".mobile-journal-batch-dock button"); waitDom("dialog[aria-label='添加标签']")
+            field("dialog[open] input[name=tags]", "#本轮批量")
+            clickText("确定", "dialog button"); until("batch tag dialog closes") { !dom("dialog[open]") }
+            checkResult("batch tagging keeps both native IDs and changes their actual versioned body", ids.all { id -> own(id)?.getJSONObject("record")?.getString("text")?.contains("#本轮批量") == true })
+            checkResult("successful batch records are unselected", js("document.querySelector('.mobile-journal-selection-heading').textContent.includes('已选中 0 条')") == true)
+            ids.forEach { id -> click("[data-record-id='$id'] .mobile-journal-card-selector") }
+            clickText("删除", ".mobile-journal-batch-dock button"); waitDom("dialog[aria-label='删除所选记录']")
+            checkResult("batch deletion asks before any record is moved", ids.all { own(it)?.optBoolean("deleted") == false })
+            clickText("移到回收站", "dialog button"); until("batch records in recoverable trash") { ids.all { own(it)?.optBoolean("deleted") == true } }
+            checkResult("batch delete preserves body and history in recoverable trash", ids.all { id -> own(id)?.getJSONObject("record")?.getString("text")?.contains("#本轮批量") == true && (native("quick_journal_history", JSONObject().put("id", id)) as JSONObject).getJSONArray("versions").length() >= 2 })
+            clickText("完成", ".mobile-journal-selection-heading button")
+            until("normal journal header restored") { dom(".mobile-journal-title") }
+            js("(()=>{document.querySelector('.mobile-journal-scroll').scrollTop=120;return true})()")
+            val scroll = js("document.querySelector('.mobile-journal-scroll').scrollTop") as Number
+            click("[aria-label='搜索日志']"); waitDom("[aria-label='搜索日志正文']")
+            until("real search keyboard visible") { keyboard() }
+            checkResult("search has quick filters and hides the feed before a search", js("document.querySelectorAll('.mobile-journal-quick-search button').length===5 && document.querySelectorAll('.mobile-journal-card').length===0 && !document.querySelector('.mobile-journal-create')") == true)
+            screenshot("03-search-keyboard")
+            click("[aria-label='展开日志筛选']"); clickText("日期", ".mobile-journal-search-filters button"); waitDom("dialog[aria-label='日期范围']")
+            field("dialog[open] input[name=start]", "2026-11-17"); field("dialog[open] input[name=end]", "2026-11-15"); clickText("确定", "dialog button")
+            checkResult("reversed dates stay in the filter sheet with an explanation", js("document.querySelector('dialog[open]').textContent.includes('结束日期不能早于开始日期')") == true)
+            field("dialog[open] input[name=start]", "2026-11-01"); clickText("确定", "dialog button"); until("date sheet closed") { !dom("dialog[open]") }
+            clickText("标签", ".mobile-journal-search-filters button"); waitDom("dialog[aria-label='标签范围']")
+            checkResult("tag scope exposes all four reference options", js("document.querySelectorAll('dialog[open] input[name=tagMode]').length===4") == true); back()
+            clickText("更多", ".mobile-journal-search-filters button"); waitDom("dialog[aria-label='更多条件']")
+            checkResult("additional criteria expose image, link and audio filters", js("document.querySelectorAll('dialog[open] input[name=more]').length===3") == true)
+            screenshot("04-filter-sheet"); back()
+            clickText("有链接", ".mobile-journal-quick-search button")
+            checkResult("link preset only shows records containing actual links", js("[...document.querySelectorAll('.mobile-journal-card')].every(e=>e.querySelector('a[href^=http]'))") == true)
+            hideKeyboard(); back(); until("search back restores journal") { dom(".mobile-journal-title") }
+            checkResult("search cancellation restores the previous list position", kotlin.math.abs((js("document.querySelector('.mobile-journal-scroll').scrollTop") as Number).toDouble()-scroll.toDouble()) < 2)
+            asyncJs("const {userProfileStorage:s}=await import(new URL('/src/UserProfileStorage.ts',location.href).href);s.setItem('hub.mobile.appearance.v1',JSON.stringify({theme:'black',accent:'blue'}));return true")
+            until("dark journal") { js("getComputedStyle(document.querySelector('.mobile-journal-feed')).backgroundColor==='rgb(9, 10, 11)'") == true }
+            checkResult("dark cards remain distinct from the dark page", js("getComputedStyle(document.querySelector('.mobile-journal-feed')).backgroundColor!==getComputedStyle(document.querySelector('.mobile-journal-card')).backgroundColor") == true)
+            screenshot("05-dark-feed")
+            val density = (js("devicePixelRatio") as Number).toDouble(); shell("wm size ${(320*density).toInt()}x${(640*density).toInt()}")
+            until("320 CSS pixel native viewport") { (js("innerWidth") as Number).toInt() <= 322 }
+            checkResult("320 CSS pixel journal has no horizontal overflow", js("document.documentElement.scrollWidth<=innerWidth+1") == true)
+            screenshot("06-dark-320")
+            checkResult("existing native capture draft was never changed", native("get_quick_journal_draft") == originalDraft)
+            evidence.put("completed", true)
+        } catch (failure: Throwable) { evidence.put("failure", failure.toString()); screenshot("failure"); throw failure }
+        finally {
+            shell(if (override != null) "wm size $override" else "wm size reset")
+            try {
+                ids.forEach { id -> own(id)?.let { item -> if (!item.optBoolean("deleted")) native("update_quick_journal", JSONObject().put("id", id).put("expectedRevision", item.getString("revision")).put("record", item.getJSONObject("record")).put("deleted", true)) } }
+                native("save_quick_journal_settings", JSONObject().put("value", originalSettings))
+                asyncJs("const {userProfileStorage:s,flushUserProfileStorage:flush}=await import(new URL('/src/UserProfileStorage.ts',location.href).href);const keys=${JSONArray(keys)},before=$before;for(const key of keys){if(key in before)s.setItem(key,before[key]);else s.removeItem(key)}await flush();return true")
+                evidence.put("settingsRestored", (native("get_quick_journal_settings") as JSONObject).getJSONObject("settings").toString() == originalSettings.toString())
+                evidence.put("draftRetained", native("get_quick_journal_draft") == originalDraft)
+            } catch (restore: Throwable) { evidence.put("restoreFailure", restore.toString()); throw restore }
+            finally { File(directory, "result.json").writeText(evidence.toString(2), Charsets.UTF_8) }
+        }
+    }
+
+    @Test
+    fun journalFeedVisuals() {
+        launchMain()
+        val profile = (native("load_user_profile") as JSONObject).getJSONObject("values")
+        val appearance = if (profile.has("hub.mobile.appearance.v1")) profile.getString("hub.mobile.appearance.v1") else null
+        val display = shell("wm size"); val override = Regex("Override size: (\\d+x\\d+)").find(display)?.groupValues?.get(1)
+        try {
+            if (dom(".mobile-journal-feed")) { click("[aria-label='日志导航']"); clickText("返回 Hub 浏览", "dialog button"); waitDom(".mobile-browse-screen") }
+            else { click("nav[aria-label='主要导航'] button[aria-label='浏览']"); waitDom(".mobile-browse-screen") }
+            clickContaining("日志", ".mobile-browse-group button"); waitDom(".mobile-journal-feed")
+            asyncJs("const {userProfileStorage:s}=await import(new URL('/src/UserProfileStorage.ts',location.href).href);s.setItem('hub.mobile.appearance.v1',JSON.stringify({theme:'white',accent:'blue'}));return true")
+            until("light page computed style") { js("getComputedStyle(document.querySelector('.mobile-journal-feed')).backgroundColor==='rgb(245, 246, 248)'") == true }
+            until("existing local journal photos decoded") { js("[...document.querySelectorAll('.mobile-journal-photos img')].length>0&&[...document.querySelectorAll('.mobile-journal-photos img')].every(i=>i.complete&&i.naturalWidth>0)") == true }
+            checkResult("existing photo-only cards display decoded local images", true)
+            screenshot("01-final-light-feed")
+            asyncJs("const {userProfileStorage:s}=await import(new URL('/src/UserProfileStorage.ts',location.href).href);s.setItem('hub.mobile.appearance.v1',JSON.stringify({theme:'black',accent:'blue'}));return true")
+            until("actual dark page and dark card computed styles") { js("getComputedStyle(document.querySelector('.mobile-journal-feed')).backgroundColor==='rgb(9, 10, 11)'&&getComputedStyle(document.querySelector('.mobile-journal-card')).backgroundColor==='rgb(24, 26, 30)'") == true }
+            checkResult("dark page and cards use actual dark theme colors", true)
+            screenshot("02-final-dark-feed")
+            val density = (js("devicePixelRatio") as Number).toDouble(); shell("wm size ${(320*density).toInt()}x${(640*density).toInt()}")
+            until("narrow viewport") { (js("innerWidth") as Number).toInt()<=322 }
+            click("[aria-label='搜索日志']"); waitDom("[aria-label='搜索日志正文']"); hideKeyboard()
+            click("[aria-label='展开日志筛选']"); clickText("日期", ".mobile-journal-search-filters button"); waitDom("dialog[aria-label='日期范围']")
+            field("dialog[open] input[name=start]", "2026-11-01"); field("dialog[open] input[name=end]", "2026-11-15")
+            clickText("本月", "dialog label")
+            checkResult("choosing a date preset clears the previous custom range", js("document.querySelector('dialog[open] input[name=start]').value===''&&document.querySelector('dialog[open] input[name=end]').value===''") == true)
+            checkResult("320 CSS pixel filter sheet stays inside the screen", js("document.documentElement.scrollWidth<=innerWidth+1&&document.querySelector('dialog[open]').getBoundingClientRect().right<=innerWidth+1") == true)
+            screenshot("03-final-dark-narrow-filter")
+            back(); back(); until("search returns to journal") { dom(".mobile-journal-title") }
+            evidence.put("completed", true)
+        } catch (failure: Throwable) { evidence.put("failure", failure.toString()); screenshot("failure"); throw failure }
+        finally {
+            shell(if (override!=null) "wm size $override" else "wm size reset")
+            try {
+                asyncJs("const {userProfileStorage:s,flushUserProfileStorage:flush}=await import(new URL('/src/UserProfileStorage.ts',location.href).href);const value=${if(appearance==null) "null" else JSONObject.quote(appearance)};if(value===null)s.removeItem('hub.mobile.appearance.v1');else s.setItem('hub.mobile.appearance.v1',value);await flush();return true")
+                until("original appearance restored") { js("document.documentElement.dataset.mobileTheme") == (appearance?.let { JSONObject(it).optString("theme", "system") } ?: "system") }
+                screenshot("04-final-restored-feed")
+            } catch (restore: Throwable) { evidence.put("restoreFailure",restore.toString());throw restore }
+            finally { File(directory,"result.json").writeText(evidence.toString(2),Charsets.UTF_8) }
+        }
+    }
+
     private val tileComponent = "com.craftsearch.desktop/.JournalTileService"
     private fun requestTile() {
         js("(()=>{window.__tileCheck={done:false};window.__TAURI_INTERNALS__.invoke('add_quick_journal_tile').then(value=>window.__tileCheck={done:true,value},error=>window.__tileCheck={done:true,error:String(error)});return true})()")

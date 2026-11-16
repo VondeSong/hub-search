@@ -14,7 +14,7 @@ function journalStudioRecords(includeTrash = false) {
     const source = docs[id], day = source.date.match(/\s(\d+)\s日/);
     return { id:'journal-demo-'+id, sourceId:id, date:'2026-'+(source.date.startsWith('10')?'10':'11')+'-'+String(day?.[1]||'01').padStart(2,'0'), text:source.body, demo:true, attachments:[], syncState:'written', revision:0 };
   });
-  return [...st.notes.map(n => ({...n,date:recordDay(n),syncState:n.syncState||'pending'})), ...examples].map(n => j.overrides[n.id] || n).filter(n => includeTrash || !j.trash[n.id]).sort((a,b) => Number(j.pins.includes(b.id))-Number(j.pins.includes(a.id)) || b.date.localeCompare(a.date) || (b.createdAt||0)-(a.createdAt||0) || a.id.localeCompare(b.id));
+  return [...st.notes.map(n => ({...n,date:recordDay(n),syncState:n.syncState||'pending'})), ...examples].map(n => j.overrides[n.id] || n).filter(n => includeTrash || !j.trash[n.id]).sort((a,b) => typeof journalCompare==='function'?journalCompare(a,b):Number(j.pins.includes(b.id))-Number(j.pins.includes(a.id)) || b.date.localeCompare(a.date));
 }
 function journalFind(id, includeTrash = false) { return journalStudioRecords(includeTrash).find(n => n.id === id); }
 function journalSignature(n) { return JSON.stringify([n.text, n.date, n.attachments||[], n.photos||[], n.revision||0]); }
@@ -58,7 +58,8 @@ function journalFiltered() {
 }
 function journalStudioCard(n) {
   const j = journalStore(), long = n.text.length>240 || n.text.split('\n').length>8, expanded = journalExpanded.has(n.id);
-  return '<article class="journal-memo journal-studio-card" data-record-id="'+esc(n.id)+'"><header><span>'+(j.pins.includes(n.id)?'<span class="journal-pin">置顶 · </span>':'')+esc(n.date||'日期未记录')+'</span><span class="journal-state" data-journal-state="'+esc(n.id)+'">'+esc(n.syncState==='written'?'':journalStatus(n))+'</span>'+iconBtn('记录操作','journal-menu:'+n.id,'more')+'</header><div class="journal-card-copy'+(long&&!expanded?' is-collapsed':'')+'" role="button" tabindex="0" data-act="journal-edit:'+esc(n.id)+'" aria-label="编辑这条记录">'+journalMarkup(n.text,true)+'</div><div class="saved-capture-photos">'+attachmentMarkup(n)+'</div>'+(long?plain(expanded?'收起':'展开','journal-expand:'+n.id):'')+(j.trash[n.id]?plain('恢复记录','journal-restore:'+n.id):'')+'</article>';
+  const selecting=route()[0]==='journal-select',picked=selecting&&journalPicked.has(n.id);
+  return '<article class="journal-memo journal-studio-card'+(picked?' is-selected':'')+'" data-record-id="'+esc(n.id)+'">'+(selecting?'<button class="journal-card-selector" type="button" aria-label="选择记录 '+esc(n.date)+'" aria-pressed="'+picked+'" data-act="journal-pick:'+esc(n.id)+'">'+(picked?ico('check',16):'')+'</button>':'')+'<header><span>'+(j.pins.includes(n.id)?'<span class="journal-pin">置顶 · </span>':'')+esc(n.date||'日期未记录')+'</span><span class="journal-state" data-journal-state="'+esc(n.id)+'">'+esc(n.syncState==='written'?'':journalStatus(n))+'</span>'+iconBtn('记录操作','journal-menu:'+n.id,'more')+'</header><div class="journal-card-copy'+(long&&!expanded?' is-collapsed':'')+'" role="button" tabindex="0" data-act="'+(selecting?'journal-pick:':'journal-edit:')+esc(n.id)+'" aria-label="'+(selecting?'选择这条记录':'编辑这条记录')+'">'+journalMarkup(n.text,true)+'</div><div class="saved-capture-photos">'+attachmentMarkup(n)+'</div>'+(long?plain(expanded?'收起':'展开','journal-expand:'+n.id):'')+(j.trash[n.id]?plain('恢复记录','journal-restore:'+n.id):'')+'</article>';
 }
 function journalStudioHeader() {
   const mode = journalStore().filter||'all', titles = {all:'日志',pinned:'置顶',attachments:'有附件',untagged:'无标签',trash:'回收站'};
@@ -207,6 +208,7 @@ function journalDetails(id) {
   void hydrateAttachmentImages();
 }
 function journalStudioAction(a,key) {
+  if(typeof journalFeedToolsAction==='function'&&journalFeedToolsAction(a,key))return true;
   if(a==='journal-photo'){sheet('照片','<div class="journal-photo-view"><img data-local-image="'+esc(key)+'" alt="照片原图" hidden><span class="attachment-loading">照片加载中</span></div>'+plain('保存原图','download-attachment:'+key));void hydrateAttachmentImages();return true;}
   if(a==='journal-version'||a==='journal-version-restore'){
     const split=key?.lastIndexOf('~'),id=split>0?key.slice(0,split):'',index=Number(key?.slice(split+1));
@@ -257,6 +259,8 @@ function journalStudioAfterRender() {
   if(!['logs','journal-edit','journal-record'].includes(p))journalEditorSession=null;
   const d=document.querySelector('#sheet');if(d)d.classList.toggle('journal-capture-sheet',Boolean(d.querySelector('.journal-rich-form')&&!d.querySelector('[data-edit-id]')));
   if(d)d.classList.toggle('journal-menu-sheet',Boolean(d.querySelector('.journal-action-menu')));
+  if(d)d.classList.toggle('journal-view-sheet',Boolean(d.querySelector('.journal-view-options')));
+  if(d)d.classList.toggle('journal-filter-sheet',Boolean(d.querySelector('#journal-search-filter-form')));
   const editor=journalRichForm()?.querySelector('[data-journal-editor]');
   if(editor&&!editor.dataset.ready){editor.dataset.ready='true';requestAnimationFrame(()=>editor.focus({preventScroll:true}));}
   journalQueueSync();

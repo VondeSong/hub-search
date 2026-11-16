@@ -40,7 +40,7 @@ $testApk = Get-ChildItem (Join-Path $androidProject "app/build/outputs/apk/andro
 if (-not $testApk) { throw "没有找到当前架构的 AndroidTest APK。" }
 & $adb -s $Device install -r $testApk.FullName
 if ($LASTEXITCODE) { throw "验收程序安装失败；未清除 Hub 数据。" }
-$methods = @{ journal = "journalAndPrototypeRoundTrip"; tile = "nativeTileRequestsAndWarmEntry"; draft = "prepareRichColdDraft"; restore = "restoreRichColdDraft"; cold = "actualProcessColdTileEntry"; postcold = "nativeDraftAfterColdRestart"; screens = "searchReviewEditorAndAppearance" }
+$methods = @{ journal = "journalAndPrototypeRoundTrip"; feed = "journalFeedVideoAndLayout"; feedvisual = "journalFeedVisuals"; tile = "nativeTileRequestsAndWarmEntry"; draft = "prepareRichColdDraft"; restore = "restoreRichColdDraft"; cold = "actualProcessColdTileEntry"; postcold = "nativeDraftAfterColdRestart"; screens = "searchReviewEditorAndAppearance" }
 $reports = @()
 $draftHash = "not-set"
 function Invoke-AcceptancePhase([string]$phase) {

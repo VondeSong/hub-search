@@ -74,8 +74,8 @@ const group=(content,empty='暂无项目。')=>'<div class="group">'+(content||'
 const intro=(t,d)=>t===routes[route()[0]]&&!['doc','note','article','task','finding','work','deck','study','widgets'].includes(route()[0])?'':'<h1>'+esc(t)+'</h1><p class="lede">'+esc(d)+'</p>';
 const detail=(t,badge,body)=>'<article class="detail">'+badge+'<h1>'+esc(t)+'</h1>'+body+'</article>';
 const sourceRow=(id)=>row(docs[id].t,docs[id].s+' · '+docs[id].tag,'note','go:doc/'+id);
-const routes={future:'后续功能',deck:'牌组', 'collab-sync':'协作同步演示',search:'搜索',browse:'浏览',tasks:'任务',review:'复习',insights:'洞察',reading:'阅读',favorites:'收藏',recent:'最近浏览',logs:'日志',tags:'标签',libraries:'资料库',settings:'设置',sync:'同步状态',agent:'Agents',agents:'Agents','agent-chat':'Agents 对话','agent-connection':'云端连接',requests:'更新请求',request:'请求详情',guide:'功能梳理',doc:'资料详情',article:'阅读详情',task:'任务详情',finding:'发现详情','journal-edit':'编辑日志','journal-record':'日志详情',capture:'快速记录',recap:'阶段回顾',works:'工作与专题',work:'工作详情',saved:'日志',label:'标签详情',study:'牌组复习',appearance:'外观与阅读'};
-const parent={future:'settings',deck:'review','collab-sync':'future',reading:'browse',favorites:'browse',recent:'browse',logs:'browse',tags:'browse',libraries:'browse',settings:'browse',sync:'browse',agent:'browse',agents:'browse','agent-chat':'agents','agent-connection':'agents',requests:'insights',request:'insights',guide:'browse',doc:'browse',article:'browse',task:'tasks',finding:'insights',recap:'insights','journal-edit':'logs','journal-record':'logs',capture:'browse',works:'browse',work:'browse',saved:'browse',label:'browse',study:'review',appearance:'browse'};
+const routes={future:'后续功能',deck:'牌组', 'collab-sync':'协作同步演示',search:'搜索',browse:'浏览',tasks:'任务',review:'复习',insights:'洞察',reading:'阅读',favorites:'收藏',recent:'最近浏览',logs:'日志',tags:'标签',libraries:'资料库',settings:'设置',sync:'同步状态',agent:'Agents',agents:'Agents','agent-chat':'Agents 对话','agent-connection':'云端连接',requests:'更新请求',request:'请求详情',guide:'功能梳理',doc:'资料详情',article:'阅读详情',task:'任务详情',finding:'发现详情','journal-search':'搜索日志','journal-select':'选择笔记','journal-edit':'编辑日志','journal-record':'日志详情',capture:'快速记录',recap:'阶段回顾',works:'工作与专题',work:'工作详情',saved:'日志',label:'标签详情',study:'牌组复习',appearance:'外观与阅读'};
+const parent={future:'settings',deck:'review','collab-sync':'future',reading:'browse',favorites:'browse',recent:'browse',logs:'browse',tags:'browse',libraries:'browse',settings:'browse',sync:'browse',agent:'browse',agents:'browse','agent-chat':'agents','agent-connection':'agents',requests:'insights',request:'insights',guide:'browse',doc:'browse',article:'browse',task:'tasks',finding:'insights',recap:'insights','journal-search':'logs','journal-select':'logs','journal-edit':'logs','journal-record':'logs',capture:'browse',works:'browse',work:'browse',saved:'browse',label:'browse',study:'review',appearance:'browse'};
 Object.assign(routes,{connections:'连接总览',note:'本地笔记',card:'闪卡详情',widgets:'小组件预览'});
 Object.assign(parent,{insights:'browse',connections:'browse',note:'browse',card:'review',agent:'agents',widgets:'settings'});
 let activeRoute='', scrolls={}, sheets=new Map(), sheetSerial=0;
@@ -297,6 +297,8 @@ function content(p,id){
  case 'recent':return intro('最近浏览','回到最近打开的资料与文章。')+section('访问历史',group(st.history.map(itemRow).join(''),'还没有浏览记录。'),st.history.length?plain('清除','clear-history'):'');
  case 'logs':return journalPage();
  case 'journal-edit':return journalRecordPage(id);
+ case 'journal-search':return journalSearchPage();
+ case 'journal-select':return journalStudioPage()+journalSelectionDock();
  case 'journal-record':return journalRecordPage(id,true);
  case 'tags':return intro('标签','按标签搜索示例资料。')+searchInput('tag-query','搜索标签',tagQuery)+'<div id="tag-results">'+tagRows()+'</div>';
  case 'label':{const t=labelFromRoute(id);return t?intro(t,'具有此标签的资料与速记。')+section('资料',group(mobileTagItems(t))):missing()}
@@ -314,12 +316,14 @@ function render(restore=false){
  if(activeRoute!==key){workspaceRememberOpened(key);if(p!=='search')workspaceSearchActive=false;}
  activeRoute=key;document.body.dataset.view=p;
  const isStudy=p==='study'&&allReviewCards().some(c=>(st.studyDeck==='全部'||c.deck===st.studyDeck)&&!st.reviewed.includes(c.id));
- document.body.classList.toggle('focus-session',isStudy);$('#tabs').hidden=isStudy||p==='agent-chat'||p==='widgets'||['logs','journal-edit','journal-record'].includes(p);
+ document.body.classList.toggle('focus-session',isStudy);$('#tabs').hidden=isStudy||p==='agent-chat'||p==='widgets'||['logs','journal-search','journal-select','journal-edit','journal-record'].includes(p);
  const brand='<span class="brand"><img src="hub.svg" alt="">Hub <span class="sample-label">示例资料</span></span>';
  if(isTab||p==='agent')$('#header').innerHTML=mobileRootHeader(p==='agent'?'agents':p);
  else if(['agent-chat','agent-connection'].includes(p))$('#header').innerHTML=agentsHeader(p,id);
  else if(p==='study')$('#header').innerHTML=plain(history.state?.from==='widgets'?'返回小组件':'退出复习',history.state?.from==='widgets'?'back':'exit-study','back')+'<span class="top-title">'+esc(st.studyDeck==='全部'?'专注复习':st.studyDeck)+'</span>';
  else if(p==='logs')$('#header').innerHTML=journalStudioHeader();
+ else if(p==='journal-search')$('#header').innerHTML=journalSearchHeader();
+ else if(p==='journal-select')$('#header').innerHTML=journalSelectHeader();
  else if(p==='journal-edit')$('#header').innerHTML=journalEditorHeader(id);
  else if(p==='journal-record')$('#header').innerHTML=iconBtn('返回日志','back','back')+'<span class="top-title">日志详情</span>'+iconBtn('记录操作','journal-menu:'+id,'more');
  else if(p==='widgets')$('#header').innerHTML=plain('返回 Hub','back','back')+brand+iconBtn('添加到手机的说明','widget-help','info');
