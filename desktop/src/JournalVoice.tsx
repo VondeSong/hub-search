@@ -7,11 +7,12 @@ import { localJournalDate } from "./JournalViews";
 import { QUICK_JOURNAL_UPDATED, openQuickJournalCapture } from "./QuickJournalEvents";
 import { userProfileStorage } from "./UserProfileStorage";
 import "./JournalVoice.css";
+import {JournalTranscript,useJournalTranscription,type Transcript} from "./JournalTranscription";
 
 type Record = QuickJournalItem["record"];
 type Attachment = Record["attachments"][number];
 export type VoiceRequest = { record?: Record; revision?: string; sourceDraft?: boolean };
-type Draft = { record: Record; revision?: string; sourceDraft?: boolean; stagedTokens: string[] };
+type Draft = { record: Record; revision?: string; sourceDraft?: boolean; stagedTokens: string[]; transcripts?:Transcript[] };
 type Status = {state:"idle"|"recording"|"paused"|"ready";elapsed:number;token:string;error?:string};
 const eventName="hub:journal-voice";
 export function openJournalVoice(request: VoiceRequest = {}) { window.dispatchEvent(new CustomEvent(eventName,{detail:request})); }
@@ -62,13 +63,21 @@ export function JournalVoiceCapture({request,onClose}:{request:VoiceRequest;onCl
     draftWrites=draftWrites.catch(()=>{}).then(()=>invoke("quick_journal_voice_draft",{value:JSON.stringify(value)}));
     await draftWrites;
   };
+  const updateTranscript=async(value:Transcript)=>{
+    const current=latest.current,items=current.transcripts||[],old=items.find(s=>s.id===value.id);
+    await persist({...current,transcripts:old?items.map(s=>s.id===value.id?{...value,edited:old.edited,applied:old.applied}:s):[...items,value]});
+  };
+  const transcription=useJournalTranscription({ready,recordId:draft.record.id,sessions:draft.transcripts||[],onChange:updateTranscript});
   useEffect(()=>{alive.current=true;ref.current?.showModal();void (async()=>{
     await draftWrites.catch(()=>{});
     const [raw,current]=await Promise.all([invoke<string>("quick_journal_voice_draft"),native("status")]);
     if(!alive.current)return;
     let value=raw?JSON.parse(raw) as Draft:emptyDraft();
     if(raw&&request.record&&value.record.id!==request.record.id&&(value.record.text.trim()||value.record.attachments.length||current.state!=="idle")){setNotice("先恢复上次未保存的语音草稿；保存后可返回目标记录继续录入。");}
-    else if(request.record&&(!raw||(!value.record.text.trim()&&!value.record.attachments.length&&current.state==="idle")))value={record:structuredClone(request.record),revision:request.revision,sourceDraft:request.sourceDraft,stagedTokens:[]};
+    else if(request.record&&(!raw||(!value.record.text.trim()&&!value.record.attachments.length&&current.state==="idle"))){
+      const archived=await invoke<string>("quick_journal_voice_draft",{recordId:request.record.id});
+      value={record:structuredClone(request.record),revision:request.revision,sourceDraft:request.sourceDraft,stagedTokens:[],transcripts:archived?JSON.parse(archived):[]};
+    }
     await persist(value);setStatus(current);setReady(true);
   })().catch(e=>{if(alive.current)setError(String(e));});
     const timer=setInterval(()=>{if(!busyRef.current)void native("status").then(s=>{if(alive.current)setStatus(s);}).catch(()=>{});},800);
@@ -82,13 +91,15 @@ export function JournalVoiceCapture({request,onClose}:{request:VoiceRequest;onCl
     if(!value.stagedTokens.includes(current.token)){
       if(value.record.attachments.length>=9)throw new Error("当前记录已有9个附件，原音已保留。请先整理附件后重试。");
       const a=await invoke<Attachment>("quick_journal_voice",{action:"read",token:current.token});
-      value={...value,record:{...value.record,attachments:[...value.record.attachments,a]},stagedTokens:[...value.stagedTokens,current.token]};
+      value={...value,record:{...value.record,attachments:[...value.record.attachments,a]},stagedTokens:[...value.stagedTokens,current.token],transcripts:value.transcripts?.map(s=>s.source===current.token?{...s,audioHash:a.hash}:s)};
     }
     await persist(value);
     setStatus(await native("acknowledge",current.token));
+    await transcription.flush();
+    if(!(latest.current.transcripts||[]).some(s=>s.source===current.token&&["connecting","running","sending"].includes(s.state)))void native("releaseChunks",current.token).catch(()=>{});
   };
   const finish=()=>run(async()=>{await stage();setNotice("原音已保留，可以回听、补充文字或继续录入。");});
-  const leave=()=>void run(async()=>{await stage();await draftWrites;onClose();});
+  const leave=()=>void run(async()=>{await stage();transcription.suspend();await draftWrites;onClose();});
   async function save(next:boolean){await run(async()=>{
     await stage();await draftWrites;
     const value=latest.current;if(!value.record.text.trim()&&!value.record.attachments.length)throw new Error("请先录一段声音或写下文字。");
@@ -100,18 +111,20 @@ export function JournalVoiceCapture({request,onClose}:{request:VoiceRequest;onCl
     const saved=items.items.find(i=>i.record.id===value.record.id);
     if(saved?.revision)await persist({...value,revision:saved.revision});
     if(value.sourceDraft){const raw=await invoke<string>("get_quick_journal_draft");if(raw&&JSON.parse(raw).id===value.record.id)await invoke("save_quick_journal_draft",{draft:""});}
+    transcription.suspend();await draftWrites;
     await invoke("quick_journal_voice_draft",{value:""});
-    if(next){await persist(emptyDraft());setStatus({state:"idle",elapsed:0,token:""});setNotice("上一条已保存。点麦克风，继续录下一条。");}
+    if(next){await persist(emptyDraft());transcription.resume();setStatus({state:"idle",elapsed:0,token:""});setNotice("上一条已保存。点麦克风，继续录下一条。");}
     else onClose();
   });}
   const active=status.state==="recording"||status.state==="paused";
   return createPortal(<dialog ref={ref} className="journal-voice-dialog" aria-label="语音速记" onCancel={e=>{e.preventDefault();leave();}}><header><div><h2>{draft.revision?"继续录入":"语音速记"}</h2><span>{draft.record.date} · 原音保留在本机</span></div><button type="button" aria-label="保留语音草稿并关闭" disabled={busy} onClick={leave}><X size={22}/></button></header><div className="journal-voice-body">
-    <div className="journal-voice-service"><Mic size={17}/><span>实时转写</span><select aria-label="转写服务" value={provider} disabled={active||busy} onChange={e=>{try{userProfileStorage.setItem("hub.voice.provider",e.target.value);setProvider(e.target.value);}catch(err){setError(String(err));}}}><option value="aliyun">阿里</option><option value="openai">OpenAI</option></select><small>尚未连接</small></div>
+    <div className="journal-voice-service"><Mic size={17}/><span>实时转写</span><select aria-label="转写服务" value={provider} disabled={active||busy} onChange={e=>{try{userProfileStorage.setItem("hub.voice.provider",e.target.value);setProvider(e.target.value);}catch(err){setError(String(err));}}}><option value="aliyun">阿里</option><option value="openai">OpenAI</option></select><small>{transcription.providers.some(p=>p.id===provider&&p.configured)?"已配置":"未连接"}</small></div>
     <div className={`journal-voice-clock ${active?"is-active":""}`}><span>{status.state==="recording"?"正在录音":status.state==="paused"?"已暂停":status.state==="ready"?"原音待加入草稿":"准备好就开始"}</span><strong>{audioTime(status.elapsed/1000)}</strong><p>{active?"说下来，之后再慢慢整理。":"长按＋，也能直接进入录音。"}</p></div>
-    <div className="journal-voice-controls">{active?<><button type="button" disabled={busy} onClick={()=>void run(async()=>setStatus(await native(status.state==="paused"?"resume":"pause")))}>{status.state==="paused"?<Play size={23}/>:<Pause size={23}/>}<span>{status.state==="paused"?"继续录音":"暂停"}</span></button><button type="button" className="voice-stop" disabled={busy} onClick={()=>void finish()}><Square size={20}/><span>完成本段</span></button></>:<button type="button" className="voice-start" disabled={busy||!ready} onClick={()=>void run(async()=>{if(status.state==="ready")await stage();if(latest.current.record.attachments.length>=9)throw new Error("每条最多9个附件，请先保存当前记录。");setStatus(await native("start"));setNotice("");})}><Mic size={27}/><span>{status.state==="ready"?"保留原音并继续":draft.record.attachments.length?"继续录入":"开始录音"}</span></button>}</div>
+    <div className="journal-voice-controls">{active?<><button type="button" disabled={busy} onClick={()=>void run(async()=>setStatus(await native(status.state==="paused"?"resume":"pause")))}>{status.state==="paused"?<Play size={23}/>:<Pause size={23}/>}<span>{status.state==="paused"?"继续录音":"暂停"}</span></button><button type="button" className="voice-stop" disabled={busy} onClick={()=>void finish()}><Square size={20}/><span>完成本段</span></button></>:<button type="button" className="voice-start" disabled={busy||!ready} onClick={()=>void run(async()=>{if(status.state==="ready")await stage();if(latest.current.record.attachments.length>=9)throw new Error("每条最多9个附件，请先保存当前记录。");const current=await native("start");setStatus(current);setNotice("");if(current.state==="recording")await transcription.begin(provider,current.token);})}><Mic size={27}/><span>{status.state==="ready"?"保留原音并继续":draft.record.attachments.length?"继续录入":"开始录音"}</span></button>}</div>
     {(error||status.error)&&<p className="journal-voice-error" role="alert">{error||status.error}</p>}{status.state==="ready"&&error&&<button type="button" disabled={busy} onClick={()=>void run(async()=>{setStatus(await native("acknowledge",status.token));setNotice("原文件已归档保留，可以重新录音。");})}>保留异常原文件并重新录音</button>}{notice&&<p className="journal-voice-notice" role="status">{notice}</p>}
-    {!!draft.record.attachments.length&&<section className="journal-voice-segments" aria-label="已保留的录音">{draft.record.attachments.filter(a=>isJournalAudio(a.name)).map((a,i)=><JournalAudio key={`${a.hash}-${i}`} attachment={a}/>)}</section>}
+    {!!draft.record.attachments.length&&<section className="journal-voice-segments" aria-label="已保留的录音">{draft.record.attachments.filter(a=>isJournalAudio(a.name)).map((a,i)=><div key={`${a.hash}-${i}`}><JournalAudio attachment={a}/><button type="button" className="journal-voice-replay" disabled={busy||active} onClick={()=>void run(()=>transcription.begin(provider,a.hash,true))}>用{provider==="openai"?"OpenAI":"阿里"}补转写</button></div>)}</section>}
+    {draft.transcripts?.map(value=><JournalTranscript key={value.id} value={value} onChange={next=>{void persist({...latest.current,transcripts:latest.current.transcripts?.map(s=>s.id===next.id?next:s)}).catch(e=>setError(String(e)));}} onApply={()=>void run(async()=>{const current=latest.current,session=current.transcripts?.find(s=>s.id===value.id);if(!session||session.applied)return;const text=session.edited??session.text;await persist({...current,record:{...current.record,text:[current.record.text,text].filter(Boolean).join("\n\n")},transcripts:current.transcripts?.map(s=>s.id===session.id?{...s,applied:true}:s)});})} onRetry={()=>void run(()=>transcription.retry(value))} onCancel={()=>void run(()=>transcription.cancel(value))}/>)}
     <label className="journal-voice-text">补充文字<textarea aria-label="录音补充文字" value={draft.record.text} placeholder="记下要点，或稍后再补充…" disabled={!ready||busy} onChange={e=>{void persist({...latest.current,record:{...latest.current.record,text:e.target.value}}).catch(err=>setError(String(err)));}}/></label>
-    <p className="journal-voice-boundary">当前可录音与回听，转写服务未接通。离开应用会结束并保留本段。</p>
+    <p className="journal-voice-boundary">{transcription.connectionError||"录音会发往所选转写服务，经你的 VPS 转接。识别后可校对并加入文字。"} 可先保存原音，稍后从这条录音继续查看转写。离开应用会结束并保留本段。</p>
     </div><footer><button type="button" disabled={!ready||busy||active} onClick={()=>void save(false)}><Check size={18}/>保存</button><button type="button" className="voice-save-next" disabled={!ready||busy||active} onClick={()=>void save(true)}>保存并录下一条<ChevronRight size={18}/></button></footer></dialog>,document.body);
 }

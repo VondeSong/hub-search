@@ -39,3 +39,11 @@
 .journal-audio audio {position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;}
 .journal-audio p {font-size:12px;line-height:1.5;margin:8px 0 0;}
 .journal-voice-dialog :focus-visible,.journal-audio :focus-visible {outline:2px solid var(--mobile-accent,#2863b8);outline-offset:3px;}
+.journal-transcript {margin:16px 0;border:1px solid var(--mobile-line,#e6e8ed);border-radius:16px;padding:14px;background:var(--mobile-surface,#fff);}
+.journal-transcript header {padding:0 0 10px;gap:8px;align-items:baseline;flex-wrap:wrap;}
+.journal-transcript strong {font-size:14px;}
+.journal-transcript header span,.journal-transcript p {font-size:12px;line-height:1.5;color:var(--mobile-secondary,#626974);}
+.journal-transcript textarea {box-sizing:border-box;width:100%;min-height:100px;resize:vertical;border:0;background:transparent;color:inherit;font:inherit;font-size:15px;line-height:1.7;padding:0;}
+.journal-transcript-actions {display:flex;gap:12px;justify-content:flex-end;}
+.journal-transcript-actions button,.journal-voice-replay {font:inherit;font-size:13px;color:var(--mobile-accent,#2863b8);background:transparent;border:0;min-height:44px;padding:8px;}
+.journal-transcript-actions button:disabled {opacity:.55;}

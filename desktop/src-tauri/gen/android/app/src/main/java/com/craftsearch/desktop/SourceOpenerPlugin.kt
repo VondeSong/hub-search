@@ -19,7 +19,7 @@ import app.tauri.annotation.PermissionCallback
 import app.tauri.PermissionState
 
 @InvokeArg
-class JournalVoiceArgs { lateinit var action: String; var token: String = "" }
+class JournalVoiceArgs { lateinit var action: String; var token: String = ""; var offset: Long = 0 }
 
 @InvokeArg
 class SourceOpenArgs { lateinit var url: String }
@@ -145,6 +145,8 @@ class SourceOpenerPlugin(private val activity: Activity) : Plugin(activity) {
                     "stop" -> JournalVoiceRecorder.stop(activity)
                     "status" -> JournalVoiceRecorder.status(activity)
                     "read" -> JournalVoiceRecorder.read(activity, args.token)
+                    "chunk" -> JournalVoiceRecorder.chunk(activity, args.token, args.offset)
+                    "releaseChunks" -> JournalVoiceRecorder.releaseChunks(activity, args.token)
                     "acknowledge" -> JournalVoiceRecorder.acknowledge(activity, args.token)
                     else -> throw IllegalArgumentException("不支持的录音操作")
                 }

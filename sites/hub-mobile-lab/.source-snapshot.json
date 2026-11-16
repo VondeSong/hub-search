@@ -3,9 +3,9 @@
   "site": "mobile",
   "project_id": "appgprj_6af1d2dc12308191acc37e5566699c2d",
   "site_url": "https://hub-mobile-lab-von11.song02211368537057.chatgpt.site",
-  "source_commit": "250eaf594c66e43c030c74faf12498dbdccbaeca",
-  "published_version": 23,
-  "deployment_id": "appgdep_6afab4118d488191ab7aa5b4f83351f5",
+  "source_commit": "e0bacffa1d7432e80cfdc211f1297b5cbc7475bc",
+  "published_version": 24,
+  "deployment_id": "appgdep_6afad52a42188191ae6310a2df8d5b81",
   "files": {
     ".openai/hosting.json": {
       "sha256": "543a776095c0181cc870f784c075ab4f263fb739e3649cd8db74f493fb5b4ca3",
@@ -158,9 +158,9 @@
       "bytes": 3295
     },
     "dist/voice.js": {
-      "sha256": "23a3a4371ffe5c415a6f8c62c37b5c230e41fa2e3256a833d60b85366c10cd76",
+      "sha256": "2b206857fac80e7ec0a92439101c4717359532698a80c5b9825ee24f6512d4ff",
       "mode": "100644",
-      "bytes": 18104
+      "bytes": 18167
     },
     "dist/widgets.css": {
       "sha256": "dab718c6ffea193c3317de835b1dcdd3a2ea118de57057687014ace3ab505df9",
@@ -196,6 +196,11 @@
       "sha256": "511a7be8554b46483a63a0b5a9e30fb81524b383772ac2e243583961b5f9b0ad",
       "mode": "100644",
       "bytes": 4065
+    },
+    "docs/dual-provider-transcription-2026-11-16.md": {
+      "sha256": "9255d7561c9646cf9df015594993f1cfd87b37ccf8188a72556722fa2fe6e9d8",
+      "mode": "100644",
+      "bytes": 1106
     },
     "docs/gemini-chat-materials-after.jpg": {
       "sha256": "482240fc952349592b3946c69a94faa3e6e501d91574e5d9ec9cd81931186308",
@@ -303,5 +308,5 @@
       "bytes": 3301
     }
   },
-  "imported_at": "2026-11-16T07:43:43.116745+00:00"
+  "imported_at": "2026-11-16T10:07:50.168416+00:00"
 }

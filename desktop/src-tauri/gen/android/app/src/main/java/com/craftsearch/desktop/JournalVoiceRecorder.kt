@@ -1,14 +1,13 @@
 package com.craftsearch.desktop
 
 import android.content.Context
-import android.media.MediaRecorder
 import android.os.SystemClock
 import app.tauri.plugin.JSObject
 import java.io.File
 
 /** Foreground capture only. Finalized originals survive WebView reloads until explicitly acknowledged. */
 internal object JournalVoiceRecorder {
-    private var recorder: MediaRecorder? = null
+    private var recorder: JournalPcmCapture? = null
     private var elapsed = 0L
     private var started = 0L
     private var paused = false
@@ -33,22 +32,16 @@ internal object JournalVoiceRecorder {
         val token = java.util.UUID.randomUUID().toString().replace("-", "")
         val output = File(context.filesDir, "journal-voice/$token.m4a")
         output.parentFile!!.mkdirs()
-        val next = MediaRecorder()
+        val next = JournalPcmCapture(output) { failed ->
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                runCatching { stop(context) }
+                error = if (failed) "录音意外中断，请回听核对已保存部分。" else "本段达到录音限制，已结束并保留原音。"
+            }
+        }
         try {
-            next.setAudioSource(MediaRecorder.AudioSource.MIC)
-            next.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            next.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            next.setAudioChannels(1)
-            next.setAudioSamplingRate(44100)
-            next.setAudioEncodingBitRate(96000)
-            next.setMaxFileSize(19L * 1024 * 1024)
-            next.setOutputFile(output.absolutePath)
-            next.prepare()
             next.start()
             recorder = next; elapsed = 0; paused = false; started = SystemClock.elapsedRealtime(); error = ""
             preferences(context).edit().putString("token", token).putLong("elapsed", 0).commit()
-            next.setOnInfoListener { _, what, _ -> if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED) { stop(context); error = "本段达到附件大小限制，已结束并保留原音。" } }
-            next.setOnErrorListener { _, _, _ -> runCatching { stop(context) }; error = "录音意外中断，请回听核对已保存部分。" }
             return status(context)
         } catch (e: Exception) { next.release(); output.delete(); throw e }
     }
@@ -65,9 +58,9 @@ internal object JournalVoiceRecorder {
     @Synchronized fun stop(context: Context): JSObject {
         val current = recorder ?: return status(context)
         if (!paused) elapsed += SystemClock.elapsedRealtime() - started
-        try { current.stop(); preferences(context).edit().putLong("elapsed", elapsed).commit() }
+        try { current.stop() }
         catch (e: RuntimeException) { error = "录音太短或音源中断，原文件保留供恢复。请返回后重试。" }
-        finally { current.release(); recorder = null }
+        finally { preferences(context).edit().putLong("elapsed", elapsed).commit(); current.release(); recorder = null }
         return status(context)
     }
     @Synchronized fun read(context: Context, token: String): JSObject {
@@ -81,10 +74,37 @@ internal object JournalVoiceRecorder {
         return JSObject().put("content", android.util.Base64.encodeToString(source.readBytes(), android.util.Base64.NO_WRAP))
             .put("name", "语音-${preferences(context).getLong("elapsed", 0) / 1000}秒.m4a")
     }
+    @Synchronized fun chunk(context: Context, token: String, offset: Long): JSObject {
+        check(token.matches(Regex("[a-f0-9]{32}")) && offset >= 0 && offset % 2 == 0L) { "录音分段身份无效" }
+        var source = File(context.filesDir, "journal-voice/$token.pcm")
+        if (!source.isFile) source = File(context.filesDir, "journal-voice/saved/$token.pcm")
+        check(source.isFile) { "这段原音没有实时分段，请使用补转写" }
+        val total = source.length() / 2 * 2
+        check(offset <= total) { "分段进度超出原音范围" }
+        val bytes = ByteArray(minOf(total - offset, 48000).toInt())
+        java.io.RandomAccessFile(source, "r").use { it.seek(offset); it.readFully(bytes) }
+        return JSObject().put("audio", android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP))
+            .put("offset", offset).put("next", offset + bytes.size).put("total", total)
+            .put("closed", recorder == null || token != preferences(context).getString("token", "")).put("sampleRate", JournalPcmCapture.RATE)
+    }
+    @Synchronized fun releaseChunks(context: Context, token: String): JSObject {
+        check(token.matches(Regex("[a-f0-9]{32}"))) { "录音身份无效" }
+        check(recorder == null || token != preferences(context).getString("token", "")) { "正在录音，暂不清理分段" }
+        val folder = File(context.filesDir, "journal-voice/saved")
+        check(File(folder, "$token.m4a").length() > 0) { "请先保留原音" }
+        val pcm = File(folder, "$token.pcm")
+        check(!pcm.exists() || pcm.delete()) { "临时分段清理未完成，压缩原音仍保留" }
+        return JSObject().put("released", true)
+    }
     @Synchronized fun acknowledge(context: Context, token: String): JSObject {
         check(recorder == null && token == preferences(context).getString("token", "")) { "录音身份已变化" }
         // Move rather than delete: keep the original recoverable if a caller's receipt is stale.
-        file(context)?.let { source -> val saved = File(context.filesDir, "journal-voice/saved"); saved.mkdirs(); check(source.renameTo(File(saved, source.name))) { "原音整理失败，待保存状态已保留" } }
+        file(context)?.let { source ->
+            val saved = File(context.filesDir, "journal-voice/saved"); saved.mkdirs()
+            check(source.renameTo(File(saved, source.name))) { "原音整理失败，待保存状态已保留" }
+            val pcm = File(source.parentFile, "$token.pcm")
+            if (pcm.exists()) check(pcm.renameTo(File(saved, pcm.name))) { "转写分段整理失败，原音仍保留" }
+        }
         preferences(context).edit().clear().commit(); error = ""
         return status(context)
     }

@@ -9,6 +9,7 @@ use tauri::AppHandle;
 const CREDENTIAL: &str = "hub-cloud-agents-v1";
 const MAX_RESPONSE: usize = 28 * 1024 * 1024;
 mod materials;
+mod transcription;
 
 #[derive(Deserialize, Serialize)]
 struct Config {
@@ -19,6 +20,9 @@ struct Config {
 #[derive(Deserialize)]
 #[serde(tag = "op", rename_all = "camelCase")]
 pub(crate) enum Action {
+    Voice {
+        request: transcription::Action,
+    },
     Materials {
         kind: String,
         query: String,
@@ -165,9 +169,10 @@ async fn request(
         .map_err(|_| RequestFailure::Transport("云端请求地址无效。".into()))?;
     let mut call = client.request(method, url).bearer_auth(&config.token);
     if let Some(body) = body {
-        if body["attachments"]
-            .as_array()
-            .is_some_and(|images| !images.is_empty())
+        if body["audio"].is_string()
+            || body["attachments"]
+                .as_array()
+                .is_some_and(|images| !images.is_empty())
         {
             call = call.timeout(Duration::from_secs(180));
         }
@@ -235,6 +240,10 @@ pub(crate) async fn cloud_agents(app: AppHandle, action: Action) -> Result<Value
             .transpose()
     };
     match action {
+        Action::Voice { request: action } => {
+            let config = current()?.ok_or("请先在 Agents 中连接你的 VPS，再使用云端转写。")?;
+            transcription::run(&app, &config, action).await
+        }
         Action::Materials {
             kind,
             query,

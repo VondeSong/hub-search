@@ -5,6 +5,7 @@ pub(crate) async fn quick_journal_voice(
     app: AppHandle,
     action: String,
     token: Option<String>,
+    offset: Option<u64>,
 ) -> Result<Value, String> {
     if ![
         "start",
@@ -13,6 +14,8 @@ pub(crate) async fn quick_journal_voice(
         "stop",
         "status",
         "read",
+        "chunk",
+        "releaseChunks",
         "acknowledge",
     ]
     .contains(&action.as_str())
@@ -26,7 +29,7 @@ pub(crate) async fn quick_journal_voice(
             .0
             .run_mobile_plugin(
                 "journalVoice",
-                json!({"action":action,"token":token.unwrap_or_default()}),
+                json!({"action":action,"token":token.unwrap_or_default(),"offset":offset.unwrap_or(0)}),
             )
             .map_err(|e| e.to_string())?;
         if action == "read" {
@@ -41,7 +44,7 @@ pub(crate) async fn quick_journal_voice(
     }
     #[cfg(not(target_os = "android"))]
     {
-        let _ = (app, token);
+        let _ = (app, token, offset);
         Err("请在 Android 客户端使用原生录音".into())
     }
 }
@@ -50,8 +53,16 @@ pub(crate) async fn quick_journal_voice(
 pub(crate) fn quick_journal_voice_draft(
     app: AppHandle,
     value: Option<String>,
+    record_id: Option<String>,
 ) -> Result<String, String> {
     let (c, _guard) = open_write_database(&database_path(&app)?)?;
+    if let Some(record_id) = record_id {
+        if value.is_some() || !format::hex_id(&record_id, 32) {
+            return Err("录音记录身份无效".into());
+        }
+        let value = metadata_string(&c, &format!("quick_journal_voice_transcripts:{record_id}"));
+        return Ok(if value.is_empty() { "[]".into() } else { value });
+    }
     if let Some(value) = value {
         if value.len() > 200_000 {
             return Err("语音草稿过大".into());
@@ -67,6 +78,16 @@ pub(crate) fn quick_journal_voice_draft(
             {
                 return Err("语音记录身份或内容无效".into());
             }
+            if let Some(transcripts) = parsed.get("transcripts") {
+                if !transcripts.is_array() {
+                    return Err("转写结果格式无效".into());
+                }
+                meta(
+                    &c,
+                    &format!("quick_journal_voice_transcripts:{}", record.id),
+                    &transcripts.to_string(),
+                )?;
+            }
         }
         meta(&c, "quick_journal_voice_draft", &value)?;
     }
@@ -75,16 +96,8 @@ pub(crate) fn quick_journal_voice_draft(
 
 #[tauri::command]
 pub(crate) fn quick_journal_audio(app: AppHandle, hash: String) -> Result<String, String> {
-    let path = asset(&database_path(&app)?, &hash)?;
-    if fs::metadata(&path).map_err(|_| "原音不在本机")?.len() > MAX_ATTACHMENT as u64 {
-        return Err("原音超过附件限制".into());
-    }
-    let bytes = fs::read(path).map_err(|_| "原音不在本机")?;
-    let kind = infer::get(&bytes).ok_or("音频格式暂不支持")?;
-    let mime = kind.mime_type();
-    if !mime.starts_with("audio/") && !["video/mp4", "video/webm"].contains(&mime) {
-        return Err("不是可播放音频".into());
-    }
+    let bytes = transcription_audio(&app, &hash)?;
+    let mime = infer::get(&bytes).ok_or("音频格式暂不支持")?.mime_type();
     use base64::Engine;
     Ok(format!(
         "data:{};base64,{}",
@@ -95,4 +108,21 @@ pub(crate) fn quick_journal_audio(app: AppHandle, hash: String) -> Result<String
         },
         base64::engine::general_purpose::STANDARD.encode(bytes)
     ))
+}
+
+pub(crate) fn transcription_audio(app: &AppHandle, hash: &str) -> Result<Vec<u8>, String> {
+    let path = asset(&database_path(app)?, hash)?;
+    if fs::metadata(&path).map_err(|_| "原音不在本机")?.len() > MAX_ATTACHMENT as u64 {
+        return Err("原音超过附件限制".into());
+    }
+    let bytes = fs::read(path).map_err(|_| "原音不在本机")?;
+    let kind = infer::get(&bytes).ok_or("音频格式暂不支持")?;
+    let mime = kind.mime_type();
+    if !mime.starts_with("audio/") && !["video/mp4", "video/webm"].contains(&mime) {
+        return Err("不是可播放音频".into());
+    }
+    if digest(&bytes) != hash {
+        return Err("原音校验失败，请重新同步附件。".into());
+    }
+    Ok(bytes)
 }

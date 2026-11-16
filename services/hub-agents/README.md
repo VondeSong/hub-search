@@ -59,6 +59,19 @@ sudo -u hub-agents python3 /opt/hub-agents/server.py --state /var/lib/hub-agents
 
 ## 运行与验收
 
+### 日志录音转写
+
+语音复用现有 HTTPS 地址和设备连接。阿里与 OpenAI 的 API Key 只放在 VPS 的 `/etc/hub-agents/transcription.json`，不填入手机、不放进 APK、Git 或公开原型。目录权限 `0750`，文件 `root:hub-agents 0640`。对象中按 `aliyun`、`openai` 分别配置 `apiKey`；阿里北京业务空间另填实际 `workspaceId`。此文件可通过 `HUB_TRANSCRIPTION_CONFIG` 指定其他受控位置。
+
+- Debian 依赖：`python3-websocket`、`ffmpeg`。语音路由的 Nginx 上传上限单独设为 29 MiB；其它 Agents 路由保持原限制。
+- 阿里使用 `paraformer-realtime-v2`，OpenAI 使用 `gpt-live-transcribe`；统一输入为单声道 24 kHz PCM16。Android 同时编码 M4A 原音，暂停不计入音频时长。
+- `/v1/voice/providers` 只返回是否已配置；不代表额度或服务永远可用。`jobs/{UUID}`、`chunks`、`finish`、`cancel` 全部要求设备认证和任务归属。限两段并发、单段 30 分钟；已有音频最多 20 MiB。
+- 同一任务编号及分段偏移可重复核对；原音或服务改变不能复用旧编号。VPS 重启将未完任务标为中断，不自动发起第二次付费识别。补转需明确选择，使用已有附件的真实哈希和原音，经本机读取后上传；不要求公开录音 URL。
+- 识别结果、校对稿与原日志分开保留，明确加入文字后才合并。允许先保存原音，稍后从同一记录查看结果。无法连接、额度不足或转写失败不影响本机录音保存。
+- 原型仍只演示流程，不调用真实识别服务。服务接入和 API 测试不等于实体手机、蓝牙、来电及后台录音已验收；当前离开应用会结束并保留本段。
+
+官方协议：[阿里 WebSocket](https://help.aliyun.com/en/model-studio/websocket-for-paraformer-real-time-service)、[阿里采样参数](https://help.aliyun.com/en/model-studio/paraformer-client-events)、[OpenAI 实时转写](https://developers.openai.com/api/docs/guides/realtime-transcription)。
+
 - 同一个发送编号和内容可安全重试。服务每次执行一条任务，已接收的任务保存在 SQLite 中。运行中的一轮遇到服务重启会标记失败并保留已有文字，等待中的任务会继续执行。
 - 一条消息最多 20,000 字、6 个附件。JPEG、PNG 和 WebP 单张最多 4 MiB，附件合计最多 12 MiB。视频只上传抽取的图片，短暂画面可能落在帧间。
 - `systemctl status hub-agents` 和 `journalctl -u hub-agents` 用于检查后台。升级时先等待当前轮次结束再重启服务。备份应覆盖整个 `/var/lib/hub-agents`，包括网关数据库与 Codex 会话；目录内含账号凭据和聊天内容。

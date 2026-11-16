@@ -21,6 +21,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from codex import AppServer, CodexError
+from transcription import Manager as SpeechManager, SpeechError, public_providers
 
 MAX_BODY = 17 * 1024**2
 MAX_IMAGE = 4 * 1024**2
@@ -443,7 +444,12 @@ class Gateway(ThreadingHTTPServer):
 
     def __init__(self, store, port, worker):
         self.store, self.worker = store, worker
+        self.speech = SpeechManager(store)
         super().__init__(("127.0.0.1", port), Handler)
+
+    def server_close(self):
+        self.speech.close()
+        super().server_close()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -486,6 +492,8 @@ class Handler(BaseHTTPRequestHandler):
             self.route(post)
         except RequestError as error:
             self.send(error.status, {"error": str(error)})
+        except SpeechError as error:
+            self.send(error.status, {"error": str(error), "code": error.code})
         except (sqlite3.Error, OSError) as error:
             if not isinstance(error, (BrokenPipeError, ConnectionResetError)):
                 logging.warning("Hub Agents request failed: %s", type(error).__name__)
@@ -498,6 +506,27 @@ class Handler(BaseHTTPRequestHandler):
             raise RequestError(403, "设备密钥无效或已被撤销。")
         url = urlsplit(self.path)
         parts = url.path.strip("/").split("/")
+        if parts[:2] == ["v1", "voice"]:
+            speech, owner = self.server.speech, digest(token[7:].encode())
+            if parts == ["v1", "voice", "providers"] and not post:
+                self.send(200, {"providers": public_providers(speech.config)})
+                return
+            if len(parts) in (4, 5) and parts[2] == "jobs" and UUID.fullmatch(parts[3]):
+                job = parts[3]
+                if len(parts) == 4:
+                    value = speech.create(owner, job, self.read_json(29 * 1024**2)) if post else speech.read(owner, job)
+                elif post and parts[4] == 'chunks':
+                    value = speech.append(owner, job, self.read_json(132000))
+                elif post and parts[4] == 'finish':
+                    value = speech.finish(owner, job, self.read_json(1024))
+                elif post and parts[4] == 'cancel':
+                    self.read_json(1024)
+                    value = speech.cancel(owner, job)
+                else:
+                    raise RequestError(404, "此语音请求不存在。")
+                self.send(200, value)
+                return
+            raise RequestError(404, "此语音请求不存在。")
         if parts == ["v1", "threads"] and not post:
             queries = parse_qs(url.query, keep_blank_values=True).get("q", [""])
             if len(queries) != 1:
