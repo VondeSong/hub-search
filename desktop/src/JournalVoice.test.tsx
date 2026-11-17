@@ -214,3 +214,22 @@ it("never requests cloud access in local mode even when a provider was previousl
  expect(document.querySelector('[aria-label="转写服务"]')).not.toBeNull();
  expect(vi.mocked(invoke).mock.calls.some(([c])=>c==="cloud_agents")).toBe(true);
 });
+
+it("disables retranscription after switching a configured provider back to local recording",async()=>{
+ const original=vi.mocked(invoke).getMockImplementation()!;
+ vi.mocked(invoke).mockImplementation((c,a:any)=>{
+  if(c==="cloud_agents"&&a?.action?.op==="config")return Promise.resolve({binding:"connected"});
+  if(c==="cloud_agents"&&a?.action?.request?.action==="providers")return Promise.resolve({providers:[{id:"aliyun",configured:true}]});
+  return original(c,a);
+ });
+ await act(async()=>root.render(<JournalVoiceCapture request={{record:{...record,attachments:[attachment]},revision:"current"}} onClose={vi.fn()}/>));
+ const mode=document.querySelector<HTMLSelectElement>('[aria-label="录音方式"]')!;
+ await act(async()=>{mode.value="transcribe";mode.dispatchEvent(new Event("change",{bubbles:true}));});
+ const replay=[...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="用阿里补转写")!;
+ expect(replay.disabled).toBe(false);
+ await act(async()=>{mode.value="local";mode.dispatchEvent(new Event("change",{bubbles:true}));});
+ expect(replay.disabled).toBe(true);
+ const before=vi.mocked(invoke).mock.calls.length;
+ await act(async()=>replay.click());
+ expect(vi.mocked(invoke).mock.calls.slice(before).some(([c])=>c==="cloud_agents")).toBe(false);
+});

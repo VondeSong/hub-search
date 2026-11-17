@@ -153,7 +153,7 @@ export function JournalVoiceCapture({request,onClose}:{request:VoiceRequest;onCl
     if(startNew){await persist({...emptyDraft(),pendingDrafts:latest.current.pendingDrafts});setRestored(false);setResumedAudio([]);setStatus({state:"idle",elapsed:0,token:""});setNotice("上一条已保存，可以开始新的记录。");transcription.resume();}
     else onClose();
   });}
-  const canTranscribe=transcription.connectionState==="ready"&&transcription.providers.some(p=>p.id===provider&&p.configured);
+  const canTranscribe=recordingMode==="transcribe"&&transcription.connectionState==="ready"&&transcription.providers.some(p=>p.id===provider&&p.configured);
   const connectionLabel=transcription.connectionState==="checking"?"检查中":transcription.connectionState==="missing"?"未连接云端":transcription.connectionState==="offline"?"云端暂不可用":canTranscribe?"可转写":"云端未配置此服务";
   const transcribing=canTranscribe&&Boolean(draft.transcripts?.some(s=>s.source===status.token&&!s.error&&["connecting","running","sending","finishing"].includes(s.state)));
   const active=status.state==="recording"||status.state==="paused";
