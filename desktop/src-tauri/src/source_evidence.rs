@@ -816,6 +816,8 @@ impl EvidenceReader {
                 let raw_body = record.body(&self.root)?;
                 let (full_body, unread_images) = if record.provider == PROVIDER_CRAFT {
                     craft_text::project(&raw_body)
+                } else if record.provider == PROVIDER_FEISHU {
+                    craft_text::project_feishu(&raw_body)
                 } else {
                     (raw_body, 0)
                 };

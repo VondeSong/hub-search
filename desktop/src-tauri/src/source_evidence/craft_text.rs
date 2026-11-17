@@ -1,5 +1,13 @@
 //! Text evidence does not read image bytes or treat an image access URL as text.
 pub(super) fn project(body: &str) -> (String, usize) {
+    project_images(body, false)
+}
+
+pub(super) fn project_feishu(body: &str) -> (String, usize) {
+    project_images(body, true)
+}
+
+fn project_images(body: &str, feishu: bool) -> (String, usize) {
     let mut result = String::with_capacity(body.len());
     let mut images = 0;
     let mut fence: Option<(char, usize)> = None;
@@ -22,7 +30,11 @@ pub(super) fn project(body: &str) -> (String, usize) {
             result.push_str(line);
             continue;
         }
-        if fence.is_none() && trimmed.starts_with("![") && trimmed.ends_with(')') {
+        if feishu && fence.is_none() && trimmed.starts_with("<image ") && trimmed.ends_with("/>") {
+            // Image references are source text, not evidence of reading pixels.
+            images += 1;
+        }
+        if !feishu && fence.is_none() && trimmed.starts_with("![") && trimmed.ends_with(')') {
             if let Some(start) = trimmed.find("](") {
                 let url = &trimmed[start + 2..trimmed.len() - 1];
                 if url.starts_with("https://r.craft.do/")
@@ -47,6 +59,11 @@ pub(super) fn project(body: &str) -> (String, usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn feishu_image_references_are_unread_and_code_examples_are_preserved() {
+        let body = "正文\n  <image token=\"source\" width=\"800\"/>\n```xml\n<image token=\"example\"/>\n```\n~~~xml\n<image token=\"example\"/>\n~~~\n";
+        assert_eq!(project_feishu(body), (body.into(), 1));
+    }
     #[test]
     fn changes_only_standalone_craft_images_and_preserves_code_and_text_links() {
         let raw = "<content>\r\n        ![现场](https://r.craft.do/old)\r\n[文件](https://r.craft.do/old)\n```md\n![例子](https://r.craft.do/old)\n```\n~~~md\n![例子](https://r.craft.do/old)\n~~~\n![外部](https://example.org/image)\n</content>";

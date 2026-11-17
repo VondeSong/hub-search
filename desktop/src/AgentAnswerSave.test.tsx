@@ -36,6 +36,19 @@ it("saves the specifically selected historical answer only after an editable pre
  expect(invoke.mock.calls.find(([,v])=>v.args.action==="submitAnswerSave")![1].args).toEqual({action:"submitAnswerSave",id:"work",saveId:"save",confirmationToken:"bound-token"});
  expect(document.body.textContent).toContain("已保存并核验");expect(button("确认保存")).toBeUndefined();
 });
+it.each(["新建笔记","插入页面","创建任务"])("uses the report heading as a separate title only for a new note (%s)",async action=>{
+ const original=invoke.getMockImplementation()!;
+ invoke.mockImplementation(async(command,payload)=>payload.args.action==="answerSaveSource"?{title:"long original request",text:"# 待查清单\n\n仍待确认，正文不能丢。",sourceHash:"verified-hash"}:original(command,payload));
+ await act(async()=>root.render(<AgentAnswerSave workId="work" runId="historical-run" disabled={false} onChanged={changed}/>));
+ await act(async()=>button(action).click());
+ expect(document.querySelector<HTMLInputElement>('[aria-label="保存标题"]')!.value).toBe(action==="新建笔记"?"待查清单":"long original request");
+ expect(document.querySelector<HTMLTextAreaElement>('[aria-label="保存正文"]')!.value).toBe(action==="新建笔记"?"仍待确认，正文不能丢。":"# 待查清单\n\n仍待确认，正文不能丢。");
+ if(action==="新建笔记"){
+  await field("保存资料库","notes");await act(async()=>button("预览保存").click());
+  expect(invoke.mock.calls.find(([,p])=>p.args.action==="prepareAnswerSave")![1].args).toMatchObject({title:"待查清单",text:"仍待确认，正文不能丢。",sourceHash:"verified-hash"});
+ }
+ expect(invoke.mock.calls.some(([,p])=>p.args.action==="submitAnswerSave")).toBe(false);
+});
 it("does not prepare or write when the original answer source is no longer valid",async()=>{
  invoke.mockImplementation(async(_,{args})=>{if(args.action==="answerSaveSource")throw Error("来源授权已撤回");return {libraries:[]};});
  await act(async()=>root.render(<AgentAnswerSave workId="work" runId="old" disabled={false} onChanged={changed}/>));

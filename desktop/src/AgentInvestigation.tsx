@@ -104,7 +104,7 @@ export function investigationAnchor(result: SearchResult): Exclude<Investigation
     const sourceId = result.taskSourceId || (result.provider === "dida365" ? result.documentId : result.sourceType === "craft_task" ? result.blockId : undefined);
     return sourceId ? { kind: "task", libraryId, sourceId } : null;
   }
-  if (!["craft", "obsidian"].includes(result.provider)) return null;
+  if (!["craft", "obsidian", "feishu"].includes(result.provider)) return null;
   return { kind: "note", libraryId: result.libraryId || result.spaceId, documentId: result.documentId, pageId: result.provider === "craft" ? result.pageId || result.blockId || result.documentId : null };
 }
 

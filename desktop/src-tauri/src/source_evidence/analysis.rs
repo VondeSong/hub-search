@@ -61,7 +61,7 @@ fn sources(
     if query.chars().count() > 200 {
         return Err("材料筛选最多 200 个字符".into());
     }
-    let mut stmt = c.prepare("SELECT d.space_id,d.id,d.title,d.path,d.content_hash,d.blob_hash,length(d.markdown),l.name FROM documents d JOIN libraries l ON l.id=d.space_id WHERE l.enabled=1 AND d.provider IN ('craft','obsidian') AND (d.space_id IN (SELECT value FROM json_each(?1)) OR EXISTS(SELECT 1 FROM json_each(?2) n WHERE json_extract(n.value,'$.libraryId')=d.space_id AND json_extract(n.value,'$.documentId')=d.id)) ORDER BY d.space_id,d.id").map_err(|e|e.to_string())?;
+    let mut stmt = c.prepare("SELECT d.space_id,d.id,d.title,d.path,d.content_hash,d.blob_hash,length(d.markdown),l.name FROM documents d JOIN libraries l ON l.id=d.space_id WHERE l.enabled=1 AND d.provider IN ('craft','obsidian','feishu') AND (d.space_id IN (SELECT value FROM json_each(?1)) OR EXISTS(SELECT 1 FROM json_each(?2) n WHERE json_extract(n.value,'$.libraryId')=d.space_id AND json_extract(n.value,'$.documentId')=d.id)) ORDER BY d.space_id,d.id").map_err(|e|e.to_string())?;
     let mut rows = stmt
         .query(params![
             serde_json::to_string(&reader.scope.library_ids).unwrap(),
@@ -467,6 +467,54 @@ mod tests {
             &f.root,
             EvidenceScope::new(vec!["notes".into()], vec![]).unwrap(),
         )
+    }
+
+    #[test]
+    fn selected_feishu_notes_are_discoverable_readable_and_still_scope_bound() {
+        let f = Fixture::new();
+        f.c().execute_batch("INSERT INTO libraries(id,provider,name,enabled,added_at) VALUES('feishu','feishu','Feishu',1,1)").unwrap();
+        f.note(
+            "feishu",
+            "selected",
+            "待核对：数据走向？\n<image token=\"image\" width=\"800\"/>",
+        );
+        f.note("feishu", "unselected", "不在授权范围的原文");
+        f.c()
+            .execute_batch("UPDATE documents SET provider='feishu' WHERE space_id='feishu'")
+            .unwrap();
+        let scope = EvidenceScope::new(vec![], vec![])
+            .unwrap()
+            .with_notes(vec![note("feishu", "selected")])
+            .unwrap();
+        let reader = EvidenceReader::new(&f.root, scope);
+        let list = execute(
+            &reader,
+            "hub_list_note_sources",
+            &json!({"query":"selected"}),
+        )
+        .unwrap();
+        assert_eq!(list["total"], 1);
+        assert_eq!(
+            list["notes"][0]["locator"],
+            json!(note("feishu", "selected"))
+        );
+        let excerpt = reader
+            .read(&note("feishu", "selected"), 0, 20000, None)
+            .unwrap();
+        assert_eq!(excerpt.facts["unreadImageCount"], 1);
+        assert!(excerpt.content.contains("数据走向？"));
+        assert!(reader
+            .read(&note("feishu", "unselected"), 0, 100, None)
+            .is_err());
+        f.c().execute_batch("UPDATE documents SET markdown='正文已更新',content_hash='changed' WHERE space_id='feishu' AND id='selected'").unwrap();
+        assert!(reader.verify(&excerpt).is_err());
+        f.c()
+            .execute_batch("UPDATE libraries SET enabled=0 WHERE id='feishu'")
+            .unwrap();
+        assert!(execute(&reader, "hub_list_note_sources", &json!({})).is_err());
+        assert!(reader
+            .read(&note("feishu", "selected"), 0, 100, None)
+            .is_err());
     }
 
     #[test]

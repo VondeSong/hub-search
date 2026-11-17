@@ -1122,6 +1122,20 @@ it("opens ordinary Craft markdown search blocks as notes instead of dropping the
   expect(document.body.textContent).toContain("希望助手做什么");
   expect(invoke.mock.calls.some(([, {args}])=>args.action==="respond")).toBe(false);
 });
+it("opens a Feishu note from its preview without authorizing its library or images", async () => {
+  const note={...result,provider:"feishu" as const,pageId:"not-a-craft-page",blockId:"display-block"};
+  expect(investigationAnchor(note)).toEqual({kind:"note",libraryId:"notes",documentId:"doc",pageId:null});
+  await act(async()=>root.render(<AgentPanelProvider><StandaloneAgentLauncher/><AgentInvestigation result={note}/></AgentPanelProvider>));
+  await click("询问助手");
+  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,50));});
+  expect(document.querySelector('aside[aria-label="Hub 助手"]')).not.toBeNull();
+  expect(invoke.mock.calls.some(([,v])=>v?.args?.action==="respond")).toBe(false);
+  await fill("investigationGoal","整理待查清单");
+  await click("开始调查");
+  const args=invoke.mock.calls.find(([,v])=>v?.args?.action==="create")![1].args;
+  expect(args.grant).toEqual({libraryIds:[],notes:[investigationAnchor(note)],readingItemKeys:[]});
+  expect(args.grant.images).toBeUndefined();
+});
 it("attachment investigation grants only the selected chunk and leaves qualification to the host", async () => {
   const attachment={...result,id:"pdf:p1:0",sourceItemId:"pdf",pageNumber:1,contentType:"pdf_page"};
   await act(async()=>root.render(<AgentInvestigation result={attachment}/>));await click("调查这个附件片段");
