@@ -2,6 +2,24 @@ use super::*;
 use crate::source_evidence::{tests::Fixture, EvidenceLocator, EvidenceReader, EvidenceScope};
 
 #[test]
+fn explicit_chat_attachments_inherit_hub_rules_without_library_access() {
+    let f = Fixture::new();
+    fs::write(f.root.join("AGENTS.md"), "只读原件").unwrap();
+    let allowed = json!({"libraries":[],"wholeLibraryIds":[],"exactNotes":[{"libraryId":source_evidence::local_text::LIBRARY,"documentId":"selected"}]});
+    let mut rules = Rules::new(&f.root, allowed, true).unwrap();
+    let value = rules
+        .load(source_evidence::local_text::LIBRARY, Some("selected"))
+        .unwrap();
+    assert_eq!(value["entries"][0]["instructions"], "只读原件");
+    assert!(rules
+        .load(source_evidence::local_text::LIBRARY, Some("other"))
+        .is_err());
+    assert!(rules.load("notes", Some("private")).is_err());
+    fs::write(f.root.join("AGENTS.md"), "变更规则").unwrap();
+    assert!(rules.verify().is_err());
+}
+
+#[test]
 fn reliability_shared_rules_preserve_scopes_and_reduce_duplicate_payloads() {
     let entry = json!({"source":"library/AGENTS.md","scope":{"kind":"library","libraryId":"notes"},"version":"v1","instructions":"规则".repeat(4000)});
     let raw = json!((0..4)

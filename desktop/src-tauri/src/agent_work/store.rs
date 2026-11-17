@@ -576,13 +576,14 @@ fn publish_on(
     super::insights::review::publication(root, c, &current, report)?;
     let review_context = super::insights::review::delivery_context(root, c, &current, run)?;
     let artifact_refs = super::artifacts::run_references(c, &current, run)?;
+    let file_artifact_refs = super::analysis::references(root, &current, Some(run))?;
     let assessment = goal::assessment_on(root, c, &current, run, report, &artifact_refs)?;
     insert(
         c,
         &work.id,
         Some(run),
         "delivery",
-        &json!({"report":report,"evidence":excerpts,"candidates":candidates,"actionReceipts":action_receipts,"materialReads":material_reads,"artifactRefs":artifact_refs,"goalBinding":assessment["goalBinding"],"deliveryAssessment":assessment,"reviewContext":review_context}),
+        &json!({"report":report,"evidence":excerpts,"candidates":candidates,"actionReceipts":action_receipts,"materialReads":material_reads,"artifactRefs":artifact_refs,"fileArtifactRefs":file_artifact_refs,"goalBinding":assessment["goalBinding"],"deliveryAssessment":assessment,"reviewContext":review_context}),
     )?;
     if !recovering {
         c.execute(
@@ -828,7 +829,7 @@ pub(super) fn view(root: &Path, id: &str) -> Result<Value, String> {
     c.execute_batch("COMMIT").map_err(|e| e.to_string())?;
     permit.checkpoint()?;
     phase!("commitAndPermit");
-    let value = json!({"materialBudget":material_budget,"workingState":working_state,"lifecycle":lifecycle,"goalRevision":goal_revision,"taskTree":task_tree,"goalAssessment":goal_assessment,"work":work,"evidence":evidence,"decisions":decisions,"run":latest,"validity":validity,"progress":progress,"history":history,"conversation":conversation,"actions":actions,"watch":watch,"memoryUse":memory_use,"modelSelection":model_selection,"modelExecutions":model_executions,"assistantOptions":assistant_options,"draftRequest":draft_request,"activity":activity,"analysisArtifacts":analysis_artifacts,"sleepDatasets":sleep_datasets,"recordVersion":record_version,"nativeTiming":{"hostEpochMs":chrono::Utc::now().timestamp_millis(),"projectionMs":projection_started.elapsed().as_secs_f64()*1000.0,"phases":projection_phases},"sourceFreshness":"notVerifiedWithRemote"});
+    let value = json!({"materialBudget":material_budget,"workingState":working_state,"lifecycle":lifecycle,"goalRevision":goal_revision,"taskTree":task_tree,"goalAssessment":goal_assessment,"work":work,"evidence":evidence,"decisions":decisions,"run":latest,"validity":validity,"progress":progress,"history":history,"conversation":conversation,"actions":actions,"watch":watch,"memoryUse":memory_use,"modelSelection":model_selection,"modelExecutions":model_executions,"assistantOptions":assistant_options,"draftRequest":draft_request,"activity":activity,"analysisArtifacts":analysis_artifacts,"fileAnalyses":super::analysis::manifest(root,&work),"sourceCoverage":super::coverage::read_on(root,&c,&work)?,"sleepDatasets":sleep_datasets,"recordVersion":record_version,"nativeTiming":{"hostEpochMs":chrono::Utc::now().timestamp_millis(),"projectionMs":projection_started.elapsed().as_secs_f64()*1000.0,"phases":projection_phases},"sourceFreshness":"notVerifiedWithRemote"});
     let mut value = value;
     value["contextCompaction"] = context_compaction;
     value["nativeContext"] = native_context;

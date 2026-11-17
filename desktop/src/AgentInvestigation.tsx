@@ -1,3 +1,5 @@
+import {AgentAnalysisInputs} from "./AgentAnalysisInputs";
+import {AgentAnalysisFiles,type FileAnalysis} from "./AgentAnalysisFiles";
 import {AgentPluginWriteRecord} from "./AgentPluginWriteRecord";
 import {AgentFollowups,type Followup} from "./AgentFollowups";
 import { loadAgentPreferences, rememberAgentPreferences, loadCodexWebSearchPreference, loadMemoryPreference, rememberMemoryPreference } from "./AgentPreferences";
@@ -27,7 +29,7 @@ import { AgentActiveTopic, AgentResearchPolicy, AgentResearchTopics, policyNames
 import { AgentTagWorkspace, suggestedTagTask, AgentTagReferences, AgentTagRelated, AgentTagResult, useTagPreparation, tagTaskNames, type TagTaskRecord } from "./AgentTagWorkspace";
 import { userProfileStorage } from "./UserProfileStorage";
 import {AgentNativeContext,type NativeContext} from "./AgentNativeContext";
-import {AgentImageCards,AgentTextFileCard,isTextAttachment,agentFileAccept,prepareImage,readTextFile} from "./AgentFileInputs";
+import {AgentImageCards,AgentTextFileCard,isTextAttachment,agentFileAccept,prepareImage,readDataUrl,readTextFile} from "./AgentFileInputs";
 import {AgentImages,type ImageGrant,type ImageChange} from "./AgentImages";
 import { AgentMaterials, materialKey, type AgentMaterial } from "./AgentMaterials";
 import {AgentLibraryScope,libraryDragType,readLibraryDrop,type AgentLibrary} from "./AgentLibraryScope";
@@ -73,7 +75,7 @@ type TaskLocator = { kind: "task"; libraryId: string; sourceId: string };
 type AttachmentLocator = { kind: "attachment"; libraryId: string; documentId: string; sourceItemId: string; chunkId: string; pageNumber: number };
 export type InvestigationLocator = NoteLocator | ReadingLocator | TaskLocator | AttachmentLocator;
 type ReportContinuation = { expectedWorkRevision:number; expectedAuthorizationVersion:number; artifactId:string; artifactRevision:number; expectedContentHash:string };
-type View = { answerSaves?:AnswerSave[];tagTasks?:TagTaskRecord[]; followups?:Followup[]; codexAccountBinding?:{scopeId:string;historyShared?:boolean}|null; nativeContext?:NativeContext|null; nativeInputs?: NativeInput[]; contextCompaction?:NativeCompaction; materialBudget?:MaterialBudget|null; workingState?: WorkingState; lifecycle?: Lifecycle; goalRevision?: GoalRevision; taskTree?: TaskTree; goalAssessment?: GoalAssessment; analysisArtifacts?: AnalysisChart[]; sleepDatasets?: SleepDatasetItem[]; activity?:ActivityRun[]; recordVersion?:number; assistantOptions?: AssistantOptions; draftRequest?: {runId:string;kind:string} | null; work: { id: string; anchor?:InvestigationLocator|null; actionTarget?:NoteLocator|null; actionTargetIdentity?:string; goal: string; revision?: number; authorizationVersion?: number; state: string; report: Report | null; grant: { images?:ImageGrant[]; libraryIds: string[]; notes?: NoteLocator[]; sources?:InvestigationLocator[]; readingItemKeys?:string[]; manifest?: {members:NoteLocator[];selection:SourceSelection;snapshot:string} } }; evidence: Evidence[]; decisions: { text: string; author: string }[]; run: { id?: string; error?: string; usage: { agentSessions?: number; modelCalls?: number; modelRetries?: number; outputRepairs?: number; entitiesRead?: number; bodyChars?: number; localScanDocuments?: number; localScanBytes?: number } } | null; validity: string; conversation?: Conversation; progress?: Progress | null; history?: HistoricalDelivery[]; runActive?: boolean; actionActive?: boolean; actions?: AgentActions; watch?: AgentCondition | null; memoryUse?: MemoryUse | null; modelSelection?: CodexSettings | null; modelExecutions?: ModelExecution[] };
+type View = { fileAnalyses?:FileAnalysis[]; answerSaves?:AnswerSave[];tagTasks?:TagTaskRecord[]; followups?:Followup[]; codexAccountBinding?:{scopeId:string;historyShared?:boolean}|null; nativeContext?:NativeContext|null; nativeInputs?: NativeInput[]; contextCompaction?:NativeCompaction; materialBudget?:MaterialBudget|null; workingState?: WorkingState; lifecycle?: Lifecycle; goalRevision?: GoalRevision; taskTree?: TaskTree; goalAssessment?: GoalAssessment; analysisArtifacts?: AnalysisChart[]; sleepDatasets?: SleepDatasetItem[]; activity?:ActivityRun[]; recordVersion?:number; assistantOptions?: AssistantOptions; draftRequest?: {runId:string;kind:string} | null; work: { id: string; anchor?:InvestigationLocator|null; actionTarget?:NoteLocator|null; actionTargetIdentity?:string; goal: string; revision?: number; authorizationVersion?: number; state: string; report: Report | null; grant: { images?:ImageGrant[]; libraryIds: string[]; notes?: NoteLocator[]; sources?:InvestigationLocator[]; readingItemKeys?:string[]; manifest?: {members:NoteLocator[];selection:SourceSelection;snapshot:string} } }; evidence: Evidence[]; decisions: { text: string; author: string }[]; run: { id?: string; error?: string; usage: { agentSessions?: number; modelCalls?: number; modelRetries?: number; outputRepairs?: number; entitiesRead?: number; bodyChars?: number; localScanDocuments?: number; localScanBytes?: number } } | null; validity: string; conversation?: Conversation; progress?: Progress | null; history?: HistoricalDelivery[]; runActive?: boolean; actionActive?: boolean; actions?: AgentActions; watch?: AgentCondition | null; memoryUse?: MemoryUse | null; modelSelection?: CodexSettings | null; modelExecutions?: ModelExecution[] };
 function historyViewScope(view: View | null) {
   return view ? JSON.stringify([view.work.id,view.work.revision,view.work.authorizationVersion,view.work.grant,view.work.state,view.recordVersion]) : "";
 }
@@ -650,14 +652,16 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       for(const file of files.slice(0,8)){
         try{
           if(/^image\//.test(file.type)){
-            if(images.length>=2)throw new Error("每个对话最多2张图片，请先移除已有图片。");
+            if(images.length>=8)throw new Error("每个对话最多8张图片或PDF页面，请先移除已有图片。");
             const prepared=await prepareImage(file);
             const staged=await call<{grant:ImageGrant}>({action:"stageImage",title:(file.name||"粘贴的图片").slice(0,200),...prepared});
             if(!images.some(g=>sameImage(g,staged.grant)))images.push(staged.grant);
           }else{
-            const text=await readTextFile(file);
+            const dataFile=/\.(csv|json|xlsx)$/i.test(file.name);
+            if(dataFile&&file.size>10*1024*1024)throw new Error("分析文件最多10 MiB。");
+            const text=dataFile?"":await readTextFile(file);
             if(notes.length+(view?.work.grant.notes?.length||0)>=31)throw new Error("本次对话材料数量已满，请先移除部分资料。");
-            const staged=await call<AgentMaterial>({action:"stageTextFile",title:file.name.slice(0,200),text});
+            const staged=await call<AgentMaterial>(dataFile?{action:"stageAnalysisFile",title:file.name.slice(0,200),base64:(await readDataUrl(file)).split(",")[1]}:{action:"stageTextFile",title:file.name.slice(0,200),text});
             if(!notes.some(n=>materialKey(n.locator)===materialKey(staged.locator))&&!view?.work.grant.notes?.some(n=>materialKey(n as AgentMaterial["locator"])===materialKey(staged.locator)))notes.push(staged);
           }
         }catch(reason){errors.push(file.name+"："+String(reason));}
@@ -1160,7 +1164,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
             }).catch(()=>{/* Refresh reports its own error; the saved answer remains acknowledged. */});
           }
         }}/>) }
-        <AgentCharts workId={view.work.id} recordVersion={view.recordVersion} items={view.analysisArtifacts || []} revoked={view.work.state === "revoked"} />
+        <AgentAnalysisFiles workId={view.work.id} items={view.fileAnalyses||[]}/><AgentCharts workId={view.work.id} recordVersion={view.recordVersion} items={view.analysisArtifacts || []} revoked={view.work.state === "revoked"} />
         {view.work.report?.status!=="completed" && view.work.state!=="revoked" && (view.workingState?.revision||0)>0 && view.work.revision!==undefined && view.work.authorizationVersion!==undefined && <AgentExternalReport key={`${view.work.id}:${view.work.revision}:${view.work.authorizationVersion}`} id={view.work.id} revision={view.work.revision} authorization={view.work.authorizationVersion} disabled={busy||!!active||view.lifecycle?.executionModes?.quick!==true||!!view.lifecycle?.requiresExplicitResume} onChanged={()=>{void revalidate(view.work.id).catch(reason=>setError(String(reason)));}}/>}
         {reportContinuation && <div>
           <button type="button" disabled={reportDisabled} aria-describedby={`agent-report-only-${view.work.id}`} onClick={()=>{
@@ -1249,6 +1253,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
               <details><summary><Library size={16}/><strong>可检索的资料库</strong><small>{composerLibraries.length?composerLibraries.length+" 个库":"未选择"}</small><ChevronDown size={14}/></summary>{!view?.work.grant.manifest&&<AgentLibraryScope registry={libraryRegistry} selected={composerLibraries} disabled={businessDisabled||!!active||confirmMessage||view?.work.state==="revoked"} onChange={changeLibraries}/>}</details>
 
             </div>}
+            {addPage==="pages"&&<AgentAnalysisInputs disabled={busy||filePreparing||!!view?.work.grant.manifest||!!publicUrl||materials.length>=31} onSelect={item=>{setMaterials(current=>current.some(n=>materialKey(n.locator)===materialKey(item.locator))?current:[...current,item]);materialPopover.close(false);goalInput.current?.focus();}}/>}
             {addPage==="pages"&&<div className="agent-scope-extra"><button type="button" disabled={!!view?.work.grant.manifest||!!publicUrl} onClick={()=>setAddPage("images")}>选择资料库图片</button>{!view&&!pageAttached&&!materials.length&&(assistantOptions.researchPolicy!=="materials-only")&&<button type="button" onClick={()=>setAddPage("web")}>读取公共链接</button>}</div>}
             {addPage==="pages"&&<>
 

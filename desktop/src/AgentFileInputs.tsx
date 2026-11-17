@@ -4,7 +4,7 @@ import type {ImageGrant} from "./AgentImages";
 import type {AgentMaterial,NoteLocator} from "./AgentMaterials";
 import {AgentMaterialCard} from "./AgentMaterialCard";
 
-export const agentFileAccept="image/png,image/jpeg,image/webp,.txt,.md,.csv,.json";
+export const agentFileAccept="image/png,image/jpeg,image/webp,.txt,.md,.csv,.json,.xlsx";
 export const isTextAttachment=(locator:{libraryId?:string})=>locator.libraryId==="__hub_chat_text";
 export function AgentTextFileCard({locator,disabled,onRemove}:{locator:NoteLocator;disabled:boolean;onRemove:()=>void}){
  const [item,setItem]=useState<AgentMaterial|null>(null);

@@ -5,6 +5,10 @@ import {afterEach,beforeEach,expect,it,vi} from "vitest";
 import {AgentActivity,type ActivityEvent,type ActivityRun} from "./AgentActivity";
 import {ActivityIdentity,activityOperation,activitySites} from "./AgentActivityIdentity";
 const {invoke}=vi.hoisted(()=>({invoke:vi.fn()}));
+it("distinguishes public file acquisition from browser interaction",()=>{
+ expect(activityOperation({kind:"tool",operation:"fetchFile"} as ActivityEvent)).toBe("download");
+ expect(activityOperation({kind:"tool",operation:"analyzeFiles"} as ActivityEvent)).toBe("compute");
+});
 vi.mock("@tauri-apps/api/core",()=>({invoke}));
 let host:HTMLDivElement,root:Root;
 beforeEach(()=>{Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});host=document.createElement("div");document.body.append(host);root=createRoot(host);invoke.mockReset();invoke.mockResolvedValue(null);});

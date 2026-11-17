@@ -5,15 +5,18 @@ mod actions;
 mod activity;
 #[cfg(test)]
 mod alignment_acceptance;
+mod analysis;
 mod answer_save;
 mod artifacts;
 mod assistant;
 #[cfg(test)]
 mod conversation_tests;
+mod coverage;
 #[cfg(all(test, windows))]
 mod daily_tag_acceptance;
 #[cfg(test)]
 mod delivery_tests;
+mod files;
 mod icons;
 mod images;
 mod insights;
@@ -134,7 +137,7 @@ impl Grant {
         if let Some(manifest) = &self.manifest {
             manifest.verify(root)?;
         }
-        Ok(())
+        analysis::verify_grant(root, self)
     }
     fn contains(&self, locator: &EvidenceLocator) -> bool {
         if self
@@ -226,6 +229,7 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
     let request_limit = match args["action"].as_str() {
         Some("stageTextFile") => crate::source_evidence::local_text::MAX_BYTES * 6 + 4096,
         Some("stageImage") => 512 * 1024,
+        Some("stageAnalysisFile") => 14 * 1024 * 1024,
         _ => 65_536,
     };
     if args.to_string().len() > request_limit {
@@ -483,6 +487,11 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
         // User-facing selection can discover available local notes; only the
         // explicitly submitted locators become the model's host-issued grant.
         "imageMaterials" => images::list(root, args),
+        "stageAnalysisFile" => analysis::stage(root, args),
+        "analysisMaterials" => analysis::source::list(root, args),
+        "analysisFilePath" => analysis::path(root, args),
+        "analysisOpenFile" => analysis::open(root, args),
+        "analysisExportFile" => analysis::export(root, args),
         "stageImage" => images::stage(root, args),
         "stageTextFile" => crate::source_evidence::local_text::stage(root, args),
         "textFileMetadata" => {

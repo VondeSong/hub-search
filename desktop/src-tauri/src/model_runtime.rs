@@ -3,6 +3,7 @@
 #[cfg(test)]
 mod acceptance;
 mod cli;
+pub(crate) use cli::agent::analysis::run as controlled_analysis;
 pub(crate) use cli::agent::capabilities::NativeCapabilities;
 pub(crate) use cli::agent::compute::run as controlled_compute;
 pub(crate) use cli::agent::interaction as agent_interaction;

@@ -4,8 +4,10 @@ use base64::Engine;
 use sha2::{Digest, Sha256};
 use std::io::Read;
 
-const MAX_BYTES: usize = 256 * 1024;
-const MAX_IMAGES: usize = 2;
+const MAX_BYTES: usize = 4 * 1024 * 1024;
+const MAX_IMAGES: usize = 8;
+const MAX_LOCAL_BYTES: usize = 256 * 1024;
+mod pages;
 const LOCAL_LIBRARY: &str = "__hub_chat_images";
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -22,6 +24,47 @@ fn identity(
     library: &str,
     source: &str,
 ) -> Result<(ImageGrant, String, String), String> {
+    if library == files::LIBRARY {
+        let (page, id) = if source.starts_with("pdf-page:") {
+            let (p, id) = pages::parts(source)?;
+            (Some(p), id)
+        } else {
+            (None, source)
+        };
+        let value = files::metadata(root, id)?;
+        let pdf = value["extension"] == "pdf";
+        if pdf != page.is_some()
+            || page.is_some_and(|p| p as u64 > value["pages"].as_u64().unwrap_or(0))
+            || !pdf && !value["mime"].as_str().unwrap_or("").starts_with("image/")
+        {
+            return Err("公开图片或PDF页码无效".into());
+        }
+        return Ok((
+            ImageGrant {
+                library_id: library.into(),
+                document_id: id.into(),
+                source_item_id: source.into(),
+                input_version: format!(
+                    "public-v1:{:x}",
+                    Sha256::digest(format!("{value}:{page:?}:2400"))
+                ),
+                blob_hash: value["sha256"].as_str().ok_or("公开图片哈希缺失")?.into(),
+            },
+            format!(
+                "{} · 公开资料{}",
+                value["title"].as_str().unwrap_or("资料"),
+                page.map(|p| format!(" · 第 {p} 页")).unwrap_or_default()
+            ),
+            if pdf {
+                "image/png".into()
+            } else {
+                value["mime"].as_str().unwrap().into()
+            },
+        ));
+    }
+    if source.starts_with("pdf-page:") {
+        return pages::identity(c, library, source);
+    }
     if library == LOCAL_LIBRARY {
         if source.len() != 64 || !source.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err("图片标识无效".into());
@@ -44,16 +87,19 @@ fn identity(
             value["mime"].as_str().unwrap_or("").into(),
         ));
     }
-    let (document,title,mime):(String,String,String)=c.query_row(
-        "SELECT s.document_id,s.title,s.mime_type FROM source_items s JOIN libraries l ON l.id=s.space_id JOIN documents d ON d.space_id=s.space_id AND d.id=s.document_id WHERE s.id=?1 AND s.space_id=?2 AND l.enabled=1 AND s.mime_type IN ('image/png','image/jpeg','image/webp') AND s.status NOT IN ('unavailable','removed','missing')",
-        params![source,library],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).map_err(|_|"原图不可用，仅支持已缓存的PNG、JPEG、WebP图片")?;
+    let (document,title,mime,parent):(String,String,String,String)=c.query_row(
+        "SELECT s.document_id,d.title || ' · ' || s.title,s.mime_type,d.content_hash FROM source_items s JOIN libraries l ON l.id=s.space_id JOIN documents d ON d.space_id=s.space_id AND d.id=s.document_id WHERE s.id=?1 AND s.space_id=?2 AND l.enabled=1 AND s.mime_type IN ('image/png','image/jpeg','image/webp') AND s.status NOT IN ('unavailable','removed','missing')",
+        params![source,library],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).map_err(|_|"原图不可用，仅支持已缓存的PNG、JPEG、WebP图片")?;
     let input = crate::attachment_evidence::input_on(c, library, source)?;
     Ok((
         ImageGrant {
             library_id: library.into(),
             document_id: document,
             source_item_id: source.into(),
-            input_version: input.version,
+            input_version: format!(
+                "v2:{:x}",
+                Sha256::digest(format!("{}:{parent}", input.version))
+            ),
             blob_hash: input.blob_hash,
         },
         title,
@@ -62,8 +108,29 @@ fn identity(
 }
 fn bytes(root: &Path, c: &Connection, g: &ImageGrant) -> Result<(Vec<u8>, String), String> {
     let (current, _, mime) = identity(root, c, &g.library_id, &g.source_item_id)?;
-    if current != *g {
+    let legacy = g.input_version.starts_with("v1:")
+        && current.document_id == g.document_id
+        && current.blob_hash == g.blob_hash
+        && crate::attachment_evidence::input_on(c, &g.library_id, &g.source_item_id)
+            .is_ok_and(|v| v.version == g.input_version);
+    if current != *g && !legacy {
         return Err("原图版本已变化，请撤回旧图片并重新选择授权".into());
+    }
+    if g.library_id == files::LIBRARY {
+        let value = files::metadata(root, &g.document_id)?;
+        let path = files::path_for(root, &value)?;
+        let data = if let Some(page) = pages::number(&g.source_item_id) {
+            crate::ocr::render_pdf_page_png(&path, page, 2400)?
+        } else {
+            std::fs::read(path).map_err(|_| "公开图片不可读")?
+        };
+        if data.is_empty() || data.len() > MAX_BYTES {
+            return Err("公开图片或PDF页面超过4 MiB，未降低清晰度".into());
+        }
+        return Ok((data, mime));
+    }
+    if g.source_item_id.starts_with("pdf-page:") {
+        return pages::render(root, c, g);
     }
     let path = if g.library_id == LOCAL_LIBRARY {
         root.join("collection-files/agent-images")
@@ -80,7 +147,7 @@ fn bytes(root: &Path, c: &Connection, g: &ImageGrant) -> Result<(Vec<u8>, String
         .read_to_end(&mut data)
         .map_err(|_| "原图读取失败")?;
     if data.is_empty() || data.len() > MAX_BYTES {
-        return Err("原图超过本轮256 KiB单图上限；请选择较小的图片".into());
+        return Err("原图超过4 MiB单图上限；请选择相关局部或较小图片".into());
     }
     if format!("{:x}", Sha256::digest(&data)) != g.blob_hash {
         return Err("原图字节与授权哈希不符，未发送图片".into());
@@ -98,7 +165,7 @@ fn bytes(root: &Path, c: &Connection, g: &ImageGrant) -> Result<(Vec<u8>, String
 }
 pub(super) fn verify(root: &Path, c: &Connection, grants: &[ImageGrant]) -> Result<(), String> {
     if grants.len() > MAX_IMAGES {
-        return Err("每个对话最多授权2张原图".into());
+        return Err("每个对话最多授权8张图片或PDF页面；实际发送仍受本轮材料额度限制".into());
     }
     for g in grants {
         bytes(root, c, g)?;
@@ -107,7 +174,7 @@ pub(super) fn verify(root: &Path, c: &Connection, grants: &[ImageGrant]) -> Resu
 }
 // Decode the exact bounded bytes, not a mutable source path; no extra image dependency.
 #[cfg(windows)]
-fn decode(data: &[u8]) -> Result<(u32, u32), String> {
+pub(super) fn decode(data: &[u8]) -> Result<(u32, u32), String> {
     use windows::{
         Graphics::Imaging::BitmapDecoder,
         Storage::Streams::{DataWriter, InMemoryRandomAccessStream},
@@ -135,7 +202,7 @@ fn decode(data: &[u8]) -> Result<(u32, u32), String> {
     result.map_err(|_| "原图解码失败或尺寸超过8192边长/1600万像素上限".into())
 }
 #[cfg(not(windows))]
-fn decode(_: &[u8]) -> Result<(u32, u32), String> {
+pub(super) fn decode(_: &[u8]) -> Result<(u32, u32), String> {
     Err("当前平台尚未接入原图解码核验".into())
 }
 
@@ -153,7 +220,8 @@ pub(super) fn prepare(
         let (w, h) = decode(&data)?;
         raw_bytes += data.len();
         input.push(json!({"type":"image","url":format!("data:{mime};base64,{}",base64::engine::general_purpose::STANDARD.encode(&data))}));
-        metadata.push(json!({"grant":g,"width":w,"height":h,"bytes":data.len(),"meaning":"original image supplied for visual interpretation; not OCR text or an exact quotation"}));
+        let (_, title, _) = identity(root, &c, &g.library_id, &g.source_item_id)?;
+        metadata.push(json!({"grant":g,"title":title,"width":w,"height":h,"bytes":data.len(),"page":pages::number(&g.source_item_id),"meaning":"exact source image or explicitly selected rendered PDF page; not OCR text or an exact quotation; only these images were sent, other pages/images remain unread"}));
     }
     Ok((input, json!(metadata), raw_bytes))
 }
@@ -164,7 +232,7 @@ pub(super) fn list(root: &Path, args: &Value) -> Result<Value, String> {
         return Err("图片查找条件过长".into());
     }
     let c = crate::source_evidence::open_read_database(root)?;
-    let mut q=c.prepare("SELECT s.space_id,s.id FROM source_items s JOIN libraries l ON l.id=s.space_id WHERE l.enabled=1 AND s.blob_hash IS NOT NULL AND s.mime_type IN ('image/png','image/jpeg','image/webp') AND s.status NOT IN ('unavailable','removed','missing') AND (?1='' OR instr(lower(s.title),lower(?1))>0) ORDER BY s.space_id,s.id LIMIT 41").map_err(|e|e.to_string())?;
+    let mut q=c.prepare("SELECT s.space_id,s.id FROM source_items s JOIN libraries l ON l.id=s.space_id JOIN documents d ON d.space_id=s.space_id AND d.id=s.document_id WHERE l.enabled=1 AND s.blob_hash IS NOT NULL AND s.mime_type IN ('image/png','image/jpeg','image/webp','application/pdf') AND s.status NOT IN ('unavailable','removed','missing') AND (?1='' OR instr(lower(s.title || ' ' || d.title),lower(?1))>0) ORDER BY s.space_id,s.id LIMIT 41").map_err(|e|e.to_string())?;
     let ids = q
         .query_map([query], |r| {
             Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
@@ -172,16 +240,35 @@ pub(super) fn list(root: &Path, args: &Value) -> Result<Value, String> {
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
-    let more = ids.len() > 40;
-    let items = ids
+    let mut more = ids.len() > 40;
+    let mut items = ids
         .into_iter()
         .take(40)
         .filter_map(|(l, s)| {
+            let page = args["page"].as_u64().unwrap_or(1);
+            if page == 0 || page > 10000 { return None; }
+            let pdf:bool=c.query_row("SELECT mime_type='application/pdf' FROM source_items WHERE id=?1",[&s],|r|r.get(0)).ok()?;
+            let s=if pdf {format!("pdf-page:{page}:{s}")} else {s};
             identity(root, &c, &l, &s)
                 .ok()
-                .map(|(grant, title, mime)| json!({"grant":grant,"title":title,"mime":mime}))
+                .map(|(grant, title, mime)| json!({"grant":grant,"title":title,"mime":mime,"page":if pdf{Some(page)}else{None},"kind":if pdf{"pdfPage"}else{"image"}}))
         })
         .collect::<Vec<_>>();
+    let page = args["page"].as_u64().unwrap_or(1);
+    if (1..=10000).contains(&page) {
+        for item in files::list_images(root, query, page as u32)? {
+            if let Ok((grant, title, mime)) = identity(
+                root,
+                &c,
+                files::LIBRARY,
+                item["sourceItemId"].as_str().unwrap_or(""),
+            ) {
+                items.push(json!({"grant":grant,"title":title,"mime":mime,"page":if mime=="image/png" && item["sourceItemId"].as_str().unwrap_or("").starts_with("pdf-page:"){Some(page)}else{None},"kind":if item["sourceItemId"].as_str().unwrap_or("").starts_with("pdf-page:"){"pdfPage"}else{"image"}}));
+            }
+        }
+    }
+    more |= items.len() > 40;
+    items.truncate(40);
     Ok(json!({"images":items,"hasMore":more}))
 }
 
@@ -193,13 +280,13 @@ pub(super) fn stage(root: &Path, args: &Value) -> Result<Value, String> {
         return Err("仅支持 PNG、JPEG、WebP 图片".into());
     }
     let encoded = args["base64"].as_str().ok_or("缺少图片内容")?;
-    if encoded.len() > (MAX_BYTES + 2) / 3 * 4 {
+    if encoded.len() > (MAX_LOCAL_BYTES + 2) / 3 * 4 {
         return Err("图片压缩后仍超过256 KiB，请选择较小图片".into());
     }
     let data = base64::engine::general_purpose::STANDARD
         .decode(encoded)
         .map_err(|_| "图片内容无效")?;
-    if data.is_empty() || data.len() > MAX_BYTES {
+    if data.is_empty() || data.len() > MAX_LOCAL_BYTES {
         return Err("图片大小无效".into());
     }
     let matches = match mime {
@@ -243,7 +330,7 @@ pub(super) fn selection(value: &Value, field: &str) -> Result<Vec<ImageGrant>, S
         serde_json::from_value(value.get(field).cloned().unwrap_or(json!([])))
             .map_err(|_| "原图授权参数无效")?;
     if images.len() > MAX_IMAGES {
-        return Err("每次最多变更2张原图".into());
+        return Err("每次最多变更8张图片或PDF页面".into());
     }
     Ok(images)
 }
@@ -281,7 +368,7 @@ pub(super) fn extend(
         grant.images.push(image.clone());
     }
     if grant.images.len() > MAX_IMAGES {
-        return Err("每个对话最多授权2张原图".into());
+        return Err("每个对话最多授权8张图片或PDF页面".into());
     }
     Ok(())
 }

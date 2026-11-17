@@ -1,4 +1,5 @@
 "use client";
+import {AssistantFileDelivery} from './AssistantDataMaterials';
 import type { ReactNode } from 'react';
 import { Activity, Brain, ChevronDown, Globe2, Layers, Maximize2, Minimize2, NotebookPen, X } from 'lucide-react';
 import { researchPolicies } from './AssistantResearch';
@@ -46,7 +47,7 @@ export function AssistantDetails({ settings, setSettings, disabled, hasReport, r
       <section className="ha-detail-section" aria-label="进度与成果"><h3>进度与成果</h3>
         <DetailRow icon={<Activity size={16}/>} title="任务状态" status={progress}>{taskDetails}</DetailRow>
         <DetailRow icon={<NotebookPen size={16}/>} title="成果与保存">
-          <p>可从回答下方插入页面、创建笔记或任务。保存前可以查看并修改草稿。</p>
+          <p>可从回答下方插入页面、创建笔记或任务。保存前可以查看并修改草稿。</p><AssistantFileDelivery/>
         </DetailRow>
       </section>
     </>}

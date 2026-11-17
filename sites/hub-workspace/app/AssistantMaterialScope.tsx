@@ -1,9 +1,11 @@
 "use client";
+import {AssistantDataMaterials} from './AssistantDataMaterials';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ChevronDown, ChevronRight, FileText, FolderBookmark, Library, Search, SlidersHorizontal, X } from 'lucide-react';
 import { researchPolicies, resolveTopicSources, TopicSourceReview, type ResearchPolicy, type ResearchTopic } from './AssistantResearch';
 import type { AssistantContext } from './Assistant';
 import type { ResourceDraft } from './AssistantResources';
+import { AssistantVisualMaterials } from './AssistantVisualMaterials';
 
 type ScopePage = 'overview' | 'pages' | 'topic';
 
@@ -88,6 +90,8 @@ export function AssistantMaterialScope({ catalog, resources, onChange, material,
         {!pageResults.length && <p className="ha-scope-hint">没有找到页面。</p>}
         {pageResults.map(item => <label className="ha-resource-choice" key={item.id}><input type="checkbox" aria-label={'选择资料 ' + item.title} disabled={disabled || (!selected.has(item.id) && resources.pages.length >= 31)} checked={selected.has(item.id)} onChange={() => togglePage(item)}/><span><strong>{item.title}</strong><small>{[item.libraryName || 'Hub', item.path].filter(Boolean).join(' · ')}{!available.has(item.id) && item.id !== material?.id ? ' · 当前不可用' : selected.has(item.id) ? (topicScope ? ' · 手选' : ' · 已加入') : ''}{topicScope?.pages.some(page => page.id === item.id) ? ' · 专题已包含' : ''}</small></span></label>)}
         {matchingPages.length > pageResults.length && <button type="button" className="ha-mode-link" onClick={() => setPageLimit(pageResults.length + 12)}>查看更多页面（{pageResults.length} / {matchingPages.length}）</button>}
+        <AssistantDataMaterials resources={resources} onChange={onChange} disabled={disabled}/>
+        <AssistantVisualMaterials resources={resources} onChange={onChange} disabled={disabled}/>
       </>}
       {page === 'topic' && <form id={formId} className="ha-scope-topic" onSubmit={event => {
         event.preventDefault();

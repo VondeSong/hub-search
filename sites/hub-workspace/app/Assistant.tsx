@@ -148,7 +148,7 @@ function readSettings(value: unknown, preserveRequestMode = false): Settings {
 function readResources(value: unknown, legacySkill?: unknown): ResourceDraft {
   const raw = plain(value) || {};
   let url = ''; try { const parsed = new URL(String(raw.url || '')); if (parsed.protocol === 'https:' && !parsed.username && !parsed.password && parsed.href.length <= 2000) url = parsed.href; } catch {}
-  return { pages: Array.isArray(raw.pages) ? raw.pages.flatMap(value => { const item = readContext(value); return item ? [item] : []; }).slice(0, 31) : [], libraryIds: strings(raw.libraryIds, 20), skills: [...new Set([...strings(raw.skills, 6), ...(typeof legacySkill === 'string' ? [legacySkill] : [])])].filter(item => /^hub-(research|statistics|flashcards|note-edit|archive|tool-guide)$/.test(item)), images: strings(raw.images, 2), url };
+  return { pages: Array.isArray(raw.pages) ? raw.pages.flatMap(value => { const item = readContext(value); return item ? [item] : []; }).slice(0, 31) : [], libraryIds: strings(raw.libraryIds, 20), skills: [...new Set([...strings(raw.skills, 6), ...(typeof legacySkill === 'string' ? [legacySkill] : [])])].filter(item => /^hub-(research|statistics|flashcards|note-edit|archive|tool-guide)$/.test(item)), images: strings(raw.images, 8), dataFiles: strings(raw.dataFiles,8), url };
 }
 
 function readTagTask(value:unknown):TagTask|undefined {
@@ -213,12 +213,12 @@ function readTopicDraft(value: unknown, resources: ResourceDraft): { activeTopic
 
 function resourcesForTurn(manual: ResourceDraft, topic: ActiveTopic | null): ResourceDraft {
   if (!topic) return manual;
-  const extra = topic.useManualOnce ? manual : { pages: [], libraryIds: [], url: '', images: [] };
+  const extra = topic.useManualOnce ? manual : { pages: [], libraryIds: [], url: '', images: [], dataFiles: [] };
   return {
     pages: [...topic.scope.pages, ...extra.pages.filter(item => !topic.scope.pages.some(page => page.id === item.id))],
     libraryIds: [...new Set([...topic.scope.libraryIds, ...extra.libraryIds])],
     skills: [...new Set([...manual.skills, ...topic.scope.skills])],
-    url: extra.url, images: extra.images,
+    url: extra.url, images: extra.images, dataFiles: extra.dataFiles||[],
   };
 }
 
@@ -274,6 +274,7 @@ function requestDetails(request: Active): Section[] {
   const media = request.resources?.pages.filter(isMediaReference) || [];
   if (media.length) sections.push({ heading: '资料库附件', body: media.map(item => item.title).join('、') + '。原型保留引用，未分析附件内容。' });
   if (request.resources?.images.length) sections.push({ heading: '图片 · 原型占位示例', body: request.resources.images.join('、') + '。未执行真实看图分析。' });
+  if (request.resources?.dataFiles?.length) sections.push({heading:'表格与数据文件 · 演示',body:request.resources.dataFiles.join('、')+'。原型仅保留选择，未执行计算或生成文件。'});
   if (request.additions.length) sections.push({ heading: '已带入的补充条件', body: request.additions.join('；') });
   if (request.attachmentNames.length) sections.push({ heading: '附件名称', body: request.attachmentNames.join('、') + '。本轮只记录文件名，未读取或上传文件内容。' });
   return sections;
@@ -607,7 +608,7 @@ function AssistantConversation({
   const turnResources = resourcesForTurn(resources, activeTopic);
   const useManualSources = !activeTopic || activeTopic.useManualOnce;
   const turnAttachments = useManualSources ? attachmentNames : [];
-  const manualSourceCount = resources.pages.length + resources.libraryIds.length + resources.images.length + Number(!!resources.url) + attachmentNames.length;
+  const manualSourceCount = resources.pages.length + resources.libraryIds.length + resources.images.length + (resources.dataFiles||[]).length + Number(!!resources.url) + attachmentNames.length;
   const resourcesBlocked = turnResources.pages.some(item => !canUseContext(item));
   const scopeTooLarge = turnResources.pages.length + Number(!activeTopic && !!context && context.id !== omittedId && !turnResources.pages.some(item => item.id === context.id)) > 31 || turnResources.libraryIds.length > 20;
   const inputBlocked = !!input && (!canUseContext(inputContext) || resourcesBlocked);
@@ -616,7 +617,7 @@ function AssistantConversation({
   const readableContexts = contexts.filter(item => canUseContext(item));
   const title = contextBlocked ? '来源不可用' : context?.workTitle || (context?.workId ? initial.title : '自由讨论');
   const material = context && !contextBlocked && !activeTopic && context.id !== omittedId && !resources.pages.some(item => item.id === context.id) ? context : null;
-  const hasDraftSources = !!material || !!turnResources.pages.length || !!turnResources.libraryIds.length || !!turnResources.images.length || !!turnResources.url || !!turnAttachments.length;
+  const hasDraftSources = !!material || !!turnResources.pages.length || !!turnResources.libraryIds.length || !!turnResources.images.length || !!turnResources.dataFiles?.length || !!turnResources.url || !!turnAttachments.length;
   const evidence = collectEvidence(readableContexts);
   const running = session.active?.status === 'running';
   const paused = session.active?.status === 'paused';
@@ -819,7 +820,7 @@ function AssistantConversation({
     setInput(''); setInputContext(null);
     if (useManualSources) {
       setAttachmentNames([]);
-      setResources(current => ({ ...current, pages: current.pages.filter(item => !isMediaReference(item)), url: '', images: [] }));
+      setResources(current => ({ ...current, pages: current.pages.filter(item => !isMediaReference(item)), url: '', images: [], dataFiles: [] }));
     }
     if (activeTopic?.useManualOnce) setActiveTopic({ ...activeTopic, useManualOnce: false });
     setMenu(null); setTopicEdit(null); setContextOpen(false); setSourcesOpen(false);

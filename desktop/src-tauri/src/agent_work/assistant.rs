@@ -411,7 +411,12 @@ impl Session<'_> {
             ),
             runner::Tool::ToolSchema { .. } => Err("工具参数目录仅由原生运行时提供".into()),
             runner::Tool::Compute { .. } => Err("受控计算仅由原生运行时提供".into()),
+            runner::Tool::AnalyzeFiles { .. } => {
+                Err("文件分析由Codex受控运行端提供；可继续查看已有成果".into())
+            }
             runner::Tool::Mcp { .. } => Err("外部 MCP 服务仅由原生运行时提供".into()),
+            runner::Tool::FetchFile { .. } => Err("公开文件获取仅由原生运行时提供".into()),
+            runner::Tool::CapabilityState {} => Err("原生能力查询仅由原生运行时提供".into()),
             runner::Tool::GoalState {} => {
                 store::goal::completion::read_context(self.root, self.work, self.run)
             }

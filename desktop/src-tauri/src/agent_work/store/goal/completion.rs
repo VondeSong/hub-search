@@ -66,13 +66,13 @@ pub(in crate::agent_work) fn schema() -> Value {
     let binding = json!({"anyOf":[binding,binding_v2]});
     let item = object(
         json!({"requirementId":{"type":"string","minLength":1,"maxLength":180,"description":"逐字复制当前 conversation.goalState.requirements 中的 requirementId。将同一要求拆为多项 criterion 时，每项继续使用同一个原始 requirementId；禁止添加序号或后缀、改写或新建 ID。"},"criterion":string,
-        "requiredResult":{"type":"string","enum":["response","chart","draft","action"],"description":"response：正文或只读约束，refs 留空；chart：已核对并留存于当前事项的内部图表，包括在有效期内继续修订，不证明永久保留或外部写入；draft：待确认草稿；action：保存到来源、导入等业务执行，必须引用实际操作回执。根据用户原意选择，不因类型冲突擅自更改要求。"},
+        "requiredResult":{"type":"string","enum":["response","chart","file","draft","action"],"description":"response：正文或只读约束，refs 留空；chart：已核对并留存于当前事项的内部图表，包括在有效期内继续修订，不证明永久保留或外部写入；file：已实际生成并核验的本机文件，不证明外部保存或内容语义正确；draft：待确认草稿；action：保存到来源、导入等业务执行，必须引用实际操作回执。根据用户原意选择，不因类型冲突擅自更改要求。"},
         "status":{"type":"string","enum":["satisfied","unfulfilled","blocked","notApplicable"]},
         "explanation":string,"refs":{"type":"array","maxItems":16,"items":id},
         "supersededBy":{"type":["string","null"],"maxLength":180}}),
     );
     json!({"anyOf":[object(json!({"goalBinding":binding,"items":{"type":"array","maxItems":128,"items":item}})),{"type":"null"}],
-        "description":"逐项覆盖 conversation.goalState.requirements。每条用户消息可拆成多个 criterion，必须包含其中全部有效要求。语义核对由模型负责；引用只能取 goalState.proofs 的 proofId。response 可无引用，chart/draft/action 必须有同类型真实证据。内部图表留存使用 chart；外部保存、导入等业务执行使用 action，不能用 chart、draft 或 response 代替。notApplicable 必须解释，并引用较新的用户命令作为 supersededBy。预算不足时如实列出 unfulfilled/blocked；null 表示尚未评估，绝不代表完成。"})
+        "description":"逐项覆盖 conversation.goalState.requirements。每条用户消息可拆成多个 criterion，必须包含其中全部有效要求。语义核对由模型负责；引用只能取 goalState.proofs 的 proofId。response 可无引用，chart/file/draft/action 必须有同类型真实证据。内部图表留存使用 chart；外部保存、导入等业务执行使用 action，不能用 chart、draft 或 response 代替。notApplicable 必须解释，并引用较新的用户命令作为 supersededBy。预算不足时如实列出 unfulfilled/blocked；null 表示尚未评估，绝不代表完成。"})
 }
 
 pub(in crate::agent_work) fn sources_on(c: &Connection, work: &Work) -> Result<Value, String> {
@@ -149,6 +149,17 @@ pub(in crate::agent_work) fn proofs_on(
             );
             proofs.push(json!({"proofId":proof_id,"kind":"chart","reference":reference}));
         }
+    }
+    for reference in super::super::super::analysis::references(root, work, None)?
+        .as_array()
+        .into_iter()
+        .flatten()
+    {
+        let proof_id = format!(
+            "file:{:x}",
+            Sha256::digest(reference.to_string().as_bytes())
+        );
+        proofs.push(json!({"proofId":proof_id,"kind":"file","reference":reference,"meaning":"Actual files and unchanged input identities, not validation of every conclusion and not an external save receipt"}));
     }
     Ok(json!(proofs))
 }

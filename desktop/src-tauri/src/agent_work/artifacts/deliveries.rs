@@ -141,6 +141,14 @@ pub(in crate::agent_work) fn delivery_projection(
         }
     }
     let mut projection = inspect_references(root, c, work, &refs)?;
+    if let Some(refs) = delivery.get("fileArtifactRefs") {
+        let files = super::super::analysis::inspect_references(root, work, refs)?;
+        if files["state"] == "stale" {
+            projection["state"] = json!("stale");
+            projection["reason"] = files["reason"].clone();
+        }
+        projection["fileReferences"] = files["references"].clone();
+    }
     let current_goal = store::goal::binding_on(c, work)?;
     let goal_changed = match delivery.get("goalBinding") {
         Some(binding) => *binding != current_goal,

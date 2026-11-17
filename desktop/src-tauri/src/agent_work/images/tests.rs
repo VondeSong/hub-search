@@ -1,6 +1,92 @@
 use super::*;
 use crate::source_evidence::tests::Fixture;
 const PNG: &[u8] = include_bytes!("fixture.png");
+
+#[test]
+fn parent_note_search_and_version_are_part_of_new_image_authorization() {
+    let f = Fixture::new();
+    let g = seed(&f);
+    f.c()
+        .execute(
+            "UPDATE documents SET title='真实材料目录' WHERE space_id='notes' AND id=?1",
+            [&g.document_id],
+        )
+        .unwrap();
+    let result = list(&f.root, &json!({"query":"真实材料目录"})).unwrap();
+    assert_eq!(result["images"].as_array().unwrap().len(), 1);
+    assert!(result["images"][0]["title"]
+        .as_str()
+        .unwrap()
+        .contains("真实材料目录"));
+    assert!(prepare(&f.root, &[g.clone()]).is_ok());
+    f.c().execute("UPDATE documents SET content_hash='new-parent-version' WHERE space_id='notes' AND id=?1",[&g.document_id]).unwrap();
+    assert!(prepare(&f.root, &[g]).is_err());
+}
+
+#[test]
+fn pdf_page_identity_keeps_source_page_and_parent_dependencies_separate() {
+    let f = Fixture::new();
+    crate::attachment_evidence::tests::seed(&f, "pdf:with:colons", "cached-pdf");
+    f.c().execute("UPDATE source_items SET mime_type='application/pdf',title='附件.pdf' WHERE id='pdf:with:colons'",[]).unwrap();
+    let first = pages::identity(&f.c(), "notes", "pdf-page:1:pdf:with:colons")
+        .unwrap()
+        .0;
+    let second = pages::identity(&f.c(), "notes", "pdf-page:2:pdf:with:colons")
+        .unwrap()
+        .0;
+    assert_eq!(first.blob_hash, second.blob_hash);
+    assert_ne!(first.input_version, second.input_version);
+    assert_eq!(pages::number(&second.source_item_id), Some(2));
+    for invalid in [
+        "pdf-page:0:pdf:with:colons",
+        "pdf-page:10001:pdf:with:colons",
+        "pdf-page:1:unknown",
+        "pdf-page:one:pdf:with:colons",
+    ] {
+        assert!(pages::identity(&f.c(), "notes", invalid).is_err());
+    }
+    f.c()
+        .execute("UPDATE libraries SET enabled=0 WHERE id='notes'", [])
+        .unwrap();
+    assert!(pages::identity(&f.c(), "notes", &first.source_item_id).is_err());
+}
+
+#[test]
+#[ignore = "explicit daily-library visual inputs and real Codex; source reads and fresh chats only"]
+fn live_daily_visual_materials_acceptance() {
+    let config: Value = serde_json::from_slice(
+        &std::fs::read(std::env::var("HUB_VISUAL_CONFIG").expect("explicit config")).unwrap(),
+    )
+    .unwrap();
+    let root = Path::new(config["root"].as_str().unwrap());
+    let out = Path::new(config["output"].as_str().unwrap());
+    let c = crate::source_evidence::open_read_database(root).unwrap();
+    let mut results = Vec::new();
+    for case in config["cases"].as_array().unwrap() {
+        let grant = identity(
+            root,
+            &c,
+            case["libraryId"].as_str().unwrap(),
+            case["sourceItemId"].as_str().unwrap(),
+        )
+        .unwrap()
+        .0;
+        let (inputs, metadata, raw) = prepare(root, &[grant.clone()]).unwrap();
+        assert!(raw > 0 && inputs.len() == 1);
+        let created=ui(root,&json!({"action":"create","anchor":null,"grant":Grant::default(),"goal":case["prompt"],"successCriteria":"依据实际发送的图片或页面回答，未读内容明确说明"})).unwrap();
+        let id = created["work"]["id"].as_str().unwrap();
+        ui(root,&json!({"action":"message","id":id,"expectedRevision":created["work"]["revision"],"clientMessageId":crate::random_url_safe(12),"text":case["prompt"],"addImages":[grant],"addNotes":case["grant"]["notes"]})).unwrap();
+        options::configure(root, &json!({"id":id,"options":config["options"]})).unwrap();
+        let result = ui(root, &json!({"action":"respond","id":id,"mode":"deep"}));
+        let view = store::view(root, id).unwrap();
+        results.push(json!({"case":case["name"],"workId":id,"result":result,"view":view,"prepared":metadata,"images":store::records(root,id,"nativeImages",20).unwrap(),"usage":store::records(root,id,"nativeMaterialUsage",20).unwrap()}));
+        std::fs::write(out, serde_json::to_vec_pretty(&results).unwrap()).unwrap();
+        result.unwrap();
+        assert!(view["work"]["report"]["prose"]["markdown"]
+            .as_str()
+            .is_some_and(|s| !s.is_empty()));
+    }
+}
 #[test]
 fn local_image_staging_does_not_grant_and_exact_bytes_survive_message_binding() {
     let f = Fixture::new();
@@ -213,7 +299,11 @@ fn cn05b_selection_count_stale_revision_and_running_changes_are_rejected() {
     let f = Fixture::new();
     let g = seed(&f);
     let id = create(&f);
-    assert!(selection(&json!({"addImages":[g,g,g]}), "addImages").is_err());
+    assert!(selection(
+        &json!({"addImages":vec![g.clone();MAX_IMAGES+1]}),
+        "addImages"
+    )
+    .is_err());
     assert!(ui(&f.root, &message(&f, &id, &g, false, 7)).is_err());
     let (_, run) = crate::agent_work::tests::claim(&f, &id);
     assert!(ui(&f.root, &message(&f, &id, &g, false, 1)).is_err());

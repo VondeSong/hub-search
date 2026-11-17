@@ -14,6 +14,9 @@ fn title(request: &Value, catalog: &mut Option<Value>) -> String {
             }
         ),
         "read" => "读取原文".into(),
+        "analyzeFiles" => "分析数据并生成文件".into(),
+        "fetchFile" => "获取公开资料文件".into(),
+        "compute" => "运行计算脚本".into(),
         "goalState" => "核对任务状态（内部）".into(),
         "loadSkill" => "读取技能说明".into(),
         "toolSchema" => format!(

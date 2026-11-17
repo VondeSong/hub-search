@@ -30,7 +30,7 @@ pub(in crate::agent_work) fn schema() -> Value {
     let spec = object(
         json!({"taskId":{"type":"string","minLength":1,"maxLength":64},"parentId":{"type":["string","null"],"maxLength":64},
         "requirementRefs":ids,"criterion":text,"dependencies":ids,
-        "requiredResult":{"type":"string","enum":["response","chart","draft","action"]},
+        "requiredResult":{"type":"string","enum":["response","chart","file","draft","action"]},
         "status":{"type":"string","enum":["pending","in_progress","waiting_decision","blocked","done","cancelled"]},
         "proofIds":ids,"review":{"type":"string","maxLength":2000},"blocker":{"type":["string","null"],"maxLength":1000}}),
     );

@@ -124,6 +124,16 @@ pub(super) enum Tool {
     Compute {
         script: String,
     },
+    AnalyzeFiles {
+        script: String,
+        title: String,
+        revision_of: Option<String>,
+    },
+    FetchFile {
+        url: String,
+        title: String,
+    },
+    CapabilityState {},
     Mcp {
         server: String,
         tool: String,
@@ -945,7 +955,7 @@ fn investigate_loop(
             let prompt = if let Some(session) = session {
                 let material = json!({"conversation":conversation,"goal":work.goal,"successCriteria":work.success_criteria,
                     "sources":catalog,"confirmedUserDecisions":decisions,"sharedMemory":shared_memory,
-                    "businessActionRecords":action_receipts,"observations":model_observations,"quoteCatalog":quote_catalog,
+                    "businessActionRecords":action_receipts,"fileAnalyses":super::analysis::context(root,work),"publicFiles":super::files::context(root,work),"sourceCoverage":super::coverage::context(root,work)?,"observations":model_observations,"quoteCatalog":quote_catalog,
                     "skills":context.skills.as_ref().map(|s|s.metadata()),
                     "knowledgeRules":context.skills.as_ref().map(|s|s.guidance()),
                     "hubCapabilities":request_tools.as_ref().map(|tools|assistant::capability_metadata(tools.clone(), &turn_schema)),

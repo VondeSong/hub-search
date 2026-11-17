@@ -57,6 +57,9 @@ pub(crate) fn metadata(root: &Path, locator: &EvidenceLocator) -> Result<Value, 
         json!({"locator":locator,"title":s.title,"path":s.path,"libraryName":"本地文本附件","totalChars":s.body.chars().count()}),
     )
 }
+pub(crate) fn selected_body(root: &Path, locator: &EvidenceLocator) -> Result<String, String> {
+    Ok(snapshot(root, locator)?.body)
+}
 pub(super) fn snapshot(root: &Path, locator: &EvidenceLocator) -> Result<Snapshot, String> {
     let EvidenceLocator::Note {
         library_id,

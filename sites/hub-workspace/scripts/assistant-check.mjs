@@ -142,8 +142,8 @@ check('具体模型只能匹配对应提供方，推理默认与连接设置严�
   assert.equal(settings.modelId, 'deepseek-analysis'); assert.equal(settings.thinking, 'xhigh'); assert.equal(settings.reasoningDefault, false); assert.deepEqual(settings.mcpServices, ['Craft']); assert.equal(settings.inputLimit, 0);
 });
 check('资料、技能和图片快照有边界，不恢复未知技能或不安全链接', () => {
-  const resources = readResources({ pages: Array.from({ length: 50 }, (_, i) => ({ id: 'p' + i, title: '资料' })), skills: ['hub-research', 'unknown'], images: ['a', 'b', 'c'], url: 'javascript:alert(1)' });
-  assert.equal(resources.pages.length, 31); assert.equal(resources.images.length, 2); assert.deepEqual(resources.skills, ['hub-research']); assert.equal(resources.url, '');
+  const resources = readResources({ pages: Array.from({ length: 50 }, (_, i) => ({ id: 'p' + i, title: '资料' })), skills: ['hub-research', 'unknown'], images: Array.from({length:10},(_,i)=>String(i)), dataFiles:Array.from({length:10},(_,i)=>'file'+i), url: 'javascript:alert(1)' });
+  assert.equal(resources.pages.length, 31); assert.equal(resources.images.length, 8); assert.equal(resources.dataFiles.length,8); assert.deepEqual(resources.skills, ['hub-research']); assert.equal(resources.url, '');
 });
 check('公共链接拒绝 HTTP、相对地址和嵌入凭据，合法地址规范化', () => {
   assert.equal(publicUrl('http://example.org'), null); assert.equal(publicUrl('/relative'), null); assert.equal(publicUrl('https://user:pass@example.org'), null);

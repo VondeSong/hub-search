@@ -212,13 +212,14 @@ it("pages older global conversations without changing the selected Work or draft
   await openHistory();
   expect(document.querySelectorAll(".agent-history-row")).toHaveLength(20);
   expect(sections.hidden).toBe(true);
-  expect(invoke.mock.calls.filter(([,v])=>v?.args?.action==="list")).toHaveLength(1);
+  // Opening history refreshes its first page so background conversations appear.
+  expect(invoke.mock.calls.filter(([,v])=>v?.args?.action==="list")).toHaveLength(2);
   await click("关闭对话历史");expect(document.querySelector<HTMLDetailsElement>(".agent-dialogue-details")!.open).toBe(false);
   await openDialogueDetails();expect(document.querySelector(".agent-details-sections")).toBe(sections);expect(sections.hidden).toBe(false);
   await openHistory();expect(document.querySelectorAll(".agent-history-row")).toHaveLength(20);
-  expect(invoke.mock.calls.filter(([,v])=>v?.args?.action==="list")).toHaveLength(1);
+  expect(invoke.mock.calls.filter(([,v])=>v?.args?.action==="list")).toHaveLength(3);
   await click("加载更多对话");
-  expect(invoke.mock.calls.filter(([,v])=>v?.args?.action==="list")[1][1].args).toEqual({action:"list",anchor:null,query:"",archived:false,before:cursor});
+  expect(invoke.mock.calls.find(([,v])=>v?.args?.action==="list"&&v.args.before)?.[1].args).toEqual({action:"list",anchor:null,query:"",archived:false,before:cursor});
   expect(document.querySelectorAll(".agent-history-row")).toHaveLength(21);
   expect(document.body.querySelector<HTMLTextAreaElement>('[name="investigationGoal"]')!.value).toBe("尚未发送的草稿");
   expect(document.querySelector(".agent-history-more")).toBeNull();

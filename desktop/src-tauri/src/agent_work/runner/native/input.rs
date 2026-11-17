@@ -16,7 +16,7 @@ pub(super) fn material(
     Ok(
         json!({"conversation":conversation,"goal":work.goal,"successCriteria":work.success_criteria,
         "sources":catalog,"confirmedUserDecisions":decisions,"sharedMemory":memory,
-        "businessActionRecords":receipts,"observations":quotes::observations(&context.observations),
+        "businessActionRecords":receipts,"sourceCoverage":super::super::super::coverage::context(session.root,work)?,"publicFiles":super::super::super::files::context(session.root,work),"fileAnalyses":super::super::super::analysis::context(session.root,work),"observations":quotes::observations(&context.observations),
         "quoteCatalog":quotes::catalog(&context.excerpts),"skills":context.skills.as_ref().map(|s|s.metadata()),"knowledgeRules":context.skills.as_ref().map(|s|s.guidance()),"hubCapabilities":capability_context(context.skills.as_ref().map(|s|s.tools()).transpose()?.unwrap_or(Value::Null), tool_specs),"capabilities":session.capabilities()?, "budget":native_budget,
         "sessionPolicy":"Hub 笔记精确编号引用仅使用本轮 quoteCatalog，核对当前授权和来源版本。公开网页可复用同一会话已读取且仍适用的原文，以具名 HTTPS 链接引用；助手旧回答不替代原文证据。不可用能力只保留说明与不可用原因，本轮不提供参数格式，也不能调用。 knowledgeRulesRef/ruleValueRef/quoteCatalogRef 指向本代上下文内 location 标明的规则、精确条目或引用目录；可从已发送的完整内容及引用无损展开，按指纹、版本与原作用域沿用，不增加授权。缺少基版时宿主补发全文，不能自行猜测。"}),
     )

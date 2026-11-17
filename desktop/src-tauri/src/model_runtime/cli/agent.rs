@@ -2,6 +2,7 @@
 //! documented public messages, summaries and lifecycle notifications.
 use super::*;
 use sha2::Digest;
+pub(crate) mod analysis;
 mod authentication;
 pub(crate) mod capabilities;
 mod compaction;
@@ -85,7 +86,16 @@ impl Drop for Process {
 impl Process {
     fn send(&mut self, value: Value) -> Result<(), String> {
         let bytes = serde_json::to_vec(&value).map_err(|_| "Agent 请求编码失败")?;
-        if bytes.len() > 512 * 1024 {
+        let image_turn = value["method"] == "turn/start"
+            && value["params"]["input"]
+                .as_array()
+                .is_some_and(|items| items.iter().any(|i| i["type"] == "image"));
+        let limit = if image_turn {
+            24 * 1024 * 1024
+        } else {
+            512 * 1024
+        };
+        if bytes.len() > limit {
             return Err("Agent 请求超过容量".into());
         }
         self.input
@@ -354,13 +364,14 @@ fn spawn_profile(
             let mut bytes = Vec::new();
             let result = reader
                 .by_ref()
-                .take(frame_limit as u64 + 2)
+                .take((24 * 1024 * 1024) as u64 + 2)
                 .read_until(b'\n', &mut bytes);
             match result {
                 Ok(0) => break,
-                Ok(_) if bytes.len() <= frame_limit && bytes.ends_with(b"\n") => {
+                Ok(_) if bytes.len() <= 24 * 1024 * 1024 && bytes.ends_with(b"\n") => {
                     let event = serde_json::from_slice(&bytes)
-                        .map_err(|_| "Agent 事件格式无效".to_string());
+                        .map_err(|_| "Agent 事件格式无效".to_string())
+                        .and_then(|value| public_image_frame(value, bytes.len(), frame_limit));
                     if send.send(event).is_err() {
                         break;
                     }
@@ -388,6 +399,51 @@ fn spawn_profile(
         #[cfg(windows)]
         group,
     })
+}
+
+fn public_image_frame(mut value: Value, wire_bytes: usize, limit: usize) -> Result<Value, String> {
+    if wire_bytes <= limit {
+        return Ok(value);
+    }
+    fn redact(value: &mut Value) -> usize {
+        match value {
+            Value::String(s) if s.starts_with("data:image/") => {
+                *s = "[inline image omitted from public event]".into();
+                1
+            }
+            Value::Array(a) => a.iter_mut().map(redact).sum(),
+            Value::Object(o) => o.values_mut().map(redact).sum(),
+            _ => 0,
+        }
+    }
+    if redact(&mut value) == 0 || value.to_string().len() > limit {
+        return Err("Agent 非图片事件超过容量，进展已保留".into());
+    }
+    Ok(value)
+}
+
+#[cfg(test)]
+mod visual_frame_tests {
+    use super::*;
+    #[test]
+    fn inline_image_echo_is_removed_before_entering_public_queue() {
+        let event = json!({"method":"turn/started","params":{"input":[{"type":"image","url":format!("data:image/png;base64,{}","A".repeat(2000))}]}});
+        let projected = public_image_frame(event, 2200, 512).unwrap();
+        assert!(projected.to_string().len() < 512);
+        assert!(!projected.to_string().contains("base64"));
+        assert!(public_image_frame(
+            json!({"method":"unknown","text":"x".repeat(2000)}),
+            2200,
+            512
+        )
+        .is_err());
+        assert!(public_image_frame(
+            json!({"image":"data:image/png;base64,A","text":"x".repeat(2000)}),
+            2200,
+            512
+        )
+        .is_err());
+    }
 }
 
 #[cfg(windows)]

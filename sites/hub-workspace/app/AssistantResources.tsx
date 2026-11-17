@@ -4,7 +4,7 @@ import { ArrowLeft, Check, ChevronRight, FileText, FolderOpen, Globe, Image as I
 import { PinShortcut } from './AssistantResearch';
 import type { AssistantContext } from './Assistant';
 
-export type ResourceDraft = { pages: AssistantContext[]; libraryIds: string[]; skills: string[]; url: string; images: string[] };
+export type ResourceDraft = { pages: AssistantContext[]; libraryIds: string[]; skills: string[]; url: string; images: string[]; dataFiles?: string[] };
 export const emptyResources = (): ResourceDraft => ({ pages: [], libraryIds: [], skills: [], url: '', images: [] });
 export const demoSkills = [
   ['hub-research', '资料分析与核对', '比较材料中的观点，核对原文与矛盾'],
@@ -61,6 +61,7 @@ export function ResourceChips({ resources, canShowPage, onChange }: { resources:
   const chips = [
     ...resources.pages.filter(canShowPage).map(item => ({ key: 'page:' + item.id, Icon: FileText, title: item.title, image: item.kind === 'image', remove: () => onChange({ ...resources, pages: resources.pages.filter(value => value.id !== item.id) }) })),
     ...resources.skills.map(id => ({ key: 'skill:' + id, Icon: WandSparkles, title: demoSkills.find(item => item[0] === id)?.[1] || id, remove: () => onChange({ ...resources, skills: resources.skills.filter(value => value !== id) }) })),
+    ...(resources.dataFiles||[]).map(name=>({key:'data:'+name,Icon:FileText,title:name,remove:()=>onChange({...resources,dataFiles:(resources.dataFiles||[]).filter(item=>item!==name)})})),
     ...resources.images.map(name => ({ key: 'image:' + name, Icon: ImageIcon, title: name, remove: () => onChange({ ...resources, images: resources.images.filter(value => value !== name) }) })),
     ...(resources.url ? [{ key: 'url', Icon: Globe, title: resources.url, remove: () => onChange({ ...resources, url: '' }) }] : []),
   ];
