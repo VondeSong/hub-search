@@ -6,13 +6,14 @@ import type {ActivityEvent} from "./AgentActivity";
 import github from "./assets/agent-services/github.svg";
 import notion from "./assets/agent-services/notion.svg";
 
-export type ActivityOperation="search"|"read"|"command"|"edit"|"skill"|"context"|"delegate"|"mcp"|"browser"|"tool";
+export type ActivityOperation="search"|"read"|"command"|"compute"|"edit"|"skill"|"context"|"delegate"|"mcp"|"browser"|"tool";
 /** The same resolver feeds rows and collapsed groups. Labels are legacy only. */
 export function activityOperation(event:ActivityEvent):ActivityOperation {
   const operation=event.operation;
   if(event.kind==="webSearch" || operation==="search")return "search";
   if(event.kind==="skill" || operation==="loadSkill" || operation==="readSkillReference")return "skill";
-  if(operation==="command" || operation==="compute")return "command";
+  if(operation==="compute")return "compute";
+  if(operation==="command")return "command";
   if(operation==="delegate")return "delegate";
   if(operation==="edit")return "edit";
   if(operation==="mcp")return event.serviceId?.startsWith("browser:")?"browser":"mcp";
@@ -25,10 +26,11 @@ export function activityOperation(event:ActivityEvent):ActivityOperation {
   if(/读取|原文|材料/.test(event.label))return "read";
   return "tool";
 }
-export const operationLabels:Record<ActivityOperation,string>={search:"搜索资料",read:"读取资料",command:"运行命令",edit:"编辑文件",skill:"使用技能",context:"整理上下文",delegate:"协调子代理",mcp:"使用外部工具",browser:"操作浏览器",tool:"调用工具"};
+export const operationLabels:Record<ActivityOperation,string>={search:"搜索资料",read:"读取资料",command:"运行命令",compute:"运行计算脚本",edit:"编辑文件",skill:"使用技能",context:"整理上下文",delegate:"协调子代理",mcp:"使用外部工具",browser:"操作浏览器",tool:"调用工具"};
+export const activityLabel=(event:ActivityEvent)=>event.kind==="tool"&&event.operation==="compute"?operationLabels.compute:event.label;
 export function ActivityIcon({event}:{event:ActivityEvent}) {
   if(event.kind==="reasoning"||event.kind==="status")return null;
-  const icons={search:Search,read:FileText,command:Terminal,edit:Pencil,skill:BookOpen,context:Shrink,delegate:Network,mcp:Globe2,browser:MousePointer2,tool:Wrench};
+  const icons={search:Search,read:FileText,command:Terminal,compute:Terminal,edit:Pencil,skill:BookOpen,context:Shrink,delegate:Network,mcp:Globe2,browser:MousePointer2,tool:Wrench};
   const Icon=event.state==="failed"||event.errorCount?TriangleAlert:event.state==="interrupted"?Circle:icons[activityOperation(event)];
   return <Icon size={16} aria-hidden="true" data-activity-icon={event.state==="failed"?"failed":activityOperation(event)}/>;
 }

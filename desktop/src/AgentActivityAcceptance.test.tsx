@@ -18,7 +18,7 @@ async function render(events:ActivityEvent[],expanded=true,extra:Partial<Activit
 
 it.each([
  ["search","搜索资料","search"],["read","读取资料","read"],
- ["command","运行命令","command"],["compute","运行命令","command"],
+ ["command","运行命令","command"],["compute","运行计算脚本","compute"],
  ["edit","编辑文件","edit"],["loadSkill","使用技能","skill"],
  ["readSkillReference","使用技能","skill"],["delegate","协调子代理","delegate"],
  ["mcp","使用外部工具","mcp"],["future-operation","调用工具","tool"],

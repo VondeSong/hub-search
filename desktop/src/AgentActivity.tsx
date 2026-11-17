@@ -1,7 +1,7 @@
 import { publicWebHref } from "./AgentWebSources";
 import { createContext, memo, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, TriangleAlert } from "lucide-react";
-import { ActivityIcon, ActivityIdentity, activityOperation, operationLabels } from "./AgentActivityIdentity";
+import { ActivityIcon, ActivityIdentity, activityLabel, activityOperation, operationLabels } from "./AgentActivityIdentity";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AgentToolResult, type ToolResultRef, type ToolResultScope } from "./AgentToolResult";
@@ -83,6 +83,7 @@ function eventStateLabel(event:ActivityEvent) {
   return ({failed:"未完成",running:"进行中",interrupted:"已中断",queued:"等待执行"} as Record<string,string>)[event.state] ?? "";
 }
 function ActivityEventView({ event, scope }: { event: ActivityEvent; scope: ToolResultScope | null }) {
+  event={...event,label:activityLabel(event)};
   if (event.label === "核对任务状态（内部）" && event.state === "completed") return <details className="agent-reasoning"><summary>已核对任务状态</summary><div>{event.resultRef && scope && <AgentToolResult value={event.resultRef} scope={scope}/>}</div></details>;
   if (event.kind === "unpublishedAnswer") return <UnpublishedAnswer text={event.label} truncated={event.truncated}/>;
   if (event.kind === "webSearch") return <WebActivity event={event} workId={scope?.workId}/>;
@@ -129,8 +130,9 @@ function OperationPhase({events,scope,running,runId}:{events:ActivityEvent[];sco
   const pending=running?operations.find(event=>event.state==="queued"):undefined;
   const current=active??pending;
   const overview=(operations.every(event=>event.state==="completed"&&!event.errorCount)?"已":"")+labels.join("、");
-  const currentLabel=current && (/^(读取|搜索|访问|运行|执行|检查|核对|验证|编辑|加载|查找|整理|分析|生成|保存|创建)/.test(current.label)?"正在"+current.label:current.label);
-  const summary=current ? pending&&!active?"等待："+current.label:currentLabel! : running?"正在思考":overview;
+  const currentTitle=current&&activityLabel(current);
+  const currentLabel=currentTitle && (/^(读取|搜索|访问|运行|执行|检查|核对|验证|编辑|加载|查找|整理|分析|生成|保存|创建)/.test(currentTitle)?"正在"+currentTitle:currentTitle);
+  const summary=current ? pending&&!active?"等待："+currentTitle:currentLabel! : running?"正在思考":overview;
   return <details className={`agent-operation-group${running?" agent-operation-active":""}`} open={open} onToggle={event=>setOpen(event.currentTarget.open)}>
     <summary title={summary}>{current?<ActivityIcon event={current}/>:!running&&<ActivityIcon event={{...summaryIcon,state:"completed",errorCount:0}}/>}<ActivityIdentity events={operations} workId={scope?.workId}/><span className={running?"agent-current-action":undefined}>{summary}</span>{failed&&!open&&<small className="agent-phase-warning" role="status"><TriangleAlert size={12} aria-hidden="true"/>{webFailure ? `${otherFailure?"部分未完成 · ":""}${webFailure}` : "部分未完成"}</small>}<ChevronDown size={12} aria-hidden="true"/></summary>
     <div>{events.map(event=><ActivityEventView key={event.id} event={event} scope={scope}/>)}</div>
