@@ -408,7 +408,7 @@ body.resizing-agent-panel * { cursor: col-resize !important; user-select: none !
 
 /* The conversation belongs to the app, independently of the preview route. */
 .desktop-main-layout:has(> .agent-body-citation) { position:relative; }
-.agent-body-citation { position:absolute; inset:0; z-index:20; overflow:auto; background:var(--hub-content-surface); padding:24px; }
+.agent-body-citation { position:absolute; inset:0; z-index:40; overflow:auto; background:var(--hub-content-surface); padding:24px; }
 .agent-global-owner > .agent-launcher { display:none; }
 body > .agent-panel { inset: auto 12px 12px auto; height:var(--agent-panel-height, 50dvh); max-height:calc(100dvh - 24px); width:min(var(--agent-panel-width, 440px), calc(100vw - 24px)); min-width:0; border-radius:22px; box-shadow:0 12px 40px #0002; }
 body > .agent-panel-resizer:not([hidden]) { display:block; position:fixed; z-index:201; top:calc(100dvh - var(--agent-panel-height, 50dvh) + 4px); bottom:28px; right:min(calc(var(--agent-panel-width, 440px) + 8px), calc(100vw - 20px)); width:8px; cursor:col-resize; touch-action:none; }

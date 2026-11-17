@@ -535,8 +535,11 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     const requestScope=sourceScopeKey; sourceScope.current=requestScope;
     const element=conversationScroll.element.current;
     const previous=citationOpen && citationReturn.current?.scope===requestScope ? citationReturn.current : null;
+    const focused=document.activeElement instanceof HTMLElement && element?.contains(document.activeElement) ? document.activeElement : null;
+    const disclosure=focused?.closest<HTMLDetailsElement>("details.agent-token-disclosure");
+    const returnFocus=disclosure&&!disclosure.open ? disclosure.querySelector<HTMLElement>("summary") : focused;
     citationReturn.current={scope:requestScope,ticket,reading:previous?.reading ?? reportReading,scrollTop:previous?.scrollTop ?? element?.scrollTop ?? 0,
-      focus:previous?.focus ?? (document.activeElement instanceof HTMLElement && element?.contains(document.activeElement) ? document.activeElement : null),pending:false};
+      focus:previous?.focus ?? returnFocus,pending:false};
     onPreviewCitation?.(null);
     setSourcePreview(null); setSourceError(""); setSourceLoading(true);
     try {

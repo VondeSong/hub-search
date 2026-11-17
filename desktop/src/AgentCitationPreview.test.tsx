@@ -27,5 +27,8 @@ it("highlights verified text, clears it for changed sources, and returns without
     await act(async () => root.render(<AgentCitationPreview value={{...value,excerpt:{...value.excerpt,content:"引用引用"}}}/>));
     expect(host.querySelector("mark")).toBeNull();
     expect(host.textContent).toContain("无法唯一定位");
+    await act(async () => root.render(<AgentCitationPreview value={{...value,quote:""}}/>));
+    expect(host.querySelector('[role="status"]')?.textContent).toContain("已打开原文");
+    expect(host.textContent).not.toContain("未找到该引用");
   } finally { await act(async () => root.unmount()); }
 });

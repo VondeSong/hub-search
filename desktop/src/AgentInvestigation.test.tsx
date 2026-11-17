@@ -1532,9 +1532,13 @@ it("opens an attached page from its compact details through the authorized sourc
   await act(async()=>root.render(<AgentCitationContext.Provider value={{value:null,show}}><StandaloneInvestigation initiallyOpen/></AgentCitationContext.Provider>));
   const detail=document.querySelector<HTMLDetailsElement>('.agent-message-user details')!;expect(detail.open).toBe(false);
   await act(async()=>detail.querySelector('summary')!.click());expect(detail.open).toBe(true);
+  detail.querySelector<HTMLButtonElement>('.agent-token-detail>button')!.focus();
   await click("打开原页面");
   expect(invoke.mock.calls.some(([,p])=>p?.args?.action==='messageMaterialSource'&&JSON.stringify(p.args.locator)===JSON.stringify(locator))).toBe(true);
   expect(show.mock.calls.some(([value])=>value?.excerpt?.title===makeView().evidence[0].title)).toBe(true);
+  const opened=show.mock.calls.map(([value])=>value).find(value=>value?.excerpt);
+  await act(async()=>opened.onReturn());
+  expect(document.activeElement).toBe(detail.querySelector('summary'));
   expect(invoke.mock.calls.some(([,p])=>['create','respond','message'].includes(p?.args?.action))).toBe(false);
 });
 it.each([false,true])("requires input for a skill alone while accepting an explicitly attached page (%s)",async page=>{
