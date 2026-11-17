@@ -530,7 +530,7 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
     {describe && <button type="button" onClick={openSkills}><Sparkles size={20}/><span>技能<small>查看方法，添加到消息</small></span><ChevronRight size={16}/></button>}
   </>;
 
-  return <section className={`cloud-agents${mobile ? " is-mobile" : ""}`} aria-label="云端 Agents">
+  return <section className={`cloud-agents${mobile ? " is-mobile" : ""}`} aria-label="云端助手">
     {mobile && (sheet === "attachments" || materialPicker) && <CloudAgentSheet
       title={materialPicker ? "选择已下载资料" : "添加材料"}
       compact={!materialPicker} onClose={() => { setSheet(undefined); setMaterialPicker(false); }}>
@@ -554,7 +554,9 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
         {connection && (!mobile || chatOpen) && <button type="button" onClick={showList} aria-label={mobile ? "返回会话列表" : "对话列表"}>{mobile ? <ArrowLeft size={21}/> : <PanelLeft size={20}/>}</button>}
         {mobile && chatOpen ? <button type="button" className="cloud-agents-header-title" onClick={showSettings} aria-label="查看云端连接与设备">
           <strong>{title}</strong><span>{connectionLabel}</span>
-        </button> : <div><h1>{chatOpen ? title : "Agents"}</h1><span>{connectionLabel}</span></div>}
+        </button> : mobile && connection ? <button type="button" className="cloud-agents-header-title cloud-agents-home-connection" onClick={showSettings} aria-label={`查看连接与设备：${warning || connectionLabel}`}>
+          <h1>助手</h1><span><Cloud size={13}/>{warning || connectionLabel}<ChevronRight size={13}/></span>
+        </button> : <div><h1>{chatOpen ? title : "助手"}</h1><span>{connectionLabel}</span></div>}
         {connection && (!mobile || !chatOpen) && <button type="button" onClick={() => select()} disabled={busy || preparing} aria-label="新对话"><Plus size={22}/></button>}
         {connection && (!mobile || !chatOpen) && <button type="button" onClick={settings ? closeSettings : showSettings} disabled={busy || preparing} aria-label="VPS 连接设置"><Settings2 size={20}/></button>}
         {chatOpen && (mobile || known && management) && <details className="cloud-agents-menu"><summary aria-label="会话选项"><MoreHorizontal size={20}/></summary><div>
@@ -565,7 +567,7 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
           </>}
           {mobile && <button type="button" onClick={event => { event.currentTarget.closest("details")!.open = false; showSettings(); }}>连接与设备</button>}
         </div></details>}
-        {onClose && (!mobile || !chatOpen) && <button type="button" onClick={onClose} aria-label="关闭云端 Agents"><X size={21}/></button>}
+        {onClose && (!mobile || !chatOpen) && <button type="button" onClick={onClose} aria-label="关闭云端助手"><X size={21}/></button>}
       </>}
     </header>
     {connection === undefined ? <p className="cloud-agents-empty" role="status">正在读取连接…</p> : !connection || settings ? <form className="cloud-agents-connect" onSubmit={event => void connect(event)}>
@@ -579,7 +581,7 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
       {notice && <p role="alert">{notice}</p>}
     </form> : !chatOpen ? <div ref={list} className="cloud-agents-home" onScroll={event => { listScroll.current = event.currentTarget.scrollTop; }}>
       <h2>你的云端对话</h2><p className="cloud-agents-lede">在手机上开始，随时接着聊。</p>
-      <button type="button" className="cloud-agents-connection-card" onClick={showSettings}><Cloud size={21}/><span><strong>{warning || "个人云端"}</strong><small>{connectionLabel}</small></span><ChevronRight size={18}/></button>
+      {!mobile && <button type="button" className="cloud-agents-connection-card" onClick={showSettings}><Cloud size={21}/><span><strong>{warning || "个人云端"}</strong><small>{connectionLabel}</small></span><ChevronRight size={18}/></button>}
       <label className="cloud-agents-search"><Search size={20}/><input type="search" aria-label="搜索会话标题或消息" placeholder={management ? "搜索标题或消息" : "搜索会话标题"} maxLength={200} value={search} onChange={event => setSearch(event.target.value)}/></label>
       <div className="cloud-agents-scopes" aria-label="会话范围">{([ ["active", "当前", catalog.length - count], ["archived", "已归档", count], ["all", "全部", catalog.length] ] as const).map(([id,label,total]) => <button type="button" key={id} aria-pressed={scope === id} onClick={() => { setScope(id); listScroll.current = 0; }}>{label} {total}</button>)}</div>
       {(network || notice) && <p role="status" className="cloud-agents-notice">{notice || network} <button type="button" onClick={() => refresh(v => v + 1)}>重新读取</button></p>}

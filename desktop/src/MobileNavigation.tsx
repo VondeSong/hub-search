@@ -15,7 +15,7 @@ export function MobileNavigation({ active, onSelect, dueCount }: MobileNavigatio
   const destinations = [
     { key: "search", label: "搜索", icon: Search },
     { key: "browse", label: "浏览", icon: FolderOpen },
-    { key: "agents", label: "Agents", icon: MessageSquare },
+    { key: "agents", label: "助手", icon: MessageSquare },
     { key: "tasks", label: "任务", icon: ListTodo },
     { key: "review", label: "复习", icon: BookOpenCheck, count: dueCount, countLabel: "今天待复习" },
   ] as const;
@@ -55,7 +55,7 @@ export function MobileBrowse({ favoriteCount, historyCount, tagCount, onOpen, on
       <h2>资料来源</h2>
       <div className="mobile-browse-group">
         <button type="button" onClick={onOpenLibraries}><FolderOpen size={20} aria-hidden="true" /><span><strong>资料库</strong><small>选择搜索范围</small></span><ChevronRight size={18} aria-hidden="true" /></button>
-        <button type="button" onClick={onOpenSyncHealth}><span className={`mobile-sync-dot${syncNeedsAttention ? " attention" : ""}`} aria-hidden="true" /><span><strong>连接总览</strong><small>{syncNeedsAttention ? "有事项需要查看" : "内容同步与 Agents 会话分别查看"}</small></span><ChevronRight size={18} aria-hidden="true" /></button>
+        <button type="button" onClick={onOpenSyncHealth}><span className={`mobile-sync-dot${syncNeedsAttention ? " attention" : ""}`} aria-hidden="true" /><span><strong>连接总览</strong><small>{syncNeedsAttention ? "有事项需要查看" : "内容同步与助手会话分别查看"}</small></span><ChevronRight size={18} aria-hidden="true" /></button>
       </div>
       {onOpenInsights && <><h2>发现与回看</h2><div className="mobile-browse-group"><button type="button" onClick={onOpenInsights}><Sparkles size={20} aria-hidden="true" /><span><strong>洞察</strong></span><ChevronRight size={18} aria-hidden="true" /></button></div></>}
     </div>
@@ -66,7 +66,7 @@ export function MobileConnections({ onContent, onAgents }: { onContent: () => vo
   return <section className="mobile-browse-screen" aria-label="连接总览"><div className="mobile-browse-scroll">
     <h1>连接总览</h1><p className="mobile-browse-intro">内容同步和云端对话各自连接、分别查看状态。</p>
     <h2>内容同步</h2><div className="mobile-browse-group"><button onClick={onContent}><Cloud size={20} aria-hidden="true"/><span><strong>阿里云内容同步</strong><small>速记、阅读、闪卡与上传队列</small></span><ChevronRight size={18} aria-hidden="true"/></button></div>
-    <h2>云端助手</h2><div className="mobile-browse-group"><button onClick={onAgents}><MessageSquare size={20} aria-hidden="true"/><span><strong>Agents 会话</strong><small>服务连接、设备与对话状态</small></span><ChevronRight size={18} aria-hidden="true"/></button></div>
-    <p className="mobile-connection-help">内容已上传不代表电脑已写入日记；Agents 连接正常也不代表内容同步已经开启。</p>
+    <h2>云端助手</h2><div className="mobile-browse-group"><button onClick={onAgents}><MessageSquare size={20} aria-hidden="true"/><span><strong>助手会话</strong><small>服务连接、设备与对话状态</small></span><ChevronRight size={18} aria-hidden="true"/></button></div>
+    <p className="mobile-connection-help">内容已上传不代表电脑已写入日记；助手连接正常也不代表内容同步已经开启。</p>
   </div></section>;
 }

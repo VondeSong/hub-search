@@ -57,8 +57,8 @@ it("switches content type without changing query, date or library range; clears 
 it("keeps the five prototype destinations reachable with Agents in the center", async () => {
   const navigate = vi.fn();
   await act(async () => root.render(<MobileNavigation active="agents" onSelect={navigate} dueCount={3}/>));
-  expect([...host.querySelectorAll("button")].map(button => button.textContent)).toEqual(["搜索", "浏览", "Agents", "任务", "3复习"]);
-  expect(host.querySelector("[aria-current='page']")?.textContent).toBe("Agents"); await click("Agents"); expect(navigate).toHaveBeenCalledWith("agents");
+  expect([...host.querySelectorAll("button")].map(button => button.textContent)).toEqual(["搜索", "浏览", "助手", "任务", "3复习"]);
+  expect(host.querySelector("[aria-current='page']")?.textContent).toBe("助手"); await click("助手"); expect(navigate).toHaveBeenCalledWith("agents");
 });
 
 it("opens the real insights workspace from browse without duplicating Agents", async () => {
@@ -73,7 +73,7 @@ it("keeps content synchronization and Agents as distinct connection actions", as
   await act(async () => root.render(<MobileConnections onContent={content} onAgents={agents}/>));
   await act(async () => [...host.querySelectorAll("button")].find(button => button.textContent?.startsWith("阿里云内容同步"))!.click());
   expect(content).toHaveBeenCalledOnce(); expect(agents).not.toHaveBeenCalled();
-  await act(async () => [...host.querySelectorAll("button")].find(button => button.textContent?.startsWith("Agents 会话"))!.click());
+  await act(async () => [...host.querySelectorAll("button")].find(button => button.textContent?.startsWith("助手会话"))!.click());
   expect(agents).toHaveBeenCalledOnce();
 });
 

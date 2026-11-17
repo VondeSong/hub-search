@@ -27,21 +27,23 @@ function voiceOpen(id) {
     st.voiceDraft=voiceNew(f?.dataset.editId||'');
   }
   const v=st.voiceDraft;
+  if(!id&&v.elapsed)v.restored=true;
   if(['recording','paused','requesting','saving'].includes(v.state)&&!voiceRecorder&&!voiceTimer){v.state='review';v.failure='上次流程中断；文字已保留，未完成录音可能缺失。';}
   voicePersist();voiceShow();
 }
 function voiceShow() {
   const v=st.voiceDraft;if(!v)return;
   const active=['recording','paused'].includes(v.state),ready=v.state==='ready',review=v.state==='review';
-  sheet('语音速记','<section class="voice-panel" aria-label="语音速记"><p class="voice-context">'+(v.mode==='real'&&!ready?'仅本机录音 · 可保存原音，稍后转写':'交互演示 · 文字为预设示例')+'</p>'+
+  const previous=v.target?recordAttachments(journalFind(v.target)||{}).filter(a=>a.voice&&a.id!==v.id):[];
+  sheet(v.target&&!v.attached?'追加录音':'语音速记','<section class="voice-panel" aria-label="语音速记">'+(v.restored&&!v.attached?'<p class="voice-notice" role="status">已恢复未完成的语音草稿，完成并保存后再新建。</p>':'')+(previous.length?'<details class="voice-history"><summary>原记录 · '+previous.length+' 段录音</summary><p>本次补录会作为新的一段加入同一条记录，原录音与正文保留。</p></details>':'')+'<p class="voice-context">'+(v.mode==='real'&&!ready?'仅本机录音 · 可保存原音，稍后转写':'交互演示 · 文字为预设示例')+'</p>'+
     '<label class="voice-provider">转写服务<select id="voice-provider" '+(!ready?'disabled':'')+'>'+Object.entries(voiceProviders).map(([k,p])=>'<option value="'+k+'" '+(v.provider===k?'selected':'')+'>'+p[0]+'</option>').join('')+'</select></label><p class="fine voice-model">'+voiceProviders[v.provider][1]+' · 每次只选一家</p>'+
     '<div class="voice-clock"><span class="voice-indicator '+(v.state==='recording'?'is-recording':'')+'">'+voiceMic()+'</span><strong id="voice-time">'+voiceTime(voiceElapsed(v))+'</strong><span id="voice-state">'+({ready:'准备好即可录音',requesting:'等待麦克风权限',recording:'录音中',paused:'已暂停',saving:'正在保存原音',review:'录音已结束'}[v.state]||'')+'</span></div>'+
     '<div id="voice-notice" class="voice-notice" role="status">'+esc(v.failure)+'</div>'+
     (ready?'<p class="voice-intro">先录音，识别文字后再校对。</p><p class="fine">本站可体验演示或本机录音，不会上传音频。Android Hub 可通过个人 VPS 使用阿里或 OpenAI，识别后校对并加入文字，保留原音。</p><div class="voice-actions">'+btn('体验实时转录','voice-demo')+plain('使用麦克风录音','voice-real')+'</div>':'')+
     (active?'<div class="voice-transcript"><h3>'+(v.mode==='demo'?'实时文字 · 演示':'文字待转写')+'</h3><div id="voice-final">'+voiceParagraphs(v)+'</div><p id="voice-partial" class="voice-partial">'+esc(v.partial||(!v.segments.length?'说出的内容将在这里逐段出现…':''))+'</p></div><div class="voice-actions">'+btn(v.state==='paused'?'继续录音':'暂停录音','voice-pause','outline')+btn('完成录音','voice-finish')+'</div>'+(v.mode==='demo'?'<details class="voice-scenarios"><summary>体验异常与恢复</summary><div class="actions">'+plain('模拟断网','voice-fail:断网')+plain('模拟额度不足','voice-fail:额度不足')+(v.failure?plain('恢复转写演示','voice-retry'):'')+'</div></details>':''):'')+
-    (review?'<div class="voice-playback">'+(v.mode==='real'?'<audio id="voice-audio" controls aria-label="原音回听"></audio><p id="voice-audio-state" class="fine">正在读取本机原音…</p>':'<p class="fine">流程演示未使用麦克风，没有原音文件。</p>')+'</div><label class="voice-edit-label" for="voice-edit">校对后的文字</label><textarea id="voice-edit" rows="5" placeholder="可以手动补充文字">'+esc(v.editedByUser?v.edited:voiceText(v))+'</textarea><details class="voice-original"><summary>查看识别原文'+(v.mode==='demo'?'（演示）':'')+'</summary><p>'+esc(voiceText(v)||'尚无识别结果')+'</p></details>'+(v.failure&&v.mode==='demo'?plain('补转缺失文字（演示）','voice-retry'):'')+'<p class="fine">'+(v.target?'保留同一条记录；补转原文不会覆盖你已有的正文。':'确认后回到原速记草稿，文字和录音一起保存。')+'</p><div class="voice-actions">'+btn(v.attached?'保存校对':'加入速记草稿','voice-attach')+(v.mode==='real'?plain('下载原音','voice-download'):'')+(v.attached&&v.target?plain('继续追加录音','voice-continue'):'')+'</div>':'')+
+    (review?'<div class="voice-playback">'+(v.mode==='real'?'<audio id="voice-audio" controls aria-label="原音回听"></audio><p id="voice-audio-state" class="fine">正在读取本机原音…</p>':'<p class="fine">流程演示未使用麦克风，没有原音文件。</p>')+'</div><label class="voice-edit-label" for="voice-edit">校对后的文字</label><textarea id="voice-edit" rows="5" placeholder="可以手动补充文字">'+esc(v.editedByUser?v.edited:voiceText(v))+'</textarea><details class="voice-original"><summary>查看识别原文'+(v.mode==='demo'?'（演示）':'')+'</summary><p>'+esc(voiceText(v)||'尚无识别结果')+'</p></details>'+(v.failure&&v.mode==='demo'?plain('补转缺失文字（演示）','voice-retry'):'')+'<p class="fine">'+(v.target?'保留同一条记录；补转原文不会覆盖你已有的正文。':'确认后回到原速记草稿，文字和录音一起保存。')+'</p><div class="voice-actions">'+btn(v.attached?'保存校对':'加入速记草稿','voice-attach')+(v.mode==='real'?plain('下载原音','voice-download'):'')+(v.attached&&v.target?plain('追加一段录音','voice-continue'):'')+'</div>':'')+
     (review&&v.mode==='real'&&!v.audioSaved&&!voiceBlob?plain('重新录制','voice-retake'):'')+
-    '<details class="voice-connection-help"><summary>转写连接与密钥说明</summary><p>阿里和 OpenAI 的服务密钥保存在个人云端，Android 手机不用重复填写；手机复用 Agents 的云端地址与设备密钥。云端暂不可用时仍可先录音，保存原音后再补转写。</p><p>此网页只演示交互和本机录音，不连接真实转写服务、不收取识别费用。</p></details><p class="voice-footnote">离开网页或锁屏可能结束录音，请先保存原音。</p></section>');
+    '<details class="voice-connection-help"><summary>转写连接与密钥说明</summary><p>阿里和 OpenAI 的服务密钥保存在个人云端，Android 手机不用重复填写；手机复用助手的云端地址与设备密钥。云端暂不可用时仍可先录音，保存原音后再补转写。</p><p>此网页只演示交互和本机录音，不连接真实转写服务、不收取识别费用。</p></details><p class="voice-footnote">离开网页或锁屏可能结束录音，请先保存原音。</p></section>');
   if(review&&v.mode==='real')void voiceLoadAudio(v);
 }
 function voiceParagraphs(v) { return v.segments.map(t=>'<p>'+esc(t)+'</p>').join(''); }
@@ -110,7 +112,7 @@ function voiceRetry(v) {
   if(v.state==='recording'){v.elapsed=Math.max(v.elapsed,15000);voiceStarted=Date.now();}
   voicePersist();voiceShow();if(v.editedByUser)voiceNotice('演示原文已补齐；你的校对稿保持不变。');
 }
-async function voiceAttach() {
+async function voiceAttach(continueTarget = '') {
   const v=st.voiceDraft;if(!v||v.state!=='review'||voiceBusy)return;
   voiceBusy=true;
   try{
@@ -137,6 +139,7 @@ async function voiceAttach() {
     });
     if(!ok){voiceNotice('未能保存，原草稿与语音仍保留，请重试。');return;}
     voiceBlob=null;
+    if(continueTarget){st.voiceDraft=voiceNew(continueTarget);voicePersist();voiceShow();return;}
     if(v.attached&&v.inDraft&&!v.target){quickCapture('note');tell('校对稿已保存在语音附件内，正文保持不变。');}
     else if(v.attached){close();render();tell('校对稿已保存，原正文保持不变。');}
     else if(v.target){if(journalCommitEdit(v.target)){close();render();tell('已保存到原记录。');}else{close();go('journal-edit/'+v.target);tell('追加已保留在原记录草稿，请核对后保存。');}}
@@ -146,7 +149,7 @@ async function voiceAttach() {
 function voiceAction(a,key) {
   if(a==='voice-continue'){
     const previous=st.voiceDraft;if(!previous?.attached||!previous.target)return true;
-    st.voiceDraft=voiceNew(previous.target);voicePersist();voiceShow();return true;
+    void voiceAttach(previous.target);return true;
   }
   if(a==='journal-voice'){voiceOpen();return true;}
   if(a==='voice-open'){voiceOpen(key);return true;}

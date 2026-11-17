@@ -26,6 +26,9 @@
 .cloud-agents-header > div { flex: 1; min-width: 0; }
 .cloud-agents-header h1 { margin: 0; font-size: 1.25rem; line-height: 1.2; letter-spacing: -.025em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cloud-agents-header span { display: block; margin-top: 3px; font-size: .75rem; color: var(--cloud-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cloud-agents.is-mobile .cloud-agents-home-connection {text-align:left;align-items:flex-start;}
+.cloud-agents.is-mobile .cloud-agents-home-connection span {display:flex;align-items:center;gap:5px;max-width:100%;}
+.cloud-agents-home-connection svg {flex:none;}
 .cloud-agents-connect { align-self: center; width: min(100%, 420px); padding: 22px 18px; overflow: auto; }
 .cloud-agents-connect h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 18px; font-size: 1.1rem; }
 .cloud-agents-connect label { display: grid; gap: 6px; margin-bottom: 13px; font-size: .9rem; }

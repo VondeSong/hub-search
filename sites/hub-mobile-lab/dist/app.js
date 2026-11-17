@@ -36,7 +36,7 @@ let readingQuery='', starQuery='', tagQuery='', taskDate='所有日期', searchD
 let query='', source='全部资料库', readingSource='全部来源', readingFilter='全部', taskFilter='待办', filter='待关注', face=false, cardIndex=0, compare='month', toastTimer;
 const save=()=>{try{localStorage.setItem('hub-mobile-v1',JSON.stringify(st));return true}catch{tell('浏览器暂时无法保存。请保留当前页面并重试。');return false}};
 function tell(t){const el=$('#toast');el.textContent=t;el.hidden=false;const feedback=$('#sheet-feedback');if($('#sheet').open&&feedback){feedback.textContent=t;feedback.hidden=false}clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.hidden=true,3800)}
-const navs=[['search','搜索','search'],['browse','浏览','folder'],['agents','Agents','chat'],['tasks','任务','task'],['review','复习','cards']];
+const navs=[['search','搜索','search'],['browse','浏览','folder'],['agents','助手','chat'],['tasks','任务','task'],['review','复习','cards']];
 const docs={
  d1:{t:'11 月 7 日 · 日志',s:'Obsidian',date:'11 月 7 日',tag:'生活日志',k:'日记 加班 作息 运动',body:'晚上加班到 21:20，原定的跑步没有去。回家后看了两集《漫长的季节》，大约 00:40 睡。'},
  d2:{t:'11 月 8 日 · 日志',s:'Obsidian',date:'11 月 8 日',tag:'生活日志',k:'日记 加班 作息 运动',body:'补完项目材料后取消了夜跑。晚饭后看了一集《漫长的季节》，过了午夜才睡。'},
@@ -75,7 +75,7 @@ const group=(content,empty='暂无项目。')=>'<div class="group">'+(content||'
 const intro=(t,d)=>t===routes[route()[0]]&&!['doc','note','article','task','finding','work','deck','study','widgets'].includes(route()[0])?'':'<h1>'+esc(t)+'</h1><p class="lede">'+esc(d)+'</p>';
 const detail=(t,badge,body)=>'<article class="detail">'+badge+'<h1>'+esc(t)+'</h1>'+body+'</article>';
 const sourceRow=(id)=>row(docs[id].t,docs[id].s+' · '+docs[id].tag,'note','go:doc/'+id);
-const routes={future:'后续功能',deck:'牌组', 'collab-sync':'协作同步演示',search:'搜索',browse:'浏览',tasks:'任务',review:'复习',insights:'洞察',reading:'阅读',favorites:'收藏',recent:'最近浏览',logs:'日志',tags:'标签',libraries:'资料库',settings:'设置',sync:'同步状态',agent:'Agents',agents:'Agents','agent-chat':'Agents 对话','agent-connection':'云端连接',requests:'更新请求',request:'请求详情',guide:'功能梳理',doc:'资料详情',article:'阅读详情',task:'任务详情',finding:'发现详情','journal-search':'搜索日志','journal-select':'选择笔记','journal-edit':'编辑日志','journal-record':'日志详情',capture:'快速记录',recap:'阶段回顾',works:'工作与专题',work:'工作详情',saved:'日志',label:'标签详情',study:'牌组复习',appearance:'外观与阅读'};
+const routes={future:'后续功能',deck:'牌组', 'collab-sync':'协作同步演示',search:'搜索',browse:'浏览',tasks:'任务',review:'复习',insights:'洞察',reading:'阅读',favorites:'收藏',recent:'最近浏览',logs:'日志',tags:'标签',libraries:'资料库',settings:'设置',sync:'同步状态',agent:'助手',agents:'助手','agent-chat':'助手对话','agent-connection':'云端连接',requests:'更新请求',request:'请求详情',guide:'功能梳理',doc:'资料详情',article:'阅读详情',task:'任务详情',finding:'发现详情','journal-search':'搜索日志','journal-select':'选择笔记','journal-edit':'编辑日志','journal-record':'日志详情',capture:'快速记录',recap:'阶段回顾',works:'工作与专题',work:'工作详情',saved:'日志',label:'标签详情',study:'牌组复习',appearance:'外观与阅读'};
 const parent={future:'settings',deck:'review','collab-sync':'future',reading:'browse',favorites:'browse',recent:'browse',logs:'browse',tags:'browse',libraries:'browse',settings:'browse',sync:'browse',agent:'browse',agents:'browse','agent-chat':'agents','agent-connection':'agents',requests:'insights',request:'insights',guide:'browse',doc:'browse',article:'browse',task:'tasks',finding:'insights',recap:'insights','journal-search':'logs','journal-select':'logs','journal-edit':'logs','journal-record':'logs',capture:'browse',works:'browse',work:'browse',saved:'browse',label:'browse',study:'review',appearance:'browse'};
 Object.assign(routes,{connections:'连接总览',note:'本地笔记',card:'闪卡详情',widgets:'小组件预览'});
 Object.assign(parent,{insights:'browse',connections:'browse',note:'browse',card:'review',agent:'agents',widgets:'settings'});
@@ -132,7 +132,7 @@ function finding(id){const f=findData(id);if(!f)return missing();const j=activeJ
  (j?section('更新进度',group(requestRow(j))):'<div class="actions">'+btn('请求桌面更新','request:'+id,'secondary','sync')+'</div>')+
  (fb.length?section('反馈记录',fb.map(x=>'<blockquote class="quote"><div class="fine">'+esc((x.sent?'已同步 · 待桌面复核':'待同步')+(x.resolved?' · 已核对':'')+' · '+stamps(x.at))+'</div><p>'+esc(x.text)+'</p></blockquote>').join('')):'')+
  (id==='f2'&&st.revised?section('结论版本','<details class="quote"><summary>版本 1 · 11 月 9 日 09:00</summary><p>'+esc(findings.f2.body)+'</p></details><details class="quote"><summary>版本 2 · '+esc(stamps(st.revisedAt))+'</summary><p>更新原因：桌面核对补录的就诊支出 ¥150。</p><p>'+esc(f.body)+'</p></details>'):'')+
- '<div class="actions">'+plain('与 Agents 继续聊','ask-finding:'+id,'chat')+plain('查看原工作：'+workTitles[owners[id]],'go:work/'+owners[id],'folder')+'</div>')}
+ '<div class="actions">'+plain('与助手继续聊','ask-finding:'+id,'chat')+plain('查看原工作：'+workTitles[owners[id]],'go:work/'+owners[id],'folder')+'</div>')}
 const scopeLabels={log:'生活日志',ledger:'同一账户的账目',read:'完读记录'};
 function recap(){
  const j=activeJob('recap');
@@ -214,7 +214,7 @@ function syncPage(){
  const jobs=st.jobs.filter(j=>['ready','waiting','running'].includes(j.stage));
  const pendingCount=st.jobs.filter(j=>['queued','published','cancelPending'].includes(j.stage)).length+Object.values(st.feedback).flat().filter(f=>!f.sent).length+st.actions.filter(a=>!a.sent).length;
  return intro('同步与离线','查看阅读、闪卡与洞察桌面更新的演示状态。')+
- section('Agents 云端对话',group(row('连接与设备','VPS 执行、订阅登录与断线恢复','cloud','go:agent-connection')))+
+ section('助手云端对话',group(row('连接与设备','VPS 执行、订阅登录与断线恢复','cloud','go:agent-connection')))+
  section('桌面同步演示',group(
   row(st.offline?'同步网络离线':'同步网络在线','仅切换本页桌面同步情景；已发布缓存仍可读','sync','offline',st.offline?'warm':'green')+
   row(st.desktopOnline?'桌面在线':'桌面离线','切换示例桌面连接','sync','desktop-online',st.desktopOnline?'green':'warm')+
@@ -244,7 +244,7 @@ function readingPage(){const limited=readingSource!=='全部来源'||readingView
 function readingFilterSheet(){sheet('筛选阅读','<form id="reading-filter-form">'+selectField('reading-source','来源',['全部来源',...new Set(reading.map(x=>x.src))],readingSource)+selectField('reading-view','内容范围',['全部内容','继续阅读','离线内容'],readingView)+'<p class="fine">“继续阅读”只看阅读中的文章；离线标记仅供本原型演示。</p><div class="actions">'+btn('重置','read-reset','outline')+'<button class="btn" type="submit">应用筛选</button></div></form>')}
 function article(id){
  const r=reading.find(x=>x.id===id);if(!r)return missing();const starred=Boolean(st.stars['article/'+id]);
- return '<article class="reader"><p class="eyebrow">'+esc(r.src)+'</p><h1>'+esc(r.t)+'</h1><div class="reader-meta"><span>'+esc(rstatus(r))+'</span><span>'+(st.cache[id]?'已加入离线示例':'示例正文')+'</span></div><p class="reader-intro">'+esc(r.blurb)+'</p><div class="reader-body">'+readerBody(r.body)+'</div><div class="reader-toolbar">'+plain(starred?'已收藏':'收藏','star:article/'+id,'star')+plain('原文出处','reading-original:'+id,'link')+plain('更多','reading-manage:'+id,'settings')+'</div><div class="actions workspace-reading-actions">'+btn('记下想法','workspace-note:reading:'+id,'secondary','note')+btn('带进 Agents','workspace-agent:reading:'+id,'outline','chat')+plain('转成任务','workspace-task:reading:'+id,'task')+'</div><div class="actions">'+btn(rstatus(r)==='已读'?'恢复未读':'标记已读','read:'+id+':'+(rstatus(r)==='已读'?'未读':'已读'),'','check')+btn('稍后接着读','read:'+id+':阅读中','outline')+'</div></article>';
+ return '<article class="reader"><p class="eyebrow">'+esc(r.src)+'</p><h1>'+esc(r.t)+'</h1><div class="reader-meta"><span>'+esc(rstatus(r))+'</span><span>'+(st.cache[id]?'已加入离线示例':'示例正文')+'</span></div><p class="reader-intro">'+esc(r.blurb)+'</p><div class="reader-body">'+readerBody(r.body)+'</div><div class="reader-toolbar">'+plain(starred?'已收藏':'收藏','star:article/'+id,'star')+plain('原文出处','reading-original:'+id,'link')+plain('更多','reading-manage:'+id,'settings')+'</div><div class="actions workspace-reading-actions">'+btn('记下想法','workspace-note:reading:'+id,'secondary','note')+btn('带进助手','workspace-agent:reading:'+id,'outline','chat')+plain('转成任务','workspace-task:reading:'+id,'task')+'</div><div class="actions">'+btn(rstatus(r)==='已读'?'恢复未读':'标记已读','read:'+id+':'+(rstatus(r)==='已读'?'未读':'已读'),'','check')+btn('稍后接着读','read:'+id+':阅读中','outline')+'</div></article>';
 }
 
 function articleRow(id){const r=reading.find(x=>x.id===id);return r?row(r.t,r.src+' · '+rstatus(r),'book','go:article/'+id,'purple'):''}
@@ -280,7 +280,7 @@ const guideRows=[
  ['日志与标签','现有：按日期浏览日志、按标签定位资料。','手机：按天浏览、快速记录。支持文字、照片与文件草稿；上传和电脑写入在原型中显式演示，语音转写留待后续。'],
  ['任务','原型：创建、编辑、日期、优先级、筛选与完成撤销。','阅读、资料、洞察和 Agent 回答可以转任务并保留来源；都是本地演示，不写回 Craft / 滴答。'],
  ['闪卡','现有：牌组与移动复习。','手机：翻卡和评分；桌面：编辑牌组、质量检查和批量导入。'],
- ['Agents 云端会话','主仓方案 #32：Android 连接个人 VPS 与 Codex app-server，已有基础接入。','此站只演示会话、材料、重命名、归档、停止与恢复，不连接 VPS、不调用模型。此站新增材料与成果操作不代表真实 Android / 服务已具备。'],
+ ['助手云端会话','主仓方案 #32：Android 连接个人 VPS 与 Codex app-server，已有基础接入。','此站只演示会话、材料、重命名、归档、停止与恢复，不连接 VPS、不调用模型。此站新增材料与成果操作不代表真实 Android / 服务已具备。'],
  ['洞察与阶段回顾','原型：浏览中直达洞察，搜索首页有轻量提醒。','查看依据、补充纠正、安排下一步；桌面更新与阶段回顾仍为历史演示，不在手机运行真实分析。'],
  ['同步与设置','现有：资料库和同步诊断。','手机：查看缓存、恢复连接、选择同步范围和重试；备份恢复与批量维护在桌面完成。']
 ];

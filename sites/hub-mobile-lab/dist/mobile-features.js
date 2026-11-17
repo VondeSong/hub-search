@@ -213,7 +213,7 @@ function mobileBrowsePage() {
   const tail=text=>'<span class="directory-meta">'+esc(text)+'</span><span class="tail">'+ico('chev',16)+'</span>';
   const count=Object.keys(findings).filter(id=>status(id)==='待关注'||pending(id)).length;
   return '<div class="browse-directory">'+group(row('日志','','calendar','go:logs','',tail('按天'))+row('阅读','','book','go:reading','',tail('稍后读'))+row('收藏','','star','go:favorites')+row('最近浏览','','clock','go:recent')+row('标签','','tag','go:tags'))+
-    section('资料来源',group(row('资料库','Craft、Obsidian 与本地记录','folder','go:libraries')+row('连接总览','内容同步与 Agents 会话','cloud','go:connections')))+
+    section('资料来源',group(row('资料库','Craft、Obsidian 与本地记录','folder','go:libraries')+row('连接总览','内容同步与 助手会话','cloud','go:connections')))+
     section('发现与回看',group(row('洞察','','spark','go:insights','',tail(count+' 条示例'))))+'</div>';
 }
 function futurePage() {

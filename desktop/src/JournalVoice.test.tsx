@@ -100,3 +100,78 @@ it("does not retain audio loaded after the card has closed",async()=>{
  await act(async()=>root.render(null));await act(async()=>finish("data:audio/mp4;base64,AAAA"));
  expect(create).not.toHaveBeenCalled();
 });
+
+it("collapses original audio while keeping new segments separate on the same record",async()=>{
+ const oldRecord={...record,attachments:[attachment]};
+ const next={...attachment,hash:"d".repeat(64),name:"语音-3秒.m4a"};
+ const original=vi.mocked(invoke).getMockImplementation()!;
+ vi.mocked(invoke).mockImplementation((c,a:any)=>c==="quick_journal_voice"&&a.action==="read"?Promise.resolve(next):original(c,a));
+ await act(async()=>root.render(<JournalVoiceCapture request={{record:oldRecord,revision:"old-revision"}} onClose={vi.fn()}/>));
+ expect(document.querySelector<HTMLDetailsElement>(".journal-voice-history")?.open).toBe(false);
+ expect(document.querySelector(".journal-voice-segments")).toBeNull();
+ status={state:"ready",elapsed:3000,token:"c".repeat(32)};
+ await click("保存");
+ expect(invoke).toHaveBeenCalledWith("update_quick_journal",expect.objectContaining({id:record.id,record:{...oldRecord,attachments:[attachment,next]}}));
+ expect(document.querySelector(".journal-voice-segments")?.textContent).toContain("本次新增 · 1 段录音");
+});
+it("labels a restored draft and starts fresh only after explicit save-and-new",async()=>{
+ let savedDraft=JSON.stringify({record:{...record,attachments:[attachment]},stagedTokens:[]});
+ const original=vi.mocked(invoke).getMockImplementation()!;
+ vi.mocked(invoke).mockImplementation((c,a:any)=>{
+  if(c==="quick_journal_voice_draft"){
+   if(a?.recordId)return Promise.resolve("[]");
+   if(a?.value!==undefined)savedDraft=a.value;
+   return Promise.resolve(savedDraft);
+  }
+  return original(c,a);
+ });
+ const close=vi.fn();
+ await act(async()=>root.render(<JournalVoiceCapture request={{}} onClose={close}/>));
+ expect(document.body.textContent).toContain("已恢复上次未保存");
+ await click("保存并新建");
+ expect(invoke).toHaveBeenCalledWith("capture_quick_journal",{record:{...record,attachments:[attachment]}});
+ expect(close).not.toHaveBeenCalled();
+ expect(document.querySelector(".journal-voice-segments")).toBeNull();
+ const fresh=JSON.parse(savedDraft);expect(fresh.record.id).not.toBe(record.id);expect(fresh.record.attachments).toEqual([]);expect(fresh.record.text).toBe("");
+ expect(document.body.textContent).not.toContain("已恢复上次未保存");
+});
+
+it("does not discard a restored draft when save-and-new fails",async()=>{
+ const value=JSON.stringify({record:{...record,attachments:[attachment]},stagedTokens:[]});
+ const original=vi.mocked(invoke).getMockImplementation()!;
+ vi.mocked(invoke).mockImplementation((c,a:any)=>c==="capture_quick_journal"?Promise.reject("保存失败"):c==="quick_journal_voice_draft"&&!a?.value?Promise.resolve(value):original(c,a));
+ await act(async()=>root.render(<JournalVoiceCapture request={{}} onClose={vi.fn()}/>));
+ await click("保存并新建");
+ expect(document.querySelector('[role="alert"]')?.textContent).toContain("保存失败");
+ expect(document.querySelector(".journal-voice-segments")?.textContent).toContain("1 段录音");
+ expect(vi.mocked(invoke).mock.calls.some(([c,a]:any)=>c==="quick_journal_voice_draft"&&a?.value==="")).toBe(false);
+});
+it("groups completed transcription under its original audio without duplicate replay",async()=>{
+ const oldRecord={...record,attachments:[attachment]};
+ const session={id:"transcript",recordId:record.id,source:attachment.hash,provider:"aliyun",binding:"cloud",state:"completed",text:"已校对",offset:1,audioHash:attachment.hash,applied:true};
+ const original=vi.mocked(invoke).getMockImplementation()!;
+ vi.mocked(invoke).mockImplementation((c,a:any)=>c==="quick_journal_voice_draft"&&a?.recordId?Promise.resolve(JSON.stringify([session])):original(c,a));
+ await act(async()=>root.render(<JournalVoiceCapture request={{record:oldRecord,revision:"old"}} onClose={vi.fn()}/>));
+ expect(document.querySelector(".journal-voice-replay")).toBeNull();
+ expect(document.querySelector<HTMLDetailsElement>(".journal-voice-history")?.open).toBe(false);
+ expect(document.querySelector(".journal-voice-history .journal-transcript")?.textContent).toContain("已加入文字");
+});
+
+it("does not resurrect an unchanged saved record as a pending voice draft",async()=>{
+ const close=vi.fn();
+ await act(async()=>root.render(<JournalVoiceCapture request={{record:{...record,attachments:[attachment]},revision:"saved"}} onClose={close}/>));
+ await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label="保留语音草稿并关闭"]')!.click());
+ expect(invoke).toHaveBeenCalledWith("quick_journal_voice_draft",{value:""});
+ expect(close).toHaveBeenCalledOnce();
+ expect(vi.mocked(invoke).mock.calls.some(([c])=>c==="update_quick_journal")).toBe(false);
+});
+
+it("opens a fresh recording after an interrupted read-only visit to a saved record",async()=>{
+ const original=vi.mocked(invoke).getMockImplementation()!;
+ const previous=JSON.stringify({record:{...record,attachments:[attachment]},revision:"saved",dirty:false,stagedTokens:[]});
+ vi.mocked(invoke).mockImplementation((c,a:any)=>c==="quick_journal_voice_draft"&&!a?Promise.resolve(previous):original(c,a));
+ await act(async()=>root.render(<JournalVoiceCapture request={{}} onClose={vi.fn()}/>));
+ expect(document.querySelector(".journal-voice-segments")).toBeNull();
+ expect(document.querySelector(".journal-voice-restored")).toBeNull();
+ expect(document.querySelector<HTMLTextAreaElement>('[aria-label="录音补充文字"]')?.value).toBe("");
+});

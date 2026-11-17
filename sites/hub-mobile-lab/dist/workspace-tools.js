@@ -5,14 +5,14 @@ const WORKSPACE_TYPES = ['全部类型', '资料', '笔记', '日志', 'PDF', '�
 const WORKSPACE_QUICK_TYPES = [['全部类型', '全部'], ['资料', '资料'], ['任务', '任务'], ['阅读', '阅读'], ['对话', '对话'], ['洞察', '洞察'], ['闪卡', '闪卡']];
 const WORKSPACE_DOCUMENT_TYPES = ['笔记', '日志', 'PDF', '链接'];
 const WORKSPACE_DATES = ['不限日期', '今天', '近 7 天', '11 月', '10 月'];
-const WORKSPACE_SOURCES = ['全部资料库', 'Craft', 'Obsidian', '本地记录', '滴答清单', '阅读', 'Agents', '洞察', '闪卡'];
+const WORKSPACE_SOURCES = ['全部资料库', 'Craft', 'Obsidian', '本地记录', '滴答清单', '阅读', '助手', '洞察', '闪卡'];
 const WORKSPACE_LIBRARIES = [
   { id: 'craft', title: 'Craft', subtitle: 'main · 示例空间', leaves: [['craft-projects', 'Hub 项目'], ['craft-reading', '阅读笔记'], ['craft-finance', '账目']] },
   { id: 'obsidian', title: 'Obsidian', subtitle: 'main · 示例库', leaves: [['obsidian-journal', '生活日志']] },
   { id: 'ticktick', title: '滴答清单', subtitle: '示例清单', leaves: [['ticktick-life', '生活'], ['ticktick-inbox', '收件箱']] },
   { id: 'reading', title: '阅读', subtitle: '示例来源', leaves: [['reading-x', 'X 书签 / 喜欢'], ['reading-telegram', 'Telegram'], ['reading-ticktick', '滴答稍后读']] },
   { id: 'local', title: '本地记录', subtitle: '当前浏览器', leaves: [['local-notes', '速记、笔记与本地任务']] },
-  { id: 'agents', title: 'Agents', subtitle: '当前浏览器 · 演示会话', leaves: [['agents-threads', '会话与已归档对话']] },
+  { id: 'agents', title: '助手', subtitle: '当前浏览器 · 演示会话', leaves: [['agents-threads', '会话与已归档对话']] },
   { id: 'insights', title: '洞察', subtitle: '示例发现与处理记录', leaves: [['insights-findings', '有依据的发现']] },
   { id: 'review', title: '闪卡', subtitle: '示例牌库与本地采用', leaves: [['review-cards', '全部牌组']] },
 ];
@@ -61,7 +61,7 @@ function workspaceIndex() {
     list.push({ key:'task:'+t.id, id:t.id, kind:'task', type:'任务', title:t.t, body:t.note||'', source:sourceName, leaf:sourceName==='Craft'?'craft-projects':sourceName==='滴答清单'?(t.src.includes('收件箱')?'ticktick-inbox':'ticktick-life'):'local-notes', tags:[], date:workspaceTaskDay(t), dateLabel:(t.date||'未安排')+' · '+(done(t)?'已完成':'待办'), route:'task/'+t.id, icon:'task', demo:true });
   }
   for (const r of reading) list.push({ key:'reading:'+r.id, id:r.id, kind:'reading', type:'阅读', title:r.t, body:r.blurb+' '+r.body, source:'阅读', leaf:r.src.startsWith('X')?'reading-x':r.src==='Telegram'?'reading-telegram':'reading-ticktick', tags:[], date:'', dateLabel:r.src+' · '+rstatus(r)+' · 示例', route:'article/'+r.id, icon:'book', demo:true });
-  for (const t of agentState().threads) list.push({ key:'agent:'+t.id, id:t.id, kind:'agent', type:'对话', title:t.title, body:(t.messages||[]).map(m=>m.text||'').join('\n'), source:'Agents', leaf:'agents-threads', tags:[], date:workspaceTimestampDay(t.updatedAt||t.createdAt), dateLabel:workspaceTimestampDay(t.updatedAt||t.createdAt)+(t.archivedAt?' · 已归档':'')+' · 演示', route:'agent-chat/'+t.id, icon:'chat', demo:true });
+  for (const t of agentState().threads) list.push({ key:'agent:'+t.id, id:t.id, kind:'agent', type:'对话', title:t.title, body:(t.messages||[]).map(m=>m.text||'').join('\n'), source:'助手', leaf:'agents-threads', tags:[], date:workspaceTimestampDay(t.updatedAt||t.createdAt), dateLabel:workspaceTimestampDay(t.updatedAt||t.createdAt)+(t.archivedAt?' · 已归档':'')+' · 演示', route:'agent-chat/'+t.id, icon:'chat', demo:true });
   for (const id of Object.keys(findings)) {
     const f = findData(id);
     list.push({key:'finding:'+id,id,kind:'finding',type:'洞察',title:f.t,body:f.desc+' '+f.body,source:'洞察',leaf:'insights-findings',tags:[],date:'2026-11-09',dateLabel:status(id)+' · 示例',route:'finding/'+id,icon:'spark',demo:true});
@@ -222,7 +222,7 @@ function workspaceConnectionsPage() {
   const sync=syncPreferences(), c=agentState().connection;
   const contentStatus=!sync.enabled?'演示已暂停':st.offline?'模拟离线':st.syncError?'模拟上传失败':'可演示同步';
   const agentStatus=c.network!=='online'?'模拟手机离线':c.server!=='online'?'模拟服务不可达':c.device==='revoked'?'模拟设备撤销':c.auth!=='valid'?'模拟登录失效':c.quota==='exhausted'?'模拟额度不足':'演示连接就绪';
-  return intro('连接总览','内容同步和 Agents 会话，是两条独立通道。')+'<p class="info">本站不探测实际 OSS、VPS 或登录状态。下列均为可操作的本地演示状态。</p>'+section('内容同步 · OSS',group(row(contentStatus,'速记、阅读与闪卡；电脑'+(st.desktopOnline?'在线':'离线')+'只影响最终写入演示','sync','go:sync')))+section('Agents 会话 · VPS',group(row(agentStatus,'文字 / 图片会话；不依赖 Windows 在线','chat','go:agent-connection')))+'<p class="fine">一个通道恢复，不会把另一个通道也标记为已恢复。真实设备的鉴权、联网与后台任务仍需独立验收。</p>';
+  return intro('连接总览','内容同步和 助手会话，是两条独立通道。')+'<p class="info">本站不探测实际 OSS、VPS 或登录状态。下列均为可操作的本地演示状态。</p>'+section('内容同步 · OSS',group(row(contentStatus,'速记、阅读与闪卡；电脑'+(st.desktopOnline?'在线':'离线')+'只影响最终写入演示','sync','go:sync')))+section('助手会话 · VPS',group(row(agentStatus,'文字 / 图片会话；不依赖 Windows 在线','chat','go:agent-connection')))+'<p class="fine">一个通道恢复，不会把另一个通道也标记为已恢复。真实设备的鉴权、联网与后台任务仍需独立验收。</p>';
 }
 function workspaceRecord(kind,id) {
   return workspaceIndex().find(item=>item.id===id && item.kind===kind);

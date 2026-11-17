@@ -143,7 +143,7 @@ it("keeps the mobile chat-close action separate from leaving the Agents page", a
   expect(onClose).not.toHaveBeenCalled();
   await act(async () => node.querySelector<HTMLButtonElement>(".cloud-agents-thread")!.click());
   expect(node.querySelector("textarea")?.value).toBe("保留这条尚未发送的草稿");
-  await returnToList(); await click("关闭云端 Agents");
+  await returnToList(); await click("关闭云端助手");
   expect(onClose).toHaveBeenCalledOnce();
   expect(invoke.mock.calls.some(([, args]) => args.action.op === "send")).toBe(false);
 });
@@ -296,4 +296,17 @@ it("returns to the list on the first attempt when another visit left stale chat 
   await act(async()=>{await new Promise(resolve=>setTimeout(resolve,30));});
   expect(node.querySelector(".cloud-agents-home")).not.toBeNull();
   expect(node.querySelector("textarea")).toBeNull();
+});
+
+it("places mobile connection status in the assistant header and opens real settings", async () => {
+  runtimeCapabilities.mobile = true;
+  await render();
+  expect(node.querySelector(".cloud-agents-header h1")?.textContent).toBe("助手");
+  expect(node.querySelector(".cloud-agents-connection-card")).toBeNull();
+  const connection=node.querySelector<HTMLButtonElement>(".cloud-agents-home-connection")!;
+  expect(connection.textContent).toContain("个人云端");
+  await act(async()=>connection.click());
+  expect(node.querySelector("input[type=url]")).not.toBeNull();
+  await click("返回并重新读取");
+  expect(node.querySelector(".cloud-agents-home")).not.toBeNull();
 });

@@ -764,6 +764,63 @@ class MobilePrototypeAcceptanceTest {
         }
     }
 
+    @Test
+    fun assistantHeaderAndVoiceSegments() {
+        launchMain()
+        val voice = native("quick_journal_voice_draft") as String
+        val draft = native("get_quick_journal_draft") as String
+        val before = list()
+        check((native("quick_journal_voice", JSONObject().put("action","status")) as JSONObject).optString("state") == "idle") { "An existing recording is active; leave it untouched" }
+        try {
+            if (dom("dialog[aria-label='语音速记']")) click("[aria-label='保留语音草稿并关闭']")
+            if (dom("dialog[aria-label='速记'][open]")) back()
+            if (!dom("nav[aria-label='主要导航']")) click("[aria-label='返回浏览']")
+            click("nav[aria-label='主要导航'] button[aria-label='助手']")
+            waitDom(".cloud-agents-home-connection")
+            checkResult("assistant naming and compact top connection", js("document.querySelector('.cloud-agents-header h1')?.textContent==='助手'&&!document.querySelector('.cloud-agents-connection-card')") == true)
+            screenshot("01-assistant-header")
+            click(".cloud-agents-home-connection")
+            waitDom(".cloud-agents-connect input[type=url]")
+            clickText("返回并重新读取")
+            waitDom(".cloud-agents-home")
+            checkResult("top connection settings returns to sessions", dom(".cloud-agents-home"))
+            click("[aria-label='关闭云端助手']")
+            native("quick_journal_voice_draft", JSONObject().put("value", ""))
+            val items = (0 until before.length()).map { before.getJSONObject(it) }
+            val sample = items.firstOrNull { item -> item.getJSONObject("record").getJSONArray("attachments").let { files -> (0 until files.length()).any { files.getJSONObject(it).getString("name").matches(Regex(".*\\.(m4a|mp3|wav|ogg|webm|aac)$",RegexOption.IGNORE_CASE)) } } } ?: items.first()
+            val request = JSONObject().put("record",sample.getJSONObject("record")).put("revision",sample.getString("revision"))
+            js("(()=>{window.dispatchEvent(new CustomEvent('hub:journal-voice',{detail:$request}));return true})()")
+            waitDom("dialog[aria-label='语音速记']")
+            until("voice draft ready") { js("!document.querySelector('.voice-start')?.disabled") == true }
+            checkResult("append mode clearly targets original record", js("document.querySelector('.journal-voice-dialog h2')?.textContent==='追加录音'") == true)
+            checkResult("old audio collapsed on entry", js("[...document.querySelectorAll('.journal-voice-history')].every(e=>!e.open)") == true)
+            repeat(2) { index ->
+                native("quick_journal_voice", JSONObject().put("action", "start"))
+                until("native microphone starts") { js("document.querySelector('.journal-voice-clock')?.textContent.includes('正在仅录音')") == true }
+                SystemClock.sleep(1200)
+                if(index==0) { clickText("暂停"); clickText("继续录音") }
+                clickText("完成本段")
+                until("new audio segment visible") { js("document.querySelectorAll('.journal-voice-segments .journal-audio').length===${index+1}") == true }
+            }
+            checkResult("two distinct new recordings retained", js("document.querySelectorAll('.journal-voice-segments .journal-audio').length===2") == true)
+            screenshot("02-two-new-segments")
+            click("[aria-label='保留语音草稿并关闭']")
+            until("voice closes") { !dom("dialog[aria-label='语音速记']") }
+            js("(()=>{window.dispatchEvent(new CustomEvent('hub:journal-voice',{detail:{}}));return true})()")
+            waitDom(".journal-voice-restored")
+            checkResult("reopen explicitly identifies the unsaved draft", js("document.querySelectorAll('.journal-voice-segments .journal-audio').length===2&&!![...document.querySelectorAll('button')].find(e=>e.textContent==='保存并新建')") == true)
+            screenshot("03-restored-draft")
+            click("[aria-label='保留语音草稿并关闭']")
+            checkResult("recording test preserves saved journals and text draft", list().toString()==before.toString() && native("get_quick_journal_draft")==draft)
+            evidence.put("completed",true)
+        } catch(failure:Throwable) { evidence.put("failure",failure.toString());screenshot("failure");throw failure }
+        finally {
+            if(dom("dialog[aria-label='语音速记']")) click("[aria-label='保留语音草稿并关闭']")
+            native("quick_journal_voice_draft",JSONObject().put("value",voice))
+            File(directory,"result.json").writeText(evidence.toString(2),Charsets.UTF_8)
+        }
+    }
+
     private fun field(selector: String, value: String) {
         js("(()=>{const e=document.querySelector(${JSONObject.quote(selector)});if(!e)throw Error('Missing field');const p=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(p,'value').set.call(e,${JSONObject.quote(value)});e.dispatchEvent(new Event('input',{bubbles:true}));return true})()")
     }

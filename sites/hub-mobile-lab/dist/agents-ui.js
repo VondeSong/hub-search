@@ -47,6 +47,9 @@ function agentUiConnectionCard(compact = false) {
   if (compact) return '<button type="button" class="agent-connection-card is-compact' + (warning ? ' is-warning' : '') + '" data-act="go:agent-connection" aria-label="' + esc('查看连接与设备。' + (warning ? '演示状态：' + agentUiConnectionLabel() : '本机演示，未连接真实服务')) + '"><span class="agent-status-dot" aria-hidden="true"></span><span class="agent-connection-copy"><strong>' + esc(warning ? '演示状态 · ' + agentUiConnectionLabel() : '本机演示 · 未连接云端') + '</strong>' + (warning ? '<small>草稿保留，点击查看恢复方式</small>' : '') + '</span><span class="agent-connection-link">连接</span>' + ico('chev', 15) + '</button>';
   return '<button type="button" class="agent-connection-card' + (warning ? ' is-warning' : '') + '" data-act="go:agent-connection"><span class="agent-status-dot" aria-hidden="true"></span><span class="agent-connection-copy"><strong>' + esc(agentUiConnectionLabel()) + '</strong><small>' + (warning ? '查看状态与恢复方式' : 'ChatGPT 订阅 · Windows 可关机') + '</small></span>' + ico('chev', 17) + '</button>';
 }
+function agentUiHeaderConnection() {
+  return '<button type="button" class="agent-home-connection" data-act="go:agent-connection" aria-label="' + esc('查看连接与设备（演示）：' + agentUiConnectionLabel()) + '"><span class="agent-home-title">助手</span><span class="agent-home-status">' + ico('cloud', 13) + '<span>' + esc(agentUiConnectionLabel()) + '</span>' + ico('chev', 13) + '</span></button>';
+}
 function agentThreadRows() {
   const search = agentListQuery.trim().toLocaleLowerCase();
   const threads = [...st.agents.threads].sort((a, b) => b.updatedAt - a.updatedAt).filter(thread =>
@@ -74,12 +77,12 @@ function agentUiListScopes() {
 }
 function agentsPage() {
   if (agentUiRevoked()) return '<div class="agents-page">' + agentUiAccessBlock() + '</div>';
-  return '<div class="agents-page"><div id="agent-list-connection">' + agentUiConnectionCard(true) + '</div><div class="agent-list-search">' + ico('search', 19) + '<input type="search" id="agent-list-query" aria-label="搜索会话标题与消息" placeholder="搜索会话标题或消息" enterkeyhint="search" value="' + esc(agentListQuery) + '"></div><div class="filter agent-list-scopes" id="agent-list-scopes" role="group" aria-label="会话范围">' + agentUiListScopes() + '</div><section class="agent-conversation-list" aria-label="会话"><div id="agent-thread-list">' + agentThreadRows() + '</div></section><p class="settings-note agent-list-footnote">对话、草稿与附件仅保存在当前浏览器，未调用真实模型。已有桌面聊天不会自动迁入。</p></div>';
+  return '<div class="agents-page"><div class="agent-list-search">' + ico('search', 19) + '<input type="search" id="agent-list-query" aria-label="搜索会话标题与消息" placeholder="搜索会话标题或消息" enterkeyhint="search" value="' + esc(agentListQuery) + '"></div><div class="filter agent-list-scopes" id="agent-list-scopes" role="group" aria-label="会话范围">' + agentUiListScopes() + '</div><section class="agent-conversation-list" aria-label="会话"><div id="agent-thread-list">' + agentThreadRows() + '</div></section><p class="settings-note agent-list-footnote">对话、草稿与附件仅保存在当前浏览器，未调用真实模型。已有桌面聊天不会自动迁入。</p></div>';
 }
 function agentsHeader(page, id) {
   if (page === 'agent-chat') {
     const thread = agentThread(id);
-    return iconBtn('返回', 'back', 'back') + '<button type="button" class="agent-header-main" data-act="go:agent-connection" aria-label="查看云端连接与设备"><span class="agent-header-title">' + esc(agentUiRevoked() ? 'Agents' : thread?.title || '对话') + '</span><span class="agent-header-subtitle">交互演示 · ' + esc(agentUiConnectionLabel()) + '</span></button>' + iconBtn('会话选项', 'agent-thread-menu:' + id, 'more');
+    return iconBtn('返回', 'back', 'back') + '<button type="button" class="agent-header-main" data-act="go:agent-connection" aria-label="查看云端连接与设备"><span class="agent-header-title">' + esc(agentUiRevoked() ? '助手' : thread?.title || '对话') + '</span><span class="agent-header-subtitle">交互演示 · ' + esc(agentUiConnectionLabel()) + '</span></button>' + iconBtn('会话选项', 'agent-thread-menu:' + id, 'more');
   }
   if (page === 'agent-connection') return iconBtn('返回', 'back', 'back') + '<span class="top-title">连接与设备</span><span class="agent-header-spacer" aria-hidden="true"></span>';
   return '<span class="brand">Hub <span class="sample-label">示例资料</span></span><div class="top-actions">' + iconBtn('外观与设置', 'go:settings', 'settings') + iconBtn('新建对话', 'agent-new', 'plus') + '</div>';
@@ -174,11 +177,11 @@ function agentUiSendControl(thread) {
 }
 function agentUiComposer(thread) {
   if (thread.archivedAt) return '<div id="agent-composer" class="agent-composer agent-archived-composer"><span>已归档 · 内容完整保留</span>' + btn('恢复并继续', 'agent-restore:' + thread.id, 'secondary', 'sync') + '</div>';
-  return '<div id="agent-composer" class="agent-composer"><div id="agent-skill-chip-container">' + agentUiSkillChip(thread) + '</div><div id="agent-draft-attachments">' + agentUiDraftMaterials(thread) + '</div><form id="agent-send-form" data-thread="' + esc(thread.id) + '"><label class="agent-sr-only" for="agent-prompt">给 Agents 的消息</label><textarea id="agent-prompt" name="message" rows="2" maxlength="6000" placeholder="问一个问题，或接着聊…" enterkeyhint="enter">' + esc(thread.draft || '') + '</textarea><div class="agent-composer-tools">' + iconBtn('添加照片或资料', 'agent-attach:' + thread.id, 'plus') + iconBtn('技能', 'agent-skills:' + thread.id, 'spark') + '<button type="button" class="agent-model-trigger" data-act="agent-model:' + esc(thread.id) + '" aria-label="选择模型"><span>' + esc(agentUiModelLabel(thread)) + '</span>' + ico('info', 13) + '</button><div id="agent-send-control">' + agentUiSendControl(thread) + '</div></div></form><div class="agent-composer-hint"><span id="agent-draft-status">' + (thread.draft ? '草稿已保留' : '交互演示 · 未调用模型') + '</span></div></div>';
+  return '<div id="agent-composer" class="agent-composer"><div id="agent-skill-chip-container">' + agentUiSkillChip(thread) + '</div><div id="agent-draft-attachments">' + agentUiDraftMaterials(thread) + '</div><form id="agent-send-form" data-thread="' + esc(thread.id) + '"><label class="agent-sr-only" for="agent-prompt">给助手的消息</label><textarea id="agent-prompt" name="message" rows="2" maxlength="6000" placeholder="问一个问题，或接着聊…" enterkeyhint="enter">' + esc(thread.draft || '') + '</textarea><div class="agent-composer-tools">' + iconBtn('添加照片或资料', 'agent-attach:' + thread.id, 'plus') + iconBtn('技能', 'agent-skills:' + thread.id, 'spark') + '<button type="button" class="agent-model-trigger" data-act="agent-model:' + esc(thread.id) + '" aria-label="选择模型"><span>' + esc(agentUiModelLabel(thread)) + '</span>' + ico('info', 13) + '</button><div id="agent-send-control">' + agentUiSendControl(thread) + '</div></div></form><div class="agent-composer-hint"><span id="agent-draft-status">' + (thread.draft ? '草稿已保留' : '交互演示 · 未调用模型') + '</span></div></div>';
 }
 function agentChatPage(id) {
   const thread = agentThread(id);
-  if (!thread) return '<div class="agent-chat-page">' + intro('这段对话暂不可用', '返回列表，选择一段已保存的会话。') + btn('返回 Agents', 'go:agents', 'secondary') + '</div>';
+  if (!thread) return '<div class="agent-chat-page">' + intro('这段对话暂不可用', '返回列表，选择一段已保存的会话。') + btn('返回助手', 'go:agents', 'secondary') + '</div>';
   if (agentUiRevoked()) return '<div class="agent-chat-page">' + agentUiAccessBlock() + '</div>';
   const view = ['chat', 'materials', 'results'].includes(thread.view) ? thread.view : 'chat';
   return '<div class="agent-chat-page" data-thread="' + esc(id) + '"><div class="agent-view-tabs" aria-label="会话视图">' + [['chat', '对话'], ['materials', '材料'], ['results', '成果']].map(([key, label]) => '<button type="button" data-act="agent-view:' + esc(id) + ':' + key + '" aria-pressed="' + (key === view) + '">' + label + '</button>').join('') + '</div><div id="agent-connection-banner">' + agentUiBanner(thread) + '</div><div id="agent-chat-panel" ' + (view !== 'chat' ? 'hidden' : '') + '><div id="agent-messages" role="log" aria-label="会话消息" aria-live="off">' + agentUiMessages(thread) + '</div><div id="agent-message-end"></div>' + agentUiComposer(thread) + '</div><div id="agent-materials-panel" ' + (view !== 'materials' ? 'hidden' : '') + '>' + agentUiMaterials(thread) + '</div><div id="agent-results-panel" ' + (view !== 'results' ? 'hidden' : '') + '>' + agentUiResults(thread) + '</div><p id="agent-live-announcement" class="agent-sr-only" role="status" aria-live="polite"></p></div>';
@@ -234,7 +237,7 @@ async function agentUiCopyAnswer(runId) {
   if (agentUiRevoked()) { tell('请先恢复演示设备访问。'); return; }
   const run = st.agents.runs[runId];
   if (!run || !['completed', 'stopped'].includes(run.phase) || !run.text) { tell('这条回答暂时没有可复制的内容。'); return; }
-  const text = run.text + '\n\n— Agents 交互原型示例回复（未调用真实模型）';
+  const text = run.text + '\n\n— 助手交互原型示例回复（未调用真实模型）';
   try {
     if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
     await navigator.clipboard.writeText(text);
@@ -526,7 +529,7 @@ function refreshAgentView() {
     if (!document.querySelector('#agent-thread-list')) { render(); return; }
     const list = document.querySelector('#agent-thread-list'); if (list) { const html = agentThreadRows(); if (list.innerHTML !== html) list.innerHTML = html; }
     const scopes = document.querySelector('#agent-list-scopes'); if (scopes) { const html = agentUiListScopes(); if (scopes.innerHTML !== html) scopes.innerHTML = html; }
-    const card = document.querySelector('#agent-list-connection'); if (card) { const html = agentUiConnectionCard(true); if (card.innerHTML !== html) card.innerHTML = html; }
+    const card = document.querySelector('#agent-list-connection'); if (card) { const html = agentUiHeaderConnection(); if (card.innerHTML !== html) card.innerHTML = html; }
     return;
   }
   if (page !== 'agent-chat') return;

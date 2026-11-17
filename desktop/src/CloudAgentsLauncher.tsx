@@ -10,9 +10,9 @@ export function CloudAgentsLauncher() {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => { if (open && dialog.current && !dialog.current.open) dialog.current.showModal(); }, [open]);
   return <>
-    <button className="icon-button agent-launcher" type="button" aria-label="云端 Agents" title="云端 Agents" onClick={() => setOpen(true)}><Cloud size={17} /></button>
-    {open && createPortal(<dialog className="cloud-agents-dialog" ref={dialog} aria-label="云端 Agents" onClose={() => setOpen(false)}>
-      <Suspense fallback={<p role="status">正在打开云端 Agents…</p>}><CloudAgents onClose={() => dialog.current?.close()} /></Suspense>
+    <button className="icon-button agent-launcher" type="button" aria-label="云端助手" title="云端助手" onClick={() => setOpen(true)}><Cloud size={17} /></button>
+    {open && createPortal(<dialog className="cloud-agents-dialog" ref={dialog} aria-label="云端助手" onClose={() => setOpen(false)}>
+      <Suspense fallback={<p role="status">正在打开云端助手…</p>}><CloudAgents onClose={() => dialog.current?.close()} /></Suspense>
     </dialog>, document.body)}
   </>;
 }
