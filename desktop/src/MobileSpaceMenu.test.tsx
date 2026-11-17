@@ -7,8 +7,22 @@ import { OPEN_QUICK_JOURNAL } from "./QuickJournalEvents";
 
 vi.mock("./JournalVoice", () => ({ JournalCaptureButton: () => <button>快速记录</button> }));
 let host: HTMLDivElement, root: Root;
-beforeEach(() => { host = document.createElement("div"); document.body.append(host); root = createRoot(host); });
-afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
+const originalShow = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'showModal');
+const originalClose = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'close');
+beforeEach(() => {
+  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  host = document.createElement("div"); document.body.append(host); root = createRoot(host);
+  Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value: function (this: HTMLDialogElement) { this.open = true; } });
+  Object.defineProperty(HTMLDialogElement.prototype, 'close', { configurable: true, value: function (this: HTMLDialogElement) { this.open = false; } });
+});
+afterEach(async () => {
+  await act(async () => root.unmount()); host.remove();
+  for (const [key, descriptor] of [['showModal', originalShow], ['close', originalClose]] as const) {
+    if (descriptor) Object.defineProperty(HTMLDialogElement.prototype, key, descriptor);
+    else Reflect.deleteProperty(HTMLDialogElement.prototype, key);
+  }
+  delete (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+});
 
 async function open() {
   const settings = vi.fn(), libraries = vi.fn(), connections = vi.fn(), appearance = vi.fn();
@@ -19,12 +33,13 @@ async function open() {
   return { trigger, settings, libraries, connections, appearance };
 }
 
-it.each(["Escape", "hub:native-back"])("dismisses the space menu with %s without opening settings or leaving the page", async key => {
+it.each(["Escape", "hub:native-back", "cancel"])("dismisses the space menu with %s without opening settings or leaving the page", async key => {
   const { trigger, settings } = await open();
   expect(host.inert || host.hasAttribute("inert")).toBe(true);
   expect(document.querySelector('[role="dialog"]')).not.toBeNull();
   await act(async () => {
     if (key === "Escape") document.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    else if (key === 'cancel') document.querySelector('dialog')!.dispatchEvent(new Event('cancel', { cancelable: true }));
     else window.dispatchEvent(new Event(key, { cancelable: true }));
   });
   expect(document.querySelector('[role="dialog"]')).toBeNull();
