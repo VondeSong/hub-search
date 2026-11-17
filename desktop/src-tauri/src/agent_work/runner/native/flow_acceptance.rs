@@ -6,6 +6,23 @@ use super::*;
 fn live_native_flow_acceptance() {
     let config = std::env::var("HUB_NATIVE_FLOW_CONFIG").expect("explicit config required");
     let config: Value = serde_json::from_slice(&std::fs::read(config).unwrap()).unwrap();
+    run_native_flow(config);
+}
+
+#[test]
+#[ignore = "explicit real daily-root batch and fixed candidate configuration; source reads and fresh chats only"]
+fn live_native_version_comparison() {
+    let path = std::env::var("HUB_COMPARE_CONFIG").expect("explicit comparison configuration");
+    let config: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    for case in config["cases"]
+        .as_array()
+        .expect("fixed nonempty case list")
+    {
+        run_native_flow(case.clone());
+    }
+}
+
+fn run_native_flow(config: Value) {
     let root = Path::new(config["root"].as_str().unwrap());
     let output = Path::new(config["output"].as_str().unwrap());
     std::fs::OpenOptions::new()
@@ -31,8 +48,10 @@ fn live_native_flow_acceptance() {
                 "clientMessageId":format!("flow-{}-{index}",crate::random_url_safe(8)),"text":prompt})).unwrap();
         }
         let started = std::time::Instant::now();
-        let result =
-            crate::agent_work::ui(root, &json!({"action":"respond","id":id,"mode":"quick"}));
+        let result = crate::agent_work::ui(
+            root,
+            &json!({"action":"respond","id":id,"mode":config["mode"].as_str().unwrap_or("quick")}),
+        );
         let view = store::view(root, id).unwrap();
         let mut records = serde_json::Map::new();
         for kind in [

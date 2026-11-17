@@ -1,0 +1,440 @@
+{
+  "reportId": "hub-version-comparison-20261117-v1",
+  "baseline": "de827047d203fc93c3f6663685870c9294e7cad2",
+  "current": "34c3c3f3d0431bc34d670f295f37765f7cb36902",
+  "rounds": 12,
+  "chats": 8,
+  "formalNativeNodes": 2,
+  "model": "gpt-6.1-sol",
+  "effort": "medium",
+  "fast": false,
+  "policy": "materials-only",
+  "network": "disabled",
+  "sourceCount": 12,
+  "unchangedSourceCount": 12,
+  "strictBlindReview": false,
+  "timingScope": "backend formal respond return; excludes compile; does not measure Windows display latency",
+  "tokenScope": "per-turn provider deltas including cached repeated contexts; not billable cost",
+  "citationScope": "per-turn occurrences, not unique facts; exact match separately checked in bound evidence and corresponding original document",
+  "streamScope": "cumulative agentStream records per chat including contextUsage; text bytes only, not visible rows",
+  "nativeWindowScreenshots": "3 Windows screenshots after user dismissed overlay: saved long chat, actual source location, expanded process",
+  "componentReplayScreenshots": 14,
+  "nativeWindowScreenshotCount": 3,
+  "history": [
+    {
+      "candidate": "baseline",
+      "turns": 3,
+      "assistantHistory": 3,
+      "historyContainsEveryAnswer": true,
+      "drafts": 0,
+      "truncatedStreamItems": 0
+    },
+    {
+      "candidate": "current",
+      "turns": 3,
+      "assistantHistory": 3,
+      "historyContainsEveryAnswer": true,
+      "drafts": 0,
+      "truncatedStreamItems": 0
+    }
+  ],
+  "receipts": {
+    "baseline": {
+      "status": "passed",
+      "collected": 1,
+      "exitCode": 0,
+      "binarySha256": "897733b166966927329bc0a746ea9568fe2dfd9cbdd32f13d6ce3114f365a8f2",
+      "byteIdentical": true,
+      "startedAt": "2026-11-17T05:14:07.740Z",
+      "finishedAt": "2026-11-17T05:19:56.324Z"
+    },
+    "current": {
+      "status": "passed",
+      "collected": 1,
+      "exitCode": 0,
+      "binarySha256": "a601542357c37883a90644ce21a7e8103b6a931d8675c0a7ab90b8ab1987d40b",
+      "byteIdentical": true,
+      "startedAt": "2026-11-17T05:22:14.190Z",
+      "finishedAt": "2026-11-17T05:28:15.432Z"
+    }
+  },
+  "totals": {
+    "baseline": {
+      "elapsedMs": 341609,
+      "citations": 120,
+      "exactQuotes": 120,
+      "inputTokens": 1348242,
+      "cachedInputTokens": 1088000,
+      "uncachedInputTokens": 260242,
+      "outputTokens": 9132,
+      "actionCount": 0
+    },
+    "current": {
+      "elapsedMs": 355555,
+      "citations": 144,
+      "exactQuotes": 144,
+      "inputTokens": 1585539,
+      "cachedInputTokens": 1355520,
+      "uncachedInputTokens": 230019,
+      "outputTokens": 9756,
+      "actionCount": 0
+    }
+  },
+  "results": [
+    {
+      "candidate": "baseline",
+      "case": "comparison",
+      "turn": 1,
+      "elapsedMs": 55886,
+      "citations": 13,
+      "exactQuotes": 13,
+      "inputTokens": 124805,
+      "cachedInputTokens": 81920,
+      "uncachedInputTokens": 42885,
+      "outputTokens": 1288,
+      "firstFeedbackHostMs": 8927,
+      "runtimeReturnedMs": 52505,
+      "streamRecordsCumulative": 4,
+      "streamTextBytesCumulative": 3297,
+      "runState": "completed",
+      "actionCount": 0,
+      "toolNames": [
+        "hub_loadSkill",
+        "hub_citations"
+      ],
+      "reuse": {
+        "resumed": false,
+        "reason": "noPreviousSession",
+        "changedBindingParts": null
+      }
+    },
+    {
+      "candidate": "baseline",
+      "case": "long",
+      "turn": 1,
+      "elapsedMs": 68448,
+      "citations": 31,
+      "exactQuotes": 31,
+      "inputTokens": 190037,
+      "cachedInputTokens": 124416,
+      "uncachedInputTokens": 65621,
+      "outputTokens": 2009,
+      "firstFeedbackHostMs": 7894,
+      "runtimeReturnedMs": 62729,
+      "streamRecordsCumulative": 5,
+      "streamTextBytesCumulative": 5327,
+      "runState": "completed",
+      "actionCount": 0,
+      "toolNames": [
+        "hub_loadSkill",
+        "hub_read",
+        "hub_citations"
+      ],
+      "reuse": {
+        "resumed": false,
+        "reason": "noPreviousSession",
+        "changedBindingParts": null
+      }
+    },
+    {
+      "candidate": "baseline",
+      "case": "long",
+      "turn": 2,
+      "elapsedMs": 76147,
+      "citations": 30,
+      "exactQuotes": 30,
+      "inputTokens": 400168,
+      "cachedInputTokens": 361984,
+      "uncachedInputTokens": 38184,
+      "outputTokens": 2242,
+      "firstFeedbackHostMs": 6585,
+      "runtimeReturnedMs": 71378,
+      "streamRecordsCumulative": 8,
+      "streamTextBytesCumulative": 9361,
+      "runState": "completed",
+      "actionCount": 0,
+      "toolNames": [
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_citations",
+        "hub_citations"
+      ],
+      "reuse": {
+        "resumed": true,
+        "reason": "eligible",
+        "changedBindingParts": []
+      }
+    },
+    {
+      "candidate": "baseline",
+      "case": "long",
+      "turn": 3,
+      "elapsedMs": 77212,
+      "citations": 31,
+      "exactQuotes": 31,
+      "inputTokens": 401580,
+      "cachedInputTokens": 368128,
+      "uncachedInputTokens": 33452,
+      "outputTokens": 2297,
+      "firstFeedbackHostMs": 7430,
+      "runtimeReturnedMs": 72075,
+      "streamRecordsCumulative": 12,
+      "streamTextBytesCumulative": 14492,
+      "runState": "completed",
+      "actionCount": 0,
+      "toolNames": [
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_citations"
+      ],
+      "reuse": {
+        "resumed": true,
+        "reason": "eligible",
+        "changedBindingParts": []
+      }
+    },
+    {
+      "candidate": "baseline",
+      "case": "missing",
+      "turn": 1,
+      "elapsedMs": 31686,
+      "citations": 10,
+      "exactQuotes": 10,
+      "inputTokens": 115994,
+      "cachedInputTokens": 75776,
+      "uncachedInputTokens": 40218,
+      "outputTokens": 722,
+      "firstFeedbackHostMs": 7847,
+      "runtimeReturnedMs": 28835,
+      "streamRecordsCumulative": 3,
+      "streamTextBytesCumulative": 1701,
+      "runState": "completed",
+      "actionCount": 0,
+      "toolNames": [
+        "hub_read",
+        "hub_citations"
+      ],
+      "reuse": {
+        "resumed": false,
+        "reason": "noPreviousSession",
+        "changedBindingParts": null
+      }
+    },
+    {
+      "candidate": "baseline",
+      "case": "single",
+      "turn": 1,
+      "elapsedMs": 32230,
+      "citations": 5,
+      "exactQuotes": 5,
+      "inputTokens": 115658,
+      "cachedInputTokens": 75776,
+      "uncachedInputTokens": 39882,
+      "outputTokens": 574,
+      "firstFeedbackHostMs": 9266,
+      "runtimeReturnedMs": 26587,
+      "streamRecordsCumulative": 3,
+      "streamTextBytesCumulative": 1248,
+      "runState": "completed",
+      "actionCount": 0,
+      "toolNames": [
+        "hub_read",
+        "hub_citations"
+      ],
+      "reuse": {
+        "resumed": false,
+        "reason": "noPreviousSession",
+        "changedBindingParts": null
+      }
+    },
+    {
+      "candidate": "current",
+      "case": "comparison",
+      "turn": 1,
+      "elapsedMs": 47014,
+      "citations": 15,
+      "exactQuotes": 15,
+      "inputTokens": 124579,
+      "cachedInputTokens": 95744,
+      "uncachedInputTokens": 28835,
+      "outputTokens": 1278,
+      "firstFeedbackHostMs": 7688,
+      "runtimeReturnedMs": 44075,
+      "streamRecordsCumulative": 5,
+      "streamTextBytesCumulative": 3586,
+      "runState": "completed",
+      "actionCount": 0,
+      "toolNames": [
+        "hub_loadSkill",
+        "hub_citations"
+      ],
+      "reuse": {
+        "resumed": false,
+        "reason": "noPreviousSession",
+        "changedBindingParts": null
+      }
+    },
+    {
+      "candidate": "current",
+      "case": "long",
+      "turn": 1,
+      "elapsedMs": 73738,
+      "citations": 34,
+      "exactQuotes": 34,
+      "inputTokens": 189773,
+      "cachedInputTokens": 124416,
+      "uncachedInputTokens": 65357,
+      "outputTokens": 2050,
+      "firstFeedbackHostMs": 13835,
+      "runtimeReturnedMs": 68737,
+      "streamRecordsCumulative": 4,
+      "streamTextBytesCumulative": 5505,
+      "runState": "completed",
+      "actionCount": 0,
+      "toolNames": [
+        "hub_loadSkill",
+        "hub_read",
+        "hub_citations"
+      ],
+      "reuse": {
+        "resumed": false,
+        "reason": "noPreviousSession",
+        "changedBindingParts": null
+      }
+    },
+    {
+      "candidate": "current",
+      "case": "long",
+      "turn": 2,
+      "elapsedMs": 80144,
+      "citations": 38,
+      "exactQuotes": 38,
+      "inputTokens": 389179,
+      "cachedInputTokens": 354304,
+      "uncachedInputTokens": 34875,
+      "outputTokens": 2405,
+      "firstFeedbackHostMs": 6964,
+      "runtimeReturnedMs": 75399,
+      "streamRecordsCumulative": 7,
+      "streamTextBytesCumulative": 10482,
+      "runState": "completed",
+      "actionCount": 0,
+      "toolNames": [
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_citations"
+      ],
+      "reuse": {
+        "resumed": true,
+        "reason": "eligible",
+        "changedBindingParts": []
+      }
+    },
+    {
+      "candidate": "current",
+      "case": "long",
+      "turn": 3,
+      "elapsedMs": 89563,
+      "citations": 39,
+      "exactQuotes": 39,
+      "inputTokens": 650016,
+      "cachedInputTokens": 615680,
+      "uncachedInputTokens": 34336,
+      "outputTokens": 2721,
+      "firstFeedbackHostMs": 6613,
+      "runtimeReturnedMs": 84783,
+      "streamRecordsCumulative": 10,
+      "streamTextBytesCumulative": 15504,
+      "runState": "completed",
+      "actionCount": 0,
+      "toolNames": [
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_read",
+        "hub_citations",
+        "hub_citations"
+      ],
+      "reuse": {
+        "resumed": true,
+        "reason": "eligible",
+        "changedBindingParts": []
+      }
+    },
+    {
+      "candidate": "current",
+      "case": "missing",
+      "turn": 1,
+      "elapsedMs": 33570,
+      "citations": 12,
+      "exactQuotes": 12,
+      "inputTokens": 116111,
+      "cachedInputTokens": 89600,
+      "uncachedInputTokens": 26511,
+      "outputTokens": 727,
+      "firstFeedbackHostMs": 9052,
+      "runtimeReturnedMs": 30722,
+      "streamRecordsCumulative": 3,
+      "streamTextBytesCumulative": 1652,
+      "runState": "completed",
+      "actionCount": 0,
+      "toolNames": [
+        "hub_read",
+        "hub_citations"
+      ],
+      "reuse": {
+        "resumed": false,
+        "reason": "noPreviousSession",
+        "changedBindingParts": null
+      }
+    },
+    {
+      "candidate": "current",
+      "case": "single",
+      "turn": 1,
+      "elapsedMs": 31526,
+      "citations": 6,
+      "exactQuotes": 6,
+      "inputTokens": 115881,
+      "cachedInputTokens": 75776,
+      "uncachedInputTokens": 40105,
+      "outputTokens": 575,
+      "firstFeedbackHostMs": 8633,
+      "runtimeReturnedMs": 25708,
+      "streamRecordsCumulative": 3,
+      "streamTextBytesCumulative": 1191,
+      "runState": "completed",
+      "actionCount": 0,
+      "toolNames": [
+        "hub_read",
+        "hub_citations"
+      ],
+      "reuse": {
+        "resumed": false,
+        "reason": "noPreviousSession",
+        "changedBindingParts": null
+      }
+    }
+  ]
+}
