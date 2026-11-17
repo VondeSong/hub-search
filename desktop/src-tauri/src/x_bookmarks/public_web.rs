@@ -107,6 +107,21 @@ fn public_dns_answer(host: &str, answer: &Value) -> Result<Vec<SocketAddr>, Stri
     Ok(addresses)
 }
 
+/// Browser tunnels pin these public addresses for their complete lifetime.
+pub(crate) async fn browser_addresses(host: &str) -> Result<Vec<SocketAddr>, String> {
+    url(&format!("https://{host}/"))?;
+    let addresses: Vec<_> = tokio::net::lookup_host((host, 443))
+        .await
+        .map_err(|_| "浏览器域名解析失败")?
+        .take(33)
+        .collect();
+    if needs_public_dns(&addresses)? {
+        public_dns(host).await
+    } else {
+        Ok(addresses)
+    }
+}
+
 async fn public_dns(host: &str) -> Result<Vec<SocketAddr>, String> {
     // Only the fixed resolver uses existing proxy settings; page connections remain IP-pinned.
     let client = reqwest::Client::builder()

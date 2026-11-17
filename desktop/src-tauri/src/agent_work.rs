@@ -347,9 +347,19 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
         | "saveResearchTopic"
         | "checkResearchTopic"
         | "replaceResearchScope" => research::ui(root, args),
-        "discoverMcpService" => crate::model_runtime::mcp_services::discover(
+        "listConnectedApps" => crate::model_runtime::mcp_services::apps::list(
+            root,
+            &Control::bounded(std::time::Duration::from_secs(120)),
+        ),
+        "prepareBrowserRuntime" => crate::model_runtime::mcp_services::browser::prepare(
+            root,
+            &Control::bounded(std::time::Duration::from_secs(180)),
+        ),
+        "submitPluginWrite" | "inspectPluginWrite" => actions::plugin::ui(root, args),
+        "discoverMcpService" => crate::model_runtime::mcp_services::discover_for(
+            root,
             &text(args, "server", 2048)?,
-            &Control::bounded(std::time::Duration::from_secs(60)),
+            &Control::bounded(std::time::Duration::from_secs(120)),
         ),
         "selectObsidianTarget" => action_target::select(root, args),
         "respond" => run_mode_app(

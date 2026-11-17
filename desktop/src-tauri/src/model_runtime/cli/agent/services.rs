@@ -1,6 +1,8 @@
 //! Hub grants the calls; the official App Server owns MCP transport and discovery.
 use super::*;
 use serde::{Deserialize, Serialize};
+pub(crate) mod apps;
+pub(crate) mod browser;
 mod custom;
 mod resources;
 
@@ -60,6 +62,8 @@ pub(crate) struct Grant {
     pub tools: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub resource_uris: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app_binding: Option<apps::Binding>,
 }
 
 fn unconfirmed(value: &bool) -> bool {
@@ -70,6 +74,11 @@ pub(crate) fn validate(grants: &[Grant]) -> Result<(), String> {
     if grants.len() > 10
         || grants
             .iter()
+            .filter(|g| g.server.starts_with("browser:"))
+            .count()
+            > 1
+        || grants
+            .iter()
             .map(|g| &g.server)
             .collect::<HashSet<_>>()
             .len()
@@ -78,6 +87,17 @@ pub(crate) fn validate(grants: &[Grant]) -> Result<(), String> {
         return Err("MCP 服务授权重复或超过开放范围".into());
     }
     for grant in grants {
+        if grant.server.starts_with("browser:") {
+            browser::validate(grant)?;
+            continue;
+        }
+        if grant.server.starts_with("app:") {
+            apps::validate(grant)?;
+            continue;
+        }
+        if grant.app_binding.is_some() {
+            return Err("账号授权不能用于匿名 MCP 服务".into());
+        }
         custom::with_service(&grant.server, |service| {
             if service.identity.is_empty() && !grant.trusted_read_only {
                 return Err("请先确认信任此服务；只读声明不等于技术隔离".into());
@@ -218,6 +238,71 @@ pub(crate) fn discover(server: &str, control: &Control) -> Result<Value, String>
         let (_cleanup, _process, _, catalog) = connect(service, control)?;
         Ok(catalog)
     })
+}
+
+pub(crate) fn discover_for(root: &Path, server: &str, control: &Control) -> Result<Value, String> {
+    if server.starts_with("app:") {
+        apps::discover(root, server, control)
+    } else if server.starts_with("browser:") {
+        browser::discover(root, server, control)
+    } else {
+        discover(server, control)
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct Runtime {
+    browser: Option<browser::Session>,
+}
+impl Runtime {
+    pub(crate) fn call(
+        &mut self,
+        root: &Path,
+        selected: Option<&str>,
+        grant: &Grant,
+        tool: &str,
+        args: &Value,
+        control: &Control,
+        check: impl Fn() -> Result<(), String>,
+    ) -> Result<Value, String> {
+        if grant.server.starts_with("browser:") {
+            browser::validate(grant)?;
+            check()?;
+            if self
+                .browser
+                .as_ref()
+                .is_some_and(|s| s.server != grant.server)
+            {
+                return Err("本轮只能使用一个浏览器网站范围，请重新开始本轮".into());
+            }
+            if self.browser.is_none() {
+                self.browser = Some(browser::Session::connect(root, &grant.server, control)?);
+            }
+            let session = self.browser.as_mut().unwrap();
+            if session.catalog["catalogSha256"] != grant.catalog_sha256 {
+                return Err("浏览器工具或范围已改变，请重新发现并选择".into());
+            }
+            session.call(grant, tool, args, control, check)
+        } else {
+            call_for(root, selected, grant, tool, args, control, check)
+        }
+    }
+}
+
+pub(crate) fn call_for(
+    root: &Path,
+    selected: Option<&str>,
+    grant: &Grant,
+    tool: &str,
+    arguments: &Value,
+    control: &Control,
+    check: impl Fn() -> Result<(), String>,
+) -> Result<Value, String> {
+    if grant.server.starts_with("app:") {
+        apps::call(root, selected, grant, tool, arguments, control, check)
+    } else {
+        call(grant, tool, arguments, control, check)
+    }
 }
 
 fn authorize(catalog: &Value, grant: &Grant, tool: &str, arguments: &Value) -> Result<(), String> {

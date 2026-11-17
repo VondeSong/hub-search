@@ -61,6 +61,7 @@ struct Process {
     _auth_file: std::fs::File,
     login: Option<Value>,
     pending: VecDeque<Value>,
+    rpc_timeout: Duration,
     #[cfg(windows)]
     group: Option<ProcessGroup>,
 }
@@ -134,7 +135,7 @@ impl Process {
         control: &Control,
         mut pump: impl FnMut() -> Result<(), String>,
     ) -> Result<Value, String> {
-        let deadline = Instant::now() + Duration::from_secs(25);
+        let deadline = Instant::now() + self.rpc_timeout;
         let mut deferred = VecDeque::new();
         loop {
             if Instant::now() >= deadline {
@@ -198,6 +199,30 @@ fn spawn(
     control: &Control,
     native_capabilities: capabilities::NativeCapabilities,
 ) -> Result<Process, String> {
+    spawn_profile(
+        directory,
+        authentication_identity,
+        prepared,
+        _model,
+        effort,
+        fast,
+        control,
+        native_capabilities,
+        false,
+    )
+}
+
+fn spawn_profile(
+    directory: &Path,
+    authentication_identity: &str,
+    prepared: authentication::Prepared,
+    _model: &str,
+    effort: &str,
+    fast: bool,
+    control: &Control,
+    native_capabilities: capabilities::NativeCapabilities,
+    connected_apps: bool,
+) -> Result<Process, String> {
     control.check()?;
     prepared.verify(authentication_identity)?;
     let exe = executable_control(false, control)?;
@@ -239,6 +264,16 @@ fn spawn(
         "shell_tool",
     ]);
     configure_investigation_mode(&mut command, true);
+    if connected_apps {
+        command.args([
+            "--enable",
+            "apps",
+            "--enable",
+            "plugins",
+            "--enable",
+            "remote_plugin",
+        ]);
+    }
     if native_capabilities.workspace {
         command.args(["--enable", "shell_tool", "--enable", "unified_exec"]);
     }
@@ -306,14 +341,24 @@ fn spawn(
     let output = child.stdout.take().expect("piped stdout");
     let mut errors = child.stderr.take().expect("piped stderr");
     let (send, receive) = mpsc::sync_channel(64);
+    // The authenticated catalog can contain hundreds of schemas. Only the
+    // non-model discovery sidecar accepts this larger, still bounded frame.
+    let frame_limit = if connected_apps {
+        4 * 1024 * 1024
+    } else {
+        524_288
+    };
     let reader = std::thread::spawn(move || {
         let mut reader = std::io::BufReader::new(output);
         loop {
             let mut bytes = Vec::new();
-            let result = reader.by_ref().take(524_290).read_until(b'\n', &mut bytes);
+            let result = reader
+                .by_ref()
+                .take(frame_limit as u64 + 2)
+                .read_until(b'\n', &mut bytes);
             match result {
                 Ok(0) => break,
-                Ok(_) if bytes.len() <= 524_288 && bytes.ends_with(b"\n") => {
+                Ok(_) if bytes.len() <= frame_limit && bytes.ends_with(b"\n") => {
                     let event = serde_json::from_slice(&bytes)
                         .map_err(|_| "Agent 事件格式无效".to_string());
                     if send.send(event).is_err() {
@@ -339,6 +384,7 @@ fn spawn(
         _auth_file: auth_file,
         login,
         pending: VecDeque::new(),
+        rpc_timeout: Duration::from_secs(if connected_apps { 90 } else { 25 }),
         #[cfg(windows)]
         group,
     })

@@ -14,6 +14,7 @@ fn grant(c: &Value) -> Grant {
         trusted_read_only: true,
         catalog_sha256: c["catalogSha256"].as_str().unwrap().into(),
         tools: vec!["lookup".into()],
+        app_binding: None,
         resource_uris: vec![],
     }
 }
@@ -140,6 +141,7 @@ fn custom_mcp_native_remote_roundtrip() {
         trusted_read_only: true,
         catalog_sha256: c["catalogSha256"].as_str().unwrap().into(),
         tools: vec![tool.clone()],
+        app_binding: None,
         resource_uris: vec![],
     };
     let result = call(&g, &tool, &args, &control, || Ok(()));

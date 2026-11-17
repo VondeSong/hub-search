@@ -7,6 +7,7 @@ mod archive;
 pub(super) mod assistant;
 mod flashcards;
 pub(super) mod obsidian;
+pub(super) mod plugin;
 pub(super) fn obsidian_ui(root: &Path, args: &Value) -> Result<Value, String> {
     match args["action"].as_str().unwrap_or_default() {
         "prepareObsidianEdit" => obsidian::prepare(root, args),
@@ -143,6 +144,9 @@ fn check_prepared(root: &Path, c: &Connection, w: &Work, a: &Action) -> Result<(
     check_action_context(root, c, w, a)
 }
 fn check_action_context(root: &Path, c: &Connection, w: &Work, a: &Action) -> Result<(), String> {
+    if a.kind == "pluginWrite" {
+        return plugin::check_context(c, w, a);
+    }
     if a.base_revision != w.revision || a.authorization_version != w.authorization_version {
         return Err("事项决定或授权已改变，请重新准备建议".into());
     }
@@ -171,6 +175,7 @@ pub(super) fn reconcile(root: &Path, work: &str, live: Option<&str>) -> Result<(
     }
     archive::reconcile(root, work, live)?;
     obsidian::reconcile(root, work)?;
+    plugin::reconcile(root, work)?;
     Ok(())
 }
 fn claim(root: &Path, id: &str, tag: &str) -> Result<(Work, String, Value), String> {
@@ -572,6 +577,11 @@ pub(super) fn view_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
     for id in ids {
         let a = load(c, &w.id, &id)?;
         let mut v = serde_json::to_value(&a).map_err(|e| e.to_string())?;
+        if a.kind == "pluginWrite" {
+            plugin::view(c, w, &a, &mut v)?;
+            items.push(v);
+            continue;
+        }
         if a.state == "prepared" {
             match check_preparation(c, w).and_then(|_| check_action_context(root, c, w, &a)) {
                 Ok(()) => {
@@ -677,6 +687,10 @@ pub(super) fn receipts_on(c: &Connection, work: &str) -> Result<Value, String> {
             facts.push(obsidian::fact(&a));
             continue;
         }
+        if a.kind == "pluginWrite" {
+            facts.push(plugin::fact(&a)?);
+            continue;
+        }
         let receipt = a.receipt.ok_or("已核验动作缺少回执")?;
         let result = &receipt["result"];
         let proposal_id = result["proposal"]["proposalId"]
@@ -739,6 +753,10 @@ pub(super) fn completion_proofs_on(
                             .is_some_and(|n| n > 0)
                 }
                 "archiveCopy" => fact["currentResult"]["state"] == "verified",
+                "pluginWrite" => {
+                    fact["receipt"]["verified"] == true
+                        && plugin::check_context(c, work, &a).is_ok()
+                }
                 "obsidianEdit" => {
                     let snapshot = a.payload.as_ref().and_then(|p| {
                         serde_json::from_value::<crate::obsidian_edit::Snapshot>(
@@ -826,6 +844,7 @@ pub(super) fn receipt_hints_on(c: &Connection, work: &str) -> Result<Value, Stri
             ),
             "tagProposal" => tags::agent_receipt_hint_on(c, proposal.as_deref().unwrap_or("")),
             "obsidianEdit" => Ok(json!({"state":state})),
+            "pluginWrite" => Ok(json!({"state":state,"verification":"saved remote readback"})),
             _ => Err("未知业务回执类型".into()),
         }
         .unwrap_or(json!({"available":false}));

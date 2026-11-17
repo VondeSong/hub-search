@@ -3,14 +3,14 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "5475054ad9d5bfe7ece65e98179ce165506c5527",
-  "published_version": 108,
-  "deployment_id": "appgdep_6afb343e910081918e7fe7dec521433e",
+  "source_commit": "4ca298a38254066b770980bed0d4898fbd065b6a",
+  "published_version": 110,
+  "deployment_id": "appgdep_6afba62385108191a5d85fcd85b807ac",
   "files": {
     ".gitignore": {
-      "sha256": "5ca3c39bdc1288c108a1931b3f6bc5795464b6253e9457390617774259deed0c",
+      "sha256": "ca0e1575efb181d784f15bf6c86e3c012fd5c7ede4daa34b924d0d8b590d4e77",
       "mode": "100644",
-      "bytes": 614
+      "bytes": 659
     },
     ".npmrc": {
       "sha256": "a3909ac0447c469fda12c57374993be70f47ce73e49fd3124678c7c047f2214d",
@@ -38,9 +38,9 @@
       "bytes": 9509
     },
     "app/AssistantDetails.tsx": {
-      "sha256": "dad5d7ec2960fa08783d1d3ce456a6fabffb35c284668fbf0f84d025c4b26197",
+      "sha256": "ff4a23895c6193764b0f3889bcd6f141467685afbc40d29d5825e3efede49090",
       "mode": "100644",
-      "bytes": 5659
+      "bytes": 5844
     },
     "app/AssistantHistory.tsx": {
       "sha256": "2e68eda6b2bf9feb7adaa5486df30ad714ccac0dda68fb95b194e9334d193f14",
@@ -61,6 +61,11 @@
       "sha256": "cd6260eb60f8681c67680551a54848bf06c53822f705033714654021c93ca244",
       "mode": "100644",
       "bytes": 5700
+    },
+    "app/AssistantNativeConnections.tsx": {
+      "sha256": "3831b2873aa711a959458f5f683e339eb29c610f2ad9268acc4180fcecde4f39",
+      "mode": "100644",
+      "bytes": 2053
     },
     "app/AssistantProcess.tsx": {
       "sha256": "44c9e09636bd716e7aa8da3e317dda02a68095fddbddb96e7651b2f9f97d0b32",
@@ -233,9 +238,9 @@
       "bytes": 1644
     },
     "app/assistant.css": {
-      "sha256": "d4d0c933d2ccb96c09437d9e8f0c887c0a21fc1a10fe88aa14e6a680bc645eea",
+      "sha256": "b679693df257f592dc2b6b3fa17f7f9c9a4a7b336ddee2ad31a386d60428f53f",
       "mode": "100644",
-      "bytes": 58993
+      "bytes": 59590
     },
     "app/calendar-period.ts": {
       "sha256": "fb67e7bd1f4e04ccfd14ffb7ef8bb59fb448b0ed2080a698e9b331fe12b1224d",
@@ -1323,5 +1328,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-16T16:51:11.441544+00:00"
+  "imported_at": "2026-11-17T00:57:11.624263+00:00"
 }

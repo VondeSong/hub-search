@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Activity, Brain, ChevronDown, Globe2, Layers, Maximize2, Minimize2, NotebookPen, X } from 'lucide-react';
 import { researchPolicies } from './AssistantResearch';
 import type { AssistantSettings } from './Assistant';
+import {AssistantNativeConnections} from './AssistantNativeConnections';
 
 function DetailRow({ icon, title, status, children }: { icon: ReactNode; title: string; status?: string; children: ReactNode }) {
   return <details className="ha-detail-row">
@@ -60,5 +61,5 @@ function AssistantConnection({ settings }: { settings: AssistantSettings }) {
     <div><dt>网页补充</dt><dd>{web}</dd></div>
     <div><dt>内置工具</dt><dd>遵循资料范围和保存权限。</dd></div>
     <div><dt>外部工具（MCP）</dt><dd>由桌面端按对话配置。</dd></div>
-  </dl><p>站点原型不实际联网或连接外部服务。</p></>;
+  </dl><p>站点原型不实际联网或连接外部服务。</p><AssistantNativeConnections disabled={settings.model==='deepseek'||settings.researchPolicy==='materials-only'}/></>;
 }

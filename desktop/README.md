@@ -4,6 +4,8 @@
 
 ## 当前能力
 
+- 对话详情的“联网与工具 → 外部工具”可逐工具选择当前 Codex ChatGPT 账号已连接的 Apps；GitHub Issue 评论采用草稿、确认和精确回读。独立浏览器使用本机 Edge/Chrome 与锁定的 Microsoft Playwright MCP，首次需准备组件并明确允许的网站；不继承个人浏览器登录。支持范围、授权与安装前提见 [原生能力合同](docs/AGENTS_NATIVE_CAPABILITIES.md)。
+
 - 正文旁的 Hub 助手支持连续对话、精确引用、笔记修改与闪卡草稿。Codex 路线采用持续 Agent 会话，由模型选择工具、处理结果并实时说明工作进展；可在运行中追加要求、停止后继续。提供方返回的公开思考摘要可以展开查看。保存与导入以 Hub 的授权和实际回执为准，详见 [助手交互与支持边界](docs/ASSISTANT_INTERACTION.md)。此路线使用本机已安装并登录的 [Codex 开源运行层](https://github.com/openai/codex)，协议参考 [官方 App Server 文档](https://learn.chatgpt.com/docs/app-server)；Codex CLI 不包含在 Hub 分发包中。
 
 - Hub 启动的 Codex CLI 共用「设置 → Codex」中的模型、推理强度、标准/Fast 速度与并发队列；标签定义、补标、逐篇检查、标签关系分析、收藏写入 Craft 和滴答转换均由同一套件管控，运行状态集中到底部信息栏。详见 [Codex 套件](docs/CODEX_SUITE.md)。
@@ -218,6 +220,8 @@ FSRS 使用 BSD-3-Clause 许可证；随应用前端资源分发的完整声明�
 [第三方许可](public/third-party-notices-fsrs.txt)。
 
 ## 第三方资源与致谢
+
+独立浏览器复用 [Microsoft Playwright MCP 0.0.85](https://github.com/microsoft/playwright-mcp)（Apache-2.0）及 [MCP TypeScript SDK 1.25.2](https://github.com/modelcontextprotocol/typescript-sdk)（MIT）。`runtime/browser/` 保存 Hub 的适配代码和固定依赖锁；组件由用户在应用内准备时从官方 npm registry 安装，保留包内许可文件。Hub 不捆绑 Node.js、Codex CLI 或 Edge/Chrome 安装包，也不复制其个人资料目录。
 
 Telegram 本机登录使用 [WezTerm portable-pty 0.9.0](https://github.com/wezterm/wezterm/tree/f8921727a11b9f8b073e8c24821d72fd41283500/pty)，
 Copyright (c) 2018 Wez Furlong，MIT。源码保留于 `src-tauri/vendor/portable-pty`，仅修改 Windows 终端创建参数以适配无控制台的桌面进程；

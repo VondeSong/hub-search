@@ -1,3 +1,4 @@
+import {AgentPluginWriteRecord} from "./AgentPluginWriteRecord";
 import {AgentFollowups,type Followup} from "./AgentFollowups";
 import { loadAgentPreferences, rememberAgentPreferences, loadCodexWebSearchPreference, loadMemoryPreference, rememberMemoryPreference } from "./AgentPreferences";
 import { AgentTagRequestContext, AgentCitationContext, AgentBrowsingContext, AgentPanelContext,AgentAccountVisibleContext,AgentTextMaterialContext,type TextMaterial,type AgentQuestion } from "./StandaloneAgentLauncher";
@@ -393,8 +394,8 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   useEffect(() => { if (!open && loaded.current && accountVisible) floatingLauncher.current?.focus(); }, [open, accountVisible]);
   useEffect(() => { if (open && (!view || initialDraft) && !busy && !detailsMenu.current?.open) goalInput.current?.focus(); }, [open, view?.work.id, busy, initialDraft]);
   const latestAction = view?.actions?.items[0];
-  const actionLabel = latestAction?.kind === "obsidianEdit" ? "笔记修改" : latestAction?.kind === "archiveCopy" ? "归档" : latestAction?.kind === "flashcardDrafts" ? "闪卡提交" : "补标提交";
-  const pendingLabel = pendingAction?.includes("ObsidianEdit") || (!pendingAction && latestAction?.kind === "obsidianEdit") ? "正在处理笔记修改…" : pendingAction?.includes("Archive") || (!pendingAction && latestAction?.kind === "archiveCopy") ? "正在处理归档动作…" : pendingAction?.includes("Flashcards") || (!pendingAction && latestAction?.kind === "flashcardDrafts") ? "正在处理闪卡草稿…" : "正在处理补标建议…";
+  const actionLabel = latestAction?.kind === "obsidianEdit" ? "笔记修改" : latestAction?.kind === "archiveCopy" ? "归档" : latestAction?.kind === "flashcardDrafts" ? "闪卡提交" : latestAction?.kind === "pluginWrite" ? "GitHub 评论" : "补标提交";
+  const pendingLabel = pendingAction?.includes("ObsidianEdit") || (!pendingAction && latestAction?.kind === "obsidianEdit") ? "正在处理笔记修改…" : pendingAction?.includes("Archive") || (!pendingAction && latestAction?.kind === "archiveCopy") ? "正在处理归档动作…" : pendingAction?.includes("Flashcards") || (!pendingAction && latestAction?.kind === "flashcardDrafts") ? "正在处理闪卡草稿…" : pendingAction?.includes("PluginWrite") || (!pendingAction && latestAction?.kind === "pluginWrite") ? "正在处理 GitHub 评论…" : "正在处理补标建议…";
   useEffect(() => {
     if (open && view && document.activeElement === document.body) statusElement.current?.focus();
   }, [open, view?.work.id, view?.work.state, view?.actions?.items[0]?.state]);
@@ -968,7 +969,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     } else setAssistantOptions(options);
     if(remember&&(JSON.stringify(previous.model)!==JSON.stringify(options.model) || previous.webSearch!==options.webSearch || previous.researchPolicy!==options.researchPolicy)) rememberAgentPreferences(options,previous,runtime.settings?.provider);
   };
-  const outcomes=(items:NonNullable<AgentActions>["items"])=>items.length ? <div className="agent-outcomes" aria-label="对话成果">{items.map(item=>item.kind==="flashcardDrafts" ? <FlashcardRecord key={item.id} item={item as FlashcardAction} disabled={businessDisabled} revoked={view?.work.state==="revoked"} onAction={businessAction}/> : item.kind==="archiveCopy" ? <ArchiveRecord key={item.id} item={item as ArchiveAction} disabled={businessDisabled} revoked={view?.work.state==="revoked"} onAction={businessAction}/> : item.kind==="obsidianEdit" ? <AgentObsidianEdit key={item.id} actions={{tagOptions:[],items:[item]}} recordsOnly verificationPending={!!businessCheck?.uncertain && businessCheck.actionId===item.id} disabled={businessDisabled} revoked={view?.work.state==="revoked"} onAction={businessAction}/> : null)}</div> : null;
+  const outcomes=(items:NonNullable<AgentActions>["items"])=>items.length ? <div className="agent-outcomes" aria-label="对话成果">{items.map(item=>item.kind==="flashcardDrafts" ? <FlashcardRecord key={item.id} item={item as FlashcardAction} disabled={businessDisabled} revoked={view?.work.state==="revoked"} onAction={businessAction}/> : item.kind==="archiveCopy" ? <ArchiveRecord key={item.id} item={item as ArchiveAction} disabled={businessDisabled} revoked={view?.work.state==="revoked"} onAction={businessAction}/> : item.kind==="pluginWrite" ? <AgentPluginWriteRecord key={item.id} item={item} disabled={businessDisabled} revoked={view?.work.state==="revoked"} onAction={businessAction}/> : item.kind==="obsidianEdit" ? <AgentObsidianEdit key={item.id} actions={{tagOptions:[],items:[item]}} recordsOnly verificationPending={!!businessCheck?.uncertain && businessCheck.actionId===item.id} disabled={businessDisabled} revoked={view?.work.state==="revoked"} onAction={businessAction}/> : null)}</div> : null;
   const visibleNote=browsing?.entry&&"result" in browsing.entry?investigationAnchor(browsing.entry.result):pageAnchor;
   const saveTarget=visibleNote?.kind==="note"?visibleNote:null;
   const inlineOutcomes=(message:ConversationMessage)=>{

@@ -196,6 +196,9 @@ pub(in crate::agent_work) fn prepare(
 pub(in crate::agent_work) fn inspect(root: &Path, w: &Work, id: &str) -> Result<Value, String> {
     let c = crate::source_evidence::open_read_database(root)?;
     let a = load(&c, &w.id, id)?;
+    if a.kind == "pluginWrite" {
+        return plugin::inspect(&c, w, &a);
+    }
     check_preparation(&c, w)?;
     if a.authorization_version != w.authorization_version
         || a.base_revision != w.revision

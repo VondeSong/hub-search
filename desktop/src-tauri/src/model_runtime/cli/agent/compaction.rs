@@ -383,6 +383,7 @@ mod tests {
             _auth_file: auth_file,
             login: None,
             pending: Default::default(),
+            rpc_timeout: std::time::Duration::from_secs(25),
             group: None,
         }
     }

@@ -1,12 +1,12 @@
 import {useEffect,useState} from "react";
 import {invoke} from "@tauri-apps/api/core";
-import {BookOpen,Circle,FileText,Globe2,Network,Pencil,Search,Shrink,Terminal,TriangleAlert,Wrench} from "lucide-react";
+import {BookOpen,Circle,FileText,Globe2,MousePointer2,Network,Pencil,Search,Shrink,Terminal,TriangleAlert,Wrench} from "lucide-react";
 import {publicWebHref} from "./AgentWebSources";
 import type {ActivityEvent} from "./AgentActivity";
 import github from "./assets/agent-services/github.svg";
 import notion from "./assets/agent-services/notion.svg";
 
-export type ActivityOperation="search"|"read"|"command"|"edit"|"skill"|"context"|"delegate"|"mcp"|"tool";
+export type ActivityOperation="search"|"read"|"command"|"edit"|"skill"|"context"|"delegate"|"mcp"|"browser"|"tool";
 /** The same resolver feeds rows and collapsed groups. Labels are legacy only. */
 export function activityOperation(event:ActivityEvent):ActivityOperation {
   const operation=event.operation;
@@ -15,7 +15,7 @@ export function activityOperation(event:ActivityEvent):ActivityOperation {
   if(operation==="command" || operation==="compute")return "command";
   if(operation==="delegate")return "delegate";
   if(operation==="edit")return "edit";
-  if(operation==="mcp")return "mcp";
+  if(operation==="mcp")return event.serviceId?.startsWith("browser:")?"browser":"mcp";
   if(operation==="read" || operation==="traceResult" || operation==="toolSchema")return "read";
   if(event.kind==="context")return event.origin==="publicLifecycle"?"context":"read";
   if(operation)return "tool";
@@ -25,10 +25,10 @@ export function activityOperation(event:ActivityEvent):ActivityOperation {
   if(/读取|原文|材料/.test(event.label))return "read";
   return "tool";
 }
-export const operationLabels:Record<ActivityOperation,string>={search:"搜索资料",read:"读取资料",command:"运行命令",edit:"编辑文件",skill:"使用技能",context:"整理上下文",delegate:"协调子代理",mcp:"查询外部工具",tool:"调用工具"};
+export const operationLabels:Record<ActivityOperation,string>={search:"搜索资料",read:"读取资料",command:"运行命令",edit:"编辑文件",skill:"使用技能",context:"整理上下文",delegate:"协调子代理",mcp:"使用外部工具",browser:"操作浏览器",tool:"调用工具"};
 export function ActivityIcon({event}:{event:ActivityEvent}) {
   if(event.kind==="reasoning"||event.kind==="status")return null;
-  const icons={search:Search,read:FileText,command:Terminal,edit:Pencil,skill:BookOpen,context:Shrink,delegate:Network,mcp:Globe2,tool:Wrench};
+  const icons={search:Search,read:FileText,command:Terminal,edit:Pencil,skill:BookOpen,context:Shrink,delegate:Network,mcp:Globe2,browser:MousePointer2,tool:Wrench};
   const Icon=event.state==="failed"||event.errorCount?TriangleAlert:event.state==="interrupted"?Circle:icons[activityOperation(event)];
   return <Icon size={16} aria-hidden="true" data-activity-icon={event.state==="failed"?"failed":activityOperation(event)}/>;
 }
@@ -59,7 +59,7 @@ function WebsiteIcon({url,title,workId}:{url:string;title:string;workId?:string}
   },[workId,url]);
   return <span className="agent-site-icon" title={title} aria-label={new URL(url).hostname}>{src?<img src={src} alt="" width={16} height={16} onError={()=>setSrc(null)}/>:<Globe2 size={16} aria-hidden="true"/>}</span>;
 }
-const brands:Record<string,{src:string;title:string}>={github:{src:github,title:"GitHub"},notion:{src:notion,title:"Notion"}};
+const brands:Record<string,{src:string;title:string}>={github:{src:github,title:"GitHub"},"app:connector_76869538009648d5b282a4bb21c3d157":{src:github,title:"GitHub"},notion:{src:notion,title:"Notion"}};
 export function ActivityIdentity({events,workId}:{events:ActivityEvent[];workId?:string}) {
   const sites=activitySites(events);
   const services=[...new Set(events.map(e=>e.serviceId).filter((s):s is string=>!!s))];

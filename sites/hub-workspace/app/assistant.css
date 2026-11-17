@@ -566,3 +566,9 @@
 .ha-process-demo>.ha-process-row:last-of-type>svg{color:#68a5dd}
 @media(prefers-color-scheme:dark){.ha-process-sites img{filter:invert(1)}}
 @media(prefers-reduced-motion:reduce){.ha-process-demo summary>svg:last-child{transition:none}}
+
+.ha-native-connections{min-width:0;border:0;padding:10px 0 0;margin:8px 0 0;border-top:1px solid var(--line);font-size:12px;overflow-wrap:anywhere}
+.ha-native-connections legend{padding:0;font-weight:500}
+.ha-native-site{display:grid;gap:6px;margin:10px 0}
+.ha-native-site input{box-sizing:border-box;min-width:0;width:100%;border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--surface);color:var(--text);font:inherit}
+.ha-native-connections>button{border:1px solid var(--line);border-radius:6px;padding:5px 8px;background:var(--surface);color:var(--text);font:inherit}

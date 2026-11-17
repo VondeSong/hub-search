@@ -22,6 +22,36 @@ fn title(request: &Value, catalog: &mut Option<Value>) -> String {
         ),
         "readSkillReference" => "读取技能参考资料".into(),
         "traceResult" => "查看已保存的工具结果".into(),
+        "mcp"
+            if request["server"]
+                .as_str()
+                .is_some_and(|s| s.starts_with("browser:")) =>
+        {
+            match request["tool"].as_str() {
+                Some("catalog") => "核对浏览器工具",
+                Some("browser_navigate") => "打开网页",
+                Some("browser_snapshot") => "读取浏览器页面",
+                Some("browser_click") => "点击网页元素",
+                Some("browser_type") => "填写网页字段",
+                Some("browser_tabs") => "管理浏览器标签",
+                _ => "操作浏览器",
+            }
+            .into()
+        }
+        "mcp"
+            if request["server"]
+                .as_str()
+                .is_some_and(|s| s.starts_with("app:")) =>
+        {
+            if request["tool"] == "catalog" {
+                "核对已连接应用工具"
+            } else if request["tool"] == "github.add_comment_to_issue" {
+                "准备 GitHub 评论草稿"
+            } else {
+                "查询已连接应用"
+            }
+            .into()
+        }
         "mcp" => if request["tool"] == "catalog" {
             "核对外部文档工具与资源"
         } else if request["tool"] == "read_resource" {
@@ -178,7 +208,7 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
                         .unwrap_or_else(|| sequence.to_string());
                     steps.insert(id, events.len());
                     events.push(json!({"id":sequence.to_string(),"kind":"tool","state":"running","label":title(&body,&mut title_catalog),
-                        "operation":body["operation"],"toolName":body["name"],"serviceId":body["server"],"detail":body["query"].as_str().map(|s|s.chars().take(200).collect::<String>()),"createdAt":time}));
+                        "operation":body["operation"],"toolName":body.get("name").or_else(||body.get("tool")),"serviceId":body["server"],"detail":body["query"].as_str().map(|s|s.chars().take(200).collect::<String>()),"createdAt":time}));
                 }
                 "selectedMaterialReadError" => {
                     events.push(json!({"id":sequence.to_string(),"kind":"context","state":"failed","origin":"hub-context",
@@ -227,6 +257,9 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
                                 "completed"
                             });
                             events[index]["finishedAt"] = json!(time);
+                            if body["serviceTitle"].is_string() {events[index]["serviceTitle"]=body["serviceTitle"].clone();}
+                            if body["sourceRefs"].is_array() {events[index]["sourceRefs"]=body["sourceRefs"].clone();}
+                            if body["browser"]["truncated"]==true {events[index]["truncated"]=json!(true);events[index]["detail"]=json!("页面快照超过容量，仅保留前段；可按元素 target 缩小范围继续读取。");}
                             if let Some(error) = body["error"].as_str() {
                                 events[index]["detail"] = json!(error.chars().take(300).collect::<String>());
                             }

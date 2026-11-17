@@ -1,4 +1,78 @@
 use super::*;
+
+#[test]
+#[ignore = "explicit real daily root and report path; one genuine Hub project acceptance chat, no source writes; comment draft only"]
+fn issue14_native_real_workflow_and_comment_draft() {
+    let root = PathBuf::from(
+        std::env::var_os("HUB_NATIVE_ACCEPTANCE_ROOT").expect("explicit daily data root"),
+    );
+    let path = PathBuf::from(
+        std::env::var_os("HUB_NATIVE_ACCEPTANCE_REPORT").expect("explicit acceptance report"),
+    );
+    let control = Control::bounded(std::time::Duration::from_secs(120));
+    let app = mcp_services::apps::GITHUB;
+    let app_catalog = mcp_services::discover_for(&root, app, &control).unwrap();
+    let mut binding = app_catalog["appBinding"].clone();
+    binding["writeRepository"] = json!("VondeSong/hub-search");
+    let app_grant = json!({"server":app,"catalogSha256":app_catalog["catalogSha256"],"tools":["github.fetch_issue",mcp_services::apps::COMMENT],"appBinding":binding});
+    let browser = "browser:https://developers.openai.com";
+    let browser_catalog = mcp_services::discover_for(&root, browser, &control).unwrap();
+    let browser_grant = json!({"server":browser,"catalogSha256":browser_catalog["catalogSha256"],"tools":["browser_navigate","browser_snapshot","browser_click"]});
+    let c = crate::source_evidence::open_read_database(&root).unwrap();
+    let present:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM documents WHERE markdown LIKE '%https://developers.openai.com/plugins/concepts/skills%')",[],|r|r.get(0)).unwrap();
+    assert!(present);
+    drop(c);
+    let goal="验收当前 Hub 原生工具接入。使用本对话 GitHub 应用实际读取 VondeSong/hub-search 的 #56，概括其已交付范围。使用独立浏览器打开日常 Skill 笔记中已有的 https://developers.openai.com/plugins/concepts/skills，调用 browser_snapshot 获取真实元素 target，点击一个同站文档链接并再次获取页面快照；简述技能在插件中的作用。仅给三条短结论和实际来源，不检索其他内容、不修改来源。完成读取和浏览后，为本仓库 #14 准备一条评论草稿，正文准确记录本轮实际已完成的 GitHub 读取与浏览器连续操作，并说明草稿需确认后才发布、业务来源未修改。不要自动发布评论。";
+    let id = if path.exists() {
+        serde_json::from_slice::<Value>(&std::fs::read(&path).unwrap()).unwrap()["workId"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    } else {
+        let value=crate::agent_work::ui(&root,&json!({"action":"create","anchor":null,"grant":{"libraryIds":[],"notes":[],"readingItemKeys":[]},"goal":goal,"successCriteria":"真实 GitHub 读取、浏览器内联快照和真实 target 点击；准确来源、持久化过程、待确认评论草稿；无来源写入"})).unwrap();
+        let id = value["work"]["id"].as_str().unwrap().to_owned();
+        std::fs::write(
+            &path,
+            serde_json::to_vec_pretty(&json!({"workId":id,"goal":goal})).unwrap(),
+        )
+        .unwrap();
+        id
+    };
+    options::configure(&root,&json!({"id":id,"options":{"model":crate::model_runtime::Settings{model:"gpt-6.1-sol".into(),reasoning_effort:"high".into(),..Default::default()},"autoFlashcardInbox":false,"researchPolicy":"open","mcpServices":[app_grant,browser_grant]}})).unwrap();
+    let result = crate::agent_work::ui(&root, &json!({"action":"respond","id":id,"mode":"deep"}));
+    let view = store::view(&root, &id).unwrap();
+    let calls = store::records(&root, &id, "toolCall", 100).unwrap();
+    let results = store::records(&root, &id, "toolResult", 100).unwrap();
+    std::fs::write(
+        &path,
+        serde_json::to_vec_pretty(
+            &json!({"workId":id,"result":result,"view":view,"calls":calls,"toolResults":results}),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    result.unwrap();
+    for tool in [
+        "github.fetch_issue",
+        "browser_navigate",
+        "browser_snapshot",
+        "browser_click",
+        mcp_services::apps::COMMENT,
+    ] {
+        assert!(
+            calls
+                .iter()
+                .any(|c| c["operation"] == "mcp" && c["tool"] == tool),
+            "missing {tool}"
+        );
+    }
+    let drafts = view["actions"]["items"].as_array().unwrap();
+    assert!(drafts
+        .iter()
+        .any(|a| a["kind"] == "pluginWrite" && a["state"] == "prepared" && a["receipt"].is_null()));
+    assert!(view["work"]["report"].is_object());
+    println!("real Hub workflow saved: {id}; GitHub read, browser snapshot/ref click, source report and unexecuted comment draft");
+}
 #[test]
 fn custom_mcp_grant_reopens_revokes_and_cites_only_actual_endpoint() {
     let f = crate::source_evidence::tests::Fixture::new();
@@ -10,6 +84,7 @@ fn custom_mcp_grant_reopens_revokes_and_cites_only_actual_endpoint() {
         trusted_read_only: true,
         catalog_sha256: "c".repeat(64),
         tools: vec!["lookup".into()],
+        app_binding: None,
         resource_uris: vec![],
     };
     let model = crate::model_runtime::Settings::default();
@@ -145,6 +220,7 @@ fn cn07c2_revoke_one_service_preserves_the_other_and_rejects_cross_service_tools
     let a = grant();
     let b = Grant {
         trusted_read_only: false,
+        app_binding: None,
         resource_uris: vec![],
         server: "context7".into(),
         catalog_sha256: "b".repeat(64),
@@ -173,6 +249,7 @@ fn cn07c2_revoke_one_service_preserves_the_other_and_rejects_cross_service_tools
 fn grant() -> Grant {
     Grant {
         trusted_read_only: false,
+        app_binding: None,
         resource_uris: vec![],
         server: "openai_docs".into(),
         catalog_sha256: "a".repeat(64),
@@ -195,6 +272,7 @@ fn cn07c2_live_context7_query_and_source_report() {
     .unwrap();
     let grant = Grant {
         trusted_read_only: false,
+        app_binding: None,
         resource_uris: vec![],
         server: "context7".into(),
         catalog_sha256: catalog["catalogSha256"].as_str().unwrap().into(),
@@ -299,6 +377,7 @@ fn cn07c_live_model_mcp_and_saved_report() {
     .unwrap();
     let grant = Grant {
         trusted_read_only: false,
+        app_binding: None,
         resource_uris: vec![],
         server: "openai_docs".into(),
         catalog_sha256: catalog["catalogSha256"].as_str().unwrap().into(),

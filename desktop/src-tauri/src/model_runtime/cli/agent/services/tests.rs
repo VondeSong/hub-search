@@ -21,6 +21,7 @@ fn cn07c2_resources_require_exact_selection_and_keep_legacy_grants() {
         server: SERVER.into(),
         catalog_sha256: c["catalogSha256"].as_str().unwrap().into(),
         tools: vec![],
+        app_binding: None,
         resource_uris: vec![uri.into()],
     };
     validate(std::slice::from_ref(&selected)).unwrap();
@@ -103,6 +104,7 @@ fn cn07c2_native_resource_roundtrip() {
         server: SERVER.into(),
         catalog_sha256: c["catalogSha256"].as_str().unwrap().into(),
         tools: vec![],
+        app_binding: None,
         resource_uris: vec![uri.into()],
     };
     authorize(&c, &g, "read_resource", &json!({"uri":uri})).unwrap();
@@ -132,6 +134,7 @@ fn cn07c2_services_have_independent_identity_tools_and_grants() {
     let c = catalog(service, &response).unwrap();
     let g = Grant {
         trusted_read_only: false,
+        app_binding: None,
         resource_uris: vec![],
         server: "context7".into(),
         catalog_sha256: c["catalogSha256"].as_str().unwrap().into(),
@@ -188,6 +191,7 @@ fn response() -> Value {
 fn grant(catalog: &Value) -> Grant {
     Grant {
         trusted_read_only: false,
+        app_binding: None,
         resource_uris: vec![],
         server: SERVER.into(),
         catalog_sha256: catalog["catalogSha256"].as_str().unwrap().into(),
@@ -366,6 +370,7 @@ fn cn07c2_native_missing_library_is_rejected_with_safe_guidance() {
     let c = discover("context7", &control).unwrap();
     let g = Grant {
         trusted_read_only: false,
+        app_binding: None,
         resource_uris: vec![],
         server: "context7".into(),
         catalog_sha256: c["catalogSha256"].as_str().unwrap().into(),
