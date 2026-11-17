@@ -16,6 +16,7 @@ import "./SearchToolbar.css";
 import { SearchFilterReveal } from "./SearchFilterReveal";
 import { MobileSearchControls, MobileSearchFilterForm } from "./MobileSearchControls";
 import { MobileFilterSheet } from "./MobileFilterSheet";
+import { MobileCollectionSearch, type MobileCollectionSearchProps } from "./MobileCollectionSearch";
 
 export type AppLayoutProps = {
   filtersOpen: boolean;
@@ -29,6 +30,7 @@ export type AppLayoutProps = {
   settingsDialog: ReactNode;
   mainContent?: ReactNode;
   mobileHeader?: ReactNode;
+  mobileCollectionSearch?: MobileCollectionSearchProps;
   onSelectMobileLibraries?: (ids: string[] | null) => void;
   desktopSidebarProps?: ComponentProps<typeof DesktopSidebar>;
 };
@@ -51,6 +53,7 @@ function AppLayoutContent({
   settingsDialog,
   mainContent,
   mobileHeader,
+  mobileCollectionSearch,
   onSelectMobileLibraries,
   AppEntry,
   Workspace,
@@ -60,7 +63,7 @@ function AppLayoutContent({
     <AppEntry filtersOpen={filtersOpen} previewOpen={mobilePreviewOpen} style={style}>
       <div className="drag-strip" onMouseDown={startWindowDrag} />
       {mainContent ? <>{mobile && mobileHeader}<div className="main-content-override">{mainContent}</div><FooterStatus {...footerStatusProps} /></> : <>
-        {mobile ? <div className="mobile-top-area">{mobileHeader}<SearchHeader {...headerProps} />{!workspaceProps.resultsPaneProps.collectionView && <MobileSearchControls filters={filterBarProps} onSelectLibraries={onSelectMobileLibraries} onOpenFilters={()=>headerProps.setFiltersOpen(true)} />}</div> : <SearchHeader {...headerProps} />}
+        {mobile ? <div className="mobile-top-area">{mobileHeader}{mobileCollectionSearch ? <MobileCollectionSearch {...mobileCollectionSearch}/> : <SearchHeader {...headerProps} />}{!workspaceProps.resultsPaneProps.collectionView && <MobileSearchControls filters={filterBarProps} onSelectLibraries={onSelectMobileLibraries} onOpenFilters={()=>headerProps.setFiltersOpen(true)} />}</div> : <SearchHeader {...headerProps} />}
         {mobile ? <MobileFilterSheet open={filtersOpen} onClose={() => headerProps.setFiltersOpen(false)} draft>{filtersOpen && <MobileSearchFilterForm filters={filterBarProps} onSelectLibraries={onSelectMobileLibraries} onApply={() => headerProps.setFiltersOpen(false)} />}</MobileFilterSheet> : filtersOpen && <FilterBar {...filterBarProps} />}
         <Workspace {...workspaceProps} />
         <FooterStatus {...footerStatusProps} />

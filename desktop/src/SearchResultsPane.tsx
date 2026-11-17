@@ -55,6 +55,7 @@ type SearchResultsPaneProps = {
   onLocateInLibrary?: (result: SearchResult) => void;
   renderLibraryIcon: (result: SearchResult, name: string) => ReactNode;
   collectionView?: "journals" | "favorites" | "history" | "tags";
+  collectionQuery?: string;
   selectedCollectionTag?: SidebarTagSummary;
   selectedTagColor?: string;
   selectedTagDescription?: string;
@@ -100,7 +101,7 @@ export function SearchResultsPane({
   resultLabel, error, searching, query, results, recentGroups, selectedIndex, showSelection = true,
   isMobileLayout, semanticRecentDates, onHoverResult, onSelectResult,
   onOpenResult, onPrepareResultLink, onDragResult, onCopyResultLink, onCopyResultMarkdown,
-  onCopyResultTitle, onCopyResultSummary, onRevealResult, canRevealResult, onLocateInLibrary, renderLibraryIcon, collectionView, selectedCollectionTag,
+  onCopyResultTitle, onCopyResultSummary, onRevealResult, canRevealResult, onLocateInLibrary, renderLibraryIcon, collectionView, collectionQuery = "", selectedCollectionTag,
   collectionTags, onSelectCollectionTag, tagOverviewMode = "all", favoriteIds, onToggleFavorite,
   collectionTagColors = {},
   tagLibraries = [], tagsLoading = false, selectedTagLibraryIds = null, onChangeTagLibraries,
@@ -140,7 +141,7 @@ export function SearchResultsPane({
   const emptyTitle = collectionView === "journals"
     ? selectedJournalDate ? `${journalScopeTitle(selectedJournalDate)}还没有日志` : "还没有日志页面"
     : collectionView === "favorites"
-    ? favoriteFilter === "snippet" ? "当前范围没有收藏片段" : favoriteFilter === "page" ? "当前范围没有收藏页面" : "当前范围没有收藏"
+    ? collectionQuery.trim() ? "没有匹配的收藏" : favoriteFilter === "snippet" ? "当前范围没有收藏片段" : favoriteFilter === "page" ? "当前范围没有收藏页面" : "当前范围没有收藏"
     : collectionView === "history"
       ? "还没有浏览记录"
       : collectionView === "tags"
@@ -266,7 +267,7 @@ export function SearchResultsPane({
                 ))}
             </div>
           ) : (
-            <div className="empty-state"><Tags size={30} /><strong>当前资料库暂无标签</strong></div>
+            <div className="empty-state"><Tags size={30} /><strong>{collectionQuery.trim() ? "没有匹配的标签" : "当前资料库暂无标签"}</strong></div>
           )}
         </section>
       ) : !showContent ? null : !query.trim() ? (

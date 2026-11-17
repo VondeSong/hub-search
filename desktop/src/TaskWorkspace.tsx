@@ -457,7 +457,7 @@ export function TaskWorkspace({
     // can unmount the filter before its change event is committed.
     const closeTransientTaskMenus = (event: MouseEvent) => {
       const target = event.target as Node;
-      if (!queryToolsRef.current?.contains(target) && !queryToolsButtonRef.current?.contains(target) && !(runtimeCapabilities.mobile && target instanceof Element && target.closest(".task-view-toolbar"))) setQueryToolsOpen(false);
+      if (!queryToolsRef.current?.contains(target) && !queryToolsButtonRef.current?.contains(target) && !(runtimeCapabilities.mobile && target instanceof Element && target.closest(".task-view-toolbar,.task-workspace-header,.task-collection-picker,.task-planning-toolbar"))) setQueryToolsOpen(false);
       if (propertyMenuRef.current?.open && !propertyMenuRef.current.contains(target)) propertyMenuRef.current.open = false;
       if (!syncMenuRef.current?.contains(target)) setSyncMenuOpen(false);
     };
@@ -1036,7 +1036,7 @@ export function TaskWorkspace({
         {!loading && !collections.length && <p>当前资料库没有任务</p>}
       </aside>
     <section className="task-workspace">
-      {runtimeCapabilities.mobile && <div className="mobile-page-intro"><h1>任务</h1><p>查看行动，接着往下做。</p></div>}
+      {runtimeCapabilities.mobile && <div className="mobile-task-status" aria-label="任务状态">{([["open", "待办"], ["completed", "已完成"], ["all", "全部"]] as const).map(([value, label]) => <button type="button" key={value} aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)}>{label}</button>)}</div>}
       {runtimeCapabilities.mobile && <div className="mobile-task-controls"><label><Search size={18} aria-hidden="true"/><input aria-label="搜索任务" placeholder="搜索任务" value={query} onChange={event => setQuery(event.target.value)}/></label><button type="button" ref={queryToolsButtonRef} aria-label="筛选与视图" aria-expanded={queryToolsOpen} onClick={() => setQueryToolsOpen(open => !open)}><ListFilter size={20}/></button></div>}
       <header className="task-workspace-header">
         <div className="task-source-chips">

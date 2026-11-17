@@ -100,12 +100,22 @@ it("exposes mobile search and advanced filters without enabling task synchroniza
     Object.assign(runtimeCapabilities, { mobile: true });
     await act(async () => root.render(<TaskWorkspace desktopSidebarVisible onStatusMessage={onStatusMessage}/>));
     expect(container.querySelector('input[aria-label="搜索任务"]')).not.toBeNull();
+    container.querySelector<HTMLElement>('.task-workspace-list')!.scrollTo = vi.fn();
+    const completed = [...container.querySelectorAll<HTMLButtonElement>('.mobile-task-status button')].find(button => button.textContent === '已完成')!;
+    await act(async () => completed.click());
+    expect(completed.getAttribute('aria-pressed')).toBe('true');
+    expect(container.querySelector('.task-workspace > .mobile-page-intro')).toBeNull();
     const trigger = container.querySelector<HTMLButtonElement>('button[aria-label="筛选与视图"]')!;
     await act(async () => trigger.click());
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
     expect(container.querySelector(".task-query-tools")?.textContent).toContain("全部状态");
+    expect(container.querySelector<HTMLSelectElement>('.task-query-tools > div:last-child select')?.value).toBe('completed');
     await act(async () => container.querySelector(".task-view-toolbar")!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })));
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
     expect(invokeMock).not.toHaveBeenCalledWith("run_task_sync");
+    for (const selector of ['.task-workspace-header', '.task-collection-picker', '.task-planning-toolbar']) {
+      await act(async () => container.querySelector(selector)!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+      expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    }
   } finally { Object.assign(runtimeCapabilities, { mobile }); }
 });

@@ -1,6 +1,7 @@
 import { JournalVoiceHost } from "./JournalVoice";
 import { MobileJournal } from "./MobileJournal";
 import { MobileHeader } from "./MobileHeader";
+import { filterMobileFavorites, matchesMobileCollection } from "./MobileCollectionSearch";
 import { invoke } from "@tauri-apps/api/core";
 import { OPEN_QUICK_JOURNAL } from "./QuickJournalEvents";
 import type { QuickJournalSaved } from "./QuickJournal";
@@ -308,6 +309,8 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
     normalize: normalizeResults,
   });
   const journalDates = journalSummary.dates;
+  const [mobileCollectionQueries, setMobileCollectionQueries] = useState({ favorites: "", tags: "" });
+  const mobileFavorites = useMemo(() => isMobileLayout ? filterMobileFavorites(filteredFavorites, mobileCollectionQueries.favorites) : filteredFavorites, [filteredFavorites, isMobileLayout, mobileCollectionQueries.favorites]);
   const searchWorkspacePresentation = useMemo(() => deriveSearchWorkspaceResults({
     desktopSidebarEnabled,
     isMobileLayout,
@@ -315,14 +318,14 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
     view: desktopSidebarView === "collections" || desktopSidebarView === "insights" || desktopSidebarView === "libraries" ? "home" : desktopSidebarView,
     results,
     journalResults,
-    favoriteResults: filteredFavorites,
+    favoriteResults: mobileFavorites,
     historyResults: viewHistory,
     tagResults,
     selectedLibraryIdSet,
     selectedJournalDate,
     dateFilter,
     groupRecentByDateWhenUnlimited: appSettings.groupRecentByDateWhenUnlimited,
-  }), [appSettings.groupRecentByDateWhenUnlimited, dateFilter, desktopSidebarEnabled, desktopSidebarView, filteredFavorites, isMobileLayout, journalResults, query, results, selectedJournalDate, selectedLibraryIdSet, tagResults, viewHistory]);
+  }), [appSettings.groupRecentByDateWhenUnlimited, dateFilter, desktopSidebarEnabled, desktopSidebarView, mobileFavorites, isMobileLayout, journalResults, query, results, selectedJournalDate, selectedLibraryIdSet, tagResults, viewHistory]);
   const { visibleResults, groups: recentGroups, journalDayCount } = searchWorkspacePresentation;
   const selected = visibleResults[selectedIndex];
   const flashcardsActive = flashcardsStandaloneOpen || desktopSidebarView === "flashcards";
@@ -1069,6 +1072,7 @@ useEffect(() => {
       renderLibraryIcon: renderResultLibraryIcon,
       collectionView: (desktopSidebarEnabled || isMobileLayout) && desktopSidebarView !== "home" && desktopSidebarView !== "flashcards" && desktopSidebarView !== "tasks" && desktopSidebarView !== "collections" && desktopSidebarView !== "insights" && desktopSidebarView !== "libraries" && !query.trim() ? desktopSidebarView : undefined,
       selectedCollectionTag: desktopSidebarView === "tags" ? selectedSidebarTagSummary : undefined,
+      collectionQuery: isMobileLayout && (desktopSidebarView === "tags" || desktopSidebarView === "favorites") ? mobileCollectionQueries[desktopSidebarView] : undefined,
       selectedTagColor: selectedSidebarTagSummary
         ? resolveTagColor(tagProperties, selectedSidebarTagSummary.normalizedName)
         : undefined,
@@ -1100,7 +1104,7 @@ useEffect(() => {
         : undefined,
       onSelectedTagTaxonomyChanged: () => refreshSidebarTags(),
       collectionTags: desktopSidebarView === "tags"
-        ? tagOverviewMode === "cleanup" ? cleanupSidebarTags : sidebarTags
+        ? (tagOverviewMode === "cleanup" ? cleanupSidebarTags : sidebarTags).filter(tag => !isMobileLayout || matchesMobileCollection(mobileCollectionQueries.tags, tag.name))
         : undefined,
       collectionTagColors: desktopSidebarView === "tags"
         ? Object.fromEntries(sidebarTags.map((tag) => [tag.normalizedName, resolveTagColor(tagProperties, tag.normalizedName)]))
@@ -1305,7 +1309,16 @@ useEffect(() => {
     filtersOpen,
     mobilePreviewOpen,
     onSelectMobileLibraries: selectLibraries,
-    mobileHeader: isMobileLayout && !mobilePreviewOpen && !mobileAgentsOpen && desktopSidebarView!=="journals" ? <MobileHeader title={flashcardsActive?"复习":mobileBrowseOpen?"浏览":({home:"搜索",tasks:"任务",collections:"阅读",favorites:"收藏",history:"最近浏览",tags:"标签",insights:"洞察"} as {[key:string]:string})[desktopSidebarView]} onBack={((!["home", "tasks"].includes(desktopSidebarView) && !mobileBrowseOpen) || mobileConnectionsOpen) ? () => navigateMobile("browse") : undefined} onSettings={() => setShowConnection(true)} /> : undefined,
+    mobileCollectionSearch: isMobileLayout && (desktopSidebarView === "favorites" || (desktopSidebarView === "tags" && !selectedSidebarTag)) ? {
+      label: desktopSidebarView === "favorites" ? "搜索收藏" : "搜索标签",
+      value: mobileCollectionQueries[desktopSidebarView as "favorites" | "tags"],
+      onChange: (value: string) => setMobileCollectionQueries(current => ({ ...current, [desktopSidebarView]: value })),
+    } : undefined,
+    mobileHeader: isMobileLayout && !mobilePreviewOpen && !mobileAgentsOpen && desktopSidebarView!=="journals" ? <MobileHeader title={flashcardsActive?"复习":mobileConnectionsOpen?"连接总览":mobileBrowseOpen?"浏览":({home:"搜索",tasks:"任务",collections:"阅读",favorites:"收藏",history:"最近浏览",tags:"标签",insights:"洞察"} as {[key:string]:string})[desktopSidebarView]} onBack={!flashcardsActive && ((!["home", "tasks"].includes(desktopSidebarView) && !mobileBrowseOpen) || mobileConnectionsOpen) ? () => navigateMobile("browse") : undefined} onSettings={() => setShowConnection(true)} spaceActions={{
+      onLibraries: () => { navigateMobile("search"); setSpaceMenuOpen(true); },
+      onConnections: () => pushMobileRoute("connections"),
+      onAppearance: () => { setSettingsCategory("display"); setShowConnection(true); },
+    }} /> : undefined,
     style: shellStyle,
     startWindowDrag,
     mainContent: isMobileLayout && mobileAgentsOpen && !flashcardsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开 Agents…</div>}><LazyCloudAgents onClose={closeMobileAgents} /></Suspense> : isMobileLayout && mobileConnectionsOpen && !flashcardsActive ? <MobileConnections onContent={() => { setSettingsCategory("cloud"); setShowConnection(true); }} onAgents={() => navigateMobile("agents")} /> : isMobileLayout && mobileBrowseOpen && !flashcardsActive ? <MobileBrowse
