@@ -71,6 +71,7 @@ pub(in crate::agent_work) fn message_on(
         .transpose()?;
     let add_images = images::selection(value, "addImages")?;
     let remove_images = images::selection(value, "removeImages")?;
+    let initial_request = value["initialRequest"] == true;
     let work = load(c, id)?;
     if work.state == "revoked" {
         return Err("该对话的来源授权已撤回".into());
@@ -83,6 +84,7 @@ pub(in crate::agent_work) fn message_on(
             && previous.get("removeNotes").cloned().unwrap_or(json!([])) == json!(removals)
             && previous.get("addImages").cloned().unwrap_or(json!([])) == json!(add_images)
             && previous.get("removeImages").cloned().unwrap_or(json!([])) == json!(remove_images)
+            && (previous["initialRequest"] == true) == initial_request
             && previous
                 .get("setLibraryIds")
                 .cloned()
@@ -102,6 +104,24 @@ pub(in crate::agent_work) fn message_on(
         .is_some_and(|revision| revision != work.revision)
     {
         return Err("对话已在其他位置更新，请刷新后再发送".into());
+    }
+    if initial_request {
+        let has_history: bool = c.query_row(
+            "SELECT EXISTS(SELECT 1 FROM agent_records WHERE work_id=?1 AND kind='userMessage') OR EXISTS(SELECT 1 FROM agent_runs WHERE work_id=?1)",
+            [id], |r| r.get(0),
+        ).map_err(|e|e.to_string())?;
+        if has_history
+            || work.anchor.is_some()
+            || work.revision != 1
+            || content != work.goal
+            || library_ids.is_none()
+            || !additions.is_empty()
+            || !removals.is_empty()
+            || !add_images.is_empty()
+            || !remove_images.is_empty()
+        {
+            return Err("初次资料范围绑定不能替代已有对话或改变问题".into());
+        }
     }
     let count: i64 = c
         .query_row(
@@ -124,6 +144,9 @@ pub(in crate::agent_work) fn message_on(
     }
     let mut body = json!({"text":content,"author":"user","revision":work.revision+1,"clientMessageId":client_id,"addNotes":additions,"removeNotes":removals,"addImages":add_images,"removeImages":remove_images});
     body["presentation"] = crate::agent_work::skills::request_presentation(&content);
+    if initial_request {
+        body["initialRequest"] = json!(true);
+    }
     if let Some(ids) = &library_ids {
         body["setLibraryIds"] = json!(ids);
     }
@@ -272,9 +295,17 @@ fn page_on_cached(
             super::materials::message_cards(c, work, &super::materials::explicit_locators(&grant))
         })
         .unwrap_or(json!([]));
-    let mut messages = vec![
-        json!({"id":format!("{}-goal",work.id),"role":"user","text":work.goal,"displayText":initial_presentation["text"],"skills":initial_presentation["skills"],"createdAt":created_at,"revision":1,"kind":"request","materials":initial_materials}),
-    ];
+    let has_initial_request: bool = c.query_row(
+        "SELECT EXISTS(SELECT 1 FROM agent_records WHERE work_id=?1 AND kind='userMessage' AND json_extract(body_json,'$.initialRequest')=1)",
+        [&work.id], |r|r.get(0),
+    ).map_err(|e|e.to_string())?;
+    let mut messages = if has_initial_request {
+        Vec::new()
+    } else {
+        vec![
+            json!({"id":format!("{}-goal",work.id),"role":"user","text":work.goal,"displayText":initial_presentation["text"],"skills":initial_presentation["skills"],"createdAt":created_at,"revision":1,"kind":"request","materials":initial_materials}),
+        ]
+    };
     for (id, kind, raw, created_at, run_id, authorization, revision) in rows {
         let body: Value = serde_json::from_str(&raw).map_err(|_| "对话记录损坏")?;
         if kind != "delivery" {

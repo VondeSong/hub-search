@@ -1902,6 +1902,8 @@ it("merges library drops anywhere in the assistant and grants them before the fi
  const calls=invoke.mock.calls.map(([,p])=>p?.args);
  const binding=calls.findIndex(p=>p?.action==="message"&&p.setLibraryIds);
  expect(calls[binding].setLibraryIds).toEqual(["notes","craft"]);
+ expect(calls[binding].initialRequest).toBe(true);
+ expect(calls[binding].text).toBe(calls.find(p=>p?.action==='create').goal);
  expect(calls.findIndex(p=>p?.action==="respond")).toBeGreaterThan(binding);
 });
 it("accepts internal material drags across the assistant and leaves unrelated drags alone",async()=>{
@@ -2281,4 +2283,24 @@ it.each([null,{kind:"note",libraryId:"notes",documentId:"doc",pageId:null},{kind
  await act(async()=>root.render(<ExistingWorkInvestigation workId="work-1" question={{id:"recall-2",text:"不得覆盖现有输入"}}/>));
  expect(input.value).toBe(question.text);expect(button("使用关联核对提问").disabled).toBe(true);
  expect(invoke.mock.calls.some(([,v])=>["create","message","respond","resume"].includes(v?.args?.action))).toBe(false);
+});
+
+
+it.each([false,true])("preserves user process collapse=%s through focus revalidation and final delivery",async collapsed=>{
+ const activity:ActivityRun={runId:"focus-run",revision:1,state:"investigating",running:true,startedAt:1000,steps:1,events:[{id:"read",kind:"tool",operation:"read",state:"completed",label:"读取原文",createdAt:1001}]};
+ const conversation:Conversation={hasEarlier:false,messages:[{id:"u",role:"user",revision:1,text:"核对来源",createdAt:1000}]};
+ current={...makeView("investigating"),activity:[activity],conversation};
+ invoke.mockImplementation(async(_,{args})=>args.action==="list"?{works:[{id:"work-1",goal:current.work.goal,state:current.work.state}]}:current);
+ await open();
+ const toggle=()=>document.querySelector<HTMLButtonElement>(".agent-activity-toggle")!;
+ await act(async()=>toggle().click());
+ if(!collapsed)await act(async()=>toggle().click());
+ if(!collapsed){const group=document.querySelector<HTMLDetailsElement>(".agent-operation-group")!;await act(async()=>group.querySelector("summary")!.click());}
+ visibility.value=false;await act(async()=>root.render(<AgentInvestigation result={result}/>));
+ current={...makeView(),activity:[{...activity,running:false,state:"completed",finishedAt:5000}],conversation:{...conversation,messages:[...conversation.messages,{id:"a",role:"assistant",runId:activity.runId,revision:1,createdAt:5000,report}]}};
+ visibility.value=true;await act(async()=>root.render(<AgentInvestigation result={result}/>));
+ expect(toggle().getAttribute("aria-expanded")).toBe(String(!collapsed));
+ if(!collapsed)expect(document.querySelector<HTMLDetailsElement>(".agent-operation-group")!.open).toBe(true);
+ expect(document.body.textContent).toContain("历史记录要求保持 M6");
+ expect(invoke.mock.calls.some(([,v])=>v.args.action==="respond")).toBe(false);
 });

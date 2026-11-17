@@ -13,7 +13,7 @@ import { useAgentLibraryRegistry, resolveAgentLibraries } from "./useAgentLibrar
 import type { CitationLocation } from "./AgentCitationPreview";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { AgentActivity, type ActivityRun } from "./AgentActivity";
+import { AgentActivity, ActivityDisclosureProvider, type ActivityRun } from "./AgentActivity";
 import { AgentNativeInput, type NativeInput } from "./AgentNativeInput";
 import { AgentSkills, skillTitle, skillPurpose } from "./AgentSkills";
 import { AgentTopics, type TopicWorkSource } from "./AgentTopics";
@@ -821,7 +821,10 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       if(snapshots||(!research&&imagesChanged)||addNotes.length||addSources.length||(!research&&libraryDraft!==null)){
         const key=JSON.stringify([messageText,addNotes,!anchor?dropped:[],[],imageChanges,libraryDraft]);
         if(!messageIdentity.current||messageIdentity.current.text!==key)messageIdentity.current={text:key,id:crypto.randomUUID()};
-        value=await call<View>({action:"message",id:value.work.id,expectedRevision:value.work.revision,text:messageText,...(sendLibraryDraft!==null?{setLibraryIds:sendLibraryDraft.map(l=>l.id)}:{}),...sendImages,...(addNotes.length?{addNotes}:{}),...(addSources.length?{addSources}:{}),clientMessageId:messageIdentity.current.id});
+        // This scope binding belongs to the first submitted question. The host
+        // validates that no earlier message/run exists before merging its UI row.
+        const initialRequest=!research&&!anchor&&!snapshots&&!imagesChanged&&!addNotes.length&&!addSources.length&&libraryDraft!==null;
+        value=await call<View>({action:"message",id:value.work.id,expectedRevision:value.work.revision,text:messageText,...(initialRequest?{initialRequest:true}:{}),...(sendLibraryDraft!==null?{setLibraryIds:sendLibraryDraft.map(l=>l.id)}:{}),...sendImages,...(addNotes.length?{addNotes}:{}),...(addSources.length?{addSources}:{}),clientMessageId:messageIdentity.current.id});
         if(alive.current){setView(value);setLibraryDraft(null);setSnippets([]);setMaterials([]);setDropped([]);setImageDraft(null);messageIdentity.current=null;}
       }
       await configureTags(value); setLibraryDraft(null);
@@ -1128,6 +1131,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       {loadingConversation && <div className="agent-conversation-loading" role="status" aria-label="正在打开对话"><span/><span/><span/></div>}
       <div className="agent-conversation" hidden={loadingConversation || (sourceScope.current===sourceScopeKey && (!!sourcePreview || !!sourceError || sourceLoading))} ref={conversationScroll.element} tabIndex={0} aria-label="对话与报告" onScroll={conversationScroll.onScroll} onClickCapture={event=>{if((event.target as Element).closest(".agent-activity-toggle,details > summary"))conversationScroll.holdPosition();}}>
       <div className="agent-conversation-content" ref={conversationScroll.content}>
+      <ActivityDisclosureProvider key={view?.work.id||"new"}>
 
       {controlsNeedAttention && view?.work.state!=="revoked" && <div className="agent-task-notice" role="status"><span>{view?.materialBudget?.preflight?.allowed===false || !!view?.materialBudget?.overrunBytes ? "资料处理容量不足" : view?.lifecycle?.requiresExplicitResume ? "任务已暂停，需手动恢复" : view?.lifecycle?.usageCompleteness==="incomplete" ? "部分模型用量尚未返回" : "任务状态需要处理"}</span><button type="button" onClick={()=>{setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current){workControls.current.open=true;workControls.current.querySelector("summary")?.focus();setTimeout(()=>workControls.current?.querySelector("summary")?.focus(),0);}}}>查看任务详情</button></div>}
 
@@ -1179,6 +1183,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         </div>}
 
       </>}
+      </ActivityDisclosureProvider>
       </div>
       </div>
       {view && !businessCheck?.scopeChanging && sourceScope.current===sourceScopeKey && view.work.state!=="revoked" && (sourcePreview || sourceError || sourceLoading) && <section ref={sourcePreviewElement} className="agent-source-preview" aria-label="引用原文"><header><strong>{sourcePreview?.excerpt.title || (sourceLoading?"正在核对引用来源…":"引用暂不可读取")}</strong><button type="button" aria-label="关闭引用原文" onClick={returnFromCitation}>关闭</button></header>{sourceLoading ? <p role="status">正在读取当前版本的原文…</p> : sourceError ? <p role="alert">{sourceError}。可核对来源后重新打开引用。</p> : sourcePreview && <><p className="agent-note">{sourcePreview.excerpt.sourcePath} · 第 {sourcePreview.excerpt.startChar+1}–{sourcePreview.excerpt.endChar} 字符{sourcePreview.excerpt.truncated?"（原文节选）":""}</p><blockquote>{sourcePreview.excerpt.content.includes(sourcePreview.quote)?<>{sourcePreview.excerpt.content.slice(0,sourcePreview.excerpt.content.indexOf(sourcePreview.quote))}<mark>{sourcePreview.quote}</mark>{sourcePreview.excerpt.content.slice(sourcePreview.excerpt.content.indexOf(sourcePreview.quote)+sourcePreview.quote.length)}</>:sourcePreview.excerpt.content}</blockquote></>}</section>}

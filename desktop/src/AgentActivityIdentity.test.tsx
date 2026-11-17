@@ -42,3 +42,23 @@ it("keeps a fixed fallback on icon failure and derives avatars only from actual 
  expect(host.querySelectorAll('.agent-avatar')).toHaveLength(1);expect(host.querySelector('.agent-site-icon img')).toBeNull();
  expect(host.querySelector('svg[aria-label="子代理 -child"]')).not.toBeNull();
 });
+
+const tinyPng="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6JXsAAAAASUVORK5CYII=";
+it.each([[tinyPng,true],["data:image/svg+xml;base64,PHN2Zy8+",false],["https://untrusted.example/icon.png",false]])("accepts only an inert host-approved raster icon (%s)",async(dataUrl,accepted)=>{
+ invoke.mockResolvedValue({dataUrl});
+ await act(async()=>root.render(<ActivityIdentity workId={'raster-'+dataUrl} events={[event({url:'https://github.com/a'})]}/>));
+ const img=host.querySelector('.agent-site-icon img');
+ expect(!!img).toBe(accepted);
+ if(img){expect(img.getAttribute('width')).toBe('16');expect(img.getAttribute('height')).toBe('16');expect(img.getAttribute('alt')).toBe('');}
+});
+it("does not let an old icon request replace the current work or survive scope removal",async()=>{
+ let resolveOld!:(value:{dataUrl:string})=>void;
+ invoke.mockImplementation((_command,{args})=>args.id==='late-icon-old'?new Promise(resolve=>{resolveOld=resolve;}):Promise.resolve({dataUrl:tinyPng}));
+ await act(async()=>root.render(<ActivityIdentity workId="late-icon-old" events={[event({url:'https://github.com/a'})]}/>));
+ await act(async()=>root.render(<ActivityIdentity workId="late-icon-current" events={[event({url:'https://developers.openai.com/a'})]}/>));
+ await act(async()=>resolveOld({dataUrl:'data:image/x-icon;base64,AAAA'}));
+ expect(host.querySelector('.agent-site-icon')?.getAttribute('aria-label')).toBe('developers.openai.com');
+ expect(host.querySelector('.agent-site-icon img')?.getAttribute('src')).toBe(tinyPng);
+ await act(async()=>root.render(<ActivityIdentity events={[event({url:'https://developers.openai.com/a'})]}/>));
+ expect(host.querySelector('.agent-site-icon img')).toBeNull();
+});

@@ -8,6 +8,57 @@ fn setup() -> (Fixture, String) {
     (f, id)
 }
 #[test]
+fn initial_library_binding_is_one_user_request_and_an_explicit_repeat_remains_separate() {
+    let f = Fixture::new();
+    f.note("notes", "current", "实际范围的确定性夹具");
+    let view=ui(&f.root,&json!({"action":"create","goal":"核对技能资料","successCriteria":"","anchor":null,"grant":{"libraryIds":[],"notes":[],"readingItemKeys":[]}})).unwrap();
+    let id = view["work"]["id"].as_str().unwrap();
+    let request = json!({"action":"message","id":id,"text":"核对技能资料","clientMessageId":"initial-scope","expectedRevision":1,"setLibraryIds":["notes"],"initialRequest":true});
+    let bound = ui(&f.root, &request).unwrap();
+    assert_eq!(
+        bound["conversation"]["messages"].as_array().unwrap().len(),
+        1
+    );
+    assert_eq!(bound["conversation"]["messages"][0]["text"], "核对技能资料");
+    assert_eq!(bound["work"]["grant"]["libraryIds"], json!(["notes"]));
+    assert_eq!(
+        bound["work"]["grant"]["attachmentLibraryIds"],
+        json!(["notes"])
+    );
+    let replay = ui(&f.root, &request).unwrap();
+    assert_eq!(
+        replay["conversation"]["messages"].as_array().unwrap().len(),
+        1
+    );
+    let repeated=ui(&f.root,&json!({"action":"message","id":id,"text":"核对技能资料","clientMessageId":"explicit-repeat"})).unwrap();
+    assert_eq!(
+        repeated["conversation"]["messages"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+}
+#[test]
+fn initial_library_binding_cannot_relabel_existing_history_or_change_the_initial_question() {
+    let f = Fixture::new();
+    f.note("notes", "current", "范围夹具");
+    let view=ui(&f.root,&json!({"action":"create","goal":"原问题","successCriteria":"","anchor":null,"grant":{"libraryIds":[],"notes":[],"readingItemKeys":[]}})).unwrap();
+    let id = view["work"]["id"].as_str().unwrap();
+    assert!(ui(&f.root,&json!({"action":"message","id":id,"text":"另一个问题","clientMessageId":"forged-initial","expectedRevision":1,"setLibraryIds":["notes"],"initialRequest":true})).is_err());
+    ui(
+        &f.root,
+        &json!({"action":"message","id":id,"text":"普通追问","clientMessageId":"regular"}),
+    )
+    .unwrap();
+    assert!(ui(&f.root,&json!({"action":"message","id":id,"text":"原问题","clientMessageId":"late-initial","expectedRevision":2,"setLibraryIds":["notes"],"initialRequest":true})).is_err());
+    let saved = ui(&f.root, &json!({"action":"status","id":id})).unwrap();
+    assert_eq!(
+        saved["conversation"]["messages"].as_array().unwrap().len(),
+        2
+    );
+}
+#[test]
 fn materials_only_filters_old_answers_from_model_context_and_history_not_the_ui() {
     let (f, id) = setup();
     publish(&f, &id, 1, &[], "OLD_WEB_FACT_SENTINEL");
