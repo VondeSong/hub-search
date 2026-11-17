@@ -3,9 +3,9 @@
   "site": "mobile",
   "project_id": "appgprj_6af1d2dc12308191acc37e5566699c2d",
   "site_url": "https://hub-mobile-lab-von11.song02211368537057.chatgpt.site",
-  "source_commit": "ee3b7c775c26c6fa6c12c119c62c6e5890c1adfd",
-  "published_version": 30,
-  "deployment_id": "appgdep_6afc6072500481919b722d8d4ac00b11",
+  "source_commit": "fe282f0c8b0571c531c20a4adaa6a4227779ff6e",
+  "published_version": 31,
+  "deployment_id": "appgdep_6afc7214cb2481919a359799581ac5d8",
   "files": {
     ".openai/hosting.json": {
       "sha256": "543a776095c0181cc870f784c075ab4f263fb739e3649cd8db74f493fb5b4ca3",
@@ -58,9 +58,9 @@
       "bytes": 13501
     },
     "checks/voice-checks.cjs": {
-      "sha256": "dbc8df3a0345bfeb6c4e336c8bb65f00d99f2cbedd7ca725937afed68966c729",
+      "sha256": "0a498fb71ee5418d7d320bde9ab5be53ce2a05400a9c5ee2d5e84bbf0d510720",
       "mode": "100644",
-      "bytes": 6423
+      "bytes": 7148
     },
     "checks/widget-checks.cjs": {
       "sha256": "0ef59e92d55ed4aff330fa00f30acd4d186459b0dcdcac18df399cad39f6676e",
@@ -118,9 +118,9 @@
       "bytes": 23885
     },
     "dist/journal-studio.js": {
-      "sha256": "867d36eb0f270c42ac05e868b9fd5b4d2ee39302eb65923401cc7a867a0a5077",
+      "sha256": "8a422a8a553e7de73a79eab866b33022a3b188d0b53ee0ab61e55977db3bd4d2",
       "mode": "100644",
-      "bytes": 39840
+      "bytes": 39873
     },
     "dist/mobile-features.js": {
       "sha256": "c38c47d5e3cc9e6a0e799040e85bcbcb6fb8bda0d59e019e987ac5f7c6fe4895",
@@ -158,9 +158,9 @@
       "bytes": 3909
     },
     "dist/voice.js": {
-      "sha256": "3884d32a8b9aa20ed4d7083694888b1f7313efdaa8e8cb086db32cac61c656b6",
+      "sha256": "86f46d1415d1cee500bfe3ccb8dc0c3d433666977fa37dd4bd03c13342352baa",
       "mode": "100644",
-      "bytes": 18618
+      "bytes": 19666
     },
     "dist/widgets.css": {
       "sha256": "dab718c6ffea193c3317de835b1dcdd3a2ea118de57057687014ace3ab505df9",
@@ -333,5 +333,5 @@
       "bytes": 3301
     }
   },
-  "imported_at": "2026-11-17T14:11:34.615835+00:00"
+  "imported_at": "2026-11-17T15:27:13.869824+00:00"
 }

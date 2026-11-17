@@ -62,4 +62,12 @@ const run=s=>vm.runInContext(s,c);
  assert.equal(c.st.voiceDraft.state,'review');await c.voiceAttach();assert(!c.st.voiceDraft);assert(c.st.captureDraft.note.attachments.some(a=>a.voice.mode==='real'&&a.voice.audioSaved));
  console.log('PASS voice: timer, pause/resume identity, failure retention, retry/edit protection, draft merge, save rollback, same-note update, missing-audio guard');
  console.log('PASS recorder lifecycle mock: final data before storage, microphone release, real audio has no simulated transcript');
+ c.st.voicePending=[];run("st.voiceDraft=voiceNew()");
+ const parked=structuredClone(c.st.voiceDraft);parked.state='review';parked.elapsed=9000;parked.edited='上次未保存';c.st.voiceDraft=parked;
+ c.voiceOpen();assert.notEqual(c.st.voiceDraft.id,parked.id);assert.equal(c.st.voiceDraft.mode,'real');
+ assert.equal(c.st.voicePending[0].id,parked.id);assert.equal(c.st.voicePending[0].edited,'上次未保存');
+ c.voiceAction('voice-resume',parked.id);assert.equal(c.st.voiceDraft.id,parked.id);assert.equal(c.st.voiceDraft.edited,'上次未保存');
+ assert.equal(c.st.voicePending.length,0);assert(c.st.voiceDraft.restored);
+ console.log('PASS local-first entry and explicit recovery preserve unrelated voice drafts');
+
 })().catch(e=>{console.error(e);process.exitCode=1;});

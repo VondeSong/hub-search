@@ -153,3 +153,17 @@ it("uses inline tags to filter without opening the editor or duplicating footer 
  await act(async()=>card.querySelector<HTMLButtonElement>('.mobile-journal-inline-tag')!.click());
  expect(node.querySelector('.mobile-journal-scope')?.textContent).toContain('#日常');expect(document.querySelector('[aria-label="编辑日志"]')).toBeNull();
 });
+
+it("offers direct local recording from the existing-note editor without submitting the note",async()=>{
+ const original=invoke.getMockImplementation()!;
+ invoke.mockImplementation((cmd:string,args:any)=>cmd==="quick_journal_voice"?Promise.resolve({state:"idle",elapsed:0,token:""}):cmd==="quick_journal_voice_draft"?Promise.resolve(""):original(cmd,args));
+ await render();await edit();
+ expect(button("本地录音")).toBeTruthy();
+ await act(async()=>button("本地录音").click());
+ expect(document.querySelector('[aria-label="录音方式"]')).not.toBeNull();
+ expect(document.querySelector<HTMLSelectElement>('[aria-label="录音方式"]')?.value).toBe("local");
+ expect(invoke.mock.calls.some(c=>c[0]==="update_quick_journal")).toBe(false);
+ await act(async()=>button("保留语音草稿并关闭").click());
+ expect(document.querySelector('[aria-label="编辑日志"]')).not.toBeNull();
+ expect(document.querySelector('[aria-label="录音方式"]')).toBeNull();
+});

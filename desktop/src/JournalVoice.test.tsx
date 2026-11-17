@@ -35,8 +35,8 @@ it("allows local recording without cloud service and labels it without attemptin
  const original=vi.mocked(invoke).getMockImplementation()!;
  vi.mocked(invoke).mockImplementation((c,a:any)=>c==="quick_journal_voice"&&a.action==="start"?Promise.resolve(status={state:"recording",elapsed:0,token:"f".repeat(32)}):original(c,a));
  await act(async()=>root.render(<JournalVoiceCapture request={{}} onClose={vi.fn()}/>));await click("开始录音");
- expect(document.body.textContent).toContain("正在仅录音");expect(document.body.textContent).toContain("连接恢复后再补转写");
- expect(document.body.textContent).toContain("服务密钥在哪里设置");expect(document.querySelector('[role="alert"]')).toBeNull();
+ expect(document.body.textContent).toContain("正在仅录音");expect(document.body.textContent).toContain("不会自动转写或发送给识别服务");
+ expect(document.querySelector('[aria-label="转写服务"]')).toBeNull();expect(document.querySelector('[role="alert"]')).toBeNull();
  expect(vi.mocked(invoke).mock.calls.some(([c,a]:any)=>c==="cloud_agents"&&a?.action?.request?.action==="start")).toBe(false);
 });
 it("persists a staged original before acknowledgement and updates the same revision",async()=>{
@@ -127,7 +127,9 @@ it("labels a restored draft and starts fresh only after explicit save-and-new",a
  });
  const close=vi.fn();
  await act(async()=>root.render(<JournalVoiceCapture request={{}} onClose={close}/>));
+ await click("继续 2026-11-16 的草稿 · 1 段录音");
  expect(document.body.textContent).toContain("已恢复上次未保存");
+ expect(document.querySelector<HTMLDetailsElement>(".journal-voice-history")?.open).toBe(false);
  await click("保存并新建");
  expect(invoke).toHaveBeenCalledWith("capture_quick_journal",{record:{...record,attachments:[attachment]}});
  expect(close).not.toHaveBeenCalled();
@@ -141,9 +143,10 @@ it("does not discard a restored draft when save-and-new fails",async()=>{
  const original=vi.mocked(invoke).getMockImplementation()!;
  vi.mocked(invoke).mockImplementation((c,a:any)=>c==="capture_quick_journal"?Promise.reject("保存失败"):c==="quick_journal_voice_draft"&&!a?.value?Promise.resolve(value):original(c,a));
  await act(async()=>root.render(<JournalVoiceCapture request={{}} onClose={vi.fn()}/>));
+ await click("继续 2026-11-16 的草稿 · 1 段录音");
  await click("保存并新建");
  expect(document.querySelector('[role="alert"]')?.textContent).toContain("保存失败");
- expect(document.querySelector(".journal-voice-segments")?.textContent).toContain("1 段录音");
+ expect(document.querySelector(".journal-voice-history")?.textContent).toContain("1 段录音");
  expect(vi.mocked(invoke).mock.calls.some(([c,a]:any)=>c==="quick_journal_voice_draft"&&a?.value==="")).toBe(false);
 });
 it("groups completed transcription under its original audio without duplicate replay",async()=>{
@@ -174,4 +177,40 @@ it("opens a fresh recording after an interrupted read-only visit to a saved reco
  expect(document.querySelector(".journal-voice-segments")).toBeNull();
  expect(document.querySelector(".journal-voice-restored")).toBeNull();
  expect(document.querySelector<HTMLTextAreaElement>('[aria-label="录音补充文字"]')?.value).toBe("");
+});
+
+it("keeps an unrelated seven-segment draft parked while saving new audio to the current editor",async()=>{
+ const previous={record:{...record,attachments:Array.from({length:7},(_,i)=>({...attachment,hash:String(i+1).repeat(64)}))},stagedTokens:[]};
+ const target={...record,id:"e".repeat(32),text:"当前笔记的未保存文字"};
+ let stored=JSON.stringify(previous);
+ const original=vi.mocked(invoke).getMockImplementation()!;
+ vi.mocked(invoke).mockImplementation((c,a:any)=>{
+  if(c==="quick_journal_voice_draft"){
+   if(a?.recordId)return Promise.resolve("[]");
+   if(a?.value!==undefined)stored=a.value;
+   return Promise.resolve(stored);
+  }
+  return original(c,a);
+ });
+ const onSave=vi.fn().mockResolvedValue(undefined),close=vi.fn();
+ await act(async()=>root.render(<JournalVoiceCapture request={{record:target,revision:"edit-revision",onSave}} onClose={close}/>));
+ expect(document.querySelector<HTMLTextAreaElement>('[aria-label="录音补充文字"]')?.value).toBe(target.text);
+ expect(document.querySelectorAll(".journal-audio")).toHaveLength(0);
+ expect(document.querySelector<HTMLDetailsElement>(".journal-voice-history")?.open).toBe(false);
+ expect(JSON.parse(stored).pendingDrafts[0]).toEqual(previous);
+ status={state:"ready",elapsed:5000,token:"c".repeat(32)};
+ await click("保存");
+ expect(onSave).toHaveBeenCalledWith({...target,attachments:[attachment]});
+ expect(close).toHaveBeenCalledOnce();
+ expect(JSON.parse(stored).pendingDrafts[0]).toEqual(previous);
+ expect(vi.mocked(invoke).mock.calls.some(([c])=>["update_quick_journal","capture_quick_journal","cloud_agents"].includes(c))).toBe(false);
+});
+it("never requests cloud access in local mode even when a provider was previously selected",async()=>{
+ await act(async()=>root.render(<JournalVoiceCapture request={{}} onClose={vi.fn()}/>));
+ expect(document.querySelector<HTMLSelectElement>('[aria-label="录音方式"]')?.value).toBe("local");
+ expect(vi.mocked(invoke).mock.calls.some(([c])=>c==="cloud_agents")).toBe(false);
+ const select=document.querySelector<HTMLSelectElement>('[aria-label="录音方式"]')!;
+ await act(async()=>{select.value="transcribe";select.dispatchEvent(new Event("change",{bubbles:true}));});
+ expect(document.querySelector('[aria-label="转写服务"]')).not.toBeNull();
+ expect(vi.mocked(invoke).mock.calls.some(([c])=>c==="cloud_agents")).toBe(true);
 });

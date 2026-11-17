@@ -8,9 +8,18 @@ function voiceMic() { return '<svg width="21" height="21" viewBox="0 0 24 24" fi
 function voiceTime(ms) { const s=Math.floor(ms/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
 function voiceElapsed(v) { return v.elapsed+(v.state==='recording'?Date.now()-voiceStarted:0); }
 function voiceText(v) { return (v.segments||[]).join('\n'); }
-function voiceNew(target = '') { return {id:'voice-'+crypto.randomUUID(),target,provider:st.voiceProvider||'aliyun',state:'ready',mode:'demo',elapsed:0,segments:[],partial:'',failure:'',edited:'',editedByUser:false,date:localDay()}; }
+function voiceNew(target = '') { return {id:'voice-'+crypto.randomUUID(),target,provider:st.voiceProvider||'aliyun',state:'ready',mode:'real',elapsed:0,segments:[],partial:'',failure:'',edited:'',editedByUser:false,date:localDay()}; }
 function voicePersist() { const ok=save()!==false;if(!ok)voiceNotice('浏览器存储未成功，请保留页面并重试。');return ok; }
 function voiceNotice(message) { const el=document.querySelector('#voice-notice');if(el)el.textContent=message;else tell(message); }
+function voiceParkCurrent() {
+  const v=st.voiceDraft;if(!v)return true;
+  if(['recording','paused','requesting','saving'].includes(v.state)||voiceBlob&&!v.audioSaved){voiceNotice('请先完成并保留本段原音，再切换录音。');return false;}
+  if(!v.attached&&(v.elapsed||voiceText(v)||v.edited)){
+    st.voicePending=st.voicePending||[];
+    st.voicePending=st.voicePending.filter(d=>d.id!==v.id).concat(structuredClone(v));
+  }
+  return true;
+}
 function voiceOpen(id) {
   if(id){
     const form=journalRichForm(),draft=form&&journalDraftFor(form);
@@ -19,10 +28,11 @@ function voiceOpen(id) {
     const a=draftAttachment||(n&&recordAttachments(n).find(a=>a.id===id));
     if(!a?.voice)return;
     if(st.voiceDraft&&st.voiceDraft.state==='ready'&&!st.voiceDraft.elapsed&&!voiceText(st.voiceDraft)&&!st.voiceDraft.edited){st.voiceDraft=null;}
-    if(st.voiceDraft&&st.voiceDraft.id!==id){tell('请先完成当前语音草稿，再打开其他录音。');return;}
+    if(st.voiceDraft&&st.voiceDraft.id!==id&&!voiceParkCurrent())return;
     voiceBlob=null;
     st.voiceDraft={...structuredClone(a.voice),id,target:draftAttachment?(form.dataset.editId||''):n.id,state:'review',attached:true,inDraft:Boolean(draftAttachment)};
-  }else if(!st.voiceDraft){
+  }else{
+    if(!voiceParkCurrent())return;
     const f=journalRichForm();if(f&&!journalPersistEditor(f))return;
     st.voiceDraft=voiceNew(f?.dataset.editId||'');
   }
@@ -35,11 +45,12 @@ function voiceShow() {
   const v=st.voiceDraft;if(!v)return;
   const active=['recording','paused'].includes(v.state),ready=v.state==='ready',review=v.state==='review';
   const previous=v.target?recordAttachments(journalFind(v.target)||{}).filter(a=>a.voice&&a.id!==v.id):[];
-  sheet(v.target&&!v.attached?'追加录音':'语音速记','<section class="voice-panel" aria-label="语音速记">'+(v.restored&&!v.attached?'<p class="voice-notice" role="status">已恢复未完成的语音草稿，完成并保存后再新建。</p>':'')+(previous.length?'<details class="voice-history"><summary>原记录 · '+previous.length+' 段录音</summary><p>本次补录会作为新的一段加入同一条记录，原录音与正文保留。</p></details>':'')+'<p class="voice-context">'+(v.mode==='real'&&!ready?'仅本机录音 · 可保存原音，稍后转写':'交互演示 · 文字为预设示例')+'</p>'+
-    '<label class="voice-provider">转写服务<select id="voice-provider" '+(!ready?'disabled':'')+'>'+Object.entries(voiceProviders).map(([k,p])=>'<option value="'+k+'" '+(v.provider===k?'selected':'')+'>'+p[0]+'</option>').join('')+'</select></label><p class="fine voice-model">'+voiceProviders[v.provider][1]+' · 每次只选一家</p>'+
+  sheet(v.target&&!v.attached?'追加录音':'语音速记','<section class="voice-panel" aria-label="语音速记">'+(v.restored&&!v.attached?'<p class="voice-notice" role="status">已恢复未完成的语音草稿，完成并保存后再新建。</p>':'')+(previous.length?'<details class="voice-history"><summary>原记录 · '+previous.length+' 段录音</summary><p>本次补录会作为新的一段加入同一条记录，原录音与正文保留。</p></details>':'')+'<p class="voice-context">'+(v.mode==='real'?'仅本机录音 · 不上传、不自动转写':'交互演示 · 文字为预设示例')+'</p>'+
+    (v.mode==='demo'?'<label class="voice-provider">转写服务<select id="voice-provider" '+(!ready?'disabled':'')+'>'+Object.entries(voiceProviders).map(([k,p])=>'<option value="'+k+'" '+(v.provider===k?'selected':'')+'>'+p[0]+'</option>').join('')+'</select></label><p class="fine voice-model">'+voiceProviders[v.provider][1]+' · 每次只选一家</p>':'')+
     '<div class="voice-clock"><span class="voice-indicator '+(v.state==='recording'?'is-recording':'')+'">'+voiceMic()+'</span><strong id="voice-time">'+voiceTime(voiceElapsed(v))+'</strong><span id="voice-state">'+({ready:'准备好即可录音',requesting:'等待麦克风权限',recording:'录音中',paused:'已暂停',saving:'正在保存原音',review:'录音已结束'}[v.state]||'')+'</span></div>'+
     '<div id="voice-notice" class="voice-notice" role="status">'+esc(v.failure)+'</div>'+
-    (ready?'<p class="voice-intro">先录音，识别文字后再校对。</p><p class="fine">本站可体验演示或本机录音，不会上传音频。Android Hub 可通过个人 VPS 使用阿里或 OpenAI，识别后校对并加入文字，保留原音。</p><div class="voice-actions">'+btn('体验实时转录','voice-demo')+plain('使用麦克风录音','voice-real')+'</div>':'')+
+    ((st.voicePending||[]).length?'<details class="voice-history"><summary>其他未保存草稿 · '+st.voicePending.length+' 条</summary><p>点选后才恢复，旧录音不会混入当前笔记。</p>'+st.voicePending.map(d=>plain('继续 '+d.date+' 的草稿','voice-resume:'+d.id)).join('')+'</details>':'')+
+    (ready?'<p class="voice-intro">默认仅本地录音，原音作为当前笔记附件保留。</p><p class="fine">本站可体验演示或本机录音，不会上传音频。Android Hub 可通过个人 VPS 使用阿里或 OpenAI，识别后校对并加入文字，保留原音。</p><div class="voice-actions">'+btn('开始本地录音','voice-real')+plain('体验转写（演示）','voice-demo')+'</div>':'')+
     (active?'<div class="voice-transcript"><h3>'+(v.mode==='demo'?'实时文字 · 演示':'文字待转写')+'</h3><div id="voice-final">'+voiceParagraphs(v)+'</div><p id="voice-partial" class="voice-partial">'+esc(v.partial||(!v.segments.length?'说出的内容将在这里逐段出现…':''))+'</p></div><div class="voice-actions">'+btn(v.state==='paused'?'继续录音':'暂停录音','voice-pause','outline')+btn('完成录音','voice-finish')+'</div>'+(v.mode==='demo'?'<details class="voice-scenarios"><summary>体验异常与恢复</summary><div class="actions">'+plain('模拟断网','voice-fail:断网')+plain('模拟额度不足','voice-fail:额度不足')+(v.failure?plain('恢复转写演示','voice-retry'):'')+'</div></details>':''):'')+
     (review?'<div class="voice-playback">'+(v.mode==='real'?'<audio id="voice-audio" controls aria-label="原音回听"></audio><p id="voice-audio-state" class="fine">正在读取本机原音…</p>':'<p class="fine">流程演示未使用麦克风，没有原音文件。</p>')+'</div><label class="voice-edit-label" for="voice-edit">校对后的文字</label><textarea id="voice-edit" rows="5" placeholder="可以手动补充文字">'+esc(v.editedByUser?v.edited:voiceText(v))+'</textarea><details class="voice-original"><summary>查看识别原文'+(v.mode==='demo'?'（演示）':'')+'</summary><p>'+esc(voiceText(v)||'尚无识别结果')+'</p></details>'+(v.failure&&v.mode==='demo'?plain('补转缺失文字（演示）','voice-retry'):'')+'<p class="fine">'+(v.target?'保留同一条记录；补转原文不会覆盖你已有的正文。':'确认后回到原速记草稿，文字和录音一起保存。')+'</p><div class="voice-actions">'+btn(v.attached?'保存校对':'加入速记草稿','voice-attach')+(v.mode==='real'?plain('下载原音','voice-download'):'')+(v.attached&&v.target?plain('追加一段录音','voice-continue'):'')+'</div>':'')+
     (review&&v.mode==='real'&&!v.audioSaved&&!voiceBlob?plain('重新录制','voice-retake'):'')+
@@ -150,6 +161,10 @@ function voiceAction(a,key) {
   if(a==='voice-continue'){
     const previous=st.voiceDraft;if(!previous?.attached||!previous.target)return true;
     void voiceAttach(previous.target);return true;
+  }
+  if(a==='voice-resume'){
+    const value=(st.voicePending||[]).find(d=>d.id===key);if(!value||!voiceParkCurrent())return true;
+    st.voicePending=st.voicePending.filter(d=>d.id!==key);st.voiceDraft={...value,restored:true};voicePersist();voiceShow();return true;
   }
   if(a==='journal-voice'){voiceOpen();return true;}
   if(a==='voice-open'){voiceOpen(key);return true;}
