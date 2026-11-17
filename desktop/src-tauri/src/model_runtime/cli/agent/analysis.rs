@@ -129,6 +129,9 @@ pub(crate) fn run(directory: &Path, runtime: &Path, control: &Control) -> Result
         inherited.check()?;
         workspace_limit(&owned_dir)
     });
+    // command/exec waits for execution, unlike the short initialization RPCs.
+    // Keep the 120-second process limit and allow its termination response to arrive.
+    process.rpc_timeout = Duration::from_secs(130);
     let result=process.rpc("analysis","command/exec",json!({"command":[runtime.join("python.exe"),"-I","-X","utf8","-B","analysis.py"],"cwd":directory,"permissionProfile":"hub-analysis","env":env,"timeoutMs":120000,"outputBytesCap":65536}),&execution_control)?;
     control.check()?;
     let stdout = result["stdout"].as_str().ok_or("分析输出缺失")?;

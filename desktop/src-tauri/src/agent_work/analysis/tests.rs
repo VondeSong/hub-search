@@ -228,6 +228,10 @@ fn live_daily_analysis_continuation() {
         }
         let result = if let Some(prompt) = step["prompt"].as_str() {
             ui(root,&json!({"action":"message","id":id,"expectedRevision":before["work"]["revision"],"clientMessageId":crate::random_url_safe(12),"text":prompt})).unwrap();
+            if step["compactBeforeResponse"] == true {
+                let current = store::view(root, id).unwrap();
+                ui(root,&json!({"action":"requestContextCompaction","id":id,"operationId":crate::random_url_safe(12),"expectedWorkRevision":current["work"]["revision"],"expectedAuthorizationVersion":current["work"]["authorizationVersion"]})).unwrap();
+            }
             if step["cancelDuringResponse"] == true {
                 let owned_root = root.to_owned();
                 let owned_id = id.to_owned();
@@ -268,6 +272,35 @@ fn live_daily_analysis_continuation() {
                 root,
                 &json!({"action":"resume","id":id,"commandId":crate::random_url_safe(12),"expectedControlRevision":before["lifecycle"]["controlRevision"],"expectedWorkRevision":before["work"]["revision"],"expectedRunId":before["lifecycle"]["activeRunId"],"mode":"deep"}),
             )
+        } else if step["revoke"] == true {
+            let mut state = ui(root, &json!({"action":"revoke","id":id})).unwrap();
+            let revoked = store::load(
+                &crate::source_evidence::open_read_database(root).unwrap(),
+                id,
+            )
+            .unwrap();
+            assert_eq!(revoked.state, "revoked");
+            assert_eq!(context(root, &revoked)["currentReports"], json!([]));
+            let mut rejections = Vec::new();
+            if let Some(destination) = step["refusedExportDirectory"].as_str() {
+                let directory = Path::new(destination);
+                assert!(directory.is_absolute() && directory.is_dir());
+                for item in before["fileAnalyses"].as_array().into_iter().flatten() {
+                    for file in item["files"].as_array().into_iter().flatten() {
+                        let target = directory.join(file["name"].as_str().unwrap());
+                        assert!(!target.exists());
+                        let error = export(root,&json!({"id":id,"executionId":item["executionId"],"file":file["name"],"expectedSha256":file["sha256"],"destination":target})).unwrap_err();
+                        assert!(error.contains("未授权"), "{error}");
+                        assert!(!target.exists());
+                        rejections.push(
+                            json!({"file":file["name"],"error":error,"destinationCreated":false}),
+                        );
+                    }
+                }
+                assert!(!rejections.is_empty());
+            }
+            state["revokedFileExportChecks"] = json!(rejections);
+            Ok(state)
         } else {
             store::view(root, id)
         };
@@ -301,4 +334,61 @@ fn live_daily_analysis_continuation() {
             export.unwrap();
         }
     }
+}
+
+#[test]
+#[ignore = "explicit daily analysis Work; real isolated runtime negative checks, no source edits"]
+fn live_daily_analysis_failure_matrix() {
+    let config: Value = serde_json::from_slice(
+        &std::fs::read(std::env::var("HUB_ANALYSIS_FAILURE_CONFIG").expect("explicit config"))
+            .unwrap(),
+    )
+    .unwrap();
+    let root = Path::new(config["root"].as_str().unwrap());
+    let id = config["workId"].as_str().unwrap();
+    let run = format!("analysis-negative-{}", crate::random_url_safe(12));
+    let work = store::claim(root, id, &run).unwrap();
+    let before = manifest(root, &work);
+    let mut results = Vec::new();
+    for case in config["cases"].as_array().unwrap() {
+        let started = std::time::Instant::now();
+        let result = super::run(
+            root,
+            &work,
+            &run,
+            case["script"].as_str().unwrap(),
+            "真实输入的受控异常验收",
+            None,
+            &Control::bounded(Duration::from_secs(180)),
+        );
+        results.push(json!({"label":case["label"],"result":result,"elapsedMs":started.elapsed().as_millis(),"artifactsUnchanged":manifest(root,&work)==before}));
+        std::fs::write(
+            config["output"].as_str().unwrap(),
+            serde_json::to_vec_pretty(&json!({"workId":id,"cases":results})).unwrap(),
+        )
+        .unwrap();
+        if let Some(expected) = case["errorContains"].as_str() {
+            let error = result.expect_err("negative execution must refuse its result");
+            assert!(error.contains(expected), "{error}");
+        } else {
+            let receipt = result.expect("valid computation after failures must recover");
+            assert_eq!(receipt["output"]["exitCode"], 0);
+            assert_eq!(receipt["files"], json!([]));
+        }
+        if let Some(minimum) = case["minimumElapsedMs"].as_u64() {
+            assert!(started.elapsed().as_millis() >= minimum as u128);
+        }
+        assert_eq!(
+            manifest(root, &work),
+            before,
+            "failed run published an artifact"
+        );
+    }
+    store::fail(
+        root,
+        &work,
+        &run,
+        "受控异常验收结束，没有修改源资料或发布失败产物",
+    )
+    .unwrap();
 }

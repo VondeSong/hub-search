@@ -40,7 +40,7 @@ pub(in crate::agent_work) fn request(root: &Path, args: &Value) -> Result<Value,
             }
             return Ok(());
         }
-        if provider_budget::view_on(c, &w)?["canAdmitRun"] != true {
+        if !budget_allows_request(c, &w)? {
             return Err("本事项剩余额度不足，未安排上下文整理".into());
         }
         if let Some(old) = latest(c, &id, "nativeCompactionRequest")? {
@@ -96,10 +96,14 @@ pub(in crate::agent_work) fn view_on(c: &Connection, w: &Work) -> Result<Value, 
             s["threadId"].as_str().is_some_and(|v| !v.is_empty())
                 && s["tokenUsage"]["total"].is_object()
         })
-        && provider_budget::view_on(c, w)?["canAdmitRun"] == true;
+        && budget_allows_request(c, w)?;
     Ok(
         json!({"canRequest":can_request,"pending":pending,"operationId":plan.as_ref().map(|v|&v["operationId"]),"latestLifecycle":latest(c,&w.id,"nativeContextLifecycle")?,"meaning":"request/acknowledgement is not provider completion; no budget reset"}),
     )
+}
+fn budget_allows_request(c: &Connection, w: &Work) -> Result<bool, String> {
+    let budget = provider_budget::view_on(c, w)?;
+    Ok(budget["state"] == "unconfigured" || budget["canAdmitRun"] == true)
 }
 pub(in crate::agent_work) fn pending(
     root: &Path,
@@ -157,6 +161,42 @@ mod tests {
     use super::*;
     use crate::agent_work::tests::create;
     use crate::source_evidence::tests::Fixture;
+    #[test]
+    fn ordinary_work_without_frozen_budget_can_request_compaction() {
+        let f = Fixture::new();
+        f.note("notes", "current", "合成来源");
+        let id = create(&f, true);
+        let w = super::super::claim(&f.root, &id, "first").unwrap();
+        let session = json!({"threadId":"synthetic","fingerprint":"v1","tokenUsage":{"total":{"inputTokens":10,"cachedInputTokens":5,"outputTokens":1}}});
+        super::super::record(&f.root, "first", "nativeSession", &session).unwrap();
+        super::super::fail(&f.root, &w, "first", "合成停止").unwrap();
+        let w = load(&f.c(), &id).unwrap();
+        assert_eq!(
+            provider_budget::view_on(&f.c(), &w).unwrap()["state"],
+            "unconfigured"
+        );
+        assert_eq!(view_on(&f.c(), &w).unwrap()["canRequest"], true);
+        request(&f.root,&json!({"id":id,"operationId":"ordinary","expectedWorkRevision":w.revision,"expectedAuthorizationVersion":w.authorization_version})).unwrap();
+        assert_eq!(view_on(&f.c(), &w).unwrap()["pending"], true);
+        assert!(!provider_budget::configured_on(&f.c(), &w).unwrap());
+    }
+    #[test]
+    fn frozen_exhausted_budget_still_refuses_compaction_without_reset() {
+        let f = Fixture::new();
+        f.note("notes", "current", "合成来源");
+        let id = create(&f, true);
+        super::super::provider_budget::freeze(&f.root,&json!({"id":id,"expectedWorkRevision":1,"limits":{"inputTokens":100,"uncachedInputTokens":60,"outputTokens":20},"perRun":{"inputTokens":100,"uncachedInputTokens":60,"outputTokens":20},"unknownReservations":{}})).unwrap();
+        let w = super::super::claim(&f.root, &id, "first").unwrap();
+        provider_budget::admit_after_preflight(&f.root, &w, "first").unwrap();
+        super::super::record(&f.root, "first", "nativeSession", &json!({"threadId":"synthetic","tokenUsage":{"total":{"inputTokens":10,"outputTokens":1}}})).unwrap();
+        super::super::fail(&f.root, &w, "first", "未知用量停止").unwrap();
+        let w = load(&f.c(), &id).unwrap();
+        let before = provider_budget::view_on(&f.c(), &w).unwrap();
+        assert_eq!(before["canAdmitRun"], false);
+        assert_eq!(view_on(&f.c(), &w).unwrap()["canRequest"], false);
+        assert!(request(&f.root,&json!({"id":id,"operationId":"exhausted","expectedWorkRevision":w.revision,"expectedAuthorizationVersion":w.authorization_version})).unwrap_err().contains("额度不足"));
+        assert_eq!(provider_budget::view_on(&f.c(), &w).unwrap(), before);
+    }
     #[test]
     fn request_is_source_bound_once_only_and_keeps_old_budget() {
         let f = Fixture::new();

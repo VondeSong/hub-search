@@ -71,11 +71,24 @@ fn live_daily_visual_materials_acceptance() {
         )
         .unwrap()
         .0;
-        let (inputs, metadata, raw) = prepare(root, &[grant.clone()]).unwrap();
-        assert!(raw > 0 && inputs.len() == 1);
+        let mut grants = vec![grant];
+        for item in case["additionalImages"].as_array().into_iter().flatten() {
+            grants.push(
+                identity(
+                    root,
+                    &c,
+                    item["libraryId"].as_str().unwrap(),
+                    item["sourceItemId"].as_str().unwrap(),
+                )
+                .unwrap()
+                .0,
+            );
+        }
+        let (inputs, metadata, raw) = prepare(root, &grants).unwrap();
+        assert!(raw > 0 && inputs.len() == grants.len());
         let created=ui(root,&json!({"action":"create","anchor":null,"grant":Grant::default(),"goal":case["prompt"],"successCriteria":"依据实际发送的图片或页面回答，未读内容明确说明"})).unwrap();
         let id = created["work"]["id"].as_str().unwrap();
-        ui(root,&json!({"action":"message","id":id,"expectedRevision":created["work"]["revision"],"clientMessageId":crate::random_url_safe(12),"text":case["prompt"],"addImages":[grant],"addNotes":case["grant"]["notes"]})).unwrap();
+        ui(root,&json!({"action":"message","id":id,"expectedRevision":created["work"]["revision"],"clientMessageId":crate::random_url_safe(12),"text":case["prompt"],"addImages":grants,"addNotes":case["grant"]["notes"]})).unwrap();
         options::configure(root, &json!({"id":id,"options":config["options"]})).unwrap();
         let result = ui(root, &json!({"action":"respond","id":id,"mode":"deep"}));
         let view = store::view(root, id).unwrap();
