@@ -1,6 +1,7 @@
 "use client";
 import {useState} from 'react';
 import type {ResourceDraft} from './AssistantResources';
+import {AssistantCloudHandoff} from './AssistantCloudHandoff';
 
 export function AssistantDataMaterials({resources,onChange,disabled}:{resources:ResourceDraft;onChange:(value:ResourceDraft)=>void;disabled:boolean}){
  const [query,setQuery]=useState('');
@@ -11,5 +12,5 @@ export function AssistantDataMaterials({resources,onChange,disabled}:{resources:
 
 export function AssistantFileDelivery(){
  const [version,setVersion]=useState(1),[show,setShow]=useState(false);
- return <section aria-label="分析文件交付演示"><button type="button" className="ha-secondary-button" onClick={()=>setShow(!show)}>{show?'收起文件示例':'查看分析文件交付示例'}</button>{show&&<><p className="ha-scope-hint">交互演示，不是实际计算结果。正式客户端会先核对来源与文件，再打开或保存。</p><details open><summary>材料汇总 · 第 {version} 版 · 4 个文件</summary><p>汇总.csv · 核对.xlsx · 分类图.png · 报告.pdf</p><p className="ha-scope-hint">文件保存在本次工作中；保存到知识库、发送给别人分别确认并记录结果。</p></details>{version>1&&<details><summary>第 1 版 · 已被修订</summary><p>保留历史文件，后续回答使用第 {version} 版；原资料撤销后，文件入口也会失效。</p></details>}<button type="button" className="ha-secondary-button" onClick={()=>setVersion(v=>v+1)}>模拟调整统计口径</button></>}</section>;
+ return <section aria-label="分析文件交付演示"><button type="button" className="ha-secondary-button" onClick={()=>setShow(!show)}>{show?'收起文件示例':'查看分析文件交付示例'}</button>{show&&<><p className="ha-scope-hint">交互演示，不是实际计算结果。正式客户端会先核对来源与文件，再打开或保存。</p><details open><summary>材料汇总 · 第 {version} 版 · 4 个文件</summary><p>汇总.csv · 核对.xlsx · 分类图.png · 报告.pdf</p><p className="ha-scope-hint">文件保存在本次工作中；保存到知识库、发送给别人分别确认并记录结果。</p></details>{version>1&&<details><summary>第 1 版 · 已被修订</summary><p>保留历史文件，后续回答使用第 {version} 版；原资料撤销后，文件入口也会失效。</p></details>}<button type="button" className="ha-secondary-button" onClick={()=>setVersion(v=>v+1)}>模拟调整统计口径</button><AssistantCloudHandoff/></>}</section>;
 }

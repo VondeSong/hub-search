@@ -5,6 +5,7 @@ use sha2::{Digest, Sha256};
 mod dependencies;
 mod execute;
 mod export;
+pub(crate) mod handoff;
 pub(super) use export::save as export;
 mod output;
 mod runtime;

@@ -59,6 +59,20 @@ sudo -u hub-agents python3 /opt/hub-agents/server.py --state /var/lib/hub-agents
 
 ## 运行与验收
 
+### 桌面分析交接与手机取回
+
+桌面文件成果提供「手机继续查看」：选择当前有效版的成果和一份 Markdown 报告，预览目标个人 VPS 后确认发送。手机在同名云端会话中查看「桌面已有分析」、取回文件并继续讨论报告。后续回答由 VPS 的订阅模型执行，明确以桌面报告为依据；本接口不在 VPS 运行上传的脚本或重新读取原始表格。
+
+- `handoffs.py` 与 `server.py` 一起安装。`GET /v1/threads` 的 `handoffs: true` 表示网关支持这一合同；所有交接路由沿用设备鉴权，属于同一个个人空间。
+- `POST /v1/handoffs/{UUID}` 准备固定清单；`POST .../files/{SHA256}` 逐文件上传；`POST .../commit` 以 `{"confirm":true}` 完整发布。未完整发布时不会建立可见会话。同编号同内容可重试，不重复建立会话或发起模型调用；同编号异内容返回 409。服务重启保留已上传文件和交接状态。
+- 限 1–16 个文件、每文件 10 MiB、合计 50 MiB；供阅读及续聊的 UTF-8 Markdown 正文最多 48,000 字节，必须与所选报告文件哈希及大小一致。允许已有 CSV、JSON、XLSX、PNG、SVG、Markdown、PDF 成果；固定清单包含桌面工作、成果、执行及修订身份和输入标题/哈希。
+- `GET .../files/{SHA256}` 返回 `sha256`、`bytes`、Base64 `data`。客户端核对清单、字节数和 SHA-256 后放入本机 BlobStore；Android 复用原生系统保存与回读校验，打开保存窗口不算保存成功。
+- `POST .../withdraw` 接收 `{"confirm":true}`，移除 Hub 云端交接副本、停止文件下载与该会话后续提问。已发给 Codex 的内容、历史回答、备份和此前保存的副本仍保留。正在回答时须先结束该轮。桌面本地授权撤回不会自动删除已显式导出的云端副本。
+- `GET /v1/handoffs` 列出未完成交接，可在连接设置中核对并撤回不再需要的临时副本。最多 8 份未完成交接，全部未撤回交接的清单预算合计不超过 512 MiB，避免无限占用个人 VPS。
+- 已读会话按设备连接分别缓存。离线时标明缓存截至时间；只可取用本机已下载文件，恢复连接后核对远端状态。收到认证拒绝会隐藏云端内容并清除该连接缓存；未联网的设备只能知道上次读取的状态。Android 保留最近查看的会话和成果页，已发送但未确认的消息沿用既有原编号恢复流程。
+
+部署前等待 Agents 与语音任务结束，备份服务源码和完整 `/var/lib/hub-agents`，更新后逐表核对原有记录。T17 的模拟器结果与 #32 的实体手机、Windows 真关机及自然认证/额度边界分别记录。
+
 ### 日志录音转写
 
 语音复用现有 HTTPS 地址和设备连接。阿里与 OpenAI 的 API Key 只放在 VPS 的 `/etc/hub-agents/transcription.json`，不填入手机、不放进 APK、Git 或公开原型。目录权限 `0750`，文件 `root:hub-agents 0640`。对象中按 `aliyun`、`openai` 分别配置 `apiKey`；阿里北京业务空间另填实际 `workspaceId`。此文件可通过 `HUB_TRANSCRIPTION_CONFIG` 指定其他受控位置。

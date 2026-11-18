@@ -29,6 +29,7 @@ const type = async (element: HTMLInputElement | HTMLTextAreaElement, value: stri
 const waitSearch = async () => { await act(async () => { await new Promise(resolve => setTimeout(resolve, 280)); }); };
 const render = async () => { await act(async () => root.render(<CloudAgents onClose={vi.fn()}/>)); };
 beforeEach(() => {
+  localStorage.clear();
   (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   node = document.createElement("div"); document.body.append(node); root = createRoot(node);
   runtimeCapabilities.mobile = false; running = false;
@@ -309,4 +310,32 @@ it("places mobile connection status in the assistant header and opens real setti
   expect(node.querySelector("input[type=url]")).not.toBeNull();
   await click("返回并重新读取");
   expect(node.querySelector(".cloud-agents-home")).not.toBeNull();
+});
+
+it("restores the last mobile report view from disk and labels cached results without starting a model",async()=>{
+ runtimeCapabilities.mobile=true;
+ localStorage.setItem("hub-cloud-last:device",JSON.stringify({thread:"one",view:"results"}));
+ const handler=invoke.getMockImplementation()!;
+ const handoff={id:"one",thread:"one",state:"published",createdAt:1000,publishedAt:2000,manifest:{version:1,title:"桌面两版比较",origin:{workId:"work-one",artifactId:"artifact-one",executionId:"analysis-one",revision:2,generatedAt:"2026-11-18T01:00:00Z",inputs:[{title:"原表.xlsx",sha256:"a".repeat(64)}]},files:[],report:{name:"报告.md",sha256:"b".repeat(64),text:"桌面报告：新增7项，需核对备注。"}}};
+ invoke.mockImplementation(async(cmd,args)=>args.action.op==="read"?{thread:{...entries[0],turns:[],before:null,handoff},cached:true,cachedAt:1794963600000,account:{state:"ready"}}:handler(cmd,args));
+ await render();
+ expect(node.querySelector('.cloud-agents-views button[aria-pressed="true"]')?.textContent).toBe("成果");
+ expect(node.textContent).toContain("桌面报告：新增7项");expect(node.textContent).toContain("显示本机缓存");
+ expect(node.textContent).not.toContain("正在读取对话");expect(JSON.parse(localStorage.getItem("hub-cloud-last:device")!).view).toBe("results");
+ expect(invoke.mock.calls.some(([,a])=>a.action.op==="send")).toBe(false);
+});
+
+it("clears already visible cloud content when device access is rejected",async()=>{
+ await render();await act(async()=>node.querySelector<HTMLButtonElement>(".cloud-agents-thread")!.click());expect(node.textContent).toContain("原回答");
+ const handler=invoke.getMockImplementation()!;invoke.mockImplementation(async(cmd,args)=>args.action.op==="read"?{thread:null,accessDenied:true,error:"设备密钥已被撤销"}:handler(cmd,args));
+ await act(async()=>window.dispatchEvent(new Event("online")));
+ expect(node.textContent).not.toContain("原回答");expect(node.querySelector(".cloud-agents-home")).not.toBeNull();
+});
+it("renders cloud answer tables with actual header and value cells",async()=>{
+ const handler=invoke.getMockImplementation()!;
+ invoke.mockImplementation(async(cmd,args)=>args.action.op==="read"?{thread:{...entries[0],before:null,turns:[{id:"turn",seq:1,text:"数量和变化",answer:"| 变化 | 数量 |\n|---|---:|\n| 新增 | 7 |\n| 删除 | 0 |",attachments:[],status:"completed"}]},account:{state:"ready"}}:handler(cmd,args));
+ await render();await act(async()=>node.querySelector<HTMLButtonElement>(".cloud-agents-thread")!.click());
+ const region=node.querySelector<HTMLElement>('[role="region"][aria-label="表格，可横向滚动"]');
+ expect(region?.tabIndex).toBe(0);expect(region?.querySelectorAll('thead th')).toHaveLength(2);
+ expect([...region!.querySelectorAll('tbody td')].map(cell=>cell.textContent)).toEqual(["新增","7","删除","0"]);
 });

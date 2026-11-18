@@ -1,0 +1,6 @@
+.cloud-agents-turn,.cloud-agents-answer { min-width:0; }
+.cloud-markdown-table { min-width:0; max-width:100%; overflow-x:auto; margin-block:12px; }
+.cloud-markdown-table:focus-visible { outline:2px solid var(--cloud-accent,var(--hub-accent)); outline-offset:2px; }
+.cloud-markdown-table table { width:100%; border-collapse:collapse; font:inherit; font-variant-numeric:tabular-nums; }
+.cloud-markdown-table :is(th,td) { min-width:8em; padding:8px 10px; text-align:start; vertical-align:top; border-block-end:1px solid var(--cloud-line,var(--hub-separator)); }
+.cloud-markdown-table th { font-weight:600; }

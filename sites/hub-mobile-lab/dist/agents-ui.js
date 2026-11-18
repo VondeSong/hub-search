@@ -77,7 +77,7 @@ function agentUiListScopes() {
 }
 function agentsPage() {
   if (agentUiRevoked()) return '<div class="agents-page">' + agentUiAccessBlock() + '</div>';
-  return '<div class="agents-page"><div class="agent-list-search">' + ico('search', 19) + '<input type="search" id="agent-list-query" aria-label="搜索会话标题与消息" placeholder="搜索会话标题或消息" enterkeyhint="search" value="' + esc(agentListQuery) + '"></div><div class="filter agent-list-scopes" id="agent-list-scopes" role="group" aria-label="会话范围">' + agentUiListScopes() + '</div><section class="agent-conversation-list" aria-label="会话"><div id="agent-thread-list">' + agentThreadRows() + '</div></section><p class="settings-note agent-list-footnote">对话、草稿与附件仅保存在当前浏览器，未调用真实模型。已有桌面聊天不会自动迁入。</p></div>';
+  return '<div class="agents-page">' + plain('查看桌面交接示例', 'agent-handoff-demo', 'folder') + '<div class="agent-list-search">' + ico('search', 19) + '<input type="search" id="agent-list-query" aria-label="搜索会话标题与消息" placeholder="搜索会话标题或消息" enterkeyhint="search" value="' + esc(agentListQuery) + '"></div><div class="filter agent-list-scopes" id="agent-list-scopes" role="group" aria-label="会话范围">' + agentUiListScopes() + '</div><section class="agent-conversation-list" aria-label="会话"><div id="agent-thread-list">' + agentThreadRows() + '</div></section><p class="settings-note agent-list-footnote">对话、草稿与附件仅保存在当前浏览器，未调用真实模型。已有桌面聊天不会自动迁入。</p></div>';
 }
 function agentsHeader(page, id) {
   if (page === 'agent-chat') {
@@ -157,7 +157,7 @@ function agentUiMessage(message, threadId) {
 function agentUiEmptyChat(thread) {
   return '<section class="agent-empty-chat"><span class="agent-empty-mark">' + ico('spark', 31) + '</span><h2>从一个问题开始</h2><p>' + (thread.attachments.length ? '材料已放好。想从哪里开始看？' : '写下想法，或带上一张照片、几条资料。') + '</p><div class="agent-suggestions">' + [['validation', '核对项目的下一步', 'task'], ['reading', '让一条阅读笔记更好用', 'book'], ['image', '试试图片提问', 'image']].map(([key, label, icon]) => agentUiActionButton(label, 'agent-suggest:' + thread.id + ':' + key, 'agent-suggestion', icon)).join('') + '</div></section>';
 }
-function agentUiMessages(thread) { return thread.messages.length ? thread.messages.map(m => agentUiMessage(m, thread.id)).join('') : agentUiEmptyChat(thread); }
+function agentUiMessages(thread) { return thread.messages.length ? thread.messages.map(m => agentUiMessage(m, thread.id)).join('') : thread.handoff ? '' : agentUiEmptyChat(thread); }
 function agentUiMaterials(thread) {
   const materials = [...(thread.materials || []), ...(thread.attachments || [])];
   const unique = [...new Map(materials.map(a => [a.id, a])).values()];
@@ -166,6 +166,7 @@ function agentUiMaterials(thread) {
 }
 function agentUiResults(thread) {
   const runs = Object.values(st.agents.runs).filter(run => run.threadId === thread.id && run.phase === 'completed').sort((a, b) => b.finishedAt - a.finishedAt);
+  if (!runs.length && thread.handoff) return agentUiDesktopHandoff(thread);
   if (!runs.length) return '<div class="empty-state">' + ico('note', 27) + '<h2>完成的回答会留在这里</h2><p>可以回看依据，再保存成一条本地笔记。</p>' + plain('回到对话', 'agent-view:' + thread.id + ':chat', 'chat') + '</div>';
   return runs.map(run => '<article class="agent-result-card"><span class="eyebrow">示例成果 · ' + esc(agentUiStamp(run.finishedAt)) + '</span><h2>' + esc(thread.title) + '</h2><div class="agent-result-body">' + agentUiText(run.text || run.answer) + '</div>' + agentUiCitations({ citations: run.citations || [] }, run) + '<div class="actions">' + agentUiMessageActions({ id: run.messageId, text: run.text }, run) + '</div></article>').join('');
 }
@@ -184,7 +185,7 @@ function agentChatPage(id) {
   if (!thread) return '<div class="agent-chat-page">' + intro('这段对话暂不可用', '返回列表，选择一段已保存的会话。') + btn('返回助手', 'go:agents', 'secondary') + '</div>';
   if (agentUiRevoked()) return '<div class="agent-chat-page">' + agentUiAccessBlock() + '</div>';
   const view = ['chat', 'materials', 'results'].includes(thread.view) ? thread.view : 'chat';
-  return '<div class="agent-chat-page" data-thread="' + esc(id) + '"><div class="agent-view-tabs" aria-label="会话视图">' + [['chat', '对话'], ['materials', '材料'], ['results', '成果']].map(([key, label]) => '<button type="button" data-act="agent-view:' + esc(id) + ':' + key + '" aria-pressed="' + (key === view) + '">' + label + '</button>').join('') + '</div><div id="agent-connection-banner">' + agentUiBanner(thread) + '</div><div id="agent-chat-panel" ' + (view !== 'chat' ? 'hidden' : '') + '><div id="agent-messages" role="log" aria-label="会话消息" aria-live="off">' + agentUiMessages(thread) + '</div><div id="agent-message-end"></div>' + agentUiComposer(thread) + '</div><div id="agent-materials-panel" ' + (view !== 'materials' ? 'hidden' : '') + '>' + agentUiMaterials(thread) + '</div><div id="agent-results-panel" ' + (view !== 'results' ? 'hidden' : '') + '>' + agentUiResults(thread) + '</div><p id="agent-live-announcement" class="agent-sr-only" role="status" aria-live="polite"></p></div>';
+  return '<div class="agent-chat-page" data-thread="' + esc(id) + '"><div class="agent-view-tabs" aria-label="会话视图">' + [['chat', '对话'], ['materials', '材料'], ['results', '成果']].map(([key, label]) => '<button type="button" data-act="agent-view:' + esc(id) + ':' + key + '" aria-pressed="' + (key === view) + '">' + label + '</button>').join('') + '</div><div id="agent-connection-banner">' + agentUiBanner(thread) + '</div><div id="agent-chat-panel" ' + (view !== 'chat' ? 'hidden' : '') + '><div id="agent-messages" role="log" aria-label="会话消息" aria-live="off">' + agentUiDesktopHandoff(thread) + agentUiMessages(thread) + '</div><div id="agent-message-end"></div>' + agentUiComposer(thread) + '</div><div id="agent-materials-panel" ' + (view !== 'materials' ? 'hidden' : '') + '>' + agentUiMaterials(thread) + '</div><div id="agent-results-panel" ' + (view !== 'results' ? 'hidden' : '') + '>' + agentUiResults(thread) + '</div><p id="agent-live-announcement" class="agent-sr-only" role="status" aria-live="polite"></p></div>';
 }
 function agentConnectionPage() {
   const c = agentUiConnection(), profile = st.agents.setup;
@@ -352,6 +353,8 @@ function agentUiFrames(threadId) {
   sheet('关键帧示例', '<p class="prose">只把 0、1、2 秒的三张采样帧送入对话，明确保留时间戳。</p><div class="agent-frame-strip">' + ['red', 'green', 'blue'].map((color, index) => '<div class="agent-frame" data-frame="' + color + '"><strong>' + index + ' 秒</strong></div>').join('') + '</div><p class="info">这不是完整视频理解。采样之间发生的动作可能被遗漏，声音也没有被转写。</p><div class="actions">' + btn('附上这 3 帧示例', 'agent-add-frames:' + threadId, '', 'plus') + '</div>');
 }
 function handleAgentAction(action, key, value) {
+  if (action === 'agent-handoff-demo') { agentUiCreateHandoffDemo(); return true; }
+  if (action === 'agent-handoff-download') { const thread = agentThread(key); if (thread?.handoff) { thread.handoff.downloaded = true; save(); render(); tell('示例文件已缓存；原型未下载真实文件。'); } return true; }
   if (!action.startsWith('agent-')) return false;
   const thread = agentThread(key);
   if (agentPreferenceAction(action, key, value)) return true;
@@ -545,7 +548,7 @@ function refreshAgentView() {
   const expectedIds = thread.messages.map(m => m.id).join('|');
   const existingIds = [...messages.querySelectorAll('[data-agent-message]')].map(el => el.dataset.agentMessage).join('|');
   if (expectedIds !== existingIds || !thread.messages.length) {
-    const html = agentUiMessages(thread);
+    const html = agentUiDesktopHandoff(thread) + agentUiMessages(thread);
     if (messages.innerHTML !== html) {
       const expanded = [...messages.querySelectorAll('details[open][data-agent-process]')].map(el => el.dataset.agentProcess);
       messages.innerHTML = html;
@@ -580,4 +583,20 @@ function setupAgentUI() {
   addEventListener('hub-agent-update', refreshAgentView);
   addEventListener('resize', agentUiResizeComposer);
   window.visualViewport?.addEventListener('resize', agentUiResizeComposer);
+}
+
+function agentUiDesktopHandoff(thread) {
+  if (!thread.handoff) return '';
+  const h = thread.handoff;
+  return '<section class="agent-result-card" aria-label="桌面交接报告"><h2>桌面已有分析</h2><p class="fine">材料汇总 · 第 2 版 · 交接于 ' + esc(agentUiStamp(h.at)) + '（示例）</p><p>这是交接时的固定副本。后续追问交给个人云端，只读取这份报告；没有重跑桌面计算。</p><div class="agent-result-body"><p>先核对原表中仍有歧义的字段，再确认统计口径。本段为界面示例，没有读取实际工程资料。</p></div><p>报告.md · 汇总.csv</p><div class="actions">' + btn(h.downloaded ? '已缓存示例 · 体验保存副本' : '取回已选文件（演示）', 'agent-handoff-download:' + thread.id, 'secondary', 'download') + '</div><p class="fine">' + (h.downloaded ? '离线仍可回看已收到的报告；未取回文件需要联网。' : '文件取回后可离线保存；系统保存完成后才算拿到副本。') + '</p></section>';
+}
+function agentUiCreateHandoffDemo() {
+  let thread = agentThread('ag-desktop-handoff-demo');
+  if (!thread) {
+    const at = Date.now();
+    thread = {id:'ag-desktop-handoff-demo',title:'桌面分析 · 材料汇总（示例）',model:AGENT_MODEL,createdAt:at,updatedAt:at,draft:'',attachments:[],materials:[],activeRunId:null,view:'chat',origin:'desktop-handoff',messages:[],handoff:{at,downloaded:false}};
+    st.agents.threads.push(thread);
+    save();
+  }
+  go('agent-chat/' + thread.id);
 }

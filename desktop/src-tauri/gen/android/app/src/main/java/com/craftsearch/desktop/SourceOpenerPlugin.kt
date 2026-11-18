@@ -347,6 +347,27 @@ class SourceOpenerPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     @Command
+    fun prepareAttachmentExport(invoke: Invoke) {
+        val args = invoke.parseArgs(AttachmentExportArgs::class.java)
+        Thread {
+            try {
+                val token = PendingAttachmentExport.prepare(activity.applicationContext, args)
+                invoke.resolve(JSObject().put("token", token))
+            } catch (error: Exception) { invoke.reject(error.message ?: "无法准备文件副本") }
+        }.start()
+    }
+
+    @Command
+    fun attachmentExportStatus(invoke: Invoke) {
+        try {
+            val token = invoke.parseArgs(PreparedAttachmentExportArgs::class.java).token
+            val job = PendingAttachmentExport.read(activity.applicationContext, token)
+            invoke.resolve(JSObject().put("state", if (job.completed) "verified" else if (job.cancelled) "cancelled" else if (job.destination != null) "saving" else "saveDialogOpened")
+                .put("name", job.fileName).put("sha256", job.hash).put("bytes", job.size))
+        } catch (_: Exception) { invoke.resolve(JSObject().put("state", "cancelled")) }
+    }
+
+    @Command
     fun exportFlashcardAttachment(invoke: Invoke) {
         try {
             val args = invoke.parseArgs(AttachmentExportArgs::class.java)

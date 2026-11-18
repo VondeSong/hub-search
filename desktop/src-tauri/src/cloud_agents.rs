@@ -8,6 +8,8 @@ use tauri::AppHandle;
 
 const CREDENTIAL: &str = "hub-cloud-agents-v1";
 const MAX_RESPONSE: usize = 28 * 1024 * 1024;
+mod cache;
+mod handoffs;
 mod materials;
 mod transcription;
 
@@ -20,6 +22,9 @@ struct Config {
 #[derive(Deserialize)]
 #[serde(tag = "op", rename_all = "camelCase")]
 pub(crate) enum Action {
+    Handoff {
+        request: Value,
+    },
     Voice {
         request: transcription::Action,
     },
@@ -170,6 +175,7 @@ async fn request(
     let mut call = client.request(method, url).bearer_auth(&config.token);
     if let Some(body) = body {
         if body["audio"].is_string()
+            || body["data"].is_string()
             || body["attachments"]
                 .as_array()
                 .is_some_and(|images| !images.is_empty())
@@ -240,6 +246,10 @@ pub(crate) async fn cloud_agents(app: AppHandle, action: Action) -> Result<Value
             .transpose()
     };
     match action {
+        Action::Handoff { request: action } => {
+            let config = current()?.ok_or("请先在云端助手中连接你的个人 VPS")?;
+            handoffs::run(&app, &config, action).await
+        }
         Action::Voice { request: action } => {
             let config = current()?.ok_or("请先在 Agents 中连接你的 VPS，再使用云端转写。")?;
             transcription::run(&app, &config, action).await
@@ -381,6 +391,9 @@ pub(crate) async fn cloud_agents(app: AppHandle, action: Action) -> Result<Value
                 ),
                 _ => unreachable!(),
             };
+            if method == Method::GET && !image && !missing {
+                return cache::read(&crate::active_data_root(&app)?, &config, &path).await;
+            }
             match request(&config, method, &path, body, image).await {
                 Err(RequestFailure::Http(404, _)) if missing => Ok(json!({"thread":null})),
                 result => result.map_err(Into::into),

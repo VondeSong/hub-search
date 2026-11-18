@@ -6,6 +6,21 @@ mod activity;
 #[cfg(test)]
 mod alignment_acceptance;
 mod analysis;
+pub(crate) use analysis::handoff::prepare as prepare_analysis_handoff;
+pub(crate) fn record_analysis_handoff(
+    root: &std::path::Path,
+    args: &serde_json::Value,
+    receipt: &serde_json::Value,
+) -> Result<(), String> {
+    let id = text(args, "work", 150)?;
+    store::write(root, |c| {
+        let existing:bool = c.query_row("SELECT EXISTS(SELECT 1 FROM agent_records WHERE work_id=?1 AND kind='analysisHandoff' AND json_extract(body_json,'$.handoff.id')=?2)",params![id,receipt["handoff"]["id"].as_str()],|r|r.get(0)).map_err(|e|e.to_string())?;
+        if !existing {
+            store::insert(c, &id, None, "analysisHandoff", receipt)?;
+        }
+        Ok(())
+    })
+}
 mod answer_save;
 mod artifacts;
 mod assistant;

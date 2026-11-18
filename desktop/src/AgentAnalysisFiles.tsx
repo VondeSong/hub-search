@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState} from "react";
 import {save} from "@tauri-apps/plugin-dialog";
 import {invoke} from "@tauri-apps/api/core";
+import {AgentCloudHandoff} from "./CloudHandoff";
 export type FileAnalysis={executionId:string;title:string;revision?:number;superseded?:boolean;available:boolean;runtime:string;files:{name:string;bytes:number;sha256:string;type:string}[]};
 export function AgentAnalysisFiles({workId,items}:{workId:string;items:FileAnalysis[]}){
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
@@ -16,5 +17,5 @@ export function AgentAnalysisFiles({workId,items}:{workId:string;items:FileAnaly
   }catch(e){if(scope.current===workId)setError(String(e));}finally{if(scope.current===workId)setBusy(false);}
  }
  if(!items.length)return null;
- return <section className="agent-analysis-files" aria-label="分析文件成果">{items.map(item=><details key={item.executionId}><summary>{item.title} · 第 {item.revision||1} 版 · {item.files.length} 个文件{!item.available?" · 已失效":item.superseded?" · 已被修订":""}</summary><p className="agent-note">本机分析产物。可打开检查，或导出到自己选择的位置。保存到知识库仍需使用保存入口。</p>{item.files.map(file=><p key={file.name}><button type="button" disabled={busy||!item.available} onClick={()=>void open(item,file.name)}>{file.name}</button><small> · {(file.bytes/1024).toFixed(1)} KiB</small> <button type="button" disabled={busy||!item.available} aria-label={"导出 "+file.name} onClick={()=>void exportFile(item,file)}>导出副本</button></p>)}</details>)}{notice&&<p role="status">{notice}</p>}{error&&<p role="alert">{error}</p>}</section>;
+ return <section className="agent-analysis-files" aria-label="分析文件成果">{items.map(item=><details key={item.executionId}><summary>{item.title} · 第 {item.revision||1} 版 · {item.files.length} 个文件{!item.available?" · 已失效":item.superseded?" · 已被修订":""}</summary><p className="agent-note">本机分析产物。可打开检查，或导出到自己选择的位置。保存到知识库仍需使用保存入口。</p>{item.files.map(file=><p key={file.name}><button type="button" disabled={busy||!item.available} onClick={()=>void open(item,file.name)}>{file.name}</button><small> · {(file.bytes/1024).toFixed(1)} KiB</small> <button type="button" disabled={busy||!item.available} aria-label={"导出 "+file.name} onClick={()=>void exportFile(item,file)}>导出副本</button></p>)}<AgentCloudHandoff workId={workId} item={item}/></details>)}{notice&&<p role="status">{notice}</p>}{error&&<p role="alert">{error}</p>}</section>;
 }

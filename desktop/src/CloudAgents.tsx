@@ -3,12 +3,15 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { Archive, ArrowLeft, ArrowUp, Camera, ChevronRight, Clock3, Cloud, FileText, Image, LoaderCircle, MessageSquare, MoreHorizontal, PanelLeft, Plus, Search, Settings2, Sparkles, Square, Video, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { CloudMarkdownTable } from "./CloudMarkdownTable";
 import { imageUpload, outbox, uploadSize, videoUploads, type CloudSkillPayload, type DraftTurn, type Upload, type MaterialSnapshot } from "./CloudAgentMedia";
 import "./CloudAgents.css";
 import { CloudAgentSheet, CloudAnswerNote, CloudMaterialPicker } from "./CloudAgentMaterials";
 import { AgentAnswerActions } from "./AgentAnswerActions";
 import { runtimeCapabilities } from "./RuntimePlatform";
 import { CloudModelPanel, CloudSkillSheet, modelLabel, effortLabel, type CloudAccount, type ModelCatalog, type ModelSelection, type SkillChoice } from "./CloudAgentPreferences";
+import {CloudHandoffPanel,CloudPendingHandoffs,type CloudHandoff} from "./CloudHandoff";
 
 type Connection = { endpoint: string; binding: string };
 type Account = CloudAccount;
@@ -16,8 +19,9 @@ type Summary = { id: string; title: string; updated: number; archived?: boolean;
 type Attachment = { id: string; name: string; seconds?: number | null };
 type Progress = { startedAt?: number; finishedAt?: number; summary?: string[]; updates?: string[] };
 type Turn = { id: string; seq: number; created?: number; text: string; answer: string; error?: string; status: "queued" | "running" | "stopping" | "completed" | "failed" | "stopped"; attachments: Attachment[]; material?: MaterialSnapshot; progress?: Progress };
-type Thread = Summary & { turns: Turn[]; before: number | null; skill?: { name: string; version: string; paths: string[] } | null; selection?: ModelSelection | null };
-type Snapshot = { thread: Thread | null; account?: Account };
+type Thread = Summary & { turns: Turn[]; before: number | null; handoff?:CloudHandoff|null; skill?: { name: string; version: string; paths: string[] } | null; selection?: ModelSelection | null };
+type CacheState = {cached?:boolean;cachedAt?:number;cacheWarning?:string;accessDenied?:boolean;error?:string};
+type Snapshot = CacheState & { thread: Thread | null; account?: Account };
 type Delivery = { turn: string; phase: "sending" | "checking" | "accepted" | "rejected"; error?: string };
 type ChatView = "chat" | "materials" | "results";
 const active = (turn?: Pick<Turn, "status">) => turn && ["queued", "running", "stopping"].includes(turn.status);
@@ -144,6 +148,7 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
   const chosenSkill = skills?.find(skill => skill.methodVersion === skillVersion);
   const boundSkill = current?.skill;
   const archived = Boolean(current?.archived ?? catalog.find(item => item.id === selected)?.archived);
+  const handoffWithdrawn = current?.handoff?.state === "withdrawn";
 
   useEffect(() => {
     const timer = setTimeout(() => setQuery(search.trim()), 250);
@@ -190,6 +195,7 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
     let live = true;
     void outbox(binding).then(saved => {
       if (live && saved) { setPending(saved); select(saved.thread); }
+      else if(live&&mobile){try{const previous=JSON.parse(localStorage.getItem("hub-cloud-last:"+binding)||"null");if(previous?.thread){select(previous.thread);if(["chat","results","materials"].includes(previous.view)){setView(previous.view);remember(previous.thread,previous.view);}}}catch{}}
     }).catch(() => { if (live) setNotice("无法读取本机待重试的消息。"); });
     return () => { live = false; };
   }, [binding]);
@@ -205,8 +211,12 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
       const selectedThread = chatOpen && selected && known ? selected : undefined;
       const threads = [...new Set([selectedThread, pending?.thread].filter((id): id is string => Boolean(id)))];
       let running = false;
-      const readList = Date.now() >= nextList ? [call<{ threads: Summary[]; account: Account; threadManagement?: boolean; modelCatalog?: ModelCatalog; modelSelection?: boolean }>("list", { query }).then(data => {
+      let cachedAt:number|undefined;
+      let cacheWarning:string|undefined;
+      function access(data:CacheState){if(data.accessDenied){setCatalog([]);setSnapshot(undefined);setChatOpen(false);throw new Error(data.error||"云端访问已撤销，缓存已清除。");}if(data.cached)cachedAt=data.cachedAt;cacheWarning=data.cacheWarning||cacheWarning;}
+      const readList = Date.now() >= nextList ? [call<CacheState & { threads: Summary[]; account: Account; threadManagement?: boolean; modelCatalog?: ModelCatalog; modelSelection?: boolean }>("list", { query }).then(data => {
         if (!live) return;
+        access(data);
         setCatalog(data.threads);
         setManagement(Boolean(data.threadManagement));
         setModelCatalog(data.modelSelection ? data.modelCatalog : undefined);
@@ -218,6 +228,7 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
         thread, missing: thread === pending?.thread && thread !== selectedThread,
       }).then(data => {
         if (!live) return;
+        access(data);
         const result = data.thread;
         if (!result) return;
         if (thread === selected) setSnapshot(result);
@@ -237,8 +248,9 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
       const relevant = threads.length ? results.slice(0, threads.length) : results;
       const failure = relevant.find(item => item.status === "rejected");
       if (relevant.some(item => item.status === "fulfilled")) {
-        setNetwork("");
-        setCheckedAt(Date.now());
+        setNetwork(cachedAt?`显示本机缓存（截至 ${new Date(cachedAt).toLocaleString("zh-CN")}），恢复连接后重新核对。`:"");
+        if(cacheWarning)setNotice(cacheWarning);
+        setCheckedAt(cachedAt||Date.now());
         missed = 0;
       } else if (failure?.status === "rejected" && (++missed >= 2 || !navigator.onLine)) {
         setNetwork(errorText(failure.reason));
@@ -274,6 +286,7 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
     setModelSelection(draft?.selection);
     follow.current = true;
     setSelected(id);
+    remember(id,"chat");
     setEarlier([]);
     setBefore(undefined);
     setChatOpen(true); setView("chat"); setSettings(false); setRename(undefined);
@@ -285,9 +298,13 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
   }
 
   function showList() {
+    remember(undefined,"chat");
     setSettings(false); setRename(undefined); setChatOpen(false); setView("chat");
     if (mobile && window.history.state?.hubCloudAgentOwner === historyOwner.current && window.history.state?.hubCloudAgentChat) window.history.back();
   }
+
+  function remember(id:string|undefined,next:ChatView){if(!mobile||!binding)return;try{if(id)localStorage.setItem("hub-cloud-last:"+binding,JSON.stringify({thread:id,view:next}));else localStorage.removeItem("hub-cloud-last:"+binding);}catch{}}
+  function changeView(next:ChatView){setView(next);remember(selected,next);}
 
   function showSettings() {
     setNotice("");
@@ -344,7 +361,7 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
 
   async function send(event?: FormEvent) {
     event?.preventDefault();
-    if (!binding || sending.current || preparing || archived || (deliveryPhase === "accepted" && pending) ||
+    if (!binding || sending.current || preparing || archived || handoffWithdrawn || (deliveryPhase === "accepted" && pending) ||
       (pending && pending.thread !== selected) || (!pending && (!text.trim() && !attachments.length && !material || active(last)))) return;
     sending.current = true;
     setBusy(true);
@@ -471,8 +488,8 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
     localPending?.text.slice(0, 48) || (localPending?.attachments.length ? "附件对话" : "对话") : "新对话";
   const activeTurn = active(last) ? last?.id : deliveryPhase === "accepted" ? displayedPending?.turn : undefined;
   const stopPending = Boolean(activeTurn && (activeTurn === waitingToStop || last?.status === "stopping"));
-  const warning = account?.state === "login" ? "ChatGPT 登录已失效" : account?.state === "quota" ? "订阅额度不足" : network ? "暂时连不上个人云端" : "";
-  const attachDisabled = busy || preparing || archived || Boolean(pending);
+  const warning = account?.state === "login" ? "ChatGPT 登录已失效" : account?.state === "quota" ? "订阅额度不足" : network || "";
+  const attachDisabled = busy || preparing || archived || handoffWithdrawn || Boolean(pending);
   const defaultModel = modelCatalog?.models.find(item => item.isDefault) ?? modelCatalog?.models[0];
   const effectiveSelection = localPending?.selection ?? modelSelection ?? current?.selection ?? (defaultModel ? { model: defaultModel.model, effort: defaultModel.defaultReasoningEffort } : undefined);
   const selectedModel = modelCatalog?.models.find(item => item.model === effectiveSelection?.model);
@@ -492,7 +509,8 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
     </div>)}
   </div>;
 
-  const markdown = (answer: string) => <ReactMarkdown skipHtml components={{
+  const markdown = (answer: string) => <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={{
+    table: CloudMarkdownTable,
     img: () => null,
     a: ({ href, children }) => <a href={href} onClick={event => {
       event.preventDefault();
@@ -579,6 +597,7 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
       <label>设备密钥<input type="password" value={token} onChange={event => setToken(event.target.value)} autoComplete="off" required /></label>
       <button className="cloud-agents-primary" disabled={busy}>{busy ? "正在连接…" : "连接"}</button>
       {notice && <p role="alert">{notice}</p>}
+      {connection&&<CloudPendingHandoffs/>}
     </form> : !chatOpen ? <div ref={list} className="cloud-agents-home" onScroll={event => { listScroll.current = event.currentTarget.scrollTop; }}>
       <h2>你的云端对话</h2><p className="cloud-agents-lede">在手机上开始，随时接着聊。</p>
       {!mobile && <button type="button" className="cloud-agents-connection-card" onClick={showSettings}><Cloud size={21}/><span><strong>{warning || "个人云端"}</strong><small>{connectionLabel}</small></span><ChevronRight size={18}/></button>}
@@ -594,7 +613,7 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
       <div className="cloud-agents-chat">
         {mobile && <div className="cloud-agents-views" aria-label="会话视图">
           {([["chat", "对话"], ["materials", "材料"], ["results", "成果"]] as const).map(([id, label]) =>
-            <button type="button" key={id} aria-pressed={view === id} onClick={() => setView(id)}>{label}</button>)}
+            <button type="button" key={id} aria-pressed={view === id} onClick={() => changeView(id)}>{label}</button>)}
         </div>}
         {rename !== undefined && <form className="cloud-agents-rename" aria-label="重命名会话" onSubmit={event => { event.preventDefault(); void updateThread({ title: rename.trim() }); }}><label>会话名称<input autoFocus maxLength={80} value={rename} onChange={event => setRename(event.target.value)}/></label><button type="submit" disabled={updating || !rename.trim()}>保存名称</button><button type="button" disabled={updating} onClick={() => setRename(undefined)}>取消</button></form>}
         {archived && <div className="cloud-agents-archived"><span>这段会话已归档，消息和附件均保留。</span><button type="button" disabled={updating} onClick={() => void updateThread({ archived: false })}>恢复会话</button></div>}
@@ -607,7 +626,8 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
           follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
         }}>
           {(before === undefined ? current?.before : before) && <button type="button" disabled={loadingEarlier} onClick={() => void loadEarlier()}>查看更早消息</button>}
-          {turns.length === 0 && !displayedPending && (selected && known ? <p className="cloud-agents-empty" role="status">正在读取对话…</p> :
+          {current?.handoff&&<CloudHandoffPanel handoff={current.handoff} compact={mobile} onOpen={()=>changeView("results")} onWithdraw={()=>refresh(v=>v+1)}/>}
+          {turns.length === 0 && !displayedPending && !current?.handoff && (selected && known ? <p className="cloud-agents-empty" role="status">正在读取对话…</p> :
             <div className="cloud-agents-empty">
               {mobile && <span className="cloud-agents-empty-icon"><Sparkles size={27}/></span>}
               <h2>{mobile ? "从一个问题开始" : "新对话"}</h2>
@@ -674,10 +694,11 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
           {(before === undefined ? current?.before : before) && <button type="button" disabled={loadingEarlier} onClick={() => void loadEarlier()}>查看更早材料</button>}
         </div>}
         {mobile && view === "results" && <div className="cloud-agents-panel" aria-label="会话成果">
+          {current?.handoff&&<CloudHandoffPanel handoff={current.handoff} onWithdraw={()=>refresh(v=>v+1)}/>}
           {turns.filter(turn => turn.status === "completed" && turn.answer).reverse().map(turn => <article className="cloud-agents-panel-card cloud-agents-answer" key={turn.id}>
             <h2>{turn.text.slice(0, 48) || title}{turn.created && <time>{stamp(turn.created)}</time>}</h2>{markdown(turn.answer)}{answerActions(turn)}
           </article>)}
-          {!turns.some(turn => turn.status === "completed" && turn.answer) && <div className="cloud-agents-empty"><FileText size={27}/><h2>完成的回答会留在这里</h2><button type="button" onClick={() => setView("chat")}>回到对话</button></div>}
+          {!current?.handoff&&!turns.some(turn => turn.status === "completed" && turn.answer) && <div className="cloud-agents-empty"><FileText size={27}/><h2>完成的回答会留在这里</h2><button type="button" onClick={() => changeView("chat")}>回到对话</button></div>}
           {(before === undefined ? current?.before : before) && <button type="button" disabled={loadingEarlier} onClick={() => void loadEarlier()}>查看更早成果</button>}
         </div>}
         {view === "chat" && (!mobile || !archived) && <form className="cloud-agents-compose" onSubmit={event => void send(event)}>
@@ -688,7 +709,7 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
           {mobile && (attachments.length>0||material) && <small className="cloud-agents-pending-count">待发送材料 {attachments.length+Number(Boolean(material))} 份</small>}
           {draftFiles(attachments, true)}
           {attachments.some(file => file.seconds != null) && <small>将发送带时间戳的关键帧，短暂变化可能漏掉。</small>}
-          <textarea ref={textarea} value={text} onChange={event => setText(event.target.value)} disabled={archived || busy || Boolean(pending)} maxLength={20000} placeholder={archived ? "恢复会话后可继续提问" : "问一个问题，或接着聊…"} aria-label="消息" rows={mobile ? 1 : 2}/>
+          <textarea ref={textarea} value={text} onChange={event => setText(event.target.value)} disabled={handoffWithdrawn || archived || busy || Boolean(pending)} maxLength={20000} placeholder={handoffWithdrawn?"交接已撤回，可新建其他对话":archived ? "恢复会话后可继续提问" : "问一个问题，或接着聊…"} aria-label="消息" rows={mobile ? 1 : 2}/>
           <div className="cloud-agents-tools">
             {mobile ? <>
               <button type="button" aria-label="添加照片或资料" aria-haspopup="dialog" disabled={attachDisabled} onClick={() => setSheet("attachments")}><Plus size={22}/></button>

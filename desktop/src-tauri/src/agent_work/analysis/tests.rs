@@ -1,6 +1,65 @@
 use super::*;
 use crate::source_evidence::tests::Fixture;
 #[test]
+fn cloud_handoff_exports_only_current_selected_results_and_report() {
+    let f = Fixture::new();
+    let staged=stage(&f.root,&json!({"title":"input.csv","base64":base64::engine::general_purpose::STANDARD.encode(b"value\n1\n")})).unwrap();
+    let created=ui(&f.root,&json!({"action":"create","anchor":null,"grant":{"libraryIds":[],"notes":[],"readingItemKeys":[]},"goal":"核对表格并交接成果","successCriteria":"版本及文件可核对"})).unwrap();
+    let id = created["work"]["id"].as_str().unwrap();
+    ui(&f.root,&json!({"action":"message","id":id,"expectedRevision":created["work"]["revision"],"clientMessageId":"select-handoff-source","text":"分析所选文件","addNotes":[staged["locator"]]})).unwrap();
+    let work = store::claim(&f.root, id, "handoff-run").unwrap();
+    let input = inputs(&f.root, &work).unwrap()[0].2.clone();
+    for (revision, execution) in [(1, "analysis-handoff-old"), (2, "analysis-handoff-current")] {
+        let dir = f
+            .root
+            .join("agent-analysis")
+            .join(id)
+            .join(execution)
+            .join("output");
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut files = Vec::new();
+        for (name, raw, kind) in [
+            ("report.md", b"# Existing report\n".as_slice(), "md"),
+            ("detail.csv", b"value\n1\n".as_slice(), "csv"),
+            ("unselected.json", b"{}".as_slice(), "json"),
+        ] {
+            std::fs::write(dir.join(name), raw).unwrap();
+            files.push(json!({"name":name,"bytes":raw.len(),"sha256":digest(raw),"type":kind}));
+        }
+        store::record(&f.root,"handoff-run","analysisExecution",&json!({"artifactId":"artifact-handoff","executionId":execution,"title":"所选报告","revision":revision,"authorizationVersion":work.authorization_version,"inputs":[input],"files":files})).unwrap();
+    }
+    let args = json!({"work":id,"execution":"analysis-handoff-current","files":["report.md","detail.csv"],"report":"report.md"});
+    let prepared = handoff::prepare(&f.root, &args).unwrap();
+    assert_eq!(prepared.files.len(), 2);
+    assert_eq!(prepared.manifest["origin"]["revision"], 2);
+    assert_eq!(prepared.manifest["report"]["text"], "# Existing report\n");
+    assert!(!prepared.manifest.to_string().contains("locator"));
+    assert!(!prepared.manifest.to_string().contains("unselected.json"));
+    let mut bad = args.clone();
+    bad["execution"] = json!("analysis-handoff-old");
+    assert!(handoff::prepare(&f.root, &bad).is_err());
+    bad = args.clone();
+    bad["files"] = json!(["detail.csv"]);
+    assert!(handoff::prepare(&f.root, &bad).is_err());
+    bad = args.clone();
+    bad["files"] = json!(["report.md", "report.md"]);
+    assert!(handoff::prepare(&f.root, &bad).is_err());
+    std::fs::write(
+        f.root
+            .join("agent-analysis")
+            .join(id)
+            .join("analysis-handoff-current/output/report.md"),
+        b"changed",
+    )
+    .unwrap();
+    assert!(handoff::prepare(&f.root, &args).is_err());
+    f.c()
+        .execute("UPDATE agent_works SET state='revoked' WHERE id=?1", [id])
+        .unwrap();
+    assert!(handoff::prepare(&f.root, &args).is_err());
+}
+
+#[test]
 fn unrelated_material_change_preserves_only_artifacts_with_current_inputs() {
     let f = Fixture::new();
     let mut notes = Vec::new();
