@@ -18,7 +18,7 @@ it.each(["materials","images","mcp"])("%s Enter respects Chinese composition bef
   await act(async()=>root.render(kind==="materials"?<AgentMaterials selected={[]} disabled={false} onChange={changed}/>:kind==="images"?<AgentImages current={[]} disabled={false} onApply={changed}/>:<AgentMcpServices value={[]} disabled={false} onChange={changed}/>));
   const input=host.querySelector<HTMLInputElement>("input")!;
   if(kind==="images"){
-   expect(invoke.mock.calls).toEqual([["agent_investigation",{args:{action:"imageMaterials",query:""}}]]);
+   expect(invoke.mock.calls).toEqual([["agent_investigation",{args:{action:"imageMaterials",query:"",page:1}}]]);
    expect(input.disabled).toBe(true);
    await act(async()=>finishInitialImages!());
    expect(input.disabled).toBe(false);
@@ -34,7 +34,7 @@ it.each(["materials","images","mcp"])("%s Enter respects Chinese composition bef
    expect(invoke).not.toHaveBeenCalled();
   }else{
    expect(invoke).toHaveBeenCalledTimes(initialCalls+1);
-   expect(invoke.mock.calls.slice(initialCalls)).toEqual([["agent_investigation",{args:kind==="images"?{action:"imageMaterials",query:"中文资料"}:{action:"materials",query:{query:"中文资料",offset:0,limit:20}}}]]);
+   expect(invoke.mock.calls.slice(initialCalls)).toEqual([["agent_investigation",{args:kind==="images"?{action:"imageMaterials",query:"中文资料",page:1}:{action:"materials",query:{query:"中文资料",offset:0,limit:20}}}]]);
   }
   expect(changed).not.toHaveBeenCalled();
  } finally {await act(async()=>root.unmount());host.remove();}
