@@ -32,8 +32,22 @@ pub(in crate::agent_work) fn source(
 }
 
 // Message attachments describe the user's selection, never evidence that it was read.
-pub(super) fn message_cards(c: &Connection, work: &Work, locators: &[EvidenceLocator]) -> Value {
+pub(super) fn message_cards(
+    root: &Path,
+    c: &Connection,
+    work: &Work,
+    locators: &[EvidenceLocator],
+) -> Value {
     json!(locators.iter().map(|locator| {
+        if crate::source_evidence::local_text::is_local(locator) {
+            let allowed = work.state != "revoked" && work.grant.contains(locator);
+            let metadata = allowed
+                .then(|| crate::source_evidence::local_text::metadata(root, locator).ok())
+                .flatten();
+            let title = if allowed { "本地附件不可用" } else { "资料已移除" };
+            return json!({"kind":"file","title":metadata.as_ref().and_then(|v|v["title"].as_str()).unwrap_or(title),
+                "locator":locator,"available":metadata.is_some()});
+        }
         let (kind, fallback) = match locator {
             EvidenceLocator::Note { .. } => ("page", "页面"),
             EvidenceLocator::Reading { .. } => ("reading", "阅读条目"),

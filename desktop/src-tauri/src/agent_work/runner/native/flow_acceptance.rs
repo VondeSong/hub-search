@@ -44,8 +44,14 @@ fn run_native_flow(config: Value) {
     let mut turns = Vec::new();
     for (index, prompt) in prompts.iter().enumerate() {
         if index > 0 {
+            let before = store::view(root, id).unwrap();
+            let notes = config["attachmentsByTurn"]
+                .get(index)
+                .cloned()
+                .unwrap_or(json!([]));
             crate::agent_work::ui(root, &json!({"action":"message","id":id,
-                "clientMessageId":format!("flow-{}-{index}",crate::random_url_safe(8)),"text":prompt})).unwrap();
+                "expectedRevision":before["work"]["revision"],
+                "addNotes":notes,"clientMessageId":format!("flow-{}-{index}",crate::random_url_safe(8)),"text":prompt})).unwrap();
         }
         let started = std::time::Instant::now();
         let result = crate::agent_work::ui(
@@ -64,6 +70,8 @@ fn run_native_flow(config: Value) {
             "reportRejected",
             "agentStream",
             "nativeMeasurement",
+            "selectedDataRead",
+            "analysisInspection",
         ] {
             records.insert(
                 kind.into(),

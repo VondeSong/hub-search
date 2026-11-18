@@ -9,6 +9,10 @@ pub(super) struct DeliveryRead<'a> {
     entries: HashMap<String, (Value, Verified)>,
 }
 impl<'a> DeliveryRead<'a> {
+    pub(super) fn root(&self) -> &'a Path {
+        self.root
+    }
+
     pub(super) fn new(root: &'a Path, c: &'a Connection, work: &Work) -> Self {
         Self {
             root,

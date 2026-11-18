@@ -110,7 +110,7 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
         if authorization != w.authorization_version {
             continue;
         }
-        let mut query=c.prepare("SELECT rowid,kind,body_json,created_at,id FROM agent_records WHERE run_id=?1 AND kind IN ('nativeMeasurement','nativeRuntime','libraryRules','agentStream','activity','intent','toolCall','toolResult','evidence','selectedMaterialReadError','autoInboxReceipt','workingState','nativeContextLifecycle','nativeFinal','delivery','nativeImages') ORDER BY rowid LIMIT 4096").map_err(|e|e.to_string())?;
+        let mut query=c.prepare("SELECT rowid,kind,body_json,created_at,id FROM agent_records WHERE run_id=?1 AND kind IN ('nativeMeasurement','nativeRuntime','libraryRules','agentStream','activity','intent','toolCall','toolResult','evidence','selectedMaterialReadError','selectedDataRead','autoInboxReceipt','workingState','nativeContextLifecycle','nativeFinal','delivery','nativeImages') ORDER BY rowid LIMIT 4096").map_err(|e|e.to_string())?;
         let rows = query
             .query_map([&run], |r| {
                 Ok((
@@ -217,6 +217,17 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
                     events.push(json!({"id":sequence.to_string(),"kind":"context","state":"failed","origin":"hub-context",
                         "label":"添加的资料未读入","detail":body["readError"],"createdAt":time,"finishedAt":time}));
                 }
+                "selectedDataRead" => {
+                    let locator = serde_json::from_value::<EvidenceLocator>(body["locator"].clone());
+                    if locator.is_ok_and(|locator| w.grant.contains(&locator)) {
+                        let title = body["title"].as_str().unwrap_or("数据附件");
+                        let read = body["read"] == true;
+                        events.push(json!({"id":sequence.to_string(),"kind":"context","origin":"hub-context",
+                            "state":if read {"completed"} else {"failed"},
+                            "label":format!("{}「{title}」",if read {"已读取数据预览"} else {"未能读取数据"}),
+                            "detail":body["readError"],"createdAt":time,"finishedAt":time}));
+                    }
+                }
                 "toolResult" | "evidence" => {
                     // A stopped native call can persist its complete outcome
                     // before the separate presentation evidence is appended.
@@ -242,7 +253,10 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
                             if reader.verify_in_transaction(c, &[source.clone()]).is_err() {
                                 valid = false;
                             }
-                            if body["request"]["stepId"].is_null() {
+                            if body["request"]["stepId"].is_null()
+                                && !(crate::source_evidence::local_text::is_local(&source.locator)
+                                    && super::analysis::attachment_format(&source.content).is_some())
+                            {
                                 events.push(json!({"id":sequence.to_string(),"kind":"context","state":"completed","origin":"hub-context",
                                     "label":if body["origin"] == "hostSelectedRead" {format!("{}「{}」",if source.truncated {"已读取部分资料"} else {"已读取资料"},source.title)} else {format!("已载入材料「{}」",source.title)},
                                     "detail":if body["origin"] == "hostSelectedRead" {json!(format!("已读取 {}–{} / {} 字符，模型自行判断是否采用",source.start_char,source.end_char,source.total_chars))} else {Value::Null},"createdAt":time,"finishedAt":time}));

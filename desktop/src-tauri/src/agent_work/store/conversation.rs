@@ -292,7 +292,12 @@ fn page_on_cached(
         .unwrap_or_else(|| crate::agent_work::skills::request_presentation(&work.goal));
     let initial_materials = super::materials::grant_at(c, work, 1)
         .map(|grant| {
-            super::materials::message_cards(c, work, &super::materials::explicit_locators(&grant))
+            super::materials::message_cards(
+                delivery_reads.root(),
+                c,
+                work,
+                &super::materials::explicit_locators(&grant),
+            )
         })
         .unwrap_or(json!([]));
     let has_initial_request: bool = c.query_row(
@@ -319,7 +324,8 @@ fn page_on_cached(
             let attachments: Vec<EvidenceLocator> =
                 serde_json::from_value(body.get("addNotes").cloned().unwrap_or(json!([])))
                     .map_err(|_| "对话资料身份损坏")?;
-            let materials = super::materials::message_cards(c, work, &attachments);
+            let materials =
+                super::materials::message_cards(delivery_reads.root(), c, work, &attachments);
             let presentation = body.get("presentation").cloned().unwrap_or_else(|| {
                 crate::agent_work::skills::request_presentation(body["text"].as_str().unwrap_or(""))
             });
@@ -528,6 +534,7 @@ pub(in crate::agent_work) fn context(root: &Path, work: &Work) -> Result<Value, 
             .is_none_or(|items| items.is_empty())
         {
             request_materials = super::materials::message_cards(
+                root,
                 &c,
                 &current,
                 &super::materials::explicit_locators(&current.grant),

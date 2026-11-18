@@ -77,6 +77,43 @@ fn context(f: &Fixture, w: &Work) -> Context {
 }
 
 #[test]
+fn data_attachment_in_existing_chat_keeps_its_identity_and_is_not_text_evidence() {
+    let f = Fixture::new();
+    let id = create(&f, vec![]);
+    let (work, run) = claim(&f, &id);
+    investigate(&f.root, &work, &run, &Control::default(), |_, _| {
+        Ok(answer())
+    })
+    .unwrap();
+    let staged = analysis::stage(
+        &f.root,
+        &json!({"title":"members.csv","base64":"bmFtZSxjb3VudAphLDEK"}),
+    )
+    .unwrap();
+    ui(&f.root,&json!({"action":"message","id":id,"text":"分析解释一下","clientMessageId":"new-data","expectedRevision":1,"addNotes":[staged["locator"]]})).unwrap();
+    let (work, run) = claim(&f, &id);
+    let conversation = store::conversation::context(&f.root, &work).unwrap();
+    assert_eq!(
+        conversation["currentRequestMaterials"][0]["title"],
+        "members.csv"
+    );
+    assert_eq!(conversation["currentRequestMaterials"][0]["kind"], "file");
+    let mut context = context(&f, &work);
+    prepare(&f.root, &work, &run, &mut context).unwrap();
+    assert!(
+        context.excerpts.is_empty(),
+        "file manifest cannot be cited as data"
+    );
+    let locator = serde_json::from_value(staged["locator"].clone()).unwrap();
+    let files = inspect_data(&f.root, &work, &run, [locator], false, &mut context).unwrap();
+    assert_eq!(files[0]["title"], "members.csv");
+    assert!(files[0]["readError"].is_string());
+    let receipt = &store::records(&f.root, &id, "selectedDataRead", 1).unwrap()[0];
+    assert_eq!(receipt["read"], false);
+    assert!(receipt["preview"].is_null());
+}
+
+#[test]
 fn selected_body_reaches_model_but_citation_is_optional() {
     let f = Fixture::new();
     f.note("notes", "chosen", "SELECTED_BODY_SENTINEL");

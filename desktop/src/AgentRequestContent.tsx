@@ -13,7 +13,7 @@ export function requestPresentation(message:Pick<ConversationMessage,"text"|"dis
 export function AgentRequestContent({message,onOpenMaterial}:{message:ConversationMessage;onOpenMaterial?:(item:MessageMaterial)=>void}){
  const [expanded,setExpanded]=useState(false),{body,skills}=requestPresentation(message),materials=message.materials||[],visible=expanded?materials:materials.slice(0,2);
  return <>{message.kind==="decision"&&<small>已确认的决定</small>}{body&&<p>{body}</p>}{(materials.length>0||skills.length>0)&&<div className="agent-message-references" aria-label="本轮附带资料与技能">
-  {visible.map((item,index)=><AgentMaterialCard key={index} kind={item.kind} title={item.title} subtitle={item.available?item.sourcePath||"本条消息选择的资料":"已不在当前资料范围"} onOpen={item.available&&item.locator&&onOpenMaterial?()=>onOpenMaterial(item):undefined}/>)}
+  {visible.map((item,index)=><AgentMaterialCard key={index} kind={item.kind} title={item.title} subtitle={item.available?item.sourcePath||undefined:"当前无法打开"} openLabel={item.kind==="file"?"查看附件信息":undefined} onOpen={item.available&&item.locator&&onOpenMaterial?()=>onOpenMaterial(item):undefined}/>)}
   {materials.length>2&&<button type="button" className="agent-token-more" onClick={()=>setExpanded(!expanded)}>{expanded?"收起":`另 ${materials.length-2} 项`}</button>}
   {skills.map(skill=><AgentMaterialCard key={skill.name} kind="skill" title={skill.title} identifier={skill.name} subtitle={skill.description||skillPurpose(skill.name)||"本条请求选择的技能"}/>)}
  </div>}</>;

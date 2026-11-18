@@ -25,7 +25,7 @@ fn valid_name(value: &str) -> bool {
         && value != "."
         && value != ".."
 }
-fn extension(title: &str) -> Result<&str, String> {
+fn extension(title: &str) -> Result<&'static str, String> {
     match title
         .rsplit('.')
         .next()
@@ -102,6 +102,38 @@ pub(super) fn stage(root: &Path, args: &Value) -> Result<Value, String> {
 fn inputs(root: &Path, work: &Work) -> Result<Vec<(String, PathBuf, Value)>, String> {
     dependencies::select(root, work, None)
 }
+
+pub(super) fn attachment_format(body: &str) -> Option<&'static str> {
+    let manifest: Value = serde_json::from_str(body).ok()?;
+    if manifest["format"] != MARKER {
+        return None;
+    }
+    extension(manifest["title"].as_str()?).ok()
+}
+
+pub(super) fn attachment_id(locator: &EvidenceLocator) -> String {
+    dependencies::id(&json!({"locator":locator}))
+}
+
+pub(super) fn inspect_attached(
+    root: &Path,
+    work: &Work,
+    run: &str,
+    selected: &[String],
+    control: &Control,
+) -> Result<Value, String> {
+    run_selected(
+        root,
+        work,
+        run,
+        include_str!("analysis/inspect_attached.py"),
+        "检查本轮数据附件",
+        None,
+        Some(selected),
+        control,
+    )
+}
+
 pub(super) fn verify_grant(root: &Path, grant: &Grant) -> Result<(), String> {
     selected_inputs(root, grant).map(|_| ())
 }

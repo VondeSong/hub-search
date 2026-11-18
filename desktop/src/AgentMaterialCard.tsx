@@ -1,8 +1,8 @@
-import {BookOpen,FileText,Image,Layers,Globe2,SquareCheck,Quote,WandSparkles,X} from "lucide-react";
+import {BookOpen,File,FileText,Image,Layers,Globe2,SquareCheck,Quote,WandSparkles,X} from "lucide-react";
 import {useAgentPopover} from "./useAgentPopover";
-export type MaterialKind="library"|"page"|"reading"|"task"|"flashcard"|"text"|"image"|"link"|"skill";
-const icons={library:Layers,page:FileText,reading:BookOpen,task:SquareCheck,flashcard:Layers,text:Quote,image:Image,link:Globe2,skill:WandSparkles};
-const labels={library:"资料库范围",page:"页面",reading:"阅读条目",task:"任务",flashcard:"闪卡文字快照",text:"所选文字",image:"已授权原图",link:"公共网页",skill:"本条请求选择的技能"};
+export type MaterialKind="library"|"page"|"file"|"reading"|"task"|"flashcard"|"text"|"image"|"link"|"skill";
+const icons={library:Layers,page:FileText,file:File,reading:BookOpen,task:SquareCheck,flashcard:Layers,text:Quote,image:Image,link:Globe2,skill:WandSparkles};
+const labels={library:"资料库范围",page:"页面",file:"本地附件",reading:"阅读条目",task:"任务",flashcard:"闪卡文字快照",text:"所选文字",image:"已授权原图",link:"公共网页",skill:"本条请求选择的技能"};
 export function AgentMaterialCard({kind,title,subtitle,identifier,onRemove,disabled=false,removeLabel,onOpen,openLabel,manage=false}:{kind:MaterialKind;title:string;subtitle?:string;identifier?:string;onRemove?:()=>void;disabled?:boolean;removeLabel?:string;onOpen?:()=>void;openLabel?:string;manage?:boolean}){
  const popover=useAgentPopover(),Icon=icons[kind];
  return <span className="agent-context agent-material-card agent-reference-token" data-material-kind={kind}>

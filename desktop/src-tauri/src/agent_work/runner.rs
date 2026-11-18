@@ -766,6 +766,21 @@ fn investigate_loop(
                 .push(json!({"origin":"host","anchor":seed}));
         }
         selected_materials::prepare(root, work, run, &mut context)?;
+        let native_files = session.is_some_and(|s| s.operation.is_some_and(|op| op.native_agent()));
+        let current_attachments = conversation["currentRequestMaterials"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|item| item["available"] == true)
+            .filter_map(|item| serde_json::from_value(item["locator"].clone()).ok());
+        selected_materials::inspect_data(
+            root,
+            work,
+            run,
+            current_attachments,
+            native_files,
+            &mut context,
+        )?;
         if let Some(result) = super::tag_tasks::prepare(
             root,
             work,
