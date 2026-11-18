@@ -5,12 +5,14 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import CloudAgents from "./CloudAgents";
 import { imageUpload, outbox } from "./CloudAgentMedia";
 import { runtimeCapabilities } from "./RuntimePlatform";
+import { loadComposerDrafts, saveComposerDraft } from "./CloudAgentDrafts";
 
 const invoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...args: unknown[]) => invoke(...args) }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
 vi.mock("./CloudAgentMedia", () => ({ outbox: vi.fn(async () => undefined), uploadSize: () => 0, imageUpload: vi.fn(), videoUploads: vi.fn() }));
 vi.mock("./RuntimePlatform", () => ({ runtimeCapabilities: { mobile: false } }));
+vi.mock("./CloudAgentDrafts", () => ({ loadComposerDrafts: vi.fn(async () => new Map()), saveComposerDraft: vi.fn(async () => {}) }));
 
 let node: HTMLDivElement, root: Root;
 let entries: { id: string; title: string; archived: boolean; updated: number; preview: string; status: string; matches: boolean }[];
@@ -35,6 +37,8 @@ beforeEach(() => {
   runtimeCapabilities.mobile = false; running = false;
   vi.mocked(imageUpload).mockReset();
   vi.mocked(outbox).mockClear();
+  vi.mocked(loadComposerDrafts).mockReset().mockResolvedValue(new Map());
+  vi.mocked(saveComposerDraft).mockReset().mockResolvedValue();
   window.history.replaceState({ hubMobileRoute: "agents" }, "");
   entries = [
     { id: "one", title: "设计复核", updated: Date.now(), archived: false, preview: "已找到参考依据", status: "completed", matches: true },
@@ -55,6 +59,38 @@ beforeEach(() => {
   });
 });
 afterEach(async () => { await act(async () => root.unmount()); node.remove(); window.history.replaceState(null, ""); });
+
+it("restores an unsent mobile question after remount without sending it", async () => {
+  runtimeCapabilities.mobile = true;
+  const saved = new Map();
+  vi.mocked(loadComposerDrafts).mockImplementation(async () => new Map(saved));
+  vi.mocked(saveComposerDraft).mockImplementation(async (_binding, id, value) => { saved.set(id, value); });
+  await render(); await act(async () => node.querySelector<HTMLButtonElement>(".cloud-agents-thread")!.click());
+  await type(node.querySelector("textarea")!, "前门线束待核对项有哪些？");
+  await act(async () => root.unmount()); root = createRoot(node);
+  await render();
+  expect(node.querySelector("textarea")?.value).toBe("前门线束待核对项有哪些？");
+  expect(invoke.mock.calls.some(([, args]) => args.action.op === "send")).toBe(false);
+});
+
+it("does not replace a saved new-chat draft with the initial empty composer", async () => {
+  runtimeCapabilities.mobile = true;
+  const draft = { text: "请解释报告中的变化", attachments: [], skillVersion: "", skillPaths: [] };
+  vi.mocked(loadComposerDrafts).mockResolvedValue(new Map([["new", draft]]));
+  await render();
+  expect(node.querySelector("textarea")?.value).toBe(draft.text);
+  expect(saveComposerDraft).toHaveBeenCalledWith("device", "new", expect.objectContaining({ text: draft.text }));
+  expect(invoke.mock.calls.some(([, args]) => args.action.op === "send")).toBe(false);
+});
+
+it("preserves unreadable local drafts and prevents editing over them", async () => {
+  runtimeCapabilities.mobile = true;
+  vi.mocked(loadComposerDrafts).mockRejectedValue(new Error("unreadable"));
+  await render(); await click("新对话");
+  expect(node.textContent).toContain("原数据已保留");
+  expect(node.querySelector("textarea")).toBeNull();
+  expect(saveComposerDraft).not.toHaveBeenCalled();
+});
 
 it("opens the real conversation list with summaries, dates and archive counts", async () => {
   await render();

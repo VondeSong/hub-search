@@ -1,6 +1,7 @@
 package com.craftsearch.desktop
 
 import android.os.Bundle
+import android.os.Looper
 import android.content.Intent
 import android.webkit.WebView
 import java.io.File
@@ -12,12 +13,15 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.graphics.Insets
 
 class MainActivity : TauriActivity() {
+  private val activityInstance = System.identityHashCode(this)
+  private external fun activityLifecycle(instance: Int, stage: Int)
   private var hubWebView: WebView? = null
   private var pendingJournalKeyboard = false
 
   override fun onWebViewCreate(webView: WebView) {
     super.onWebViewCreate(webView)
     hubWebView = webView
+    activityLifecycle(activityInstance, 2)
     // Keep the editor's DOM focus when Android requests focus during IME/layout changes.
     webView.settings.setNeedInitialFocus(false)
     onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -30,6 +34,7 @@ class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
+    activityLifecycle(activityInstance, 1)
     rememberJournalAction(intent)
 
     val content = findViewById<android.view.View>(android.R.id.content)
@@ -66,6 +71,19 @@ class MainActivity : TauriActivity() {
     // No foreground service in this phase: finalize rather than silently lose background audio.
     runCatching { JournalVoiceRecorder.stop(this) }
     super.onStop()
+  }
+
+  override fun onDestroy() {
+    activityLifecycle(activityInstance, 3)
+    hubWebView = null
+    super.onDestroy()
+    // Wry queues its callback removal on the Android looper during super.onDestroy().
+    // Wait for that queue to drain before reusing the same Tauri WebView label.
+    val destroyedInstance = activityInstance
+    Looper.myQueue().addIdleHandler {
+      activityLifecycle(destroyedInstance, 4)
+      false
+    }
   }
 
   internal fun requestJournalKeyboard(done: () -> Unit) {

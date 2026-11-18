@@ -1,3 +1,6 @@
+import { openCloudAgentLocalStorage } from "./CloudAgentLocalStorage";
+import { composerDraftKey, flushComposerDrafts } from "./CloudAgentDrafts";
+
 export type Upload = { name: string; mime: string; data: string; seconds?: number };
 export type CloudSkillPayload = { name: string; version: string; manifestSha256: string; files: Record<string, { text: string; sha256: string }> };
 export type MaterialSnapshot={id:string;title:string;source:string;text:string;sha256:string};
@@ -124,13 +127,9 @@ export async function videoUploads(file: File, limit: number): Promise<Upload[]>
   }
 }
 
-export async function outbox(binding: string, draft?: DraftTurn | null, expectedTurn?: string): Promise<DraftTurn | undefined> {
-  const db = await new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open("hub-cloud-agents-v1", 1);
-    request.onupgradeneeded = () => request.result.createObjectStore("pending");
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+export async function outbox(binding: string, draft?: DraftTurn | null, expectedTurn?: string, composerThread?: string): Promise<DraftTurn | undefined> {
+  await flushComposerDrafts();
+  const db = await openCloudAgentLocalStorage();
   try {
     return await new Promise((resolve, reject) => {
       const transaction = db.transaction("pending", draft === undefined ? "readonly" : "readwrite");
@@ -145,6 +144,7 @@ export async function outbox(binding: string, draft?: DraftTurn | null, expected
             transaction.abort();
           } else {
             store.put(draft, binding);
+            if (composerThread !== undefined) store.delete(composerDraftKey(binding, composerThread));
           }
         }
       };

@@ -6,6 +6,9 @@
 }
 -keep class com.craftsearch.desktop.QuickJournalWorker { *; }
 -keep class com.craftsearch.desktop.QuickJournalWorker$Companion { *; }
+-keepclasseswithmembernames class com.craftsearch.desktop.MainActivity {
+    native <methods>;
+}
 # You can control the set of applied configuration files using the
 # proguardFiles setting in build.gradle.
 #

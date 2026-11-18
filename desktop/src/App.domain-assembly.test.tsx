@@ -53,7 +53,7 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.clear(); delete (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT; });
 
-it.each(["standalone", "sidebar"].flatMap(origin => ["Agents", "搜索", "浏览", "任务"].map(destination => [origin, destination])))("leaves %s review when the mobile navigation opens %s", async (origin, destination) => {
+it.each(["standalone", "sidebar"].flatMap(origin => ["助手", "搜索", "浏览", "任务"].map(destination => [origin, destination])))("leaves %s review when the mobile navigation opens %s", async (origin, destination) => {
   const original = { ...runtimeCapabilities };
   Object.assign(runtimeCapabilities, { mobile: origin === "standalone", desktop: origin !== "standalone" });
   if (origin === "sidebar") localStorage.setItem("hub-desktop-sidebar-enabled-v1", "true");
@@ -80,7 +80,7 @@ it.each(["standalone", "sidebar"].flatMap(origin => ["Agents", "搜索", "浏览
     await navigate(destination);
     expect(host.querySelector('[data-testid="paused-review"]')).toBeNull();
     expect(window.history.state.hubFlashcards).not.toBe(true);
-    if (destination === "Agents") expect(host.querySelector('[data-testid="cloud-agents"]')).not.toBeNull();
+    if (destination === "助手") expect(host.querySelector('[data-testid="cloud-agents"]')).not.toBeNull();
     await navigate("复习");
     expect(host.querySelector('[data-testid="paused-review"]')).not.toBeNull();
     await act(async () => window.history.back()); await advance(100);
@@ -102,8 +102,8 @@ it.each(["revisited-agents", "expanded-search"])("closes the Agents page explici
   try {
     await act(async () => root.render(<App />)); await advance(400);
     if (scenario === "expanded-search") await navigate("搜索");
-    await navigate("Agents");
-    if (scenario === "revisited-agents") { await navigate("复习"); await navigate("Agents"); }
+    await navigate("助手");
+    if (scenario === "revisited-agents") { await navigate("复习"); await navigate("助手"); }
     const close = host.querySelector<HTMLButtonElement>('button[aria-label="关闭云端 Agents"]')!;
     expect(close).toBeTruthy();
     await act(async () => close.click()); await advance(400);
@@ -111,7 +111,7 @@ it.each(["revisited-agents", "expanded-search"])("closes the Agents page explici
     expect(host.querySelector('[data-testid="paused-review"]')).toBeNull();
     expect(window.history.state.hubMobileRoute).toBe("search");
     expect(window.history.state.hubMobileSearch).not.toBe(true);
-    expect(host.querySelector('button[aria-label="设置"]')).not.toBeNull();
+    expect(host.querySelector('nav[aria-label="主要导航"] button[aria-label="搜索"][aria-current="page"]')).not.toBeNull();
   } finally { Object.assign(runtimeCapabilities, original); }
 });
 

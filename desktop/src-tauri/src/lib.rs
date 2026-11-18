@@ -6,6 +6,8 @@ mod agent_work;
 pub fn run_m1_projection_acceptance_cli() -> Result<(), String> {
     agent_work::run_projection_acceptance()
 }
+#[cfg(any(target_os = "android", test))]
+mod android_activity;
 mod attachments;
 mod background_workers;
 mod blob_store;
@@ -34883,6 +34885,8 @@ pub fn run() {
             if !isolated_runtime::enabled() {
                 let _ = install_hub_mcp_launcher_internal(app.handle(), false);
             }
+            #[cfg(target_os = "android")]
+            android_activity::initialize(app.handle());
             window_lifecycle::initialize(app)?;
             background_workers::start(app.handle().clone());
             Ok(())
@@ -35211,7 +35215,17 @@ pub fn run() {
     builder
         .expect("error while building Hub")
         .run(|_app, event| {
+            #[cfg(target_os = "android")]
+            if matches!(&event, tauri::RunEvent::WindowEvent { label, event: tauri::WindowEvent::Destroyed, .. } if label == "main") {
+                android_activity::restore_if_needed();
+            }
             if let tauri::RunEvent::ExitRequested { code, api, .. } = &event {
+                #[cfg(target_os = "android")]
+                if code.is_none() && !window_lifecycle::profile_exit_confirmed() {
+                    // Activity teardown is not a request to shut down the Rust application.
+                    api.prevent_exit();
+                    return;
+                }
                 if code.unwrap_or(0) == 0 && !window_lifecycle::profile_exit_confirmed() {
                     api.prevent_exit();
                     window_lifecycle::request_profile_exit(_app);

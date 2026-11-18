@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CloudMarkdownTable } from "./CloudMarkdownTable";
+import { loadComposerDrafts, saveComposerDraft, type ComposerDraft } from "./CloudAgentDrafts";
 import { imageUpload, outbox, uploadSize, videoUploads, type CloudSkillPayload, type DraftTurn, type Upload, type MaterialSnapshot } from "./CloudAgentMedia";
 import "./CloudAgents.css";
 import { CloudAgentSheet, CloudAnswerNote, CloudMaterialPicker } from "./CloudAgentMaterials";
@@ -137,7 +138,9 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
   const listScroll = useRef(0);
   const list = useRef<HTMLDivElement>(null);
   const historyOwner = useRef(crypto.randomUUID());
-  const drafts = useRef(new Map<string, { text: string; attachments: Upload[]; material?:MaterialSnapshot; skillVersion: string; skillPaths: string[]; selection?: ModelSelection }>());
+  const drafts = useRef(new Map<string, ComposerDraft>());
+  const draftOwner = useRef<string | undefined>(undefined);
+  const [draftsReady, setDraftsReady] = useState(false);
   const current = snapshot?.id === selected ? snapshot : undefined;
   const last = current?.turns[current.turns.length - 1];
   const binding = connection?.binding;
@@ -193,12 +196,24 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
   useEffect(() => {
     if (!binding || initialSettings) return;
     let live = true;
-    void outbox(binding).then(saved => {
-      if (live && saved) { setPending(saved); select(saved.thread); }
-      else if(live&&mobile){try{const previous=JSON.parse(localStorage.getItem("hub-cloud-last:"+binding)||"null");if(previous?.thread){select(previous.thread);if(["chat","results","materials"].includes(previous.view)){setView(previous.view);remember(previous.thread,previous.view);}}}catch{}}
-    }).catch(() => { if (live) setNotice("无法读取本机待重试的消息。"); });
+    draftOwner.current=undefined;
+    setDraftsReady(false);
+    void Promise.all([outbox(binding), mobile ? loadComposerDrafts(binding) : Promise.resolve(new Map<string,ComposerDraft>())]).then(([saved,stored]) => {
+      if (!live) return;
+      drafts.current=stored;draftOwner.current=binding;setDraftsReady(true);
+      if (saved) { setPending(saved); select(saved.thread,false,true); }
+      else if(mobile){try{const previous=JSON.parse(localStorage.getItem("hub-cloud-last:"+binding)||"null");if(previous?.thread){select(previous.thread,false,true);if(["chat","results","materials"].includes(previous.view)){setView(previous.view);remember(previous.thread,previous.view);}}else if(stored.has("new"))select(undefined,false,true);}catch{}}
+    }).catch(() => { if (live) setNotice("无法读取本机草稿或待重试的消息。原数据已保留，请重新打开后重试。"); });
     return () => { live = false; };
   }, [binding]);
+
+  useEffect(() => {
+    if (!mobile || !binding || !chatOpen || pending || draftOwner.current!==binding) return;
+    const id=selected??"new";
+    const draft={text,attachments,material,skillVersion,skillPaths,selection:modelSelection};
+    drafts.current.set(id,draft);
+    void saveComposerDraft(binding,id,draft).catch(()=>{if(draftOwner.current===binding)setNotice("草稿尚未保存，请保留应用并重试。原内容仍在输入框中。");});
+  },[mobile,binding,draftsReady,chatOpen,selected,pending,text,attachments,material,skillVersion,skillPaths,modelSelection]);
 
   useEffect(() => {
     if (!binding || settings) return;
@@ -278,8 +293,9 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
     return () => observer.disconnect();
   }, [mobile, chatOpen, view, settings]);
 
-  function select(id?: string, sent = false) {
-    drafts.current.set(selected ?? "new", sent ? { text: "", attachments: [], skillVersion: "", skillPaths: [] } : { text, attachments, material, skillVersion, skillPaths, selection: modelSelection });
+  function select(id?: string, sent = false, restoring = false) {
+    if (mobile && !restoring && draftOwner.current !== binding) return;
+    if(!restoring)drafts.current.set(selected ?? "new", sent ? { text: "", attachments: [], skillVersion: "", skillPaths: [] } : { text, attachments, material, skillVersion, skillPaths, selection: modelSelection });
     const draft = sent ? undefined : drafts.current.get(id ?? "new");
     setText(draft?.text ?? ""); setAttachments(draft?.attachments ?? []); setMaterial(draft?.material); setMaterialPicker(false);
     setSkillVersion(draft?.skillVersion ?? ""); setSkillPaths(draft?.skillPaths ?? []);
@@ -361,7 +377,7 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
 
   async function send(event?: FormEvent) {
     event?.preventDefault();
-    if (!binding || sending.current || preparing || archived || handoffWithdrawn || (deliveryPhase === "accepted" && pending) ||
+    if (!binding || mobile && !draftsReady || sending.current || preparing || archived || handoffWithdrawn || (deliveryPhase === "accepted" && pending) ||
       (pending && pending.thread !== selected) || (!pending && (!text.trim() && !attachments.length && !material || active(last)))) return;
     sending.current = true;
     setBusy(true);
@@ -384,7 +400,7 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
       }
       const draft = pending ?? { thread: selected ?? crypto.randomUUID(), turn: crypto.randomUUID(), text: text.trim(), attachments, skill, material, ...(selection && { selection }), created: Date.now() };
       if (!pending) {
-        await outbox(binding, draft);
+        await outbox(binding, draft, undefined, selected??"new");
         setPending(draft);
         setText(""); setAttachments([]); setMaterial(undefined);
       }
@@ -489,7 +505,7 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
   const activeTurn = active(last) ? last?.id : deliveryPhase === "accepted" ? displayedPending?.turn : undefined;
   const stopPending = Boolean(activeTurn && (activeTurn === waitingToStop || last?.status === "stopping"));
   const warning = account?.state === "login" ? "ChatGPT 登录已失效" : account?.state === "quota" ? "订阅额度不足" : network || "";
-  const attachDisabled = busy || preparing || archived || handoffWithdrawn || Boolean(pending);
+  const attachDisabled = busy || preparing || mobile && !draftsReady || archived || handoffWithdrawn || Boolean(pending);
   const defaultModel = modelCatalog?.models.find(item => item.isDefault) ?? modelCatalog?.models[0];
   const effectiveSelection = localPending?.selection ?? modelSelection ?? current?.selection ?? (defaultModel ? { model: defaultModel.model, effort: defaultModel.defaultReasoningEffort } : undefined);
   const selectedModel = modelCatalog?.models.find(item => item.model === effectiveSelection?.model);
@@ -709,7 +725,7 @@ export default function CloudAgents({ onClose, initialSettings = false }: { onCl
           {mobile && (attachments.length>0||material) && <small className="cloud-agents-pending-count">待发送材料 {attachments.length+Number(Boolean(material))} 份</small>}
           {draftFiles(attachments, true)}
           {attachments.some(file => file.seconds != null) && <small>将发送带时间戳的关键帧，短暂变化可能漏掉。</small>}
-          <textarea ref={textarea} value={text} onChange={event => setText(event.target.value)} disabled={handoffWithdrawn || archived || busy || Boolean(pending)} maxLength={20000} placeholder={handoffWithdrawn?"交接已撤回，可新建其他对话":archived ? "恢复会话后可继续提问" : "问一个问题，或接着聊…"} aria-label="消息" rows={mobile ? 1 : 2}/>
+          <textarea ref={textarea} value={text} onChange={event => setText(event.target.value)} disabled={attachDisabled} maxLength={20000} placeholder={handoffWithdrawn?"交接已撤回，可新建其他对话":archived ? "恢复会话后可继续提问" : "问一个问题，或接着聊…"} aria-label="消息" rows={mobile ? 1 : 2}/>
           <div className="cloud-agents-tools">
             {mobile ? <>
               <button type="button" aria-label="添加照片或资料" aria-haspopup="dialog" disabled={attachDisabled} onClick={() => setSheet("attachments")}><Plus size={22}/></button>

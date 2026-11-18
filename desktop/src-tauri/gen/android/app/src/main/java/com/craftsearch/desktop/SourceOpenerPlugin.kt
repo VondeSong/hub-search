@@ -128,7 +128,11 @@ internal object BackupCopyControl {
 }
 
 @TauriPlugin(permissions = [Permission(strings = [android.Manifest.permission.RECORD_AUDIO], alias = "microphone")])
-class SourceOpenerPlugin(private val activity: Activity) : Plugin(activity) {
+class SourceOpenerPlugin(initialActivity: Activity) : Plugin(initialActivity) {
+    // Plugin instances survive Activity replacement. Launch from the current window.
+    private val activity: Activity
+        get() = app.tauri.plugin.PluginManager.activity
+            ?: throw IllegalStateException("应用窗口正在切换，请稍后重试")
     @Command
     fun journalVoice(invoke: Invoke) {
         val args = invoke.parseArgs(JournalVoiceArgs::class.java)
