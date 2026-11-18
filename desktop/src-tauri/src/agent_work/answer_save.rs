@@ -107,6 +107,26 @@ pub(super) fn records(root: &Path, id: &str) -> Result<Value, String> {
     }
     Ok(json!(values))
 }
+pub(super) fn task_origins(root: &Path, args: &Value) -> Result<Value, String> {
+    let target = text(args, "libraryId", 150)?;
+    let object = text(args, "objectId", 150)?;
+    crate::library_runtime::gate(root, &target)?;
+    let c = crate::source_evidence::open_read_database(root)?;
+    if library(&c, &target)?["provider"] != "dida365" {
+        return Err("任务来源必须属于当前滴答资料库".into());
+    }
+    let mut q = c.prepare("SELECT DISTINCT s.work_id,s.run_id FROM agent_answer_saves s JOIN agent_works w ON w.id=s.work_id WHERE s.state='verified' AND w.state!='revoked' AND json_extract(s.body_json,'$.mode')='task' AND json_extract(s.body_json,'$.provider')='dida365' AND json_extract(s.body_json,'$.libraryId')=?1 AND json_extract(s.body_json,'$.receipt.objectId')=?2 AND json_extract(s.body_json,'$.receipt.verified')=1 ORDER BY s.updated_at DESC LIMIT 8").map_err(|e|e.to_string())?;
+    let rows = q
+        .query_map(params![target, object], |r| {
+            Ok(json!({"workId":r.get::<_,String>(0)?,"runId":r.get::<_,String>(1)?}))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    // This is navigation metadata only. Opening the Work rechecks its current
+    // sources; it neither exposes its saved answer here nor starts a model.
+    Ok(json!(rows))
+}
 pub(super) async fn ui(app: tauri::AppHandle, args: Value) -> Result<Value, String> {
     let root = crate::active_data_root(&app)?;
     let id = text(&args, "id", 150)?;
@@ -556,6 +576,52 @@ fn local_save(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn task_origin_requires_exact_verified_destination_and_hides_revoked_work() {
+        let f = crate::source_evidence::tests::Fixture::new();
+        let id = store::create(
+            &f.root,
+            "核对资料".into(),
+            "".into(),
+            None,
+            Grant::default(),
+        )
+        .unwrap();
+        let c = f.c();
+        c.execute(
+            "UPDATE libraries SET provider='dida365' WHERE id='notes'",
+            [],
+        )
+        .unwrap();
+        let body = json!({"mode":"task","provider":"dida365","libraryId":"notes","receipt":{"objectId":"task-a","verified":true}});
+        c.execute(
+            "INSERT INTO agent_answer_saves VALUES('saved',?1,'source-run','verified',?2,1)",
+            params![id, body.to_string()],
+        )
+        .unwrap();
+        let args = json!({"libraryId":"notes","objectId":"task-a"});
+        assert_eq!(
+            task_origins(&f.root, &args).unwrap(),
+            json!([{"workId":id,"runId":"source-run"}])
+        );
+        assert_eq!(
+            task_origins(&f.root, &json!({"libraryId":"notes","objectId":"task-b"})).unwrap(),
+            json!([])
+        );
+        assert!(task_origins(
+            &f.root,
+            &json!({"libraryId":"other-account","objectId":"task-a"})
+        )
+        .is_err());
+        c.execute("UPDATE agent_answer_saves SET state='unknown'", [])
+            .unwrap();
+        assert_eq!(task_origins(&f.root, &args).unwrap(), json!([]));
+        c.execute("UPDATE agent_answer_saves SET state='verified'", [])
+            .unwrap();
+        c.execute("UPDATE agent_works SET state='revoked' WHERE id=?1", [id])
+            .unwrap();
+        assert_eq!(task_origins(&f.root, &args).unwrap(), json!([]));
+    }
     #[test]
     fn new_note_names_cannot_escape_the_chosen_vault() {
         for name in ["../a", "a/b", "a\\b", "CON.txt", "NUL", "a.", "a:b"] {

@@ -128,6 +128,7 @@ pub(super) enum Tool {
         script: String,
         title: String,
         revision_of: Option<String>,
+        input_ids: Option<Vec<String>>,
     },
     FetchFile {
         url: String,

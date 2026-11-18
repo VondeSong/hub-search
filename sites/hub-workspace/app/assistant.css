@@ -552,7 +552,13 @@
 .ha-token summary{min-height:30px;line-height:18px;box-sizing:border-box;padding-block:5px}
 
 /* #56: reference-aligned activity identities; every prototype event is labelled. */
+.ha-process-demo{color:var(--subtle,var(--text))}
 .ha-process-demo>summary,.ha-process-group>summary{display:flex;align-items:center;gap:8px;list-style:none;min-height:24px;cursor:pointer}
+.ha-process-demo summary:focus-visible,.ha-answer-table:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
+.ha-answer-table{max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;margin-block:12px}
+.ha-answer-table table{width:100%;border-collapse:collapse;font-size:12px;line-height:1.6}
+.ha-answer-table :is(th,td){min-width:8em;padding:8px 10px;text-align:start;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.ha-answer-table caption{text-align:start;color:var(--subtle,var(--text));padding-block:0 8px}
 .ha-process-demo summary::-webkit-details-marker{display:none}
 .ha-process-demo svg,.ha-process-demo img{flex-shrink:0}
 .ha-process-demo summary>svg:last-child{margin-left:auto;transition:transform .15s}

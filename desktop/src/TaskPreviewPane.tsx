@@ -4,6 +4,7 @@ import { usePreviewController } from "./usePreviewController";
 import { providerName } from "./ProviderLabels";
 import type { LibrarySummary, SearchResult } from "./SearchTypes";
 import type { OperationTone } from "./useOperationStatus";
+import {TaskAnswerOrigin} from "./TaskAnswerOrigin";
 
 const Renderer = lazy(() => import("./PreviewRenderer").then(module => ({ default: module.PreviewRenderer })));
 const NO_TERMS: string[] = [];
@@ -40,7 +41,7 @@ export function TaskPreviewPane({ selected, libraries, onClose, onOpenLink, onOp
     onNavigatePreviewHistory={onNavigate} onTogglePreviewPinned={onTogglePinned}
     copiedResultId={copiedResultId} copySelectedLink={onCopyLink} openSelectedResult={onOpenSource}
     onOpenLink={onOpenLink} providerName={providerName} startWindowDrag={NO_DRAG}
-    onClose={onClose} onCloseMobilePreview={onClose} toolbarActions={toolbarActions} contentBefore={contentBefore}
+    onClose={onClose} onCloseMobilePreview={onClose} toolbarActions={toolbarActions} contentBefore={<><TaskAnswerOrigin provider={selected.provider||""} libraryId={selected.libraryId||selected.spaceId} objectId={selected.documentId}/>{contentBefore}</>}
     renderedPreviewMarkdown={controller.preview ? <Suspense fallback={<div className="preview-lazy-loading">正在准备预览…</div>}>
       <Renderer selected={selected} markdown={controller.preview} matchTerms={NO_TERMS} hasSectionContext={false} onOpenLink={onOpenLink}/>
     </Suspense> : null}/>

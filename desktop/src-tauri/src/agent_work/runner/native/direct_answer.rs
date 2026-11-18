@@ -57,6 +57,7 @@ fn review_observation_and_calculation_allow_answers_but_binding_requires_finish(
         script: "print('{}')".into(),
         title: "检查".into(),
         revision_of: None,
+        input_ids: None,
     }));
 }
 

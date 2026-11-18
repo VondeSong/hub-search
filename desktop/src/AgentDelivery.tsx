@@ -42,7 +42,7 @@ function ReportLink({ href, children }: { href?: string; children?: ReactNode })
 const reportMarkdownComponents = {
   a: ReportLink,
   img: ({ alt }: { alt?: string }) => <span>{alt}</span>,
-  table: ({ children }: { children?: ReactNode }) => <div className="agent-table-scroll"><table>{children}</table></div>,
+  table: ({ children }: { children?: ReactNode }) => <div className="agent-table-scroll" role="region" aria-label="回答表格，可横向滚动" tabIndex={0}><table>{children}</table></div>,
 };
 const reportRemarkPlugins = [remarkGfm];
 // Keep unchanged parsed markup and table nodes. Citation consumers still receive

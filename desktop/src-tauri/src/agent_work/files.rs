@@ -245,11 +245,21 @@ pub(super) fn data_inputs(
     root: &Path,
     work: &Work,
 ) -> Result<Vec<(String, PathBuf, Value)>, String> {
+    data_inputs_selected(root, work, None)
+}
+pub(super) fn data_inputs_selected(
+    root: &Path,
+    work: &Work,
+    selected: Option<&[String]>,
+) -> Result<Vec<(String, PathBuf, Value)>, String> {
     let options = options::load(root, &work.id)?;
     let mut result = Vec::new();
     let mut seen = HashSet::new();
     for receipt in store::records(root, &work.id, "publicFileAcquisition", 64)? {
         let v = &receipt["file"];
+        if selected.is_some_and(|ids| !ids.iter().any(|id| v["id"] == *id)) {
+            continue;
+        }
         let ext = v["extension"].as_str().unwrap_or("");
         if !matches!(ext, "csv" | "xlsx" | "json") || !seen.insert(v["id"].clone().to_string()) {
             continue;

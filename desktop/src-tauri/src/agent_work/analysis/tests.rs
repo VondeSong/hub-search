@@ -1,6 +1,178 @@
 use super::*;
 use crate::source_evidence::tests::Fixture;
 #[test]
+fn unrelated_material_change_preserves_only_artifacts_with_current_inputs() {
+    let f = Fixture::new();
+    let mut notes = Vec::new();
+    for (name, data) in [
+        ("first.csv", b"value\n1\n".as_slice()),
+        ("second.csv", b"value\n2\n".as_slice()),
+    ] {
+        let staged = stage(
+            &f.root,
+            &json!({"title":name,"base64":base64::engine::general_purpose::STANDARD.encode(data)}),
+        )
+        .unwrap();
+        notes.push(serde_json::from_value::<EvidenceLocator>(staged["locator"].clone()).unwrap());
+    }
+    let created = ui(&f.root,&json!({"action":"create","anchor":null,"grant":{"libraryIds":[],"notes":[],"readingItemKeys":[]},"goal":"分别分析两份表，撤回第一份时保留第二份成果","successCriteria":"成果依赖独立核对"})).unwrap();
+    let id = created["work"]["id"].as_str().unwrap();
+    ui(&f.root,&json!({"action":"message","id":id,"expectedRevision":created["work"]["revision"],"clientMessageId":"select-analysis-inputs","text":"分别分析所选文件","addNotes":notes})).unwrap();
+    let work = store::claim(&f.root, id, "dependency-run").unwrap();
+    for (index, (_, _, input)) in inputs(&f.root, &work).unwrap().iter().enumerate() {
+        let execution = format!("analysis-dependency-{index}");
+        let dir = f
+            .root
+            .join("agent-analysis")
+            .join(id)
+            .join(&execution)
+            .join("output");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("result.csv"), b"value\n1\n").unwrap();
+        store::record(&f.root,"dependency-run","analysisExecution",&json!({"artifactId":format!("artifact-{index}"),"executionId":execution,"revision":1,"authorizationVersion":work.authorization_version,"inputs":[input],"files":[{"name":"result.csv","bytes":8,"sha256":digest(b"value\n1\n")}]})).unwrap();
+    }
+    store::fail(&f.root, &work, "dependency-run", "测试切换材料").unwrap();
+    let before = store::view(&f.root, id).unwrap();
+    ui(&f.root,&json!({"action":"message","id":id,"expectedRevision":before["work"]["revision"],"clientMessageId":"withdraw-first-analysis-input","text":"撤回第一份资料，保留第二份成果","removeNotes":[notes[0]]})).unwrap();
+    let current = store::load(&f.c(), id).unwrap();
+    let values = manifest(&f.root, &current);
+    let rows = values.as_array().unwrap();
+    assert_eq!(
+        rows.iter()
+            .find(|v| v["executionId"] == "analysis-dependency-0")
+            .unwrap()["available"],
+        false
+    );
+    assert_eq!(
+        rows.iter()
+            .find(|v| v["executionId"] == "analysis-dependency-1")
+            .unwrap()["available"],
+        true,
+        "unrelated material change invalidated a current artifact"
+    );
+    let second_id = dependencies::id(&json!({"locator":notes[1]}));
+    assert_eq!(
+        dependencies::select(&f.root, &current, Some(&[second_id.clone()]))
+            .unwrap()
+            .len(),
+        1
+    );
+    assert!(dependencies::select(&f.root, &current, Some(&["local:unknown".into()])).is_err());
+    assert!(
+        dependencies::select(&f.root, &current, Some(&[second_id.clone(), second_id])).is_err()
+    );
+    let mut damaged = rows
+        .iter()
+        .find(|v| v["executionId"] == "analysis-dependency-1")
+        .unwrap()
+        .clone();
+    damaged["inputs"][0]["sha256"] = json!("0".repeat(64));
+    assert!(dependencies::Verifier::new(&f.root, &current)
+        .verify(&damaged)
+        .is_err());
+    let mut revoked = current.clone();
+    revoked.state = "revoked".into();
+    assert!(manifest(&f.root, &revoked)
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|v| v["available"] == false));
+}
+
+#[test]
+#[ignore = "explicit real old/new files and unrelated daily material; actual Python, no source edits"]
+fn live_daily_selective_recompute() {
+    let config: Value = serde_json::from_slice(
+        &std::fs::read(std::env::var("HUB_SELECTIVE_RECOMPUTE_CONFIG").expect("explicit config"))
+            .unwrap(),
+    )
+    .unwrap();
+    let root = Path::new(config["root"].as_str().unwrap());
+    let stage_file = |item: &Value| {
+        let bytes = std::fs::read(item["path"].as_str().unwrap()).unwrap();
+        stage(root,&json!({"title":item["title"],"base64":base64::engine::general_purpose::STANDARD.encode(bytes)})).unwrap()["locator"].clone()
+    };
+    let original = stage_file(&config["original"]);
+    let other = stage_file(&config["unrelated"]);
+    let created=ui(root,&json!({"action":"create","anchor":null,"grant":Grant::default(),"goal":config["goal"],"successCriteria":"只更新受影响成果，保留不相关结果、来源与版本历史"})).unwrap();
+    let id = created["work"]["id"].as_str().unwrap();
+    ui(root,&json!({"action":"message","id":id,"expectedRevision":created["work"]["revision"],"clientMessageId":crate::random_url_safe(12),"text":"分别处理两份真实资料","addNotes":[original,other]})).unwrap();
+    let mut evidence = Vec::new();
+    let mut executions = Vec::new();
+    for locator in [&original, &other] {
+        let run = format!("selective-{}", crate::random_url_safe(12));
+        let work = store::claim(root, id, &run).unwrap();
+        let input = dependencies::id(&json!({"locator":locator}));
+        let receipt = run_selected(
+            root,
+            &work,
+            &run,
+            config["script"].as_str().unwrap(),
+            "真实资料独立分析",
+            None,
+            Some(&[input]),
+            &Control::bounded(Duration::from_secs(180)),
+        )
+        .unwrap();
+        executions.push(receipt.clone());
+        evidence.push(json!({"step":"originalIndependentAnalysis","receipt":receipt}));
+        store::fail(root, &work, &run, "本步实际计算结束，等待下一步材料替换").unwrap();
+    }
+    let replacement = stage_file(&config["replacement"]);
+    let before = store::view(root, id).unwrap();
+    ui(root,&json!({"action":"message","id":id,"expectedRevision":before["work"]["revision"],"clientMessageId":crate::random_url_safe(12),"text":"用真实新版替换旧版，只重算受影响成果，保留另一份资料的成果","removeNotes":[original],"addNotes":[replacement]})).unwrap();
+    let run = format!("selective-{}", crate::random_url_safe(12));
+    let work = store::claim(root, id, &run).unwrap();
+    let changed = manifest(root, &work);
+    let find = |execution: &Value| {
+        changed
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|v| v["executionId"] == execution["executionId"])
+            .unwrap()
+    };
+    assert_eq!(find(&executions[0])["available"], false);
+    assert_eq!(find(&executions[1])["available"], true);
+    let receipt = run_selected(
+        root,
+        &work,
+        &run,
+        config["script"].as_str().unwrap(),
+        "按真实新版重算",
+        executions[0]["executionId"].as_str(),
+        Some(&[dependencies::id(&json!({"locator":replacement}))]),
+        &Control::bounded(Duration::from_secs(180)),
+    )
+    .unwrap();
+    assert_eq!(receipt["artifactId"], executions[0]["artifactId"]);
+    assert_eq!(receipt["revision"], 2);
+    let after = manifest(root, &work);
+    let untouched = after
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|v| v["executionId"] == executions[1]["executionId"])
+        .unwrap();
+    assert_eq!(untouched["available"], true);
+    assert_eq!(untouched["files"], executions[1]["files"]);
+    evidence.push(
+        json!({"step":"replacement","beforeRecompute":changed,"receipt":receipt,"after":after}),
+    );
+    std::fs::write(
+        config["output"].as_str().unwrap(),
+        serde_json::to_vec_pretty(&json!({"workId":id,"steps":evidence})).unwrap(),
+    )
+    .unwrap();
+    store::fail(
+        root,
+        &work,
+        &run,
+        "真实版本替换与局部重算验收结束；原始文件未修改",
+    )
+    .unwrap();
+}
+#[test]
 fn svg_accepts_static_plot_and_rejects_active_or_external_content() {
     let plot = r##"<?xml version="1.0"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"><svg xmlns="http://www.w3.org/2000/svg"><defs><style>*{stroke-linejoin:round}</style><path id="p" d="M0 0"/></defs><g clip-path="url(#p)"><use href="#p"/></g></svg>"##;
     assert!(!output::svg(plot).unwrap().contains("DOCTYPE"));
@@ -227,7 +399,7 @@ fn live_daily_analysis_continuation() {
             options::configure(root, &json!({"id":id,"options":step["options"]})).unwrap();
         }
         let result = if let Some(prompt) = step["prompt"].as_str() {
-            ui(root,&json!({"action":"message","id":id,"expectedRevision":before["work"]["revision"],"clientMessageId":crate::random_url_safe(12),"text":prompt})).unwrap();
+            ui(root,&json!({"action":"message","id":id,"expectedRevision":before["work"]["revision"],"clientMessageId":crate::random_url_safe(12),"text":prompt,"addNotes":step.get("addNotes").cloned().unwrap_or(json!([])),"removeNotes":step.get("removeNotes").cloned().unwrap_or(json!([]))})).unwrap();
             if step["compactBeforeResponse"] == true {
                 let current = store::view(root, id).unwrap();
                 ui(root,&json!({"action":"requestContextCompaction","id":id,"operationId":crate::random_url_safe(12),"expectedWorkRevision":current["work"]["revision"],"expectedAuthorizationVersion":current["work"]["authorizationVersion"]})).unwrap();

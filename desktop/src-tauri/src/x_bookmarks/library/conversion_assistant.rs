@@ -45,7 +45,7 @@ pub(crate) async fn inspect_answer(
         {
             return Err("任务或笔记的标题、正文或类型不一致，未确认保存成功".into());
         }
-        cache_calendar_task(app, plan, &live)?;
+        cache_saved_dida_task(app, plan, &live)?;
     }
     Ok(json!({"provider":provider,"objectId":object,"verified":true,"inspected":true}))
 }
@@ -79,11 +79,10 @@ fn dida_save_payload(
     Ok(json!({"task":task}))
 }
 
-fn cache_calendar_task(app: &AppHandle, plan: &Value, live: &DidaTask) -> Result<(), String> {
-    if !plan["journalDate"].is_string() {
-        return Ok(());
+fn cache_saved_dida_task(app: &AppHandle, plan: &Value, live: &DidaTask) -> Result<(), String> {
+    if plan["journalDate"].is_string() {
+        check_calendar_fields(plan, live.status, live.start_date.as_deref())?;
     }
-    check_calendar_fields(plan, live.status, live.start_date.as_deref())?;
     let library = plan["libraryId"].as_str().ok_or("保存资料库缺失")?;
     let project = plan["projectId"].as_str().ok_or("保存清单缺失")?;
     let name = plan["remote"]["projects"]
@@ -174,7 +173,7 @@ pub(crate) async fn save_answer(
             created(&id)?;
             let live=dida_read(&client,&session,&id,project).await?;
             if live.title!=title||live.content.trim()!=content.trim()||live.kind.to_ascii_uppercase()!=kind{return Err("滴答已返回保存位置，但正文或类型读回不一致；请核对结果".into());}
-            cache_calendar_task(app,plan,&live)?;
+            cache_saved_dida_task(app,plan,&live)?;
             Ok(json!({"verified":true,"provider":provider,"objectId":id,"projectId":project,"kind":kind,"operation":if kind=="TEXT"{"newTask"}else{"newNote"}}))
         }
     })).await

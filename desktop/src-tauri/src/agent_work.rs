@@ -239,6 +239,7 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
         account_binding::pin(root, args)?;
     }
     match args["action"].as_str().unwrap_or("status") {
+        "answerTaskOrigins" => answer_save::task_origins(root, args),
         "nativeWorkspacePath" => options::workspace_path(root, &text(args, "id", 150)?),
         action if action.starts_with("insight") => insights::ui(root, args),
         "authorizeCodexConversation" => account_binding::authorize(root, args),

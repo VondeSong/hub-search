@@ -115,3 +115,10 @@ it("asks for a target again for a legacy preview without a locator and never def
  expect(button("预览保存").disabled).toBe(true);
  expect(invoke.mock.calls.some(([,p])=>p.args.action==="prepareAnswerSave")).toBe(false);
 });
+it("rechecks an already verified save by reading its receipt without submitting another write",async()=>{
+ const saved={...preview,state:"verified",receipt:{verified:true,objectId:"actual-task"}};
+ await act(async()=>root.render(<AgentAnswerSave workId="work" runId="historical-run" records={[saved]} disabled={false} onChanged={changed}/>));
+ await act(async()=>button("查看保存结果").click());
+ expect(invoke.mock.calls.find(([,p])=>p.args.action==="inspectAnswerSave")![1].args).toEqual({action:"inspectAnswerSave",id:"work",saveId:"save"});
+ expect(invoke.mock.calls.some(([,p])=>p.args.action==="submitAnswerSave"||p.args.action==="prepareAnswerSave")).toBe(false);
+});

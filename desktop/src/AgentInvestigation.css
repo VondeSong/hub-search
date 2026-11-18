@@ -197,10 +197,11 @@ body.resizing-agent-panel * { cursor: col-resize !important; user-select: none !
 .agent-answer > :first-child { margin-block-start: 0; }
 .agent-answer h1, .agent-answer h2, .agent-answer h3 { font-size: 14px; margin: 20px 0 8px; }
 .agent-answer code { white-space: pre-wrap; }
-.agent-table-scroll { max-width: 100%; overflow-x: auto; }
+.agent-table-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; }
+.agent-table-scroll:focus-visible { outline: 2px solid var(--hub-text-secondary); outline-offset: 2px; }
 .agent-answer table { border-collapse: collapse; width: 100%; font-size: 12px; }
-.agent-answer :is(td,th) { padding: 6px 9px; border: 1px solid var(--hub-separator); text-align: start; }
-.agent-activity { margin-block: 10px 18px; color: var(--hub-text-secondary); font-size: 13px; line-height:1.5; }
+.agent-answer :is(td,th) { min-width: 8em; padding: 6px 9px; border: 1px solid var(--hub-separator); text-align: start; vertical-align: top; overflow-wrap: anywhere; }
+.agent-activity { --hub-text-tertiary: var(--hub-text-secondary); margin-block: 10px 18px; color: var(--hub-text-secondary); font-size: 13px; line-height:1.5; }
 .agent-body .agent-activity-toggle { display: flex; gap: 7px; align-items: center; border: 0; padding: 4px 0; background: transparent; color: inherit; text-align: start; font-size: 12px; }
 .agent-collapsed { transform: rotate(-90deg); }
 .agent-activity-events { margin-block-start: 10px; min-width: 0; }
