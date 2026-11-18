@@ -8,6 +8,30 @@ fn frozen() -> Value {
 fn hash(value: &Value) -> String {
     format!("{:x}", Sha256::digest(value.to_string().as_bytes()))
 }
+
+#[test]
+fn analysis_checkpoint_adopts_only_verified_additions() {
+    let previous = json!({"executionId":"old","available":true,"superseded":false});
+    let addition = json!({"executionId":"new","available":true,"superseded":false,"files":[{"name":"delta.csv"}]});
+    let initial = json!({"items":[previous],"currentReports":[{"executionId":"old"}],"earlierItemsOmitted":0,"capability":{"inputs":2}});
+    let mut current = initial.clone();
+    current["items"]
+        .as_array_mut()
+        .unwrap()
+        .insert(0, addition.clone());
+    let verified = json!([{"executionId":"new","files":addition["files"]}]);
+    assert!(analysis_can_settle(&initial, &current, &verified));
+    assert!(!analysis_can_settle(&initial, &current, &json!([])));
+
+    let mut drifted = current.clone();
+    drifted["items"][1]["superseded"] = json!(true);
+    assert!(!analysis_can_settle(&initial, &drifted, &verified));
+    drifted = current.clone();
+    drifted["currentReports"] = json!([]);
+    assert!(!analysis_can_settle(&initial, &drifted, &verified));
+    current["capability"]["inputs"] = json!(1);
+    assert!(!analysis_can_settle(&initial, &current, &verified));
+}
 fn binding(f: &Fixture, work: &Work, environment: &crate::hub_capabilities::Session) -> Value {
     json!({"charts":artifacts::manifest_on(&f.root, &f.c(), work).unwrap(),"protocol":3,
         "skills":environment.fingerprint(),"selection":null,"grant":work.grant,
@@ -175,7 +199,7 @@ fn saved_chart_drift_replays_and_success_checkpoint_keeps_protected_bindings() {
         }
     }
     let s = Scenario::new();
-    let settled = checkpoint(&s.f.root, &s.work, &s.initial, true).unwrap();
+    let settled = checkpoint(&s.f.root, &s.work, &s.run, &s.initial, true).unwrap();
     let current = binding(&s.f, &s.work, &s.environment);
     assert_eq!(settled["fingerprint"], hash(&current));
     assert_eq!(settled["bindingParts"], measurement::fingerprints(&current));
@@ -202,14 +226,14 @@ fn saved_chart_drift_replays_and_success_checkpoint_keeps_protected_bindings() {
         "reason":"同一用户要求下调整呈现并重新核对"
     }), &Control::default()).unwrap();
     artifacts::execute(&s.f.root, &s.work, &s.run, &json!({"action":"validate","artifactId":revised["artifactId"],"revision":revised["revision"]}), &Control::default()).unwrap();
-    let revised_checkpoint = checkpoint(&s.f.root, &s.work, &s.initial, true).unwrap();
+    let revised_checkpoint = checkpoint(&s.f.root, &s.work, &s.run, &s.initial, true).unwrap();
     assert_eq!(
         revised_checkpoint["fingerprint"],
         hash(&binding(&s.f, &s.work, &s.environment))
     );
     assert_ne!(revised_checkpoint["fingerprint"], settled["fingerprint"]);
     assert_eq!(revised["revision"], 2);
-    let failed = checkpoint(&s.f.root, &s.work, &s.initial, false).unwrap();
+    let failed = checkpoint(&s.f.root, &s.work, &s.run, &s.initial, false).unwrap();
     assert_eq!(failed["fingerprint"], hash(&s.initial));
     assert_eq!(failed["bindingParts"], initial_parts);
     assert_eq!(failed["bindingPhase"], "initial");
@@ -222,7 +246,7 @@ fn saved_chart_drift_replays_and_success_checkpoint_keeps_protected_bindings() {
 #[test]
 fn settled_continuation_matches_but_user_correction_still_requires_revalidation() {
     let s = Scenario::new();
-    let settled = checkpoint(&s.f.root, &s.work, &s.initial, true).unwrap();
+    let settled = checkpoint(&s.f.root, &s.work, &s.run, &s.initial, true).unwrap();
     s.publish(&s.work, &s.run);
     let old_delivery = store::records(&s.f.root, &s.work.id, "delivery", 1).unwrap()[0].clone();
     let (next, next_run) = crate::agent_work::tests::claim(&s.f, &s.work.id);

@@ -876,11 +876,17 @@ pub(super) fn investigate(
             work,
             run,
         )?;
-        // Successful chart creation/revision belongs to this thread's settled
+        // Successful artifact creation belongs to this thread's settled
         // state. Never refresh source, rule or authorization bindings here.
         // A failed manifest read must not publish a falsely eligible checkpoint.
         if let (Ok(checkpoint), Ok(execution_manifest)) = (
-            reuse::checkpoint(root, work, &binding, result.is_ok() && accepted.is_some()),
+            reuse::checkpoint(
+                root,
+                work,
+                run,
+                &binding,
+                result.is_ok() && accepted.is_some(),
+            ),
             compatibility::manifest(root, work, run, &tool_specs, &authentication_identity),
         ) {
             let _ = store::record(
