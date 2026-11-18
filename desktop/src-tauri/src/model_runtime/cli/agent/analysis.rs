@@ -38,6 +38,25 @@ fn workspace_limit(directory: &Path) -> Result<(), String> {
     }
     Ok(())
 }
+
+fn sandbox_config_path(path: &Path) -> Result<String, String> {
+    // The desktop app supplies verbatim Windows paths. Codex's profile
+    // loader requires ordinary absolute paths for the filesystem entries.
+    let value = path.to_str().ok_or("分析路径编码无效")?;
+    let path = if let Some(unc) = value.strip_prefix(r"\\?\UNC\") {
+        format!("//{}", unc.replace('\\', "/"))
+    } else {
+        value
+            .strip_prefix(r"\\?\")
+            .unwrap_or(value)
+            .replace('\\', "/")
+    };
+    if path.contains(['\'', '\n', '\r']) {
+        return Err("分析路径无法写入隔离配置".into());
+    }
+    Ok(path)
+}
+
 pub(crate) fn run(directory: &Path, runtime: &Path, control: &Control) -> Result<Value, String> {
     if !cfg!(windows) {
         return Err("当前平台没有受控Python执行端".into());
@@ -46,13 +65,7 @@ pub(crate) fn run(directory: &Path, runtime: &Path, control: &Control) -> Result
     let home = directory.join("home");
     std::fs::create_dir(&home).map_err(|_| "无法创建分析策略目录")?;
     let runtime = runtime.canonicalize().map_err(|_| "分析运行时不存在")?;
-    let normal = runtime
-        .to_string_lossy()
-        .trim_start_matches(r"\\?\")
-        .replace('\\', "/");
-    if normal.contains('\'') {
-        return Err("分析运行时路径无效".into());
-    }
+    let normal = sandbox_config_path(&runtime)?;
     let mut config=format!("default_permissions = 'hub-analysis'\n[windows]\nsandbox = 'mxc'\n[permissions.hub-analysis.filesystem]\n':minimal' = 'read'\n':workspace_roots' = 'write'\n'{normal}' = 'read'\n");
     for file in [
         directory.join("inputs"),
@@ -60,35 +73,17 @@ pub(crate) fn run(directory: &Path, runtime: &Path, control: &Control) -> Result
         directory.join("input.json"),
         directory.join("analysis.py"),
     ] {
-        let path = file.to_string_lossy().replace('\\', "/");
-        if path.contains('\'') {
-            return Err("分析路径无效".into());
-        }
+        let path = sandbox_config_path(&file)?;
         config.push_str(&format!("'{path}' = 'read'\n"));
     }
     let font =
         PathBuf::from(std::env::var_os("SystemRoot").ok_or("无法定位系统字体")?).join("Fonts");
-    let fontpath = font.to_string_lossy().replace('\\', "/");
-    if !fontpath.contains('\'') {
+    if let Ok(fontpath) = sandbox_config_path(&font) {
         config.push_str(&format!("'{fontpath}' = 'read'\n"));
     }
     config.push_str("[permissions.hub-analysis.network]\nenabled = false\n");
     std::fs::write(home.join("config.toml"), config).map_err(|_| "无法保存分析策略")?;
-    let bytes = b"{}".to_vec();
-    let identity = format!("{:x}", sha2::Sha256::digest(&bytes));
-    let mut process = spawn(
-        directory,
-        &identity,
-        authentication::Prepared {
-            bytes,
-            identity: identity.clone(),
-        },
-        "",
-        "",
-        false,
-        control,
-        Default::default(),
-    )?;
+    let mut process = spawn_isolated_command(directory, "hub-analysis", control)?;
     #[cfg(windows)]
     unsafe {
         use windows::Win32::System::JobObjects::*;
@@ -106,20 +101,7 @@ pub(crate) fn run(directory: &Path, runtime: &Path, control: &Control) -> Result
         )
         .map_err(|_| "无法限制分析资源")?;
     }
-    process.rpc("initialize","initialize",json!({"clientInfo":{"name":"hub_analysis","version":env!("CARGO_PKG_VERSION")},"capabilities":{"experimentalApi":true}}),control)?;
-    process.send(json!({"method":"initialized"}))?;
-    let mut env = serde_json::Map::new();
-    for (key, _) in std::env::vars_os() {
-        env.insert(key.to_string_lossy().into_owned(), Value::Null);
-    }
-    for key in ["SystemRoot", "WINDIR", "SystemDrive", "LOCALAPPDATA"] {
-        if let Some(value) = std::env::var_os(key) {
-            env.insert(key.into(), json!(value.to_string_lossy()));
-        }
-    }
-    env.insert("TEMP".into(), json!(directory));
-    env.insert("TMP".into(), json!(directory));
-    env.insert("CODEX_HOME".into(), json!(home));
+    let mut env = isolated_command_env(directory, &home)?;
     env.insert("MPLCONFIGDIR".into(), json!(directory.join("matplotlib")));
     env.insert("MPLBACKEND".into(), json!("Agg"));
     env.insert("OPENBLAS_NUM_THREADS".into(), json!("1"));
@@ -152,6 +134,21 @@ pub(crate) fn run(directory: &Path, runtime: &Path, control: &Control) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn sandbox_config_preserves_absolute_drive_and_network_paths() {
+        for (input, expected) in [
+            (r"C:\Hub\工作区\inputs", "C:/Hub/工作区/inputs"),
+            (r"\\?\C:\Hub\工作区\inputs", "C:/Hub/工作区/inputs"),
+            (
+                r"\\?\UNC\server\share\Hub\inputs",
+                "//server/share/Hub/inputs",
+            ),
+        ] {
+            assert_eq!(sandbox_config_path(Path::new(input)).unwrap(), expected);
+        }
+        assert!(sandbox_config_path(Path::new("C:/unsafe'path")).is_err());
+    }
+
     #[test]
     fn bounded_disk_monitor_refuses_oversized_outputs() {
         let dir =

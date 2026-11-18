@@ -219,7 +219,84 @@ fn spawn(
         control,
         native_capabilities,
         false,
+        None,
     )
+}
+
+fn spawn_isolated_command(
+    directory: &Path,
+    profile: &str,
+    control: &Control,
+) -> Result<Process, String> {
+    let bytes = b"{}".to_vec();
+    let identity = format!("{:x}", sha2::Sha256::digest(&bytes));
+    let mut process = spawn_profile(
+        directory,
+        &identity,
+        authentication::Prepared {
+            bytes,
+            identity: identity.clone(),
+        },
+        "",
+        "",
+        false,
+        control,
+        Default::default(),
+        false,
+        Some(profile),
+    )?;
+    process.rpc("initialize","initialize",json!({"clientInfo":{"name":profile,"version":env!("CARGO_PKG_VERSION")},"capabilities":{"experimentalApi":true}}),control)?;
+    process.send(json!({"method":"initialized"}))?;
+    let effective = process.rpc(
+        "effective-config",
+        "config/read",
+        json!({"cwd":directory,"includeLayers":false}),
+        control,
+    )?;
+    if effective["config"]["windows"]["sandbox"] != "mxc"
+        || effective["config"]["default_permissions"] != profile
+    {
+        return Err("本地隔离环境未采用 Hub 配置，未启动分析脚本".into());
+    }
+    Ok(process)
+}
+
+fn isolated_command_env(
+    directory: &Path,
+    home: &Path,
+) -> Result<serde_json::Map<String, Value>, String> {
+    let mut env = serde_json::Map::new();
+    // Windows variable names are case-insensitive, including when MXC builds
+    // the environment for a child process.
+    for (key, value) in std::env::vars_os() {
+        let key = key.to_string_lossy();
+        let name = key.to_ascii_uppercase();
+        match name.as_str() {
+            "SYSTEMROOT" | "WINDIR" | "SYSTEMDRIVE" | "LOCALAPPDATA" => {
+                env.insert(name, json!(value.to_string_lossy()));
+            }
+            _ => {
+                // Unset the exact inherited key even if the transport merges
+                // its environment through a case-sensitive map.
+                env.insert(key.into_owned(), Value::Null);
+            }
+        }
+    }
+    if !env
+        .get("SYSTEMROOT")
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.is_empty())
+    {
+        return Err("无法定位 Windows 系统目录，未启动分析脚本".into());
+    }
+    for (key, value) in [
+        ("TEMP", directory),
+        ("TMP", directory),
+        ("CODEX_HOME", home),
+    ] {
+        env.insert(key.into(), json!(value));
+    }
+    Ok(env)
 }
 
 fn spawn_profile(
@@ -232,6 +309,7 @@ fn spawn_profile(
     control: &Control,
     native_capabilities: capabilities::NativeCapabilities,
     connected_apps: bool,
+    isolated_profile: Option<&str>,
 ) -> Result<Process, String> {
     control.check()?;
     prepared.verify(authentication_identity)?;
@@ -274,6 +352,11 @@ fn spawn_profile(
         "shell_tool",
     ]);
     configure_investigation_mode(&mut command, true);
+    if let Some(profile) = isolated_profile {
+        command
+            .args(["-c", "windows.sandbox=\"mxc\"", "-c"])
+            .arg(format!("default_permissions={profile:?}"));
+    }
     if connected_apps {
         command.args([
             "--enable",

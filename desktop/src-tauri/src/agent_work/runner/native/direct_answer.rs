@@ -61,11 +61,45 @@ fn review_observation_and_calculation_allow_answers_but_binding_requires_finish(
     }));
 }
 
+#[cfg(test)]
+#[test]
+fn file_inspection_failure_can_explain_limits_and_file_artifacts_still_require_finish() {
+    let mut answer = Answer::default();
+    assert!(!answer.observe_analysis(&Err("读取工作簿失败".into())));
+    answer.observe(
+        "finalMessage",
+        &json!({"text":"暂时无法读取表格中的数据。"}),
+    );
+    let report = answer.prepare(0, 0, &HashSet::new()).unwrap().unwrap();
+    assert_eq!(report.status, "insufficientEvidence");
+    assert!(!answer.observe_analysis(&Ok(json!({"files":[]}))));
+    answer.observe("finalMessage", &json!({"text":"已核对工作簿。"}));
+    let report = answer.prepare(0, 0, &HashSet::new()).unwrap().unwrap();
+    assert_eq!(report.status, "completed");
+    assert!(answer.observe_analysis(&Ok(json!({"files":[{"name":"汇总.csv"}]}))));
+    assert!(answer.prepare(1, 0, &HashSet::new()).unwrap().is_none());
+}
+
 #[derive(Default)]
 pub(super) struct Answer {
     text: Option<String>,
+    analysis_failed: bool,
 }
 impl Answer {
+    pub(super) fn observe_analysis(&mut self, result: &Result<Value, String>) -> bool {
+        match result {
+            Ok(receipt) if receipt["files"].as_array().is_some_and(Vec::is_empty) => {
+                self.analysis_failed = false;
+                false
+            }
+            Err(_) => {
+                self.analysis_failed = true;
+                false
+            }
+            Ok(_) => true,
+        }
+    }
+
     pub(super) fn observe(&mut self, kind: &str, value: &Value) {
         if kind == "finalMessage" {
             self.text = value["text"].as_str().map(str::to_owned);
@@ -107,8 +141,13 @@ impl Answer {
         let Some(text) = self.text.as_deref().filter(|s| !s.trim().is_empty()) else {
             return Ok(None);
         };
+        let status = if self.analysis_failed {
+            "insufficientEvidence"
+        } else {
+            "completed"
+        };
         let mut value = assistant::normalize(
-            json!({"rationale":"","requests":[],"report":{"status":"completed","markdown":text,"citations":citations,"questions":[],"limitations":[],"waitCondition":"","completion":null}}),
+            json!({"rationale":"","requests":[],"report":{"status":status,"markdown":text,"citations":citations,"questions":[],"limitations":[],"waitCondition":"","completion":null}}),
             &json!(quotes::catalog(excerpts)),
         )?;
         let web_sources = web::from_markdown(text, web_accessed);

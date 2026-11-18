@@ -27,22 +27,7 @@ pub(crate) fn run(material: &Value, script: &str, control: &Control) -> Result<V
     let path = input_path.to_string_lossy().replace('\\', "/");
     let config=format!("default_permissions = 'hub-compute'\n[windows]\nsandbox = 'mxc'\n[permissions.hub-compute.filesystem]\n':minimal' = 'read'\n':workspace_roots' = 'write'\n'{path}' = 'read'\n[permissions.hub-compute.network]\nenabled = false\n");
     std::fs::write(home.join("config.toml"), config).map_err(|_| "无法准备计算策略")?;
-    let bytes = b"{}".to_vec();
-    let identity = format!("{:x}", sha2::Sha256::digest(&bytes));
-    let prepared = authentication::Prepared {
-        bytes,
-        identity: identity.clone(),
-    };
-    let mut process = spawn(
-        &directory,
-        &identity,
-        prepared,
-        "",
-        "",
-        false,
-        control,
-        Default::default(),
-    )?;
+    let mut process = spawn_isolated_command(&directory, "hub-compute", control)?;
     #[cfg(windows)]
     unsafe {
         use windows::Win32::System::JobObjects::*;
@@ -60,21 +45,7 @@ pub(crate) fn run(material: &Value, script: &str, control: &Control) -> Result<V
         )
         .map_err(|_| "无法限制计算资源")?;
     }
-    process.rpc("initialize","initialize",json!({"clientInfo":{"name":"hub_compute","version":env!("CARGO_PKG_VERSION")},"capabilities":{"experimentalApi":true}}),control)?;
-    process.send(json!({"method":"initialized"}))?;
-    // Remove inherited secrets from the workload, including unknown provider keys.
-    let mut env = serde_json::Map::new();
-    for (key, _) in std::env::vars_os() {
-        env.insert(key.to_string_lossy().into_owned(), Value::Null);
-    }
-    for key in ["SystemRoot", "WINDIR", "SystemDrive", "LOCALAPPDATA"] {
-        if let Some(value) = std::env::var_os(key) {
-            env.insert(key.into(), json!(value.to_string_lossy()));
-        }
-    }
-    env.insert("TEMP".into(), json!(workspace));
-    env.insert("TMP".into(), json!(workspace));
-    env.insert("CODEX_HOME".into(), json!(home));
+    let env = isolated_command_env(&workspace, &home)?;
     let shell = std::env::var_os("SystemRoot")
         .map(PathBuf::from)
         .ok_or("无法定位系统运行时")?

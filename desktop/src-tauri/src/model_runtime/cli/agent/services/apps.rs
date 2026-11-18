@@ -111,6 +111,7 @@ fn connect(root: &Path, selected: Option<&str>, control: &Control) -> Result<Ses
         control,
         Default::default(),
         true,
+        None,
     )?;
     process.rpc("initialize", "initialize", json!({"clientInfo":{"name":"hub_apps_client","version":env!("CARGO_PKG_VERSION")},"capabilities":{"experimentalApi":true,"explicitGatewayOauth":true}}), control)?;
     process.send(json!({"method":"initialized"}))?;

@@ -617,7 +617,8 @@ pub(super) fn investigate(
                         Ok(tool)=>tool,
                         Err(feedback)=>{store::usage(root,run,&context.usage())?;session.notify();return Ok(feedback);}
                     };
-                    if direct_answer::requires_structured_delivery(&tool) { structured_tools += 1; }
+                    let file_analysis = matches!(tool, Tool::AnalyzeFiles { revision_of: None, .. });
+                    let needs_structured_delivery = direct_answer::requires_structured_delivery(&tool);
                     let mut request=json!(tool);request["stepId"]=value["callId"].clone();
                     store::record(root,run,"toolCall",&request)?;session.notify();
                     let before=control.execution_receipts().len();
@@ -655,6 +656,10 @@ pub(super) fn investigate(
                         Tool::PrepareArchive{..} if archived>=2=>Err("本轮归档方案预算已用尽".into()),
                         tool=>{context.usage.tool_steps+=1;if matches!(tool,Tool::PrepareArchive{..}){archived+=1;} session.dispatch_for_capture(tool)}
                     }};
+                    let requires_finish = if file_analysis { direct_answer.observe_analysis(&result) } else { needs_structured_delivery };
+                    if requires_finish {
+                        structured_tools += 1;
+                    }
                     let raw=match result {Ok(v)=>v,Err(error)=>json!({"error":error,"origin":"host"})};
                     let result_ref=store::tool_results::capture(root,&work.id,run,&request,&raw)?;
                     session.notify();
