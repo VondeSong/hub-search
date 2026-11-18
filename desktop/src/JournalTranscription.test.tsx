@@ -32,7 +32,7 @@ it("persists identity before starting and finishes exactly the acknowledged audi
  await act(async()=>root.render(<Harness/>));
  await act(async()=>api.begin("aliyun",source));
  expect(events[0]).toBe("persist:"+items[0]!.id);expect(events[1]).toBe("start:"+items[0]!.id);
- await act(async()=>api.flush());
+ await act(async()=>api.poll());
  expect(items[0]!.text).toBe("最终文字");expect(items[0]!.state).toBe("completed");
  expect(invoke).toHaveBeenCalledWith("cloud_agents",{action:{op:"voice",request:{action:"finish",job:items[0]!.id,bytes:2}}});
 });
@@ -78,4 +78,33 @@ it("a late creation response cannot put the previous recording into the next dra
  await act(async()=>{reset([]);root.render(<Harness recordId="next-record"/>);});
  await act(async()=>{release({...previous,state:"running",text:"上一条的迟到结果"});await pending;});
  expect(items).toEqual([]);expect(events.filter(e=>e.startsWith("persist:"))).toHaveLength(1);
+});
+
+
+it("stops before a pending network request completes, preserving partial text",async()=>{
+ const original=vi.mocked(invoke).getMockImplementation()!;
+ let releaseRead!: (value:Transcript)=>void,releaseCancel!: (value:Transcript)=>void;
+ vi.mocked(invoke).mockImplementation((command,args:any)=>{
+  if(args?.action?.request?.action==="read")return new Promise(resolve=>{releaseRead=resolve;});
+  if(args?.action?.request?.action==="cancel")return new Promise(resolve=>{releaseCancel=resolve;});
+  return original(command,args);
+ });
+ await act(async()=>root.render(<Harness/>));
+ await act(async()=>api.begin("aliyun",source));
+ await act(async()=>reset([{...items[0]!,text:"已识别"}]));
+ let polling!:Promise<void>,cancelling!:Promise<void>;
+ await act(async()=>{polling=api.poll();});
+ await act(async()=>{cancelling=api.cancel(items[0]!);});
+ expect(items[0]).toMatchObject({state:"cancelled",text:"已识别",cancelPending:true});
+ await act(async()=>{releaseRead({...remote,state:"running",text:"迟到文字"});await polling;});
+ expect(items[0]).toMatchObject({state:"cancelled",text:"已识别"});
+ expect(events.some(e=>e.startsWith("append:"))).toBe(false);
+ await act(async()=>{releaseCancel({...remote,state:"cancelled"});await cancelling;});
+ expect(items[0]).toMatchObject({state:"cancelled",text:"已识别",cancelPending:false});
+});
+
+it("does not send a saved file to a cloud that advertises only realtime support",async()=>{
+ await act(async()=>root.render(<Harness/>));
+ await expect(api.begin("aliyun","a".repeat(64),true)).rejects.toThrow("尚未启用");
+ expect(events).toEqual([]);
 });

@@ -3,6 +3,7 @@
 import base64
 import binascii
 import hashlib
+import http.client
 import json
 import os
 import queue
@@ -20,6 +21,8 @@ RATE = 24000
 MAX_AUDIO = 20 * 1024**2
 MAX_PCM = RATE * 2 * 30 * 60
 MODELS = {"aliyun": "paraformer-realtime-v2", "openai": "gpt-live-transcribe"}
+FILE_MODELS = {"aliyun": "qwen3-asr-flash", "openai": "gpt-transcribe"}
+FILE_MAX_SECONDS = {"aliyun": 300, "openai": 1800}
 CONFIG = Path(os.environ.get("HUB_TRANSCRIPTION_CONFIG", "/etc/hub-agents/transcription.json"))
 ID = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}")
 HEX = re.compile(r"[0-9a-f]{32}")
@@ -42,7 +45,8 @@ def settings(path=CONFIG):
 def public_providers(path=CONFIG):
     configured = settings(path)
     return [{"id": name, "model": model, "configured": bool(configured.get(name, {}).get("apiKey")),
-             "sampleRate": RATE} for name, model in MODELS.items()]
+             "sampleRate": RATE, "fileModel": FILE_MODELS[name],
+             "fileMaxSeconds": FILE_MAX_SECONDS[name]} for name, model in MODELS.items()]
 
 
 def error_for(code):
@@ -53,6 +57,87 @@ def error_for(code):
     if any(x in code for x in ("429", "quota", "balance", "arrear", "insufficient", "throttl")):
         return SpeechError("quota", "转写服务额度不足或请求过多，原音仍保留，可以稍后重试。", 503)
     return SpeechError("service", "转写服务未能完成识别，原音仍保留，可以稍后重试。", 503)
+
+
+def aliyun_host(config):
+    workspace = config.get("workspaceId", "")
+    if workspace and (not isinstance(workspace, str) or not re.fullmatch(r"[a-zA-Z0-9-]{1,80}", workspace)):
+        raise SpeechError("configuration", "阿里业务空间编号无效。", 503)
+    return f"{workspace}.cn-beijing.maas.aliyuncs.com" if workspace else "dashscope.aliyuncs.com"
+
+
+def encode_file(audio, limit):
+    with tempfile.TemporaryDirectory(prefix="hub-speech-") as folder:
+        source = Path(folder) / "original"
+        source.write_bytes(audio)
+        try:
+            result = subprocess.run([
+                "ffmpeg", "-v", "error", "-nostdin", "-threads", "1",
+                "-protocol_whitelist", "file,pipe",
+                "-format_whitelist", "wav,mov,mp3,ogg,matroska,webm,aac,flac,amr",
+                "-i", str(source), "-map", "0:a:0", "-t", str(limit + .2),
+                "-ac", "1", "-ar", "16000", "-codec:a", "libmp3lame", "-b:a", "64k",
+                "-progress", "pipe:2", "-f", "mp3", "pipe:1",
+            ], capture_output=True, timeout=90)
+        except (OSError, subprocess.TimeoutExpired):
+            raise SpeechError("decode", "个人云端未能读取原音，附件仍保留。", 503) from None
+    times = re.findall(rb"^out_time_us=(\d+)\r?$", result.stderr, re.MULTILINE)
+    if result.returncode or not result.stdout or not times:
+        raise SpeechError("decode", "无法读取这个音频文件，附件仍保留。")
+    # MP3 encoder padding can add a few milliseconds to the output clock.
+    if int(times[-1]) > (limit + .05) * 1_000_000:
+        raise SpeechError("duration", f"所选文件转写服务每段最多 {limit // 60} 分钟，原音仍保留。")
+    return result.stdout
+
+
+def transcribe_file(provider, config, audio, is_active):
+    selected = config.get(provider, {})
+    key = selected.get("apiKey")
+    if not isinstance(key, str) or not key:
+        raise SpeechError("configuration", "所选转写服务尚未配置。", 503)
+    encoded = encode_file(audio, FILE_MAX_SECONDS[provider])
+    model = FILE_MODELS[provider]
+    if provider == "openai":
+        host, path = "api.openai.com", "/v1/audio/transcriptions"
+        boundary = uuid.uuid4().hex
+        content_type = f"multipart/form-data; boundary={boundary}"
+        fields = (
+            f'--{boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\n{model}\r\n'
+            f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="recording.mp3"\r\n'
+            'Content-Type: audio/mpeg\r\n\r\n'
+        )
+        body = fields.encode() + encoded + f"\r\n--{boundary}--\r\n".encode()
+    else:
+        host, path = aliyun_host(selected), "/compatible-mode/v1/chat/completions"
+        content_type = "application/json"
+        data_url = "data:audio/mpeg;base64," + base64.b64encode(encoded).decode("ascii")
+        body = json.dumps({
+            "model": model, "stream": False,
+            "messages": [{"role": "user", "content": [{
+                "type": "input_audio", "input_audio": {"data": data_url},
+            }]}],
+        }).encode()
+    if not is_active():
+        return None
+    with closing(http.client.HTTPSConnection(host, timeout=180)) as connection:
+        connection.request("POST", path, body, {
+            "Authorization": "Bearer " + key, "Content-Type": content_type,
+        })
+        response = connection.getresponse()
+        if response.status != 200:
+            raise error_for(response.status)
+        raw = response.read(512 * 1024 + 1)
+    if len(raw) > 512 * 1024:
+        raise error_for("")
+    result = json.loads(raw)
+    text = result.get("text") if provider == "openai" else result["choices"][0]["message"]["content"]
+    if not isinstance(text, str):
+        raise error_for("")
+    usage = result.get("usage", {})
+    return {"text": text, "usage": {
+        k: v for k, v in usage.items()
+        if (k.endswith("_tokens") or k in ("seconds", "duration")) and type(v) in (int, float)
+    } if isinstance(usage, dict) else {}}
 
 
 class Results:
@@ -132,10 +217,7 @@ class Stream:
         if provider == "openai":
             url = "wss://api.openai.com/v1/realtime?intent=transcription"
         else:
-            workspace = config[provider].get("workspaceId", "")
-            if workspace and not re.fullmatch(r"[a-zA-Z0-9-]{1,80}", workspace):
-                raise SpeechError("configuration", "阿里业务空间编号无效。", 503)
-            host = f"{workspace}.cn-beijing.maas.aliyuncs.com" if workspace else "dashscope.aliyuncs.com"
+            host = aliyun_host(config[provider])
             url = f"wss://{host}/api-ws/v1/inference"
         try:
             self.socket = factory(url, timeout=20, header=["Authorization: Bearer " + key],
@@ -250,8 +332,9 @@ class Stream:
 
 class Manager:
     """Durable identities prevent retries from starting a second paid session."""
-    def __init__(self, store, config=CONFIG, stream=Stream):
+    def __init__(self, store, config=CONFIG, stream=Stream, file_transcriber=transcribe_file):
         self.store, self.config, self.factory = store, config, stream
+        self.file_transcriber = file_transcriber
         self.lock, self.live = threading.RLock(), {}
         self.stopped = threading.Event()
         with closing(store.connect()) as db, db:
@@ -331,6 +414,8 @@ class Manager:
         with self.lock, closing(self.store.connect()) as db, db:
             row = db.execute('SELECT * FROM voice_jobs WHERE id=?', (job,)).fetchone()
             if row:
+                if row['owner'] == owner and row['provider'] == '':
+                    return json.loads(row['body'])
                 if (row['owner'], row['provider'], row['source']) != (owner, provider, source):
                     raise SpeechError('conflict', '转写编号已用于其他原音或服务。', 409)
                 return json.loads(row['body'])
@@ -338,60 +423,65 @@ class Manager:
                 raise SpeechError('busy', '当前已有两段语音正在转写，请稍后再试。', 429)
             if not self._authorized(owner):
                 raise SpeechError('device', '本设备连接已撤销。', 403)
-            value = {'id': job, 'provider': provider, 'source': source, 'model': MODELS[provider],
-                     'state': 'connecting', 'text': '', 'offset': 0, 'usage': {}, 'metrics': {}, 'replay': audio is not None}
+            is_file = audio is not None
+            value = {'id': job, 'provider': provider, 'source': source,
+                     'model': (FILE_MODELS if is_file else MODELS)[provider],
+                     'state': 'connecting', 'text': '', 'offset': 0, 'usage': {}, 'metrics': {},
+                     'mode': 'file' if is_file else 'realtime', 'replay': is_file}
             db.execute('INSERT INTO voice_jobs VALUES(?,?,?,?,?,?)', (job, owner, provider, source, json.dumps(value), time.time()))
-            entry = {'stream': None, 'lock': threading.RLock(), 'owner': owner, 'touched': time.monotonic(), 'created': time.monotonic()}
+            entry = {'stream': None, 'lock': threading.RLock(), 'owner': owner, 'touched': time.monotonic(), 'created': time.monotonic(), 'file': is_file}
+            entry['thread'] = threading.Thread(
+                target=self._transcribe_file if is_file else self._start,
+                args=(job, provider, audio, entry) if is_file else (job, provider, entry),
+                daemon=True,
+            )
+            # Make the receipt visible before the worker uses its own connection.
+            db.commit()
             self.live[job] = entry
-        entry['thread'] = threading.Thread(target=self._start, args=(job, provider, audio, entry), daemon=True)
-        entry['thread'].start()
+            entry['thread'].start()
         return value
 
-    def _start(self, job, provider, audio, entry):
+    def _start(self, job, provider, entry):
         stream = None
         try:
+            if not self._authorized(entry['owner']) or self.read(entry['owner'], job)['state'] != 'connecting':
+                return
             stream = self.factory(provider, settings(self.config), lambda v: self._update(job, **{k: x for k, x in v.items() if k != 'state' or x in ('completed', 'failed')}))
-            with entry['lock']:
+            with self.lock:
                 if not self._authorized(entry['owner']) or self.read(entry['owner'], job)['state'] != 'connecting':
                     stream.cancel()
                     return
                 entry['stream'] = stream
                 self._update(job, state='running')
-            if audio is not None:
-                self._replay(job, entry, audio)
         except Exception as error:
             error = error if isinstance(error, SpeechError) else error_for('')
             self._update(job, state='failed', code=error.code, error=str(error))
             if stream:
                 stream.cancel()
         finally:
-            if stream:
-                stream.done.wait(100 if audio is not None else 0)
             if self.read(entry['owner'], job)['state'] in ('completed', 'failed', 'cancelled'):
                 with self.lock:
                     self.live.pop(job, None)
 
-    def _replay(self, job, entry, audio):
-        with tempfile.TemporaryDirectory(prefix='hub-speech-') as folder:
-            source = Path(folder) / 'original'
-            source.write_bytes(audio)
-            try:
-                decoded = subprocess.run(['ffmpeg', '-v', 'error', '-nostdin', '-threads', '1',
-                    '-protocol_whitelist', 'file,pipe', '-format_whitelist', 'wav,mov,mp3,ogg,matroska,webm,aac,flac,amr',
-                    '-i', str(source), '-vn', '-t', '1800.1',
-                    '-ac', '1', '-ar', str(RATE), '-f', 's16le', 'pipe:1'], capture_output=True, timeout=60)
-            except (OSError, subprocess.TimeoutExpired):
-                raise SpeechError('decode', 'VPS 未能解码原音，原附件仍保留。', 503) from None
-            pcm = decoded.stdout
-            if decoded.returncode or not pcm or len(pcm) > MAX_PCM:
-                raise SpeechError('decode', '音频无法识别或超过单段 30 分钟限制。')
-            for offset in range(0, len(pcm), 4800):
-                if not self._authorized(entry['owner']) or self.read(entry['owner'], job)['state'] != 'running':
-                    raise SpeechError('cancelled', '转写已取消或设备连接已撤销。', 403)
-                entry['stream'].push(pcm[offset:offset + 4800])
-                time.sleep(.05)
-            self._update(job, offset=len(pcm), state='finishing')
-            entry['stream'].finish()
+    def _transcribe_file(self, job, provider, audio, entry):
+        owner = entry['owner']
+
+        def active():
+            return self._authorized(owner) and self.read(owner, job)['state'] == 'running'
+
+        try:
+            self._update(job, state='running')
+            result = self.file_transcriber(provider, settings(self.config), audio, active) if active() else None
+            if result is not None and active():
+                self._update(job, state='completed', **result)
+            elif not self._authorized(owner):
+                self._update(job, state='cancelled')
+        except Exception as error:
+            error = error if isinstance(error, SpeechError) else error_for('')
+            self._update(job, state='failed', code=error.code, error=str(error))
+        finally:
+            with self.lock:
+                self.live.pop(job, None)
 
     def append(self, owner, job, data):
         if not isinstance(data, dict) or set(data) != {'offset', 'audio'} or type(data['offset']) is not int or data['offset'] < 0:
@@ -450,18 +540,35 @@ class Manager:
             return self._update(job, state='finishing')
 
     def cancel(self, owner, job):
-        value = self.read(owner, job)
-        entry = self.live.get(job)
-        value = self._update(job, state='cancelled')
+        with self.lock:
+            try:
+                self._row(owner, job)
+            except SpeechError as error:
+                if error.code != 'missing' or not self._authorized(owner):
+                    raise
+                # A cancel can arrive before a large upload on another connection.
+                value = {'id': job, 'state': 'cancelled', 'text': '', 'offset': 0}
+                with closing(self.store.connect()) as db, db:
+                    inserted = db.execute('INSERT OR IGNORE INTO voice_jobs VALUES(?,?,?,?,?,?)',
+                                          (job, owner, '', '', json.dumps(value), time.time()))
+                    if not inserted.rowcount:
+                        raise error
+                return value
+            entry = self.live.get(job)
+            value = self._update(job, state='cancelled')
+            if not entry or not entry['file']:
+                self.live.pop(job, None)
         if entry and entry['stream']:
             entry['stream'].cancel()
-        with self.lock:
-            self.live.pop(job, None)
         return value
 
     def _expire(self):
         while not self.stopped.wait(10):
             for job, entry in list(self.live.items()):
+                if entry['file']:
+                    if not self._authorized(entry['owner']):
+                        self.cancel(entry['owner'], job)
+                    continue
                 stream = entry['stream']
                 if not self._authorized(entry['owner']) or time.monotonic() - entry['touched'] > 120 or time.monotonic() - entry['created'] > 40 * 60:
                     self._update(job, state='failed', code='interrupted', error='转写连接已结束，原音仍保留，可以补转写。')

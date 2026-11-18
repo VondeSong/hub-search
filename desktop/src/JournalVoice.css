@@ -9,6 +9,8 @@
 .journal-voice-body {padding:0 22px;overflow:auto;min-height:0;}
 .journal-voice-service {display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--mobile-border,#e7e9ec);padding-bottom:14px;font-size:13px;}
 .journal-voice-service select {margin-left:auto;background:transparent;color:inherit;border:0;font:inherit;min-height:36px;max-width:100px;}
+.journal-voice-file-service {flex-wrap:wrap;justify-content:space-between;}
+.journal-voice-file-service small {flex-basis:100%;}
 .journal-voice-clock {padding:26px 0 16px;text-align:center;}
 .journal-voice-clock>span {font-size:13px;color:var(--mobile-secondary,#626974);}
 .journal-voice-clock.is-active>span {color:var(--mobile-accent,#2863b8);}

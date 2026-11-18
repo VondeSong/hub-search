@@ -9,13 +9,14 @@ import uuid
 import secrets
 import shutil
 import wave
+from unittest.mock import patch
 from types import SimpleNamespace
 from contextlib import closing
 from pathlib import Path
 
 from server import Store, digest, Handler
 from test_server import MemorySocket
-from transcription import Manager, Results, SpeechError, RATE, public_providers
+from transcription import Manager, Results, SpeechError, RATE, encode_file, public_providers, transcribe_file
 
 
 class FakeStream:
@@ -106,7 +107,95 @@ class SpeechTests(unittest.TestCase):
         path.write_text(json.dumps({'aliyun': {'apiKey': 'secret-test-value'}}))
         view = public_providers(path)
         self.assertTrue(view[0]['configured'])
+        self.assertEqual(view[0]['fileModel'], 'qwen3-asr-flash')
         self.assertNotIn('secret-test-value', json.dumps(view))
+
+    def test_completed_file_has_an_independent_job_and_no_realtime_stream(self):
+        audio = b'original file'
+        entered, release = threading.Event(), threading.Event()
+        calls = []
+
+        def recognize(provider, config, saved, active):
+            calls.append((provider, saved, active()))
+            entered.set()
+            release.wait(2)
+            return {'text': '文件文字'}
+
+        self.manager.file_transcriber = recognize
+        self.addCleanup(release.set)
+        data = {'provider': 'openai', 'source': hashlib.sha256(audio).hexdigest(),
+                'audio': base64.b64encode(audio).decode()}
+        original = self.manager.create(self.owner, self.job, data)
+        self.assertTrue(entered.wait(2))
+        self.assertEqual(original['mode'], 'file')
+        self.assertEqual(original['model'], 'gpt-transcribe')
+        self.manager.create(self.owner, self.job, data)
+        release.set()
+        for _ in range(200):
+            if self.manager.read(self.owner, self.job)['state'] == 'completed':
+                break
+            time.sleep(.01)
+        self.assertEqual(self.manager.read(self.owner, self.job)['text'], '文件文字')
+        self.assertEqual(calls, [('openai', audio, True)])
+        self.assertEqual(FakeStream.calls, [])
+
+    def test_cancel_can_precede_upload_and_keeps_other_devices_private(self):
+        self.assertEqual(self.manager.cancel(self.owner, self.job)['state'], 'cancelled')
+        self.assertEqual(self.manager.create(self.owner, self.job, self.data)['state'], 'cancelled')
+        with self.assertRaises(SpeechError) as foreign:
+            self.manager.cancel(digest(b'foreign'), self.job)
+        self.assertEqual(foreign.exception.status, 404)
+        self.assertEqual(FakeStream.calls, [])
+
+    def test_cancelled_file_job_discards_a_late_provider_result(self):
+        audio = b'recorded audio'
+        entered, release = threading.Event(), threading.Event()
+
+        def recognize(provider, config, saved, active):
+            entered.set()
+            release.wait(2)
+            return {'text': '迟到结果'}
+
+        self.manager.file_transcriber = recognize
+        self.addCleanup(release.set)
+        self.manager.create(self.owner, self.job, {
+            'provider': 'aliyun', 'source': hashlib.sha256(audio).hexdigest(),
+            'audio': base64.b64encode(audio).decode(),
+        })
+        self.assertTrue(entered.wait(2))
+        worker = self.manager.live[self.job]['thread']
+        stopped = self.manager.cancel(self.owner, self.job)
+        release.set()
+        worker.join(2)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(stopped['state'], 'cancelled')
+        self.assertEqual(self.manager.read(self.owner, self.job), stopped)
+
+    def test_file_adapters_use_separate_http_endpoints_and_bounded_payloads(self):
+        configurations = {'openai': {'apiKey': 'fixture'}, 'aliyun': {'apiKey': 'fixture', 'workspaceId': 'ws-test'}}
+        for provider in configurations:
+            with self.subTest(provider=provider), patch('transcription.encode_file', return_value=b'mp3-file') as encode, patch('transcription.http.client.HTTPSConnection') as connect:
+                connection = connect.return_value
+                response = connection.getresponse.return_value
+                response.status = 200
+                response.read.return_value = b'{"text":"result"}' if provider == 'openai' else b'{"choices":[{"message":{"content":"result"}}]}'
+                self.assertEqual(transcribe_file(provider, configurations, b'original', lambda: True)['text'], 'result')
+                encode.assert_called_once_with(b'original', 1800 if provider == 'openai' else 300)
+                method, path, body, headers = connection.request.call_args.args
+                self.assertEqual(method, 'POST')
+                if provider == 'openai':
+                    self.assertEqual(connect.call_args.args[0], 'api.openai.com')
+                    self.assertEqual(path, '/v1/audio/transcriptions')
+                    self.assertIn('multipart/form-data', headers['Content-Type'])
+                    self.assertIn(b'gpt-transcribe', body)
+                    self.assertIn(b'mp3-file', body)
+                else:
+                    self.assertEqual(connect.call_args.args[0], 'ws-test.cn-beijing.maas.aliyuncs.com')
+                    self.assertEqual(path, '/compatible-mode/v1/chat/completions')
+                    payload = json.loads(body)
+                    self.assertEqual(payload['model'], 'qwen3-asr-flash')
+                    self.assertFalse(payload['stream'])
+                    self.assertEqual(payload['messages'][0]['content'][0]['input_audio']['data'], 'data:audio/mpeg;base64,bXAzLWZpbGU=')
 
     def test_sentence_revisions_heartbeats_and_foreign_task_are_ignored(self):
         result = Results('aliyun', 'task')
@@ -148,20 +237,19 @@ class SpeechTests(unittest.TestCase):
         self.assertIn(b'404 Not Found', response)
         self.assertNotIn(self.job.encode(), response)
 
-    @unittest.skipUnless(shutil.which('ffmpeg'), 'requires the replay decoder')
+    @unittest.skipUnless(shutil.which('ffmpeg'), 'requires the file decoder')
     def test_playlist_cannot_read_other_files_as_an_audio_attachment(self):
         private = Path(self.folder.name) / 'private.wav'
         with wave.open(str(private), 'wb') as audio:
             audio.setnchannels(1); audio.setsampwidth(2); audio.setframerate(RATE); audio.writeframes(b'\0' * 4800)
         playlist = ("ffconcat version 1.0\nfile '" + private.as_posix() + "'\n").encode()
-        self.manager.create(self.owner, self.job, {'provider': 'aliyun', 'source': hashlib.sha256(playlist).hexdigest(), 'audio': base64.b64encode(playlist).decode()})
-        for _ in range(200):
-            result = self.manager.read(self.owner, self.job)
-            if result['state'] == 'failed':break
-            time.sleep(.01)
-        self.assertEqual(result['state'], 'failed')
-        self.assertEqual(result['code'], 'decode')
-        self.assertEqual(FakeStream.calls[0].parts, [])
+        with self.assertRaises(SpeechError) as rejected:
+            encode_file(playlist, 300)
+        self.assertEqual(rejected.exception.code, 'decode')
+        self.assertTrue(encode_file(private.read_bytes(), 300))
+        with self.assertRaises(SpeechError) as long_audio:
+            encode_file(private.read_bytes(), .01)
+        self.assertEqual(long_audio.exception.code, 'duration')
 
 
 if __name__ == '__main__':

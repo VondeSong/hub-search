@@ -78,13 +78,14 @@ sudo -u hub-agents python3 /opt/hub-agents/server.py --state /var/lib/hub-agents
 语音复用现有 HTTPS 地址和设备连接。阿里与 OpenAI 的 API Key 只放在 VPS 的 `/etc/hub-agents/transcription.json`，不填入手机、不放进 APK、Git 或公开原型。目录权限 `0750`，文件 `root:hub-agents 0640`。对象中按 `aliyun`、`openai` 分别配置 `apiKey`；阿里北京业务空间另填实际 `workspaceId`。此文件可通过 `HUB_TRANSCRIPTION_CONFIG` 指定其他受控位置。
 
 - Debian 依赖：`python3-websocket`、`ffmpeg`。语音路由的 Nginx 上传上限单独设为 29 MiB；其它 Agents 路由保持原限制。
-- 阿里使用 `paraformer-realtime-v2`，OpenAI 使用 `gpt-live-transcribe`；统一输入为单声道 24 kHz PCM16。Android 同时编码 M4A 原音，暂停不计入音频时长。
-- `/v1/voice/providers` 只返回是否已配置；不代表额度或服务永远可用。`jobs/{UUID}`、`chunks`、`finish`、`cancel` 全部要求设备认证和任务归属。限两段并发、单段 30 分钟；已有音频最多 20 MiB。
-- 同一任务编号及分段偏移可重复核对；原音或服务改变不能复用旧编号。VPS 重启将未完任务标为中断，不自动发起第二次付费识别。补转需明确选择，使用已有附件的真实哈希和原音，经本机读取后上传；不要求公开录音 URL。
-- 识别结果、校对稿与原日志分开保留，明确加入文字后才合并。允许先保存原音，稍后从同一记录查看结果。无法连接、额度不足或转写失败不影响本机录音保存。
+- 实时转写使用 WebSocket。阿里使用 `paraformer-realtime-v2`，OpenAI 使用 `gpt-live-transcribe`，输入为 24 kHz PCM16。Android 同时编码 M4A 原音，暂停不计入音频时长。
+- 录完后转写和手动补转写提交本机已保存的原音附件。个人云端校验 SHA-256 后生成完整的 MP3 请求。阿里走 `qwen3-asr-flash` 的兼容 HTTP 接口，每段最多 5 分钟。OpenAI 走 `/v1/audio/transcriptions` 的 `gpt-transcribe`，Hub 每段最多 30 分钟。阿里请求内直接带音频数据，无需公开录音 URL。
+- `/v1/voice/providers` 返回服务配置状态及 `fileModel` 能力。新版客户端依靠该字段启用文件转写。已有客户端提交文件和查询历史任务沿用原路由。`jobs/{UUID}`、`chunks`、`finish`、`cancel` 均需设备认证和任务归属。共限两段并发，本机原音附件最多 20 MiB。
+- 手机本机持久化任务号和原音，可先保存记录。个人云端接收后的文件任务独立完成，重开原记录可以读取结果或按原任务号补交。断网后待提交的任务在重新打开原记录时恢复。VPS 重启把处理中任务记为中断，避免重复计费。
+- 停止操作立即保留手机上已有的识别文字，云端回执随后更新。正在处理的文件请求能丢弃迟到的结果，供应商已接收的请求仍可能计费。识别结果归属原录音，校对并确认后加入同一条笔记正文。
 - 原型仍只演示流程，不调用真实识别服务。服务接入和 API 测试不等于实体手机、蓝牙、来电及后台录音已验收；当前离开应用会结束并保留本段。
 
-官方协议：[阿里 WebSocket](https://help.aliyun.com/en/model-studio/websocket-for-paraformer-real-time-service)、[阿里采样参数](https://help.aliyun.com/en/model-studio/paraformer-client-events)、[OpenAI 实时转写](https://developers.openai.com/api/docs/guides/realtime-transcription)。
+[阿里实时转写](https://help.aliyun.com/en/model-studio/websocket-for-paraformer-real-time-service) · [阿里文件转写](https://docs.modelstudio.console.alibabacloud.com/en/model-studio/qwen-asr-api-reference) · [OpenAI 实时转写](https://developers.openai.com/api/docs/guides/realtime-transcription) · [OpenAI 文件转写](https://developers.openai.com/api/docs/guides/speech-to-text)
 
 - 同一个发送编号和内容可安全重试。服务每次执行一条任务，已接收的任务保存在 SQLite 中。运行中的一轮遇到服务重启会标记失败并保留已有文字，等待中的任务会继续执行。
 - 一条消息最多 20,000 字、6 个附件。JPEG、PNG 和 WebP 单张最多 4 MiB，附件合计最多 12 MiB。视频只上传抽取的图片，短暂画面可能落在帧间。

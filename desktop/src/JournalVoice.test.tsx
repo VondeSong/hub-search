@@ -35,7 +35,7 @@ it("allows local recording without cloud service and labels it without attemptin
  const original=vi.mocked(invoke).getMockImplementation()!;
  vi.mocked(invoke).mockImplementation((c,a:any)=>c==="quick_journal_voice"&&a.action==="start"?Promise.resolve(status={state:"recording",elapsed:0,token:"f".repeat(32)}):original(c,a));
  await act(async()=>root.render(<JournalVoiceCapture request={{}} onClose={vi.fn()}/>));await click("开始录音");
- expect(document.body.textContent).toContain("正在仅录音");expect(document.body.textContent).toContain("不会自动转写或发送给识别服务");
+ expect(document.body.textContent).toContain("正在录音");expect(document.body.textContent).toContain("原音保存在本机");
  expect(document.querySelector('[aria-label="转写服务"]')).toBeNull();expect(document.querySelector('[role="alert"]')).toBeNull();
  expect(vi.mocked(invoke).mock.calls.some(([c,a]:any)=>c==="cloud_agents"&&a?.action?.request?.action==="start")).toBe(false);
 });
@@ -215,21 +215,51 @@ it("never requests cloud access in local mode even when a provider was previousl
  expect(vi.mocked(invoke).mock.calls.some(([c])=>c==="cloud_agents")).toBe(true);
 });
 
-it("disables retranscription after switching a configured provider back to local recording",async()=>{
+it("allows choosing file transcription for local audio and saves while the upload is pending",async()=>{
  const original=vi.mocked(invoke).getMockImplementation()!;
+ let release!: (value:unknown)=>void;
  vi.mocked(invoke).mockImplementation((c,a:any)=>{
   if(c==="cloud_agents"&&a?.action?.op==="config")return Promise.resolve({binding:"connected"});
-  if(c==="cloud_agents"&&a?.action?.request?.action==="providers")return Promise.resolve({providers:[{id:"aliyun",configured:true}]});
+  if(c==="cloud_agents"&&a?.action?.request?.action==="providers")return Promise.resolve({providers:[{id:"aliyun",configured:true,fileModel:"qwen3-asr-flash"}]});
+  if(c==="cloud_agents"&&a?.action?.request?.action==="replay")return new Promise(resolve=>{release=resolve;});
   return original(c,a);
  });
- await act(async()=>root.render(<JournalVoiceCapture request={{record:{...record,attachments:[attachment]},revision:"current"}} onClose={vi.fn()}/>));
- const mode=document.querySelector<HTMLSelectElement>('[aria-label="录音方式"]')!;
- await act(async()=>{mode.value="transcribe";mode.dispatchEvent(new Event("change",{bubbles:true}));});
- const replay=[...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="用阿里补转写")!;
- expect(replay.disabled).toBe(false);
- await act(async()=>{mode.value="local";mode.dispatchEvent(new Event("change",{bubbles:true}));});
- expect(replay.disabled).toBe(true);
+ const withAudio={...record,attachments:[attachment]}, close=vi.fn();
+ await act(async()=>root.render(<JournalVoiceCapture request={{record:withAudio,revision:"current"}} onClose={close}/>));
+ expect(vi.mocked(invoke).mock.calls.some(([c])=>c==="cloud_agents")).toBe(false);
+ await click("补转写");
+ expect(document.querySelector('[aria-label="文件转写服务"]')).not.toBeNull();
+ await click("用阿里补转写");
+ expect(release).toBeDefined();
+ await click("保存");
+ expect(close).toHaveBeenCalledOnce();
+ expect(invoke).toHaveBeenCalledWith("update_quick_journal",expect.objectContaining({record:withAudio}));
+ const job=vi.mocked(invoke).mock.calls.find(([c,a]:any)=>c==="cloud_agents"&&a.action.request?.action==="replay")?.[1] as any;
+ expect(job.action.request.hash).toBe(attachment.hash);
+ expect(vi.mocked(invoke).mock.calls.some(([c,a]:any)=>c==="cloud_agents"&&a.action.request?.action==="start")).toBe(false);
  const before=vi.mocked(invoke).mock.calls.length;
- await act(async()=>replay.click());
- expect(vi.mocked(invoke).mock.calls.slice(before).some(([c])=>c==="cloud_agents")).toBe(false);
+ await act(async()=>{release({id:job.action.request.job,state:"completed",text:"迟到文字"});});
+ expect(vi.mocked(invoke).mock.calls).toHaveLength(before);
+});
+
+it("queues file mode from the staged original without opening a live connection",async()=>{
+ const token="c".repeat(32),original=vi.mocked(invoke).getMockImplementation()!;
+ vi.mocked(invoke).mockImplementation((c,a:any)=>{
+  if(c==="cloud_agents"&&a?.action?.op==="config")return Promise.resolve({binding:"connected"});
+  if(c==="cloud_agents"&&a?.action?.request?.action==="providers")return Promise.resolve({providers:[{id:"aliyun",configured:true,fileModel:"qwen3-asr-flash"}]});
+  if(c==="cloud_agents"&&a?.action?.request?.action==="replay")return Promise.resolve({state:"running",mode:"file"});
+  if(c==="quick_journal_voice"&&a.action==="start")return Promise.resolve(status={state:"recording",elapsed:0,token});
+  if(c==="quick_journal_voice"&&a.action==="stop")return Promise.resolve(status={state:"ready",elapsed:5000,token});
+  return original(c,a);
+ });
+ await act(async()=>root.render(<JournalVoiceCapture request={{}} onClose={vi.fn()}/>));
+ const select=document.querySelector<HTMLSelectElement>('[aria-label="录音方式"]')!;
+ await act(async()=>{select.value="file";select.dispatchEvent(new Event("change",{bubbles:true}));});
+ await click("开始录音");
+ const voiceCalls=()=>vi.mocked(invoke).mock.calls.flatMap(([c,a]:any)=>c==="cloud_agents"&&a.action.request?[a.action.request]:[]);
+ expect(voiceCalls().map(x=>x.action)).toEqual(["providers"]);
+ await click("完成本段");
+ expect(voiceCalls().map(x=>x.action)).toEqual(["providers","replay"]);
+ expect(voiceCalls()[1]?.hash).toBe(attachment.hash);
+ expect(vi.mocked(invoke).mock.calls.some(([c,a]:any)=>c==="quick_journal_voice_draft"&&a?.value?.includes('"state":"queued"'))).toBe(true);
 });
