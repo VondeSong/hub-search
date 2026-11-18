@@ -354,6 +354,10 @@
 .ha-detail-setting{align-items:center;font-size:12px}
 .ha-detail-setting select{max-width:55%;min-width:0;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--text);padding:3px 4px}
 .ha-detail-setting input{accent-color:var(--accent)}
+.ha-connection-group{border-top:1px solid var(--line);margin-top:8px;padding-top:6px}
+.ha-connection-group>summary{cursor:pointer;min-height:28px;padding:5px 0}
+.ha-connection-group>summary small{margin-inline-start:8px;color:var(--muted)}
+.ha-scope-recovery{display:grid;justify-items:start;gap:6px;padding:8px 6px;font-size:12px;color:var(--muted)}
 .ha-detail-standalone{padding:5px 9px}
 
 .ha-composer-area:has(.ha-composer-menu){z-index:13}

@@ -4,8 +4,8 @@ import { ChevronDown, Pin, PinOff, Search, X } from 'lucide-react';
 import type { AssistantContext } from './Assistant';
 
 export const researchPolicies = [
-  { id: 'material-first', name: '材料优先', hint: '先读选定资料，有缺口时再用网络补充。' },
-  { id: 'materials-only', name: '仅依据材料', hint: '只依据所选范围，不查网页；证据不足时说明。' },
+  { id: 'material-first', name: '优先用所选资料', hint: '先读所选资料，再按联网设置补充。' },
+  { id: 'materials-only', name: '只用所选资料', hint: '回答只使用所选资料。' },
   { id: 'open', name: '开放研究', hint: '围绕问题研究，选定材料作为背景与约束。' },
 ] as const;
 export type ResearchPolicy = typeof researchPolicies[number]['id'];

@@ -13,7 +13,7 @@ import { useAgentLibraryRegistry } from "./useAgentLibraryRegistry";
 export type ResearchGrant = {images?:ImageGrant[];libraryIds:string[];notes:NoteLocator[];sources?:InvestigationLocator[];readingItemKeys:string[]};
 export type ResearchTopic = {id:string;revision:number;title:string;pinned:boolean;grant:ResearchGrant;policy:ResearchPolicy;skills:string[];versions?:{locator:InvestigationLocator;title:string;version:unknown}[]};
 export type ResearchSelection = {topic:ResearchTopic;manual:ResearchGrant;manualPolicy:ResearchPolicy;includeManual:boolean};
-export const policyNames:Record<ResearchPolicy,string>={"material-first":"材料优先","materials-only":"仅依据材料",open:"开放研究"};
+export const policyNames:Record<ResearchPolicy,string>={"material-first":"优先用所选资料","materials-only":"只用所选资料",open:"开放研究"};
 const call=<T,>(args:Record<string,unknown>)=>invoke<T>("agent_investigation",{args});
 const unique=<T,>(items:T[])=>[...new Map(items.map(item=>[item&&typeof item==="object"?JSON.stringify(item,Object.keys(item).sort()):JSON.stringify(item),item])).values()];
 export function AgentActiveTopic({topic,disabled,onChange,onCancel}:{topic:ResearchTopic;disabled:boolean;onChange:(topic:ResearchTopic)=>void;onCancel:()=>void}) {
@@ -38,7 +38,7 @@ export function useResearchSelection(key:string){
   return [state.key===key?state.value:null,(value:ResearchSelection|null)=>{setState({key,value});try{if(value)userProfileStorage.setItem("hub.agent.research."+key,JSON.stringify(value));else userProfileStorage.removeItem("hub.agent.research."+key);}catch{}}] as const;
 }
 export function AgentResearchPolicy({value,disabled,onChange}:{value:ResearchPolicy;disabled:boolean;onChange:(v:ResearchPolicy)=>void}){
-  return <div className="agent-research-policies">{(Object.keys(policyNames) as ResearchPolicy[]).map(policy=><button type="button" key={policy} disabled={disabled} className="agent-menu-choice" aria-pressed={value===policy} onClick={()=>onChange(policy)}><span><strong>{policyNames[policy]}</strong><small>{policy==="material-first"?"先读核心材料，必要时联网补充":policy==="materials-only"?"只使用所选材料，缺少依据时说明":"围绕问题研究，保持本地资料范围"}</small></span>{value===policy&&<Check size={16} aria-hidden="true"/>}</button>)}</div>;
+  return <div className="agent-research-policies">{(Object.keys(policyNames) as ResearchPolicy[]).filter(policy=>policy!=="open" || value==="open").map(policy=><button type="button" key={policy} disabled={disabled} className="agent-menu-choice" aria-pressed={value===policy} onClick={()=>onChange(policy)}><span><strong>{policyNames[policy]}</strong><small>{policy==="material-first"?"先读所选资料，再按联网设置补充":policy==="materials-only"?"回答只使用所选资料":"围绕问题研究，保持本地资料范围"}</small></span>{value===policy&&<Check size={16} aria-hidden="true"/>}</button>)}</div>;
 }
 export function AgentResearchTopics({open,saveMode,config,active,disabled,onApply,onClose,initialId,onBack,onMetadata}:{onBack?:()=>void;onMetadata?:(topic:ResearchTopic)=>void;initialId?:string;open:boolean;saveMode:boolean;config:Omit<ResearchTopic,"id"|"revision"|"title"|"pinned">;active?:ResearchTopic;disabled:boolean;onApply:(t:ResearchTopic)=>Promise<void>;onClose:()=>void}){
   const [topics,setTopics]=useState<ResearchTopic[]>([]),[query,setQuery]=useState(""),[title,setTitle]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(false),[saveSkills,setSaveSkills]=useState(true);

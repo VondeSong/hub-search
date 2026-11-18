@@ -56,7 +56,6 @@ export function loadAgentPreferences(): AssistantOptions {
   try {
     const saved = JSON.parse(localStorage.getItem(key) || "null");
     if (!saved || typeof saved !== "object") return defaults;
-    if (["material-first","materials-only","open"].includes(saved.researchPolicy)) defaults.researchPolicy = saved.researchPolicy;
     const model = saved.model;
     if (model && [undefined, "codex", "deepseek"].includes(model.provider) && typeof model.model === "string" && model.model.length <= 200 && typeof model.reasoningEffort === "string" && model.reasoningEffort.length <= 40 && typeof model.fast === "boolean" && Number.isInteger(model.maxConcurrent) && model.maxConcurrent >= 1 && model.maxConcurrent <= 32) {
       defaults.model = { provider: model.provider, model: model.model, reasoningEffort: model.reasoningEffort, fast: model.fast, maxConcurrent: model.maxConcurrent };
@@ -83,7 +82,7 @@ export function rememberAgentPreferences(value: AssistantOptions, previous?: Ass
   const codexWebSearch = provider === "codex" ? value.webSearch ?? "disabled"
     : previous && previousProvider === "codex" ? previous.webSearch ?? "disabled"
     : loadCodexWebSearchPreference();
-  try { localStorage.setItem(key, JSON.stringify({ researchPolicy:value.researchPolicy, model: value.model, webSearch: provider === "deepseek" ? "disabled" : codexWebSearch, codexWebSearch })); }
+  try { localStorage.setItem(key, JSON.stringify({ model: value.model, webSearch: provider === "deepseek" ? "disabled" : codexWebSearch, codexWebSearch })); }
   catch { /* Saving the actual conversation does not depend on browser preference storage. */ }
   rememberAgentModelPreference(value.model);
 }

@@ -89,7 +89,7 @@ afterEach(async () => {
 
 it.each(["live", "cached", "disabled"] as const)("restores Codex search after a DeepSeek round trip (%s)", async webSearch => {
   const model = { provider: "codex", model: "codex-search-test", reasoningEffort: "medium", fast: false, maxConcurrent: 2 };
-  localStorage.setItem("hub.agent.preferences.v1", JSON.stringify({ model, webSearch }));
+  localStorage.setItem("hub.agent.preferences.v1", JSON.stringify({ model, webSearch, researchPolicy: "materials-only" }));
   vi.mocked(loadCodexSuiteModels).mockImplementation(async (provider = "codex") => [{ id: provider + "-search-test", name: provider, reasoningLevels: ["medium"], defaultReasoning: "medium" }]);
   await render(<StandaloneInvestigation initiallyOpen/>);
   async function choose(provider: ModelProvider) {
@@ -105,10 +105,11 @@ it.each(["live", "cached", "disabled"] as const)("restores Codex search after a 
   await submit("联网偏好切换回归");
   const configured = invoke.mock.calls.find(([command, payload]) => command === "agent_investigation" && payload?.args?.action === "configureAssistant")![1].args.options;
   expect(configured.webSearch).toBe(webSearch);
+  expect(configured.researchPolicy).toBe("material-first");
   expect(configured.model.provider).toBe("codex");
 });
 
-it("keeps pinned skills only in the bottom skill library and the scope overview to three entries",async()=>{
+it("keeps pinned skills in the skill library and hides the policy with empty scope",async()=>{
   await render(<StandaloneInvestigation initiallyOpen/>);
   await activate(select<HTMLButtonElement>('.agent-skill-shortcut'));
   await activate(select<HTMLButtonElement>('[aria-label="置顶技能 资料分析与核对"]'));
@@ -119,7 +120,7 @@ it("keeps pinned skills only in the bottom skill library and the scope overview 
   await activate(select<HTMLButtonElement>('[aria-label="关闭任务模式"]'));
   await activate(select<HTMLButtonElement>('.agent-scope-trigger'));
   const panel=select<HTMLElement>('.agent-add-materials');
-  expect([...panel.querySelectorAll('.agent-scope-overview>button strong,.agent-scope-overview>details>summary strong')].map(e=>e.textContent)).toEqual(['资料策略','核心材料','可检索的资料库']);
+  expect([...panel.querySelectorAll('.agent-scope-overview>button strong,.agent-scope-overview>details>summary strong')].map(e=>e.textContent)).toEqual(['核心材料','可检索的资料库']);
   expect(panel.querySelector('.agent-popover-header')?.textContent).toBe('资料范围');
   expect(panel.querySelector('[aria-label="返回资料范围"]')).toBeNull();
   expect(panel.querySelector('.agent-scope-extra')).toBeNull();
@@ -134,6 +135,28 @@ it("keeps pinned skills only in the bottom skill library and the scope overview 
   await activate(select<HTMLButtonElement>('.agent-scope-done'));
   expect(document.activeElement).toBe(select<HTMLTextAreaElement>('[name="investigationGoal"]'));
   expect(calls('create')).toHaveLength(0);
+});
+
+it("blocks an empty materials-only scope until the user switches to ordinary chat", async () => {
+  localStorage.setItem("hub.agent.preferences.v1", JSON.stringify({ webSearch: "cached" }));
+  await render(<StandaloneInvestigation initiallyOpen startFresh />);
+  await activate(select<HTMLButtonElement>(".agent-scope-trigger"));
+  const library = select<HTMLInputElement>('input[aria-label="允许查找 资料库 A"]');
+  await activate(library);
+  const policy = select<HTMLDetailsElement>(".agent-scope-overview details:has(.agent-research-policies)");
+  expect(policy.querySelector("summary")?.textContent).toContain("怎样使用资料");
+  await activate([...policy.querySelectorAll("button")].find(button => button.textContent?.startsWith("只用所选资料"))!);
+  await activate(library);
+  expect(document.body.textContent).toContain("请添加资料，或切换为普通提问");
+  await submit("保留这条提问");
+  expect(calls("create")).toHaveLength(0);
+  expect(select<HTMLTextAreaElement>('[name="investigationGoal"]').value).toBe("保留这条提问");
+  await activate(select<HTMLButtonElement>(".agent-scope-recovery button"));
+  expect(document.querySelector(".agent-scope-recovery")).toBeNull();
+  await submit("保留这条提问");
+  expect(calls("create")).toHaveLength(1);
+  expect(invoke.mock.calls.find(([,payload]) => payload?.args?.action === "configureAssistant")?.[1].args.options)
+    .toMatchObject({ researchPolicy: "material-first", webSearch: "cached" });
 });
 
 const select = <T extends Element>(selector: string, within: ParentNode = document): T => {

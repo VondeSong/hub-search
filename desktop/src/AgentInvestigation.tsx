@@ -44,7 +44,7 @@ import { runtimeCapabilities } from "./RuntimePlatform";
 import { useDocumentVisible } from "./WindowVisibility";
 import { useAgentUiTiming, type TimedEvent } from "./useAgentUiTiming";
 import { AgentTagAction, type AgentActions } from "./AgentTagAction";
-import { AgentAssistantOptions, defaultAssistantOptions, type AssistantOptions } from "./AgentAssistantOptions";
+import { AgentAssistantOptions, defaultAssistantOptions, webSearchNames, type AssistantOptions } from "./AgentAssistantOptions";
 import { AgentBusinessActions, ArchiveRecord, FlashcardRecord } from "./AgentBusinessActions";
 import { AgentObsidianEdit, AgentObsidianTarget, AgentReportSave } from "./AgentObsidianEdit";
 import { AgentConditions, type AgentCondition } from "./AgentConditions";
@@ -720,11 +720,29 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   };
   const [publicUrl,setPublicUrl] = useState("");
   const resumeQueue=async(selectedMessageId?:string)=>{if(!view)return;cancelResponse.current=false;setPendingRun(true);setError("");try{const next=await call<View>({action:"resumeQueue",id:view.work.id,mode,selectedMessageId,expectedRunId:view.lifecycle?.activeRunId??null,...(view.lifecycle?lifecycleRequest(view.lifecycle,crypto.randomUUID()):{})});if(alive.current)setView(current=>acceptLifecycleSnapshot(current,next));}catch(reason){await showRunError(view.work.id,reason);}finally{if(alive.current){setPendingRun(false);void refresh(view.work.id);}}};
+  const scopeOptions = view ? view.assistantOptions ?? defaultAssistantOptions : assistantOptions;
+  const scopePolicy = scopeOptions.researchPolicy ?? "material-first";
+  const materialsOnly = scopePolicy === "materials-only";
+  const composerGrant = researchGrant(manualResearchGrant(), research?.topic.grant, research?.includeManual);
+  const hasEffectiveMaterials = Boolean(
+    composerGrant.notes.length || composerGrant.sources?.length || composerGrant.readingItemKeys.length ||
+    composerGrant.libraryIds.length || composerGrant.images?.length || view?.work.grant.manifest?.members.length ||
+    ((!research || research.includeManual) && snippets.length)
+  );
+  const needsMaterials = materialsOnly && !hasEffectiveMaterials;
+  const blockEmptyScope = needsMaterials && !active && !saveOnly && !confirmMessage;
+  const scopeRecovery = "当前只用所选资料。请添加资料，或切换为普通提问。";
+  const openMaterialScope = () => {
+    setAddPage("scope");
+    setAddMenuOpen(true);
+    if (materialPopover.ref.current) materialPopover.ref.current.open = true;
+  };
   const submitInFlight=useRef(false);
   const createRequest = async (event: React.FormEvent, preparedView = view) => {
     let view=preparedView;
     event.preventDefault();
     if (busy || filePreparing || stopping) return;
+    if (blockEmptyScope) { openMaterialScope(); return; }
     if (!goal.trim() && !materials.length && !dropped.length && !snippets.length && !imageChanges.addImages.length && !(tagMode&&tagPreparation.tag)) { setError("请输入问题或添加附件。"); goalInput.current?.focus(); return; }
     if(research&&!active){
       const scope=selectionScope.current;setBusy(true);
@@ -974,7 +992,13 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       if(!alive.current||selectionScope.current!==scope)throw Error("对话已切换，当前对话设置未改变");
       setView(next);
     } else setAssistantOptions(options);
-    if(remember&&(JSON.stringify(previous.model)!==JSON.stringify(options.model) || previous.webSearch!==options.webSearch || previous.researchPolicy!==options.researchPolicy)) rememberAgentPreferences(options,previous,runtime.settings?.provider);
+    if(remember&&(JSON.stringify(previous.model)!==JSON.stringify(options.model) || previous.webSearch!==options.webSearch)) rememberAgentPreferences(options,previous,runtime.settings?.provider);
+  };
+  const changeMaterialPolicy = async (policy: NonNullable<AssistantOptions["researchPolicy"]>) => {
+    try {
+      await saveAssistantOptions({ ...scopeOptions, researchPolicy: policy }, false);
+      if (research) setResearch({ ...research, topic: { ...research.topic, policy } });
+    } catch (reason) { setError(String(reason)); }
   };
   const outcomes=(items:NonNullable<AgentActions>["items"])=>items.length ? <div className="agent-outcomes" aria-label="对话成果">{items.map(item=>item.kind==="flashcardDrafts" ? <FlashcardRecord key={item.id} item={item as FlashcardAction} disabled={businessDisabled} revoked={view?.work.state==="revoked"} onAction={businessAction}/> : item.kind==="archiveCopy" ? <ArchiveRecord key={item.id} item={item as ArchiveAction} disabled={businessDisabled} revoked={view?.work.state==="revoked"} onAction={businessAction}/> : item.kind==="pluginWrite" ? <AgentPluginWriteRecord key={item.id} item={item} disabled={businessDisabled} revoked={view?.work.state==="revoked"} onAction={businessAction}/> : item.kind==="obsidianEdit" ? <AgentObsidianEdit key={item.id} actions={{tagOptions:[],items:[item]}} recordsOnly verificationPending={!!businessCheck?.uncertain && businessCheck.actionId===item.id} disabled={businessDisabled} revoked={view?.work.state==="revoked"} onAction={businessAction}/> : null)}</div> : null;
   const visibleNote=browsing?.entry&&"result" in browsing.entry?investigationAnchor(browsing.entry.result):pageAnchor;
@@ -1022,12 +1046,15 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     { label: "找出待办与待确认事项", icon: ListChecks, prompt: "梳理当前材料中的行动项、未解决的问题和需要确认的事项，并给出原文依据。" },
     { label: "核对依据与遗漏", icon: Search, prompt: "检查当前材料中哪些结论有依据、哪些还缺少证据或验证，说明依据和局限。" },
   ];
-  const detailGrant=research?researchGrant(manualResearchGrant(),research.topic.grant,research.includeManual):null;
+  const detailGrant=research?composerGrant:null;
   const detailCoreCount=detailGrant?detailGrant.notes.length+(detailGrant.sources?.length||0)+detailGrant.readingItemKeys.length:coreMaterialCount;
   const detailLibraries=detailGrant?detailGrant.libraryIds.length:composerLibraries.length;
-  const scopeStatus=[detailCoreCount?`${detailCoreCount} 份资料`:"",detailLibraries?`${detailLibraries} 个库`:""].filter(Boolean).join(" · ")||"未选资料";
+  const scopeStatus = [detailCoreCount ? `${detailCoreCount} 份资料` : "", detailLibraries ? `${detailLibraries} 个库` : ""].filter(Boolean).join(" · ") || (hasEffectiveMaterials ? "已选资料" : "未选资料");
+  const provider = (scopeOptions.model ?? runtime.settings)?.provider;
+  const searchStatus = materialsOnly ? "只用所选资料" : provider === "deepseek" ? "搜索不可用" :
+    scopeOptions.webSearch && scopeOptions.webSearch !== "disabled" ? webSearchNames[scopeOptions.webSearch] : "搜索关闭";
   const scopeDetails = view ? <>
-        <details className="agent-run-details agent-detail-row"><summary><AgentDetailSummary icon={<Layers size={16}/>} title="资料范围" status={scopeStatus}/></summary><p className="agent-note">资料策略：{policyNames[(view.assistantOptions||assistantOptions).researchPolicy||"material-first"]}。在输入框底部调整，浏览页面不会自动加入。</p>
+        <details className="agent-run-details agent-detail-row"><summary><AgentDetailSummary icon={<Layers size={16}/>} title="资料范围" status={scopeStatus}/></summary>{(hasEffectiveMaterials || materialsOnly) && <p className="agent-note">{needsMaterials ? scopeRecovery : policyNames[scopePolicy]}</p>}
         <p className="agent-note">{view.work.grant.manifest ? `已授权：固定清单 ${view.work.grant.manifest.members.length} 份材料` : view.work.grant.libraryIds.length ? `已授权：${view.work.grant.libraryIds.length} 个资料库` : view.work.state === "revoked" ? "已停止使用来源" : (!anchor || view.work.grant.notes && view.work.grant.notes.length>1) ? `已授权：${view.work.grant.notes?.length || 0} 份明确选中的文档/页面` : `已授权：${currentObjectLabel}`} · 下一轮{mode === "quick" ? "最多 8 分钟、8 次分析调用" : "最多 15 分钟、16 次分析调用"}，另有最多 1 次结果纠错，仍计入总时限。</p>
         {view.run?.usage.modelCalls !== undefined && <p className="agent-note">{nativeRun?`本轮 Agent 会话：${view.run.usage.agentSessions ?? "未返回"}；模型响应轮次：未返回`:"本轮已调用 "+view.run.usage.modelCalls+" 次"}，读取 {view.run.usage.entitiesRead || 0} 个来源、{view.run.usage.bodyChars || 0} 字符。</p>}
         {nativeTokens && <p className="agent-note">本轮输入 {tokenLabel(nativeTokens.inputTokens)} Token，其中缓存输入 {tokenLabel(nativeTokens.cachedInputTokens)}、未缓存输入 {tokenLabel(nativeTokens.uncachedInputTokens)}；输出 {tokenLabel(nativeTokens.outputTokens)}。恢复会话按本轮差额记录，缓存输入已包含在本轮输入中；缺少回执时显示未返回。</p>}
@@ -1037,7 +1064,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         {!!view.run?.usage.modelRetries && <p className="agent-note">模型超时后已重试 {view.run.usage.modelRetries} 次，计入本轮调用次数与总时限。</p>}
         {!!view.run?.usage.outputRepairs && <p className="agent-note">结果核验后已纠错 {view.run.usage.outputRepairs} 次，计入本轮调用次数与总时限。</p>}
         </details>
-  </> : <details className="agent-run-details agent-detail-row"><summary><AgentDetailSummary icon={<Layers size={16}/>} title="资料范围" status={scopeStatus}/></summary><p className="agent-note">资料策略：{policyNames[assistantOptions.researchPolicy||"material-first"]}。{hasDraftSources?"已选择待发送资料，发送消息时按本次选择授权。":"当前未添加资料，可直接提问。"}</p><button type="button" disabled={busy} onClick={()=>{detailsPopover.close();setAddPage("scope");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}>管理资料范围</button></details>;
+  </> : <details className="agent-run-details agent-detail-row"><summary><AgentDetailSummary icon={<Layers size={16}/>} title="资料范围" status={scopeStatus}/></summary>{(hasEffectiveMaterials || materialsOnly) && <p className="agent-note">{needsMaterials ? scopeRecovery : policyNames[scopePolicy]}</p>}<button type="button" disabled={busy} onClick={()=>{detailsPopover.close();openMaterialScope();}}>{hasEffectiveMaterials ? "管理资料范围" : "添加资料"}</button></details>;
   const conversationDetails = view ? <>
         {!!view.decisions.length && <details><summary>你确认的决定（{view.decisions.length}）</summary><ul>{[...view.decisions].reverse().map((item, index) => <li key={index}>{item.text}</li>)}</ul></details>}
         <details className="agent-more-tools agent-detail-row" open={canEditNote && (view.work.goal === "修改当前 Obsidian 笔记" || !!view.actions?.items.some(item => item.kind === "obsidianEdit"))}><summary><AgentDetailSummary icon={<NotebookPen size={16}/>} title="成果与保存"/></summary><p className="agent-note">从回答下方插入页面、创建笔记或任务。保存前可查看并修改草稿。</p>
@@ -1096,7 +1123,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
             {onTopicBack&&<button type="button" disabled={busy||!!active} onClick={onTopicBack}><ArrowLeft size={16}/>返回专题所在工作</button>}
           </div>
           <section className="agent-detail-section agent-detail-materials" hidden={taskStatusOnly}><h3 className="agent-detail-group-title">资料与工具</h3>{scopeDetails}
-          <details className="agent-run-details agent-detail-row"><summary><AgentDetailSummary icon={<Globe2 size={16}/>} title="联网与工具" status={(view?.assistantOptions||assistantOptions).researchPolicy==="materials-only"?"不联网":"按资料策略"}/></summary><AgentAssistantOptions workId={view?.work.id} section="connection" value={view?view.assistantOptions||defaultAssistantOptions:assistantOptions} disabled={busy||!!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/></details>
+          <details className="agent-run-details agent-detail-row"><summary><AgentDetailSummary icon={<Globe2 size={16}/>} title="联网与工具" status={searchStatus}/></summary><AgentAssistantOptions workId={view?.work.id} section="connection" value={view?view.assistantOptions||defaultAssistantOptions:assistantOptions} disabled={busy||!!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/></details>
           {anchor?.kind==="note"&&canEditNote&&<AgentTopics key={`topics-${view?.work.id||draftRevision}`} anchor={anchor} work={view?.work} disabled={businessDisabled||!!active} onOpenWork={async (id,source,draft)=>{if(source&&!sameNoteAnchor(source.anchor,anchor)){if(!onOpenTopicWork)throw new Error("此入口尚不支持跨笔记继续，请从本期笔记打开原工作");onOpenTopicWork(id,source,view?.work.id,draft);return;}setLibraryDraft(null);setError("");setGoal("");setMaterials([]);setDropped([]);setRemovals([]);setSourcePreview(null);sourceSequence.current++;await refresh(id);if(alive.current){void reloadWorks();if(draft){setGoal(draft);goalInput.current?.focus();}}}}/>}
           <SharedMemory summary={selection=><AgentDetailSummary icon={<Brain size={16}/>} title="共享记忆" status={(view?.assistantOptions||assistantOptions).researchPolicy==="materials-only"?"本轮不使用":selection?selection.enabled?"已启用":"未启用":"展开核对"}/>} key={'details-memory-'+(view?.work.id || draftRevision)} compact workId={view?.work.id} initialSelection={memorySelection} disabled={busy || !!active} onSelectionChange={setMemorySelection} usage={view?.memoryUse}/>
           </section>
@@ -1248,10 +1275,16 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
                 {addMenuOpen && addPage==="skills" && <AgentSkills pinned={pinnedSkills} onPin={toggleSkillPin} selected={selectedSkills.map(token=>token.slice(1))} onReset={()=>setGoal(questionText)} disabled={busy || (!!active && !steerable)} onSelect={name=>{setGoal(current=>new RegExp(`(^|[^a-zA-Z0-9_$\\\\-])\\$${name}(?=$|[^a-zA-Z0-9_-])`).test(current)?current:`$${name} ${current}`);materialPopover.close(false);goalInput.current?.focus();}} embedded/>}
                 {addMenuOpen && (addPage==="materials" || addPage==="scope" || addPage==="pages") && <div className="agent-add-section agent-scope-body">
             {addPage!=="pages"&&<div className="agent-scope-overview">
-              <details><summary><SlidersHorizontal size={16}/><strong>资料策略</strong><small>{policyNames[(view?.assistantOptions||assistantOptions).researchPolicy||"material-first"]}</small><ChevronDown size={14}/></summary><AgentResearchPolicy value={(view?.assistantOptions||assistantOptions).researchPolicy||"material-first"} disabled={busy||!!active} onChange={policy=>void saveAssistantOptions({...view?.assistantOptions||assistantOptions,researchPolicy:policy}).then(()=>{if(research)setResearch({...research,topic:{...research.topic,policy}});}).catch(e=>setError(String(e)))}/></details>
               <button type="button" onClick={()=>setAddPage("pages")}><FileText size={16}/><strong>核心材料</strong><span>{coreMaterialCount?`${coreMaterialCount} 份资料`:"添加页面"}</span><ChevronRight size={14}/></button>
               <details><summary><Library size={16}/><strong>可检索的资料库</strong><small>{composerLibraries.length?composerLibraries.length+" 个库":"未选择"}</small><ChevronDown size={14}/></summary>{!view?.work.grant.manifest&&<AgentLibraryScope registry={libraryRegistry} selected={composerLibraries} disabled={businessDisabled||!!active||confirmMessage||view?.work.state==="revoked"} onChange={changeLibraries}/>}</details>
-
+              {hasEffectiveMaterials && <details>
+                <summary><SlidersHorizontal size={16}/><strong>怎样使用资料</strong><small>{policyNames[scopePolicy]}</small><ChevronDown size={14}/></summary>
+                <AgentResearchPolicy value={scopePolicy} disabled={busy || !!active} onChange={changeMaterialPolicy}/>
+              </details>}
+              {needsMaterials && <div className="agent-scope-recovery">
+                <p className="agent-note" role="status">{scopeRecovery}</p>
+                <button type="button" disabled={busy || !!active} onClick={() => void changeMaterialPolicy("material-first")}>切换为普通提问</button>
+              </div>}
             </div>}
             {addPage==="pages"&&<AgentAnalysisInputs disabled={busy||filePreparing||!!view?.work.grant.manifest||!!publicUrl||materials.length>=31} onSelect={item=>{setMaterials(current=>current.some(n=>materialKey(n.locator)===materialKey(item.locator))?current:[...current,item]);materialPopover.close(false);goalInput.current?.focus();}}/>}
             {addPage==="pages"&&<div className="agent-scope-extra"><button type="button" disabled={!!view?.work.grant.manifest||!!publicUrl} onClick={()=>setAddPage("images")}>选择资料库图片</button>{!view&&!pageAttached&&!materials.length&&(assistantOptions.researchPolicy!=="materials-only")&&<button type="button" onClick={()=>setAddPage("web")}>读取公共链接</button>}</div>}
@@ -1271,18 +1304,21 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
               {!view && anchor?.kind!=="note" && <p className="agent-note">可在上方选择资料库范围，或单独添加页面。</p>}
             </div>}
             </details></div>}
-                {addMenuOpen&&["materials","scope","pages"].includes(addPage)&&<footer className="agent-scope-footer"><p className="agent-note">{addPage==="pages"?"只添加选中的页面，不开放整个资料库。":hasDraftSources||research?"所选范围用于下一轮；浏览页面不会自动加入资料。":"未选资料，可直接提问。"}</p><div>{addPage!=="pages"&&<button type="button" disabled={busy||!!active||!!view?.work.grant.manifest||!hasDraftSources&&!research} onClick={()=>{materialPopover.close();setRequestedTopic(undefined);setTopicSave(true);setTopicsOpen(true);}}><FolderBookmark size={14}/>保存为专题</button>}<button type="button" className="agent-scope-done" disabled={addPage==="pages"&&(busy||filePreparing||!!businessCheck||confirmMessage||!!removals.length)} onClick={()=>{if(addPage==="pages")setAddPage("scope");else{materialPopover.close();goalInput.current?.focus();}}}>{addPage==="pages"?"完成选择":"完成"}</button></div></footer>}
+                {addMenuOpen&&["materials","scope","pages"].includes(addPage)&&<footer className="agent-scope-footer"><p className="agent-note">{addPage==="pages"?"只添加选中的页面，不开放整个资料库。":hasEffectiveMaterials?"所选范围用于下一轮。":needsMaterials?"":"未选资料，可直接提问。"}</p><div>{addPage!=="pages"&&<button type="button" disabled={busy||!!active||!!view?.work.grant.manifest||!hasDraftSources&&!research} onClick={()=>{materialPopover.close();setRequestedTopic(undefined);setTopicSave(true);setTopicsOpen(true);}}><FolderBookmark size={14}/>保存为专题</button>}<button type="button" className="agent-scope-done" disabled={addPage==="pages"&&(busy||filePreparing||!!businessCheck||confirmMessage||!!removals.length)} onClick={()=>{if(addPage==="pages")setAddPage("scope");else{materialPopover.close();goalInput.current?.focus();}}}>{addPage==="pages"?"完成选择":"完成"}</button></div></footer>}
 
               </div>
             </details>
             <AgentAssistantOptions section="permissions" value={(view ? view.assistantOptions || defaultAssistantOptions : assistantOptions)} disabled={busy || !!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
-            <AgentScopeTrigger selected={detailGrant ? detailGrant.libraryIds.map(id=>({id,name:id})) : composerLibraries} registry={libraryRegistry} fallbackLabel={detailGrant ? (detailCoreCount ? `${detailCoreCount} 份资料` : "添加资料范围") : view?.work.grant.manifest ? `固定 ${view.work.grant.manifest.members.length} 份资料` : (materials.length || dropped.length || snippets.length || (view?.work.grant.notes?.length || 0)>1) ? "已添加资料" : (pageAttached || !!anchor) ? "当前页面" : "添加资料范围"} pending={libraryDraft!==null} disabled={busy || filePreparing || !!publicUrl} onClick={()=>{setAddPage("scope");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}/>
+            <AgentScopeTrigger selected={detailGrant ? detailGrant.libraryIds.map(id=>({id,name:id})) : composerLibraries} registry={libraryRegistry} fallbackLabel={detailGrant ? (detailCoreCount ? `${detailCoreCount} 份资料` : "添加资料范围") : view?.work.grant.manifest ? `固定 ${view.work.grant.manifest.members.length} 份资料` : (pageAttached ? "当前页面" : hasEffectiveMaterials ? "已添加资料" : "添加资料范围")} pending={libraryDraft!==null} disabled={busy || filePreparing || !!publicUrl} onClick={openMaterialScope}/>
           <button type="button" className="agent-current-page agent-skill-shortcut" aria-label="添加技能" title="技能：选择本次使用的处理方法" disabled={busy || (!!active && !steerable)} onClick={()=>{setAddPage("skills");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}><WandSparkles size={18} aria-hidden="true"/></button>
           {textMaterials?.selection&&<button type="button" className="agent-current-page agent-selection-tool" aria-label="添加所选文字" title="添加所选文字（文字快照，不是区块）" disabled={busy||filePreparing||!!view?.work.grant.manifest} onMouseDown={event=>event.preventDefault()} onClick={()=>{addTextMaterial(textMaterials.selection!);textMaterials.clearSelection();}}><Quote size={18}/></button>}
             <AgentAssistantOptions value={(view ? view.assistantOptions || defaultAssistantOptions : assistantOptions)} disabled={busy || !!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
             {active && <button className="agent-send" type="button" aria-label="停止本轮" title="停止本轮" disabled={busy || stopping || !!view?.lifecycle && !view.lifecycle.activeRunId} onClick={()=>void mutate("cancel")}><Square size={13} fill="currentColor" aria-hidden="true" /></button>}
-            {(!active || !!goal.trim() || !!materials.length || !!dropped.length || !!snippets.length || !!imageChanges.addImages.length) && <button className="agent-send" type="submit" aria-label={tagMode&&!active?tagTaskNames[tagPreparation.task]:saveOnly&&!active?"保存补充":"发送"} aria-keyshortcuts="Control+Enter Meta+Enter" title="发送" disabled={busy || filePreparing || stopping || !!removals.length || (!goal.trim()&&!materials.length&&!dropped.length&&!snippets.length&&!imageChanges.addImages.length&&!(tagMode&&tagPreparation.tag))}><ArrowUp size={19} /></button>}
+            {(!active || !!goal.trim() || !!materials.length || !!dropped.length || !!snippets.length || !!imageChanges.addImages.length) && <button className="agent-send" type="submit" aria-label={tagMode&&!active?tagTaskNames[tagPreparation.task]:saveOnly&&!active?"保存补充":"发送"} aria-keyshortcuts="Control+Enter Meta+Enter" title="发送" disabled={busy || filePreparing || stopping || !!removals.length || blockEmptyScope || (!goal.trim()&&!materials.length&&!dropped.length&&!snippets.length&&!imageChanges.addImages.length&&!(tagMode&&tagPreparation.tag))}><ArrowUp size={19} /></button>}
           </div>
+          {blockEmptyScope && <p className="agent-composer-note" role="status">
+            当前只用所选资料。<button type="button" className="agent-scope-recover-link" onClick={openMaterialScope}>添加资料或切换策略</button>
+          </p>}
           {filePreparing&&<p className="agent-composer-note" role="status">正在准备附件，可继续输入…</p>}{saveOnly&&!active&&<p className="agent-composer-note">保存补充，不启动运行</p>}
         </form>}
       </div>

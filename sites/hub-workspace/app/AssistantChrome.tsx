@@ -22,11 +22,11 @@ function MenuHeading({ title, close }: { title: string; close: () => void }) {
   return <header className="ha-menu-heading"><strong>{title}</strong><button type="button" className="ha-icon" aria-label={'关闭' + title} onClick={close}><X size={16}/></button></header>;
 }
 
-export function AssistantHeader({ tagMode, menu, setMenu, title, topicName, hasSkills, settings, setSettings, expanded, onExpand, onClose, history, currentId, onNew, onSelect, onHistoryChange, disabled, hasReport, reading, onReading, messageCount, materialCount, libraryCount, taskStatus, modePanel }: MenuProps & {
+export function AssistantHeader({ tagMode, menu, setMenu, title, topicName, hasSkills, settings, setSettings, expanded, onExpand, onClose, history, currentId, onNew, onSelect, onHistoryChange, disabled, hasReport, reading, onReading, messageCount, materialCount, libraryCount, hasMaterials, taskStatus, modePanel }: MenuProps & {
   tagMode: boolean; title: string; topicName?: string; hasSkills: boolean; settings: AssistantSettings; setSettings: (value: AssistantSettings) => void;
   expanded: boolean; onExpand: () => void; onClose: () => void; disabled: boolean;
   history: HistoryItem[]; currentId: string; onNew: () => void; onSelect: (id: string) => void;
-  onHistoryChange: (id: string, change: HistoryChange) => void; hasReport: boolean; reading: boolean; onReading: () => void; messageCount: number; materialCount: number; libraryCount: number; taskStatus?: 'running' | 'paused'; modePanel: ReactNode;
+  onHistoryChange: (id: string, change: HistoryChange) => void; hasReport: boolean; reading: boolean; onReading: () => void; messageCount: number; materialCount: number; libraryCount: number; hasMaterials: boolean; taskStatus?: 'running' | 'paused'; modePanel: ReactNode;
 }) {
   const toggle = (value: AssistantMenu) => setMenu(menu === value ? null : value);
   const modeLabel = tagMode ? '标签' : topicName ? '专题' : '标准';
@@ -36,7 +36,7 @@ export function AssistantHeader({ tagMode, menu, setMenu, title, topicName, hasS
     {modePanel}
     <div className="ha-header-end"><button type="button" className="ha-icon ha-layout-toggle" title={expanded ? '切换为浮窗' : '展开为侧边栏'} aria-label={expanded ? '切换为浮窗' : '展开为侧边栏'} onClick={() => { setMenu(null); onExpand(); }}>{expanded ? <PanelsTopLeft size={18} aria-hidden="true"/> : <PanelRight size={18} aria-hidden="true"/>}</button><button type="button" className="ha-icon" title="对话详情" aria-label="对话详情" aria-expanded={menu === 'details' || menu === 'usage'} onClick={() => setMenu(menu === 'details' || menu === 'usage' ? null : 'details')}><MoreHorizontal size={18}/></button><button type="button" className="ha-icon" title="关闭助手（Esc）" aria-label="关闭助手" onClick={onClose}><X size={19}/></button></div>
     {menu === 'history' && <AssistantHistory history={history} currentId={currentId} disabled={disabled} onSelect={onSelect} onChange={onHistoryChange} onClose={() => setMenu(null)}/>}
-    {(menu === 'details' || menu === 'usage') && <AssistantDetails taskStatus={taskStatus} usageOpen={menu === 'usage'} settings={settings} setSettings={setSettings} disabled={disabled} hasReport={hasReport} reading={reading} onReading={onReading} onClose={() => setMenu(null)} messageCount={messageCount} materialCount={materialCount} libraryCount={libraryCount}/>}
+    {(menu === 'details' || menu === 'usage') && <AssistantDetails taskStatus={taskStatus} usageOpen={menu === 'usage'} settings={settings} setSettings={setSettings} disabled={disabled} hasReport={hasReport} reading={reading} onReading={onReading} onClose={() => setMenu(null)} messageCount={messageCount} materialCount={materialCount} libraryCount={libraryCount} hasMaterials={hasMaterials}/>}
   </header>;
 }
 

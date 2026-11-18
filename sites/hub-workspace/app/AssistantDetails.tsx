@@ -13,12 +13,15 @@ function DetailRow({ icon, title, status, children }: { icon: ReactNode; title: 
   </details>;
 }
 
-export function AssistantDetails({ settings, setSettings, disabled, hasReport, reading, onReading, onClose, messageCount, materialCount, libraryCount, usageOpen = false, taskStatus }: {
-  settings: AssistantSettings; setSettings: (value: AssistantSettings) => void; disabled: boolean; hasReport: boolean; reading: boolean; onReading: () => void; onClose: () => void; messageCount: number; materialCount: number; libraryCount: number; usageOpen?: boolean; taskStatus?: 'running' | 'paused';
+export function AssistantDetails({ settings, setSettings, disabled, hasReport, reading, onReading, onClose, messageCount, materialCount, libraryCount, hasMaterials, usageOpen = false, taskStatus }: {
+  settings: AssistantSettings; setSettings: (value: AssistantSettings) => void; disabled: boolean; hasReport: boolean; reading: boolean; onReading: () => void; onClose: () => void; messageCount: number; materialCount: number; libraryCount: number; hasMaterials: boolean; usageOpen?: boolean; taskStatus?: 'running' | 'paused';
 }) {
   const progress = taskStatus === 'running' ? '正在处理' : taskStatus === 'paused' ? '已暂停' : hasReport ? '回答已生成' : '尚未开始';
   const scope = [materialCount ? materialCount + ' 份资料' : '', libraryCount ? libraryCount + ' 个库' : ''].filter(Boolean).join(' · ') || '未选资料';
   const policy = researchPolicies.find(item => item.id === settings.researchPolicy) || researchPolicies[0];
+  const materialsOnly = settings.researchPolicy === 'materials-only';
+  const searchBlocked = materialsOnly || settings.model === 'deepseek';
+  const searchNames = { disabled: '关闭', cached: '缓存搜索', live: '实时搜索' };
   const taskDetails = <dl className="ha-detail-facts" aria-live="polite">
     <div><dt>任务进展</dt><dd>{progress}</dd></div>
     <div><dt>对话消息</dt><dd>{messageCount} 条</dd></div>
@@ -32,11 +35,22 @@ export function AssistantDetails({ settings, setSettings, disabled, hasReport, r
       </section>}
       <section className="ha-detail-section" aria-label="资料与工具"><h3>资料与工具</h3>
         <DetailRow icon={<Layers size={16}/>} title="资料范围" status={scope}>
-          <dl className="ha-detail-facts ha-detail-scope"><div><dt>资料策略</dt><dd>{policy.name}</dd></div><div><dt>选定范围</dt><dd>{scope}</dd></div></dl>
-          <p>在输入框底部调整。浏览页面不会自动加入。</p>
+          {hasMaterials || materialsOnly ? <p>{materialsOnly && !hasMaterials ? '请添加资料，或切换为普通提问。' : policy.name}</p> : null}
+          <p>从输入框底部添加页面或资料库。</p>
         </DetailRow>
-        <DetailRow icon={<Globe2 size={16}/>} title="联网与工具" status={settings.researchPolicy === 'materials-only' ? '不联网' : '按资料策略'}>
-          <AssistantConnection settings={settings}/>
+        <DetailRow icon={<Globe2 size={16}/>} title="联网与工具" status={materialsOnly ? '只用所选资料' : settings.model === 'deepseek' ? '搜索不可用' : searchNames[settings.webSearch]}>
+          <label className="ha-detail-setting"><span>联网搜索</span><select value={searchBlocked ? 'disabled' : settings.webSearch} disabled={disabled || searchBlocked} onChange={event => setSettings({ ...settings, webSearch: event.target.value as AssistantSettings['webSearch'] })}>
+            <option value="disabled">关闭</option><option value="cached">缓存搜索</option><option value="live">实时搜索</option>
+          </select></label>
+          {searchBlocked && <p>{materialsOnly ? '当前对话只使用所选资料。' : 'DeepSeek 模式下网页搜索不可用。'}</p>}
+          <details className="ha-connection-group"><summary>外部工具（MCP）</summary><AssistantNativeConnections disabled={disabled || searchBlocked}/></details>
+          <details className="ha-connection-group"><summary>开发者诊断{settings.externalMcp && <small>通过 MCP 调用</small>}</summary>
+            <label className="ha-detail-setting"><span>Hub 工具调用方式</span><select value={settings.externalMcp ? 'mcp' : 'direct'} disabled={disabled || settings.model === 'deepseek'} onChange={event => setSettings({ ...settings, externalMcp: event.target.value === 'mcp' })}>
+              <option value="direct">直接调用（默认）</option><option value="mcp">通过 MCP 调用</option>
+            </select></label>
+            <p>两种方式使用相同的资料范围和保存权限。MCP 用于检查工具调用。</p>
+          </details>
+          <p>此处演示设置，搜索和工具调用由桌面端执行。</p>
         </DetailRow>
         <DetailRow icon={<Brain size={16}/>} title="共享记忆" status={settings.memoryEnabled ? '已启用' : '未启用'}>
           <label className="ha-detail-setting"><span>下一轮使用共享记忆</span><input type="checkbox" disabled={disabled} checked={settings.memoryEnabled} onChange={event => setSettings({ ...settings, memoryEnabled: event.target.checked })}/></label>
@@ -52,15 +66,4 @@ export function AssistantDetails({ settings, setSettings, disabled, hasReport, r
       </section>
     </>}
   </section>;
-}
-
-function AssistantConnection({ settings }: { settings: AssistantSettings }) {
-  const web = settings.researchPolicy === 'materials-only' ? '只用本轮材料，不搜索网页或读取链接。'
-    : settings.model === 'deepseek' ? 'DeepSeek 不支持联网搜索。'
-    : settings.researchPolicy === 'open' ? '可按问题查询公开来源。' : '优先使用材料，有需要再补充网页。';
-  return <><dl className="ha-detail-facts ha-detail-connections">
-    <div><dt>网页补充</dt><dd>{web}</dd></div>
-    <div><dt>内置工具</dt><dd>遵循资料范围和保存权限。</dd></div>
-    <div><dt>外部工具（MCP）</dt><dd>由桌面端按对话配置。</dd></div>
-  </dl><p>站点原型不实际联网或连接外部服务。</p><AssistantNativeConnections disabled={settings.model==='deepseek'||settings.researchPolicy==='materials-only'}/></>;
 }

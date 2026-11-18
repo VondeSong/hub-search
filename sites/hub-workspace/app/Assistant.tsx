@@ -617,7 +617,10 @@ function AssistantConversation({
   const readableContexts = contexts.filter(item => canUseContext(item));
   const title = contextBlocked ? '来源不可用' : context?.workTitle || (context?.workId ? initial.title : '自由讨论');
   const material = context && !contextBlocked && !activeTopic && context.id !== omittedId && !resources.pages.some(item => item.id === context.id) ? context : null;
-  const hasDraftSources = !!material || !!turnResources.pages.length || !!turnResources.libraryIds.length || !!turnResources.images.length || !!turnResources.dataFiles?.length || !!turnResources.url || !!turnAttachments.length;
+  const hasMaterials = Boolean(material || turnResources.pages.length || turnResources.libraryIds.length || turnResources.images.length || turnResources.dataFiles?.length || turnAttachments.length);
+  const hasDraftSources = hasMaterials || !!turnResources.url;
+  const needsMaterial = settings.researchPolicy === 'materials-only' && !hasMaterials;
+  const effectiveWebSearch = settings.researchPolicy === 'materials-only' || settings.model === 'deepseek' ? 'disabled' : settings.webSearch;
   const evidence = collectEvidence(readableContexts);
   const running = session.active?.status === 'running';
   const paused = session.active?.status === 'paused';
@@ -782,6 +785,7 @@ function AssistantConversation({
   function send(text = input) {
     if (contextBlocked || inputBlocked || activeBlocked || resourcesBlocked) { notify('相关来源当前不可用，请先核对来源或移除未完成的演示请求'); return; }
     if (scopeTooLarge) { notify('本轮资料超过上限，请减少已选资料'); return; }
+    if (needsMaterial && !session.active) { changeMenu('materials'); return; }
     let value = text.trim() || (tagIntent ? tagPrompt({intent:tagIntent,tag:currentTag,other:tagOther}) : tagMode ? '' : turnResources.pages.length || turnResources.libraryIds.length || material ? '请核对所选资料的要点与待确认事项。' : turnAttachments.length || turnResources.images.length || turnResources.url ? '请整理这些附件或链接仍需补充的信息。' : '');
     if (!value) return;
     const researchDemo = settings.researchPolicy !== 'material-first' || !!(turnResources.libraryIds.length || turnResources.pages.length);
@@ -810,8 +814,8 @@ function AssistantConversation({
         type: 'send',
         request: {
           ...settings, researchDemo, id: uniqueId(), text: (tagRefs.length ? '讨论标签：'+tagRefs.map(name=>'#'+name+(tagModel.ruleFor(name)?'（'+tagModel.ruleFor(name)!.rule.description+'）':'（尚无已确认定义）')).join('、')+'\n\n' : '')+value,
-          webSearch: settings.researchPolicy === 'materials-only' || settings.model === 'deepseek' ? 'disabled' : 'live',
-          externalMcp: false, mcpServices: [],
+          webSearch: effectiveWebSearch,
+          mcpServices: [],
           context: requestContext, resources: { ...turnResources, url: settings.researchPolicy === 'materials-only' ? '' : publicLinkIn(value) || turnResources.url },
           additions: [], attachmentNames: turnAttachments,
         },
@@ -1050,7 +1054,7 @@ function AssistantConversation({
         onBack={() => changeMenu(topicReview?.from || 'topics')} onClose={() => changeMenu(null)} onApply={() => applyTopic(reviewedTopic)} onEdit={() => editTopicScope(reviewedTopic)}/> : (menu === 'mode' || menu === 'topics') && <AssistantTaskModes tagActive={tagMode} onTag={() => { setTagMode(true); changeMenu(null); }} topics={topics} pins={pins} activeTopic={activeTopic?.id || null} skills={resources.skills} allTopics={menu === 'topics'} disabled={!!session.active}
         onPin={onPin} onSkill={id => { setResources(value => ({ ...value, skills: [...new Set([...value.skills, id])] })); changeMenu(null); }}
         onGeneral={() => { setTagMode(false); changeMenu(null); }}
-        onTopic={topic => { setTopicReview({ id: topic.id, from: menu === 'topics' ? 'topics' : 'mode' }); changeMenu('topic-review'); }} onAllTopics={() => changeMenu(menu === 'topics' ? 'mode' : 'topics')} onUsage={() => changeMenu('usage')} onClose={() => changeMenu(null)}/>} taskStatus={session.active?.status} menu={menu} setMenu={changeMenu} title={chatTitle} settings={settings} setSettings={value => { if (!session.active) setSettings(value); }} expanded={expanded} onExpand={onExpand} onClose={onClose} history={history} currentId={workKey} onNew={onNew} onSelect={onSelect} onHistoryChange={onHistoryChange} disabled={!!session.active} hasReport={session.messages.some(item => item.role === 'assistant' && canUseContext(item.context))} reading={reading} onReading={() => setReading(value => !value)} messageCount={session.messages.length} materialCount={turnResources.pages.length + Number(!!material)} libraryCount={turnResources.libraryIds.length}/>
+        onTopic={topic => { setTopicReview({ id: topic.id, from: menu === 'topics' ? 'topics' : 'mode' }); changeMenu('topic-review'); }} onAllTopics={() => changeMenu(menu === 'topics' ? 'mode' : 'topics')} onUsage={() => changeMenu('usage')} onClose={() => changeMenu(null)}/>} taskStatus={session.active?.status} menu={menu} setMenu={changeMenu} title={chatTitle} settings={settings} setSettings={value => { if (!session.active) setSettings(value); }} expanded={expanded} onExpand={onExpand} onClose={onClose} history={history} currentId={workKey} onNew={onNew} onSelect={onSelect} onHistoryChange={onHistoryChange} disabled={!!session.active} hasReport={session.messages.some(item => item.role === 'assistant' && canUseContext(item.context))} reading={reading} onReading={() => setReading(value => !value)} messageCount={session.messages.length} materialCount={turnResources.pages.length + Number(!!material)} libraryCount={turnResources.libraryIds.length} hasMaterials={hasMaterials}/>
       <div className="ha-workspace">
         <div className="ha-conversation">
           {tagIntent&&!reading&&!contextBlocked&&<TagTaskSelector intent={tagIntent} onChange={prepareTag} onCancel={()=>{setTagIntent(null);setTagError('');composer.current?.focus({preventScroll:true});}}/>}
@@ -1082,7 +1086,7 @@ function AssistantConversation({
                   {!!message.tagResult.process?.length&&<AssistantProcess steps={message.tagResult.process}/>}
                 </>}
                 {message.tagTask && !message.tagResult && <div className="ha-message-actions"><button type="button" onClick={() => { setTagMode(true); setTag(message.tagTask!.tag); setTagRefs(refs=>[...new Set([...refs,message.tagTask!.tag])]); prepareTag(message.tagTask!.intent); }}>在标签助手继续</button></div>}
-                {!message.tagTask && !message.tagResult && <><AssistantProcess webEnabled={settings.webSearch!=='disabled'}/>
+                {!message.tagTask && !message.tagResult && <><AssistantProcess webEnabled={effectiveWebSearch !== 'disabled'}/>
                 <div className="ha-message-actions"><button type="button" className="ha-copy-answer" aria-label={copied === message.id ? '已复制回答' : '复制回答'} title={copied === message.id ? '已复制' : '复制回答'} onClick={async () => { try { await navigator.clipboard.writeText([message.text, ...(message.sections || []).map(item => item.heading + '\n' + item.body)].join('\n\n')); setCopied(message.id); } catch { notify('复制失败，请重试或选择正文复制。'); } }}>{copied === message.id ? <Check size={16}/> : <Copy size={16}/>}</button>{onInsertPage && <button type="button" onClick={() => setInsertion({ body: [message.text, ...(message.sections || []).map(item => item.heading + '\n' + item.body)].join('\n\n'), source: message.context || null })}><FilePlus2 size={14}/>插入页面</button>}<button type="button" title="将回答另存为独立笔记" onClick={() => prepare(message, 'note')}><PencilLine size={14}/>新建笔记</button><button type="button" title="将回答转为可编辑的待办草稿" onClick={() => prepare(message, 'task')}><ListPlus size={14}/>创建任务</button></div></>}
               </>}
             </article>)}
@@ -1126,7 +1130,8 @@ function AssistantConversation({
               </section>}
               {inputBlocked && <div className="ha-input-blocked"><span>未发送的内容引用了不可用来源，暂时隐藏。</span><button type="button" onClick={()=>{setInput('');setInputContext(null);setAttachmentNames([]);}}>移除这份输入</button></div>}
               <textarea ref={composer} aria-label="给 Hub 助手的消息" value={inputBlocked || contextBlocked ? '' : input} disabled={contextBlocked || inputBlocked || activeBlocked} onChange={event => { setInput(event.target.value); setInputContext(material); }} onKeyDown={inputKey} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} placeholder={contextBlocked || inputBlocked || activeBlocked ? '请先核对来源状态…' : tagIntent ? '补充要求（可选）…' : tagMode && !session.messages.length ? '例如：查找 #线束设计 的漏标' : session.messages.length ? '继续追问，或告诉我接下来做什么…' : '询问 Hub 助手…'} maxLength={8000} rows={2} />
-              {linkInDraft && !inputBlocked && !contextBlocked && settings.researchPolicy === 'materials-only' && <p className="ha-link-policy-note" role="status">当前策略仅依据材料，链接会保留在消息中，网页不会读取。</p>}
+              {needsMaterial && !session.active && <p className="ha-link-policy-note" role="status">当前只用所选资料。<button type="button" className="ha-mode-link" onClick={() => changeMenu('materials')}>添加资料或切换策略</button></p>}
+              {linkInDraft && !needsMaterial && !inputBlocked && !contextBlocked && settings.researchPolicy === 'materials-only' && <p className="ha-link-policy-note" role="status">当前策略仅依据材料，链接会保留在消息中，网页不会读取。</p>}
               <div className="ha-input-actions">
                 <input type="file" hidden multiple ref={fileInput} aria-label="选择附件，仅显示文件名" onChange={attachFileNames} />
                 <AssistantTools menu={menu} setMenu={value=>{if(value==='tags')setTagPickerRole('references');changeMenu(value);}} settings={settings} setSettings={value => { if (!session.active) setSettings(value); }} material={material} disabled={!!session.active} resources={resources} onResources={setResources} skillPins={pins.skills} onPinSkill={id => onPin('skills', id)}
@@ -1134,7 +1139,7 @@ function AssistantConversation({
                   materialPanel={menu === 'materials' && <AssistantMaterialScope catalog={accessibleCatalog} resources={scopeResources} onChange={next => {setTagError("");topicEdit ? setTopicEdit({ ...topicEdit, resources: next }) : setResources(next);}} material={scopeMaterial}
                     current={scopeCurrent} topicScope={!topicEdit && activeTopic ? activeTopic.scope : undefined}
                     manualOnce={!topicEdit && activeTopic ? { checked: activeTopic.useManualOnce, count: manualSourceCount, onChange: checked => setActiveTopic(value => value && ({ ...value, useManualOnce: checked })) } : undefined}
-                    policy={scopePolicy} onPolicy={researchPolicy => topicEdit ? setTopicEdit({ ...topicEdit, policy: researchPolicy }) : setSettings(value => ({ ...value, researchPolicy }))} disabled={!!session.active} webStatus={topicEdit ? '' : webStatus}
+                    effectiveScope={topicEdit ? undefined : hasMaterials} policy={scopePolicy} onPolicy={researchPolicy => topicEdit ? setTopicEdit({ ...topicEdit, policy: researchPolicy }) : setSettings(value => ({ ...value, researchPolicy }))} disabled={!!session.active} webStatus={topicEdit ? '' : webStatus}
                     onSave={saveCurrentTopic} editingTopic={topicEdit?.topic} skillNames={scopeResources.skills.map(id => demoSkills.find(item => item[0] === id)?.[1] || id)} onDone={() => changeMenu(topicEdit ? 'topic-review' : null)} onRemoveCurrent={() => { if (material) { setOmittedId(material.id); setResources(value => ({ ...value, pages: value.pages.filter(item => item.id !== material.id) })); } }}
                     onAttachCurrent={() => { if (topicEdit && scopeCurrent) { setTopicEdit({ ...topicEdit, resources: { ...scopeResources, pages: [...scopeResources.pages, scopeCurrent] } }); } else if (activeTopic && scopeCurrent) { setResources(value => ({ ...value, pages: [...value.pages, scopeCurrent] })); } else if (browsingContext && canUseContext(browsingContext) && browsingContext.id !== context?.id) setResources(value => ({ ...value, pages: [...value.pages.filter(item => item.id !== browsingContext.id), browsingContext] })); else setOmittedId(null); }}/>} onFiles={() => fileInput.current?.click()}/>
 
@@ -1147,7 +1152,7 @@ function AssistantConversation({
                   <button type="button" className="ha-tag-definition-action" disabled={!tagPageIds.length} onClick={()=>{const pages=[...new Map([...resources.pages,...accessibleCatalog.filter(page=>tagPageIds.includes(page.id))].map(page=>[page.id,page])).values()];if(pages.length>30){notify('最多选择 30 份资料');return;}setResources({...resources,pages});changeMenu(null);}}>添加所选 {tagPageIds.length} 份资料</button>
                 </section>}
                 {running && <button type="button" className="ha-send" aria-label="停止本轮" title="停止本轮" onClick={() => dispatch({ type: 'stop' })}><Square size={13} fill="currentColor"/></button>}
-                {(!running || !!input.trim() || !!attachmentNames.length) && <button type="button" className="ha-send" disabled={contextBlocked || inputBlocked || activeBlocked || resourcesBlocked || scopeTooLarge || (!input.trim() && !tagIntent && (tagMode || !hasDraftSources)) || (tagMode && (!!session.active || !tagModel.ready))} aria-label={tagIntent ? tagIntent==='definition'?'生成草稿':tagIntent==='missing'?'开始检查':'开始比较' : '发送'} title="发送" onClick={() => send()}>{tagIntent?<span>{tagIntent==='definition'?'生成草稿':tagIntent==='missing'?'开始检查':'开始比较'}</span>:<ArrowUp size={19}/>}</button>}
+                {(!running || !!input.trim() || !!attachmentNames.length) && <button type="button" className="ha-send" disabled={contextBlocked || inputBlocked || activeBlocked || resourcesBlocked || scopeTooLarge || (needsMaterial && !session.active) || (!input.trim() && !tagIntent && (tagMode || !hasDraftSources)) || (tagMode && (!!session.active || !tagModel.ready))} aria-label={tagIntent ? tagIntent==='definition'?'生成草稿':tagIntent==='missing'?'开始检查':'开始比较' : '发送'} title="发送" onClick={() => send()}>{tagIntent?<span>{tagIntent==='definition'?'生成草稿':tagIntent==='missing'?'开始检查':'开始比较'}</span>:<ArrowUp size={19}/>}</button>}
               </div>
             </div>
             <div className="ha-composer-hint"><span>演示模式 · 不调用模型服务</span>{evidence.length > 0 ? <button type="button" aria-expanded={sourcesOpen} onClick={() => { setSourcesOpen(value => !value); setContextOpen(false); }}><FileText size={10} />来源 {evidence.length}<ChevronDown size={9} /></button> : <span>Ctrl+Enter 发送</span>}</div>

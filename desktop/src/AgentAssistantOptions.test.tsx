@@ -75,13 +75,20 @@ it("groups providers without applying disabled choices",async()=>{
  await render("model",true,defaultAssistantOptions,true);await open();expect(host.querySelector('[aria-label="OpenAI 模型"]')).not.toBeNull();expect(host.querySelector('[aria-label="DeepSeek 模型"]')).not.toBeNull();await click("实际模型");expect(save).not.toHaveBeenCalled();
 });
 it("MCP remains explicit and absent from the regular model picker",async()=>{
- await render();expect(host.textContent).not.toContain("工具连接");await render("connection");
- const select=host.querySelector("select")!;await act(async()=>{select.value="mcp";select.dispatchEvent(new Event("change",{bubbles:true}));});
- expect(save).not.toHaveBeenCalled();expect(host.textContent).toContain("累计预算");await click("应用到本对话");expect(save).toHaveBeenLastCalledWith({model:null,autoFlashcardInbox:false,externalMcp:true});
+ await render();expect(host.textContent).not.toContain("Hub 工具调用方式");
+ await render("connection",true,{...defaultAssistantOptions,webSearch:"cached"});
+ const diagnostics=host.querySelector<HTMLDetailsElement>(".agent-diagnostics")!;
+ expect(diagnostics.open).toBe(false);
+ const select=diagnostics.querySelector("select")!;
+ expect(select.value).toBe("native");
+ await act(async()=>{diagnostics.open=true;select.value="mcp";select.dispatchEvent(new Event("change",{bubbles:true}));});
+ expect(save).not.toHaveBeenCalled();expect(host.textContent).toContain("累计预算");
+ await click("应用到本对话");
+ expect(save).toHaveBeenLastCalledWith({...defaultAssistantOptions,webSearch:"cached",externalMcp:true});
 });
 it("revokes native grants in the draft when selecting the alternative MCP channel",async()=>{
  await render("connection",true,{...defaultAssistantOptions,nativeCapabilities:{workspace:true,multiAgent:true}});
- const select=host.querySelector("select")!;
+ const select=host.querySelector<HTMLSelectElement>(".agent-diagnostics select")!;
  await act(async()=>{select.value="mcp";select.dispatchEvent(new Event("change",{bubbles:true}));});
  expect(save).not.toHaveBeenCalled();
  expect([...host.querySelectorAll<HTMLInputElement>('.agent-connection-explanation input')].every(field=>!field.checked&&field.disabled)).toBe(true);

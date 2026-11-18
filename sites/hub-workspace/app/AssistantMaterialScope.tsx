@@ -9,12 +9,12 @@ import { AssistantVisualMaterials } from './AssistantVisualMaterials';
 
 type ScopePage = 'overview' | 'pages' | 'topic';
 
-export function AssistantMaterialScope({ catalog, resources, onChange, material, current, disabled, policy, webStatus, onPolicy, onSave, editingTopic, skillNames, onAttachCurrent, onRemoveCurrent, onDone, topicScope, manualOnce }: {
+export function AssistantMaterialScope({ catalog, resources, onChange, material, current, disabled, policy, webStatus, onPolicy, onSave, editingTopic, skillNames, onAttachCurrent, onRemoveCurrent, onDone, topicScope, manualOnce, effectiveScope }: {
   catalog: AssistantContext[]; resources: ResourceDraft; onChange: (value: ResourceDraft) => void;
   material: AssistantContext | null; current: AssistantContext | null; disabled: boolean;
   policy: ResearchPolicy; webStatus: string; onPolicy: (value: ResearchPolicy) => void;
   onSave: (name: string, includeSkills: boolean) => boolean; editingTopic?: ResearchTopic; skillNames: string[]; onAttachCurrent: () => void; onRemoveCurrent: () => void; onDone: () => void;
-  topicScope?: ResourceDraft; manualOnce?: { checked: boolean; count: number; onChange: (checked: boolean) => void };
+  effectiveScope?: boolean; topicScope?: ResourceDraft; manualOnce?: { checked: boolean; count: number; onChange: (checked: boolean) => void };
 }) {
   const [page, setPage] = useState<ScopePage>('overview');
   const [expanded,setExpanded]=useState({policy:false,libraries:false});
@@ -37,6 +37,8 @@ export function AssistantMaterialScope({ catalog, resources, onChange, material,
   const selected = new Set(selectedPages.map(item => item.id));
   const available = new Set(catalog.map(item => item.id));
   const hasScope = !!(selectedPages.length || resources.libraryIds.length);
+  const canChoosePolicy = effectiveScope ?? hasScope;
+  const needsMaterial = !canChoosePolicy && policy === 'materials-only';
   const policyName = researchPolicies.find(item => item.id === policy)?.name || '材料优先';
   const allPages = [...selectedPages, ...catalog.filter(item => !selected.has(item.id))];
   const keyword = query.trim().toLowerCase();
@@ -64,13 +66,6 @@ export function AssistantMaterialScope({ catalog, resources, onChange, material,
     <div className="ha-scope-body" ref={body}>
       {page === 'overview' && <>
         <div className="ha-scope-overview">
-          <button type="button" data-scope-page="policy" aria-expanded={expanded.policy} aria-controls="ha-scope-policy" onClick={()=>setExpanded(value=>({...value,policy:!value.policy}))}><SlidersHorizontal size={16}/><strong>资料策略</strong><span>{policyName}</span><ChevronDown className={expanded.policy?'is-open':''} size={14}/></button>
-          {expanded.policy&&<div className="ha-scope-inline" id="ha-scope-policy" role="region" aria-label="资料策略选项">
-        <fieldset className="ha-scope-policies"><legend className="ha-sr-only">怎样使用资料</legend>
-          {researchPolicies.map((item, index) => <label className="ha-resource-choice" key={item.id}><input data-scope-focus={index === 0 ? '' : undefined} type="radio" name="ha-research-policy" value={item.id} disabled={disabled} checked={policy === item.id} onChange={() => onPolicy(item.id)}/><span><strong>{item.name}</strong><small>{item.hint}</small></span></label>)}
-        </fieldset>
-        {webStatus && <p className="ha-scope-hint">{webStatus}</p>}
-      </div>}
           <button type="button" data-scope-page="pages" onClick={() => setPage('pages')}><FileText size={16}/><strong>核心材料</strong><span>{selectedPages.length ? (topicScope ? '手选 ' : '已选 ') + selectedPages.length + ' 页' : '添加页面'}</span><ChevronRight size={14}/></button>
           <button type="button" data-scope-page="libraries" aria-expanded={expanded.libraries} aria-controls="ha-scope-libraries" onClick={()=>setExpanded(value=>({...value,libraries:!value.libraries}))}><Library size={16}/><strong>可检索的资料库</strong><span title={libraryNames.join('、')}>{libraryNames.length > 2 ? libraryNames.length + ' 个库' : libraryNames.join('、') || '未选择'}</span><ChevronDown className={expanded.libraries?'is-open':''} size={14}/></button>
           {expanded.libraries&&<div className="ha-scope-inline" id="ha-scope-libraries" role="region" aria-label="资料库选择">
@@ -79,7 +74,13 @@ export function AssistantMaterialScope({ catalog, resources, onChange, material,
         {!libraries.length && !resources.libraryIds.length && <p className="ha-scope-hint">当前没有可检索的资料库。</p>}
         {[...libraries, ...resources.libraryIds.filter(id => !libraries.some(([key]) => key === id)).map(id => [id, '不可用资料库'] as const)].map(([id, label]) => <label className="ha-resource-choice" key={id}><Library size={16}/><span>{label}{topicScope?.libraryIds.includes(id) && <small>专题已包含</small>}</span><input type="checkbox" aria-label={'允许查找 ' + label} disabled={disabled} checked={resources.libraryIds.includes(id)} onChange={event => onChange({ ...resources, libraryIds: event.target.checked ? [...resources.libraryIds, id] : resources.libraryIds.filter(value => value !== id) })}/></label>)}
       </div>}
+          {canChoosePolicy && <button type="button" data-scope-page="policy" aria-expanded={expanded.policy} aria-controls="ha-scope-policy" onClick={() => setExpanded(value => ({ ...value, policy: !value.policy }))}><SlidersHorizontal size={16}/><strong>怎样使用资料</strong><span>{policyName}</span><ChevronDown className={expanded.policy ? 'is-open' : ''} size={14}/></button>}
+          {canChoosePolicy && expanded.policy && <fieldset className="ha-scope-inline ha-scope-policies" id="ha-scope-policy">
+            <legend className="ha-sr-only">怎样使用资料</legend>
+            {researchPolicies.filter(item => item.id !== 'open' || policy === 'open').map(item => <label className="ha-resource-choice" key={item.id}><input type="radio" name="ha-research-policy" value={item.id} disabled={disabled} checked={policy === item.id} onChange={() => onPolicy(item.id)}/><span><strong>{item.name}</strong><small>{item.hint}</small></span></label>)}
+          </fieldset>}
         </div>
+        {needsMaterial && <div className="ha-scope-recovery" role="status"><p>当前只用所选资料。请添加资料，或切换为普通提问。</p><button type="button" className="ha-secondary-button" disabled={disabled} onClick={() => onPolicy('material-first')}>切换为普通提问</button></div>}
         {manualOnce && <label className="ha-resource-choice"><input type="checkbox" checked={manualOnce.checked} disabled={disabled || (!manualOnce.count && !manualOnce.checked)} onChange={event => manualOnce.onChange(event.target.checked)}/><span><strong>下一条消息也使用手选资料</strong><small>{manualOnce.count ? '仅对下一条消息生效。会在专题范围外加入手选的页面、库或附件。' : '可先选页面、资料库或添加附件。'}</small></span></label>}
         {editingTopic && <p className="ha-scope-hint">正在调整「{editingTopic.name}」。更新会保存到专题，当前对话不受影响。</p>}
         {policy === 'materials-only' && resources.url && <p className="ha-scope-hint">{webStatus}</p>}
@@ -104,7 +105,7 @@ export function AssistantMaterialScope({ catalog, resources, onChange, material,
       </form>}
     </div>
     <footer className="ha-scope-footer">
-      {page === 'overview' && <><p>{editingTopic ? '选好资料后更新专题。' : topicScope ? '这里编辑手选资料。专题资料可在输入框的专题标签里查看或移除。' : hasScope ? '所选范围用于下一轮；切换浏览页面不会自动加入资料。' : '未选资料，可直接提问。'}</p><div><button type="button" className="ha-secondary-button" disabled={disabled || !hasScope} onClick={() => setPage('topic')}><FolderBookmark size={14}/>{editingTopic ? '更新专题' : topicScope ? '保存手选为专题' : '保存为专题'}</button><button type="button" className="ha-primary-button" onClick={onDone}>{editingTopic ? '返回专题' : '完成'}</button></div></>}
+      {page === 'overview' && <><p>{editingTopic ? '选好资料后更新专题。' : topicScope ? '这里编辑手选资料。专题资料可在输入框的专题标签里查看或移除。' : hasScope ? '所选范围用于下一轮；切换浏览页面不会自动加入资料。' : needsMaterial ? '' : '未选资料，可直接提问。'}</p><div><button type="button" className="ha-secondary-button" disabled={disabled || !hasScope} onClick={() => setPage('topic')}><FolderBookmark size={14}/>{editingTopic ? '更新专题' : topicScope ? '保存手选为专题' : '保存为专题'}</button><button type="button" className="ha-primary-button" onClick={onDone}>{editingTopic ? '返回专题' : '完成'}</button></div></>}
       {page === 'topic' && <div><button type="button" className="ha-secondary-button" onClick={() => setPage('overview')}>取消</button><button type="submit" form={formId} className="ha-primary-button" disabled={disabled || !canSave || !name.trim()}>{missing ? '保存可用资料' : editingTopic ? '确认更新' : '保存专题'}</button></div>}
       {page !== 'overview' && page !== 'topic' && <div><button type="button" className="ha-primary-button" onClick={() => setPage('overview')}>完成选择</button></div>}
     </footer>

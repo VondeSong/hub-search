@@ -22,9 +22,22 @@ it("CN04 web search is explicit, preserves other settings and saves off again",a
  await act(async()=>root.render(<AgentAssistantOptions section="connection" value={{...initial,webSearch:"live"}} disabled={false} canAuto={false} onSave={save}/>));
  await choose("disabled");await apply();expect(save).toHaveBeenLastCalledWith(initial);
 });
-it("CN04 unsupported provider can turn search off and failed saves remain visible",async()=>{
- runtime.settings.provider="deepseek";const save=vi.fn().mockRejectedValue(new Error("保存失败"));await act(async()=>root.render(<AgentAssistantOptions section="connection" value={{...initial,webSearch:"cached"}} disabled={false} canAuto={false} onSave={save}/>));
- expect(select().disabled).toBe(false);expect(select().querySelector<HTMLOptionElement>('[value="live"]')!.disabled).toBe(true);
+it("shows the effective restriction while preserving a saved web preference",async()=>{
+ const save=vi.fn();
+ await act(async()=>root.render(<AgentAssistantOptions section="connection" value={{...initial,webSearch:"cached",researchPolicy:"materials-only"}} disabled={false} canAuto={false} onSave={save}/>));
+ expect(select().disabled).toBe(true);
+ expect(select().value).toBe("disabled");
+ expect(host.textContent).toContain("当前对话只使用所选资料");
+ runtime.settings.provider="deepseek";
+ await act(async()=>root.render(<AgentAssistantOptions section="connection" value={{...initial,webSearch:"cached"}} disabled={false} canAuto={false} onSave={save}/>));
+ expect(select().disabled).toBe(true);
+ expect(select().value).toBe("disabled");
+ expect(host.textContent).toContain("当前模型不支持网页搜索");
+ expect(save).not.toHaveBeenCalled();
+});
+it("CN04 failed saves remain visible",async()=>{
+ const save=vi.fn().mockRejectedValue(new Error("保存失败"));
+ await act(async()=>root.render(<AgentAssistantOptions section="connection" value={{...initial,webSearch:"cached"}} disabled={false} canAuto={false} onSave={save}/>));
  await choose("disabled");await apply();expect(host.querySelector('[role="alert"]')?.textContent).toContain("保存失败");expect(select().value).toBe("disabled");
 });
 it("CN04 restored web sources have safe clickable links and explicit provenance",async()=>{
