@@ -39,6 +39,18 @@ it("deduplicates real public origins and refuses unsafe website references",()=>
  const sites=activitySites([event({url:"https://github.com/a",sourceRefs:[{url:"https://github.com/b"},{url:"http://127.0.0.1/x"},{url:"https://user:secret@example.com"},{url:"https://notion.so/doc"}]})]);
  expect(sites.map(s=>new URL(s.url).hostname)).toEqual(["github.com","notion.so"]);
 });
+it("uses one icon for a main site and its language variant without folding independent subdomains",()=>{
+ const sites=activitySites([event({sourceRefs:[
+   {url:"https://en.chateauversailles.fr/a"},{url:"https://www.chateauversailles.fr/b"},
+   {url:"https://chateauversailles.fr/c"},{url:"https://tickets.chateauversailles.fr/d"},
+   {url:"https://fr.example.org/e"},{url:"https://fr.example.net/f"}
+ ]})]);
+ expect(sites.map(site=>site.hosts)).toEqual([
+   ["en.chateauversailles.fr","www.chateauversailles.fr","chateauversailles.fr"],
+   ["tickets.chateauversailles.fr"],["fr.example.org"],["fr.example.net"]
+ ]);
+ expect(sites[0].url).toBe("https://chateauversailles.fr/c");
+});
 it("keeps a fixed fallback on icon failure and derives avatars only from actual identities",async()=>{
  invoke.mockRejectedValue(new Error("offline"));
  await act(async()=>root.render(<ActivityIdentity workId="identity-failure" events={[event({url:"https://github.com/a",agentIds:["actual-child"]}),event({url:"https://github.com/b",label:"两个代理已完成"})]}/>));

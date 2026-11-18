@@ -68,7 +68,7 @@ it("AC07 source and agent decorations cannot be invented by a model label",async
 it("AC08 extra public sites remain counted, unsafe references add no icon, and image failure keeps its footprint",async()=>{
  await act(async()=>root.render(<ActivityIdentity workId="acceptance-sites" events={[event({sourceRefs:[{url:"https://github.com/a"},{url:"https://github.com/b"},{url:"https://developers.openai.com/a"},{url:"https://notion.so/a"},{url:"https://modelcontextprotocol.io/a"},{url:"http://localhost/private"},{url:"https://user:password@example.com"}]})]}/>));
  expect(host.querySelectorAll(".agent-site-icon")).toHaveLength(3);
- expect(host.querySelector("small")?.textContent).toBe("+1");
+ expect(host.querySelector("small")?.textContent).toBe("另 1 个站点");
  expect(host.querySelector("small")?.title).toContain("modelcontextprotocol.io");
  expect(host.querySelector(".agent-site-icon img")).toBeNull();
 });

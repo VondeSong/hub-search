@@ -37,10 +37,10 @@ function UnpublishedAnswer({text,truncated}:{text:string;truncated?:boolean}) {
   </details>;
 }
 function webLabel(event:ActivityEvent) {
-  const original=event.label.replace(/^Codex\s*/,"").replace(/[：:]\s*$/,"").trim();
-  const legacy=!event.action || /^Codex\s/.test(event.label);
-  const generic=event.action==="other" || !original || (legacy && original==="搜索网页");
-  return generic ? "查阅网页资料" : legacy ? original.split(/[：:]/,1)[0] : original;
+  const operation = activityOperation(event);
+  const legacyLabel = !event.action && event.label.trim();
+  const label = operation === "webUnknown" ? (legacyLabel && legacyLabel !== "查阅网页资料" ? legacyLabel : "网页操作") : operationLabels[operation];
+  return operation === "webSearch" && event.queries?.length ? `${label} · ${event.queries.length} 条查询` : label;
 }
 function webSummary(event:ActivityEvent) {
   const state=event.state==="running"?" · 进行中":event.state==="interrupted"?" · 已中断":event.state==="failed"?" · 未完成":"";
@@ -63,7 +63,9 @@ function WebActivity({event,workId}:{event:ActivityEvent;workId?:string}) {
     <details className="agent-reasoning agent-web-activity">
       <summary title={webSummary(event)}><ActivityIcon event={event}/><ActivityIdentity events={[event]} workId={workId}/><span>{webSummary(event)}</span><ChevronDown className="agent-reasoning-chevron" size={12} aria-hidden="true"/></summary>
       <div className="agent-web-details">
-      <p className="agent-note">{event.resultCount!=null ? `本批返回 ${event.resultCount} 项结果` : "这条记录未提供逐项返回结果"} · {event.state==="completed"?"已结束":event.state==="running"?"进行中":event.state==="interrupted"?"已中断":"未完成"}</p>
+      <p className="agent-note">{event.resultCount != null
+        ? `本批返回 ${event.resultCount} 项${activityOperation(event) === "webSearch" ? "搜索结果" : "结果"}`
+        : "这条记录未提供逐项返回结果"}</p>
       {legacy && original!==webLabel(event) && original!=="搜索网页" && <p>{original}</p>}
       {href && <p><a href={href} target="_blank" rel="noreferrer">打开网页</a></p>}
       {!!event.errorCount && <div className="agent-process-failure"><div><p>本批 {event.errorCount} 项未能获取。</p>{!!event.errors?.length && <ul aria-label="网页访问失败详情">{event.errors.map((error,index)=>{const link=publicWebHref(error.url);return <li key={index}>{link ? <a href={link} target="_blank" rel="noreferrer">{new URL(link).hostname}</a> : "网页访问"} · {error.reason || "当前展示记录未包含具体原因"}</li>;})}</ul>}{(!event.errors?.length || event.errors.length<event.errorCount!) && <p>当前展示记录未包含{event.errors?.length ? "其余错误的" : ""}具体原因。</p>}</div></div>}
@@ -125,16 +127,17 @@ function OperationPhase({events,scope,running,runId}:{events:ActivityEvent[];sco
   const failed=operations.some(event=>event.state==="failed"||event.state==="interrupted"||event.errorCount);
   const webFailure=webFailureSummary(operations);
   const otherFailure=operations.some(event=>event.kind!=="webSearch" && (event.state==="failed" || event.state==="interrupted"));
-  const labels=[...new Set(operations.map(event=>event.kind==="webSearch"?"查阅网页":operationLabels[activityOperation(event)]))];
+  const webOnly = operations.every(event => event.kind === "webSearch");
+  const labels = [...new Set(operations.map(event => operationLabels[activityOperation(event)]))];
   const summaryIcon=operations.every(event=>activityOperation(event)===activityOperation(operations[0]))?operations[0]:{...operations[0],kind:"tool" as const,operation:"mixed"};
   const pending=running?operations.find(event=>event.state==="queued"):undefined;
   const current=active??pending;
   const overview=(operations.every(event=>event.state==="completed"&&!event.errorCount)?"已":"")+labels.join("、");
-  const currentTitle=current&&activityLabel(current);
+  const currentTitle=current && (current.kind === "webSearch" ? webLabel(current) : activityLabel(current));
   const currentLabel=currentTitle && (/^(读取|搜索|访问|运行|执行|检查|核对|验证|编辑|加载|查找|整理|分析|生成|保存|创建)/.test(currentTitle)?"正在"+currentTitle:currentTitle);
-  const summary=current ? pending&&!active?"等待："+currentTitle:currentLabel! : running?"正在思考":overview;
+  const summary=current ? pending&&!active?"等待："+currentTitle:currentLabel! : running && !webOnly ? "正在思考" : overview;
   return <details className={`agent-operation-group${running?" agent-operation-active":""}`} open={open} onToggle={event=>setOpen(event.currentTarget.open)}>
-    <summary title={summary}>{current?<ActivityIcon event={current}/>:!running&&<ActivityIcon event={{...summaryIcon,state:"completed",errorCount:0}}/>}<ActivityIdentity events={operations} workId={scope?.workId}/><span className={running?"agent-current-action":undefined}>{summary}</span>{failed&&!open&&<small className="agent-phase-warning" role="status"><TriangleAlert size={12} aria-hidden="true"/>{webFailure ? `${otherFailure?"部分未完成 · ":""}${webFailure}` : "部分未完成"}</small>}<ChevronDown size={12} aria-hidden="true"/></summary>
+    <summary title={summary}>{current ? <ActivityIcon event={current}/> : (!running || webOnly) && <ActivityIcon event={{...summaryIcon,state:"completed",errorCount:0}}/>}<span className="agent-phase-label">{summary}</span><ActivityIdentity events={operations} workId={scope?.workId}/>{failed&&!open&&<small className="agent-phase-warning" role="status"><TriangleAlert size={12} aria-hidden="true"/>{webFailure ? `${otherFailure?"部分未完成 · ":""}${webFailure}` : "部分未完成"}</small>}<ChevronDown size={12} aria-hidden="true"/></summary>
     <div>{events.map(event=><ActivityEventView key={event.id} event={event} scope={scope}/>)}</div>
   </details>;
 }
@@ -185,10 +188,18 @@ export function AgentActivity({ value }: { value: ActivityRun }) {
     </button> : (!value.running || answer) && <p className="agent-elapsed">用时 {duration}</p>}
     {expanded && (hasProcess || (value.running && !answer)) && <div id={detailsId} className="agent-activity-events" aria-label="完整工作过程">
       {value.validity && <p className="agent-note">{value.validity}</p>}
-      {value.capabilities&&<details className="agent-reasoning"><summary>本轮授权工具<ChevronDown size={12} aria-hidden="true"/></summary><p>{value.capabilities.nativeCapabilities?.workspace?"独立工作区（无网络）":"Hub 受控工具"} · {value.capabilities.nativeCapabilities?.multiAgent?"可委派子任务":"单代理"} · {value.capabilities.webSearch&&value.capabilities.webSearch!=="disabled"?"可搜索网页":"网页搜索关闭"}</p>{!!value.capabilities.externalTools?.length&&<ul>{value.capabilities.externalTools.map(service=><li key={service.server}>{service.server.startsWith("browser:")?"独立浏览器 · "+service.server.slice(8).split("|").join("、"):service.server.startsWith("app:")?"已连接应用":service.server} · {service.tools.length} 个已选工具{service.writeRepository&&` · 评论目标 ${service.writeRepository}`}</li>)}</ul>}{value.capabilities.nativeCapabilities?.multiAgent&&<p>主线程 Token 统计不含子代理；子代理累计用量单独记录，缺失时不视为零。</p>}</details>}
       <ActivityTimeline running={value.running && !answer} events={processEvents} scope={value.validity ? null : scope} runId={value.runId}/>
       {value.running && !answer && !hasActiveStep && !phaseShowsStatus && <p className="agent-live-status" role="status">正在思考</p>}
-      {processEvents.some(event=>event.kind==="webSearch") && <p className="agent-note agent-web-provenance">返回结果数不是已读全文数；联网记录中的来源不代表已完整读取。</p>}
+      {value.capabilities && <details className="agent-reasoning agent-runtime-details">
+        <summary>运行详情<ChevronDown className="agent-reasoning-chevron" size={12} aria-hidden="true"/></summary>
+        <p>本轮可用 Hub 工具{value.capabilities.nativeCapabilities?.workspace ? "、独立工作区（无网络）" : ""}{value.capabilities.nativeCapabilities?.multiAgent ? "、子任务委派" : ""}。</p>
+        {value.capabilities.webSearch && <p>网页搜索 · {value.capabilities.webSearch === "live" ? "实时搜索" : value.capabilities.webSearch === "cached" ? "缓存搜索" : "关闭"}</p>}
+        {!!value.capabilities.externalTools?.length && <ul>{value.capabilities.externalTools.map(service => <li key={service.server}>
+          {service.server.startsWith("browser:") ? "独立浏览器 · " + service.server.slice(8).split("|").join("、") : service.server.startsWith("app:") ? "已连接应用" : service.server}
+          {" · "}{service.tools.length} 个已选工具{service.writeRepository && ` · 评论目标 ${service.writeRepository}`}
+        </li>)}</ul>}
+        {value.capabilities.nativeCapabilities?.multiAgent && <p>主线程与子代理用量分别记录。缺失用量显示为未知。</p>}
+      </details>}
     </div>}
     {!expanded && lastToolIssue && <p className="agent-process-failure" role="status" aria-label="工具操作未完成"><TriangleAlert size={14} aria-hidden="true"/><span>{toolIssues.length>1&&`${toolIssues.length} 项工具操作未完成 · `}{lastToolIssue.label} · {eventStateLabel(lastToolIssue)}{lastToolIssue.detail ? `：${lastToolIssue.detail}` : ""}</span></p>}
     {!expanded && failure && failure.kind!=="webSearch" && !isOperation(failure) && <p className="agent-process-failure" role="status"><TriangleAlert size={14} aria-hidden="true"/><span>{failure.label} · {failure.state==="failed" ? "未完成" : "已中断"}{failure.detail ? `：${failure.detail}` : ""}</span></p>}

@@ -55,12 +55,28 @@ it("CN04 native web activity remains visible without claiming full-text reading"
  await act(async()=>root.render(<AgentActivity value={value}/>));await act(async()=>host.querySelector<HTMLButtonElement>("button")!.click());
  expect(host.textContent).not.toContain("调用已结束");expect(host.textContent).not.toContain("搜索网页： ·");
  expect(host.textContent).toContain("搜索网页 · 未完成");
- const explanation=host.querySelectorAll(".agent-web-provenance");
- expect(explanation).toHaveLength(1);expect(explanation[0].closest("details")).toBeNull();expect(explanation[0].textContent).toContain("返回结果数不是已读全文数");expect(explanation[0].textContent).toContain("不代表已完整读取");
+ expect(host.querySelector(".agent-web-provenance")).toBeNull();
+ expect(host.textContent).not.toContain("已读全文");
  expect(host.textContent).toContain("这条记录未提供逐项返回结果");
  expect(host.querySelector('a[href="https://example.org/a"]')).not.toBeNull();
 });
 
+it("keeps the search and page-opening summaries distinct and the runtime details collapsed",async()=>{
+ const value:ActivityRun={runId:"search-open",revision:1,state:"completed",running:false,startedAt:1,finishedAt:1001,steps:2,capabilities:{webSearch:"live"},events:[
+  {id:"search",kind:"webSearch",state:"completed",label:"搜索网页",action:"search",resultCount:38,createdAt:2},
+  {id:"progress",kind:"message",state:"completed",label:"核对来源",createdAt:3},
+  {id:"open",kind:"webSearch",state:"completed",label:"访问网页",action:"openPage",resultCount:4,createdAt:4}
+ ]};
+ await act(async()=>root.render(<AgentActivity value={value}/>));
+ await act(async()=>host.querySelector<HTMLButtonElement>(".agent-activity-toggle")!.click());
+ const groups=[...host.querySelectorAll(".agent-operation-group > summary")];
+ expect(groups.map(row=>row.textContent)).toEqual(["已搜索网页","已打开网页"]);
+ expect(groups.map(row=>row.querySelector("[data-activity-icon]")?.getAttribute("data-activity-icon"))).toEqual(["webSearch","webOpen"]);
+ expect(host.textContent).toContain("本批返回 38 项搜索结果");
+ const runtime=host.querySelector<HTMLDetailsElement>(".agent-runtime-details")!;
+ expect(runtime.open).toBe(false);
+ expect(runtime.previousElementSibling?.classList.contains("agent-operation-group")).toBe(true);
+});
 it("shows batch outcomes and separate details without turning unknown web actions into searches",async()=>{
  const value:ActivityRun={runId:"batch",revision:1,state:"completed",running:false,startedAt:1,finishedAt:1001,steps:3,events:[
   {id:"open",kind:"webSearch",state:"completed",label:"查阅网页资料",action:"other",resultCount:6,errorCount:1,sourceRefs:[{url:"https://www.archives.gov/electoral-college/2016",title:"2016 Results"},{url:"https://127.0.0.1/private",title:"Unsafe"}],createdAt:2},
@@ -71,7 +87,7 @@ it("shows batch outcomes and separate details without turning unknown web action
  expect(host.querySelector('.agent-activity-toggle')?.textContent).toBe('用时 1 秒');
  await act(async()=>host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!.click());
  const summaries=Array.from(host.querySelectorAll('.agent-activity-step summary')).map(s=>s.textContent);
- expect(summaries[0]).toBe('查阅网页资料 · 1 项未获取');
+ expect(summaries[0]).toBe('网页操作 · 1 项未获取');
  expect(summaries[1]).not.toContain('first query');
  expect(host.querySelectorAll('[aria-label="本批搜索词"] li')).toHaveLength(2);
  expect(host.textContent).toContain('65,853,514');
@@ -96,7 +112,7 @@ it("keeps old empty web records readable without claiming a search or successful
  const value:ActivityRun={runId:"legacy",revision:1,state:"completed",running:false,startedAt:1,finishedAt:1001,steps:0,events:[{id:"empty",kind:"webSearch",state:"completed",label:"Codex 搜索网页：",action:"other",createdAt:1},{id:"old-search",kind:"webSearch",state:"completed",label:"Codex 搜索网页：first query；second query",action:"search",createdAt:2}]};
  await act(async()=>root.render(<AgentActivity value={value}/>));
  await act(async()=>host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!.click());
- expect(host.querySelector('.agent-activity-step summary')?.textContent).toBe('查阅网页资料');
+ expect(host.querySelector('.agent-activity-step summary')?.textContent).toBe('网页操作');
  expect(host.textContent).toContain('这条记录未提供逐项返回结果');
  expect(Array.from(host.querySelectorAll('.agent-activity-step summary'))[1]?.textContent).toBe('搜索网页');
  expect(host.textContent).toContain('first query；second query');
@@ -106,13 +122,13 @@ it("keeps partial web errors visible when the operation group or the entire proc
  const value:ActivityRun={runId:"live",revision:1,state:"investigating",running:true,startedAt:1,steps:0,events:[{id:"web",kind:"webSearch",state:"completed",label:"访问网页",action:"openPage",resultCount:5,errorCount:1,createdAt:1}]};
  await act(async()=>root.render(<AgentActivity value={value}/>));
  expect(host.querySelector<HTMLDetailsElement>('.agent-operation-group')!.open).toBe(false);
- expect(host.querySelector('.agent-operation-group > summary [role="status"]')?.textContent).toBe('访问网页 · 1 项未获取');
+ expect(host.querySelector('.agent-operation-group > summary [role="status"]')?.textContent).toBe('打开网页 · 1 项未获取');
  expect(host.querySelector('.agent-phase-warning .lucide-triangle-alert')).not.toBeNull();
  expect(host.querySelector('.agent-phase-warning .agent-spinning')).toBeNull();
  const toggle=host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!;
  await act(async()=>toggle.click());
  expect(host.querySelector('.agent-activity-events')).toBeNull();
- expect(host.querySelector('.agent-web-warning[role="status"]')?.textContent).toBe('访问网页 · 1 项未获取');
+ expect(host.querySelector('.agent-web-warning[role="status"]')?.textContent).toBe('打开网页 · 1 项未获取');
  expect(host.querySelector('.agent-web-warning .lucide-triangle-alert')).not.toBeNull();
  expect(host.querySelector('.agent-web-warning .agent-spinning')).toBeNull();
  await act(async()=>root.render(<AgentActivity value={{...value,running:false,state:"completed",events:value.events.map(event=>({...event,errorCount:0}))}}/>));
@@ -138,10 +154,10 @@ it.each([true,false])("keeps partial web errors visible after later reasoning wh
  const toggle=host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!;
  if(running) await act(async()=>toggle.click());
  expect(toggle.getAttribute('aria-expanded')).toBe('false');
- expect(host.querySelector('.agent-web-warning')?.textContent).toBe('访问网页 · 1 项未获取');
+ expect(host.querySelector('.agent-web-warning')?.textContent).toBe('打开网页 · 1 项未获取');
  expect(host.querySelector('.agent-web-warning .lucide-triangle-alert')).not.toBeNull();
  await act(async()=>toggle.click());
- expect(host.querySelector('.agent-web-activity > summary')?.textContent).toBe('访问网页 · 1 项未获取');
+ expect(host.querySelector('.agent-web-activity > summary')?.textContent).toBe('打开网页 · 1 项未获取');
 });
 
 it("distinguishes affected batches from failed pages and retains safe reasons without inventing missing details",async()=>{
@@ -155,7 +171,7 @@ it("distinguishes affected batches from failed pages and retains safe reasons wi
  expect(host.querySelector('.agent-web-warning')?.textContent).not.toContain('3 项');
  await act(async()=>host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!.click());
  expect(host.querySelector('.agent-activity-group')).toBeNull();
- expect(Array.from(host.querySelectorAll('.agent-web-activity > summary')).map(e=>e.textContent)).toEqual(['查阅网页资料 · 1 项未获取','查阅网页资料 · 2 项未获取']);
+ expect(Array.from(host.querySelectorAll('.agent-web-activity > summary')).map(e=>e.textContent)).toEqual(['网页操作 · 1 项未获取','网页操作 · 2 项未获取']);
  expect(host.textContent).toContain('访问超时');
  expect(host.textContent).toContain('当前展示记录未包含具体原因');
  expect(host.textContent).toContain('继续核对可用来源');
