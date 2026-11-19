@@ -137,6 +137,15 @@ pub(super) fn inspect_attached(
 pub(super) fn verify_grant(root: &Path, grant: &Grant) -> Result<(), String> {
     selected_inputs(root, grant).map(|_| ())
 }
+
+pub(super) fn verify_result_inputs(
+    root: &Path,
+    work: &Work,
+    receipt: &Value,
+) -> Result<(), String> {
+    dependencies::Verifier::new(root, work).verify(receipt)
+}
+
 fn selected_inputs(root: &Path, grant: &Grant) -> Result<Vec<(String, PathBuf, Value)>, String> {
     let mut result = Vec::new();
     for locator in &grant.notes {

@@ -292,6 +292,13 @@ pub(super) fn insert(
         524_288
     } else if kind == "libraryRules" {
         crate::knowledge_rules::MAX_GUIDANCE_BYTES
+    } else if body["output"]["backend"] == "codex-mxc-python"
+        && (matches!(kind, "analysisInspection" | "analysisExecution")
+            || (kind == "toolResult" && body["request"]["operation"] == "analyzeFiles"))
+    {
+        // Isolated Python JSON plus input metadata and trace binding.
+        // The per-run and per-work budgets still apply.
+        160 * 1024
     } else {
         65_536
     };

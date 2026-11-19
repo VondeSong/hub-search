@@ -5,14 +5,7 @@ pub(super) fn attach_request(mut result: Value, request: &Value) -> Value {
     if !result.is_object() {
         result = json!({"value":result});
     }
-    let mut reference = crate::agent_work::store::tool_results::request_reference(request);
-    if reference["operation"] == "analyzeFiles" {
-        // The exact script is already in the tool call and durable trace.
-        if let Some(fields) = reference.as_object_mut() {
-            fields.remove("script");
-        }
-    }
-    result["request"] = reference;
+    result["request"] = crate::agent_work::store::tool_results::request_reference(request);
     result
 }
 
@@ -21,12 +14,120 @@ pub(super) fn model_view(raw: &Value) -> Value {
     if let Some(error) = raw["error"].as_str() {
         result["error"] = json!(error.chars().take(300).collect::<String>());
     }
+    if raw["output"]["backend"] == "codex-mxc-python" {
+        project_analysis_output(raw, &mut result["output"]);
+    }
     result
+}
+
+// Positions match hub_traceResult's character offsets in compact JSON.
+fn member_start(value: &Value, name: &str) -> Option<usize> {
+    let mut start = 1;
+    for (key, field) in value.as_object()? {
+        start += json!(key).to_string().chars().count() + 1;
+        if key == name {
+            return Some(start);
+        }
+        start += field.to_string().chars().count() + 1;
+    }
+    None
+}
+
+fn project_analysis_output(raw: &Value, output: &mut Value) {
+    const INLINE_BYTES: usize = 48 * 1024;
+    if output.to_string().len() <= INLINE_BYTES {
+        return;
+    }
+    let Some(result_start) = member_start(raw, "output")
+        .zip(member_start(output, "output"))
+        .map(|(outer, inner)| outer + inner)
+    else {
+        return;
+    };
+    let mut shown = serde_json::Map::new();
+    let mut omitted = 0usize;
+    let mut ranges = Vec::new();
+    let mut remaining = INLINE_BYTES / 2;
+    if let Some(fields) = output["output"].as_object() {
+        let mut start = result_start + 1;
+        for (key, value) in fields {
+            let encoded_key = json!(key).to_string();
+            let encoded_value = value.to_string();
+            start += encoded_key.chars().count() + 1;
+            let end = start + encoded_value.chars().count();
+            let bytes = encoded_key.len() + encoded_value.len() + 2;
+            if bytes <= remaining {
+                shown.insert(key.clone(), value.clone());
+                remaining -= bytes;
+            } else {
+                omitted += 1;
+                if ranges.len() < 12 {
+                    ranges.push(json!({
+                        "field": key.chars().take(120).collect::<String>(),
+                        "startChar": start,
+                        "endChar": end
+                    }));
+                }
+            }
+            start = end + 1;
+        }
+    } else {
+        ranges.push(json!({"startChar":result_start,"endChar":result_start + output["output"].to_string().chars().count()}));
+    }
+    output["outputProjection"] = json!({
+        "omittedFieldCount": output["output"].is_object().then_some(omitted),
+        "omittedRanges": ranges,
+        "fullResultAvailable": true,
+        "meaning": "已展示的统计字段是完整值。足以回答时直接交付。确需某个省略字段时，按该字段的 startChar 和 endChar 用 toolResultRef 分段读取；无需扫描整份结果或重跑。"
+    });
+    output["output"] = if output["output"].is_object() {
+        Value::Object(shown)
+    } else {
+        Value::Null
+    };
+    output["stderr"] = json!(output["stderr"]
+        .as_str()
+        .unwrap_or("")
+        .chars()
+        .take(300)
+        .collect::<String>());
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn large_analysis_result_keeps_exact_trace_and_returns_small_complete_fields() {
+        let raw = json!({"output":{"backend":"codex-mxc-python","exitCode":0,
+            "output":{"allRows":"项".repeat(25_000),"files":1877,"range":"A7:J2470"}}});
+        let projected = model_view(&raw);
+        assert_eq!(
+            projected["output"]["output"],
+            json!({"files":1877,"range":"A7:J2470"})
+        );
+        assert_eq!(
+            projected["output"]["outputProjection"]["omittedFieldCount"],
+            1
+        );
+        let range = &projected["output"]["outputProjection"]["omittedRanges"][0];
+        let start = range["startChar"].as_u64().unwrap() as usize;
+        let end = range["endChar"].as_u64().unwrap() as usize;
+        assert_eq!(range["field"], "allRows");
+        assert_eq!(
+            raw.to_string()
+                .chars()
+                .skip(start)
+                .take(end - start)
+                .collect::<String>(),
+            raw["output"]["output"]["allRows"].to_string()
+        );
+        assert!(raw["output"]["output"]["allRows"].is_string());
+        let request = json!({"operation":"analyzeFiles","script":"print('{}')","stepId":"step"});
+        let projected = attach_request(projected, &request);
+        assert_eq!(projected["request"]["stepId"], "step");
+        assert!(projected["request"].get("script").is_none());
+    }
 
     #[test]
     fn trace_result_error_model_view_is_bounded_without_mutating_full_fact() {

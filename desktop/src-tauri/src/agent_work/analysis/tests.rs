@@ -417,18 +417,51 @@ fn live_daily_file_analysis_runtime() {
     }
     let run = format!("analysis-probe-{}", crate::random_url_safe(12));
     let work = store::claim(root, id, &run).unwrap();
+    let script = config["script"].as_str().unwrap();
+    let trace_request = (config["verifyLargeTrace"] == true).then(|| {
+        let request = json!({"operation":"analyzeFiles","script":script,"stepId":"analysis-probe"});
+        store::record(root, &run, "toolCall", &request).unwrap();
+        request
+    });
     let result = super::run(
         root,
         &work,
         &run,
-        config["script"].as_str().unwrap(),
+        script,
         "真实数据分析运行时验收",
         None,
         &Control::bounded(Duration::from_secs(900)),
     );
+    let trace = trace_request.map(|request| {
+        let value = result.as_ref().unwrap();
+        let raw = value.to_string();
+        assert!(raw.len() > 65536);
+        let reference = store::tool_results::capture(root, id, &run, &request, value).unwrap();
+        let mut restored = String::new();
+        let mut start = 0;
+        loop {
+            let page = store::tool_results::read_for_work(
+                root,
+                &work,
+                reference["recordId"].as_str().unwrap(),
+                reference["sha256"].as_str().unwrap(),
+                start,
+                4000,
+            )
+            .unwrap();
+            restored.push_str(page["content"].as_str().unwrap());
+            let Some(next) = page["nextStartChar"].as_u64() else {
+                break;
+            };
+            start = next as usize;
+        }
+        assert_eq!(restored, raw);
+        json!({"reference":reference,"utf8Bytes":raw.len(),"roundTripExact":true})
+    });
     std::fs::write(
         config["output"].as_str().unwrap(),
-        serde_json::to_vec_pretty(&json!({"workId":id,"runId":run,"result":result})).unwrap(),
+        serde_json::to_vec_pretty(&json!({"workId":id,"runId":run,"result":result,"trace":trace}))
+            .unwrap(),
     )
     .unwrap();
     store::fail(

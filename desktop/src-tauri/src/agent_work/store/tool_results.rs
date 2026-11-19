@@ -11,6 +11,12 @@ fn sha(v: &Value) -> String {
 
 pub(in crate::agent_work) fn request_reference(request: &Value) -> Value {
     let mut reference = request.clone();
+    if reference["operation"] == "analyzeFiles" {
+        // The admitted toolCall already keeps the executable script.
+        if let Some(fields) = reference.as_object_mut() {
+            fields.remove("script");
+        }
+    }
     if reference["operation"] == "sleepDataset" {
         if let Some(rows) = reference["request"]
             .as_object_mut()
@@ -208,6 +214,11 @@ fn load_raw(
         return Err("历史结果摘要不匹配，未返回正文".into());
     }
     let value = raw(&body)?;
+    if body["request"]["operation"] == "analyzeFiles"
+        && value["output"]["backend"] == "codex-mxc-python"
+    {
+        crate::agent_work::analysis::verify_result_inputs(root, w, &value)?;
+    }
     crate::agent_work::artifacts::sleep::verify_batch_summary_on(root, c, w, &value)?;
     if !verified_runs.contains(&run) {
         verify_run(root, c, w, &run, revision, authorization)?;

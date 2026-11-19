@@ -1,5 +1,7 @@
 //! Offline Python execution under MXC, without inherited credentials.
 use super::*;
+const CAPTURE_BYTES: usize = 128 * 1024;
+
 fn workspace_limit(directory: &Path) -> Result<(), String> {
     let mut stack = vec![(directory.to_path_buf(), 0usize)];
     let mut count = 0usize;
@@ -114,7 +116,7 @@ pub(crate) fn run(directory: &Path, runtime: &Path, control: &Control) -> Result
     // command/exec waits for execution, unlike the short initialization RPCs.
     // Keep the 120-second process limit and allow its termination response to arrive.
     process.rpc_timeout = Duration::from_secs(130);
-    let result=process.rpc("analysis","command/exec",json!({"command":[runtime.join("python.exe"),"-I","-X","utf8","-B","analysis.py"],"cwd":directory,"permissionProfile":"hub-analysis","env":env,"timeoutMs":120000,"outputBytesCap":65536}),&execution_control)?;
+    let result=process.rpc("analysis","command/exec",json!({"command":[runtime.join("python.exe"),"-I","-X","utf8","-B","analysis.py"],"cwd":directory,"permissionProfile":"hub-analysis","env":env,"timeoutMs":120000,"outputBytesCap":CAPTURE_BYTES}),&execution_control)?;
     control.check()?;
     let stdout = result["stdout"].as_str().ok_or("分析输出缺失")?;
     let stderr = result["stderr"].as_str().unwrap_or("");
@@ -124,8 +126,8 @@ pub(crate) fn run(directory: &Path, runtime: &Path, control: &Control) -> Result
             stderr.chars().take(1200).collect::<String>()
         ));
     }
-    if stdout.len().saturating_add(stderr.len()) >= 65536 {
-        return Err("分析输出达到 64 KiB，结果不完整。重试时只输出汇总、异常和原表范围，省去逐行内容和重复单元格。".into());
+    if stdout.len().saturating_add(stderr.len()) >= CAPTURE_BYTES {
+        return Err("分析输出达到 128 KiB，结果不完整。重试时只输出汇总、异常和原表范围，省去逐行内容和重复单元格。".into());
     }
     let output: Value = serde_json::from_str(stdout.trim())
         .map_err(|_| "分析必须输出完整JSON；文件请写入output目录")?;
