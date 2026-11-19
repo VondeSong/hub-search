@@ -34,7 +34,7 @@ fn long_local_text_is_pre_read_and_tail_remains_addressable_without_inline_messa
     let id = create(&f, vec![locator.clone()]);
     let (work, run) = claim(&f, &id);
     let mut c = context(&f, &work);
-    prepare(&f.root, &work, &run, &mut c).unwrap();
+    prepare(&f.root, &work, &run, &mut c, false).unwrap();
     assert_eq!(c.excerpts[0].total_chars, 40_017);
     assert!(c.excerpts[0].truncated);
     assert_eq!(c.excerpts[0].start_char, 0);
@@ -99,7 +99,7 @@ fn data_attachment_in_existing_chat_keeps_its_identity_and_is_not_text_evidence(
     );
     assert_eq!(conversation["currentRequestMaterials"][0]["kind"], "file");
     let mut context = context(&f, &work);
-    prepare(&f.root, &work, &run, &mut context).unwrap();
+    prepare(&f.root, &work, &run, &mut context, false).unwrap();
     assert!(
         context.excerpts.is_empty(),
         "file manifest cannot be cited as data"
@@ -229,7 +229,7 @@ fn followup_addition_is_read_without_title_in_question() {
     ui(&f.root,&json!({"action":"message","id":id,"text":"继续","clientMessageId":"ordinary","expectedRevision":2})).unwrap();
     let (w, r) = claim(&f, &id);
     let mut ctx = context(&f, &w);
-    prepare(&f.root, &w, &r, &mut ctx).unwrap();
+    prepare(&f.root, &w, &r, &mut ctx, false).unwrap();
     assert!(
         ctx.excerpts.is_empty(),
         "old authorization is not a fresh attachment"
@@ -245,7 +245,7 @@ fn partial_reads_and_budget_skips_are_explicit() {
     let (w, r) = claim(&f, &id);
     let mut ctx = context(&f, &w);
     ctx.budget.body_chars = 6000;
-    prepare(&f.root, &w, &r, &mut ctx).unwrap();
+    prepare(&f.root, &w, &r, &mut ctx, false).unwrap();
     assert_eq!(ctx.excerpts.len(), 1);
     assert!(ctx.excerpts[0].truncated);
     assert_eq!(ctx.usage.body_chars, 6000);
@@ -270,7 +270,7 @@ fn missing_material_is_not_reported_as_read() {
         .execute("DELETE FROM documents WHERE id='chosen'", [])
         .unwrap();
     let mut ctx = context(&f, &w);
-    prepare(&f.root, &w, &r, &mut ctx).unwrap();
+    prepare(&f.root, &w, &r, &mut ctx, false).unwrap();
     assert!(ctx.excerpts.is_empty());
     assert_eq!(ctx.usage.entities_read, 0);
     assert!(ctx.observations[0]["readError"].is_string());

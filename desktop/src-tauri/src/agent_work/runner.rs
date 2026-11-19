@@ -736,6 +736,20 @@ fn investigate_loop(
         let catalog = context.reader.catalog()?;
         let decisions = store::records(root, &work.id, "userDecision", 32)?;
         let conversation = store::conversation::context(root, work)?;
+        let continuation = store::review_trigger(root, run)?;
+        if let Some(delta) = continuation
+            .as_ref()
+            .and_then(|entry| entry.get("libraryDelta"))
+            .filter(|delta| delta.is_object())
+        {
+            context.observations.push(json!({"origin":"scheduledLibraryDelta","delta":delta,
+                "instruction":"这是本次在授权资料库本机索引中发现的新增、变更和已不见的笔记。先列出实际供本轮复查的增量；缺失项不能读取或引用。按需读新增、变更正文并引用，说明哪些旧结论值得复查。没有变化时如实说明，remaining 非零时标记还有多少条留待后续检查。"}));
+        }
+        if let Some(pass) = super::goal_mode::context(root, work, run)? {
+            context.observations.push(json!({"origin":"hostGoalMode","progress":pass,"instruction":
+                format!("用户已明确开启目标模式。先用 hub_goalState 核对验收条件和仍有效的成果，必要时用 hub_task 维护可核验的待办。优先复用已验证的资料和成果。{}",
+                    super::goal_mode::DELIVERY_GUIDANCE)}));
+        }
         let current_request = conversation["currentRequest"]
             .as_str()
             .unwrap_or(&work.goal);
@@ -765,8 +779,14 @@ fn investigate_loop(
                 .observations
                 .push(json!({"origin":"host","anchor":seed}));
         }
-        selected_materials::prepare(root, work, run, &mut context)?;
         let native_files = session.is_some_and(|s| s.operation.is_some_and(|op| op.native_agent()));
+        selected_materials::prepare(
+            root,
+            work,
+            run,
+            &mut context,
+            native_files && research_options.knowledge_review,
+        )?;
         let current_attachments = conversation["currentRequestMaterials"]
             .as_array()
             .into_iter()
@@ -794,7 +814,6 @@ fn investigate_loop(
             context.observations.push(result);
         }
         context.named_sources(root, run, current_request)?;
-        let continuation = store::review_trigger(root, run)?;
         if continuation.is_some() {
             // The condition host has already selected this exact changed set.
             // Supply a small current excerpt, rather than making the model

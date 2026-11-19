@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "5fe2688f8c734541fbdf57cb21ecaef858386e5a",
-  "published_version": 116,
-  "deployment_id": "appgdep_6afdb53e9958819198ce86f40168c3ee",
+  "source_commit": "5c2d7b4c2d216655c8852283364e22eafabb9b38",
+  "published_version": 117,
+  "deployment_id": "appgdep_6afe775f1ebc81918af1d2954c6ce013",
   "files": {
     ".gitignore": {
       "sha256": "ca0e1575efb181d784f15bf6c86e3c012fd5c7ede4daa34b924d0d8b590d4e77",
@@ -28,14 +28,14 @@
       "bytes": 31055
     },
     "app/Assistant.tsx": {
-      "sha256": "8f2a6a2a91c5716fa2665a3bcd14e87c25c38418f2bc030b71bce0a07caadd46",
+      "sha256": "a5f80b5c3d9879dbc33f2d5b00811a96d2d36667289f58d3945479553de98a4e",
       "mode": "100644",
-      "bytes": 105911
+      "bytes": 106192
     },
     "app/AssistantChrome.tsx": {
-      "sha256": "2aa1cb98b39039c6d1fecc686a1a0f1118e7f47d077b1da3d5fdec26db8d3b3f",
+      "sha256": "646f7d5b632c03c97792d5518948dca4aeeb51dcc67b09052110ca2e6a6291cc",
       "mode": "100644",
-      "bytes": 9574
+      "bytes": 9626
     },
     "app/AssistantCloudHandoff.tsx": {
       "sha256": "7e25f2eed3a620ced94fe1e1cae5bca934d2004f78a13078e3d973e96dfaeaa2",
@@ -48,9 +48,9 @@
       "bytes": 2620
     },
     "app/AssistantDetails.tsx": {
-      "sha256": "fc68a674612d0d7f431b122addea899bf3ef8679ad03b41d3aab69fa8dfeab1d",
+      "sha256": "7ce6f5283836f99d628df09c709f7d0957d811fbe5d3b12019abc0ffd79b13f5",
       "mode": "100644",
-      "bytes": 6846
+      "bytes": 8499
     },
     "app/AssistantHistory.tsx": {
       "sha256": "2e68eda6b2bf9feb7adaa5486df30ad714ccac0dda68fb95b194e9334d193f14",
@@ -93,9 +93,9 @@
       "bytes": 8824
     },
     "app/AssistantTaskModes.tsx": {
-      "sha256": "3c4dfd9ae9af2aa4b4a1cac67caf30346a4d0d28024320c3ed9c0f38ee811d00",
+      "sha256": "09a6fd111a9ebfffa099a71a3127377f719f045d9253b09c273707e2039be0d6",
       "mode": "100644",
-      "bytes": 7147
+      "bytes": 7525
     },
     "app/AssistantTokens.tsx": {
       "sha256": "45909b686676a2a2871f844e4c93366208fb9ac630ce63060b0e485f4194d031",
@@ -1333,9 +1333,9 @@
       "bytes": 16041
     },
     "vite.config.ts": {
-      "sha256": "22ff558b1636d251e076f74c1697c7166079861667af10922d6bc505cb8f8290",
+      "sha256": "ff335e2b110ffea938d6665f5e8e3bfe81e5f974d8c01ffbbd9c58e4ad8e4f12",
       "mode": "100644",
-      "bytes": 2673
+      "bytes": 3239
     },
     "worker/index.ts": {
       "sha256": "a0a10229cdda6f5fdb32234e3539007412233bb4938a671866c9295a44a3bdb6",
@@ -1343,5 +1343,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-18T14:27:56.030910+00:00"
+  "imported_at": "2026-11-19T04:14:11.353587+00:00"
 }

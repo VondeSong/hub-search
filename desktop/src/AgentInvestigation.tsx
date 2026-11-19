@@ -75,7 +75,7 @@ type TaskLocator = { kind: "task"; libraryId: string; sourceId: string };
 type AttachmentLocator = { kind: "attachment"; libraryId: string; documentId: string; sourceItemId: string; chunkId: string; pageNumber: number };
 export type InvestigationLocator = NoteLocator | ReadingLocator | TaskLocator | AttachmentLocator;
 type ReportContinuation = { expectedWorkRevision:number; expectedAuthorizationVersion:number; artifactId:string; artifactRevision:number; expectedContentHash:string };
-type View = { fileAnalyses?:FileAnalysis[]; answerSaves?:AnswerSave[];tagTasks?:TagTaskRecord[]; followups?:Followup[]; codexAccountBinding?:{scopeId:string;historyShared?:boolean}|null; nativeContext?:NativeContext|null; nativeInputs?: NativeInput[]; contextCompaction?:NativeCompaction; materialBudget?:MaterialBudget|null; workingState?: WorkingState; lifecycle?: Lifecycle; goalRevision?: GoalRevision; taskTree?: TaskTree; goalAssessment?: GoalAssessment; analysisArtifacts?: AnalysisChart[]; sleepDatasets?: SleepDatasetItem[]; activity?:ActivityRun[]; recordVersion?:number; assistantOptions?: AssistantOptions; draftRequest?: {runId:string;kind:string} | null; work: { id: string; anchor?:InvestigationLocator|null; actionTarget?:NoteLocator|null; actionTargetIdentity?:string; goal: string; revision?: number; authorizationVersion?: number; state: string; report: Report | null; grant: { images?:ImageGrant[]; libraryIds: string[]; notes?: NoteLocator[]; sources?:InvestigationLocator[]; readingItemKeys?:string[]; manifest?: {members:NoteLocator[];selection:SourceSelection;snapshot:string} } }; evidence: Evidence[]; decisions: { text: string; author: string }[]; run: { id?: string; error?: string; usage: { agentSessions?: number; modelCalls?: number; modelRetries?: number; outputRepairs?: number; entitiesRead?: number; bodyChars?: number; localScanDocuments?: number; localScanBytes?: number } } | null; validity: string; conversation?: Conversation; progress?: Progress | null; history?: HistoricalDelivery[]; runActive?: boolean; actionActive?: boolean; actions?: AgentActions; watch?: AgentCondition | null; memoryUse?: MemoryUse | null; modelSelection?: CodexSettings | null; modelExecutions?: ModelExecution[] };
+type View = { goalMode?: {round:number;maximumRounds:number;stopReason?:string|null} | null; fileAnalyses?:FileAnalysis[]; answerSaves?:AnswerSave[];tagTasks?:TagTaskRecord[]; followups?:Followup[]; codexAccountBinding?:{scopeId:string;historyShared?:boolean}|null; nativeContext?:NativeContext|null; nativeInputs?: NativeInput[]; contextCompaction?:NativeCompaction; materialBudget?:MaterialBudget|null; workingState?: WorkingState; lifecycle?: Lifecycle; goalRevision?: GoalRevision; taskTree?: TaskTree; goalAssessment?: GoalAssessment; analysisArtifacts?: AnalysisChart[]; sleepDatasets?: SleepDatasetItem[]; activity?:ActivityRun[]; recordVersion?:number; assistantOptions?: AssistantOptions; draftRequest?: {runId:string;kind:string} | null; work: { id: string; anchor?:InvestigationLocator|null; actionTarget?:NoteLocator|null; actionTargetIdentity?:string; goal: string; revision?: number; authorizationVersion?: number; state: string; report: Report | null; grant: { images?:ImageGrant[]; libraryIds: string[]; notes?: NoteLocator[]; sources?:InvestigationLocator[]; readingItemKeys?:string[]; manifest?: {members:NoteLocator[];selection:SourceSelection;snapshot:string} } }; evidence: Evidence[]; decisions: { text: string; author: string }[]; run: { id?: string; error?: string; usage: { agentSessions?: number; modelCalls?: number; modelRetries?: number; outputRepairs?: number; entitiesRead?: number; bodyChars?: number; localScanDocuments?: number; localScanBytes?: number } } | null; validity: string; conversation?: Conversation; progress?: Progress | null; history?: HistoricalDelivery[]; runActive?: boolean; actionActive?: boolean; actions?: AgentActions; watch?: AgentCondition | null; memoryUse?: MemoryUse | null; modelSelection?: CodexSettings | null; modelExecutions?: ModelExecution[] };
 function historyViewScope(view: View | null) {
   return view ? JSON.stringify([view.work.id,view.work.revision,view.work.authorizationVersion,view.work.grant,view.work.state,view.recordVersion]) : "";
 }
@@ -133,9 +133,9 @@ export function PersistentSourceInvestigation({ result, compact = false, onPrevi
   const startNew = () => { setTopicWork(null); setPinned(result); setNewChat(value=>value+1); };
   return anchor ? <Investigation onPreviewCitation={onPreviewCitation} key={JSON.stringify(anchor)+":"+(topicWork?.id||"")+":"+newChat} anchor={anchor} initialWorkId={topicWork?.id} initialDraft={topicWork?.draft} startNew={startFresh||newChat>0} onNewConversation={startNew} onOpenTopicWork={openTopicWork} onTopicBack={topicWork?.back?backToTopic:undefined} libraryName={context.libraryName || context.spaceName} sourceTitle={context.documentTitle || context.title} canEditNote={runtimeCapabilities.localVault && context.provider === "obsidian" && anchor?.kind === "note"} compact={compact} initialOpen={!!pinned||!!topicWork} onPin={() => setPinned(context)} newSource={changed && investigationAnchor(result) ? { title: result.documentTitle || result.title, use: startNew } : undefined} /> : null;
 }
-export function StandaloneInvestigation({ initiallyOpen=false, startFresh=false }: { initiallyOpen?:boolean; startFresh?:boolean } = {}) {
+export function StandaloneInvestigation({ initiallyOpen=false, startFresh=false, onDismiss }: { initiallyOpen?:boolean; startFresh?:boolean; onDismiss?:()=>void } = {}) {
   const [generation,setGeneration]=useState(0);
-  return runtimeCapabilities.desktop ? <Investigation key={generation} anchor={null} libraryName="" initialOpen={initiallyOpen || generation>0} startNew={startFresh||generation>0} onNewConversation={()=>setGeneration(value=>value+1)}/> : null;
+  return runtimeCapabilities.desktop ? <Investigation key={generation} anchor={null} libraryName="" initialOpen={initiallyOpen || generation>0} startNew={startFresh||generation>0} onDismiss={onDismiss} onNewConversation={()=>setGeneration(value=>value+1)}/> : null;
 }
 export function ExistingWorkInvestigation({workId,question}:{workId:string;question?:AgentQuestion}){
  const {source,error}=useInsightWork(workId);
@@ -155,7 +155,7 @@ export function PersistentReadingInvestigation({ itemKey, initiallyOpen=false, s
   return runtimeCapabilities.desktop && context ? <Investigation key={context+":"+newChat} anchor={{ kind: "reading", itemKey: context }} libraryName="当前阅读条目" initialOpen={!!pinned} startNew={startFresh||newChat>0} onNewConversation={startNew} onPin={() => setPinned(context)} newSource={pinned && pinned!==itemKey ? {title:"当前阅读条目",use:startNew} : undefined} /> : null;
 }
 
-function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pageLibraryName, sourceTitle: pageTitle, canEditNote: pageCanEditNote = false, compact = false, initialOpen = false, initialWorkId, initialDraft, suggestedQuestion, startNew=false, onNewConversation, onOpenTopicWork, onTopicBack, onPin, newSource }: { onPreviewCitation?: (value: CitationLocation | null) => void; anchor: InvestigationLocator|null; libraryName: string; sourceTitle?: string; canEditNote?: boolean; compact?: boolean; initialOpen?: boolean; initialWorkId?:string; initialDraft?:string; suggestedQuestion?:AgentQuestion; startNew?:boolean; onNewConversation?:()=>void; onOpenTopicWork?:(id:string,source:TopicWorkSource,originId?:string,draft?:string)=>void; onTopicBack?:()=>void; onPin?: () => void; newSource?: { title: string; use: () => void } }) {
+function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pageLibraryName, sourceTitle: pageTitle, canEditNote: pageCanEditNote = false, compact = false, initialOpen = false, initialWorkId, initialDraft, suggestedQuestion, startNew=false, onDismiss, onNewConversation, onOpenTopicWork, onTopicBack, onPin, newSource }: { onPreviewCitation?: (value: CitationLocation | null) => void; anchor: InvestigationLocator|null; libraryName: string; sourceTitle?: string; canEditNote?: boolean; compact?: boolean; initialOpen?: boolean; initialWorkId?:string; initialDraft?:string; suggestedQuestion?:AgentQuestion; startNew?:boolean; onDismiss?:()=>void; onNewConversation?:()=>void; onOpenTopicWork?:(id:string,source:TopicWorkSource,originId?:string,draft?:string)=>void; onTopicBack?:()=>void; onPin?: () => void; newSource?: { title: string; use: () => void } }) {
   const browsing=useContext(AgentBrowsingContext);
   const tagRequest=useContext(AgentTagRequestContext);
   const textMaterials=useContext(AgentTextMaterialContext);
@@ -208,6 +208,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const libraryRegistry = useAgentLibraryRegistry(open);
   const [worksError, setWorksError] = useState("");
   const [goal, setGoal] = useState(initialDraft||"");
+  const [completionCriteria, setCompletionCriteria] = useState("");
   const [usedQuestion,setUsedQuestion]=useState("");
   const skillPrefix = goal.match(/^(?:\$[a-z0-9]+(?:-[a-z0-9]+)*(?:\s+|$))+/)?.[0] || "";
   const selectedSkills = [...new Set(skillPrefix.match(/\$[a-z0-9]+(?:-[a-z0-9]+)*/g) || [])];
@@ -290,9 +291,9 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     }
   }
   const panelResize = useAgentPanelResize(open, launcher);
-  const [docked, setDocked] = useState(() => sessionStorage.getItem("hub-agent-docked") === "true");
+  const [docked, setDocked] = useState(() => !onDismiss && sessionStorage.getItem("hub-agent-docked") === "true");
   const panelHeightResize = useAgentPanelResize(open && !docked, launcher, "height");
-  useEffect(() => { sessionStorage.setItem("hub-agent-docked", String(docked)); }, [docked]);
+  useEffect(() => { if (!onDismiss) sessionStorage.setItem("hub-agent-docked", String(docked)); }, [docked, onDismiss]);
   const titleQuestion=(view?.work.goal||questionText).replace(/^(?:\$[a-z0-9]+(?:-[a-z0-9]+)*(?:\s+|$))+/g, "").trim();
   const chatTitle = research?.topic.title || (titleQuestion || "新聊天").replace(/\s+/g, " ");
   useEffect(() => {
@@ -354,7 +355,10 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const isReading = anchor?.kind === "reading";
   const currentObjectLabel = !anchor ? "未添加资料" : isReading ? "这一阅读条目" : anchor?.kind === "task" ? "当前任务" : anchor?.kind === "attachment" ? "当前附件文字片段" : "当前笔记页面";
   const entryLabel = !anchor ? "Hub 助手" : isReading ? "调查这篇阅读材料" : anchor?.kind === "task" ? "调查这项任务" : anchor?.kind === "attachment" ? "调查这个附件片段" : "调查这篇笔记";
-  const closePanel = () => { clearSourcePreview(); setSourceVisible(false); setOpen(false); };
+  const closePanel = () => {
+    if (onDismiss) { onDismiss(); return; }
+    clearSourcePreview(); setSourceVisible(false); setOpen(false);
+  };
   useEffect(() => {
     if (!open) return;
     const dismiss = (event: KeyboardEvent) => {
@@ -706,7 +710,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         await authorizeCodexConversation(id,codexScopeId);
         if(pendingAccountHistory.current===consent)pendingAccountHistory.current=null;
       }
-      const value=await call<View>({action:recovery ? "resume" : "respond",id,mode:executionMode,...(codexScopeId?{codexScopeId}:{}),...(recovery ? lifecycleRequest(recovery,crypto.randomUUID()) : {}),...(reportContinuation ? {reportContinuation} : {})});
+      const value=await call<View>({action:recovery ? "resume" : "respond",id,mode:executionMode,...(codexScopeId?{codexScopeId}:{}),...(recovery ? lifecycleRequest(recovery,crypto.randomUUID()) : {}),...(reportContinuation ? {reportContinuation} : {}),...(!reportContinuation && (view?.work.id === id ? view.assistantOptions?.goalMode : assistantOptions.goalMode) && !tagMode ? {goalMode:true} : {})});
       if(alive.current) { uiTiming.snapshotReceived(value); setView(current=>acceptLifecycleSnapshot(current,value)); }
 
     }
@@ -721,6 +725,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const [publicUrl,setPublicUrl] = useState("");
   const resumeQueue=async(selectedMessageId?:string)=>{if(!view)return;cancelResponse.current=false;setPendingRun(true);setError("");try{const next=await call<View>({action:"resumeQueue",id:view.work.id,mode,selectedMessageId,expectedRunId:view.lifecycle?.activeRunId??null,...(view.lifecycle?lifecycleRequest(view.lifecycle,crypto.randomUUID()):{})});if(alive.current)setView(current=>acceptLifecycleSnapshot(current,next));}catch(reason){await showRunError(view.work.id,reason);}finally{if(alive.current){setPendingRun(false);void refresh(view.work.id);}}};
   const scopeOptions = view ? view.assistantOptions ?? defaultAssistantOptions : assistantOptions;
+  const goalMode = !!scopeOptions.goalMode && !tagMode;
   const scopePolicy = scopeOptions.researchPolicy ?? "material-first";
   const materialsOnly = scopePolicy === "materials-only";
   const composerGrant = researchGrant(manualResearchGrant(), research?.topic.grant, research?.includeManual);
@@ -822,7 +827,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     try {
       await checkDraftMemory();
       const grant=research?{libraryIds:[],notes:[],readingItemKeys:[]}:buildDraftGrant();
-      let value = publicUrl.trim() ? await call<View>({action:"createFromPublicUrl",url:publicUrl.trim(),goal:goal.trim(),confirmedPublicRead:true,researchPolicy:assistantOptions.researchPolicy}) : await call<View>({ action: "create", goal: snapshots?(submittedText.trim()||"请分析提供的文字资料。"):messageText, successCriteria: "", anchor:research?null:anchor, grant });
+      let value = publicUrl.trim() ? await call<View>({action:"createFromPublicUrl",url:publicUrl.trim(),goal:goal.trim(),confirmedPublicRead:true,researchPolicy:assistantOptions.researchPolicy}) : await call<View>({ action: "create", goal: snapshots?(submittedText.trim()||"请分析提供的文字资料。"):messageText, successCriteria: goalMode ? completionCriteria.trim() : "", anchor:research?null:anchor, grant });
       if (!alive.current) return;
       setPublicUrl("");
       boundMaterial.current=primaryMaterial || null;
@@ -836,7 +841,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       }
       // Bind the user's preflight selection before the first model call. A
       // failed binding leaves a visible ready work and never starts a model.
-      if (assistantOptions.researchPolicy || assistantOptions.model || assistantOptions.autoFlashcardInbox || assistantOptions.externalMcp || assistantOptions.nativeCapabilities?.workspace || assistantOptions.webSearch || assistantOptions.mcpServices?.length) value=await call<View>({action:"configureAssistant",id:value.work.id,options:assistantOptions,confirmedAutoInbox:assistantOptions.autoFlashcardInbox});
+      if (assistantOptions.researchPolicy || assistantOptions.model || assistantOptions.autoFlashcardInbox || assistantOptions.externalMcp || assistantOptions.goalMode || assistantOptions.knowledgeReview || assistantOptions.nativeCapabilities?.workspace || assistantOptions.webSearch || assistantOptions.mcpServices?.length) value=await call<View>({action:"configureAssistant",id:value.work.id,options:assistantOptions,confirmedAutoInbox:assistantOptions.autoFlashcardInbox});
       if (assistantOptions.researchPolicy!=="materials-only" && (memorySelection.enabled || memorySelection.projectId)) await invoke("shared_memory", { args: { action: "selectScope", workId: value.work.id, ...memorySelection } });
       const addNotes=!research&&!anchor?sendMaterials.map(m=>m.locator):[];
       const addSources=!research&&!anchor?sendDropped.map(m=>m.locator):[];
@@ -875,7 +880,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       const value=await call<View>({action:"createWithSourceScope",selection,expectedManifest,anchor,goal:goal.trim(),successCriteria:"依据固定范围回答问题，说明覆盖、出处和局限；未读取或未抽取的材料不能算作已处理。"});
       if(!alive.current)return;
       setView(value);void reloadWorks();setGoal("");setMaterials([]);setDropped([]);setRemovals([]);
-      if(assistantOptions.researchPolicy || assistantOptions.model || assistantOptions.autoFlashcardInbox || assistantOptions.externalMcp || assistantOptions.nativeCapabilities?.workspace || assistantOptions.webSearch || assistantOptions.mcpServices?.length) await call<View>({action:"configureAssistant",id:value.work.id,options:assistantOptions,confirmedAutoInbox:assistantOptions.autoFlashcardInbox});
+      if(assistantOptions.researchPolicy || assistantOptions.model || assistantOptions.autoFlashcardInbox || assistantOptions.externalMcp || assistantOptions.goalMode || assistantOptions.knowledgeReview || assistantOptions.nativeCapabilities?.workspace || assistantOptions.webSearch || assistantOptions.mcpServices?.length) await call<View>({action:"configureAssistant",id:value.work.id,options:assistantOptions,confirmedAutoInbox:assistantOptions.autoFlashcardInbox});
       if(memorySelection.enabled || memorySelection.projectId) await invoke("shared_memory",{args:{action:"selectScope",workId:value.work.id,...memorySelection}});
     } catch(reason) {if(alive.current)setError(String(reason));throw reason;}
     finally {if(alive.current)setBusy(false);}
@@ -985,7 +990,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     const previous=(view ? view.assistantOptions || defaultAssistantOptions : assistantOptions);
     const provider=(options.model ?? runtime.settings)?.provider ?? "codex";
     const previousProvider=(previous.model ?? runtime.settings)?.provider ?? "codex";
-    if(provider === "deepseek") {options={...options,webSearch:"disabled"};delete options.nativeCapabilities;}
+    if(provider === "deepseek") {options={...options,webSearch:"disabled"};delete options.nativeCapabilities;delete options.goalMode;delete options.knowledgeReview;}
     else if(previousProvider === "deepseek") options={...options,webSearch:loadCodexWebSearchPreference()};
     if(view) {
       const next=await call<View>({action:"configureAssistant",id:view.work.id,options,confirmedAutoInbox:options.autoFlashcardInbox});
@@ -1034,7 +1039,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   };
   const newInvestigation = (preserveHistory=false) => {
     setDraftSession(crypto.randomUUID());
-    sequence.current++; setLibraryDraft(null); setView(null); setPublicUrl(""); setAssistantOptions(loadAgentPreferences()); setGoal(""); setWholeLibrary(false); setMaterials([]);setDropped([]);setSnippets([]);setImageDraft(null); setRemovals([]);
+    sequence.current++; setLibraryDraft(null); setView(null); setPublicUrl(""); setAssistantOptions(loadAgentPreferences()); setGoal(""); setCompletionCriteria(""); setWholeLibrary(false); setMaterials([]);setDropped([]);setSnippets([]);setImageDraft(null); setRemovals([]);
     setMemorySelection(loadMemoryPreference()); setConfirmMessage(false); setError("");  setSourcePreview(null); setSourceError(""); setSourceLoading(false); sourceSequence.current++; messageIdentity.current=null;
     setDraftRevision(value => value + 1);
     setPageAttached(!!pageAnchor);boundMaterial.current=null;clearSourcePreview();
@@ -1074,7 +1079,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         {!view.run?.id&&<AgentReportSave actions={view.actions} disabled={businessDisabled||!!active||!!view.lifecycle?.requiresExplicitResume} onAction={businessAction}/>}
         <AgentObsidianEdit formsOnly key={`obsidian-edit-${view.work.id}`} actions={view.actions} revoked={view.work.state === "revoked"} disabled={businessDisabled || !!view.lifecycle?.requiresExplicitResume || view.actions?.standaloneModelDrafts?.allowed===false} onAction={businessAction} />
         {anchor && <AgentBusinessActions formsOnly key={`business-${view.work.id}`} actions={view.actions} sourceKind={anchor.kind} initialGoal={view.work.goal} revoked={view.work.state === "revoked"} disabled={businessDisabled || !!view.lifecycle?.requiresExplicitResume || view.actions?.standaloneModelDrafts?.allowed===false} onAction={businessAction} />}
-        {view.work.state !== "revoked" && (report || view.watch) && <AgentConditions key={`conditions-${view.work.id}`} value={view.watch} disabled={busy} active={!!active} onAction={conditionAction} />}
+        {view.work.state !== "revoked" && (report || view.watch) && <AgentConditions key={`conditions-${view.work.id}`} value={view.watch} disabled={busy} active={!!active} libraryCount={view.work.grant.manifest ? 0 : view.work.grant.libraryIds.length} onAction={conditionAction} />}
         </details>
         <div className="agent-actions">
           {view.work.state !== "revoked" && <button type="button" disabled={busy} onClick={() => void mutate("revoke")}>撤回来源授权</button>}
@@ -1150,9 +1155,9 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         </div></details>
           <button type="button" title="新对话" aria-label="新对话" disabled={busy || !!active} onClick={()=>newInvestigation()}><Plus size={19} /></button>
         </div>
-        <AgentTaskMode activeTopic={research?.topic} onUnpinTopic={async topic=>{const scope=selectionScope.current;const saved=await call<ResearchTopic>({action:"saveResearchTopic",topic:{...topic,pinned:false}});if(alive.current&&selectionScope.current===scope&&research?.topic.id===saved.id)setResearch({...research,topic:{...research.topic,revision:saved.revision,pinned:false}});}} title={chatTitle} disabled={busy || !!active} tagMode={tagMode} onGeneral={()=>setTagMode(false)} onTag={enableTagMode} selectedSkills={selectedSkills.map(token=>token.slice(1))} onTopics={()=>{setRequestedTopic(undefined);setTopicSave(false);setTopicsOpen(true);}} onTopic={topic=>{setRequestedTopic(topic.id);setTopicSave(false);setTopicsOpen(true);}} onUsage={()=>{detailsReturn.current=document.getElementById(panelId)?.querySelector<HTMLElement>(".agent-task-mode>summary")||null;setTaskStatusOnly(true);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current)workControls.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-heading button")?.focus();},0);}}/>
+        <AgentTaskMode activeTopic={research?.topic} onUnpinTopic={async topic=>{const scope=selectionScope.current;const saved=await call<ResearchTopic>({action:"saveResearchTopic",topic:{...topic,pinned:false}});if(alive.current&&selectionScope.current===scope&&research?.topic.id===saved.id)setResearch({...research,topic:{...research.topic,revision:saved.revision,pinned:false}});}} title={chatTitle} disabled={busy || !!active} tagMode={tagMode} goalMode={goalMode} goalDisabled={(scopeOptions.model ?? runtime.settings)?.provider === "deepseek"} onGeneral={()=>{setTagMode(false);if(scopeOptions.goalMode)void saveAssistantOptions({...scopeOptions,goalMode:false},false).catch(reason=>setError(String(reason)));}} onGoal={()=>{setTagMode(false);void saveAssistantOptions({...scopeOptions,goalMode:true},false).catch(reason=>setError(String(reason)));}} onTag={enableTagMode} selectedSkills={selectedSkills.map(token=>token.slice(1))} onTopics={()=>{setRequestedTopic(undefined);setTopicSave(false);setTopicsOpen(true);}} onTopic={topic=>{setRequestedTopic(topic.id);setTopicSave(false);setTopicsOpen(true);}} onUsage={()=>{detailsReturn.current=document.getElementById(panelId)?.querySelector<HTMLElement>(".agent-task-mode>summary")||null;setTaskStatusOnly(true);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current)workControls.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-heading button")?.focus();},0);}}/>
         <div className="agent-header-end">
-          <button type="button" aria-label={docked?"切换为浮窗":"展开为侧边栏"} title={docked?"切换为浮窗":"展开为侧边栏"} onClick={()=>{setDocked(value=>!value);detailsPopover.close();}}>{docked?<PanelsTopLeft size={18}/>:<PanelRight size={18}/>}</button>
+          {!onDismiss && <button type="button" aria-label={docked?"切换为浮窗":"展开为侧边栏"} title={docked?"切换为浮窗":"展开为侧边栏"} onClick={()=>{setDocked(value=>!value);detailsPopover.close();}}>{docked?<PanelsTopLeft size={18}/>:<PanelRight size={18}/>}</button>}
           <button ref={detailsTrigger} type="button" title="对话详情" aria-label="对话详情" onClick={event=>{if(detailsMenu.current?.open&&!historyExpanded){detailsPopover.close();event.currentTarget.focus();return;}detailsReturn.current=event.currentTarget;setTaskStatusOnly(false);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-sections .agent-details-heading button")?.focus();},0);}}><MoreHorizontal size={18}/></button>
           <button type="button" title="关闭助手（Esc）" aria-label="关闭助手" onClick={closePanel}><X size={19} /></button>
         </div>
@@ -1168,6 +1173,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
 
       {newSource && <div className="agent-notice"><p>正在讨论「{sourceTitle || currentObjectLabel}」。当前浏览：{newSource.title}</p><button type="button" disabled={busy || !!active} onClick={newSource.use}>用当前材料新建对话</button></div>}
       {tagMode&&<AgentTagWorkspace value={tagPreparation} disabled={busy||!!active} onChange={setTagPreparation} onCancel={()=>setTagMode(false)}/>}
+      {view?.goalMode && view.work.state !== "revoked" && <p className="agent-note" role="status">目标模式 · 第 {view.goalMode.round} / {view.goalMode.maximumRounds} 轮{view.goalMode.stopReason && ` · ${view.goalMode.stopReason}`}</p>}
       {!view && !tagMode && !loadingConversation && <div className="agent-welcome">
         <h2>{hasDraftSources?"从这份材料开始":"有什么可以帮你？"}</h2><p>{hasDraftSources?"提一个问题，或试试下面的建议。":"直接提问，或从＋添加需要使用的资料。"}</p>
         {hasDraftSources && <div className="agent-suggestions">{suggestions.map(({ label, icon: Icon, prompt }) => <button key={label} type="button" disabled={busy} onClick={() => { setGoal(prompt); goalInput.current?.focus(); }}><Icon size={18} aria-hidden="true" /><span>{label}</span></button>)}</div>}
@@ -1254,6 +1260,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
           {!!selectedSkills.length && <div className="agent-selected-skills" aria-label="本次指定技能">{selectedSkills.map(token=><AgentMaterialCard key={token} kind="skill" title={skillTitle(token.slice(1))} identifier={token.slice(1)} subtitle={skillPurpose(token.slice(1))} disabled={busy} removeLabel={`移除技能 ${skillTitle(token.slice(1))}`} onRemove={()=>setGoal(selectedSkills.filter(item=>item!==token).map(item=>item+" ").join("")+questionText)}/>)}</div>}
         </div>
         {view?.work.state !== "revoked" && <form onSubmit={event=>void create(event)}>
+          {goalMode && !view && !publicUrl && <label className="agent-question"><span>完成条件</span><input name="goalCompletionCriteria" value={completionCriteria} disabled={busy} maxLength={2000} onChange={event=>setCompletionCriteria(event.target.value)} placeholder="例如，交付对照表并独立复算关键数字" /></label>}
           {tagSuggestion&&<button type="button" className="agent-tag-open" disabled={busy||!!active} onClick={()=>prepareTagTask(tagSuggestion)}>准备标签任务 · {tagTaskNames[tagSuggestion]}</button>}<AgentTagReferences value={tagPreparation} mode={tagMode} disabled={busy||!!active} onChange={setTagPreparation} searchOpen={tagSearchOpen} onSearchClose={()=>setTagSearchOpen(false)}/><AgentTagRelated tags={[...tagPreparation.references,...(tagMode&&tagPreparation.tag?[tagPreparation.tag]:[])]} grant={researchGrant(manualResearchGrant(),research?.topic.grant,research?.includeManual)} disabled={busy||!!active} onAdd={item=>setMaterials(items=>items.some(m=>materialKey(m.locator)===materialKey(item.locator))?items:[...items,item])}/>
 
           {suggestedQuestion&&usedQuestion!==suggestedQuestion.id&&view?.work.id===initialWorkId&&<div className="agent-note"><p>关联核对提问已准备，不会自动发送。{goal.trim()?"先保留当前输入，再使用这条提问。":"可先检查资料范围，再开始核对。"}</p><button type="button" disabled={busy||!!active||!!goal.trim()} onClick={()=>{setGoal(suggestedQuestion.text);setUsedQuestion(suggestedQuestion.id);goalInput.current?.focus();}}>使用关联核对提问</button><button type="button" onClick={()=>setUsedQuestion(suggestedQuestion.id)}>忽略这条提问</button></div>}

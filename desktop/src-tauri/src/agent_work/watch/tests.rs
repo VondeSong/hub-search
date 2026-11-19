@@ -3,6 +3,73 @@ use crate::agent_work::tests::{claim, create, report};
 use crate::source_evidence::tests::Fixture;
 
 #[test]
+fn periodic_library_watch_retains_unreported_changes_and_rejects_the_same_slot_twice() {
+    let fixture = Fixture::new();
+    fixture.note("craft", "base", "已经核对的材料");
+    let anchor = EvidenceLocator::Note {
+        library_id: "craft".into(),
+        document_id: "base".into(),
+        page_id: None,
+    };
+    let id = ready_at(
+        &fixture,
+        anchor,
+        Grant {
+            library_ids: vec!["craft".into()],
+            ..Default::default()
+        },
+        "已经核对的材料",
+    );
+    configure(
+        &fixture.root,
+        &json!({"id":id,"confirmed":true,
+        "dueAt":now()+20_000,"repeatDays":7,"scanLibraries":true}),
+    )
+    .unwrap();
+    let mut original = condition(&fixture, &id);
+    let slot = now() - 30;
+    original.due_at = Some(slot);
+    save(&fixture.c(), &id, &original, slot).unwrap();
+    fixture.note("craft", "new-note", "本次新增材料");
+    let work = store::load(&fixture.c(), &id).unwrap();
+    let delta = catalog::delta(&fixture.root, &fixture.c(), &work).unwrap();
+    assert_eq!(delta["changes"][0]["kind"], "added");
+    assert_eq!(delta["changes"][0]["locator"]["documentId"], "new-note");
+    let trigger = json!({"reason":"agreedReview","scheduledAt":slot,"libraryDelta":delta});
+    let claimed = store::write(&fixture.root, |c| {
+        claim_on(c, &id, "schedule-test", &original, &trigger)
+    })
+    .unwrap();
+    assert!(condition(&fixture, &id).due_at.unwrap() > slot + WEEK - 10);
+    assert_eq!(
+        store::review_trigger(&fixture.root, "schedule-test")
+            .unwrap()
+            .unwrap()["scope"],
+        "authorizedLibraryDelta"
+    );
+    // A later revision must survive acknowledgement of this slot.
+    fixture.c().execute("UPDATE documents SET content_hash='a-later-version' WHERE space_id='craft' AND id='new-note'", []).unwrap();
+    catalog::advance(&fixture.root, &fixture.c(), &claimed, &delta).unwrap();
+    assert_eq!(
+        catalog::delta(&fixture.root, &fixture.c(), &claimed).unwrap()["changes"][0]["kind"],
+        "added"
+    );
+    let mut after = condition(&fixture, &id);
+    after.running = None;
+    save(&fixture.c(), &id, &after, now()).unwrap();
+    assert!(store::write(&fixture.root, |c| claim_on(
+        c,
+        &id,
+        "duplicate",
+        &original,
+        &trigger
+    ))
+    .err()
+    .expect("duplicate claim rejected")
+    .contains("已处理"));
+}
+
+#[test]
 fn a_bound_task_change_reads_only_its_known_authorized_peers_and_keeps_other_dependencies() {
     let f = Fixture::new();
     f.note("craft", "doc", "父页");

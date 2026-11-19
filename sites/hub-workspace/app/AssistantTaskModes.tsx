@@ -1,11 +1,11 @@
 "use client";
 import { useId, useState } from 'react';
-import { Check, ChevronDown, FolderBookmark, Sparkles, Tags, WandSparkles, X } from 'lucide-react';
+import { Check, ChevronDown, FolderBookmark, Goal, Sparkles, Tags, WandSparkles, X } from 'lucide-react';
 import { demoSkills } from './AssistantResources';
 import { PinShortcut, TopicSourceReview, researchPolicies, type TopicSource, type ResearchTopic, type WorkPins } from './AssistantResearch';
 
-export function AssistantTaskModes({ tagActive, onTag, topics, pins, skills, allTopics, disabled, onPin, onSkill, onGeneral, onTopic, onAllTopics, onUsage, onClose, activeTopic }: {
-  tagActive: boolean; onTag: () => void; topics: ResearchTopic[]; pins: WorkPins; skills: string[]; allTopics: boolean; disabled: boolean; activeTopic: string | null;
+export function AssistantTaskModes({ tagActive, onTag, goalActive, onGoal, topics, pins, skills, allTopics, disabled, onPin, onSkill, onGeneral, onTopic, onAllTopics, onUsage, onClose, activeTopic }: {
+  tagActive: boolean; onTag: () => void; goalActive: boolean; onGoal: () => void; topics: ResearchTopic[]; pins: WorkPins; skills: string[]; allTopics: boolean; disabled: boolean; activeTopic: string | null;
   onPin: (kind: keyof WorkPins, id: string) => void; onSkill: (id: string) => void; onGeneral: () => void;
   onTopic: (topic: ResearchTopic) => void; onAllTopics: () => void; onUsage: () => void; onClose: () => void;
 }) {
@@ -13,7 +13,8 @@ export function AssistantTaskModes({ tagActive, onTag, topics, pins, skills, all
   return <section className="ha-menu ha-header-menu ha-work-modes" aria-label={allTopics ? '全部专题' : '任务模式'}>
     <header className="ha-menu-heading"><strong>{allTopics ? '全部专题' : '任务模式'}</strong><button type="button" className="ha-icon" aria-label={allTopics ? '关闭全部专题' : '关闭任务模式'} onClick={onClose}><X size={16}/></button></header>
     {!allTopics && <>
-      <button type="button" className="ha-menu-choice" disabled={disabled} aria-pressed={!tagActive} onClick={onGeneral}><Sparkles size={17}/><span><strong>通用助手</strong><small>自由提问，保留当前对话与设置</small></span>{!tagActive && <Check size={16}/>}</button>
+      <button type="button" className="ha-menu-choice" disabled={disabled} aria-pressed={!tagActive && !goalActive} onClick={onGeneral}><Sparkles size={17}/><span><strong>通用助手</strong><small>自由提问，保留当前对话与设置</small></span>{!tagActive && !goalActive && <Check size={16}/>}</button>
+      <button type="button" className="ha-menu-choice" disabled={disabled} aria-pressed={goalActive} onClick={onGoal}><Goal size={17}/><span><strong>目标模式</strong><small>按完成条件推进，遇到阻碍时暂停</small></span>{goalActive && <Check size={16}/>}</button>
       <button type="button" className="ha-menu-choice" disabled={disabled} aria-pressed={tagActive} onClick={onTag}><Tags size={17}/><span><strong>标签助手</strong><small>起草定义、查找漏标、比较关系</small></span>{tagActive && <Check size={16}/>}</button>
     </>}
     <div className="ha-mode-group">

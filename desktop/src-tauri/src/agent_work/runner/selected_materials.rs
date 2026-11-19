@@ -124,8 +124,8 @@ pub(super) fn prepare(
     work: &Work,
     run: &str,
     context: &mut Context,
+    review_selected: bool,
 ) -> Result<(), String> {
-    let previous = store::records(root, &work.id, "evidence", 64)?;
     let mut selected = if work.grant.manifest.is_none() {
         let mut items = work.grant.notes.clone();
         items.extend(work.grant.sources.clone());
@@ -137,12 +137,15 @@ pub(super) fn prepare(
                     item_key: key.clone(),
                 }),
         );
-        // Recover attachments that older runs authorized but never read.
-        items.retain(|locator| {
-            !previous
-                .iter()
-                .any(|record| record["excerpt"]["locator"] == json!(locator))
-        });
+        if !review_selected {
+            // Recover attachments that older runs authorized but never read.
+            let previous = store::records(root, &work.id, "evidence", 64)?;
+            items.retain(|locator| {
+                !previous
+                    .iter()
+                    .any(|record| record["excerpt"]["locator"] == json!(locator))
+            });
+        }
         items
     } else {
         Vec::new()

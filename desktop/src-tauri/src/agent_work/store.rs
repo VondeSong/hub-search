@@ -90,13 +90,21 @@ fn read(root: &Path) -> Result<Connection, String> {
 }
 pub(super) fn review_trigger(root: &Path, run: &str) -> Result<Option<Value>, String> {
     let c = read(root)?;
+    review_trigger_on(&c, run)
+}
+pub(super) fn review_trigger_on(c: &Connection, run: &str) -> Result<Option<Value>, String> {
     let raw:Option<String>=c.query_row("SELECT body_json FROM agent_records WHERE run_id=?1 AND kind='conditionTrigger' LIMIT 1",[run],|r|r.get(0)).optional().map_err(|e|e.to_string())?;
     raw.map(|raw| {
-        if raw.len() > 4096 {
+        if raw.len() > 16_384 {
             return Err("复查触发记录过大".into());
         }
         let v: Value = serde_json::from_str(&raw).map_err(|_| "复查触发记录损坏")?;
-        if v["readOnly"] != true || v["scope"] != "knownDependenciesOnly" {
+        if v["readOnly"] != true
+            || !matches!(
+                v["scope"].as_str(),
+                Some("knownDependenciesOnly" | "authorizedLibraryDelta")
+            )
+        {
             return Err("复查触发记录无效".into());
         }
         Ok(v)
@@ -836,7 +844,11 @@ pub(super) fn view(root: &Path, id: &str) -> Result<Value, String> {
     c.execute_batch("COMMIT").map_err(|e| e.to_string())?;
     permit.checkpoint()?;
     phase!("commitAndPermit");
-    let value = json!({"materialBudget":material_budget,"workingState":working_state,"lifecycle":lifecycle,"goalRevision":goal_revision,"taskTree":task_tree,"goalAssessment":goal_assessment,"work":work,"evidence":evidence,"decisions":decisions,"run":latest,"validity":validity,"progress":progress,"history":history,"conversation":conversation,"actions":actions,"watch":watch,"memoryUse":memory_use,"modelSelection":model_selection,"modelExecutions":model_executions,"assistantOptions":assistant_options,"draftRequest":draft_request,"activity":activity,"analysisArtifacts":analysis_artifacts,"fileAnalyses":super::analysis::manifest(root,&work),"sourceCoverage":super::coverage::read_on(root,&c,&work)?,"sleepDatasets":sleep_datasets,"recordVersion":record_version,"nativeTiming":{"hostEpochMs":chrono::Utc::now().timestamp_millis(),"projectionMs":projection_started.elapsed().as_secs_f64()*1000.0,"phases":projection_phases},"sourceFreshness":"notVerifiedWithRemote"});
+    let goal_mode = match latest.as_ref().and_then(|run| run["id"].as_str()) {
+        Some(run) => super::goal_mode::view_on(&c, &work, run)?,
+        None => None,
+    };
+    let value = json!({"materialBudget":material_budget,"workingState":working_state,"lifecycle":lifecycle,"goalRevision":goal_revision,"taskTree":task_tree,"goalAssessment":goal_assessment,"goalMode":goal_mode,"work":work,"evidence":evidence,"decisions":decisions,"run":latest,"validity":validity,"progress":progress,"history":history,"conversation":conversation,"actions":actions,"watch":watch,"memoryUse":memory_use,"modelSelection":model_selection,"modelExecutions":model_executions,"assistantOptions":assistant_options,"draftRequest":draft_request,"activity":activity,"analysisArtifacts":analysis_artifacts,"fileAnalyses":super::analysis::manifest(root,&work),"sourceCoverage":super::coverage::read_on(root,&c,&work)?,"sleepDatasets":sleep_datasets,"recordVersion":record_version,"nativeTiming":{"hostEpochMs":chrono::Utc::now().timestamp_millis(),"projectionMs":projection_started.elapsed().as_secs_f64()*1000.0,"phases":projection_phases},"sourceFreshness":"notVerifiedWithRemote"});
     let mut value = value;
     value["contextCompaction"] = context_compaction;
     value["nativeContext"] = native_context;

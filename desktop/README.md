@@ -115,6 +115,14 @@ npm install
 npm run tauri dev
 ```
 
+Windows 上可向运行中的 Hub 发送正常退出请求。开发版脚本可从 `desktop` 目录执行以下命令。
+
+```powershell
+Start-Process -FilePath '.\src-tauri\target\debug\craft-search.exe' -ArgumentList '--quit' -WindowStyle Hidden -Wait
+```
+
+Hub 收到请求后走与托盘「退出」相同的保存流程。发送命令结束后，需确认原 Hub 进程已经退出，再覆盖或重新启动程序文件。
+
 本机开发连接可写入 `.env.development.local`：
 
 ```dotenv

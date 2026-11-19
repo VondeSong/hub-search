@@ -2,6 +2,7 @@
 //! calls tick; the Suite owns priority/admission and the existing runner owns AI.
 use super::*;
 use crate::source_evidence::EvidenceVersion;
+mod catalog;
 const INTERVAL: i64 = 60_000;
 const WEEK: i64 = 7 * 24 * 60 * 60 * 1000;
 
@@ -15,6 +16,10 @@ struct Condition {
     authorization_version: i64,
     on_change: bool,
     due_at: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    repeat_days: Option<u32>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    scan_libraries: bool,
     expires_at: i64,
     remaining: u32,
     notify: bool,
@@ -28,6 +33,7 @@ fn now() -> i64 {
 }
 pub(super) fn migrate(c: &Connection) -> rusqlite::Result<()> {
     c.execute_batch("CREATE TABLE IF NOT EXISTS agent_watch_conditions(work_id TEXT PRIMARY KEY REFERENCES agent_works(id),enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),next_check_at INTEGER NOT NULL,body_json TEXT NOT NULL); CREATE INDEX IF NOT EXISTS agent_watch_due ON agent_watch_conditions(enabled,next_check_at); CREATE INDEX IF NOT EXISTS agent_condition_budget ON agent_records(created_at) WHERE kind='conditionTrigger';")?;
+    catalog::prepare(c)?;
     c.prepare(
         "SELECT work_id,enabled,next_check_at,body_json FROM agent_watch_conditions LIMIT 0",
     )?;
@@ -54,6 +60,7 @@ fn load(c: &Connection, id: &str) -> Result<Option<Condition>, String> {
         if v.format != 1
             || v.enabled != enabled
             || v.remaining > 3
+            || !matches!(v.repeat_days, None | Some(1 | 7))
             || v.dependencies.is_empty()
             || v.dependencies.len() > 64
         {
@@ -76,7 +83,7 @@ pub(super) fn view_on(c: &Connection, id: &str) -> Result<Value, String> {
         Err(_) => json!({"enabled":false,"message":"复查条件不可用，未继续运行；请重新设置"}),
         Ok(None) => json!(null),
         Ok(Some(v)) => {
-            json!({"enabled":v.enabled,"onChange":v.on_change,"dueAt":v.due_at,"expiresAt":v.expires_at,"remaining":v.remaining,"notify":v.notify,"running":v.running,"message":v.message})
+            json!({"enabled":v.enabled,"onChange":v.on_change,"dueAt":v.due_at,"repeatDays":v.repeat_days,"scanLibraries":v.scan_libraries,"executionHost":"desktop","expiresAt":v.expires_at,"remaining":v.remaining,"notify":v.notify,"running":v.running,"message":v.message})
         }
     })
 }
@@ -158,6 +165,20 @@ pub(super) fn configure(root: &Path, args: &Value) -> Result<(), String> {
     }
     let change = args["onChange"].as_bool().unwrap_or(false);
     let due = args["dueAt"].as_i64();
+    let repeat_days = match args.get("repeatDays").filter(|v| !v.is_null()) {
+        None => None,
+        Some(value) if matches!(value.as_u64(), Some(1 | 7)) => {
+            value.as_u64().map(|days| days as u32)
+        }
+        Some(_) => return Err("复查周期仅支持每天或每周".into()),
+    };
+    if repeat_days.is_some() && (due.is_none() || change) {
+        return Err("定时复查需要首次运行时间，请单独选择定时触发".into());
+    }
+    let scan_libraries = args["scanLibraries"] == true;
+    if scan_libraries && repeat_days.is_none() {
+        return Err("检查资料库新增内容需要设置每天或每周定时复查".into());
+    }
     let stamp = now();
     if (!change && due.is_none()) || due.is_some_and(|d| d < stamp + 10_000 || d > stamp + WEEK) {
         return Err("请选择来源变化或未来 10 秒至 7 天内的复查时间".into());
@@ -202,6 +223,23 @@ pub(super) fn configure(root: &Path, args: &Value) -> Result<(), String> {
             reader.expand_task_dependencies(c, dependencies(&work, &excerpts, &candidates)?)?;
         let deps = normalize_dependencies(&work, deps)?;
         let baseline = sample_on(root, c, &work, &deps)?;
+        let previous = load(c, &id)?.filter(|condition| {
+            condition.enabled
+                && condition.revision == work.revision
+                && condition.authorization_version == work.authorization_version
+                && condition.repeat_days.is_some()
+        });
+        if scan_libraries {
+            if work.grant.library_ids.is_empty() || work.grant.manifest.is_some() {
+                return Err("请在当前事项明确选择可持续复查的资料库".into());
+            }
+            if !previous
+                .as_ref()
+                .is_some_and(|condition| condition.scan_libraries)
+            {
+                catalog::capture(root, c, &work)?;
+            }
+        }
         let condition = Condition {
             format: 1,
             enabled: true,
@@ -210,13 +248,23 @@ pub(super) fn configure(root: &Path, args: &Value) -> Result<(), String> {
             authorization_version: work.authorization_version,
             on_change: change,
             due_at: due,
-            expires_at: stamp + WEEK,
-            remaining: 3,
+            repeat_days,
+            scan_libraries,
+            expires_at: match (due, repeat_days) {
+                (Some(first), Some(days)) => first + 3 * i64::from(days) * (WEEK / 7),
+                _ => stamp + WEEK,
+            },
+            remaining: previous.as_ref().map_or(3, |condition| condition.remaining),
             notify: args["notify"].as_bool().unwrap_or(false),
             dependencies: deps,
             baseline,
             running: None,
-            message: "已启用；最多自动复查 3 轮，7 天后到期".into(),
+            message: if repeat_days.is_some() {
+                "定时复查已启用，Hub 运行时最多完成 3 轮"
+            } else {
+                "已启用；最多自动复查 3 轮，7 天后到期"
+            }
+            .into(),
         };
         save(c, &id, &condition, stamp)
     })
@@ -277,6 +325,11 @@ pub(super) fn published(
     // Only observations verified in this delivery may advance their baseline.
     // An unread dependency can change while the model is generating a report.
     let original = store::load(c, &work.id)?;
+    if v.scan_libraries && state == "completed" {
+        if let Some(changes) = scheduled_delta_on(c, run)? {
+            catalog::advance(root, c, &original, &changes)?;
+        }
+    }
     let reader = original.grant.reader(root)?;
     let observed =
         reader.expand_task_dependencies(c, dependencies(&original, excerpts, candidates)?)?;
@@ -310,9 +363,11 @@ pub(super) fn published(
     v.baseline = sample;
     v.dependencies = deps;
     v.running = None;
-    v.enabled = v.on_change && v.remaining > 0 && state != "needsDecision";
+    v.enabled = (v.on_change || v.due_at.is_some()) && v.remaining > 0 && state != "needsDecision";
     v.message = if state == "needsDecision" {
         "自动复查已完成；需要你的决定，已暂停"
+    } else if v.enabled && v.repeat_days.is_some() {
+        "本次报告已保存，等待下次定时复查"
     } else if v.enabled {
         "自动复查已完成，等待下一次相关变化"
     } else {
@@ -414,11 +469,16 @@ fn one(root: &Path, id: &str) -> Result<Option<Value>, String> {
             save(c, id, &v, now() + INTERVAL)?;
             return Ok((v, work, None));
         }
-        let timed = v.due_at.is_some_and(|d| d <= now());
+        let timed = v.due_at.filter(|d| *d <= now());
         let changed = v.on_change && sample != v.baseline;
-        let event = if timed || changed {
+        let event = if timed.is_some() || changed {
+            let library_delta = if timed.is_some() && v.scan_libraries {
+                Some(catalog::delta(root, c, &work)?)
+            } else {
+                None
+            };
             Some(
-                json!({"reason":if timed {"agreedReview"} else {"knownDependencyChanged"},"metadataOnly":true,"sample":sample}),
+                json!({"reason":if timed.is_some() {"agreedReview"} else {"knownDependencyChanged"},"scheduledAt":timed,"metadataOnly":true,"sample":sample,"libraryDelta":library_delta}),
             )
         } else {
             None
@@ -457,7 +517,15 @@ fn one(root: &Path, id: &str) -> Result<Option<Value>, String> {
     if map.contains_key(&key) {
         return Ok(None);
     }
-    let claimed = store::write(root, |c| claim_on(c, id, &run, &v, &event))?;
+    let claimed = store::write(root, |c| {
+        if v.scan_libraries && catalog::delta(root, c, &work)? != event["libraryDelta"] {
+            return Ok(None);
+        }
+        claim_on(c, id, &run, &v, &event).map(Some)
+    })?;
+    let Some(claimed) = claimed else {
+        return Ok(None);
+    };
     map.insert(
         key.clone(),
         Active {
@@ -468,7 +536,20 @@ fn one(root: &Path, id: &str) -> Result<Option<Value>, String> {
     );
     drop(map);
     let running = Running(key);
-    let focused = affected(&claimed, &v, &event);
+    let mut focused = affected(&claimed, &v, &event);
+    for value in event["libraryDelta"]["changes"]
+        .as_array()
+        .into_iter()
+        .flatten()
+    {
+        if value["kind"] != "missing" {
+            let locator: EvidenceLocator = serde_json::from_value(value["locator"].clone())
+                .map_err(|_| "定时复查的资料定位无效")?;
+            if !focused.contains(&locator) {
+                focused.push(locator);
+            }
+        }
+    }
     let result = execute_investigation(
         root,
         &narrowed(&claimed, &focused),
@@ -517,13 +598,28 @@ fn claim_on(
     if current.generation != v.generation || current.running.is_some() {
         return Err("复查约定已改变".into());
     }
+    let timed = event["reason"] == "agreedReview";
+    if timed
+        && event.get("scheduledAt").is_some()
+        && event["scheduledAt"].as_i64() != current.due_at
+    {
+        return Err("本次定时复查已处理".into());
+    }
+    let scheduled_at = current.due_at.filter(|_| timed);
     let work = store::claim_on(c, id, &run)?;
     store::execution_budget::reserve_on(c, &work, run, Budget::mode("quick")?)?;
     current.remaining -= 1;
     current.running = Some(run.into());
     current.message = "正在按约定复查已知来源".into();
-    if event["reason"] == "agreedReview" {
-        current.due_at = None;
+    if timed {
+        current.due_at = match (scheduled_at, current.repeat_days) {
+            (Some(slot), Some(days)) if current.remaining != 0 => {
+                let interval = i64::from(days) * (WEEK / 7);
+                let next = slot + ((now() - slot).max(0) / interval + 1) * interval;
+                (next < current.expires_at).then_some(next)
+            }
+            _ => None,
+        };
     }
     save(c, id, &current, now() + INTERVAL)?;
     store::insert(
@@ -531,9 +627,18 @@ fn claim_on(
         id,
         Some(&run),
         "conditionTrigger",
-        &json!({"reason":event["reason"],"generation":current.generation,"dependencyCount":current.dependencies.len(),"scope":"knownDependenciesOnly","readOnly":true}),
+        &json!({"reason":event["reason"],"scheduledAt":scheduled_at,"generation":current.generation,"dependencyCount":current.dependencies.len(),"scope":if current.scan_libraries {"authorizedLibraryDelta"} else {"knownDependenciesOnly"},"libraryDelta":event["libraryDelta"],"readOnly":true}),
     )?;
     Ok(work)
+}
+
+fn scheduled_delta_on(c: &Connection, run: &str) -> Result<Option<Value>, String> {
+    Ok(store::review_trigger_on(c, run)?.and_then(|record| {
+        record
+            .get("libraryDelta")
+            .filter(|delta| delta.is_object())
+            .cloned()
+    }))
 }
 
 fn affected(work: &Work, v: &Condition, event: &Value) -> Vec<EvidenceLocator> {

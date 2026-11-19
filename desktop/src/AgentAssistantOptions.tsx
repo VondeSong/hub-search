@@ -8,7 +8,7 @@ import {invoke} from "@tauri-apps/api/core";
 import {openPath} from "@tauri-apps/plugin-opener";
 
 export type ResearchPolicy = "material-first" | "materials-only" | "open";
-export type AssistantOptions = { researchPolicy?:ResearchPolicy; model: CodexSettings | null; autoFlashcardInbox: boolean; externalMcp?:boolean; nativeCapabilities?:{workspace:boolean;multiAgent:boolean}; webSearch?:"disabled"|"cached"|"live";mcpServices?:McpGrant[] };
+export type AssistantOptions = { researchPolicy?:ResearchPolicy; model: CodexSettings | null; autoFlashcardInbox: boolean; externalMcp?:boolean; goalMode?:boolean; knowledgeReview?:boolean; nativeCapabilities?:{workspace:boolean;multiAgent:boolean}; webSearch?:"disabled"|"cached"|"live";mcpServices?:McpGrant[] };
 export const defaultAssistantOptions: AssistantOptions = {model:null,autoFlashcardInbox:false};
 export const webSearchNames = { disabled: "关闭", cached: "缓存搜索", live: "实时搜索" };
 type Section = "model" | "permissions" | "connection";
@@ -55,6 +55,8 @@ function AgentSaveOptions({value,disabled,canAuto,onSave,section,workId}:Props) 
       <details className="agent-connection-explanation"><summary>搜索说明</summary><p className="agent-note">新聊天默认实时搜索；此处可关闭，选择会用于后续新聊天。已有对话保留各自设置。仅支持 Codex。开启后，检索词会发送给联网搜索服务；不会因此开放其他本地资料。缓存搜索可能不是最新信息，实时搜索可获取更新内容。搜索记录和链接随对话保存，网页全文需另行读取。提供方内部检索材料不计入 Hub 的材料字节统计。</p></details>
       <details className="agent-mcp-settings"><summary>外部工具（MCP）<small>{draft.mcpServices?.length ? `已选 ${draft.mcpServices.length} 项` : "未选择"}</small></summary><AgentMcpServices value={draft.mcpServices ?? []} disabled={disabled || saving || searchBlocked} onChange={services=>setDraft(current=>{const next={...current};if(services.length)next.mcpServices=services;else delete next.mcpServices;return next;})}/></details>
       <details className="agent-connection-explanation"><summary>执行与协作<small>{draft.nativeCapabilities?.workspace?draft.nativeCapabilities.multiAgent?"工作区与子代理":"独立工作区":"受控计算"}</small></summary>
+        <label><input type="checkbox" checked={!!draft.knowledgeReview} disabled={disabled || saving || deepseek} onChange={event=>setDraft(current=>({...current,knowledgeReview:event.target.checked}))}/>分工复核资料</label>
+        <p className="agent-note">两位助手分头看已授权的原文，并各自核对共同的重点。主助手会汇总发现、分歧和未读部分。</p>
         <label><input type="checkbox" checked={!!draft.nativeCapabilities?.workspace} disabled={disabled||saving||draft.externalMcp||effective?.provider==="deepseek"} onChange={event=>setDraft(current=>{const next={...current};if(event.target.checked)next.nativeCapabilities={workspace:true,multiAgent:false};else delete next.nativeCapabilities;return next;})}/>允许本对话使用独立工作区</label>
         <p className="agent-note">Windows 可运行脚本、创建和编辑工作区文件。网络关闭，不开放原资料库与宿主凭据；来源保存继续使用 Hub 的授权与回执。</p>
         {workId && value.nativeCapabilities?.workspace && <button type="button" onClick={()=>{void invoke<{path:string}>("agent_investigation",{args:{action:"nativeWorkspacePath",id:workId}}).then(result=>openPath(result.path)).catch(reason=>setError(String(reason)));}}>打开本对话工作区</button>}

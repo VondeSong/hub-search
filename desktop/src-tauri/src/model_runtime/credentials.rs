@@ -6,6 +6,10 @@ fn entry() -> Result<keyring::Entry, String> {
     crate::credential_entry(KEY).map_err(|_| "无法访问系统模型凭据库。".into())
 }
 pub(super) fn get() -> Result<Option<String>, String> {
+    #[cfg(test)]
+    if std::env::var_os("HUB_ACCEPTANCE_MISSING_DEEPSEEK_KEY").is_some() {
+        return Ok(None);
+    }
     if crate::isolated_runtime::enabled() {
         return crate::isolated_runtime::secret_get(KEY);
     }

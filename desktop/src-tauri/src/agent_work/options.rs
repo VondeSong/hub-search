@@ -38,6 +38,10 @@ pub(super) struct Options {
     pub auto_flashcard_inbox: bool,
     #[serde(default, skip_serializing_if = "disabled")]
     pub external_mcp: bool,
+    #[serde(default, skip_serializing_if = "disabled")]
+    pub goal_mode: bool,
+    #[serde(default, skip_serializing_if = "disabled")]
+    pub knowledge_review: bool,
     #[serde(
         default,
         skip_serializing_if = "crate::model_runtime::NativeCapabilities::disabled"
@@ -172,6 +176,16 @@ pub(super) fn preflight(
         && (!prepare_drafts || !crate::model_runtime::native_agent_provider(&settings.provider))
     {
         return Err("当前入口不支持原生工作区；未创建运行或预留额度".into());
+    }
+    if options.knowledge_review
+        && (!prepare_drafts
+            || !crate::model_runtime::native_agent_provider(&settings.provider)
+            || store::provider_budget::configured_on(&c, &w)?
+            || store::material_budget::load_on(&c, id)?.is_some())
+    {
+        return Err(
+            "分工复核使用 Codex 原生助手；已冻结独立 Token 或材料预算的事项请使用单助手".into(),
+        );
     }
     let services = load_on(&c, id)?.mcp_services;
     crate::model_runtime::mcp_services::validate(&services)?;

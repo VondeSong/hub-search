@@ -487,6 +487,7 @@ fn live_daily_analysis_continuation() {
     let mut steps = Vec::new();
     for step in config["steps"].as_array().unwrap() {
         let before = store::view(root, id).unwrap();
+        let goal_mode = step["goalMode"].as_bool().unwrap_or(false);
         if step["options"].is_object() {
             options::configure(root, &json!({"id":id,"options":step["options"]})).unwrap();
         }
@@ -496,13 +497,15 @@ fn live_daily_analysis_continuation() {
                 let current = store::view(root, id).unwrap();
                 ui(root,&json!({"action":"requestContextCompaction","id":id,"operationId":crate::random_url_safe(12),"expectedWorkRevision":current["work"]["revision"],"expectedAuthorizationVersion":current["work"]["authorizationVersion"]})).unwrap();
             }
-            if step["cancelDuringResponse"] == true {
+            if step["revokeDuringReview"] == true {
+                revoke_during_review(root, id)
+            } else if step["cancelDuringResponse"] == true {
                 let owned_root = root.to_owned();
                 let owned_id = id.to_owned();
                 let worker = std::thread::spawn(move || {
                     ui(
                         &owned_root,
-                        &json!({"action":"respond","id":owned_id,"mode":"deep"}),
+                        &json!({"action":"respond","id":owned_id,"mode":"deep","goalMode":goal_mode}),
                     )
                 });
                 let started = std::time::Instant::now();
@@ -529,12 +532,15 @@ fn live_daily_analysis_continuation() {
                 assert_eq!(state["lifecycle"]["requiresExplicitResume"], true);
                 Ok(state)
             } else {
-                ui(root, &json!({"action":"respond","id":id,"mode":"deep"}))
+                ui(
+                    root,
+                    &json!({"action":"respond","id":id,"mode":"deep","goalMode":goal_mode}),
+                )
             }
         } else if step["resume"] == true {
             ui(
                 root,
-                &json!({"action":"resume","id":id,"commandId":crate::random_url_safe(12),"expectedControlRevision":before["lifecycle"]["controlRevision"],"expectedWorkRevision":before["work"]["revision"],"expectedRunId":before["lifecycle"]["activeRunId"],"mode":"deep"}),
+                &json!({"action":"resume","id":id,"commandId":crate::random_url_safe(12),"expectedControlRevision":before["lifecycle"]["controlRevision"],"expectedWorkRevision":before["work"]["revision"],"expectedRunId":before["lifecycle"]["activeRunId"],"mode":"deep","goalMode":goal_mode}),
             )
         } else if step["revoke"] == true {
             let mut state = ui(root, &json!({"action":"revoke","id":id})).unwrap();
@@ -569,6 +575,13 @@ fn live_daily_analysis_continuation() {
             store::view(root, id)
         };
         let after = store::view(root, id).unwrap();
+        if step["assertOneReviewFailed"] == true {
+            let records = store::records(root, id, "knowledgeReview", 1).unwrap();
+            assert_eq!(records[0]["workers"][0]["state"], "failed");
+            assert_eq!(records[0]["workers"][1]["state"], "completed");
+            assert!(records[0]["workers"][1]["usage"].is_object());
+            assert!(after["work"]["report"].is_object());
+        }
         let mut exports = Vec::new();
         if let Some(destination) = step["exportDirectory"].as_str() {
             let destination = Path::new(destination);
@@ -598,6 +611,48 @@ fn live_daily_analysis_continuation() {
             export.unwrap();
         }
     }
+}
+
+fn revoke_during_review(root: &Path, id: &str) -> Result<Value, String> {
+    std::thread::scope(|scope| {
+        let reader = crate::source_evidence::open_read_database(root)?;
+        let worker = scope.spawn(|| ui(root, &json!({"action":"respond","id":id,"mode":"deep"})));
+        let deadline = std::time::Instant::now() + Duration::from_secs(120);
+        let run = loop {
+            let started: Option<String> = reader
+                .query_row(
+                    "SELECT w.active_run FROM agent_works w WHERE w.id=?1 AND
+                     (SELECT count(*) FROM agent_records r WHERE r.run_id=w.active_run
+                      AND r.kind='agentStream' AND json_extract(r.body_json,'$.origin')='hub-knowledge-review'
+                      AND json_extract(r.body_json,'$.state')='running')=2",
+                    [id],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(|error| error.to_string())?;
+            if let Some(run) = started {
+                break run;
+            }
+            if worker.is_finished() || std::time::Instant::now() >= deadline {
+                return Err("未观察到两组同时复核，不能记为运行中撤权通过".into());
+            }
+            std::thread::sleep(Duration::from_millis(150));
+        };
+        ui(root, &json!({"action":"revoke","id":id}))?;
+        let _ = worker.join().map_err(|_| "复核运行异常退出")?;
+        let view = store::view(root, id)?;
+        assert_eq!(view["work"]["state"], "revoked");
+        assert!(view["evidence"].as_array().is_some_and(Vec::is_empty));
+        let publications: i64 = reader
+            .query_row(
+                "SELECT count(*) FROM agent_records WHERE run_id=?1 AND kind IN ('knowledgeReview','delivery')",
+                [&run],
+                |row| row.get(0),
+            )
+            .map_err(|error| error.to_string())?;
+        assert_eq!(publications, 0);
+        Ok(view)
+    })
 }
 
 #[test]

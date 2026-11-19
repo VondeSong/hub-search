@@ -1,4 +1,6 @@
 import vinext from "vinext";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
 import { readExecutionProfile } from "./scripts/execution-profile.mjs";
@@ -14,6 +16,13 @@ const { d1, r2 } = hostingConfig;
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const managedLinux = readExecutionProfile() === "managed-linux";
+const vinextExports = JSON.parse(readFileSync(new URL("./node_modules/vinext/package.json", import.meta.url), "utf8")).exports;
+const windowsVinextAliases = process.platform !== "win32" ? [] : Object.keys(vinextExports)
+  .filter(key => key.startsWith("./server/"))
+  .map(key => {
+    const specifier = `vinext${key.slice(1)}`;
+    return { find: specifier, replacement: fileURLToPath(import.meta.resolve(specifier)) };
+  });
 
 const localBindingConfig = {
   main: "./worker/index.ts",
@@ -44,6 +53,9 @@ export default defineConfig(async ({ command }) => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    resolve: {
+      alias: windowsVinextAliases,
+    },
     server: {
       ...(managedLinux
         ? { host: "0.0.0.0", allowedHosts: ["terminal.local"] }

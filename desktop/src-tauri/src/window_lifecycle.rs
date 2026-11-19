@@ -24,13 +24,25 @@ use tauri::{AppHandle, Emitter, Manager};
 #[cfg(all(desktop, not(windows)))]
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
+#[cfg(windows)]
+pub(super) mod assistant;
+
 const DEFAULT_TOGGLE_SHORTCUT: &str = "Ctrl+Shift+K";
 struct ProfileExitRequest {
     id: String,
     restart: bool,
+    windows: std::collections::BTreeSet<String>,
 }
 static PROFILE_EXIT_REQUEST: Mutex<Option<ProfileExitRequest>> = Mutex::new(None);
 static PROFILE_EXIT_CONFIRMED: AtomicBool = AtomicBool::new(false);
+
+#[cfg(windows)]
+pub(super) fn quit_requested(
+    arguments: impl IntoIterator<Item = impl AsRef<std::ffi::OsStr>>,
+) -> bool {
+    let mut arguments = arguments.into_iter();
+    arguments.next().is_some_and(|arg| arg.as_ref() == "--quit") && arguments.next().is_none()
+}
 
 pub(crate) fn request_profile_exit(app: &AppHandle) {
     request_profile_shutdown(app, false);
@@ -47,6 +59,11 @@ fn request_profile_shutdown(app: &AppHandle, restart: bool) {
     let request = pending.get_or_insert_with(|| ProfileExitRequest {
         id: crate::random_url_safe(24),
         restart,
+        windows: app
+            .webview_windows()
+            .into_keys()
+            .filter(|label| label == "main" || label == "quick-assistant")
+            .collect(),
     });
     request.restart |= restart;
     let request_id = request.id.clone();
@@ -64,25 +81,35 @@ pub(crate) fn profile_exit_confirmed() -> bool {
 }
 
 #[tauri::command]
-pub(crate) fn user_profile_exit_ready() -> Result<serde_json::Value, String> {
+pub(crate) fn user_profile_exit_ready(
+    window: tauri::WebviewWindow,
+) -> Result<serde_json::Value, String> {
     let pending = PROFILE_EXIT_REQUEST
         .lock()
         .map_err(|_| "退出保存状态不可用")?;
-    Ok(serde_json::json!({"requestId":pending.as_ref().map(|request|&request.id)}))
+    Ok(
+        serde_json::json!({"requestId":pending.as_ref().filter(|request| request.windows.contains(window.label())).map(|request|&request.id)}),
+    )
 }
 
 #[tauri::command]
-pub(crate) fn confirm_user_profile_exit(app: AppHandle, request_id: String) -> Result<(), String> {
+pub(crate) fn confirm_user_profile_exit(
+    app: AppHandle,
+    window: tauri::WebviewWindow,
+    request_id: String,
+) -> Result<(), String> {
     let mut pending = PROFILE_EXIT_REQUEST
         .lock()
         .map_err(|_| "退出保存状态不可用")?;
-    if !pending
-        .as_ref()
-        .is_some_and(|request| request.id == request_id)
-    {
-        return Err("退出请求已失效".into());
+    let request = pending
+        .as_mut()
+        .filter(|request| request.id == request_id)
+        .ok_or("退出请求已失效")?;
+    request.windows.remove(window.label());
+    if !request.windows.is_empty() {
+        return Ok(());
     }
-    let restart = pending.as_ref().is_some_and(|request| request.restart);
+    let restart = request.restart;
     *pending = None;
     PROFILE_EXIT_CONFIRMED.store(true, Ordering::Release);
     drop(pending);
@@ -111,6 +138,8 @@ pub(crate) fn confirm_user_profile_exit(app: AppHandle, request_id: String) -> R
 }
 #[cfg(windows)]
 const NATIVE_TOGGLE_HOTKEY_ID: i32 = 0x4842;
+#[cfg(windows)]
+const NATIVE_ASSISTANT_HOTKEY_ID: i32 = 0x4843;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -172,6 +201,10 @@ pub(super) struct WindowState {
     closed: AtomicBool,
     #[cfg(windows)]
     native_hotkey: Mutex<Option<NativeHotkeyThread>>,
+    #[cfg(windows)]
+    assistant_return: Mutex<isize>,
+    #[cfg(windows)]
+    assistant_visibility: Mutex<VisibilityState>,
 }
 #[cfg(windows)]
 struct NativeHotkeyThread {
@@ -203,13 +236,21 @@ fn refresh_visibility(app: &AppHandle) -> Result<WindowVisibility, String> {
     let (snapshot, changed) = current.update(visible, minimized, foreground);
     drop(current);
     if changed {
-        let _ = app.emit("hub-window-visibility", &snapshot);
+        let _ = app.emit_to("main", "hub-window-visibility", &snapshot);
     }
     Ok(snapshot)
 }
 
 #[tauri::command]
-pub(super) fn get_window_visibility(app: AppHandle) -> Result<WindowVisibility, String> {
+pub(super) fn get_window_visibility(
+    app: AppHandle,
+    window: tauri::WebviewWindow,
+) -> Result<WindowVisibility, String> {
+    #[cfg(windows)]
+    if window.label() == assistant::LABEL {
+        return assistant::visibility(&window);
+    }
+    let _ = window;
     refresh_visibility(&app)
 }
 
@@ -240,6 +281,11 @@ pub(super) fn show_window(app: AppHandle) -> Result<(), String> {
 }
 
 pub(super) fn handle_event(window: &tauri::Window, event: &tauri::WindowEvent) {
+    #[cfg(windows)]
+    if window.label() == assistant::LABEL {
+        assistant::handle_event(window, event);
+        return;
+    }
     if window.label() != "main" {
         return;
     }
@@ -687,21 +733,40 @@ fn register_global_shortcuts(app: &AppHandle, toggle_shortcut: &str) -> Result<(
                 let _ = ready_tx.send(Err(native_hotkey_error(&toggle_label, &error)));
                 return;
             }
+            let assistant_registered = ["Ctrl+Alt+J", "Ctrl+Alt+F9"].into_iter().any(|shortcut| {
+                let Ok((modifiers, key)) = parse_native_hotkey(shortcut) else {
+                    return false;
+                };
+                unsafe {
+                    RegisterHotKey(
+                        None,
+                        NATIVE_ASSISTANT_HOTKEY_ID,
+                        HOT_KEY_MODIFIERS(modifiers),
+                        key,
+                    )
+                    .is_ok()
+                }
+            });
             if ready_tx.send(Ok(thread_id)).is_ok() && !control.load(Ordering::Acquire) {
                 loop {
                     let result = unsafe { GetMessageW(&mut message, None, 0, 0) };
                     if result.0 <= 0 || control.load(Ordering::Acquire) {
                         break;
                     }
+                    let hotkey = message.wParam.0 as i32;
                     if message.message == WM_HOTKEY
-                        && message.wParam.0 == NATIVE_TOGGLE_HOTKEY_ID as usize
+                        && matches!(hotkey, NATIVE_TOGGLE_HOTKEY_ID | NATIVE_ASSISTANT_HOTKEY_ID)
                     {
                         // Scheduling avoids joining a producer waiting on the UI thread during shutdown.
                         let target = app_handle.clone();
                         let active = control.clone();
                         let _ = app_handle.run_on_main_thread(move || {
                             if !active.load(Ordering::Acquire) {
-                                toggle_main_window(&target);
+                                if hotkey == NATIVE_ASSISTANT_HOTKEY_ID {
+                                    assistant::toggle(&target);
+                                } else {
+                                    toggle_main_window(&target);
+                                }
                             }
                         });
                     }
@@ -709,6 +774,9 @@ fn register_global_shortcuts(app: &AppHandle, toggle_shortcut: &str) -> Result<(
             }
             unsafe {
                 let _ = UnregisterHotKey(None, NATIVE_TOGGLE_HOTKEY_ID);
+                if assistant_registered {
+                    let _ = UnregisterHotKey(None, NATIVE_ASSISTANT_HOTKEY_ID);
+                }
             }
         })
         .map_err(|error| format!("无法启动 Windows 快捷键监听：{error}"))?;
@@ -852,6 +920,12 @@ pub(super) fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error:
         }
         let show_item = MenuItem::with_id(app, "show", "显示 Hub", true, None::<&str>)?;
         let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+        #[cfg(windows)]
+        let assistant_item =
+            MenuItem::with_id(app, "assistant", "打开 Hub 助手", true, None::<&str>)?;
+        #[cfg(windows)]
+        let menu = Menu::with_items(app, &[&show_item, &assistant_item, &quit_item])?;
+        #[cfg(not(windows))]
         let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
         TrayIconBuilder::new()
             .icon(app.default_window_icon().ok_or("应用图标不可用")?.clone())
@@ -861,6 +935,8 @@ pub(super) fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error:
             .on_menu_event(|app, event| match event.id.as_ref() {
                 "show" => show_main_window(app),
                 "quit" => request_profile_exit(app),
+                #[cfg(windows)]
+                "assistant" => assistant::toggle(app),
                 _ => {}
             })
             .on_tray_icon_event(|tray, event| {
@@ -881,6 +957,15 @@ pub(super) fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error:
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(windows)]
+    #[test]
+    fn quit_requires_the_standalone_flag() {
+        assert!(quit_requested(["--quit"]));
+        assert!(!quit_requested(["--quit", "--manual-session"]));
+        assert!(!quit_requested(["hub://open/--quit"]));
+        assert!(!quit_requested(std::iter::empty::<&str>()));
+    }
+
     #[test]
     fn global_shortcut_allows_standalone_function_keys() {
         for number in 1..=24 {

@@ -1,4 +1,5 @@
 "use client";
+import { useState } from 'react';
 import {AssistantFileDelivery} from './AssistantDataMaterials';
 import type { ReactNode } from 'react';
 import { Activity, Brain, ChevronDown, Globe2, Layers, Maximize2, Minimize2, NotebookPen, X } from 'lucide-react';
@@ -16,6 +17,10 @@ function DetailRow({ icon, title, status, children }: { icon: ReactNode; title: 
 export function AssistantDetails({ settings, setSettings, disabled, hasReport, reading, onReading, onClose, messageCount, materialCount, libraryCount, hasMaterials, usageOpen = false, taskStatus }: {
   settings: AssistantSettings; setSettings: (value: AssistantSettings) => void; disabled: boolean; hasReport: boolean; reading: boolean; onReading: () => void; onClose: () => void; messageCount: number; materialCount: number; libraryCount: number; hasMaterials: boolean; usageOpen?: boolean; taskStatus?: 'running' | 'paused';
 }) {
+  const [review, setReview] = useState(false);
+  const [frequency, setFrequency] = useState('weekly');
+  const [firstRun, setFirstRun] = useState('');
+  const [scheduled, setScheduled] = useState(false);
   const progress = taskStatus === 'running' ? '正在处理' : taskStatus === 'paused' ? '已暂停' : hasReport ? '回答已生成' : '尚未开始';
   const scope = [materialCount ? materialCount + ' 份资料' : '', libraryCount ? libraryCount + ' 个库' : ''].filter(Boolean).join(' · ') || '未选资料';
   const policy = researchPolicies.find(item => item.id === settings.researchPolicy) || researchPolicies[0];
@@ -44,6 +49,10 @@ export function AssistantDetails({ settings, setSettings, disabled, hasReport, r
           </select></label>
           {searchBlocked && <p>{materialsOnly ? '当前对话只使用所选资料。' : 'DeepSeek 模式下网页搜索不可用。'}</p>}
           <details className="ha-connection-group"><summary>外部工具（MCP）</summary><AssistantNativeConnections disabled={disabled || searchBlocked}/></details>
+          <details className="ha-connection-group"><summary>执行与协作</summary>
+            <label className="ha-detail-setting"><span>分工复核资料</span><input type="checkbox" checked={review} disabled={disabled || settings.model === 'deepseek'} onChange={event => setReview(event.target.checked)}/></label>
+            <p>两位助手分头阅读已选资料，并独立核对共同的重点。当前设置为原型示例。</p>
+          </details>
           <details className="ha-connection-group"><summary>开发者诊断{settings.externalMcp && <small>通过 MCP 调用</small>}</summary>
             <label className="ha-detail-setting"><span>Hub 工具调用方式</span><select value={settings.externalMcp ? 'mcp' : 'direct'} disabled={disabled || settings.model === 'deepseek'} onChange={event => setSettings({ ...settings, externalMcp: event.target.value === 'mcp' })}>
               <option value="direct">直接调用（默认）</option><option value="mcp">通过 MCP 调用</option>
@@ -60,6 +69,12 @@ export function AssistantDetails({ settings, setSettings, disabled, hasReport, r
       </section>
       <section className="ha-detail-section" aria-label="进度与成果"><h3>进度与成果</h3>
         <DetailRow icon={<Activity size={16}/>} title="任务状态" status={progress}>{taskDetails}</DetailRow>
+        {hasReport && <DetailRow icon={<Activity size={16}/>} title="定时复查" status={scheduled ? '已安排 · 示例' : '未启用'}>
+          <label className="ha-detail-setting"><span>复查频率</span><select value={frequency} disabled={disabled || scheduled} onChange={event => setFrequency(event.target.value)}><option value="daily">每天</option><option value="weekly">每周</option></select></label>
+          <label className="ha-detail-setting"><span>首次运行</span><input type="datetime-local" value={firstRun} disabled={disabled || scheduled} onChange={event => setFirstRun(event.target.value)}/></label>
+          <p>Windows 上的 Hub 运行时，可以定期检查已授权的资料库。这里可预览设置。</p>
+          <button type="button" disabled={disabled || (!firstRun && !scheduled)} onClick={() => setScheduled(!scheduled)}>{scheduled ? '暂停复查' : '启用定时复查'}</button>
+        </DetailRow>}
         <DetailRow icon={<NotebookPen size={16}/>} title="成果与保存">
           <p>可从回答下方插入页面、创建笔记或任务。保存前可以查看并修改草稿。</p><AssistantFileDelivery/>
         </DetailRow>

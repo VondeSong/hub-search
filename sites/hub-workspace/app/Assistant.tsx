@@ -519,6 +519,7 @@ function AssistantConversation({
   const [session, dispatch] = useReducer(reducer, initial.session);
   const [input, setInput] = useState(initial.tagIntent ? cleanTagStarter(initial.input) : initial.input);
   const [tagMode, setTagMode] = useState(initial.tagMode);
+  const [goalMode, setGoalMode] = useState(false);
   const [tag, setTag] = useState(initial.tag);
   const currentTag = tagModel.tags.includes(tag) ? tag : '';
   const [tagRefs,setTagRefs]=useState(initial.tagRefs.length ? initial.tagRefs : initial.tag ? [initial.tag] : []);
@@ -1050,10 +1051,10 @@ function AssistantConversation({
     <section ref={panel} style={{ '--ha-width': panelSize.width + 'px', '--ha-height': panelSize.height ? panelSize.height + 'px' : 'clamp(460px, 80dvh, 704px)' } as import('react').CSSProperties} className={'ha-panel' + (expanded ? ' ha-expanded' : '') + (reading ? ' ha-report-reading' : '')} aria-label="Hub 助手" data-work-id={context?.workId || 'general'} inert={draft !== null || insertion !== null}>
       <div role="separator" aria-label="调整助手宽度" aria-orientation="vertical" tabIndex={0} className="ha-width-resizer" title="拖动调整宽度，双击恢复默认" {...resize('width')}/>
       {!expanded && <div role="separator" aria-label="调整助手高度" aria-orientation="horizontal" tabIndex={0} className="ha-height-resizer" title="拖动调整高度，双击恢复默认" {...resize('height')}/>}
-      <AssistantHeader tagMode={tagMode} topicName={activeTopicName} hasSkills={!!turnResources.skills.length} modePanel={reviewedTopic ? <AssistantTopicReview topic={reviewedTopic} sources={resolveTopicSources(reviewedTopic, accessibleCatalog).sources} disabled={!!session.active}
-        onBack={() => changeMenu(topicReview?.from || 'topics')} onClose={() => changeMenu(null)} onApply={() => applyTopic(reviewedTopic)} onEdit={() => editTopicScope(reviewedTopic)}/> : (menu === 'mode' || menu === 'topics') && <AssistantTaskModes tagActive={tagMode} onTag={() => { setTagMode(true); changeMenu(null); }} topics={topics} pins={pins} activeTopic={activeTopic?.id || null} skills={resources.skills} allTopics={menu === 'topics'} disabled={!!session.active}
+      <AssistantHeader tagMode={tagMode} goalMode={goalMode} topicName={activeTopicName} hasSkills={!!turnResources.skills.length} modePanel={reviewedTopic ? <AssistantTopicReview topic={reviewedTopic} sources={resolveTopicSources(reviewedTopic, accessibleCatalog).sources} disabled={!!session.active}
+        onBack={() => changeMenu(topicReview?.from || 'topics')} onClose={() => changeMenu(null)} onApply={() => applyTopic(reviewedTopic)} onEdit={() => editTopicScope(reviewedTopic)}/> : (menu === 'mode' || menu === 'topics') && <AssistantTaskModes tagActive={tagMode} goalActive={goalMode} onGoal={() => { setTagMode(false); setGoalMode(true); changeMenu(null); }} onTag={() => { setGoalMode(false); setTagMode(true); changeMenu(null); }} topics={topics} pins={pins} activeTopic={activeTopic?.id || null} skills={resources.skills} allTopics={menu === 'topics'} disabled={!!session.active}
         onPin={onPin} onSkill={id => { setResources(value => ({ ...value, skills: [...new Set([...value.skills, id])] })); changeMenu(null); }}
-        onGeneral={() => { setTagMode(false); changeMenu(null); }}
+        onGeneral={() => { setGoalMode(false); setTagMode(false); changeMenu(null); }}
         onTopic={topic => { setTopicReview({ id: topic.id, from: menu === 'topics' ? 'topics' : 'mode' }); changeMenu('topic-review'); }} onAllTopics={() => changeMenu(menu === 'topics' ? 'mode' : 'topics')} onUsage={() => changeMenu('usage')} onClose={() => changeMenu(null)}/>} taskStatus={session.active?.status} menu={menu} setMenu={changeMenu} title={chatTitle} settings={settings} setSettings={value => { if (!session.active) setSettings(value); }} expanded={expanded} onExpand={onExpand} onClose={onClose} history={history} currentId={workKey} onNew={onNew} onSelect={onSelect} onHistoryChange={onHistoryChange} disabled={!!session.active} hasReport={session.messages.some(item => item.role === 'assistant' && canUseContext(item.context))} reading={reading} onReading={() => setReading(value => !value)} messageCount={session.messages.length} materialCount={turnResources.pages.length + Number(!!material)} libraryCount={turnResources.libraryIds.length} hasMaterials={hasMaterials}/>
       <div className="ha-workspace">
         <div className="ha-conversation">
@@ -1063,7 +1064,7 @@ function AssistantConversation({
             {contextBlocked && <div className="ha-access-note" role="status"><FileText size={17}/><div><strong>相关来源当前不可用</strong><p>正文、引文与依赖这些来源的历史内容已隐藏。恢复访问并核对后，可以继续。</p></div></div>}
             {!session.messages.length && !contextBlocked && <div className="ha-welcome">
               <h2>{tagIntent ? tagIntents.find(([intent])=>intent===tagIntent)?.[1] : tagMode ? '你想怎么整理标签？' : hasDraftSources ? '从这份材料开始' : '有什么可以帮你？'}</h2>
-              <p>{tagIntent ? tagIntent==='definition'?'根据选定资料起草定义，确认后保存。':tagIntent==='missing'?'按已确认定义查找候选，逐项核对。':'比较标签的适用边界，并核对原文依据。' : tagMode ? '选择一个场景开始，也可以直接输入 #标签名 提问。' : hasDraftSources ? '提一个问题，或选一条建议开始。' : '直接提问，也可以先选资料再讨论。'}</p>
+              <p>{tagIntent ? tagIntent==='definition'?'根据选定资料起草定义，确认后保存。':tagIntent==='missing'?'按已确认定义查找候选，逐项核对。':'比较标签的适用边界，并核对原文依据。' : tagMode ? '选择一个场景开始，也可以直接输入 #标签名 提问。' : hasDraftSources ? '提一个问题，或选一条建议开始。' : goalMode ? '写下要完成的事和你用来判断完成的条件。' : '直接提问，也可以先选资料再讨论。'}</p>
               {!tagIntent&&<div className="ha-prompts" role="group" aria-label="建议">
                 <h3>建议</h3>
                 {tagMode ? tagSuggestions : prompts.map(({ icon: Icon, label, prompt }) => <button type="button" key={label} onClick={() => { setInput(value => value.trim() ? (value + '\n\n' + prompt).slice(0, 8000) : prompt); setInputContext(value => value || material); composer.current?.focus(); }}><Icon size={17} aria-hidden="true"/><span>{label}</span><ChevronRight className="ha-prompt-arrow" size={14} aria-hidden="true"/></button>)}

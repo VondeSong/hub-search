@@ -34802,6 +34802,10 @@ pub fn run() {
     #[cfg(feature = "integration-agent-acceptance")]
     agent_acceptance::mcp_channel::configure_context(&mut context)
         .expect("MCP acceptance context must match its isolated fixture");
+    #[cfg(windows)]
+    if window_lifecycle::quit_requested(std::env::args_os().skip(1)) {
+        context.config_mut().app.windows.clear();
+    }
     if background_workers::manual_session() {
         eprintln!("Hub：本次启动已暂停自动任务，原有设置未更改。");
         for window in &mut context.config_mut().app.windows {
@@ -34834,7 +34838,14 @@ pub fn run() {
     let builder = if isolated_runtime::enabled() {
         builder
     } else {
-        builder.plugin(tauri_plugin_single_instance::init(|app, _, _| {
+        builder.plugin(tauri_plugin_single_instance::init(|app, arguments, _| {
+            #[cfg(windows)]
+            if window_lifecycle::quit_requested(arguments.iter().skip(1)) {
+                window_lifecycle::request_profile_exit(app);
+                return;
+            }
+            #[cfg(not(windows))]
+            let _ = arguments;
             window_lifecycle::show_main_window(app);
         }))
     }
@@ -34846,6 +34857,13 @@ pub fn run() {
         .manage(AppState::default())
         .manage(window_lifecycle::WindowState::default())
         .setup(|app| {
+            #[cfg(windows)]
+            if window_lifecycle::quit_requested(std::env::args_os().skip(1)) {
+                // A second instance forwards the request before setup. Reaching
+                // here means there was no reachable instance; leave data alone.
+                app.handle().cleanup_before_exit();
+                std::process::exit(0);
+            }
             if !isolated_runtime::enabled() {
                 let _ = complete_pending_storage_migration(app.handle());
                 let _ = data_portability::complete_pending_open(app.handle());
@@ -34903,6 +34921,8 @@ pub fn run() {
                 data_portability::data_portability,
                 window_lifecycle::confirm_user_profile_exit,
                 window_lifecycle::user_profile_exit_ready,
+                #[cfg(windows)]
+                window_lifecycle::assistant::dismiss_assistant_window,
                 telegram::save_telegram_connection,
                 telegram::disconnect_telegram,
                 telegram::sync_telegram,

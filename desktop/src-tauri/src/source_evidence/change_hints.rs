@@ -3,6 +3,54 @@
 use super::*;
 
 impl EvidenceReader {
+    pub(crate) fn scheduled_library_inventory(
+        &self,
+        c: &Connection,
+    ) -> Result<Vec<(EvidenceLocator, String)>, String> {
+        let visible = self.visible(c)?;
+        if self
+            .scope
+            .library_ids
+            .iter()
+            .any(|id| !visible.contains(id))
+        {
+            return Err("定时复查的资料库当前不可用，请重新核对授权".into());
+        }
+        let libraries =
+            serde_json::to_string(&self.scope.library_ids).map_err(|e| e.to_string())?;
+        let mut query = c
+            .prepare(
+                "SELECT space_id,id,content_hash,blob_hash,title,path FROM documents
+             WHERE space_id IN (SELECT value FROM json_each(?1))
+               AND provider IN ('craft','obsidian','feishu')
+             ORDER BY space_id,id LIMIT 5001",
+            )
+            .map_err(|error| error.to_string())?;
+        let mut rows = query
+            .query([libraries])
+            .map_err(|error| error.to_string())?;
+        let mut entries = Vec::new();
+        while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+            self.checkpoint()?;
+            let locator = EvidenceLocator::Note {
+                library_id: row.get(0).map_err(|e| e.to_string())?,
+                document_id: row.get(1).map_err(|e| e.to_string())?,
+                page_id: None,
+            };
+            let fields = (
+                row.get::<_, String>(2).map_err(|e| e.to_string())?,
+                row.get::<_, Option<String>>(3).map_err(|e| e.to_string())?,
+                row.get::<_, String>(4).map_err(|e| e.to_string())?,
+                row.get::<_, String>(5).map_err(|e| e.to_string())?,
+            );
+            entries.push((locator, fingerprint(&json!(fields))));
+        }
+        if entries.len() > 5000 {
+            return Err("定时复查最多比较 5000 篇笔记，请缩小资料库范围".into());
+        }
+        Ok(entries)
+    }
+
     pub(crate) fn change_hints(&self, locators: &[EvidenceLocator]) -> Result<Value, String> {
         self.in_snapshot(|c, _| self.change_hints_in_transaction(c, locators))
     }

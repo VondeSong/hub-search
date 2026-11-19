@@ -68,6 +68,9 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
+mod goal_mode;
+#[cfg(test)]
+mod roadmap_acceptance;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
@@ -741,7 +744,10 @@ fn run_mode_app(
     app: Option<&tauri::AppHandle>,
     args: Option<&Value>,
 ) -> Result<Value, String> {
-    let mut result = run_once_app(root, id, budget, prepare_drafts, app, args);
+    if prepare_drafts && args.is_some_and(|args| args["goalMode"] == true) {
+        return goal_mode::drive(root, id, budget, app, args);
+    }
+    let mut result = run_once_app(root, id, budget, prepare_drafts, app, args, None);
     for _ in 0..32 {
         if result.is_err() {
             store::followups::hold(root, id)?;
@@ -750,7 +756,7 @@ fn run_mode_app(
         if !store::followups::take_next(root, id)? {
             break;
         }
-        result = run_once_app(root, id, budget, prepare_drafts, app, None);
+        result = run_once_app(root, id, budget, prepare_drafts, app, None, None);
     }
     result.and_then(|_| status(root, id))
 }
@@ -761,6 +767,7 @@ fn run_once_app(
     prepare_drafts: bool,
     app: Option<&tauri::AppHandle>,
     args: Option<&Value>,
+    goal: Option<&goal_mode::Pass>,
 ) -> Result<Value, String> {
     let recovery = args.filter(|v| v["action"] == "resume");
     let report = args.and_then(|v| v.get("reportContinuation"));
@@ -786,6 +793,9 @@ fn run_once_app(
             }
         }
         let selection = options::preflight(root, id, prepare_drafts)?;
+        if goal.is_some() && !crate::model_runtime::native_agent_provider(&selection.provider) {
+            return Err("目标模式需要使用 Codex 原生助手".into());
+        }
         if report.is_some() && !crate::model_runtime::native_agent_provider(&selection.provider) {
             return Err("报告接续仅支持Codex原生助手，未创建运行或预留额度".into());
         }
@@ -850,6 +860,8 @@ fn run_once_app(
                     return status(root, id);
                 }
             }
+        } else if let Some(goal) = goal {
+            goal.claim(root, id, &run_id, budget)?
         } else {
             store::claim_with_report(root, id, &run_id, budget, report)?
         };
@@ -865,6 +877,9 @@ fn run_once_app(
     };
     let running = Running(key);
     let result = (|| {
+        if let Some(goal) = goal.filter(|_| recovery.is_some()) {
+            store::record(root, &run_id, "goalModePass", &goal.context())?;
+        }
         let operation = std::sync::Arc::new(options::operation_with_selection(
             root,
             &work,

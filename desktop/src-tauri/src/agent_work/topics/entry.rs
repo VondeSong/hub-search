@@ -321,6 +321,8 @@ pub(super) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
                 research_policy: None,
                 auto_flashcard_inbox: false,
                 external_mcp: false,
+                goal_mode: false,
+                knowledge_review: false,
                 mcp_services: vec![],
                 web_search: Default::default(),
             }),

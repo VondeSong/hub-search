@@ -3,11 +3,14 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   flushUserProfileStorage, getUserProfileStorageStatus, initializeUserProfileStorage,
   retryUserProfileStorage, subscribeUserProfileStorage,
 } from "./UserProfileStorage";
 
+const quickAssistant = "__TAURI_INTERNALS__" in window && getCurrentWindow().label === "quick-assistant";
+const QuickAssistant = React.lazy(() => import("./QuickAssistant"));
 const rootElement = document.getElementById("root") as HTMLElement;
 const root = ReactDOM.createRoot(rootElement);
 let exitRequestId: string | undefined;
@@ -51,7 +54,11 @@ function PersonalDataStatus() {
 
 function renderApplication() {
   if (!getUserProfileStorageStatus().ready) return;
-  root.render(<React.StrictMode><App /><PersonalDataStatus /></React.StrictMode>);
+  root.render(<React.StrictMode>{quickAssistant
+    ? <React.Suspense fallback={<p role="status">正在打开助手…</p>}><QuickAssistant /></React.Suspense>
+    : <App />}
+    <PersonalDataStatus />
+  </React.StrictMode>);
 }
 
 let lifecycleReady = false;
