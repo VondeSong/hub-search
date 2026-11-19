@@ -138,7 +138,10 @@ export function AgentConversation({ conversation, revoked, onOpenCitation, onOpe
         : run.revision === message.revision && !conversation.messages.some(item => item.runId === run.runId)
           && !conversation.messages.slice(index + 1).some(item => item.revision === message.revision));
       const combinedValidity = message.artifactState === "unavailable" && messageRuns.some(run=>run.validity) ? message.validity : undefined;
-      const runs = messageRuns.map(run => <AgentActivity key={`run:${run.runId}`} value={combinedValidity && run.validity ? {...run,validity:combinedValidity} : run} onRecheck={onRecheck}/>);
+      const runs = messageRuns.map(run => {
+        const request=conversation.messages.slice(0,index+1).reverse().find(item=>item.role==="user" && item.kind!=="decision" && item.kind!=="scope" && item.revision===run.revision);
+        return <AgentActivity key={`run:${run.runId}`} value={combinedValidity && run.validity ? {...run,validity:combinedValidity} : run} onRecheck={onRecheck} requestText={request?.displayText ?? request?.text}/>;
+      });
       const body = <section key={`message:${message.id}`} className={`agent-message agent-message-${message.role}`} aria-label={message.role === "user" ? "你的消息" : "助手回答"}>
       {message.role === "user" ? <><div className="agent-user-message-content"><AgentRequestContent message={message} onOpenMaterial={onOpenMaterial}/></div><div className="agent-user-message-actions">
         {Number.isFinite(message.createdAt)&&message.createdAt>0&&!Number.isNaN(new Date(message.createdAt).getTime())&&<time dateTime={new Date(message.createdAt).toISOString()} title={new Date(message.createdAt).toLocaleString("zh-CN",{hour12:false})}>{new Date(message.createdAt).toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit",hour12:false})}</time>}

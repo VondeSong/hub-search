@@ -256,9 +256,10 @@ body.resizing-agent-panel * { cursor: col-resize !important; user-select: none !
 .agent-tool-activity[open] > summary > .agent-reasoning-chevron { transform:none; }
 .agent-web-activity > summary:hover > .agent-reasoning-chevron,
 .agent-web-activity > summary:focus-visible > .agent-reasoning-chevron { opacity:1; }
-.agent-web-details { font-size:11px; }
+.agent-web-details { font-size:12px; padding-inline-start:23px; }
+.agent-web-activity > summary:hover, .agent-web-activity > summary:focus-visible { color:var(--hub-text-primary); }
 .agent-web-details ul { padding-inline-start:18px; margin-block:6px 10px; }
-.agent-web-details .agent-process-failure { color:var(--hub-text-secondary); font-size:11px; }
+.agent-web-details .agent-process-failure { color:var(--hub-text-secondary); font-size:12px; }
 .agent-activity summary:focus-visible { outline:2px solid var(--hub-text-secondary); outline-offset:2px; border-radius:3px; }
 .agent-commentary > :first-child { margin-top:0; }
 .agent-commentary > :last-child { margin-bottom:0; }

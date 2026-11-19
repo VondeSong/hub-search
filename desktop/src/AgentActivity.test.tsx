@@ -149,7 +149,7 @@ it("keeps chronological work flat without hiding public updates or partial failu
   const timeline=host.querySelector('.agent-activity-events')!;
   expect(timeline.textContent!.indexOf('先核对一手来源')).toBeLessThan(timeline.textContent!.indexOf('读取原文'));
   expect(timeline.textContent!.indexOf('读取原文')).toBeLessThan(timeline.textContent!.indexOf('已找到两个版本'));
-  expect(host.querySelector('.agent-web-activity > summary')?.textContent).toBe('打开网页 · 1 项未获取');
+  expect(host.querySelector('.agent-web-activity > summary')?.textContent).toBe('打开网页');
   expect(host.textContent).toContain('当前展示记录未包含具体原因');
   expect(host.querySelector('.agent-spinning')).toBeNull();
 });

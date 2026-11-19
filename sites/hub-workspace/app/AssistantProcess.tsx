@@ -66,9 +66,11 @@ export function AssistantProcessDemo({onClose}: {onClose: () => void}) {
 }
 
 export function AssistantProcess({steps,webEnabled=false,seconds}:{steps?:string[];webEnabled?:boolean;seconds?:number}) {
-  const [failed,setFailed]=useState(false);
+  const [required,setRequired]=useState(false);
   return <details className="ha-activity ha-process-demo" open={seconds ? true : undefined}>
     <summary>{seconds ? `用时 ${seconds} 秒` : '工作过程 · 演示'}<ChevronDown size={13} aria-hidden="true"/></summary>
+    {seconds && webEnabled && <button type="button" aria-pressed={required} onClick={()=>setRequired(value=>!value)}>指定来源示例</button>}
+    {required && <p role="status">指定网页无法访问，暂未核对原文。</p>}
     <div className="ha-process-commentary">先核对资料与技能要求，再整理可验证的结果。</div>
     <div className="ha-process-row"><BookOpen size={16}/><span>已读取技能说明</span></div>
     <details className="ha-process-group"><summary><Search size={16}/><span>核对本轮资料</span><ChevronDown size={12}/></summary><div className="ha-process-children">
@@ -76,18 +78,18 @@ export function AssistantProcess({steps,webEnabled=false,seconds}:{steps?:string
     </div></details>
     {webEnabled && <>
       <details className="ha-process-group">
-        <summary><Search size={16} aria-hidden="true"/><span className="ha-process-label">已搜索网页</span><span className="ha-process-sites"><img src="/agent-icons/github.svg" alt="GitHub"/><img src="/agent-icons/notion.svg" alt="Notion"/></span><small>另 2 个站点</small><ChevronDown size={12} aria-hidden="true"/></summary>
+        <summary><Search size={16} aria-hidden="true"/><span className="ha-process-label">网页检索 · 2 步</span><span className="ha-process-sites"><img src="/agent-icons/github.svg" alt="GitHub"/><img src="/agent-icons/notion.svg" alt="Notion"/></span><small>另 2 个站点</small><ChevronDown size={12} aria-hidden="true"/></summary>
         <div className="ha-process-children">
-          <p>本批返回 8 项搜索结果。</p>
-          <details><summary>返回来源 · 4 个站点</summary><ul><li>github.com</li><li>docs.github.com</li><li>notion.so</li><li>developers.openai.com</li><li>modelcontextprotocol.io</li></ul></details>
-        </div>
-      </details>
-      <details className="ha-process-group">
-        <summary><Globe2 size={16} aria-hidden="true"/><span className="ha-process-label">{failed ? '打开网页 · 1 项未获取' : '打开 2 个网页'}</span>{failed && <TriangleAlert size={14} aria-hidden="true"/>}<ChevronDown size={12} aria-hidden="true"/></summary>
-        <div className="ha-process-children">
-          <div className="ha-process-row"><img src="/agent-icons/github.svg" alt="" width="16" height="16"/><span>github.com · 已打开</span></div>
-          <div className="ha-process-row"><img src="/agent-icons/notion.svg" alt="" width="16" height="16"/><span>notion.so · {failed ? '访问未完成' : '已打开'}</span></div>
-          <button type="button" onClick={() => setFailed(value => !value)}>{failed ? '恢复正常示例' : '查看部分失败示例'}</button>
+          <details className="ha-process-batch">
+            <summary><Search size={15} aria-hidden="true"/><span>搜索网页</span><ChevronDown size={12} aria-hidden="true"/></summary>
+            <p>本批返回 8 项搜索结果。</p>
+            <details><summary>返回来源 · 4 个站点</summary><ul><li>github.com</li><li>notion.so</li><li>developers.openai.com</li><li>modelcontextprotocol.io</li></ul></details>
+          </details>
+          <details className="ha-process-batch">
+            <summary><Globe2 size={15} aria-hidden="true"/><span>{required ? '打开指定网页' : '在网页内查找'}</span><ChevronDown size={12} aria-hidden="true"/></summary>
+            {!required && <p>查找内容：页面历史。返回 4 条来源记录。</p>}
+            <p>notion.so · 网站拒绝访问（403）</p>
+          </details>
         </div>
       </details>
     </>}
