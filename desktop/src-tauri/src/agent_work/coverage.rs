@@ -30,6 +30,7 @@ fn project(rows: &[(String, String, Value)], omitted: bool) -> Value {
     let mut images: std::collections::BTreeMap<String, Value> = Default::default();
     let mut calculations = Vec::new();
     let mut failures = Vec::new();
+    let mut previews = std::collections::BTreeMap::new();
     for (run, kind, v) in rows {
         if kind == "evidence" {
             let e = &v["excerpt"];
@@ -60,6 +61,11 @@ fn project(rows: &[(String, String, Value)], omitted: bool) -> Value {
             }
         } else if matches!(kind.as_str(), "analysisExecution" | "analysisInspection") {
             calculations.push(json!({"executionId":v["executionId"],"inputFiles":v["inputs"].as_array().map(|a|a.iter().map(|f|json!({"title":f["title"],"sha256":f["sha256"]})).collect::<Vec<_>>()),"outputFiles":v["files"],"reportedCoverage":v["output"]["output"]["coverage"],"meaning":"Actual execution on read-only file copies. Row/cell coverage is unknown unless separately reported and checked; no assumption that all rows were read."}));
+        } else if kind == "selectedDataRead" {
+            if let Some(id) = v["inputId"].as_str() {
+                previews.insert(id.to_owned(), json!({"inputId":id,"title":v["title"],"sha256":v["sha256"],
+                    "executionId":v["executionId"],"read":v["read"],"range":v["previewCoverage"],"error":v["readError"]}));
+            }
         } else if kind == "selectedMaterialReadError" {
             failures.push(json!({"locator":v["locator"],"error":v["readError"]}));
         }
@@ -69,19 +75,32 @@ fn project(rows: &[(String, String, Value)], omitted: bool) -> Value {
         let count: u64 = spans.iter().map(|(a, b)| b - a).sum();
         value["ranges"] = json!(spans);
         value["readChars"] = json!(count);
+        let mut cursor = 0;
+        let mut gaps = Vec::new();
+        let total = value["totalChars"].as_u64().unwrap();
+        for (start, end) in &spans {
+            if cursor < *start {
+                gaps.push((cursor, *start));
+            }
+            cursor = *end;
+        }
+        if cursor < total {
+            gaps.push((cursor, total));
+        }
+        value["unreadRanges"] = json!(gaps);
         value["complete"] = json!(
             count == value["totalChars"].as_u64().unwrap_or(u64::MAX)
                 && spans.first().is_none_or(|p| p.0 == 0)
         );
     }
-    json!({"schemaVersion":1,"texts":texts.into_values().collect::<Vec<_>>(),"images":images.into_values().collect::<Vec<_>>(),"fileExecutions":calculations,"failedReads":failures,"earlierRecordsOmitted":omitted,"totalCandidates":null,"meaning":"Recorded coverage in current authorization, not a complete inventory of everything in a library. Search hits, downloaded files, read text, transmitted pixels and computed files are distinct facts."})
+    json!({"schemaVersion":1,"texts":texts.into_values().collect::<Vec<_>>(),"images":images.into_values().collect::<Vec<_>>(),"fileExecutions":calculations,"filePreviews":previews.into_values().collect::<Vec<_>>(),"failedReads":failures,"earlierRecordsOmitted":omitted,"totalCandidates":null,"meaning":"覆盖记录区分正文区间、实际送达的图像页、表格预览与分析运行。表格仅以实际预览或运行回执中的范围为准。缺失的总范围保持未知。"})
 }
 pub(super) fn read_on(root: &Path, c: &Connection, work: &Work) -> Result<Value, String> {
     if work.state == "revoked" {
         return Ok(json!({"schemaVersion":1,"revoked":true}));
     }
     static CACHE: OnceLock<Mutex<HashMap<(PathBuf, String), (i64, i64, Value)>>> = OnceLock::new();
-    let relevant="a.work_id=?1 AND r.authorization_version=?2 AND a.kind IN ('evidence','nativeImages','nativeProtocol','nativeMeasurement','analysisExecution','analysisInspection','selectedMaterialReadError')";
+    let relevant="a.work_id=?1 AND r.authorization_version=?2 AND a.kind IN ('evidence','nativeImages','nativeProtocol','nativeMeasurement','analysisExecution','analysisInspection','selectedDataRead','selectedMaterialReadError')";
     let watermark:i64=c.query_row(&format!("SELECT COALESCE(MAX(a.rowid),0) FROM agent_records a JOIN agent_runs r ON r.id=a.run_id WHERE {relevant}"),params![work.id,work.authorization_version],|r|r.get(0)).map_err(|e|e.to_string())?;
     let key = (root.to_owned(), work.id.clone());
     if let Some((last, authorization, value)) = CACHE
@@ -94,7 +113,14 @@ pub(super) fn read_on(root: &Path, c: &Connection, work: &Work) -> Result<Value,
             return Ok(value.clone());
         }
     }
-    let mut q=c.prepare(&format!("SELECT a.run_id,a.kind,CASE WHEN a.kind='evidence' THEN json_remove(a.body_json,'$.excerpt.content','$.excerpt.body','$.excerpt.text') WHEN a.kind IN ('analysisExecution','analysisInspection') THEN json_object('executionId',json_extract(a.body_json,'$.executionId'),'inputs',json_extract(a.body_json,'$.inputs'),'files',json_extract(a.body_json,'$.files'),'output',json_object('output',json_object('coverage',json_extract(a.body_json,'$.output.output.coverage')))) ELSE a.body_json END FROM agent_records a JOIN agent_runs r ON r.id=a.run_id WHERE {relevant} ORDER BY a.rowid DESC LIMIT 1025")).map_err(|e|e.to_string())?;
+    let mut q=c.prepare(&format!("SELECT a.run_id,a.kind,CASE
+        WHEN a.kind='evidence' THEN CASE WHEN json_extract(a.body_json,'$.excerpt.locator.libraryId')='__hub_chat_text'
+            AND json_extract(a.body_json,'$.excerpt.content') LIKE '%\"hub-analysis-file-v1\"%'
+            THEN '{{}}' ELSE json_remove(a.body_json,'$.excerpt.content','$.excerpt.body','$.excerpt.text') END
+        WHEN a.kind IN ('analysisExecution','analysisInspection') THEN json_object('executionId',json_extract(a.body_json,'$.executionId'),'inputs',json_extract(a.body_json,'$.inputs'),'files',json_extract(a.body_json,'$.files'),'output',json_object('output',json_object('coverage',json_extract(a.body_json,'$.output.output.coverage'))))
+        ELSE a.body_json END
+        FROM agent_records a JOIN agent_runs r ON r.id=a.run_id WHERE {relevant}
+        ORDER BY a.rowid DESC LIMIT 1025")).map_err(|e|e.to_string())?;
     let mut rows = q
         .query_map(params![work.id, work.authorization_version], |r| {
             Ok((
@@ -132,7 +158,26 @@ pub(super) fn read_on(root: &Path, c: &Connection, work: &Work) -> Result<Value,
 pub(super) fn context(root: &Path, work: &Work) -> Result<Value, String> {
     let c = crate::source_evidence::open_read_database(root)?;
     let mut value = read_on(root, &c, work)?;
-    for field in ["texts", "images", "fileExecutions", "failedReads"] {
+    if let Some(texts) = value["texts"].as_array_mut() {
+        let reader = work.grant.reader(root)?;
+        for text in texts.iter_mut().take(16) {
+            let current = serde_json::from_value::<EvidenceLocator>(text["locator"].clone())
+                .ok()
+                .and_then(|locator| reader.version_in_transaction(&c, &locator).ok())
+                .is_some_and(|version| json!(version) == text["version"]);
+            text["versionCurrent"] = json!(current);
+            if !current {
+                text["unreadRanges"] = Value::Null;
+            }
+        }
+    }
+    for field in [
+        "texts",
+        "images",
+        "fileExecutions",
+        "filePreviews",
+        "failedReads",
+    ] {
         if let Some(rows) = value[field].as_array_mut() {
             let omitted = rows.len().saturating_sub(16);
             rows.truncate(16);
@@ -157,6 +202,7 @@ mod tests {
         ));
         let partial = project(&rows, false);
         assert_eq!(partial["texts"][0]["readChars"], 15);
+        assert_eq!(partial["texts"][0]["unreadRanges"], json!([[15, 20]]));
         assert_eq!(partial["texts"][0]["complete"], false);
         assert_eq!(partial["images"][0]["sentToModel"], false);
         assert!(partial["totalCandidates"].is_null());
@@ -168,6 +214,7 @@ mod tests {
         rows.push(("r".into(),"evidence".into(),json!({"excerpt":{"locator":{"kind":"note","libraryId":"x","documentId":"y"},"version":"v1","title":"资料","startChar":15,"endChar":20,"totalChars":20}})));
         let full = project(&rows, true);
         assert_eq!(full["texts"][0]["complete"], true);
+        assert_eq!(full["texts"][0]["unreadRanges"], json!([]));
         assert_eq!(full["images"][0]["sentToModel"], true);
         assert_eq!(full["earlierRecordsOmitted"], true);
     }

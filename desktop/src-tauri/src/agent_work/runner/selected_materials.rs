@@ -97,6 +97,20 @@ pub(super) fn inspect_data(
         let mut record = file.clone();
         record.as_object_mut().unwrap().remove("preview");
         record["read"] = json!(file["preview"].is_object());
+        let preview = &file["preview"];
+        if let Some(sheets) = preview["worksheetsPreview"].as_array() {
+            let read_sheets: Vec<_> = sheets.iter().filter_map(|sheet| {
+                let rows = sheet["tableRowsPreview"].as_array()?;
+                let shown_rows: Vec<_> = rows.iter().map(|row| &row["row"]).collect();
+                Some(json!({"sheet":sheet["name"],"shownRowNumbers":shown_rows,
+                    "scannedThroughRow":sheet["scannedThroughRow"],"previewColumnLimit":sheet["previewColumnLimit"]}))
+            }).collect();
+            record["previewCoverage"] =
+                json!({"worksheetCount":preview["worksheetCount"],"workSheetSamples":read_sheets});
+        } else if let Some(count) = preview["dataRowCount"].as_u64() {
+            record["previewCoverage"] =
+                json!({"dataRecordsScanned":count,"columnCount":preview["columnCount"]});
+        }
         store::record(root, run, "selectedDataRead", &record)?;
     }
     context

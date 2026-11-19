@@ -45,10 +45,17 @@ def inspect_csv(path):
 
 
 def inspect_xlsx(path):
-    from openpyxl import load_workbook
+    from openpyxl.reader.excel import ExcelReader
 
-    workbook = load_workbook(path, read_only=True, data_only=True, keep_links=False)
+    class PreviewReader(ExcelReader):
+        def read_custom(self):
+            # A worksheet preview does not use optional document properties.
+            pass
+
+    reader = PreviewReader(path, read_only=True, data_only=True, keep_links=False)
     try:
+        reader.read()
+        workbook = reader.wb
         sheets = [
             {"name": preview_text(sheet.title), "declaredRows": sheet.max_row,
              "declaredColumns": sheet.max_column}
@@ -57,9 +64,11 @@ def inspect_xlsx(path):
         for metadata, sheet in zip(sheets, workbook.worksheets[:2]):
             row_preview = []
             first_value_row = None
+            scanned_through_row = 0
             for number, row in enumerate(
                 sheet.iter_rows(min_row=1, min_col=1, max_row=8, max_col=12, values_only=True), 1
             ):
+                scanned_through_row = number
                 # Empty rows and repeated cells in title banners consume the
                 # preview without helping locate the actual table.
                 distinct = {str(cell) for cell in row if cell is not None and cell != ""}
@@ -69,12 +78,14 @@ def inspect_xlsx(path):
                     row_preview.append({"row": number, "cells": preview_row(row)})
                 if len(row_preview) == 2:
                     break
+            metadata["scannedThroughRow"] = scanned_through_row
+            metadata["previewColumnLimit"] = 12
             metadata["tableRowsPreview"] = row_preview or (
                 [first_value_row] if first_value_row else []
             )
         return {"worksheetCount": len(workbook.worksheets), "worksheetsPreview": sheets}
     finally:
-        workbook.close()
+        reader.archive.close()
 
 
 def inspect_json(path):
