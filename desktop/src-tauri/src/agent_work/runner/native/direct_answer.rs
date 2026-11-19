@@ -52,7 +52,9 @@ fn review_observation_and_calculation_allow_answers_but_binding_requires_finish(
     assert!(requires_structured_delivery(&Tool::Review {
         request: json!({"action":"bind"})
     }));
-    assert!(!requires_structured_delivery(&Tool::CapabilityState {}));
+    assert!(!requires_structured_delivery(&Tool::CapabilityState {
+        analysis_first_record: None
+    }));
     assert!(requires_structured_delivery(&Tool::AnalyzeFiles {
         script: "print('{}')".into(),
         title: "检查".into(),

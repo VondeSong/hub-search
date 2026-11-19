@@ -134,7 +134,9 @@ pub(super) enum Tool {
         url: String,
         title: String,
     },
-    CapabilityState {},
+    CapabilityState {
+        analysis_first_record: Option<i64>,
+    },
     Mcp {
         server: String,
         tool: String,

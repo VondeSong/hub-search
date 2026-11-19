@@ -91,7 +91,14 @@ fn compact_fields(output: &Value) -> Value {
     Value::Object(fields.collect())
 }
 
-pub(in crate::agent_work) fn saved(root: &Path, work: &Work) -> Result<Value, String> {
+pub(in crate::agent_work) fn saved(
+    root: &Path,
+    work: &Work,
+    first_record: Option<i64>,
+) -> Result<Value, String> {
+    if first_record.is_some_and(|start| start < 1) {
+        return Err("分析批次的起始记录号须为正整数".into());
+    }
     let c = crate::source_evidence::open_read_database(root)?;
     let current = store::load(&c, &work.id)?;
     if current.state == "revoked"
@@ -100,9 +107,19 @@ pub(in crate::agent_work) fn saved(root: &Path, work: &Work) -> Result<Value, St
     {
         return Err("事项或资料授权已变化，未返回分析结果".into());
     }
-    let mut q = c.prepare("SELECT body_json FROM agent_records WHERE work_id=?1 AND kind IN ('analysisExecution','analysisInspection') ORDER BY rowid DESC LIMIT ?2").map_err(|e|e.to_string())?;
+    // Apply the selector before limiting the response, including to preexisting receipts.
+    let mut q = c
+        .prepare(
+            "SELECT body_json FROM agent_records
+             WHERE work_id=?1 AND kind IN ('analysisExecution','analysisInspection')
+               AND (?2 IS NULL OR json_extract(body_json, '$.output.output.start') = ?2)
+             ORDER BY rowid DESC LIMIT ?3",
+        )
+        .map_err(|e| e.to_string())?;
     let rows = q
-        .query_map(params![work.id, MAX_RECORDS + 1], |r| r.get::<_, String>(0))
+        .query_map(params![work.id, first_record, MAX_RECORDS + 1], |r| {
+            r.get::<_, String>(0)
+        })
         .map_err(|e| e.to_string())?
         .map(|row| {
             serde_json::from_str(&row.map_err(|e| e.to_string())?).map_err(|e| e.to_string())
@@ -156,7 +173,7 @@ pub(in crate::agent_work) fn saved(root: &Path, work: &Work) -> Result<Value, St
         .collect();
     Ok(
         json!({"results":results,"cellSamples":samples,"unavailableCount":unavailable,
-        "earlierExecutionsOmitted":rows.len()>MAX_RECORDS,
+        "requestedFirstRecord":first_record,"earlierExecutionsOmitted":rows.len()>MAX_RECORDS,
         "meaning":"从同一事项仍可核对输入版本的历史执行回执中读取。单元格汇总由留存的行字面值复核，范围按 CSV 数据记录编号，可能有间隔。批次重叠时不合计。回读未重新执行脚本，不能证明全表或其他版本。"}),
     )
 }
@@ -164,6 +181,73 @@ pub(in crate::agent_work) fn saved(root: &Path, work: &Work) -> Result<Value, St
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn saved_analysis_can_find_a_batch_older_than_the_recent_index() {
+        let f = crate::source_evidence::tests::Fixture::new();
+        let staged = stage(
+            &f.root,
+            &json!({"title":"input.csv","base64":"dmFsdWUKMQo="}),
+        )
+        .unwrap();
+        let created = ui(
+            &f.root,
+            &json!({
+                "action":"create","anchor":null,
+                "grant":{"libraryIds":[],"notes":[],"readingItemKeys":[]},
+                "goal":"核对表格","successCriteria":"可回查批次"
+            }),
+        )
+        .unwrap();
+        let id = created["work"]["id"].as_str().unwrap();
+        ui(
+            &f.root,
+            &json!({
+                "action":"message","id":id,"expectedRevision":created["work"]["revision"],
+                "clientMessageId":"select-analysis-recall-input","text":"分析选中的表格",
+                "addNotes":[staged["locator"]]
+            }),
+        )
+        .unwrap();
+        let work = store::claim(&f.root, id, "analysis-recall-run").unwrap();
+        let input = inputs(&f.root, &work).unwrap()[0].2.clone();
+        for start in 1..=MAX_RECORDS + 1 {
+            store::record(
+                &f.root,
+                "analysis-recall-run",
+                "analysisInspection",
+                &json!({
+                    "executionId":format!("batch-{start}"),
+                    "authorizationVersion":work.authorization_version,
+                    "inputs":[input],"output":{"exitCode":0,"output":{
+                        "start":start,"count":1,"details":[["Main",start,format!("A{start}")]]
+                    }}
+                }),
+            )
+            .unwrap();
+        }
+
+        let recent = saved(&f.root, &work, None).unwrap();
+        assert_eq!(recent["earlierExecutionsOmitted"], true);
+        assert_eq!(recent["cellSamples"][0]["batches"][0]["firstRecord"], 2);
+        let older = saved(&f.root, &work, Some(1)).unwrap();
+        assert_eq!(older["requestedFirstRecord"], 1);
+        assert_eq!(older["earlierExecutionsOmitted"], false);
+        assert_eq!(
+            older["cellSamples"][0]["batches"],
+            json!([
+                {"firstRecord":1,"lastRecord":1,"executionId":"batch-1"}
+            ])
+        );
+        assert_eq!(older["cellSamples"][0]["bySheet"], json!({"Main":1}));
+        let missing = saved(&f.root, &work, Some(999)).unwrap();
+        assert_eq!(missing["cellSamples"], json!([]));
+
+        f.c()
+            .execute("UPDATE agent_works SET state='revoked' WHERE id=?1", [id])
+            .unwrap();
+        assert!(saved(&f.root, &work, Some(1)).is_err());
+    }
 
     #[test]
     fn saved_cell_samples_count_cross_batch_coordinates_and_withhold_overlapping_totals() {
