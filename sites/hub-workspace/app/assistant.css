@@ -556,7 +556,7 @@
 .ha-token summary{min-height:30px;line-height:18px;box-sizing:border-box;padding-block:5px}
 
 /* #56: reference-aligned activity identities; every prototype event is labelled. */
-.ha-process-demo{color:var(--muted,var(--text))}
+.ha-process-demo{color:var(--text)}
 .ha-process-demo>summary,.ha-process-group>summary{display:flex;align-items:center;gap:8px;list-style:none;min-height:24px;cursor:pointer}
 .ha-process-demo summary:focus-visible,.ha-answer-table:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
 .ha-answer-table{max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;margin-block:12px}
@@ -567,10 +567,25 @@
 .ha-process-demo svg,.ha-process-demo img{flex-shrink:0}
 .ha-process-demo summary>svg:last-child{margin-left:auto;transition:transform .15s}
 .ha-process-group:not([open])>summary>svg:last-child{transform:rotate(-90deg)}
-.ha-process-commentary{margin-block:16px;color:var(--text);line-height:1.7;font-size:13px}
+.ha-process-commentary{margin-block:12px;color:var(--text);line-height:1.6;font-size:14px}
 .ha-process-row{display:flex;align-items:flex-start;gap:8px;margin-block:8px;line-height:1.6}
 .ha-process-group{margin-block:12px}
 .ha-process-group>div{padding-block:4px;padding-inline-start:24px}
+.ha-process-group>.ha-process-children{border-inline-start:1px solid var(--line);margin-inline-start:8px;padding-inline-start:14px;overflow-wrap:anywhere}
+.ha-process-children>p{margin:4px 0 8px}
+.ha-process-meta{color:var(--subtle);font-size:13px}
+.ha-process-review{padding:12px 4px;min-width:0}
+.ha-process-review>header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.ha-process-review h2{font-size:18px;font-weight:600;margin:0}
+.ha-process-examples{display:flex;flex-wrap:wrap;gap:6px;margin-block:12px}
+.ha-process-review button{padding:5px 9px;border-radius:7px;background:transparent;color:inherit}
+.ha-process-review button:hover,.ha-process-review button[aria-pressed=true]{background:var(--surface-2)}
+.ha-process-review button:focus-visible,.ha-process-review a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ha-process-example{border-top:1px solid var(--line);padding-top:12px;font-size:14px}
+.ha-process-batch>summary{display:flex;gap:8px;align-items:center;overflow-wrap:anywhere;min-height:30px;cursor:pointer}
+.ha-process-technical{margin-top:8px;color:var(--subtle)}
+.ha-process-technical>summary{cursor:pointer}
+.ha-process-technical>pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:160px;overflow:auto}
 .ha-process-group>summary{gap:6px;min-height:30px}
 .ha-process-group>summary>small{flex-shrink:0;font-size:11px;color:inherit}
 .ha-process-label{min-width:0;overflow-wrap:anywhere}

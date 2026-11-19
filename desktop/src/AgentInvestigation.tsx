@@ -213,6 +213,10 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const skillPrefix = goal.match(/^(?:\$[a-z0-9]+(?:-[a-z0-9]+)*(?:\s+|$))+/)?.[0] || "";
   const selectedSkills = [...new Set(skillPrefix.match(/\$[a-z0-9]+(?:-[a-z0-9]+)*/g) || [])];
   const questionText = goal.slice(skillPrefix.length);
+  function prepareSourceRecheck() {
+    if (!questionText.trim()) setGoal(skillPrefix + "请按当前授权重新读取发生变化的资料，核对后再更新结论。");
+    goalInput.current?.focus();
+  }
   const [wholeLibrary, setWholeLibrary] = useState(false);
   const [libraryDraft,setLibraryDraft]=useState<AgentLibrary[]|null>(null);
   const selectedLibraries = resolveAgentLibraries(libraryDraft ?? (research?.manual.libraryIds||view?.work.grant.libraryIds||[]).map(id=>({id,name:""})),libraryRegistry);
@@ -1184,7 +1188,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         {!view.conversation && <p className="agent-goal">{view.work.goal}</p>}
         {(view.validity || view.run?.error) && <p className="agent-notice">{view.validity || view.run?.error}</p>}
         {view.run?.error && ["failed","interrupted"].includes(view.work.state) && <section className="agent-notice" aria-label="本轮恢复说明"><p>问题与资料选择保留在本对话中。可从输入框下方的“资料”核对范围，处理失败原因后再继续；不会自动反复重试。</p>{view.activity?.some(run=>run.runId===view.run?.id && run.events.some(event=>event.kind==="unpublishedAnswer")) && <p>模型答复已保留在本轮工作过程中，但尚未完成交付核验，不能当作已保存成果。</p>}</section>}
-        {view.conversation && <AgentConversation workId={view.work.id} recordVersion={view.recordVersion} conversation={view.conversation} revoked={view.work.state==="revoked"} onOpenCitation={(...args)=>void openCitation(...args)} onOpenMaterial={item=>void openMaterial(item)} onEdit={!busy&&!active?editMessage:undefined} onLoadEarlier={()=>void loadEarlier()} earlierLoading={historyLoadingScope===historyScope.current} earlierError={historyNotice?.scope===historyScope.current ? historyNotice.text : ""} renderAfter={inlineOutcomes} renderActions={message=>message.role==="assistant"&&message.report&&message.runId&&view&&<AgentAnswerSave workId={view.work.id} runId={message.runId} current={saveTarget} disabled={businessDisabled||!!active||!!view.lifecycle?.requiresExplicitResume||message.artifactState==="unavailable"} records={view.answerSaves} onChanged={()=>void refresh(view.work.id)}/>} activity={view.activity}/> }
+        {view.conversation && <AgentConversation workId={view.work.id} recordVersion={view.recordVersion} conversation={view.conversation} revoked={view.work.state==="revoked"} onOpenCitation={(...args)=>void openCitation(...args)} onOpenMaterial={item=>void openMaterial(item)} onEdit={!busy&&!active?editMessage:undefined} onRecheck={!businessDisabled&&!saveOnly&&!questionText.trim()&&view.work.state!=="revoked"?prepareSourceRecheck:undefined} onLoadEarlier={()=>void loadEarlier()} earlierLoading={historyLoadingScope===historyScope.current} earlierError={historyNotice?.scope===historyScope.current ? historyNotice.text : ""} renderAfter={inlineOutcomes} renderActions={message=>message.role==="assistant"&&message.report&&message.runId&&view&&<AgentAnswerSave workId={view.work.id} runId={message.runId} current={saveTarget} disabled={businessDisabled||!!active||!!view.lifecycle?.requiresExplicitResume||message.artifactState==="unavailable"} records={view.answerSaves} onChanged={()=>void refresh(view.work.id)}/>} activity={view.activity}/> }
         {view.work.state!=="revoked" && view.activity?.filter(run=>!view.conversation?.messages.some(message=>message.runId===run.runId || message.revision===run.revision)).map(run=><AgentActivity key={run.runId} value={run}/>)}
         {view.work.state!=="revoked" && view.nativeInputs?.map(input=><AgentNativeInput key={input.key} value={input} disabled={busy||stopping||(!running&&input.delivery!=="async")} onAnswer={async(answers,cancel)=>{
           const ticket=sequence.current;

@@ -121,7 +121,7 @@ export function AgentDelivery({ report, evidence, progress, history = [], runnin
   </>;
 }
 
-export function AgentConversation({ conversation, revoked, onOpenCitation, onOpenMaterial, onEdit, renderAfter, renderActions, activity=[], workId, recordVersion, onLoadEarlier, earlierLoading=false, earlierError="" }: Reopening & { conversation: Conversation; revoked: boolean; onOpenCitation: CitationOpening; onOpenMaterial?:(item:MessageMaterial)=>void; onEdit?:(message:ConversationMessage)=>void; onLoadEarlier?: () => void; earlierLoading?: boolean; earlierError?: string; renderAfter?: (message: ConversationMessage) => ReactNode; renderActions?: (message:ConversationMessage)=>ReactNode; activity?:ActivityRun[] }) {
+export function AgentConversation({ conversation, revoked, onOpenCitation, onOpenMaterial, onEdit, onRecheck, renderAfter, renderActions, activity=[], workId, recordVersion, onLoadEarlier, earlierLoading=false, earlierError="" }: Reopening & { conversation: Conversation; revoked: boolean; onOpenCitation: CitationOpening; onOpenMaterial?:(item:MessageMaterial)=>void; onEdit?:(message:ConversationMessage)=>void; onRecheck?:()=>void; onLoadEarlier?: () => void; earlierLoading?: boolean; earlierError?: string; renderAfter?: (message: ConversationMessage) => ReactNode; renderActions?: (message:ConversationMessage)=>ReactNode; activity?:ActivityRun[] }) {
   if (revoked) return null;
   return <div className="agent-messages" aria-label="对话记录">
     {conversation.hasEarlier && (onLoadEarlier && conversation.nextCursor ? <button type="button" disabled={earlierLoading} onClick={onLoadEarlier}>{earlierLoading ? "正在读取更早记录…" : "查看更早记录"}</button> : <p className="agent-note">这里只显示最近的对话，较早记录仍已保存。</p>)}
@@ -134,17 +134,18 @@ export function AgentConversation({ conversation, revoked, onOpenCitation, onOpe
         && message.validity === "用户要求已更新；新增或纠正的要求需要重新核对，旧回答仅供历史查阅。";
       // Runs stay keyed siblings of messages when a streamed answer is published.
       // Moving them between message subtrees would discard every open disclosure.
-      const runs = activity.filter(run => message.role === "assistant" ? run.runId === message.runId
+      const messageRuns = activity.filter(run => message.role === "assistant" ? run.runId === message.runId
         : run.revision === message.revision && !conversation.messages.some(item => item.runId === run.runId)
-          && !conversation.messages.slice(index + 1).some(item => item.revision === message.revision))
-        .map(run => <AgentActivity key={`run:${run.runId}`} value={run}/>);
+          && !conversation.messages.slice(index + 1).some(item => item.revision === message.revision));
+      const combinedValidity = message.artifactState === "unavailable" && messageRuns.some(run=>run.validity) ? message.validity : undefined;
+      const runs = messageRuns.map(run => <AgentActivity key={`run:${run.runId}`} value={combinedValidity && run.validity ? {...run,validity:combinedValidity} : run} onRecheck={onRecheck}/>);
       const body = <section key={`message:${message.id}`} className={`agent-message agent-message-${message.role}`} aria-label={message.role === "user" ? "你的消息" : "助手回答"}>
       {message.role === "user" ? <><div className="agent-user-message-content"><AgentRequestContent message={message} onOpenMaterial={onOpenMaterial}/></div><div className="agent-user-message-actions">
         {Number.isFinite(message.createdAt)&&message.createdAt>0&&!Number.isNaN(new Date(message.createdAt).getTime())&&<time dateTime={new Date(message.createdAt).toISOString()} title={new Date(message.createdAt).toLocaleString("zh-CN",{hour12:false})}>{new Date(message.createdAt).toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit",hour12:false})}</time>}
         <AgentAnswerActions text={requestPresentation(message).body || requestPresentation(message).skills.map(skill=>skill.title).join("、")} label="消息"/>
         {onEdit&&message.kind!=="scope"&&<button type="button" className="agent-edit-message" title="恢复正文和引用为新消息，不修改历史记录" disabled={message.materials?.some(item=>!item.available)} onClick={()=>onEdit(message)}><PencilLine size={13}/>编辑</button>}
       </div></> : <>
-        {message.validity && <p className="agent-note">{revisedText ? "此前回答" : message.validity}</p>}
+        {message.validity && !combinedValidity && <p className="agent-note">{revisedText ? "此前回答" : message.validity}</p>}
         {message.report && <BoundReport workId={workId} recordVersion={recordVersion} value={message} report={message.report} evidence={message.evidence || []} runId={message.runId} onOpenCitation={onOpenCitation} keepHistoricalTextVisible={revisedText} actions={renderActions?.(message)}/>}
       </>}
       {message.role === "assistant" && renderAfter?.(message)}

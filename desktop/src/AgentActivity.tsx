@@ -6,7 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AgentToolResult, type ToolResultRef, type ToolResultScope } from "./AgentToolResult";
 
-export type ActivityEvent = { id: string; sequence?:number; updatedAt?:number; operation?:string|null; serviceId?:string|null; serviceTitle?:string|null; toolName?:string|null; agentIds?:string[]|null; agentStates?:Record<string,{status:string}>|null; origin?:string; truncated?:boolean; kind: "answer" | "context" | "message" | "reasoning" | "plan" | "unpublishedAnswer" | "webSearch" | "skill" | "tool" | "status"; state: string; label: string; detail?: string | null; url?:string|null; actionId?: string; resultRef?: ToolResultRef; createdAt: number; finishedAt?: number; action?:string|null; queries?:string[]|null; pattern?:string|null; sourceRefs?:{url:string;title?:string|null}[]|null; resultCount?:number|null; errorCount?:number|null; errors?:{refId:string;url?:string|null;reason?:string|null}[]|null; omittedSourceCount?:number|null };
+export type ActivityEvent = { id: string; sequence?:number; updatedAt?:number; operation?:string|null; serviceId?:string|null; serviceTitle?:string|null; toolName?:string|null; agentIds?:string[]|null; agentStates?:Record<string,{status:string}>|null; origin?:string; truncated?:boolean; kind: "answer" | "context" | "message" | "reasoning" | "plan" | "unpublishedAnswer" | "webSearch" | "skill" | "tool" | "status"; state: string; label: string; detail?: string | null; url?:string|null; actionId?: string; resultRef?: ToolResultRef; readSpan?: {title:string;start:number;end:number;total:number}; createdAt: number; finishedAt?: number; action?:string|null; queries?:string[]|null; pattern?:string|null; sourceRefs?:{url:string;title?:string|null}[]|null; resultCount?:number|null; errorCount?:number|null; errors?:{refId:string;url?:string|null;reason?:string|null}[]|null; omittedSourceCount?:number|null };
 export type ActivityRun = { workId?:string;currentWorkRevision?:number;authorizationVersion?:number;runId: string; revision: number; state: string; running: boolean; native?:boolean; capabilities?:{externalTools?:{server:string;tools:string[];writeRepository?:string|null}[];webSearch?:string;nativeCapabilities?:{workspace:boolean;multiAgent:boolean}}|null; measurement?:{turnTokens?:{inputTokens?:number|null;cachedInputTokens?:number|null;uncachedInputTokens?:number|null;outputTokens?:number|null}}; canSteer?:boolean; startedAt: number; finishedAt?: number | null; steps: number; events: ActivityEvent[]; validity?: string };
 
 const DisclosureContext=createContext<Map<string,boolean>|null>(null);
@@ -85,7 +85,12 @@ function eventStateLabel(event:ActivityEvent) {
   return ({failed:"未完成",running:"进行中",interrupted:"已中断",queued:"等待执行"} as Record<string,string>)[event.state] ?? "";
 }
 function ActivityEventView({ event, scope }: { event: ActivityEvent; scope: ToolResultScope | null }) {
-  event={...event,label:activityLabel(event)};
+  const span=event.readSpan;
+  event={
+    ...event,
+    label:span?.title ? `读取原文 · ${span.title}` : activityLabel(event),
+    detail:span && span.end>span.start ? `已读取 ${span.start+1}–${span.end} / ${span.total} 字符` : event.detail,
+  };
   if (event.label === "核对任务状态（内部）" && event.state === "completed") return <details className="agent-reasoning"><summary>已核对任务状态</summary><div>{event.resultRef && scope && <AgentToolResult value={event.resultRef} scope={scope}/>}</div></details>;
   if (event.kind === "unpublishedAnswer") return <UnpublishedAnswer text={event.label} truncated={event.truncated}/>;
   if (event.kind === "webSearch") return <WebActivity event={event} workId={scope?.workId}/>;
@@ -121,24 +126,29 @@ function elapsed(milliseconds: number) {
 const isOperation=(event:ActivityEvent)=>["context","tool","skill","webSearch"].includes(event.kind);
 function OperationPhase({events,scope,running,runId}:{events:ActivityEvent[];scope:ToolResultScope|null;running:boolean;runId:string}) {
   const [open,setOpen]=useActivityDisclosure(`group:${runId}:${events[0].id}`,false);
+  const [visible,setVisible]=useState(8);
   const operations=events.filter(isOperation);
   if(!operations.length)return <>{events.map(event=><ActivityEventView key={event.id} event={event} scope={scope}/>)}</>;
   const active=running?[...events].reverse().find(event=>event.state==="running"):undefined;
   const failed=operations.some(event=>event.state==="failed"||event.state==="interrupted"||event.errorCount);
   const webFailure=webFailureSummary(operations);
   const otherFailure=operations.some(event=>event.kind!=="webSearch" && (event.state==="failed" || event.state==="interrupted"));
-  const webOnly = operations.every(event => event.kind === "webSearch");
   const labels = [...new Set(operations.map(event => operationLabels[activityOperation(event)]))];
-  const summaryIcon=operations.every(event=>activityOperation(event)===activityOperation(operations[0]))?operations[0]:{...operations[0],kind:"tool" as const,operation:"mixed"};
+  const mixedWeb = labels.length > 1 && operations.every(event=>event.kind==="webSearch");
+  const summaryIcon=mixedWeb || labels.length===1 ? operations[0] : {...operations[0],kind:"tool" as const,operation:"mixed"};
   const pending=running?operations.find(event=>event.state==="queued"):undefined;
   const current=active??pending;
-  const overview=(operations.every(event=>event.state==="completed"&&!event.errorCount)?"已":"")+labels.join("、");
+  const readSpan=operations.length===1 ? operations[0].readSpan : undefined;
+  const overview=mixedWeb ? `网页检索 · ${operations.length} 步`
+    : (operations.every(event=>event.state==="completed"&&!event.errorCount)?"已":"")+labels.join("、")+(readSpan?.title ? ` · ${readSpan.title}` : "");
   const currentTitle=current && (current.kind === "webSearch" ? webLabel(current) : activityLabel(current));
   const currentLabel=currentTitle && (/^(读取|搜索|访问|运行|执行|检查|核对|验证|编辑|加载|查找|整理|分析|生成|保存|创建)/.test(currentTitle)?"正在"+currentTitle:currentTitle);
-  const summary=current ? pending&&!active?"等待："+currentTitle:currentLabel! : running && !webOnly ? "正在思考" : overview;
+  const summary=current ? pending&&!active?"等待："+currentTitle:currentLabel! : overview;
   return <details className={`agent-operation-group${running?" agent-operation-active":""}`} open={open} onToggle={event=>setOpen(event.currentTarget.open)}>
-    <summary title={summary}>{current ? <ActivityIcon event={current}/> : (!running || webOnly) && <ActivityIcon event={{...summaryIcon,state:"completed",errorCount:0}}/>}<span className="agent-phase-label">{summary}</span><ActivityIdentity events={operations} workId={scope?.workId}/>{failed&&!open&&<small className="agent-phase-warning" role="status"><TriangleAlert size={12} aria-hidden="true"/>{webFailure ? `${otherFailure?"部分未完成 · ":""}${webFailure}` : "部分未完成"}</small>}<ChevronDown size={12} aria-hidden="true"/></summary>
-    <div>{events.map(event=><ActivityEventView key={event.id} event={event} scope={scope}/>)}</div>
+    <summary title={summary}><ActivityIcon event={current ?? {...summaryIcon,state:"completed",errorCount:0}}/><span className="agent-phase-label">{summary}</span><ActivityIdentity events={operations} workId={scope?.workId}/>{failed&&!open&&<small className="agent-phase-warning" role="status"><TriangleAlert size={12} aria-hidden="true"/>{webFailure ? `${otherFailure?"部分未完成 · ":""}${webFailure}` : "部分未完成"}</small>}<ChevronDown size={12} aria-hidden="true"/></summary>
+    <div className="agent-operation-children">{events.slice(0,visible).map(event=><ActivityEventView key={event.id} event={event} scope={scope}/>)}
+      {visible<events.length && <button type="button" className="agent-show-more" onClick={()=>setVisible(count=>count+8)}>显示更多步骤 · 另 {events.length-visible} 项</button>}
+    </div>
   </details>;
 }
 function ActivityTimeline({events,scope,running,runId}:{events:ActivityEvent[];scope:ToolResultScope|null;running:boolean;runId:string}) {
@@ -152,7 +162,7 @@ function ActivityTimeline({events,scope,running,runId}:{events:ActivityEvent[];s
   return <>{groups.map(group=>boundary(group[0]) ? <ActivityEventView key={group[0].id} event={group[0]} scope={scope}/> : <OperationPhase key={group[0].id} events={group} scope={scope} runId={runId} running={running && group===groups[groups.length-1]}/>)}</>;
 }
 
-export function AgentActivity({ value }: { value: ActivityRun }) {
+export function AgentActivity({ value, onRecheck }: { value: ActivityRun; onRecheck?: () => void }) {
   const [expanded, setExpanded] = useActivityDisclosure(`run:${value.runId}`,value.running);
   const detailsId = useId();
   const [now, setNow] = useState(Date.now());
@@ -171,25 +181,28 @@ export function AgentActivity({ value }: { value: ActivityRun }) {
   const timeLabel=value.running&&!answer?"已处理":"用时";
   const publicSummaries=value.events.filter(event=>event.kind==="reasoning"&&event.origin==="deepseek");
   const processEvents=value.events.filter(event=>event.kind!=="answer"&&!isThinkingPlaceholder(event)&&!(event.kind==="message"&&publicSummaries.some(summary=>summary.label.trim()===event.label.trim()&&summary.createdAt<=event.createdAt))).sort((a,b)=>a.sequence!=null&&b.sequence!=null?a.sequence-b.sequence:a.createdAt-b.createdAt);
-  const hasActiveStep=processEvents.some(event=>["tool","skill","webSearch","reasoning","status"].includes(event.kind)&&event.state==="running");
+  const hasActiveStep=processEvents.some(event=>event.state==="running" || isOperation(event)&&event.state==="queued");
   const stopped = !value.running && ["failed","interrupted","needsDecision"].includes(value.state);
   const failure = stopped && newest.find(event=>event.state==="failed" || event.state==="interrupted");
   const toolIssues=processEvents.filter(event=>isOperation(event)&&event.kind!=="webSearch"&&(event.state==="failed"||event.state==="interrupted"));
   const lastToolIssue=toolIssues[toolIssues.length-1];
-  const hasProcess = !!value.validity || processEvents.length>0;
-  const phaseShowsStatus=processEvents.length>0&&isOperation(processEvents[processEvents.length-1]);
+  const hasProcess = processEvents.length>0 || !!value.validity && !!value.capabilities;
+  const stateLabel = !value.running && (value.state==="needsDecision" ? " · 待确认" : value.state==="interrupted" ? " · 已暂停" : value.state==="failed" ? " · 未完成" : "");
   const webFailure=webFailureSummary(processEvents);
   const clippedProgress=processEvents.filter(event=>["message","reasoning","plan"].includes(event.kind));
   const clippingInText=clippedProgress.some(event=>event.label.trimEnd().endsWith(progressClippingNotice));
   const clipped=clippingInText || clippedProgress.some(event=>event.truncated);
   return <section className="agent-activity" aria-label="本轮工作过程">
     {hasProcess ? <button type="button" className="agent-activity-toggle" aria-expanded={expanded} aria-controls={detailsId} onClick={()=>setExpanded(!expanded)}>
-      <span>{timeLabel} {duration}</span><ChevronDown className={expanded ? "" : "agent-collapsed"} size={12} aria-hidden="true"/>
-    </button> : (!value.running || answer) && <p className="agent-elapsed">用时 {duration}</p>}
+      <span>{timeLabel} {duration}{stateLabel}</span><ChevronDown className={expanded ? "" : "agent-collapsed"} size={12} aria-hidden="true"/>
+    </button> : (!value.running || answer) && <p className="agent-elapsed">用时 {duration}{stateLabel}</p>}
+    {value.validity && <div className="agent-process-failure" role="status">
+      <TriangleAlert size={14} aria-hidden="true"/><span>{value.validity}</span>
+      {onRecheck && <button type="button" onClick={onRecheck}>准备重新核对</button>}
+    </div>}
     {expanded && (hasProcess || (value.running && !answer)) && <div id={detailsId} className="agent-activity-events" aria-label="完整工作过程">
-      {value.validity && <p className="agent-note">{value.validity}</p>}
       <ActivityTimeline running={value.running && !answer} events={processEvents} scope={value.validity ? null : scope} runId={value.runId}/>
-      {value.running && !answer && !hasActiveStep && !phaseShowsStatus && <p className="agent-live-status" role="status">正在思考</p>}
+      {value.running && !answer && !hasActiveStep && <p className="agent-live-status" role="status">正在思考</p>}
       {value.capabilities && <details className="agent-reasoning agent-runtime-details">
         <summary>运行详情<ChevronDown className="agent-reasoning-chevron" size={12} aria-hidden="true"/></summary>
         <p>本轮可用 Hub 工具{value.capabilities.nativeCapabilities?.workspace ? "、独立工作区（无网络）" : ""}{value.capabilities.nativeCapabilities?.multiAgent ? "、子任务委派" : ""}。</p>

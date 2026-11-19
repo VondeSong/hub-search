@@ -11,7 +11,7 @@ import { parseTagRequest, tagIntents, tagPrompt, tagRuleLibrary, type TagReviewM
 import { cleanTagStarter, prepareTagTask } from './tag-task';
 import { TagContext, TagPicker, TagReviewCard, TagTaskSelector } from './TagAssistant';
 import { AssistantInsert } from './AssistantInsert';
-import { AssistantProcess } from './AssistantProcess';
+import { AssistantProcess, AssistantProcessDemo } from './AssistantProcess';
 import { AssistantTokens } from './AssistantTokens';
 import type { PageInsertion } from './assistant-insert';
 import { MaterialScopeButton, readTopics, readWorkPins, researchPolicies, researchSources, resolveTopicSources, topicStorageKey, workPinsKey, type ResearchPolicy, type ResearchTopic, type WorkPins } from './AssistantResearch';
@@ -79,6 +79,8 @@ export type AssistantProps = {
   tagEntry: { tag?: string; task?: TagTask } | null; onTagEntryHandled: () => void; tagModel: TagReviewModel;
   open: boolean;
   sourceDemo?: boolean;
+  activityDemo?: boolean;
+  onCloseActivityDemo?: () => void;
   expanded: boolean;
   context: AssistantContext | null;
   catalog?: AssistantContext[]; currentPageId?: string; onInsertPage?: (value: PageInsertion) => void | Promise<void>;
@@ -514,6 +516,7 @@ export default function Assistant(props: AssistantProps) {
 }
 
 function AssistantConversation({
+  activityDemo, onCloseActivityDemo,
   open, expanded, context, canUseContext = allowContext, onClose, onExpand, onOpenSource, onCreateDraft, notify, workKey, initial, onPersist, history, onNew, onSelect, onHistoryChange, catalog = [], browsingContext, onNewWithContext, currentPageId, onInsertPage, topics, pins, onPin, onSaveTopic, onOpenTagQueue, tagEntry, onTagEntryHandled, tagModel,
 }: AssistantProps & { topics: ResearchTopic[]; pins: WorkPins; onPin: (kind: keyof WorkPins, id: string) => void; onSaveTopic: (config: Omit<ResearchTopic, 'id'>, updateId?: string) => boolean; workKey: string; initial: Conversation; onPersist: (key: string, conversation: Conversation) => void; browsingContext: AssistantContext | null; onNewWithContext: () => void; history: HistoryItem[]; onNew: () => void; onSelect: (id: string) => void; onHistoryChange: (id: string, change: 'pin' | 'archive' | 'delete') => void }) {
   const [session, dispatch] = useReducer(reducer, initial.session);
@@ -1060,9 +1063,10 @@ function AssistantConversation({
         <div className="ha-conversation">
           {tagIntent&&!reading&&!contextBlocked&&<TagTaskSelector intent={tagIntent} onChange={prepareTag} onCancel={()=>{setTagIntent(null);setTagError('');composer.current?.focus({preventScroll:true});}}/>}
           <div className="ha-messages" ref={scrollArea} role="log" aria-label="助手讨论记录" aria-live="polite" aria-relevant="additions" tabIndex={0} onScroll={event => { const el = event.currentTarget; setJump(el.scrollHeight - el.scrollTop - el.clientHeight > 80); }}>
+            {activityDemo && <AssistantProcessDemo onClose={()=>onCloseActivityDemo?.()}/>}
             {browsingContext && context && browsingContext.id !== context.id && <div className="ha-source-notice">正在讨论「{context.title}」。当前浏览：{canUseContext(browsingContext) ? browsingContext.title : '来源不可用'}<button type="button" disabled={!!session.active || !canUseContext(browsingContext)} onClick={onNewWithContext}>用当前材料新建对话</button></div>}
             {contextBlocked && <div className="ha-access-note" role="status"><FileText size={17}/><div><strong>相关来源当前不可用</strong><p>正文、引文与依赖这些来源的历史内容已隐藏。恢复访问并核对后，可以继续。</p></div></div>}
-            {!session.messages.length && !contextBlocked && <div className="ha-welcome">
+            {!activityDemo && !session.messages.length && !contextBlocked && <div className="ha-welcome">
               <h2>{tagIntent ? tagIntents.find(([intent])=>intent===tagIntent)?.[1] : tagMode ? '你想怎么整理标签？' : hasDraftSources ? '从这份材料开始' : '有什么可以帮你？'}</h2>
               <p>{tagIntent ? tagIntent==='definition'?'根据选定资料起草定义，确认后保存。':tagIntent==='missing'?'按已确认定义查找候选，逐项核对。':'比较标签的适用边界，并核对原文依据。' : tagMode ? '选择一个场景开始，也可以直接输入 #标签名 提问。' : hasDraftSources ? '提一个问题，或选一条建议开始。' : goalMode ? '写下要完成的事和你用来判断完成的条件。' : '直接提问，也可以先选资料再讨论。'}</p>
               {!tagIntent&&<div className="ha-prompts" role="group" aria-label="建议">

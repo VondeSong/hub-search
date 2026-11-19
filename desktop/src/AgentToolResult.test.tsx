@@ -16,19 +16,25 @@ function page(content:string,start=0,total=Array.from(content).length){const end
 function button(text:string){const found=Array.from(host.querySelectorAll("button")).find(b=>b.textContent===text);if(!found)throw new Error("missing "+text);return found;}
 async function render(s=scope){await act(async()=>root.render(<AgentToolResult value={ref} scope={s}/>));}
 async function click(text:string){await act(async()=>button(text).click());}
+async function showTechnical(){
+  const disclosure=host.querySelector<HTMLDetailsElement>("details")!;
+  expect(disclosure.open).toBe(false);
+  expect(host.querySelector("pre")).toBeNull();
+  await act(async()=>{disclosure.open=true;disclosure.dispatchEvent(new Event("toggle"));});
+}
 
 it("reads complete material through the authorized read-only entry and renders plain text",async()=>{
   mock.mockResolvedValue(page('<script>do not execute</script> 历史🙂'));
   await render();await click("查看完整工具记录");
   expect(mock).toHaveBeenCalledExactlyOnceWith("agent_investigation",{args:{action:"readToolResult",id:"work",expectedWorkRevision:7,expectedAuthorizationVersion:2,recordId:"record",expectedSha256:ref.sha256,startChar:0,maxChars:4000}});
+  await showTechnical();
   expect(host.querySelector("pre")?.textContent).toContain("<script>");expect(host.querySelector("script")).toBeNull();
-  expect(host.textContent).toContain("查看不会重新执行操作");
   button("返回工作过程").focus();await click("返回工作过程");
   expect(host.querySelector("pre")).toBeNull();expect(document.activeElement).toBe(button("查看完整工具记录"));
 });
 it("uses bounded Unicode pagination and retains the current authorization for each page",async()=>{
   mock.mockResolvedValueOnce(page("🙂".repeat(4000),0,4005)).mockResolvedValueOnce(page("尾部🙂文字",4000,4005)).mockResolvedValueOnce(page("🙂".repeat(4000),0,4005));
-  await render();await click("查看完整工具记录");await click("下一段");
+  await render();await click("查看完整工具记录");await showTechnical();await click("下一段");
   expect(mock.mock.calls[1][1]).toMatchObject({args:{startChar:4000,maxChars:4000,expectedWorkRevision:7}});
   expect(button("下一段").disabled).toBe(true);expect(host.querySelector("pre")?.textContent).toBe("尾部🙂文字");
   await click("上一段");expect(mock.mock.calls[2][1]).toMatchObject({args:{startChar:0}});
@@ -43,7 +49,7 @@ it("discards delayed text after closing or changing Work authorization",async()=
 });
 it("hides the previous page on an actual source failure and does not run a business action",async()=>{
   mock.mockResolvedValueOnce(page("x".repeat(4000),0,4010)).mockRejectedValueOnce("来源已变化，未返回正文");
-  await render();await click("查看完整工具记录");await click("下一段");
+  await render();await click("查看完整工具记录");await showTechnical();await click("下一段");
   expect(host.querySelector("pre")).toBeNull();expect(host.querySelector('[role="alert"]')?.textContent).toContain("来源已变化");
   expect(mock.mock.calls.every(([,args])=>(args as {args:{action:string}}).args.action==="readToolResult")).toBe(true);
 });
@@ -67,7 +73,7 @@ it("shows the authorized source separately from collapsed technical JSON",async(
  expect(host.querySelector('[aria-label="读取的原文片段"]')?.textContent).toContain("原文标题");
  expect(host.querySelector('details')?.open).toBe(false);
  expect(host.querySelector('script')).toBeNull();
- expect(host.textContent).toContain("不是文章字数");
+ expect(host.querySelector("pre")).toBeNull();
 });
 
 it("renders historical skill instructions as Markdown without executing links or confusing them with evidence",async()=>{

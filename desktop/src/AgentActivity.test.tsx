@@ -331,10 +331,10 @@ it("marks completed public reasoning as historical without altering its text",as
 });
 
 it("does not show a completed, failed or interrupted tool as still running",async()=>{
-  for(const [state] of [["completed","已完成：读取原文"],["failed","未完成：读取原文"],["interrupted","已中断：读取原文"]]) {
+  for(const state of ["completed","failed","interrupted"]) {
     await act(async()=>root.render(<AgentActivity value={{...run,events:[{...run.events[1],state}]}}/>));
-    expect(host.querySelector('.agent-operation-group > summary')?.textContent).toContain('正在思考');
-    expect(host.querySelector('.agent-live-status')).toBeNull();
+    expect(host.querySelector('.agent-operation-group > summary')?.textContent).toContain('读取资料');
+    expect(host.querySelector('.agent-live-status')?.textContent).toBe('正在思考');
     expect(host.querySelector('.agent-activity-step')?.textContent).toContain('读取原文');
     expect(host.querySelector('.agent-live-status .agent-spinning')).toBeNull();
   }
@@ -391,9 +391,9 @@ it("replays waiting, tools, answer streaming and completion without resetting ei
  const detail=phase.querySelector<HTMLDetailsElement>('.agent-tool-activity')!;
  await act(async()=>{detail.querySelector('summary')!.click();});
  await draw([run.events[0],{...tool,state:'completed'}]);
- expect(title.textContent).toBe('正在思考');
- expect(title.querySelectorAll('svg')).toHaveLength(1); // disclosure only
- expect(host.querySelector('.agent-live-status')).toBeNull();
+ expect(title.textContent).toBe('已读取资料');
+ expect(title.querySelectorAll('svg')).toHaveLength(2);
+ expect(host.querySelector('.agent-live-status')?.textContent).toBe('正在思考');
  expect(phase.open&&detail.open).toBe(true);
  await draw([run.events[0],{...tool,state:'completed'},run.events[2]]);
  expect(title.textContent).toBe('正在检查草稿');

@@ -246,10 +246,12 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
                             valid = false;
                         }
                     }
-                    if kind == "evidence" {
-                        if let Ok(source) =
-                            serde_json::from_value::<EvidenceExcerpt>(body["excerpt"].clone())
-                        {
+                    let excerpt = if kind == "evidence" {
+                        serde_json::from_value::<EvidenceExcerpt>(body["excerpt"].clone()).ok()
+                    } else {
+                        None
+                    };
+                    if let Some(source) = &excerpt {
                             if reader.verify_in_transaction(c, &[source.clone()]).is_err() {
                                 valid = false;
                             }
@@ -261,7 +263,6 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
                                     "label":if body["origin"] == "hostSelectedRead" {format!("{}「{}」",if source.truncated {"已读取部分资料"} else {"已读取资料"},source.title)} else {format!("已载入材料「{}」",source.title)},
                                     "detail":if body["origin"] == "hostSelectedRead" {json!(format!("已读取 {}–{} / {} 字符，模型自行判断是否采用",source.start_char,source.end_char,source.total_chars))} else {Value::Null},"createdAt":time,"finishedAt":time}));
                             }
-                        }
                     }
                     if let Some(id) = body["request"]["stepId"].as_str() {
                         if let Some(index) = steps.remove(id) {
@@ -274,6 +275,16 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
                                 "completed"
                             });
                             events[index]["finishedAt"] = json!(time);
+                            if body["request"]["operation"] == "read" && !body["error"].is_string() {
+                                if let Some(source) = &excerpt {
+                                    events[index]["readSpan"] = json!({
+                                        "title": source.title,
+                                        "start": source.start_char,
+                                        "end": source.end_char,
+                                        "total": source.total_chars,
+                                    });
+                                }
+                            }
                             if body["serviceTitle"].is_string() {events[index]["serviceTitle"]=body["serviceTitle"].clone();}
                             if body["sourceRefs"].is_array() {events[index]["sourceRefs"]=body["sourceRefs"].clone();}
                             if body["browser"]["truncated"]==true {events[index]["truncated"]=json!(true);events[index]["detail"]=json!("页面快照超过容量，仅保留前段；可按元素 target 缩小范围继续读取。");}

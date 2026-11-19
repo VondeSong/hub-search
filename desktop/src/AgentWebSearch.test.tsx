@@ -86,6 +86,7 @@ it("shows batch outcomes and separate details without turning unknown web action
  await act(async()=>root.render(<AgentActivity value={value}/>));
  expect(host.querySelector('.agent-activity-toggle')?.textContent).toBe('用时 1 秒');
  await act(async()=>host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!.click());
+ expect(host.querySelector('.agent-operation-group > summary')?.textContent).toContain('网页检索 · 3 步');
  const summaries=Array.from(host.querySelectorAll('.agent-activity-step summary')).map(s=>s.textContent);
  expect(summaries[0]).toBe('网页操作 · 1 项未获取');
  expect(summaries[1]).not.toContain('first query');

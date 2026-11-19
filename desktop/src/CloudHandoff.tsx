@@ -19,6 +19,9 @@ export const handoffCall=<T,>(request:Record<string,unknown>)=>invoke<T>("cloud_
 const message=(error:unknown)=>error instanceof Error?error.message:String(error);
 const size=(bytes:number)=>bytes<1024*1024?`${(bytes/1024).toFixed(1)} KiB`:`${(bytes/1024/1024).toFixed(1)} MiB`;
 const date=(value:string|number)=>new Date(value).toLocaleString("zh-CN");
+export function canHandoffAnalysis(item:FileAnalysis) {
+  return item.available && !item.superseded && item.files.some(file=>file.type==="md" && file.bytes>0 && file.bytes<=48000);
+}
 
 export function AgentCloudHandoff({workId,item}:{workId:string;item:FileAnalysis}){
  const [open,setOpen]=useState(false),[files,setFiles]=useState<string[]>([]),[report,setReport]=useState("");
