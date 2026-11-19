@@ -161,8 +161,14 @@ function OperationPhase({events,scope,running,runId}:{events:ActivityEvent[];sco
   const currentTitle=current && (current.kind === "webSearch" ? webLabel(current) : activityLabel(current));
   const currentLabel=currentTitle && (/^(读取|搜索|访问|运行|执行|检查|核对|验证|编辑|加载|查找|整理|分析|生成|保存|创建)/.test(currentTitle)?"正在"+currentTitle:currentTitle);
   const summary=current ? pending&&!active?"等待："+currentTitle:currentLabel! : overview;
-  return <details className={`agent-operation-group${running?" agent-operation-active":""}`} open={open} onToggle={event=>setOpen(event.currentTarget.open)}>
-    <summary title={summary}><ActivityIcon event={current ?? {...summaryIcon,state:"completed",errorCount:0}}/><span className="agent-phase-label">{summary}</span><ActivityIdentity events={operations} workId={scope?.workId}/>{otherFailure&&!open&&<small className="agent-phase-warning" role="status"><TriangleAlert size={12} aria-hidden="true"/>部分未完成</small>}<ChevronDown size={12} aria-hidden="true"/></summary>
+  return <details className={`agent-operation-group${active?" agent-operation-active":""}`} open={open} onToggle={event=>setOpen(event.currentTarget.open)}>
+    <summary title={summary}>
+      <ActivityIcon event={current ?? {...summaryIcon,state:"completed",errorCount:0}}/>
+      <span className="agent-phase-label">{summary}</span>
+      <ActivityIdentity events={operations} workId={scope?.workId}/>
+      <ChevronDown className="agent-reasoning-chevron" size={12} aria-hidden="true"/>
+      {otherFailure&&!open&&<small className="agent-phase-warning" role="status"><TriangleAlert size={12} aria-hidden="true"/>部分未完成</small>}
+    </summary>
     <div className="agent-operation-children">{events.slice(0,visible).map(event=><ActivityEventView key={event.id} event={event} scope={scope} runId={runId}/>)}
       {visible<events.length && <button type="button" className="agent-show-more" onClick={()=>setVisible(count=>count+8)}>显示更多步骤 · 另 {events.length-visible} 项</button>}
     </div>

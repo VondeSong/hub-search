@@ -419,6 +419,13 @@ it("closes a previous phase at a public update while the newest phase owns the l
  const phases=host.querySelectorAll('.agent-operation-group > summary');
  expect(phases[0].textContent).toBe('已读取资料、调用工具');
  expect(phases[1].textContent).toBe('正在验证差异');
- expect(host.querySelectorAll('.agent-operation-active')).toHaveLength(1);
+ expect(phases[0].parentElement?.classList.contains('agent-operation-active')).toBe(false);
+ expect(phases[1].parentElement?.classList.contains('agent-operation-active')).toBe(true);
  expect(host.querySelectorAll('.agent-commentary')).toHaveLength(2);
+ const latest=events[events.length-1];
+ await act(async()=>root.render(<AgentActivity value={{...run,events:[...events.slice(0,-1),{...latest,state:'queued'}]}}/>));
+ expect(phases[1].textContent).toBe('等待：验证差异');
+ expect(host.querySelector('.agent-operation-active')).toBeNull();
+ await act(async()=>root.render(<AgentActivity value={{...run,running:false,state:'completed',events}}/>));
+ expect(host.querySelector('.agent-operation-active')).toBeNull();
 });
