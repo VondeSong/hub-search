@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useAgentPopover } from "./useAgentPopover";
 
 export type NoteLocator = { kind: "note"; libraryId: string; documentId: string; pageId: string | null };
-export type AgentMaterial = { locator: NoteLocator; title: string; path: string; libraryName: string; totalChars?:number; fileBytes?:number };
+export type AgentMaterial = { locator: NoteLocator; title: string; path: string; libraryName: string; totalChars?:number; fileBytes?:number; libraryPdf?:boolean };
 type Page = { notes: AgentMaterial[]; total: number; nextOffset: number | null; snapshot: string };
 export const materialKey = (note: NoteLocator) => JSON.stringify([note.libraryId, note.documentId, note.pageId]);
 

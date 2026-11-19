@@ -155,7 +155,7 @@ impl Grant {
         if let Some(manifest) = &self.manifest {
             manifest.verify(root)?;
         }
-        analysis::verify_grant(root, self)
+        Ok(())
     }
     fn contains(&self, locator: &EvidenceLocator) -> bool {
         if self

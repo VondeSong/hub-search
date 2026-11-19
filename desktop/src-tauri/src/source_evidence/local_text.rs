@@ -56,7 +56,7 @@ pub(crate) fn metadata(root: &Path, locator: &EvidenceLocator) -> Result<Value, 
     if s.facts["fileManifest"] == true {
         let file: Value = serde_json::from_str(&s.body).map_err(|_| "附件清单损坏")?;
         return Ok(
-            json!({"locator":locator,"title":s.title,"path":s.path,"libraryName":"本地文件附件","fileBytes":file["bytes"]}),
+            json!({"locator":locator,"title":s.title,"path":s.path,"libraryName":"本地文件附件","fileBytes":file["bytes"],"libraryPdf":file["source"].is_object() && s.title.to_ascii_lowercase().ends_with(".pdf")}),
         );
     }
     Ok(

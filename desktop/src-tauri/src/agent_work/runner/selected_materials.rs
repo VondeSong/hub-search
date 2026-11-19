@@ -211,5 +211,61 @@ pub(super) fn prepare(
     Ok(())
 }
 
+pub(super) fn supply_cached_pdf_text(
+    root: &Path,
+    work: &Work,
+    run: &str,
+    context: &mut Context,
+) -> Result<(), String> {
+    let mut remaining = context
+        .budget
+        .body_chars
+        .saturating_sub(context.usage.body_chars)
+        .min(12_000);
+    for locator in &work.grant.notes {
+        context.control.check()?;
+        if remaining == 0 || !crate::source_evidence::local_text::is_local(locator) {
+            continue;
+        }
+        let Ok(Some(manifest)) =
+            crate::source_evidence::local_text::selected_file_manifest(root, locator)
+        else {
+            continue;
+        };
+        if !manifest["title"]
+            .as_str()
+            .is_some_and(|title| title.to_ascii_lowercase().ends_with(".pdf"))
+        {
+            continue;
+        }
+        let notice = match analysis::cached_pdf_text(
+            root,
+            work,
+            locator,
+            &manifest,
+            remaining.min(6_000),
+        ) {
+            Ok(Some((text, input))) => {
+                let chars = text["chars"].as_u64().unwrap_or_default() as usize;
+                remaining -= chars;
+                context.usage.body_chars += chars;
+                store::record(
+                    root,
+                    run,
+                    "cachedAttachmentText",
+                    &json!({"inputs":[input]}),
+                )?;
+                json!({"pages":text["pages"],"meaning":"这是当前原件已提取的部分文字。仅按列出的页码和已返回文字答复，不声称看到了原页图像或未返回的内容。"})
+            }
+            Ok(None) => json!({"readError":"暂无当前版本的已提取文字，可切到 Codex 使用原件。"}),
+            Err(reason) => json!({"readError":reason}),
+        };
+        context.observations.push(
+            json!({"origin":"cachedAttachmentText","title":manifest["title"],"result":notice}),
+        );
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests;

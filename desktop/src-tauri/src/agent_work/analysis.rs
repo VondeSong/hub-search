@@ -78,13 +78,6 @@ pub(super) fn stage(root: &Path, args: &Value) -> Result<Value, String> {
         return source::import(root, args);
     }
     let title = text(args, "title", 200)?;
-    if !valid_name(&title) {
-        return Err("分析文件名无效".into());
-    }
-    let extension = extension(&title);
-    if !original {
-        extension.as_ref().map_err(Clone::clone)?;
-    }
     let encoded = args["base64"].as_str().ok_or("缺少文件内容")?;
     if encoded.len() > ((MAX_FILE + 2) / 3) * 4 {
         return Err("分析文件最多10 MiB".into());
@@ -92,27 +85,37 @@ pub(super) fn stage(root: &Path, args: &Value) -> Result<Value, String> {
     let data = base64::engine::general_purpose::STANDARD
         .decode(encoded)
         .map_err(|_| "文件内容编码无效")?;
+    stage_bytes(root, &title, &data, original, &Value::Null)
+}
+
+fn stage_bytes(
+    root: &Path,
+    title: &str,
+    data: &[u8],
+    original: bool,
+    source: &Value,
+) -> Result<Value, String> {
+    if !valid_name(title) {
+        return Err("分析文件名无效".into());
+    }
     if data.is_empty() || data.len() > MAX_FILE {
         return Err("分析文件为空或超过10 MiB".into());
     }
-    if let Ok(ext) = extension {
-        validate_file(&data, ext)?;
+    match extension(title) {
+        Ok(ext) => validate_file(data, ext)?,
+        Err(error) if !original => return Err(error),
+        Err(_) => {}
     }
-    let hash = digest(&data);
+    let hash = digest(data);
     let dir = root.join("collection-files/agent-analysis-inputs");
     crate::craft_backup::reject_links(&dir)?;
     std::fs::create_dir_all(&dir).map_err(|_| "无法准备分析文件缓存")?;
     let path = dir.join(&hash);
     crate::craft_backup::reject_links(&path)?;
     if !path.exists() {
-        crate::data_portability::atomic_write(&path, &data).map_err(|_| "无法保存分析文件")?;
+        crate::data_portability::atomic_write(&path, data).map_err(|_| "无法保存分析文件")?;
     }
     let marker = if original { ORIGINAL_MARKER } else { MARKER };
-    let source = if original {
-        Value::Null
-    } else {
-        args["sourceBinding"].clone()
-    };
     let body =
         json!({"format":marker,"title":title,"sha256":hash,"bytes":data.len(),"source":source})
             .to_string();
@@ -125,6 +128,27 @@ fn inputs(root: &Path, work: &Work) -> Result<Vec<(String, PathBuf, Value)>, Str
     dependencies::select(root, work, None)
 }
 
+pub(super) fn verify_run_inputs(
+    root: &Path,
+    connection: &Connection,
+    work: &Work,
+    run: &str,
+) -> Result<(), String> {
+    let mut statement = connection.prepare(
+        "SELECT json_extract(body_json,'$.inputs') FROM agent_records WHERE work_id=?1 AND run_id=?2 AND kind IN ('analysisInspection','analysisExecution','cachedAttachmentText')",
+    ).map_err(|e| e.to_string())?;
+    let input_sets = statement
+        .query_map(params![work.id, run], |row| row.get::<_, String>(0))
+        .map_err(|e| e.to_string())?;
+    let mut verifier = dependencies::Verifier::new(root, work);
+    for inputs in input_sets {
+        let inputs: Value = serde_json::from_str(&inputs.map_err(|e| e.to_string())?)
+            .map_err(|_| "本轮文件读取记录损坏")?;
+        verifier.verify(&json!({"inputs":inputs}))?;
+    }
+    Ok(())
+}
+
 pub(super) fn attachment_format(manifest: &Value) -> Option<&'static str> {
     if manifest["format"] != MARKER {
         return None;
@@ -134,6 +158,28 @@ pub(super) fn attachment_format(manifest: &Value) -> Option<&'static str> {
 
 pub(super) fn attachment_id(locator: &EvidenceLocator) -> String {
     dependencies::id(&json!({"locator":locator}))
+}
+
+pub(super) fn cached_pdf_text(
+    root: &Path,
+    work: &Work,
+    locator: &EvidenceLocator,
+    manifest: &Value,
+    max_chars: usize,
+) -> Result<Option<(Value, Value)>, String> {
+    if !work.grant.contains(locator) || !manifest["source"].is_object() {
+        return Ok(None);
+    }
+    let Some(pages) = source::cached_pdf_pages(root, &manifest["source"], max_chars)? else {
+        return Ok(None);
+    };
+    let mut grant = Grant::default();
+    grant.notes.push(locator.clone());
+    let input = selected_inputs(root, &grant)?
+        .pop()
+        .ok_or("附件已不可用")?
+        .2;
+    Ok(Some((pages, input)))
 }
 
 pub(super) fn inspect_attached(
@@ -153,10 +199,6 @@ pub(super) fn inspect_attached(
         Some(selected),
         control,
     )
-}
-
-pub(super) fn verify_grant(root: &Path, grant: &Grant) -> Result<(), String> {
-    selected_inputs(root, grant).map(|_| ())
 }
 
 pub(super) fn verify_result_inputs(
@@ -227,9 +269,6 @@ fn selected_inputs(root: &Path, grant: &Grant) -> Result<Vec<(String, PathBuf, V
             path,
             json!({"locator":locator,"title":title,"sha256":hash,"bytes":size,"source":v["source"],"originalAttachment":original}),
         ));
-        if result.len() > 8 {
-            return Err("每项分析最多8个文件".into());
-        }
     }
     Ok(result)
 }
@@ -274,7 +313,7 @@ pub(super) fn run_selected(
     }
     let inputs = dependencies::select(root, work, input_ids)?;
     if inputs.is_empty() {
-        return Err("请先明确添加CSV、XLSX或JSON分析文件；仅有正文片段不等于完整数据文件".into());
+        return Err("请先添加本轮需要读取的原文件".into());
     }
     let previous = if let Some(id) = revision_of {
         let values = manifest(root, work);

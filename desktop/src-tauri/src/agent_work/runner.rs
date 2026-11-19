@@ -791,6 +791,9 @@ fn investigate_loop(
             &mut context,
             native_files && research_options.knowledge_review,
         )?;
+        if !native_files {
+            selected_materials::supply_cached_pdf_text(root, work, run, &mut context)?;
+        }
         let current_attachments = conversation["currentRequestMaterials"]
             .as_array()
             .into_iter()

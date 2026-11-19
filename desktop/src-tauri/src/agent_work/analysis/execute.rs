@@ -101,6 +101,7 @@ pub(super) fn run(
         files.push(json!({"name":name,"bytes":saved_bytes,"sha256":crate::craft_backup::hash_file(&path)?,"type":ext}));
     }
     timing["resultAndOutputValidationMs"] = json!(verification_started.elapsed().as_millis());
+    verify_result_inputs(root, work, &json!({"inputs":manifest}))?;
     if files.is_empty() {
         let receipt = json!({"executionId":execution,"runId":run,"inputs":manifest,"scriptSha256":digest(script.as_bytes()),"runtime":"python-3.13.17-analysis-v1","timing":timing,"output":result,"files":[],"artifactId":null,"revision":null,"businessWrites":false,"meaning":"Inspection/computation only. No file artifact was created or superseded. Use revisionOf:null when creating the first actual deliverable."});
         store::record(root, run, "analysisInspection", &receipt)?;

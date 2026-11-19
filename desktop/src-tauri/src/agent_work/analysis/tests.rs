@@ -349,7 +349,7 @@ fn library_data_file_keeps_attachment_and_parent_identity() {
             [],
         )
         .unwrap();
-    assert!(verify_grant(&f.root, &grant).is_err());
+    assert!(selected_inputs(&f.root, &grant).is_err());
 }
 #[test]
 fn file_staging_is_explicit_immutable_and_rejects_unsafe_inputs() {
@@ -400,6 +400,83 @@ fn original_attachment_needs_a_real_file_grant() {
     assert!(attachment_format(&serde_json::from_str(&body).unwrap()).is_none());
     std::fs::write(&files[0].1, b"different original").unwrap();
     assert!(selected_inputs(&f.root, &grant).is_err());
+}
+
+#[test]
+fn nine_attachments_keep_the_chat_open_and_only_the_selected_files_are_read() {
+    let f = Fixture::new();
+    let view = ui(&f.root, &json!({"action":"create","goal":"核对文件","successCriteria":"核对","anchor":null,"grant":{"libraryIds":[],"notes":[],"readingItemKeys":[]}})).unwrap();
+    let mut work = store::load(&f.c(), view["work"]["id"].as_str().unwrap()).unwrap();
+    for index in 0..9 {
+        let data = format!("attachment {index}");
+        let staged = stage_bytes(
+            &f.root,
+            &format!("{index}.pptx"),
+            data.as_bytes(),
+            true,
+            &Value::Null,
+        )
+        .unwrap();
+        work.grant
+            .notes
+            .push(serde_json::from_value(staged["locator"].clone()).unwrap());
+    }
+    assert!(work.grant.reader(&f.root).is_ok());
+    assert!(dependencies::select(&f.root, &work, None).is_err());
+    let unavailable = selected_inputs(&f.root, &work.grant).unwrap()[0].1.clone();
+    std::fs::remove_file(unavailable).unwrap();
+    assert!(work.grant.reader(&f.root).is_ok());
+    assert!(dependencies::select(&f.root, &work, None).is_err());
+    let requested = attachment_id(&work.grant.notes[8]);
+    let files = dependencies::select(&f.root, &work, Some(&[requested])).unwrap();
+    assert_eq!(files.len(), 1);
+    assert_eq!(files[0].2["title"], "8.pptx");
+    assert_eq!(
+        dependencies::catalog(&f.root, &work)
+            .iter()
+            .filter(|file| file["available"] == true)
+            .count(),
+        8
+    );
+}
+
+#[test]
+fn library_pdf_fallback_only_returns_the_current_cached_pages() {
+    let f = Fixture::new();
+    let (job, input) = crate::attachment_evidence::tests::seed(&f, "cache-pdf", "PDF first page");
+    crate::attachment_evidence::tests::produce(&f, &job, &input, "PDF first page");
+    let listed = source::list(&f.root, &json!({"query":"工艺附件"})).unwrap();
+    assert_eq!(listed["files"][0]["source"]["sourceItemId"], "cache-pdf");
+    let staged = stage(&f.root, &json!({"source":listed["files"][0]["source"]})).unwrap();
+    assert_eq!(staged["libraryPdf"], true);
+    let locator = serde_json::from_value(staged["locator"].clone()).unwrap();
+    let manifest = crate::source_evidence::local_text::selected_file_manifest(&f.root, &locator)
+        .unwrap()
+        .unwrap();
+    let source = &manifest["source"];
+    let reading = source::cached_pdf_pages(&f.root, source, 9)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        reading["pages"][0],
+        json!({"page":1,"text":"PDF first","truncated":true})
+    );
+    f.c()
+        .execute(
+            "UPDATE content_items SET input_version=NULL WHERE source_item_id='cache-pdf'",
+            [],
+        )
+        .unwrap();
+    assert!(source::cached_pdf_pages(&f.root, source, 9)
+        .unwrap()
+        .is_none());
+    f.c()
+        .execute(
+            "UPDATE documents SET content_hash='changed' WHERE space_id='notes'",
+            [],
+        )
+        .unwrap();
+    assert!(source::cached_pdf_pages(&f.root, source, 9).is_err());
 }
 
 #[test]

@@ -560,6 +560,7 @@ fn publish_on(
     recovering: bool,
 ) -> Result<(), String> {
     images::verify(root, c, &work.grant.images)?;
+    super::analysis::verify_run_inputs(root, c, work, run)?;
     control.check()?;
     let current = load(c, &work.id)?;
     if current.revision != work.revision

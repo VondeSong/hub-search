@@ -5,10 +5,14 @@ import type {AgentMaterial,NoteLocator} from "./AgentMaterials";
 import {AgentMaterialCard} from "./AgentMaterialCard";
 
 export const isTextAttachment=(locator:{libraryId?:string})=>locator.libraryId==="__hub_chat_text";
-export function AgentTextFileCard({locator,disabled,onRemove}:{locator:NoteLocator;disabled:boolean;onRemove:()=>void}){
+export function fileUseHint(item:AgentMaterial, deepseek:boolean){
+ if(!deepseek || item.fileBytes===undefined)return undefined;
+ return item.libraryPdf ? "DeepSeek 只能读资料库已提取的 PDF 文字" : "DeepSeek 当前无法打开原件";
+}
+export function AgentTextFileCard({locator,disabled,onRemove,deepseek=false}:{locator:NoteLocator;disabled:boolean;onRemove:()=>void;deepseek?:boolean}){
  const [item,setItem]=useState<AgentMaterial|null>(null);
  useEffect(()=>{let alive=true;void invoke<AgentMaterial>("agent_investigation",{args:{action:"textFileMetadata",locator}}).then(value=>{if(alive)setItem(value);},()=>{});return()=>{alive=false;};},[JSON.stringify(locator)]);
- const subtitle = item?.fileBytes !== undefined ? `原文件 · ${(item.fileBytes/1024).toLocaleString(undefined,{maximumFractionDigits:1})} KiB · 按需读取` : item ? `已添加 · ${item.totalChars?.toLocaleString()} 字符 · 读取范围见工作过程` : "附件信息暂不可用";
+ const subtitle = item?.fileBytes !== undefined ? fileUseHint(item,deepseek) ?? `原文件 · ${(item.fileBytes/1024).toLocaleString(undefined,{maximumFractionDigits:1})} KiB · 按需读取` : item ? `已添加 · ${item.totalChars?.toLocaleString()} 字符 · 读取范围见工作过程` : "附件信息暂不可用";
  return <AgentMaterialCard kind="page" title={item?.title||"文件附件"} subtitle={subtitle} disabled={disabled} onRemove={onRemove} removeLabel={`撤回文件附件 ${item?.title||"文件附件"}`}/>;
 }
 // Leave room for two encoded images and the question within the native transport limit.
