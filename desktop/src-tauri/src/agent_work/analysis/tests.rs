@@ -375,6 +375,34 @@ fn file_staging_is_explicit_immutable_and_rejects_unsafe_inputs() {
     assert!(inputs(&f.root, &work).is_err());
 }
 #[test]
+fn original_attachment_needs_a_real_file_grant() {
+    let f = crate::source_evidence::tests::Fixture::new();
+    let bytes = b"arbitrary original bytes";
+    let file = stage(&f.root, &json!({"action":"stageOriginalFile","title":"slides.pptx","base64":base64::engine::general_purpose::STANDARD.encode(bytes)})).unwrap();
+    let locator: EvidenceLocator = serde_json::from_value(file["locator"].clone()).unwrap();
+    let body = crate::source_evidence::local_text::selected_body(&f.root, &locator).unwrap();
+    let imitation = crate::source_evidence::local_text::stage(
+        &f.root,
+        &json!({"title":"slides.pptx","text":body}),
+    )
+    .unwrap();
+    let mut grant = Grant::default();
+    grant
+        .notes
+        .push(serde_json::from_value(imitation["locator"].clone()).unwrap());
+    assert!(selected_inputs(&f.root, &grant).unwrap().is_empty());
+    grant.notes.push(locator.clone());
+    let files = selected_inputs(&f.root, &grant).unwrap();
+    assert_eq!(files.len(), 1);
+    assert_eq!(files[0].0, "input-1.pptx");
+    assert_eq!(std::fs::read(&files[0].1).unwrap(), bytes);
+    assert_eq!(files[0].2["locator"], json!(locator));
+    assert!(attachment_format(&serde_json::from_str(&body).unwrap()).is_none());
+    std::fs::write(&files[0].1, b"different original").unwrap();
+    assert!(selected_inputs(&f.root, &grant).is_err());
+}
+
+#[test]
 #[ignore = "explicit daily data file and actual MXC Python; no model or source writes"]
 fn live_daily_file_analysis_runtime() {
     let config: Value = serde_json::from_slice(
@@ -388,7 +416,12 @@ fn live_daily_file_analysis_runtime() {
             stage(root, &json!({"source":item["source"]})).unwrap()
         } else {
             let data = std::fs::read(item["path"].as_str().unwrap()).unwrap();
-            stage(root,&json!({"title":item["title"],"base64":base64::engine::general_purpose::STANDARD.encode(data)})).unwrap()
+            let action = if item["original"] == true {
+                "stageOriginalFile"
+            } else {
+                "stageAnalysisFile"
+            };
+            stage(root,&json!({"action":action,"title":item["title"],"base64":base64::engine::general_purpose::STANDARD.encode(data)})).unwrap()
         };
         notes.push(v["locator"].clone());
     }

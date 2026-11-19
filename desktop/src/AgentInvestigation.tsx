@@ -29,7 +29,7 @@ import { AgentActiveTopic, AgentResearchPolicy, AgentResearchTopics, policyNames
 import { AgentTagWorkspace, suggestedTagTask, AgentTagReferences, AgentTagRelated, AgentTagResult, useTagPreparation, tagTaskNames, type TagTaskRecord } from "./AgentTagWorkspace";
 import { userProfileStorage } from "./UserProfileStorage";
 import {AgentNativeContext,type NativeContext} from "./AgentNativeContext";
-import {AgentImageCards,AgentTextFileCard,isTextAttachment,agentFileAccept,prepareImage,readDataUrl,readTextFile} from "./AgentFileInputs";
+import {AgentImageCards,AgentTextFileCard,isTextAttachment,prepareImage,readDataUrl,readTextFile} from "./AgentFileInputs";
 import {AgentImages,type ImageGrant,type ImageChange} from "./AgentImages";
 import { AgentMaterials, materialKey, type AgentMaterial } from "./AgentMaterials";
 import {AgentLibraryScope,libraryDragType,readLibraryDrop,type AgentLibrary} from "./AgentLibraryScope";
@@ -659,17 +659,24 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     try{
       for(const file of files.slice(0,8)){
         try{
-          if(/^image\//.test(file.type)){
+          if(/^image\/(png|jpeg|webp)$/.test(file.type)){
             if(images.length>=8)throw new Error("每个对话最多8张图片或PDF页面，请先移除已有图片。");
             const prepared=await prepareImage(file);
             const staged=await call<{grant:ImageGrant}>({action:"stageImage",title:(file.name||"粘贴的图片").slice(0,200),...prepared});
             if(!images.some(g=>sameImage(g,staged.grant)))images.push(staged.grant);
           }else{
-            const dataFile=/\.(csv|json|xlsx)$/i.test(file.name);
-            if(dataFile&&file.size>10*1024*1024)throw new Error("分析文件最多10 MiB。");
-            const text=dataFile?"":await readTextFile(file);
+            const tableFile = /\.(csv|json|xlsx)$/i.test(file.name);
+            const textFile = /\.(txt|md)$/i.test(file.name);
+            const original = !tableFile && !textFile;
+            if(original && ((scopeOptions.model?.provider ?? runtime.settings.provider ?? "codex") !== "codex" || !/windows/i.test(navigator.userAgent))) {
+              throw new Error("读取这类原件需要 Windows 桌面版的 Codex 连接。可以改用 TXT、Markdown，或加入 PNG、JPEG、WebP 页面图片。");
+            }
+            if(!textFile && file.size > 10*1024*1024)throw new Error("每份原文件最多 10 MiB。");
             if(notes.length+(view?.work.grant.notes?.length||0)>=31)throw new Error("本次对话材料数量已满，请先移除部分资料。");
-            const staged=await call<AgentMaterial>(dataFile?{action:"stageAnalysisFile",title:file.name.slice(0,200),base64:(await readDataUrl(file)).split(",")[1]}:{action:"stageTextFile",title:file.name.slice(0,200),text});
+            const title = file.name.slice(0, 200);
+            const staged = await call<AgentMaterial>(textFile
+              ? {action:"stageTextFile",title,text:await readTextFile(file)}
+              : {action:tableFile?"stageAnalysisFile":"stageOriginalFile",title,base64:(await readDataUrl(file)).split(",")[1]});
             if(!notes.some(n=>materialKey(n.locator)===materialKey(staged.locator))&&!view?.work.grant.notes?.some(n=>materialKey(n as AgentMaterial["locator"])===materialKey(staged.locator)))notes.push(staged);
           }
         }catch(reason){errors.push(file.name+"："+String(reason));}
@@ -1247,7 +1254,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       }}/>}
       <AgentResearchTopics onBack={()=>{setTopicsOpen(false);const menu=document.getElementById(panelId)?.querySelector<HTMLDetailsElement>(".agent-task-mode");if(menu){menu.open=true;menu.querySelector("summary")?.focus();}}} onMetadata={saved=>{if(research?.topic.id===saved.id)setResearch({...research,topic:{...research.topic,revision:saved.revision,pinned:saved.pinned}});}} initialId={requestedTopic} open={topicsOpen} saveMode={topicSave} active={research?.topic} disabled={busy||!!active} config={{grant:research?researchGrant(manualResearchGrant(),research.topic.grant,research.includeManual):manualResearchGrant(),policy:(view?.assistantOptions||assistantOptions).researchPolicy||"material-first",skills:research?[...new Set([...research.topic.skills,...selectedSkills.map(s=>s.slice(1))])]:selectedSkills.map(s=>s.slice(1))}} onApply={applyResearch} onClose={()=>setTopicsOpen(false)}/>
       <div className="agent-composer" hidden={reportReading} onPaste={event=>{const files=Array.from(event.clipboardData.files);if(files.length){event.preventDefault();void addFiles(files);}}}>
-        <input ref={fileInput} type="file" aria-label="选择图片或文本文件" accept={agentFileAccept} multiple hidden onChange={event=>{const files=Array.from(event.currentTarget.files||[]);event.currentTarget.value="";void addFiles(files);}}/>
+        <input ref={fileInput} type="file" aria-label="选择图片或文件" multiple hidden onChange={event=>{const files=Array.from(event.currentTarget.files||[]);event.currentTarget.value="";void addFiles(files);}}/>
         {open && globalPanel && (assistantOptions.model?.provider ?? runtime.settings.provider ?? "codex") === "codex" && <CodexAccountBadge boundScopeId={view?.codexAccountBinding?.scopeId} workId={view?.work.id} disabled={!!active||pendingRun} needsAuthorization={[error,view?.run?.error].some(value=>value?.includes("请确认账号后继续"))} onAuthorized={()=>{setError("");void refresh(view!.work.id);}}/>}
         <div className="agent-composer-materials">
         {research&&<div className="agent-topic-selection"><AgentActiveTopic topic={research.topic} disabled={busy||!!active} onChange={topic=>setResearch({...research,topic})} onCancel={()=>void cancelResearch()}/><label><input type="checkbox" checked={research.includeManual} disabled={busy||!!active} onChange={e=>setResearch({...research,includeManual:e.target.checked})}/>下一条同时使用手选资料与技能</label></div>}
@@ -1259,7 +1266,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         {!view && publicUrl && <div className="agent-pending-materials"><AgentMaterialCard kind="link" title={publicUrl} removeLabel="移除公共链接" disabled={busy} onRemove={()=>setPublicUrl("")}/></div>}
         {(!view && pageAttached || materials.length>0) && <div className="agent-pending-materials" aria-label="待发送资料">
           {!view && pageAttached && <AgentMaterialCard kind={anchor?.kind==="reading"?"reading":anchor?.kind==="task"?"task":"page"} title={pageTitle||currentObjectLabel} subtitle={wholeLibrary?`${libraryName} · 整个资料库`:undefined} disabled={busy} openLabel="查看本次资料范围" onOpen={()=>{setAddPage("scope");if(materialPopover.ref.current)materialPopover.ref.current.open=true;}} removeLabel="移除当前页面" onRemove={()=>{setPageAttached(false);setWholeLibrary(false);goalInput.current?.focus();}}/>}
-          {materials.map(item=><AgentMaterialCard key={materialKey(item.locator)} kind="page" title={item.title} subtitle={item.totalChars!==undefined?`文本附件 · 共 ${item.totalChars.toLocaleString()} 字符 · 待发送`:item.path||item.libraryName} disabled={busy||filePreparing} onRemove={()=>{setMaterials(current=>current.filter(note=>materialKey(note.locator)!==materialKey(item.locator)));goalInput.current?.focus();}}/>)}
+          {materials.map(item=><AgentMaterialCard key={materialKey(item.locator)} kind="page" title={item.title} subtitle={item.fileBytes!==undefined?"原文件 · 待发送":item.totalChars!==undefined?`文本附件 · 共 ${item.totalChars.toLocaleString()} 字符 · 待发送`:item.path||item.libraryName} disabled={busy||filePreparing} onRemove={()=>{setMaterials(current=>current.filter(note=>materialKey(note.locator)!==materialKey(item.locator)));goalInput.current?.focus();}}/>)}
         </div>}
           {!!selectedSkills.length && <div className="agent-selected-skills" aria-label="本次指定技能">{selectedSkills.map(token=><AgentMaterialCard key={token} kind="skill" title={skillTitle(token.slice(1))} identifier={token.slice(1)} subtitle={skillPurpose(token.slice(1))} disabled={busy} removeLabel={`移除技能 ${skillTitle(token.slice(1))}`} onRemove={()=>setGoal(selectedSkills.filter(item=>item!==token).map(item=>item+" ").join("")+questionText)}/>)}</div>}
         </div>

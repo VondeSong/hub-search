@@ -113,18 +113,17 @@ pub(super) fn catalog(root: &Path, work: &Work) -> Vec<Value> {
         if !crate::source_evidence::local_text::is_local(locator) {
             continue;
         }
-        let Ok(body) = crate::source_evidence::local_text::selected_body(root, locator) else {
+        let Ok(Some(meta)) =
+            crate::source_evidence::local_text::selected_file_manifest(root, locator)
+        else {
             continue;
         };
-        let Ok(meta) = serde_json::from_str::<Value>(&body) else {
-            continue;
-        };
-        if meta["format"] != MARKER {
+        if !is_file_manifest(&meta) {
             continue;
         }
         let key = id(&json!({"locator":locator}));
         let check = select(root, work, Some(&[key.clone()]));
-        result.push(json!({"inputId":key,"title":meta["title"],"sha256":meta["sha256"],"bytes":meta["bytes"],"available":check.is_ok(),"unavailableReason":check.err()}));
+        result.push(json!({"inputId":key,"title":meta["title"],"sha256":meta["sha256"],"bytes":meta["bytes"],"available":check.is_ok(),"unavailableReason":check.err(),"originalAttachment":meta["format"] == ORIGINAL_MARKER}));
     }
     for receipt in store::records(root, &work.id, "publicFileAcquisition", 64).unwrap_or_default() {
         let file = &receipt["file"];

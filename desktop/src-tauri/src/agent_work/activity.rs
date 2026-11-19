@@ -255,9 +255,13 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
                             if reader.verify_in_transaction(c, &[source.clone()]).is_err() {
                                 valid = false;
                             }
+                            let legacy_file = source.facts["fileManifest"].is_null()
+                                && crate::source_evidence::local_text::is_local(&source.locator)
+                                && serde_json::from_str::<Value>(&source.content)
+                                    .is_ok_and(|manifest| super::analysis::attachment_format(&manifest).is_some());
                             if body["request"]["stepId"].is_null()
-                                && !(crate::source_evidence::local_text::is_local(&source.locator)
-                                    && super::analysis::attachment_format(&source.content).is_some())
+                                && source.facts["fileManifest"] != true
+                                && !legacy_file
                             {
                                 events.push(json!({"id":sequence.to_string(),"kind":"context","state":"completed","origin":"hub-context",
                                     "label":if body["origin"] == "hostSelectedRead" {format!("{}「{}」",if source.truncated {"已读取部分资料"} else {"已读取资料"},source.title)} else {format!("已载入材料「{}」",source.title)},

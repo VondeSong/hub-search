@@ -2011,10 +2011,10 @@ it("stages a dropped local text file without sending and includes it only with t
  expect(request.goal).toBe('核对附件');expect(request.grant.notes).toEqual([locator]);
  expect(JSON.stringify(request)).not.toContain('附件里的核对事项');
 });
-it("does not silently accept an unsupported pasted file",async()=>{
+it("explains when this runtime cannot open a pasted original attachment",async()=>{
  await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
  await act(async()=>{const event=new Event('paste',{bubbles:true,cancelable:true});Object.defineProperty(event,'clipboardData',{value:{files:[new File(['pdf'],'图纸.pdf',{type:'application/pdf'})]}});document.querySelector('.agent-composer')!.dispatchEvent(event);});
- expect(document.body.textContent).toContain('PDF、Word');
+ expect(document.body.textContent).toContain('读取这类原件需要 Windows 桌面版的 Codex 连接');
  expect(invoke.mock.calls.some(([,p])=>['create','message','respond'].includes(p?.args?.action))).toBe(false);
 });
 it("stages pasted pixels locally, retains them after a failed send and retries the same message",async()=>{

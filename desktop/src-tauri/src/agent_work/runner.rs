@@ -775,11 +775,13 @@ fn investigate_loop(
             let anchor = context
                 .reader
                 .read(anchor, 0, budget.body_chars.min(6000), None)?;
-            let seed = context.remember(anchor)?;
-            store::record(root, run, "evidence", &seed)?;
-            context
-                .observations
-                .push(json!({"origin":"host","anchor":seed}));
+            if anchor.facts["fileManifest"] != true {
+                let seed = context.remember(anchor)?;
+                store::record(root, run, "evidence", &seed)?;
+                context
+                    .observations
+                    .push(json!({"origin":"host","anchor":seed}));
+            }
         }
         let native_files = session.is_some_and(|s| s.operation.is_some_and(|op| op.native_agent()));
         selected_materials::prepare(

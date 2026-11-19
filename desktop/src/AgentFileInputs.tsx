@@ -4,12 +4,12 @@ import type {ImageGrant} from "./AgentImages";
 import type {AgentMaterial,NoteLocator} from "./AgentMaterials";
 import {AgentMaterialCard} from "./AgentMaterialCard";
 
-export const agentFileAccept="image/png,image/jpeg,image/webp,.txt,.md,.csv,.json,.xlsx";
 export const isTextAttachment=(locator:{libraryId?:string})=>locator.libraryId==="__hub_chat_text";
 export function AgentTextFileCard({locator,disabled,onRemove}:{locator:NoteLocator;disabled:boolean;onRemove:()=>void}){
  const [item,setItem]=useState<AgentMaterial|null>(null);
  useEffect(()=>{let alive=true;void invoke<AgentMaterial>("agent_investigation",{args:{action:"textFileMetadata",locator}}).then(value=>{if(alive)setItem(value);},()=>{});return()=>{alive=false;};},[JSON.stringify(locator)]);
- return <AgentMaterialCard kind="page" title={item?.title||"文本附件"} subtitle={item?`已添加 · ${item.totalChars?.toLocaleString()} 字符 · 读取范围见工作过程`:"附件信息暂不可用"} disabled={disabled} onRemove={onRemove} removeLabel={`撤回文本附件 ${item?.title||"文本附件"}`}/>;
+ const subtitle = item?.fileBytes !== undefined ? `原文件 · ${(item.fileBytes/1024).toLocaleString(undefined,{maximumFractionDigits:1})} KiB · 按需读取` : item ? `已添加 · ${item.totalChars?.toLocaleString()} 字符 · 读取范围见工作过程` : "附件信息暂不可用";
+ return <AgentMaterialCard kind="page" title={item?.title||"文件附件"} subtitle={subtitle} disabled={disabled} onRemove={onRemove} removeLabel={`撤回文件附件 ${item?.title||"文件附件"}`}/>;
 }
 // Leave room for two encoded images and the question within the native transport limit.
 const imageTargetBytes=128*1024;
@@ -29,7 +29,7 @@ export async function prepareImage(file:File):Promise<{mime:string;base64:string
  throw new Error("图片压缩后仍过大，请选择较小图片。");
 }
 export async function readTextFile(file:File):Promise<string>{
- if(!/\.(txt|md|csv|json)$/i.test(file.name))throw new Error("暂支持 PNG、JPEG、WebP 和 TXT、Markdown、CSV、JSON；PDF、Word 请先使用资料库中的文字提取功能。");
+ if(!/\.(txt|md|csv|json)$/i.test(file.name))throw new Error("此文件需要使用原件读取方式。");
  if(file.size>2*1024*1024)throw new Error("文本附件最多2 MiB，请拆分文件后添加。");
  const url=await readDataUrl(file);const raw=atob(url.split(",")[1]);let text:string;
  try{text=new TextDecoder("utf-8",{fatal:true}).decode(Uint8Array.from(raw,c=>c.charCodeAt(0)));}catch{throw new Error("文本编码无法识别，请另存为 UTF-8 后添加。");}

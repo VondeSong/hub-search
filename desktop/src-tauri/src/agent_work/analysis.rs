@@ -15,7 +15,12 @@ pub(super) mod source;
 #[cfg(test)]
 mod tests;
 const MARKER: &str = "hub-analysis-file-v1";
+const ORIGINAL_MARKER: &str = "hub-original-file-v1";
 const MAX_FILE: usize = 10 * 1024 * 1024;
+
+fn is_file_manifest(value: &Value) -> bool {
+    matches!(value["format"].as_str(), Some(MARKER | ORIGINAL_MARKER))
+}
 
 fn digest(data: &[u8]) -> String {
     format!("{:x}", Sha256::digest(data))
@@ -68,14 +73,18 @@ pub(super) fn validate_file(data: &[u8], ext: &str) -> Result<(), String> {
     Ok(())
 }
 pub(super) fn stage(root: &Path, args: &Value) -> Result<Value, String> {
-    if args["source"].is_object() {
+    let original = args["action"] == "stageOriginalFile";
+    if !original && args["source"].is_object() {
         return source::import(root, args);
     }
     let title = text(args, "title", 200)?;
     if !valid_name(&title) {
         return Err("分析文件名无效".into());
     }
-    extension(&title)?;
+    let extension = extension(&title);
+    if !original {
+        extension.as_ref().map_err(Clone::clone)?;
+    }
     let encoded = args["base64"].as_str().ok_or("缺少文件内容")?;
     if encoded.len() > ((MAX_FILE + 2) / 3) * 4 {
         return Err("分析文件最多10 MiB".into());
@@ -86,7 +95,9 @@ pub(super) fn stage(root: &Path, args: &Value) -> Result<Value, String> {
     if data.is_empty() || data.len() > MAX_FILE {
         return Err("分析文件为空或超过10 MiB".into());
     }
-    validate_file(&data, extension(&title)?)?;
+    if let Ok(ext) = extension {
+        validate_file(&data, ext)?;
+    }
     let hash = digest(&data);
     let dir = root.join("collection-files/agent-analysis-inputs");
     crate::craft_backup::reject_links(&dir)?;
@@ -94,19 +105,27 @@ pub(super) fn stage(root: &Path, args: &Value) -> Result<Value, String> {
     let path = dir.join(&hash);
     crate::craft_backup::reject_links(&path)?;
     if !path.exists() {
-        std::fs::write(&path, &data).map_err(|_| "无法保存分析文件")?;
+        crate::data_portability::atomic_write(&path, &data).map_err(|_| "无法保存分析文件")?;
     }
-    let body=json!({"format":MARKER,"title":title,"sha256":hash,"bytes":data.len(),"source":args["sourceBinding"],"meaning":"User selected a data file. This manifest is not a statement that its rows have been read. Use hub_analyzeFiles to inspect or compute; scripts run offline on read-only copies. XLSX formulas are not recalculated and macros/external links are rejected."}).to_string();
-    let result =
-        crate::source_evidence::local_text::stage(root, &json!({"title":title,"text":body}))?;
-    Ok(result)
+    let marker = if original { ORIGINAL_MARKER } else { MARKER };
+    let source = if original {
+        Value::Null
+    } else {
+        args["sourceBinding"].clone()
+    };
+    let body =
+        json!({"format":marker,"title":title,"sha256":hash,"bytes":data.len(),"source":source})
+            .to_string();
+    crate::source_evidence::local_text::stage_file_manifest(
+        root,
+        &json!({"title":title,"text":body}),
+    )
 }
 fn inputs(root: &Path, work: &Work) -> Result<Vec<(String, PathBuf, Value)>, String> {
     dependencies::select(root, work, None)
 }
 
-pub(super) fn attachment_format(body: &str) -> Option<&'static str> {
-    let manifest: Value = serde_json::from_str(body).ok()?;
+pub(super) fn attachment_format(manifest: &Value) -> Option<&'static str> {
     if manifest["format"] != MARKER {
         return None;
     }
@@ -154,11 +173,11 @@ fn selected_inputs(root: &Path, grant: &Grant) -> Result<Vec<(String, PathBuf, V
         if !crate::source_evidence::local_text::is_local(locator) {
             continue;
         }
-        let body = crate::source_evidence::local_text::selected_body(root, locator)?;
-        let Ok(v) = serde_json::from_str::<Value>(&body) else {
+        let Some(v) = crate::source_evidence::local_text::selected_file_manifest(root, locator)?
+        else {
             continue;
         };
-        if v["format"] != MARKER {
+        if !is_file_manifest(&v) {
             continue;
         }
         if v["source"].is_object() {
@@ -175,7 +194,21 @@ fn selected_inputs(root: &Path, grant: &Grant) -> Result<Vec<(String, PathBuf, V
             .as_str()
             .filter(|t| valid_name(t))
             .ok_or("分析文件名损坏")?;
-        extension(title)?;
+        let original = v["format"] == ORIGINAL_MARKER;
+        let ext = if original {
+            Path::new(title)
+                .extension()
+                .and_then(|value| value.to_str())
+                .filter(|value| {
+                    !value.is_empty()
+                        && value.len() <= 16
+                        && value.bytes().all(|b| b.is_ascii_alphanumeric())
+                })
+                .unwrap_or("bin")
+                .to_ascii_lowercase()
+        } else {
+            extension(title)?.to_owned()
+        };
         let path = root
             .join("collection-files/agent-analysis-inputs")
             .join(hash);
@@ -190,9 +223,9 @@ fn selected_inputs(root: &Path, grant: &Grant) -> Result<Vec<(String, PathBuf, V
             return Err("分析文件与所选版本不一致".into());
         }
         result.push((
-            format!("input-{}.{}", result.len() + 1, extension(title)?),
+            format!("input-{}.{}", result.len() + 1, ext),
             path,
-            json!({"locator":locator,"title":title,"sha256":hash,"bytes":size,"source":v["source"]}),
+            json!({"locator":locator,"title":title,"sha256":hash,"bytes":size,"source":v["source"],"originalAttachment":original}),
         ));
         if result.len() > 8 {
             return Err("每项分析最多8个文件".into());
@@ -428,7 +461,7 @@ pub(super) fn context(root: &Path, work: &Work) -> Value {
 pub(super) fn facts(root: &Path, work: &Work) -> Value {
     let selected = inputs(root, work);
     let input_files = match &selected {
-        Ok(values) => values.iter().map(|(_,_,meta)|json!({"inputId":meta["inputId"],"title":meta["title"],"sha256":meta["sha256"],"bytes":meta["bytes"],"available":true,"unavailableReason":null})).collect::<Vec<_>>(),
+        Ok(values) => values.iter().map(|(_,_,meta)|json!({"inputId":meta["inputId"],"title":meta["title"],"sha256":meta["sha256"],"bytes":meta["bytes"],"originalAttachment":meta["originalAttachment"],"available":true,"unavailableReason":null})).collect::<Vec<_>>(),
         Err(_) => dependencies::catalog(root,work),
     };
     let has_available_input = input_files.iter().any(|file| file["available"] == true);
@@ -454,7 +487,7 @@ pub(super) fn facts(root: &Path, work: &Work) -> Value {
     } else if selected.is_err() && !has_available_input {
         selected.as_ref().err().cloned()
     } else if selected.as_ref().is_ok_and(|v| v.is_empty()) {
-        Some("尚未选择或获取数据文件".to_owned())
+        Some("尚未选择或获取文件".to_owned())
     } else {
         None
     };

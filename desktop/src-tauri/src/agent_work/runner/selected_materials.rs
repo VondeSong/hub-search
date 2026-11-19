@@ -22,10 +22,12 @@ pub(super) fn inspect_data(
         if !crate::source_evidence::local_text::is_local(&locator) {
             continue;
         }
-        let Ok(body) = crate::source_evidence::local_text::selected_body(root, &locator) else {
+        let Ok(Some(manifest)) =
+            crate::source_evidence::local_text::selected_file_manifest(root, &locator)
+        else {
             continue; // The normal selected-material reader records missing attachments.
         };
-        if analysis::attachment_format(&body).is_some() {
+        if analysis::attachment_format(&manifest).is_some() {
             let input_id = analysis::attachment_id(&locator);
             if seen.insert(input_id.clone()) {
                 files.push(json!({"locator":locator,"inputId":input_id}));
@@ -184,9 +186,7 @@ pub(super) fn prepare(
                 .reader
                 .read(&locator, 0, available, None)
                 .and_then(|excerpt| {
-                    if crate::source_evidence::local_text::is_local(&locator)
-                        && analysis::attachment_format(&excerpt.content).is_some()
-                    {
+                    if excerpt.facts["fileManifest"] == true {
                         return Ok(Value::Null);
                     }
                     context.remember(excerpt)
