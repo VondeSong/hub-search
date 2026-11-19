@@ -5,7 +5,14 @@ pub(super) fn attach_request(mut result: Value, request: &Value) -> Value {
     if !result.is_object() {
         result = json!({"value":result});
     }
-    result["request"] = crate::agent_work::store::tool_results::request_reference(request);
+    let mut reference = crate::agent_work::store::tool_results::request_reference(request);
+    if reference["operation"] == "analyzeFiles" {
+        // The exact script is already in the tool call and durable trace.
+        if let Some(fields) = reference.as_object_mut() {
+            fields.remove("script");
+        }
+    }
+    result["request"] = reference;
     result
 }
 

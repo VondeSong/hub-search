@@ -125,7 +125,7 @@ pub(crate) fn run(directory: &Path, runtime: &Path, control: &Control) -> Result
         ));
     }
     if stdout.len().saturating_add(stderr.len()) >= 65536 {
-        return Err("分析输出达到容量，拒绝截断结果".into());
+        return Err("分析输出达到 64 KiB，结果不完整。重试时只输出汇总、异常和原表范围，省去逐行内容和重复单元格。".into());
     }
     let output: Value = serde_json::from_str(stdout.trim())
         .map_err(|_| "分析必须输出完整JSON；文件请写入output目录")?;

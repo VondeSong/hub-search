@@ -1,5 +1,55 @@
 use super::*;
 const SPEC: &str = include_str!("../../../../runtime/analysis/manifest.json");
+
+fn verify_installation(
+    directory: &Path,
+    files: &[Value],
+    control: &Control,
+) -> Result<bool, String> {
+    if files.is_empty() {
+        return Ok(false);
+    }
+    // Keep every hash and link check, with bounded parallel reads of the
+    // already-installed runtime. Each new execution checks it again.
+    let workers = std::thread::available_parallelism().map_or(1, |n| n.get().min(4));
+    std::thread::scope(|scope| {
+        let handles: Vec<_> = files
+            .chunks(files.len().div_ceil(workers))
+            .map(|batch| {
+                scope.spawn(move || -> Result<bool, String> {
+                    for file in batch {
+                        control.check()?;
+                        let Some(name) = file["name"].as_str() else {
+                            return Ok(false);
+                        };
+                        let relative = Path::new(name);
+                        if relative.as_os_str().is_empty()
+                            || relative.components().any(|component| {
+                                !matches!(component, std::path::Component::Normal(_))
+                            })
+                        {
+                            return Ok(false);
+                        }
+                        let path = directory.join(relative);
+                        if crate::craft_backup::reject_links(&path).is_err()
+                            || !crate::craft_backup::hash_file(&path)
+                                .is_ok_and(|hash| file["sha256"] == hash)
+                        {
+                            return Ok(false);
+                        }
+                    }
+                    Ok(true)
+                })
+            })
+            .collect();
+        let mut valid = true;
+        for handle in handles {
+            valid &= handle.join().map_err(|_| "分析环境完整性检查中断")??;
+        }
+        Ok(valid)
+    })
+}
+
 pub(super) fn state(root: &Path) -> Value {
     let spec: Value = serde_json::from_str(SPEC).unwrap_or(Value::Null);
     let id = spec["id"].as_str().unwrap_or("unavailable");
@@ -27,23 +77,10 @@ pub(super) fn prepare(root: &Path, control: &Control) -> Result<PathBuf, String>
             serde_json::from_slice(&std::fs::read(&receipt).map_err(|_| "环境回执不可读")?)
                 .map_err(|_| "环境回执损坏")?;
         if saved["manifestSha256"] == digest(SPEC.as_bytes()) {
-            let valid = saved["files"].as_array().is_some_and(|files| {
-                !files.is_empty()
-                    && files.iter().all(|f| {
-                        let Some(name) = f["name"].as_str() else {
-                            return false;
-                        };
-                        let path = dir.join(name);
-                        !Path::new(name).is_absolute()
-                            && !Path::new(name)
-                                .components()
-                                .any(|p| matches!(p, std::path::Component::ParentDir))
-                            && crate::craft_backup::reject_links(&path).is_ok()
-                            && crate::craft_backup::hash_file(&path).is_ok_and(|h| f["sha256"] == h)
-                    })
-            });
-            if valid {
-                return Ok(dir);
+            if let Some(files) = saved["files"].as_array() {
+                if verify_installation(&dir, files, control)? {
+                    return Ok(dir);
+                }
             }
         }
         return Err(

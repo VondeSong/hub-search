@@ -54,13 +54,24 @@ def inspect_xlsx(path):
              "declaredColumns": sheet.max_column}
             for sheet in workbook.worksheets[:12]
         ]
-        if sheets:
-            sheets[0]["firstRowsPreview"] = [
-                preview_row(row)
-                for row in workbook.worksheets[0].iter_rows(
-                    min_row=1, min_col=1, max_row=4, max_col=12, values_only=True
-                )
-            ]
+        for metadata, sheet in zip(sheets, workbook.worksheets[:2]):
+            row_preview = []
+            first_value_row = None
+            for number, row in enumerate(
+                sheet.iter_rows(min_row=1, min_col=1, max_row=8, max_col=12, values_only=True), 1
+            ):
+                # Empty rows and repeated cells in title banners consume the
+                # preview without helping locate the actual table.
+                distinct = {str(cell) for cell in row if cell is not None and cell != ""}
+                if distinct and first_value_row is None:
+                    first_value_row = {"row": number, "cells": preview_row(row)}
+                if len(distinct) >= 2 or (distinct and sheet.max_column == 1):
+                    row_preview.append({"row": number, "cells": preview_row(row)})
+                if len(row_preview) == 2:
+                    break
+            metadata["tableRowsPreview"] = row_preview or (
+                [first_value_row] if first_value_row else []
+            )
         return {"worksheetCount": len(workbook.worksheets), "worksheetsPreview": sheets}
     finally:
         workbook.close()
