@@ -455,3 +455,43 @@ it("closes a previous phase at a public update while the newest phase owns the l
  await act(async()=>root.render(<AgentActivity value={{...run,running:false,state:'completed',events}}/>));
  expect(host.querySelector('.agent-operation-active')).toBeNull();
 });
+
+
+it("keeps Codex summaries optional and keeps the native tool group when a summary arrives",async()=>{
+  const tool={id:"script",kind:"tool" as const,state:"running",operation:"analyzeFiles",label:"分析附件",createdAt:1300};
+  const summary={id:"summary",kind:"reasoning" as const,state:"running",origin:"codex-app-server",label:"Preparing offline PE parsing",createdAt:1400};
+  const nativeRun={...run,native:true};
+  const draw=(events:ActivityRun["events"])=>act(async()=>root.render(<AgentActivity value={{...nativeRun,events}}/>));
+
+  await draw([run.events[0],tool]);
+  const phase=host.querySelector<HTMLDetailsElement>(".agent-operation-group")!;
+  await act(async()=>phase.querySelector("summary")!.click());
+  await draw([run.events[0],{...tool,state:"completed"},summary]);
+  expect(host.querySelector(".agent-operation-group")).toBe(phase);
+  expect(phase.open).toBe(true);
+  expect(host.textContent).not.toContain(summary.label);
+  expect(host.querySelector(".agent-live-status")?.textContent).toBe("正在思考");
+
+  const summaryDisclosure=phase.querySelector<HTMLDetailsElement>(".agent-public-summaries")!;
+  await act(async()=>{
+    summaryDisclosure.querySelector("summary")!.click();
+    await vi.waitFor(()=>expect(summaryDisclosure.open).toBe(true));
+    await new Promise(resolve=>setTimeout(resolve,0));
+  });
+  expect(summaryDisclosure.textContent).toContain(summary.label);
+  expect(host.querySelector(".agent-show-more")).toBeNull();
+});
+
+it("keeps a failed search in its phase after the streamed answer is replaced by the published report",async()=>{
+  const search={id:"search",kind:"webSearch" as const,state:"completed",label:"搜索网页",action:"search",errorCount:1,createdAt:1300};
+  const activity={...run,native:true,events:[run.events[0],search],running:false,state:"completed"};
+  const conversation:Conversation={hasEarlier:false,messages:[
+    {id:"user",role:"user",revision:1,text:"核对资料",createdAt:1},
+    {id:"report",role:"assistant",runId:run.runId,revision:1,createdAt:3000,report:{status:"completed",summary:"已核对可访问的来源",findings:[],nextSteps:[],questions:[],limitations:[],waitCondition:""}},
+  ]};
+  await act(async()=>root.render(<AgentConversation conversation={conversation} activity={[activity]} revoked={false} onOpenCitation={()=>{}}/>));
+  expect(host.querySelector(".agent-run-overview")?.textContent).toBe("搜索网页");
+  await expandProcess();
+  expect(host.querySelector(".agent-phase-warning")?.textContent).toBe("部分未完成");
+  expect(host.querySelector('[aria-label="助手回答"]')?.textContent).toContain("已核对可访问的来源");
+});

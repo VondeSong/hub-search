@@ -140,7 +140,7 @@ export function AgentConversation({ conversation, revoked, onOpenCitation, onOpe
       const combinedValidity = message.artifactState === "unavailable" && messageRuns.some(run=>run.validity) ? message.validity : undefined;
       const runs = messageRuns.map(run => {
         const request=conversation.messages.slice(0,index+1).reverse().find(item=>item.role==="user" && item.kind!=="decision" && item.kind!=="scope" && item.revision===run.revision);
-        return <AgentActivity key={`run:${run.runId}`} value={combinedValidity && run.validity ? {...run,validity:combinedValidity} : run} onRecheck={onRecheck} requestText={request?.displayText ?? request?.text}/>;
+        return <AgentActivity key={`run:${run.runId}`} value={combinedValidity && run.validity ? {...run,validity:combinedValidity} : run} onRecheck={onRecheck} requestText={request?.displayText ?? request?.text} delivered={message.role==="assistant" && !!message.report && message.artifactState!=="unavailable"}/>;
       });
       const body = <section key={`message:${message.id}`} className={`agent-message agent-message-${message.role}`} aria-label={message.role === "user" ? "你的消息" : "助手回答"}>
       {message.role === "user" ? <><div className="agent-user-message-content"><AgentRequestContent message={message} onOpenMaterial={onOpenMaterial}/></div><div className="agent-user-message-actions">
