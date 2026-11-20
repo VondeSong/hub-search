@@ -81,7 +81,7 @@ function cachedIcon(workId:string,url:string,dark:boolean) {
     .then(result=>/^data:image\/(png|x-icon);base64,[A-Za-z0-9+/=]+$/.test(result?.dataUrl??"")?result.dataUrl!:null).catch(()=>null);
   iconCache.set(key,{expires:Date.now()+600_000,value});return value;
 }
-function WebsiteIcon({url,title,hosts,workId}:{url:string;title:string;hosts:string[];workId?:string}) {
+export function WebsiteIcon({url,title,hosts,workId}:{url:string;title:string;hosts:string[];workId?:string}) {
   const [src,setSrc]=useState<string|null>(null);
   useEffect(()=>{
     let active=true;setSrc(null);

@@ -101,3 +101,9 @@ Codex 最后样本保留两条历史摘要、用时 2 分 58 秒及答案。早�
 | --- | --- | --- | --- | --- |
 | Codex | 1326 × 1920 | 194.062 秒 | [CSV.GZ](process-video-20261120/codex-frames.csv.gz) | 5609d2ede9ed2f723dcf2e9fe464e5e4f51aa9db1504bee457cf4a68a91621f0 |
 | Hub | 956 × 1920 | 261.157 秒 | [CSV.GZ](process-video-20261120/hub-frames.csv.gz) | 7b2bec2217130ce2dfbdc14db4f93c90a05fdb9dcbf906bf0c48ab003df205b2 |
+
+## 桌面实现复核
+
+同题历史的 24 条公开流事件在桌面组件内回放，两个阶段可独立展开。下图左列为 Codex 视频原帧，右列为桌面组件在 Chromium 中按动画时间截取的六帧。将字形划为四个等宽区，四区亮度峰值分别出现在 250、450、650、850 毫秒的采样帧；减少动态模式下无此动画。两列保留各自的字形尺寸，右列时标从一次 CSS 动画开始计算。
+
+![原录屏与桌面组件实际扫光帧](process-video-20261120/11-desktop-glow.png)

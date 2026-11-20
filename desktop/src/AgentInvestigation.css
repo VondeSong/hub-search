@@ -687,12 +687,14 @@ body.agent-sidebar-open > #root { width:calc(100% - min(var(--agent-panel-width,
 .agent-activity details > summary:is(:hover,:focus-visible) > .agent-reasoning-chevron { opacity:1; }
 @media (prefers-reduced-motion:no-preference) and (forced-colors:none) {
   @supports (background-clip:text) {
-    .agent-operation-active > summary:not(:hover,:focus-visible) > .agent-phase-label {
+    .agent-operation-active > summary > .agent-phase-label,
+    .agent-live-status > span,
+    .agent-activity[data-live] .agent-step-running .agent-script-label {
       color:transparent;
-      background-image:linear-gradient(90deg,var(--hub-text-secondary) 40%,color-mix(in srgb,var(--hub-text-primary) 60%,var(--hub-accent)) 50%,var(--hub-text-secondary) 60%);
+      background-image:linear-gradient(90deg,var(--hub-text-secondary) 40%,white 50%,var(--hub-text-secondary) 60%);
       background-size:250% 100%;
       background-clip:text;
-      animation:agent-operation-sweep 2.1s linear 3;
+      animation:agent-operation-sweep 1.45s linear infinite;
     }
   }
 }
@@ -709,3 +711,11 @@ body.agent-sidebar-open > #root { width:calc(100% - min(var(--agent-panel-width,
 .agent-followups small { color:var(--hub-text-secondary); }
 .agent-followups button { margin:4px 8px 0 0; }
 .agent-followups textarea { box-sizing:border-box; width:100%; min-height:64px; resize:vertical; }
+
+.agent-activity[data-live] { display:flex; flex-direction:column; }
+.agent-activity[data-live] .agent-activity-heading { order:1; border-bottom:0; justify-content:flex-end; }
+.agent-activity[data-live] .agent-activity-heading:not(:focus-within):not(:hover) .agent-run-time { opacity:.75; }
+.agent-web-details .agent-source-chips { display:flex; flex-wrap:wrap; gap:4px; padding:0; list-style:none; }
+.agent-source-chips li { max-width:100%; min-width:0; }
+.agent-source-chips a { display:inline-flex; align-items:center; gap:4px; max-width:100%; border-radius:1em; padding:2px 7px; background:var(--hub-separator); }
+.agent-source-chips a > span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
