@@ -66,18 +66,18 @@ export function AssistantProcessDemo({onClose}: {onClose: () => void}) {
         <div className="ha-process-time"><span className="ha-process-meta">用时 2 分 4 秒</span>
           <details><summary>本轮工具与权限</summary><ul><li>GitHub · 读取议题、准备评论草稿</li><li>独立浏览器 · developers.openai.com</li><li>内置网页搜索关闭</li></ul></details>
         </div>
-        <ProcessGroup title="读取 GitHub 议题 · 浏览网页" icon={Globe2}>
+        <ProcessGroup title="已使用 GitHub 和浏览器读取议题、浏览网页并准备评论草稿" icon={Globe2}>
           <details className="ha-process-batch"><summary>打开网页 <ChevronDown size={12} aria-hidden="true"/></summary><p>Skills · developers.openai.com</p><p>打开成功</p><details className="ha-process-technical"><summary>技术记录</summary><p>浏览器导航回执 · 展示示例</p></details></details>
+          <details className="ha-process-batch"><summary><FileText size={15} aria-hidden="true"/>准备 GitHub 评论草稿<ChevronDown size={12} aria-hidden="true"/></summary><p>草稿已准备，等待确认发布。</p></details>
         </ProcessGroup>
-        <ProcessGroup title="准备 GitHub 评论草稿" icon={FileText}><p>草稿已准备，等待确认发布。</p></ProcessGroup>
       </>}
       {scenario === 'script' && <>
         <p className="ha-process-commentary">先读取附件的文件头，确认格式和架构。</p>
-        <ProcessGroup title="检查附件 · quazip.dll" icon={Terminal}>
+        <ProcessGroup title="已使用 Python 检查附件格式和架构" icon={Terminal}>
           <details className="ha-process-batch ha-process-script">
             <summary>
               <Terminal size={15} aria-hidden="true"/>
-              <span>读取文件结构</span>
+              <span>分析附件 · quazip.dll</span>
               <small>13 秒</small>
               <ChevronDown size={12} aria-hidden="true"/>
             </summary>
@@ -90,6 +90,10 @@ export function AssistantProcessDemo({onClose}: {onClose: () => void}) {
                 <p>输出</p>
                 <pre role="region" aria-label="示例输出" tabIndex={0}>{'Machine: 0x8664\nOptional header: 0x020B\nSize: 204,288 bytes'}</pre>
               </div>
+              <details className="ha-process-technical">
+                <summary>技术记录 · JSON</summary>
+                <pre tabIndex={0}>{JSON.stringify({file:'quazip.dll', machine:'0x8664', bytes:204288, exitCode:0}, null, 2)}</pre>
+              </details>
               <div className="ha-script-status"><Check size={14} aria-hidden="true"/>执行成功</div>
             </div>
           </details>
@@ -115,8 +119,8 @@ export function AssistantProcessDemo({onClose}: {onClose: () => void}) {
 
 export function AssistantProcess({steps,webEnabled=false,seconds}:{steps?:string[];webEnabled?:boolean;seconds?:number}) {
   const [required,setRequired]=useState(false);
-  return <details className="ha-activity ha-process-demo" open={seconds ? true : undefined}>
-    <summary>{seconds ? `用时 ${seconds} 秒` : '工作过程 · 演示'}<ChevronDown size={13} aria-hidden="true"/></summary>
+  return <details className="ha-activity ha-process-demo">
+    <summary><Terminal size={16} aria-hidden="true"/><span>{webEnabled ? '已核对资料、检索网页并运行命令' : '已核对资料并运行工作区命令'}</span>{seconds && <small>{seconds} 秒</small>}<ChevronDown size={13} aria-hidden="true"/></summary>
     <details className="ha-process-group ha-process-permissions">
       <summary>本轮工具与权限<ChevronDown size={12} aria-hidden="true"/></summary>
       <div><p>本轮可用 Hub 工具</p><p>内置网页搜索{webEnabled ? '已开启' : '关闭'}</p></div>

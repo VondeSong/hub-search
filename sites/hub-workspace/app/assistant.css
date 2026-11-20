@@ -565,8 +565,8 @@
 .ha-answer-table caption{text-align:start;color:var(--subtle,var(--text));padding-block:0 8px}
 .ha-process-demo summary::-webkit-details-marker{display:none}
 .ha-process-demo svg,.ha-process-demo img{flex-shrink:0}
-.ha-process-demo summary>svg:last-child{margin-left:auto;transition:transform .15s}
-.ha-process-group:not([open])>summary>svg:last-child{transform:rotate(-90deg)}
+.ha-process-demo summary>svg:last-child{margin-inline-start:0;transition:transform .15s}
+.ha-process-demo details:not([open])>summary>svg:last-child,.ha-activity.ha-process-demo:not([open])>summary>svg:last-child{transform:rotate(-90deg)}
 .ha-process-commentary{margin-block:12px;color:var(--text);line-height:1.6;font-size:14px}
 .ha-process-row{display:flex;align-items:flex-start;gap:8px;margin-block:8px;line-height:1.6}
 .ha-process-group{margin-block:12px}
@@ -588,18 +588,20 @@
 .ha-process-script>summary>small{font-variant-numeric:tabular-nums;color:var(--subtle)}
 .ha-process-script>summary>svg:last-child{margin-inline-start:0}
 .ha-process-script:not([open])>summary>svg:last-child{transform:rotate(-90deg)}
-@media(hover:hover) and (pointer:fine){
-  .ha-process-script:not([open])>summary:not(:hover,:focus-visible)>svg:last-child{opacity:0}
-}
 .ha-script-result{
-  margin:4px 0 10px;
+  margin:4px 0 10px 7px;
+  padding-inline-start:15px;
+  border-inline-start:1px solid var(--line);
   min-width:0;
+}
+.ha-script-region{
+  margin-block-end:6px;
+  padding:10px 12px;
   border:1px solid var(--line);
   border-radius:8px;
-  background:var(--surface-2);
+  background:var(--surface);
 }
-.ha-script-region{padding:10px 12px}
-.ha-script-region+.ha-script-region{border-top:1px solid var(--line)}
+.ha-script-region+.ha-script-region{background:var(--surface-2)}
 .ha-script-region>p,.ha-script-status{font-size:12px;color:var(--subtle)}
 .ha-script-region>pre{
   margin:6px 0 0;
@@ -610,7 +612,7 @@
   color:var(--text);
 }
 .ha-script-region code{font:inherit}
-.ha-script-status{display:flex;align-items:center;gap:5px;padding:0 12px 9px}
+.ha-script-status{display:flex;align-items:center;gap:5px;padding:8px 0}
 .ha-process-technical{margin-top:8px;color:var(--subtle)}
 .ha-process-technical>summary{cursor:pointer}
 .ha-process-technical>pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:160px;overflow:auto}
