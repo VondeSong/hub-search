@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "5c2d7b4c2d216655c8852283364e22eafabb9b38",
-  "published_version": 117,
-  "deployment_id": "appgdep_6afe775f1ebc81918af1d2954c6ce013",
+  "source_commit": "77291aadac5cd09f53bad872aaa89b416e35884c",
+  "published_version": 118,
+  "deployment_id": "appgdep_6b00589347048191bb3a37095ffcf36c",
   "files": {
     ".gitignore": {
       "sha256": "ca0e1575efb181d784f15bf6c86e3c012fd5c7ede4daa34b924d0d8b590d4e77",
@@ -28,9 +28,9 @@
       "bytes": 31055
     },
     "app/Assistant.tsx": {
-      "sha256": "a5f80b5c3d9879dbc33f2d5b00811a96d2d36667289f58d3945479553de98a4e",
+      "sha256": "b37a3c8a3dba7f8562701478196275344c16e8f363cc9a3a9d4f98e8649a1fc5",
       "mode": "100644",
-      "bytes": 106192
+      "bytes": 106745
     },
     "app/AssistantChrome.tsx": {
       "sha256": "646f7d5b632c03c97792d5518948dca4aeeb51dcc67b09052110ca2e6a6291cc",
@@ -78,9 +78,9 @@
       "bytes": 2053
     },
     "app/AssistantProcess.tsx": {
-      "sha256": "ab43ceaf7cb4dce05119d2fe3b250339078ed0030c979a1ada6f644864973a08",
+      "sha256": "e8df4e08faacf2674a9b8a2f648aa5b145e97947fe33b5f91396b07e04a39641",
       "mode": "100644",
-      "bytes": 4108
+      "bytes": 15117
     },
     "app/AssistantResearch.tsx": {
       "sha256": "edd936dab8fc1ed094d5743e8a4946158a0fdde4a04aaea71ec7473eab34beec",
@@ -253,9 +253,9 @@
       "bytes": 1644
     },
     "app/assistant.css": {
-      "sha256": "a096d2547b69e51169967f648d2a96aad8989a21db61df8f4a81921cc031a4bd",
+      "sha256": "f43f397588dd28a2643b9f5bfc08de5d032a3f09f25aa9840c9b816c46f910c4",
       "mode": "100644",
-      "bytes": 60920
+      "bytes": 65295
     },
     "app/calendar-period.ts": {
       "sha256": "fb67e7bd1f4e04ccfd14ffb7ef8bb59fb448b0ed2080a698e9b331fe12b1224d",
@@ -463,9 +463,9 @@
       "bytes": 12137
     },
     "app/page.tsx": {
-      "sha256": "24a5edc57ab3d2957468ab82f5e06c6f5e38f94ec9bf2ba44834dd2227074706",
+      "sha256": "e19004d0e79cedf58188b615714536dc4800a0de0ee37c41113f65289f445b8d",
       "mode": "100644",
-      "bytes": 74168
+      "bytes": 74372
     },
     "app/pdf-preview-model.ts": {
       "sha256": "e1f72df40daff0d29d0c63cd3552edbfc47d851a2a5d0bbe3184e0371f178970",
@@ -1343,5 +1343,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-19T04:14:11.353587+00:00"
+  "imported_at": "2026-11-20T14:27:14.406284+00:00"
 }

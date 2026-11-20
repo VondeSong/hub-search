@@ -382,10 +382,29 @@ it("keeps long reasoning available and preserves a failure after an answer previ
   await act(async()=>root.render(<AgentActivity value={{...run,running:false,state:"failed",events:[{id:"a",kind:"answer",state:"completed",label:"部分回答",createdAt:1},{id:"f",kind:"tool",state:"failed",label:"保存失败",detail:"连接中断",createdAt:2}]}}/>));
   expect(host.querySelector('.agent-step-failed')?.textContent).toContain('连接中断');
 });
-it("does not offer an empty process disclosure for a direct native answer",async()=>{
+it("keeps a plain timer for legacy answers without process metadata",async()=>{
   await act(async()=>root.render(<AgentActivity value={{...run,running:false,state:"completed",finishedAt:5000,events:[{id:"a",kind:"answer",state:"completed",label:"直接回答",createdAt:2000}]}}/>));
   expect(host.querySelector('.agent-activity-toggle')).toBeNull();
   expect(host.textContent).toBe('用时 4 秒');
+});
+
+it("lets a direct native answer disclose the absence of public process events",async()=>{
+  const answer={id:"a",kind:"answer" as const,state:"completed",label:"直接回答",createdAt:2000};
+  const value={...run,native:true,capabilities:{webSearch:"disabled"},events:[],startedAt:1000};
+  await act(async()=>root.render(<AgentActivity value={value}/>));
+  const toggle=host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!;
+  expect(toggle.querySelector('svg')).not.toBeNull();
+  expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  await act(async()=>root.render(<AgentActivity value={{...value,running:false,state:"completed",finishedAt:5000,events:[answer]}}/>));
+  expect(host.querySelector('.agent-activity-toggle')).toBe(toggle);
+  expect(toggle.title).toBe('展开工作过程');
+  expect(toggle.textContent).toBe('用时 4 秒');
+  expect(host.querySelector('.agent-activity-events')).toBeNull();
+  await act(async()=>toggle.click());
+  expect(toggle.title).toBe('收起工作过程');
+  expect(host.querySelector('.agent-activity-events')?.textContent).toBe('本轮暂无可回看的公开过程。');
+  await act(async()=>toggle.click());
+  expect(host.querySelector('.agent-activity-events')).toBeNull();
 });
 
 
@@ -408,8 +427,7 @@ it("replays waiting, tools, answer streaming and completion without resetting ei
  await draw([]);
  const section=host.querySelector('.agent-activity')!;
  const heading=section.querySelector('.agent-activity-heading')!;
- expect(host.querySelector('.agent-activity-toggle')).toBeNull();
- expect(heading.querySelector('.agent-elapsed')?.textContent).toBe('已处理 4 秒');
+ expect(heading.querySelector('.agent-activity-toggle')?.textContent).toBe('已处理 4 秒');
  expect(section.firstElementChild).toBe(heading);
  expect(host.querySelector('.agent-live-status')?.textContent).toBe('正在思考');
  const tool={...run.events[1],state:'running',detail:'原文已分段读取'};
@@ -461,6 +479,28 @@ it("closes a previous phase at a public update while the newest phase owns the l
  expect(host.querySelector('.agent-operation-active')).toBeNull();
  await act(async()=>root.render(<AgentActivity value={{...run,running:false,state:'completed',events}}/>));
  expect(host.querySelector('.agent-operation-active')).toBeNull();
+});
+
+it("appends new steps to the open phase and keeps the earlier receipt open",async()=>{
+  const tools:ActivityRun['events']=Array.from({length:8},(_,i)=>({id:`tool-${i}`,kind:'tool',operation:'command',state:'completed',label:`运行命令 ${i+1}`,detail:'运行回执',createdAt:1400+i}));
+  const latest={id:'read-comments',kind:'tool' as const,operation:'mcp',toolName:'github.fetch_issue_comments',state:'running',label:'github.fetch_issue_comments',createdAt:1500};
+  const render=(steps:ActivityRun['events'],running=true)=>act(async()=>root.render(<AgentActivity value={{...run,native:true,events:[run.events[0],...steps],running}}/>));
+  await render(tools);
+  const phase=host.querySelector<HTMLDetailsElement>('.agent-operation-group')!;
+  const title=phase.querySelector('summary')!;
+  await act(async()=>title.click());
+  const receipt=phase.querySelector<HTMLDetailsElement>('.agent-tool-activity')!;
+  await act(async()=>receipt.querySelector('summary')!.click());
+  await render([...tools,latest]);
+  expect(title.textContent).toBe('正在读取 GitHub 评论');
+  expect(phase.querySelectorAll('.agent-activity-step')).toHaveLength(9);
+  expect(phase.querySelector('.agent-activity-step:last-child')?.textContent).toContain(latest.toolName);
+  await render([...tools,{...latest,state:'completed'}]);
+  expect(title.textContent).toBe('已读取 GitHub 评论');
+  await render([...tools,{...latest,state:'completed'}],false);
+  expect(phase.open && receipt.open).toBe(true);
+  expect(phase.querySelector('.agent-tool-activity')).toBe(receipt);
+  expect(phase.querySelectorAll('.agent-activity-step')).toHaveLength(9);
 });
 
 

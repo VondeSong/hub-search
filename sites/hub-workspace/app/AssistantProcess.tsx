@@ -45,34 +45,41 @@ function AttachmentReplay() {
   const [step,setStep] = useState(0);
   const [playing,setPlaying] = useState(true);
   const [revision,setRevision] = useState(0);
+  const [processOpen,setProcessOpen] = useState(true);
   useEffect(() => {
     if (!playing || step === 5) return;
     const timer = window.setTimeout(() => setStep(value => value + 1), step === 0 ? 2400 : 3200);
     return () => window.clearTimeout(timer);
   }, [step,playing,revision]);
+  const seconds = step === 0 ? 0 : Math.round((2400 + (step - 1) * 3200) / 1000);
 
   return <>
     <div className="ha-replay-toolbar">
       <span>附件分析 · 录屏回放示例</span>
       {step < 5 && <button type="button" onClick={() => setPlaying(value => !value)}>{playing ? '暂停回放' : '继续回放'}</button>}
-      <button type="button" onClick={() => { setRevision(value => value+1); setStep(0); setPlaying(true); }}>重播</button>
+      <button type="button" onClick={() => { setRevision(value => value+1); setStep(0); setPlaying(true); setProcessOpen(true); }}>重播</button>
     </div>
     <div key={revision} className="ha-replay-body">
-      {step >= 1 && <p>先核对两个附件的架构、版本及签名。</p>}
-      {step >= 2 && <ProcessGroup title="已检查两个附件" icon={Terminal}>
-        <details className="ha-process-batch"><summary>读取文件版本 <ChevronDown size={12}/></summary>
-          <div className="ha-script-region"><p>PowerShell · 示例</p><pre tabIndex={0}><code>{'(Get-Item .\\vcruntime140.dll).VersionInfo.FileVersion\n14.29.30147.0'}</code></pre><small>退出码 0</small></div>
-        </details>
-      </ProcessGroup>}
-      {step >= 2 && <p>两个文件的版本一致。接下来查找公开的分发和使用记录。</p>}
-      {step >= 3 && <ProcessGroup title="已检索网页并核对来源" icon={Search}>
-        <details className="ha-process-batch"><summary>搜索网页 <ChevronDown size={12}/></summary>
-          <p>vcruntime140_1.dll 与 vcruntime140.dll 成对分发</p>
-          <div className="ha-replay-sites"><span><Globe2 size={12}/>Spotfire 发布说明</span><span><Globe2 size={12}/>Microsoft C++ 团队</span></div>
-        </details>
-        <details className="ha-process-batch"><summary><TriangleAlert size={14}/>命令未完成 <ChevronDown size={12}/></summary><p>这一步未取得结果，已保留其他来源。</p></details>
-      </ProcessGroup>}
-      {step < 4 && <p role="status" className="ha-current-action"><span className={playing ? 'ha-active-ink' : ''}>{['正在思考','正在检查文件版本','正在搜索网页','正在整理结果'][step]}</span></p>}
+      <details className="ha-replay-process" open={processOpen} onToggle={event => setProcessOpen(event.currentTarget.open)}>
+        <summary>{step < 4 ? '已处理' : '用时'} {seconds} 秒<ChevronDown size={13} aria-hidden="true"/></summary>
+        <div className="ha-replay-activity">
+          {step >= 1 && <p>先核对两个附件的架构、版本及签名。</p>}
+          {step >= 1 && <ProcessGroup title={step === 1 ? '正在读取文件版本' : '已检查两个附件'} icon={Terminal}>
+            <details className="ha-process-batch"><summary>读取文件版本 <ChevronDown size={12}/></summary>
+              {step >= 2 ? <div className="ha-script-region"><p>PowerShell · 示例</p><pre tabIndex={0}><code>{'(Get-Item .\\vcruntime140.dll).VersionInfo.FileVersion\n14.29.30147.0'}</code></pre><small>退出码 0</small></div> : <p>正在读取 PowerShell 版本信息</p>}
+            </details>
+          </ProcessGroup>}
+          {step >= 2 && <p>两个文件的版本一致。接下来查找公开的分发和使用记录。</p>}
+          {step >= 2 && <ProcessGroup title={step === 2 ? '正在搜索网页' : step === 3 ? '正在核对网页来源' : '已检索网页并核对来源'} icon={Search}>
+            <details className="ha-process-batch"><summary>搜索网页 <ChevronDown size={12}/></summary>
+              <p>vcruntime140_1.dll 与 vcruntime140.dll 成对分发</p>
+              {step >= 3 && <div className="ha-replay-sites"><span><Globe2 size={12}/>Spotfire 发布说明</span><span><Globe2 size={12}/>Microsoft C++ 团队</span></div>}
+            </details>
+            {step >= 3 && <details className="ha-process-batch"><summary><TriangleAlert size={14}/>命令未完成 <ChevronDown size={12}/></summary><p>这一步未取得结果，已保留其他来源。</p></details>}
+          </ProcessGroup>}
+          {step === 0 && <p role="status" className="ha-current-action"><span className={playing ? 'ha-active-ink' : ''}>正在思考</span></p>}
+        </div>
+      </details>
       {step >= 4 && <p>这两个附件是 x64 Visual C++ 运行库组件，文件版本均为 14.29.30147.0。</p>}
       {step === 5 && <table className="ha-replay-table"><thead><tr><th>附件</th><th>大小</th></tr></thead><tbody><tr><td>vcruntime140.dll</td><td>98,208 字节</td></tr><tr><td>vcruntime140_1.dll</td><td>38,304 字节</td></tr></tbody></table>}
     </div>
@@ -89,7 +96,7 @@ export function AssistantProcessDemo({onClose}: {onClose: () => void}) {
     </div>
     <div key={scenario} className="ha-process-example">
       {scenario === 'timeline' && <AttachmentReplay/>}
-      {scenario === 'short' && <><p className="ha-process-meta">用时 12 秒</p><p>这份清单按资料、核对项和待确认问题分成三部分。</p></>}
+      {scenario === 'short' && <div className="ha-replay-body"><details className="ha-replay-process"><summary>用时 12 秒<ChevronDown size={13} aria-hidden="true"/></summary><div className="ha-replay-activity"><p className="ha-process-meta">本轮暂无可回看的公开过程。</p></div></details><p>这份清单按资料、核对项和待确认问题分成三部分。</p></div>}
       {scenario === 'read' && <>
         <p className="ha-process-commentary">先核对资料版本，再找出需要复查的段落。</p>
         <ProcessGroup title={readAgain ? '读取原文 · 重读成功' : '读取原文 · 版本已变化'} icon={readAgain ? FileText : TriangleAlert}>
