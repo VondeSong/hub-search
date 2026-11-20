@@ -3,6 +3,89 @@
 use super::*;
 use std::collections::HashMap;
 
+fn operation_result_summary(body: &Value) -> Option<String> {
+    let request = &body["request"];
+    if request["server"]
+        .as_str()
+        .is_some_and(|server| server.starts_with("browser:"))
+    {
+        let tool = request["tool"].as_str()?;
+        let page = match tool {
+            "browser_snapshot" => body["sourceRefs"].get(0)?["url"].as_str(),
+            "browser_navigate" | "browser_click" => {
+                let pages = body["browser"]["pages"].as_array()?;
+                if pages.len() == 1 {
+                    pages[0].as_str()
+                } else {
+                    None
+                }
+            }
+            _ => return None,
+        };
+        let url = url::Url::parse(page?).ok()?;
+        if !matches!(url.scheme(), "http" | "https") {
+            return None;
+        }
+        let host = url.host_str()?;
+        let path = url.path().chars().take(140).collect::<String>();
+        let target = format!("{host}{path}");
+        let outcome = match tool {
+            "browser_navigate" => "已打开",
+            "browser_click" => "点击后所在页面",
+            _ => "已取得页面快照",
+        };
+        let limit = if body["browser"]["truncated"] == true {
+            "。页面快照已截断，可按元素缩小读取范围。"
+        } else {
+            ""
+        };
+        return Some(format!("{outcome} · {target}{limit}"));
+    }
+    if request["tool"] == "github.fetch_issue" {
+        let args = &request["arguments"];
+        let repository = args["repository_full_name"].as_str()?;
+        let issue = args["issue_number"].as_u64()?;
+        let title = body["sourceRefs"].get(0)?["title"].as_str()?;
+        let title = title.chars().take(120).collect::<String>();
+        return Some(format!("已读取 {repository} #{issue} · {title}"));
+    }
+    if body["prepared"] == true && body["executed"] == false {
+        if let Some(target) = body["targetUrl"]
+            .as_str()
+            .and_then(|url| url::Url::parse(url).ok())
+        {
+            if target.host_str() == Some("github.com") {
+                return Some(format!(
+                    "草稿已准备，等待确认发布 · GitHub{}",
+                    target.path()
+                ));
+            }
+        }
+    }
+    if !matches!(
+        request["operation"].as_str(),
+        Some("analyzeFiles" | "compute")
+    ) {
+        return None;
+    }
+    let files = body["files"].as_array().map(Vec::as_slice).unwrap_or(&[]);
+    let names = files
+        .iter()
+        .filter_map(|file| file["name"].as_str())
+        .take(5)
+        .map(|name| name.chars().take(100).collect::<String>())
+        .collect::<Vec<_>>();
+    if names.is_empty() {
+        return (body["output"]["exitCode"] == 0 || body["exitCode"] == 0)
+            .then(|| "脚本执行成功".to_string());
+    }
+    Some(format!(
+        "生成 {} 个文件 · {}",
+        files.len(),
+        names.join("、")
+    ))
+}
+
 fn title(request: &Value, catalog: &mut Option<Value>) -> String {
     match request["operation"].as_str().unwrap_or_default() {
         "search" => format!(
@@ -48,6 +131,8 @@ fn title(request: &Value, catalog: &mut Option<Value>) -> String {
         {
             if request["tool"] == "catalog" {
                 "核对已连接应用工具"
+            } else if request["tool"] == "github.fetch_issue" {
+                "读取 GitHub 议题"
             } else if request["tool"] == "github.add_comment_to_issue" {
                 "准备 GitHub 评论草稿"
             } else {
@@ -291,7 +376,17 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
                             }
                             if body["serviceTitle"].is_string() {events[index]["serviceTitle"]=body["serviceTitle"].clone();}
                             if body["sourceRefs"].is_array() {events[index]["sourceRefs"]=body["sourceRefs"].clone();}
-                            if body["browser"]["truncated"]==true {events[index]["truncated"]=json!(true);events[index]["detail"]=json!("页面快照超过容量，仅保留前段；可按元素 target 缩小范围继续读取。");}
+                            if !body["error"].is_string() {
+                                if let Some(summary) = operation_result_summary(&body) {
+                                    events[index]["detail"] = json!(summary);
+                                }
+                            }
+                            if body["browser"]["truncated"]==true {
+                                events[index]["truncated"]=json!(true);
+                                if events[index]["detail"].is_null() {
+                                    events[index]["detail"]=json!("页面快照超过容量，仅保留前段；可按元素缩小读取范围。");
+                                }
+                            }
                             if let Some(error) = body["error"].as_str() {
                                 events[index]["detail"] = json!(error.chars().take(300).collect::<String>());
                             }
@@ -493,6 +588,40 @@ fn compression_event(sequence: i64, time: i64, body: &Value, active: bool) -> Op
 #[cfg(test)]
 mod context_lifecycle_tests {
     use super::*;
+
+    #[test]
+    fn summarizes_saved_targets_and_artifacts_without_reading_raw_output() {
+        let browser = json!({
+            "request":{"server":"browser:https://example.org","tool":"browser_navigate"},
+            "browser":{"pages":["https://example.org/docs?session=redacted#anchor"]}
+        });
+        assert_eq!(
+            operation_result_summary(&browser).as_deref(),
+            Some("已打开 · example.org/docs")
+        );
+        let multiple = json!({
+            "request":{"server":"browser:https://example.org","tool":"browser_click"},
+            "browser":{"pages":["https://example.org/old","https://example.org/new"]}
+        });
+        assert!(operation_result_summary(&multiple).is_none());
+        let analysis = json!({
+            "request":{"operation":"analyzeFiles"},"output":{"exitCode":0},
+            "files":[{"name":"results.csv"}]
+        });
+        assert_eq!(
+            operation_result_summary(&analysis).as_deref(),
+            Some("生成 1 个文件 · results.csv")
+        );
+        let draft = json!({
+            "prepared":true,"executed":false,
+            "targetUrl":"https://github.com/example/repo/issues/1"
+        });
+        assert_eq!(
+            operation_result_summary(&draft).as_deref(),
+            Some("草稿已准备，等待确认发布 · GitHub/example/repo/issues/1")
+        );
+    }
+
     #[test]
     fn native_answer_preview_is_uncommitted_and_replaced_by_delivery() {
         use crate::agent_work::tests::{claim, create};

@@ -6,6 +6,7 @@ const examples = [
   ['short', '简短问答'],
   ['read', '读取与恢复'],
   ['web', '网页检索'],
+  ['tools', '浏览器与应用'],
   ['files', '分批分析'],
 ] as const;
 
@@ -48,6 +49,15 @@ export function AssistantProcessDemo({onClose}: {onClose: () => void}) {
         <p role="status">{readAgain ? '当前版本已读取，可以继续核对。' : '正在等待重新核对这份资料。'}</p>
       </>}
       {scenario === 'web' && <AssistantProcess webEnabled seconds={36}/>}
+      {scenario === 'tools' && <>
+        <div className="ha-process-time"><span className="ha-process-meta">用时 2 分 4 秒</span>
+          <details><summary>本轮工具与权限</summary><ul><li>GitHub · 读取议题、准备评论草稿</li><li>独立浏览器 · developers.openai.com</li><li>内置网页搜索关闭</li></ul></details>
+        </div>
+        <ProcessGroup title="读取 GitHub 议题 · 浏览网页" icon={Globe2}>
+          <details className="ha-process-batch"><summary>打开网页 <ChevronDown size={12} aria-hidden="true"/></summary><p>Skills · developers.openai.com</p><p>打开成功</p><details className="ha-process-technical"><summary>技术记录</summary><p>浏览器导航回执 · 展示示例</p></details></details>
+        </ProcessGroup>
+        <ProcessGroup title="准备 GitHub 评论草稿" icon={FileText}><p>草稿已准备，等待确认发布。</p></ProcessGroup>
+      </>}
       {scenario === 'files' && <>
         <p className="ha-process-meta">用时 1 分 22 秒</p>
         <ProcessGroup title="已复用 14 批分析结果" icon={Terminal}><p>沿用已有记录并核对了批次范围。</p></ProcessGroup>
@@ -69,6 +79,10 @@ export function AssistantProcess({steps,webEnabled=false,seconds}:{steps?:string
   const [required,setRequired]=useState(false);
   return <details className="ha-activity ha-process-demo" open={seconds ? true : undefined}>
     <summary>{seconds ? `用时 ${seconds} 秒` : '工作过程 · 演示'}<ChevronDown size={13} aria-hidden="true"/></summary>
+    <details className="ha-process-group ha-process-permissions">
+      <summary>本轮工具与权限<ChevronDown size={12} aria-hidden="true"/></summary>
+      <div><p>本轮可用 Hub 工具</p><p>内置网页搜索{webEnabled ? '已开启' : '关闭'}</p></div>
+    </details>
     {seconds && webEnabled && <button type="button" aria-pressed={required} onClick={()=>setRequired(value=>!value)}>指定来源示例</button>}
     {required && <p role="status">指定网页无法访问，暂未核对原文。</p>}
     <div className="ha-process-commentary">先核对资料与技能要求，再整理可验证的结果。</div>
@@ -95,10 +109,6 @@ export function AssistantProcess({steps,webEnabled=false,seconds}:{steps?:string
     </>}
     <div className="ha-process-row"><Terminal size={16}/><span>运行工作区命令 · 展示示例</span></div>
     <div className="ha-process-row"><svg width="16" height="16" viewBox="0 0 16 16" aria-label="子代理示例" role="img">{Array.from({length:6},(_,i)=><path key={i} d="M8 8 6 1h4Z" fill="currentColor" opacity={i%2?0.6:1} transform={`rotate(${i*60} 8 8)`}/>)}</svg><span>子代理已完成 · 展示示例</span></div>
-    <details className="ha-process-group ha-process-runtime">
-      <summary><span>运行详情</span><ChevronDown size={12} aria-hidden="true"/></summary>
-      <div><p>本轮可用 {webEnabled ? '网页搜索和 Hub 工具' : 'Hub 工具'}</p></div>
-    </details>
     <div className="ha-answer-table" role="region" aria-label="成果表格排版示例，可横向滚动" tabIndex={0}><table><caption>窄窗表格排版 · 演示，非本轮执行结果</caption><thead><tr><th scope="col">内容</th><th scope="col">版本依据</th><th scope="col">可用范围</th><th scope="col">继续操作</th></tr></thead><tbody><tr><td>原始资料</td><td>当前明确授权的来源版本</td><td>保留原表的行列与来源</td><td>来源变化后重新核对相关成果</td></tr><tr><td>分析成果</td><td>实际执行时使用的输入</td><td>只沿用仍有效的结果</td><td>保留历史版本，修订生成新版本</td></tr></tbody></table></div>
   </details>;
 }

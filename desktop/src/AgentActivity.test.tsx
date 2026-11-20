@@ -29,6 +29,32 @@ it("keeps one time disclosure above the timeline and preserves the user's collap
  expect(group.open).toBe(true);
 });
 async function expandProcess(){const button=host.querySelector<HTMLButtonElement>(".agent-activity-toggle");if(button?.getAttribute("aria-expanded")==="false")await act(async()=>button.click());}
+it("shows connected operations and permissions without opening the underlying receipts",async()=>{
+ const service="app:connector_76869538009648d5b282a4bb21c3d157";
+ const browser="browser:https://developers.openai.com";
+ const events:ActivityRun["events"]=[
+  {id:"issue",kind:"tool",operation:"mcp",toolName:"github.fetch_issue",serviceId:service,state:"completed",label:"读取 GitHub 议题",createdAt:1200},
+  {id:"navigate",kind:"tool",operation:"mcp",toolName:"browser_navigate",serviceId:browser,state:"completed",label:"打开网页",detail:"已打开 · developers.openai.com/plugins/concepts/skills",createdAt:1300},
+ ];
+ await act(async()=>root.render(<AgentActivity value={{...run,running:false,state:"completed",events,capabilities:{webSearch:"disabled",externalTools:[
+  {server:service,tools:["github.fetch_issue","github.add_comment_to_issue"],writeRepository:"example/repo"},
+  {server:browser,tools:["browser_navigate","browser_snapshot"]},
+ ]}}}/>));
+ await expandProcess();
+ const group=host.querySelector<HTMLDetailsElement>(".agent-operation-group")!;
+ expect(group.querySelector(".agent-phase-label")?.textContent).toBe("读取 GitHub 议题 · 浏览网页");
+ await act(async()=>group.querySelector("summary")!.click());
+ const step=group.querySelector<HTMLDetailsElement>(".agent-tool-activity")!;
+ await act(async()=>step.querySelector("summary")!.click());
+ expect(step.open).toBe(true);
+ expect(step.textContent).toContain("已打开 · developers.openai.com/plugins/concepts/skills");
+ expect(host.querySelector(".agent-runtime-details")).toBeNull();
+ await act(async()=>host.querySelector<HTMLButtonElement>(".agent-runtime-toggle")!.click());
+ const settings=host.querySelector(".agent-runtime-details")!;
+ expect(settings.textContent).toContain("内置网页搜索 · 关闭");
+ expect(settings.textContent).toContain("GitHub · 读取议题、准备评论草稿");
+ expect(settings.textContent).toContain("独立浏览器 · https://developers.openai.com");
+});
 it("keeps public reasoning visible between collapsed tool groups in chronological order",async()=>{
  const events:ActivityRun['events']=[run.events[1],{id:'reason',kind:'reasoning',state:'running',label:'核对两份来源的差异',createdAt:1750},run.events[2]];
  await act(async()=>root.render(<AgentActivity value={{...run,events}}/>));

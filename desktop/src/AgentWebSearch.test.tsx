@@ -73,9 +73,15 @@ it("keeps the search and page-opening summaries distinct and the runtime details
  expect(groups.map(row=>row.textContent)).toEqual(["已搜索网页","已打开网页"]);
  expect(groups.map(row=>row.querySelector("[data-activity-icon]")?.getAttribute("data-activity-icon"))).toEqual(["webSearch","webOpen"]);
  expect(host.textContent).toContain("本批返回 38 项搜索结果");
- const runtime=host.querySelector<HTMLDetailsElement>(".agent-runtime-details")!;
- expect(runtime.open).toBe(false);
- expect(runtime.previousElementSibling?.classList.contains("agent-operation-group")).toBe(true);
+ const permissions=host.querySelector<HTMLButtonElement>('.agent-runtime-toggle')!;
+ expect(permissions.getAttribute("aria-expanded")).toBe("false");
+ expect(host.querySelector(".agent-runtime-details")).toBeNull();
+ await act(async()=>permissions.click());
+ expect(host.querySelector(".agent-runtime-details")?.textContent).toContain("内置网页搜索 · 实时搜索");
+ expect(host.querySelector(".agent-activity-events .agent-runtime-details")).toBeNull();
+ await act(async()=>host.querySelector<HTMLButtonElement>(".agent-activity-toggle")!.click());
+ expect(host.querySelector(".agent-activity-events")).toBeNull();
+ expect(host.querySelector(".agent-runtime-details")).not.toBeNull();
 });
 it("shows batch outcomes and separate details without turning unknown web actions into searches",async()=>{
  const value:ActivityRun={runId:"batch",revision:1,state:"completed",running:false,startedAt:1,finishedAt:1001,steps:3,events:[

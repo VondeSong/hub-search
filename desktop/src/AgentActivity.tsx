@@ -1,7 +1,7 @@
 import { publicWebHref } from "./AgentWebSources";
 import { createContext, memo, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, TriangleAlert } from "lucide-react";
-import { ActivityIcon, ActivityIdentity, activityLabel, activityOperation, operationLabels } from "./AgentActivityIdentity";
+import { ChevronDown, Ellipsis, TriangleAlert } from "lucide-react";
+import { ActivityIcon, ActivityIdentity, activityLabel, activityOperation, activityServiceTitle, operationLabels } from "./AgentActivityIdentity";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AgentToolResult, type ToolResultRef, type ToolResultScope } from "./AgentToolResult";
@@ -143,6 +143,22 @@ function elapsed(milliseconds: number) {
 }
 
 const isOperation=(event:ActivityEvent)=>["context","tool","skill","webSearch"].includes(event.kind);
+function externalPhaseTitle(operations:ActivityEvent[]) {
+  const actions = [...new Set(operations.flatMap(event => {
+    if (event.toolName === "catalog") return [];
+    if (activityOperation(event) === "browser") return ["浏览网页"];
+    if (event.toolName === "github.fetch_issue") return ["读取 GitHub 议题"];
+    if (event.toolName === "github.add_comment_to_issue") return ["准备 GitHub 评论草稿"];
+    if (activityOperation(event) === "mcp" && event.serviceId) {
+      const service = activityServiceTitle(event.serviceId, operations);
+      if (service) return [`查询 ${service}`];
+    }
+    return [];
+  }))];
+  if (!actions.length) return undefined;
+  return actions.length <= 2 ? actions.join(" · ") : `${actions[0]} · ${operations.length} 步`;
+}
+
 function OperationPhase({events,scope,running,runId}:{events:ActivityEvent[];scope:ToolResultScope|null;running:boolean;runId:string}) {
   const [open,setOpen]=useActivityDisclosure(`group:${runId}:${events[0].id}`,false);
   const [visible,setVisible]=useState(8);
@@ -157,7 +173,7 @@ function OperationPhase({events,scope,running,runId}:{events:ActivityEvent[];sco
   const current=active??pending;
   const readSpan=operations.length===1 ? operations[0].readSpan : undefined;
   const overview=mixedWeb ? `网页检索 · ${operations.length} 步`
-    : (operations.every(event=>event.state==="completed"&&!event.errorCount)?"已":"")+labels.join("、")+(readSpan?.title ? ` · ${readSpan.title}` : "");
+    : externalPhaseTitle(operations) ?? (operations.every(event=>event.state==="completed"&&!event.errorCount)?"已":"")+labels.join("、")+(readSpan?.title ? ` · ${readSpan.title}` : "");
   const currentTitle=current && (current.kind === "webSearch" ? webLabel(current) : activityLabel(current));
   const currentLabel=currentTitle && (/^(读取|搜索|访问|运行|执行|检查|核对|验证|编辑|加载|查找|整理|分析|生成|保存|创建)/.test(currentTitle)?"正在"+currentTitle:currentTitle);
   const summary=current ? pending&&!active?"等待："+currentTitle:currentLabel! : overview;
@@ -185,9 +201,37 @@ function ActivityTimeline({events,scope,running,runId}:{events:ActivityEvent[];s
   return <>{groups.map(group=>boundary(group[0]) ? <ActivityEventView key={group[0].id} event={group[0]} scope={scope} runId={runId}/> : <OperationPhase key={group[0].id} events={group} scope={scope} runId={runId} running={running && group===groups[groups.length-1]}/>)}</>;
 }
 
+const toolPermissionNames:Record<string,string> = {
+  "github.fetch_issue": "读取议题",
+  "github.add_comment_to_issue": "准备评论草稿",
+  browser_navigate: "打开网页",
+  browser_snapshot: "读取页面",
+  browser_click: "点击网页元素",
+};
+
+function RuntimePermissions({capabilities,events}:{capabilities:NonNullable<ActivityRun["capabilities"]>;events:ActivityEvent[]}) {
+  return <div className="agent-runtime-details" aria-label="本轮工具与权限">
+    <p>本轮工具与权限</p>
+    <ul>
+      <li>Hub 工具{capabilities.nativeCapabilities?.workspace && " · 独立工作区（无网络）"}{capabilities.nativeCapabilities?.multiAgent && " · 子任务委派"}</li>
+      {capabilities.webSearch && <li>内置网页搜索 · {capabilities.webSearch==="live" ? "实时搜索" : capabilities.webSearch==="cached" ? "缓存搜索" : "关闭"}</li>}
+      {capabilities.externalTools?.map(service => {
+        const name = service.server.startsWith("browser:") ? "独立浏览器 · "+service.server.slice(8).split("|").join("、")
+          : activityServiceTitle(service.server, events) || (service.server.startsWith("app:") ? "已连接应用" : service.server);
+        const tools = service.tools.map(tool => toolPermissionNames[tool]);
+        return <li key={service.server}>{name} · {tools.length && tools.every(Boolean) ? tools.join("、") : `${service.tools.length} 个已选工具`}
+          {service.writeRepository && ` · 评论目标 ${service.writeRepository}`}</li>;
+      })}
+      {capabilities.nativeCapabilities?.multiAgent && <li>主线程与子代理用量分别记录。缺失用量显示为未知。</li>}
+    </ul>
+  </div>;
+}
+
 export function AgentActivity({ value, onRecheck, requestText }: { value: ActivityRun; onRecheck?: () => void; requestText?:string }) {
   const [expanded, setExpanded] = useActivityDisclosure(`run:${value.runId}`,value.running);
+  const [permissionsOpen, setPermissionsOpen] = useActivityDisclosure(`permissions:${value.runId}`,false);
   const detailsId = useId();
+  const permissionsId = useId();
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (!value.running) return;
@@ -216,10 +260,20 @@ export function AgentActivity({ value, onRecheck, requestText }: { value: Activi
   const clippedProgress=processEvents.filter(event=>["message","reasoning","plan"].includes(event.kind));
   const clippingInText=clippedProgress.some(event=>event.label.trimEnd().endsWith(progressClippingNotice));
   const clipped=clippingInText || clippedProgress.some(event=>event.truncated);
-  return <section className="agent-activity" aria-label="本轮工作过程">
-    {hasProcess ? <button type="button" className="agent-activity-toggle" aria-expanded={expanded} aria-controls={detailsId} onClick={()=>setExpanded(!expanded)}>
+  const timeControl = hasProcess ? <button type="button" className="agent-activity-toggle" aria-expanded={expanded} aria-controls={detailsId} onClick={()=>setExpanded(!expanded)}>
       <span>{timeLabel} {duration}{stateLabel}</span><ChevronDown className={expanded ? "" : "agent-collapsed"} size={12} aria-hidden="true"/>
-    </button> : (!value.running || answer) && <p className="agent-elapsed">用时 {duration}{stateLabel}</p>}
+    </button> : (!value.running || answer || value.capabilities) && <p className="agent-elapsed">{timeLabel} {duration}{stateLabel}</p>;
+  return <section className="agent-activity" aria-label="本轮工作过程">
+    {value.capabilities ? <>
+      <div className="agent-activity-heading">
+        {timeControl}
+        <button type="button" className="agent-runtime-toggle" aria-label="本轮工具与权限" title="本轮工具与权限"
+          aria-expanded={permissionsOpen} aria-controls={permissionsId} onClick={()=>setPermissionsOpen(!permissionsOpen)}>
+          <Ellipsis size={16} aria-hidden="true"/>
+        </button>
+      </div>
+      {permissionsOpen && <div id={permissionsId}><RuntimePermissions capabilities={value.capabilities} events={processEvents}/></div>}
+    </> : timeControl}
     {value.validity && <div className="agent-process-failure" role="status">
       <TriangleAlert size={14} aria-hidden="true"/><span>{value.validity}</span>
       {onRecheck && <button type="button" onClick={onRecheck}>准备重新核对</button>}
@@ -228,16 +282,6 @@ export function AgentActivity({ value, onRecheck, requestText }: { value: Activi
     {expanded && (hasProcess || (value.running && !answer)) && <div id={detailsId} className="agent-activity-events" aria-label="完整工作过程">
       <ActivityTimeline running={value.running && !answer} events={processEvents} scope={value.validity ? null : scope} runId={value.runId}/>
       {value.running && !answer && !hasActiveStep && <p className="agent-live-status" role="status">正在思考</p>}
-      {value.capabilities && <details className="agent-reasoning agent-runtime-details">
-        <summary>运行详情<ChevronDown className="agent-reasoning-chevron" size={12} aria-hidden="true"/></summary>
-        <p>本轮可用 Hub 工具{value.capabilities.nativeCapabilities?.workspace ? "、独立工作区（无网络）" : ""}{value.capabilities.nativeCapabilities?.multiAgent ? "、子任务委派" : ""}。</p>
-        {value.capabilities.webSearch && <p>网页搜索 · {value.capabilities.webSearch === "live" ? "实时搜索" : value.capabilities.webSearch === "cached" ? "缓存搜索" : "关闭"}</p>}
-        {!!value.capabilities.externalTools?.length && <ul>{value.capabilities.externalTools.map(service => <li key={service.server}>
-          {service.server.startsWith("browser:") ? "独立浏览器 · " + service.server.slice(8).split("|").join("、") : service.server.startsWith("app:") ? "已连接应用" : service.server}
-          {" · "}{service.tools.length} 个已选工具{service.writeRepository && ` · 评论目标 ${service.writeRepository}`}
-        </li>)}</ul>}
-        {value.capabilities.nativeCapabilities?.multiAgent && <p>主线程与子代理用量分别记录。缺失用量显示为未知。</p>}
-      </details>}
     </div>}
     {!expanded && lastToolIssue && <p className="agent-process-failure" role="status" aria-label="工具操作未完成"><TriangleAlert size={14} aria-hidden="true"/><span>{toolIssues.length>1&&`${toolIssues.length} 项工具操作未完成 · `}{lastToolIssue.label} · {eventStateLabel(lastToolIssue)}{lastToolIssue.detail ? `：${lastToolIssue.detail}` : ""}</span></p>}
     {!expanded && failure && failure.kind!=="webSearch" && !isOperation(failure) && <p className="agent-process-failure" role="status"><TriangleAlert size={14} aria-hidden="true"/><span>{failure.label} · {failure.state==="failed" ? "未完成" : "已中断"}{failure.detail ? `：${failure.detail}` : ""}</span></p>}

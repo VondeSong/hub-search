@@ -589,7 +589,9 @@
 .ha-process-group>summary{gap:6px;min-height:30px}
 .ha-process-group>summary>small{flex-shrink:0;font-size:11px;color:inherit}
 .ha-process-label{min-width:0;overflow-wrap:anywhere}
-.ha-process-runtime{border-top:1px solid var(--line)}
+.ha-process-time{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.ha-process-time summary{cursor:pointer;color:var(--subtle)}
+.ha-process-permissions{margin-block:4px}
 @container hub-assistant (max-width:360px){.ha-process-group>summary{flex-wrap:wrap}}
 .ha-process-sites{display:inline-flex;gap:4px;flex-shrink:0}
 .ha-process-sites img{width:16px;height:16px;object-fit:contain}

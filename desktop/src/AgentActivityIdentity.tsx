@@ -88,6 +88,9 @@ function WebsiteIcon({url,title,hosts,workId}:{url:string;title:string;hosts:str
   return <span className="agent-site-icon" title={hosts.length > 1 ? hosts.join("、") : title} aria-label={hosts.join("、")}>{src?<img src={src} alt="" width={16} height={16} onError={()=>setSrc(null)}/>:<Globe2 size={16} aria-hidden="true"/>}</span>;
 }
 const brands:Record<string,{src:string;title:string}>={github:{src:github,title:"GitHub"},"app:connector_76869538009648d5b282a4bb21c3d157":{src:github,title:"GitHub"},notion:{src:notion,title:"Notion"}};
+export function activityServiceTitle(server:string,events:ActivityEvent[]) {
+  return brands[server]?.title ?? events.find(event=>event.serviceId===server && event.serviceTitle)?.serviceTitle;
+}
 export function ActivityIdentity({events,workId}:{events:ActivityEvent[];workId?:string}) {
   const sites=activitySites(events);
   const services=[...new Set(events.map(e=>e.serviceId).filter((s):s is string=>!!s))];
