@@ -227,6 +227,10 @@ export function ManagedSpacesSection({
         const watchStatus = indexStatus?.obsidianWatchers.find((status) => status.libraryId === space.id);
         const exportPanelOpen = exportSpaceId === space.id;
         const runtime = libraryRuntime[space.id];
+        const feishuAuthorizationRejected = space.provider === "feishu" && runtime?.state === "failed"
+          && runtime.lastError?.includes("(401 Unauthorized)");
+        const connectionLabel = feishuAuthorizationRejected ? "飞书授权未通过"
+          : space.connected ? "连接可用" : providerUnavailableLabel(space.provider);
         const paused = runtime?.state === "paused" || runtime?.state === "cancelled";
         const removing = runtime?.state === "removing" || runtime?.state === "removed";
         const retryRemove = runtime?.state === "removing" && Boolean(runtime.lastError);
@@ -251,8 +255,8 @@ export function ManagedSpacesSection({
                   <button title="取消" onClick={() => { setRenamingLibraryId(""); setLibraryNameDraft(""); }}><X size={14} /></button>
                 </span>
               : <strong>{space.name}</strong>}
-            <small>{providerName(space.provider)} · {space.documentCount === 0 && !space.lastSync ? "尚未同步" : `本地 ${space.documentCount} ${space.provider === "dida365" ? "项" : "篇"}`} · {space.connected ? "连接可用" : providerUnavailableLabel(space.provider)}</small>
-            <small className={`library-runtime ${runtime?.state || ""}`} title={runtime?.lastError}>{acceptingLibrary[space.id] ? "正在提交请求…" : libraryRuntimeLabel(runtime)}</small>
+            <small>{providerName(space.provider)} · {space.documentCount === 0 && !space.lastSync ? "尚未同步" : `本地 ${space.documentCount} ${space.provider === "dida365" ? "项" : "篇"}`} · {connectionLabel}</small>
+            <small className={`library-runtime ${runtime?.state || ""}`} title={runtime?.lastError}>{acceptingLibrary[space.id] ? "正在提交请求…" : feishuAuthorizationRejected ? "同步失败 · 本地内容仍可查看" : libraryRuntimeLabel(runtime)}</small>
             {space.provider === "obsidian" && <small className={`watch-status ${!paused && !removing && runtime?.state !== "pausing" && watchStatus && !watchStatus.watching ? "error" : ""}`} title={!paused && !removing ? watchStatus?.lastError : undefined}>{paused || runtime?.state === "pausing" ? "文件监控已暂停" : removing ? "正在关闭文件监控" : obsidianWatchLabel(watchStatus)}</small>}
             {space.provider === "obsidian" && space.location && <small className="library-location" title={space.location}>{space.location}</small>}
             {space.provider === "obsidian" && !space.connected && relocateObsidian && <button className="maintenance-button library-relocate-action" disabled={relocatingLibraryId === space.id || removing || runtime?.state === "pausing"} onClick={() => void relocateObsidian(space)}><FolderOpen size={14} /><span>{relocatingLibraryId === space.id ? "正在更新位置…" : "重新定位文件夹"}</span></button>}

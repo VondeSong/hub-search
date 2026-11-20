@@ -80,6 +80,19 @@ it("allows a disconnected library to retry saved authorization without removing 
   expect(props.controlLibrary).toHaveBeenCalledWith(props.spaces[0], "sync");
   expect(props.removeSpace).not.toHaveBeenCalled();
 });
+it("shows Feishu authorization rejection even when a session still exists", async () => {
+  props.spaces[0] = { ...props.spaces[0], provider: "feishu", connected: true, documentCount: 11 };
+  const failure = { libraryId: "space", state: "failed", phase: "failed", detail: "", activeOperations: 0, pending: 0, updatedAt: 1,
+    lastError: "飞书知识空间目录请求被拒绝：HTTP status client error (401 Unauthorized)" } as const;
+  props.libraryRuntime = { space: failure };
+  await act(async () => root.render(<ManagedSpacesSection {...props} />));
+  expect(container.textContent).toContain("本地 11 篇 · 飞书授权未通过");
+  expect(container.textContent).toContain("本地内容仍可查看");
+  expect(container.textContent).not.toContain("连接可用");
+  props.libraryRuntime = { space: { ...failure, state: "idle", lastError: undefined, updatedAt: 2 } };
+  await act(async () => root.render(<ManagedSpacesSection {...props} />));
+  expect(container.textContent).toContain("连接可用");
+});
 it("keeps paused libraries paused when the manual sync button is used", async () => {
   props.controlLibrary = vi.fn();
   props.libraryRuntime = { space: { libraryId: "space", state: "paused", phase: "paused", detail: "", activeOperations: 0, pending: 3, updatedAt: 1 } };
