@@ -12,6 +12,19 @@ pub(crate) struct NativeCapabilities {
     pub multi_agent: bool,
 }
 impl NativeCapabilities {
+    pub(crate) fn workspace_file(
+        workspace: &Path,
+        path: &Path,
+    ) -> Result<std::path::PathBuf, String> {
+        let workspace = std::fs::canonicalize(workspace).map_err(|_| "工作区不可用")?;
+        let resolved =
+            std::fs::canonicalize(workspace.join(path)).map_err(|_| "工作区文件不可用")?;
+        if !resolved.starts_with(&workspace) || !resolved.is_file() {
+            return Err("文件不在当前授权工作区".into());
+        }
+        Ok(resolved)
+    }
+
     pub(crate) fn disabled(&self) -> bool {
         !self.workspace && !self.multi_agent
     }
@@ -108,6 +121,14 @@ pub(super) fn activity(item: &Value, completed: bool) -> Option<Value> {
     let (operation, label) = match item["type"].as_str()? {
         "commandExecution" => ("command", "运行工作区命令"),
         "fileChange" => ("edit", "编辑工作区文件"),
+        "imageView" => (
+            "viewImage",
+            if completed {
+                "已查看 1 张图像"
+            } else {
+                "查看图像"
+            },
+        ),
         "collabAgentToolCall" => (
             "delegate",
             match item["tool"].as_str() {

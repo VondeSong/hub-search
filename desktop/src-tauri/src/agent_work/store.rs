@@ -362,7 +362,7 @@ pub(super) fn stream(
         .ok_or("过程消息身份无效")?;
     if !matches!(
         value["kind"].as_str(),
-        Some("message" | "answer" | "reasoning" | "plan" | "webSearch" | "contextUsage" | "tool")
+        Some("message" | "answer" | "reasoning" | "plan" | "webSearch" | "contextUsage" | "tool" | "workspaceChanges")
     ) || value["text"].as_str().is_none_or(|s| s.len() > 32_768)
     {
         return Err("过程消息超出公开通道合同".into());

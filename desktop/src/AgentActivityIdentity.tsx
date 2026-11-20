@@ -1,12 +1,12 @@
 import {useEffect,useState} from "react";
 import {invoke} from "@tauri-apps/api/core";
-import {AppWindow,BookOpen,Circle,Download,FilePenLine,FileSearch,FileText,Globe2,MessagesSquare,Network,Search,Shrink,SquareTerminal,TriangleAlert,Wrench} from "lucide-react";
+import {AppWindow,BookOpen,Circle,Download,FilePenLine,FileSearch,FileText,Globe2,Images,MessagesSquare,Network,Search,Shrink,SquareTerminal,TriangleAlert,Wrench} from "lucide-react";
 import {publicWebHref} from "./AgentWebSources";
 import type {ActivityEvent} from "./AgentActivity";
 import github from "./assets/agent-services/github.svg";
 import notion from "./assets/agent-services/notion.svg";
 
-export type ActivityOperation="search"|"read"|"command"|"compute"|"edit"|"readChat"|"renameChat"|"skill"|"context"|"delegate"|"mcp"|"browser"|"download"|"webSearch"|"webOpen"|"webFind"|"webUnknown"|"tool";
+export type ActivityOperation="search"|"read"|"command"|"compute"|"edit"|"imageInput"|"viewImage"|"readChat"|"renameChat"|"skill"|"context"|"delegate"|"mcp"|"browser"|"download"|"webSearch"|"webOpen"|"webFind"|"webUnknown"|"tool";
 /** The same resolver feeds rows and collapsed groups. Labels are legacy only. */
 export function activityOperation(event:ActivityEvent):ActivityOperation {
   const operation=event.operation;
@@ -28,6 +28,7 @@ export function activityOperation(event:ActivityEvent):ActivityOperation {
   if(operation==="command")return "command";
   if(operation==="delegate")return "delegate";
   if(operation==="edit")return "edit";
+  if(operation==="imageInput" || operation==="viewImage")return operation;
   if(operation==="readChat" || operation==="renameChat")return operation;
   if(operation==="mcp")return event.serviceId?.startsWith("browser:")?"browser":"mcp";
   if(operation==="read" || operation==="traceResult" || operation==="toolSchema")return "read";
@@ -39,7 +40,7 @@ export function activityOperation(event:ActivityEvent):ActivityOperation {
   if(/读取|原文|材料/.test(event.label))return "read";
   return "tool";
 }
-export const operationLabels:Record<ActivityOperation,string>={search:"搜索资料",read:"读取资料",command:"运行命令",compute:"运行计算脚本",edit:"编辑文件",readChat:"读取聊天",renameChat:"重命名聊天",skill:"使用技能",context:"整理上下文",delegate:"协调子代理",mcp:"使用外部工具",browser:"操作浏览器",download:"获取资料文件",webSearch:"搜索网页",webOpen:"打开网页",webFind:"在网页内查找",webUnknown:"处理网页",tool:"调用工具"};
+export const operationLabels:Record<ActivityOperation,string>={search:"搜索资料",read:"读取资料",command:"运行命令",compute:"运行计算脚本",edit:"编辑文件",imageInput:"原图资料",viewImage:"查看图像",readChat:"读取聊天",renameChat:"重命名聊天",skill:"使用技能",context:"整理上下文",delegate:"协调子代理",mcp:"使用外部工具",browser:"操作浏览器",download:"获取资料文件",webSearch:"搜索网页",webOpen:"打开网页",webFind:"在网页内查找",webUnknown:"处理网页",tool:"调用工具"};
 export function activityLabel(event:ActivityEvent) {
   if (event.kind==="tool" && event.operation==="analyzeFiles" && event.label==="分析数据并生成文件") return "分析附件";
   return event.kind==="tool" && event.operation==="compute" ? operationLabels.compute : event.label;
@@ -53,7 +54,7 @@ export function ActivityIcon({event}:{event:ActivityEvent}) {
       <img src={brand.src} alt="" width={16} height={16}/>
     </span>;
   }
-  const icons={search:Search,read:FileText,command:SquareTerminal,compute:SquareTerminal,edit:FilePenLine,readChat:MessagesSquare,renameChat:FilePenLine,skill:BookOpen,context:Shrink,delegate:Network,mcp:Globe2,browser:AppWindow,download:Download,webSearch:Search,webOpen:Globe2,webFind:FileSearch,webUnknown:Globe2,tool:Wrench};
+  const icons={search:Search,read:FileText,command:SquareTerminal,compute:SquareTerminal,edit:FilePenLine,imageInput:Images,viewImage:Images,readChat:MessagesSquare,renameChat:FilePenLine,skill:BookOpen,context:Shrink,delegate:Network,mcp:Globe2,browser:AppWindow,download:Download,webSearch:Search,webOpen:Globe2,webFind:FileSearch,webUnknown:Globe2,tool:Wrench};
   const Icon=event.state==="failed"||event.errorCount?TriangleAlert:event.state==="interrupted"?Circle:icons[operation];
   return <Icon size={16} aria-hidden="true" data-activity-icon={event.state==="failed"?"failed":operation}/>;
 }

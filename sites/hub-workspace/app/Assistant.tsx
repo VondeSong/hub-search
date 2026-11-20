@@ -665,7 +665,7 @@ function AssistantConversation({
     const element = document.activeElement as HTMLElement | null;
     const timer = setTimeout(() => composer.current?.focus({ preventScroll: true }), 80);
     const keys = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.isComposing || event.defaultPrevented || (event.target instanceof Element && event.target.closest('.ha-token'))) return;
+      if (event.key !== 'Escape' || event.isComposing || event.defaultPrevented || document.querySelector('.ha-receipt-dialog[open]') || (event.target instanceof Element && event.target.closest('.ha-token'))) return;
       event.preventDefault();
       event.stopPropagation();
       if (callback.current.draft) setDraft(null);

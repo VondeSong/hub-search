@@ -134,6 +134,42 @@ fn local_image_staging_does_not_grant_and_exact_bytes_survive_message_binding() 
 }
 
 #[test]
+fn timeline_image_preview_uses_the_recorded_grant_and_current_scope() {
+    let f = Fixture::new();
+    let grant = seed(&f);
+    let id = create(&f);
+    ui(&f.root, &message(&f, &id, &grant, false, 1)).unwrap();
+    let (work, run) = crate::agent_work::tests::claim(&f, &id);
+    store::record(
+        &f.root,
+        &run,
+        "nativeImages",
+        &json!({"images":[{"grant":grant}]}),
+    )
+    .unwrap();
+    let sequence: i64 = f
+        .c()
+        .query_row(
+            "SELECT rowid FROM agent_records WHERE run_id=?1 AND kind='nativeImages'",
+            [&run],
+            |row| row.get(0),
+        )
+        .unwrap();
+    let query = json!({"action":"activityImagePreview","id":id,"runId":run,"sequence":sequence,"index":0,"expectedWorkRevision":work.revision,"expectedAuthorizationVersion":work.authorization_version});
+    let view = ui(&f.root, &query).unwrap();
+    assert!(view["url"].as_str().unwrap().starts_with("data:image/"));
+    let mut wrong = query.clone();
+    wrong["runId"] = json!("different-run");
+    assert!(ui(&f.root, &wrong).is_err());
+    wrong = query.clone();
+    wrong["expectedAuthorizationVersion"] = json!(work.authorization_version + 1);
+    assert!(ui(&f.root, &wrong).is_err());
+    wrong = query;
+    wrong["index"] = json!(1);
+    assert!(ui(&f.root, &wrong).is_err());
+}
+
+#[test]
 fn local_image_rejects_invalid_and_oversized_inputs_before_staging() {
     let f = Fixture::new();
     for (mime, data) in [

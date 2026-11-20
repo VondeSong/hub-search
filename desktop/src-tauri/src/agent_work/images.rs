@@ -325,6 +325,122 @@ pub(super) fn preview(root: &Path, args: &Value) -> Result<Value, String> {
         json!({"title":title,"url":format!("data:{mime};base64,{}",base64::engine::general_purpose::STANDARD.encode(data))}),
     )
 }
+fn activity_record(root: &Path, args: &Value) -> Result<(Work, String, Value), String> {
+    let work_id = args["id"].as_str().ok_or("缺少对话身份")?;
+    let run_id = args["runId"].as_str().ok_or("缺少运行身份")?;
+    let sequence = args["sequence"].as_i64().ok_or("缺少图片回执身份")?;
+    let c = crate::source_evidence::open_read_database(root)?;
+    let work = store::load(&c, work_id)?;
+    if work.state == "revoked"
+        || args["expectedWorkRevision"].as_i64() != Some(work.revision)
+        || args["expectedAuthorizationVersion"].as_i64() != Some(work.authorization_version)
+    {
+        return Err("回执授权已变化，请重新打开对话".into());
+    }
+    let (kind, raw): (String,String) = c.query_row(
+        "SELECT r.kind,r.body_json FROM agent_records r JOIN agent_runs a ON a.id=r.run_id WHERE r.rowid=?1 AND r.work_id=?2 AND a.work_id=?2 AND r.run_id=?3 AND r.kind IN ('nativeImages','agentStream') AND a.authorization_version=?4",
+        params![sequence, work_id, run_id, work.authorization_version], |row| Ok((row.get(0)?,row.get(1)?)),
+    ).map_err(|_| "工作过程回执不可用")?;
+    Ok((
+        work,
+        kind,
+        serde_json::from_str(&raw).map_err(|_| "工作过程回执不可用")?,
+    ))
+}
+
+fn workspace_receipt_bytes(
+    root: &Path,
+    work: &Work,
+    path: &str,
+    limit: usize,
+) -> Result<(String, Vec<u8>), String> {
+    let value = options::workspace_path(root, &work.id)?;
+    let base = value["path"].as_str().ok_or("工作区路径不可用")?;
+    let file =
+        crate::model_runtime::NativeCapabilities::workspace_file(Path::new(base), Path::new(path))?;
+    let title = file
+        .file_name()
+        .ok_or("文件名不可用")?
+        .to_string_lossy()
+        .into_owned();
+    let mut bytes = Vec::new();
+    std::fs::File::open(&file)
+        .and_then(|file| file.take(limit as u64 + 1).read_to_end(&mut bytes))
+        .map_err(|_| "工作区文件不可回读")?;
+    Ok((title, bytes))
+}
+
+pub(super) fn activity_preview(root: &Path, args: &Value) -> Result<Value, String> {
+    let index = args["index"]
+        .as_u64()
+        .filter(|&i| i < MAX_IMAGES as u64)
+        .ok_or("图片序号无效")?;
+    let (work, kind, body) = activity_record(root, args)?;
+    if kind == "agentStream"
+        && body["origin"] == "codex-native"
+        && body["operation"] == "viewImage"
+        && body["state"] == "completed"
+        && index == 0
+    {
+        let receipt = &body["viewedImage"];
+        let path = receipt["path"].as_str().ok_or("回执没有可回读的图像引用")?;
+        let (title, bytes) = workspace_receipt_bytes(root, &work, path, MAX_BYTES)?;
+        if bytes.len() > MAX_BYTES || receipt["sha256"] != format!("{:x}", Sha256::digest(&bytes)) {
+            return Err("已查看的图片内容发生变化".into());
+        }
+        let mime = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+            "image/png"
+        } else if bytes.starts_with(&[255, 216, 255]) {
+            "image/jpeg"
+        } else if bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP") {
+            "image/webp"
+        } else {
+            return Err("该图像格式不支持预览".into());
+        };
+        decode(&bytes)?;
+        return Ok(
+            json!({"title":title,"url":format!("data:{mime};base64,{}",base64::engine::general_purpose::STANDARD.encode(bytes))}),
+        );
+    }
+    if kind != "nativeImages" {
+        return Err("该回执没有原图资料".into());
+    }
+    let grant: ImageGrant = serde_json::from_value(body["images"][index as usize]["grant"].clone())
+        .map_err(|_| "旧回执没有可回读的图片引用")?;
+    if !work.grant.images.contains(&grant) {
+        return Err("图片授权已撤回".into());
+    }
+    preview(root, &json!({"grant":grant}))
+}
+
+pub(super) fn activity_file_preview(root: &Path, args: &Value) -> Result<Value, String> {
+    const TEXT_LIMIT: usize = 32_768;
+    let index = args["index"]
+        .as_u64()
+        .filter(|&i| i < 20)
+        .ok_or("文件序号无效")?;
+    let (work, kind, body) = activity_record(root, args)?;
+    if kind != "agentStream" || body["origin"] != "codex-native" || body["operation"] != "edit" {
+        return Err("该回执没有工作区文件".into());
+    }
+    let path = body["fileChanges"][index as usize]["path"]
+        .as_str()
+        .ok_or("回执未记录该文件")?;
+    let (title, bytes) = workspace_receipt_bytes(root, &work, path, TEXT_LIMIT)?;
+    let truncated = bytes.len() > TEXT_LIMIT;
+    let mut prefix = &bytes[..bytes.len().min(TEXT_LIMIT)];
+    if let Err(error) = std::str::from_utf8(prefix) {
+        if !truncated || error.error_len().is_some() {
+            return Err("此文件不是可预览的 UTF-8 文本".into());
+        }
+        prefix = &prefix[..error.valid_up_to()];
+    }
+    let text = std::str::from_utf8(prefix).map_err(|_| "此文件不是可预览的 UTF-8 文本")?;
+    if text.contains('\0') {
+        return Err("此文件不是可预览的 UTF-8 文本".into());
+    }
+    Ok(json!({"title":title,"content":text,"truncated":truncated}))
+}
 pub(super) fn selection(value: &Value, field: &str) -> Result<Vec<ImageGrant>, String> {
     let images: Vec<ImageGrant> =
         serde_json::from_value(value.get(field).cloned().unwrap_or(json!([])))

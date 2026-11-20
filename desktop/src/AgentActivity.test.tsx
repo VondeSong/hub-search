@@ -29,6 +29,50 @@ it("keeps one time disclosure above the timeline and preserves the user's collap
  expect(group.open).toBe(true);
 });
 async function expandProcess(){const button=host.querySelector<HTMLButtonElement>(".agent-activity-toggle");if(button?.getAttribute("aria-expanded")==="false")await act(async()=>button.click());}
+
+it("preserves an open diff and two command receipts across a parent toggle and public progress",async()=>{
+ const edit:ActivityRun['events'][number]={id:'edit',kind:'tool',origin:'codex-native',operation:'edit',state:'completed',label:'编辑工作区文件',createdAt:2000,detail:'config/settings.yml',fileChanges:[{path:'config/settings.yml',patch:'@@ -4 +4 @@\n-compact: false\n+compact: true',added:1,removed:1}]};
+ const command:ActivityRun['events'][number]={id:'command',kind:'tool',origin:'codex-native',operation:'command',state:'running',label:'运行工作区命令',createdAt:2100,detail:'git diff',commandOutput:'正在检查'};
+ const previous:ActivityRun['events'][number]={...command,id:'previous',createdAt:2050,state:'completed',commandOutput:'检查完成',exitCode:0};
+ const draw=(events:ActivityRun['events'])=>act(async()=>root.render(<ActivityDisclosureProvider isFollowing={()=>true}><AgentActivity value={{...run,native:true,events,workspaceChanges:{files:1,added:1,removed:1,patch:edit.fileChanges![0].patch}}}/></ActivityDisclosureProvider>));
+ await draw([edit,previous,command]);
+ const select=(s:string)=>host.querySelector<HTMLElement>(s)!;
+ const click=(s:string)=>act(async()=>select(s).click());
+ async function open(item:HTMLDetailsElement) {await act(async()=>{item.open=true;item.dispatchEvent(new Event('toggle'));});}
+ await open(host.querySelector('.agent-operation-group')!);
+ for (const item of [...host.querySelectorAll<HTMLDetailsElement>('.agent-tool-activity')]) await open(item);
+ await open(host.querySelector('.agent-tool-activity .agent-patch-details')!);
+ expect(select('.agent-patch-added').textContent).toContain('+compact: true');
+ expect(select('pre[aria-label="当前命令输出"]').textContent).toBe('正在检查');
+ expect(select('pre[aria-label="命令输出"]').textContent).toBe('检查完成');
+ await click('.agent-activity-toggle');
+ expect(host.querySelector('.agent-activity-events')).toBeNull();
+ expect(select('.agent-activity > .agent-patch-details > summary').textContent).toContain('本轮文件变更 · 1 个文件');
+ await click('.agent-activity-toggle');
+ expect(host.querySelectorAll('.agent-tool-activity[open]')).toHaveLength(3);
+ expect(select('.agent-patch-added').textContent).toContain('+compact: true');
+ const progress:ActivityRun['events'][number]={id:'progress',kind:'message',state:'completed',label:'已核对配置，接着检查预览。',createdAt:2200};
+ await draw([edit,previous,{...command,state:'completed',exitCode:0},progress,{...command,id:'new',createdAt:2300}]);
+ expect(host.querySelectorAll('.agent-operation-group')).toHaveLength(2);
+ expect(select('.agent-operation-group').hasAttribute('open')).toBe(true);
+ expect(select('.agent-commentary').textContent).toBe(progress.label);
+ expect(host.querySelector('.agent-native-answer')).toBeNull();
+});
+
+it("treats commentary before more tools differently from the first final answer",async()=>{
+ const progress:ActivityRun['events'][number]={id:'progress',kind:'message',state:'running',label:'检查还在继续。',createdAt:2000};
+ const tool:ActivityRun['events'][number]={id:'edit',kind:'tool',operation:'edit',state:'running',label:'检查文件',createdAt:2100};
+ const draw=(events:ActivityRun['events'])=>act(async()=>root.render(<ActivityDisclosureProvider isFollowing={()=>true}><AgentActivity value={{...run,native:true,events}}/></ActivityDisclosureProvider>));
+ await draw([progress]);
+ expect(host.querySelector('.agent-activity-toggle')?.getAttribute('aria-expanded')).toBe('true');
+ expect(host.querySelector('.agent-commentary')?.textContent).toBe(progress.label);
+ expect(host.querySelector('.agent-native-answer')).toBeNull();
+ await draw([{...progress,state:'completed'},tool]);
+ expect(host.querySelector('.agent-activity-toggle')?.getAttribute('aria-expanded')).toBe('true');
+ await draw([{...progress,state:'completed'},{...tool,state:'completed'},{...progress,id:'answer',kind:'answer',label:'检查完成。',createdAt:2500}]);
+ expect(host.querySelector('.agent-activity-toggle')?.getAttribute('aria-expanded')).toBe('false');
+ expect(host.querySelector('.agent-native-answer')?.textContent).toBe('检查完成。');
+});
 it("shows connected operations and permissions without opening the underlying receipts",async()=>{
  const service="app:connector_76869538009648d5b282a4bb21c3d157";
  const browser="browser:https://developers.openai.com";
@@ -92,11 +136,11 @@ it("puts a recorded exit code above the closed native command",async()=>{
  await act(async()=>host.querySelector<HTMLDetailsElement>(".agent-operation-group")!.querySelector("summary")!.click());
  const step=host.querySelector<HTMLDetailsElement>(".agent-tool-activity")!;
  expect(step.querySelector("summary")?.textContent).toContain("运行工作区命令 · git status");
- expect(step.querySelector(".agent-script-status")?.textContent).toBe("退出码 9");
+ expect(step.querySelector(".agent-script-status")?.textContent).toBe("未完成 · 退出码 9");
  expect(step.querySelector<HTMLDetailsElement>("details")?.open).toBe(false);
  expect(step.querySelector("pre")?.textContent).toBe("git status --short");
  await act(async()=>root.render(<AgentActivity value={{...run,native:true,events:[{...command,exitCode:undefined}]}}/>));
- expect(step.querySelector(".agent-script-status")).toBeNull();
+ expect(step.querySelector(".agent-script-status")?.textContent).toBe("未完成");
  expect(step.querySelector("pre")?.textContent).toContain("退出码 9");
 });
 

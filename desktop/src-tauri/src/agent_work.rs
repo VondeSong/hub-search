@@ -519,6 +519,8 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
             crate::source_evidence::local_text::metadata(root, &locator)
         }
         "imagePreview" => images::preview(root, args),
+        "activityImagePreview" => images::activity_preview(root, args),
+        "activityFilePreview" => images::activity_file_preview(root, args),
         "materials" => {
             let mut environment = crate::hub_capabilities::Session::new(root, None)?;
             environment.call("hub_list_note_sources", &args["query"], "")

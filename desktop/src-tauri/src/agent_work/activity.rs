@@ -195,7 +195,7 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
         if authorization != w.authorization_version {
             continue;
         }
-        let mut query=c.prepare("SELECT rowid,kind,body_json,created_at,id FROM agent_records WHERE run_id=?1 AND kind IN ('nativeMeasurement','nativeRuntime','libraryRules','agentStream','activity','intent','toolCall','toolResult','evidence','selectedMaterialReadError','selectedDataRead','autoInboxReceipt','workingState','nativeContextLifecycle','nativeFinal','delivery','nativeImages') ORDER BY rowid LIMIT 4096").map_err(|e|e.to_string())?;
+        let mut query=c.prepare("SELECT rowid,kind,body_json,created_at,id FROM agent_records WHERE run_id=?1 AND kind IN ('nativeMeasurement','nativeRuntime','libraryRules','agentStream','activity','intent','toolCall','toolResult','evidence','selectedMaterialReadError','selectedDataRead','autoInboxReceipt','workingState','nativeContextLifecycle','nativeFinal','delivery','nativeImages','nativeTurn') ORDER BY rowid LIMIT 4096").map_err(|e|e.to_string())?;
         let rows = query
             .query_map([&run], |r| {
                 Ok((
@@ -224,6 +224,8 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
         let mut measurement = Value::Null;
         let mut runtime_capabilities = Value::Null;
         let mut has_delivery = false;
+        let mut workspace_changes = Value::Null;
+        let mut prepared_images = None;
         for row in rows {
             let (sequence, kind, raw, time, record_id) = row.map_err(|e| e.to_string())?;
             let before_events = events.len();
@@ -261,16 +263,35 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
                         }
                     }
                 }
-                "nativeImages" => { events.push(json!({"id":sequence.to_string(),"kind":"context","state":"completed","label":format!("本轮已准备 {} 张授权原图；图片解读以模型答复为准",body["images"].as_array().map_or(0,Vec::len)),"createdAt":time})); }
+                "nativeImages" => {
+                    let count = body["images"].as_array().map_or(0, Vec::len);
+                    if count > 0 {
+                        prepared_images = Some((events.len(), count));
+                        events.push(json!({"id":sequence.to_string(),"kind":"context","operation":"imageInput","state":"completed","label":format!("已准备 {count} 张授权原图"),"createdAt":time,"imageCount":count}));
+                    }
+                }
+                "nativeTurn" => {
+                    if let Some((index,count)) = prepared_images {
+                        if body["imageCount"].as_u64() == Some(count as u64) {
+                            events[index]["label"] = json!(format!("已发送 {count} 张授权原图"));
+                        }
+                    }
+                }
                 "nativeFinal" if state!="investigating" => {
                     if let Some(text)=body["text"].as_str().filter(|s|!s.trim().is_empty()) { events.push(json!({"id":sequence.to_string(),"kind":"unpublishedAnswer","state":"unverified","label":text,"createdAt":time})); }
                 }
                 "delivery" => { has_delivery = true; events.retain(|e|e["kind"]!="unpublishedAnswer"); }
                 "agentStream" if body["kind"]=="contextUsage" => {},
+                "agentStream" if body["kind"]=="workspaceChanges" => workspace_changes = body["changes"].clone(),
                 "agentStream" => {
                     if body["text"].as_str().is_some_and(|s| !s.trim().is_empty()) {
-                        events.push(json!({"id":sequence.to_string(),"kind":body["kind"],"state":body["state"],"label":body["text"],"url":body["url"],"createdAt":time,"sequence":sequence,"updatedAt":body["updatedAt"],"finishedAt":body["finishedAt"],"operation":body["operation"],"detail":body["detail"],"agentIds":body["agentIds"],"agentStates":body["agentStates"],"origin":body["origin"].as_str().unwrap_or("codex-app-server"),
-                            "truncated":body["truncated"]==true,"action":body["action"],"queries":body["queries"],"pattern":body["pattern"],"sourceRefs":body["sourceRefs"],"resultCount":body["resultCount"],"errorCount":body["errorCount"],"errors":body["errors"],"omittedSourceCount":body["omittedSourceCount"],"exitCode":body["exitCode"]}));
+                        let mut event=json!({"id":sequence.to_string(),"kind":body["kind"],"state":body["state"],"label":body["text"],"url":body["url"],"createdAt":time,"sequence":sequence,"updatedAt":body["updatedAt"],"finishedAt":body["finishedAt"],"operation":body["operation"],"detail":body["detail"],"agentIds":body["agentIds"],"agentStates":body["agentStates"],"origin":body["origin"].as_str().unwrap_or("codex-app-server"),
+                            "truncated":body["truncated"]==true,"action":body["action"],"queries":body["queries"],"pattern":body["pattern"],"sourceRefs":body["sourceRefs"],"resultCount":body["resultCount"],"errorCount":body["errorCount"],"errors":body["errors"],"omittedSourceCount":body["omittedSourceCount"],"exitCode":body["exitCode"]});
+                        for field in ["fileChanges","commandOutput","outputTruncated"] {
+                            if let Some(value)=body.get(field) {event[field]=value.clone();}
+                        }
+                        if body["operation"]=="viewImage" && body["viewedImage"].is_object() {event["imageCount"]=json!(1);}
+                        events.push(event);
                     }
                 }
                 "activity" => {
@@ -553,6 +574,7 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
         events.retain(|e| e["kind"] != "status" || e["state"] == "running");
         if !valid {
             events.retain(|e| e["kind"] == "status");
+            workspace_changes = Value::Null;
         }
         let count = events
             .iter()
@@ -561,7 +583,7 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
         let native:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM agent_records WHERE run_id=?1 AND kind='nativeRuntime')",[&run],|r|r.get(0)).map_err(|e|e.to_string())?;
         let can_steer = active && can_steer_on(c, &run)?;
         result.push(json!({"workId":w.id,"currentWorkRevision":w.revision,"authorizationVersion":w.authorization_version,"runId":run,"revision":revision,"state":state,"running":active,"startedAt":started,
-            "finishedAt":finished,"capabilities":runtime_capabilities,"measurement":measurement,"steps":count,"events":events,"native":native,"canSteer":can_steer,"validity":if valid{""}else{"来源已变化，这轮的过程正文已隐藏"}}));
+            "finishedAt":finished,"capabilities":runtime_capabilities,"measurement":measurement,"steps":count,"events":events,"workspaceChanges":workspace_changes,"native":native,"canSteer":can_steer,"validity":if valid{""}else{"来源已变化，这轮的过程正文已隐藏"}}));
     }
     Ok(json!(result))
 }

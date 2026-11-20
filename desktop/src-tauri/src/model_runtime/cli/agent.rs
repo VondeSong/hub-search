@@ -10,6 +10,7 @@ pub(crate) mod compute;
 pub(crate) mod interaction;
 pub(crate) mod mcp;
 mod output;
+mod receipts;
 pub(crate) mod services;
 pub(crate) mod web;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -814,7 +815,7 @@ pub(crate) fn run(
         .to_string();
     host(
         "started",
-        &json!({"threadId":thread_id,"turnId":turn_id,"resumed":resumed}),
+        &json!({"threadId":thread_id,"turnId":turn_id,"resumed":resumed,"imageCount":request.image_input.len()}),
     )?;
     let mut items: HashMap<String, PublicItem> = HashMap::new();
     let mut calls: HashMap<String, Value> = HashMap::new();
@@ -828,6 +829,7 @@ pub(crate) fn run(
     let mut event_kinds = HashSet::new();
     let mut final_items = HashSet::new();
     let mut web_events = web::Events::default();
+    let mut commands = receipts::Commands::default();
     let mut first_event = true;
     let mut child_threads = HashSet::new();
     loop {
@@ -1030,8 +1032,22 @@ pub(crate) fn run(
                 continue;
             }
             if matches!(method, "item/started" | "item/completed") {
-                if let Some(event) = capabilities::activity(&p["item"], method == "item/completed")
-                {
+                let completed = method == "item/completed";
+                let item = &p["item"];
+                if let Some(mut event) = capabilities::activity(item, completed) {
+                    if request.native_capabilities.workspace {
+                        if item["type"] == "commandExecution" {
+                            commands.item(item, &mut event, completed);
+                        } else if item["type"] == "fileChange" && completed {
+                            event["fileChanges"] = receipts::edits(&item["changes"]);
+                        } else if item["type"] == "imageView" && completed {
+                            if let Some(image) =
+                                receipts::viewed_image(request.directory, &item["path"])
+                            {
+                                event["viewedImage"] = image;
+                            }
+                        }
+                    }
                     flush(&mut items, &mut host)?;
                     host("event", &event)?;
                 }
@@ -1050,6 +1066,19 @@ pub(crate) fn run(
                 continue;
             }
             match method {
+                "item/commandExecution/outputDelta" if request.native_capabilities.workspace => {
+                    if let Some(event) = commands.delta(p) {
+                        host("event", &event)?;
+                    }
+                }
+                "turn/diff/updated" if request.native_capabilities.workspace => {
+                    if let Some(diff) = p["diff"].as_str() {
+                        host(
+                            "event",
+                            &json!({"id":"native-turn-diff","kind":"workspaceChanges","text":"本轮文件变更","state":"running","changes":receipts::turn_diff(diff)}),
+                        )?;
+                    }
+                }
                 "turn/plan/updated" => {
                     host("event", &interaction::plan(p, &thread_id, &turn_id)?)?;
                 }

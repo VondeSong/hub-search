@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "b5dcfee81bbf9e74fe54b8752214ca9f6541eb6b",
-  "published_version": 121,
-  "deployment_id": "appgdep_6b00692e739081919bd402840a63ccab",
+  "source_commit": "c108c47cd45e774d38ef3437a75f12f0e7ce9269",
+  "published_version": 123,
+  "deployment_id": "appgdep_6b007d1e2ec48191bcf3d801e57f224c",
   "files": {
     ".gitignore": {
       "sha256": "ca0e1575efb181d784f15bf6c86e3c012fd5c7ede4daa34b924d0d8b590d4e77",
@@ -28,9 +28,9 @@
       "bytes": 31055
     },
     "app/Assistant.tsx": {
-      "sha256": "b37a3c8a3dba7f8562701478196275344c16e8f363cc9a3a9d4f98e8649a1fc5",
+      "sha256": "fa60d05f190b3010a2ec9743fa6b5b4974c8ec4883b7d861a489ab51c680ceb0",
       "mode": "100644",
-      "bytes": 106745
+      "bytes": 106799
     },
     "app/AssistantChrome.tsx": {
       "sha256": "646f7d5b632c03c97792d5518948dca4aeeb51dcc67b09052110ca2e6a6291cc",
@@ -78,9 +78,9 @@
       "bytes": 2053
     },
     "app/AssistantProcess.tsx": {
-      "sha256": "b9820c7604d50c21eef313c0d984a143e7df9e00fe8e81c8d05bfe0efa2c03dc",
+      "sha256": "b000f5af0d5ef8916fadba136e0e0f9687a6bf3d4c2fd08897f76f870c2a13c9",
       "mode": "100644",
-      "bytes": 18283
+      "bytes": 20950
     },
     "app/AssistantResearch.tsx": {
       "sha256": "edd936dab8fc1ed094d5743e8a4946158a0fdde4a04aaea71ec7473eab34beec",
@@ -253,9 +253,9 @@
       "bytes": 1644
     },
     "app/assistant.css": {
-      "sha256": "42ba6d87211bf375cc9001946feb9ef3dedbd6afcfc54bc27ffce58154780d20",
+      "sha256": "64dce3028f0d9252e7b5dbc088e278315dd96766c2a9286527d0c365e9bc26da",
       "mode": "100644",
-      "bytes": 65916
+      "bytes": 66721
     },
     "app/calendar-period.ts": {
       "sha256": "fb67e7bd1f4e04ccfd14ffb7ef8bb59fb448b0ed2080a698e9b331fe12b1224d",
@@ -1343,5 +1343,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-20T15:40:51.052315+00:00"
+  "imported_at": "2026-11-20T17:03:05.801635+00:00"
 }

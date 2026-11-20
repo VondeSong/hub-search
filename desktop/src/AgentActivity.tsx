@@ -1,4 +1,5 @@
 import { publicWebHref } from "./AgentWebSources";
+import { invoke } from "@tauri-apps/api/core";
 import { createContext, memo, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Ellipsis, TriangleAlert } from "lucide-react";
 import { ActivityIcon, ActivityIdentity, WebsiteIcon, activityLabel, activityOperation, activityServiceTitle, operationLabels, type ActivityOperation } from "./AgentActivityIdentity";
@@ -7,8 +8,10 @@ import remarkGfm from "remark-gfm";
 import { AgentToolResult, type ToolResultRef, type ToolResultScope } from "./AgentToolResult";
 
 type ActivitySource = {url:string;title?:string|null;query?:string|null};
-export type ActivityEvent = { id: string; sequence?:number; updatedAt?:number; operation?:string|null; serviceId?:string|null; serviceTitle?:string|null; toolName?:string|null; agentIds?:string[]|null; agentStates?:Record<string,{status:string}>|null; origin?:string; truncated?:boolean; kind: "answer" | "context" | "message" | "reasoning" | "plan" | "unpublishedAnswer" | "webSearch" | "skill" | "tool" | "status"; state: string; label: string; detail?: string | null; url?:string|null; actionId?: string; resultRef?: ToolResultRef; readSpan?: {title:string;start:number;end:number;total:number}; createdAt: number; finishedAt?: number; exitCode?:number|null; action?:string|null; queries?:string[]|null; pattern?:string|null; sourceRefs?:ActivitySource[]|null; resultCount?:number|null; errorCount?:number|null; errors?:{refId:string;url?:string|null;reason?:string|null}[]|null; omittedSourceCount?:number|null };
-export type ActivityRun = { workId?:string;currentWorkRevision?:number;authorizationVersion?:number;runId: string; revision: number; state: string; running: boolean; native?:boolean; capabilities?:{externalTools?:{server:string;tools:string[];writeRepository?:string|null}[];webSearch?:string;nativeCapabilities?:{workspace:boolean;multiAgent:boolean}}|null; measurement?:{turnTokens?:{inputTokens?:number|null;cachedInputTokens?:number|null;uncachedInputTokens?:number|null;outputTokens?:number|null}}; canSteer?:boolean; startedAt: number; finishedAt?: number | null; steps: number; events: ActivityEvent[]; validity?: string };
+type PatchPreview = {patch?:string|null;truncated?:boolean; added?:number|null; removed?:number|null};
+type FileChange = PatchPreview & {path:string};
+export type ActivityEvent = { id: string; sequence?:number; updatedAt?:number; operation?:string|null; serviceId?:string|null; serviceTitle?:string|null; toolName?:string|null; agentIds?:string[]|null; agentStates?:Record<string,{status:string}>|null; origin?:string; truncated?:boolean; kind: "answer" | "context" | "message" | "reasoning" | "plan" | "unpublishedAnswer" | "webSearch" | "skill" | "tool" | "status"; state: string; label: string; detail?: string | null; url?:string|null; actionId?: string; resultRef?: ToolResultRef; readSpan?: {title:string;start:number;end:number;total:number}; createdAt: number; finishedAt?: number; exitCode?:number|null; commandOutput?:string|null; outputTruncated?:boolean; fileChanges?:FileChange[]|null; imageCount?:number; action?:string|null; queries?:string[]|null; pattern?:string|null; sourceRefs?:ActivitySource[]|null; resultCount?:number|null; errorCount?:number|null; errors?:{refId:string;url?:string|null;reason?:string|null}[]|null; omittedSourceCount?:number|null };
+export type ActivityRun = { workId?:string;currentWorkRevision?:number;authorizationVersion?:number;runId: string; revision: number; state: string; running: boolean; native?:boolean; capabilities?:{externalTools?:{server:string;tools:string[];writeRepository?:string|null}[];webSearch?:string;nativeCapabilities?:{workspace:boolean;multiAgent:boolean}}|null; measurement?:{turnTokens?:{inputTokens?:number|null;cachedInputTokens?:number|null;uncachedInputTokens?:number|null;outputTokens?:number|null}}; canSteer?:boolean; startedAt: number; finishedAt?: number | null; steps: number; events: ActivityEvent[]; workspaceChanges?: (PatchPreview & {files:number})|null; validity?: string };
 
 const DisclosureContext=createContext<Map<string,boolean>|null>(null);
 const FollowConversationContext = createContext<(() => boolean) | undefined>(undefined);
@@ -136,11 +139,13 @@ function eventStateLabel(event:ActivityEvent) {
   return ({failed:"未完成",running:"进行中",interrupted:"已中断",queued:"等待执行"} as Record<string,string>)[event.state] ?? "";
 }
 
-function RecordedToolActivity({event, resultRef, scope}: {event:ActivityEvent;resultRef:ToolResultRef;scope:ToolResultScope}) {
-  const [open,setOpen]=useState(false);
+function RecordedToolActivity({event, resultRef, scope, runId}: {event:ActivityEvent;resultRef:ToolResultRef;scope:ToolResultScope;runId:string}) {
+  const [open,setOpen]=useActivityDisclosure(`tool:${runId}:${event.id}`,false);
+  const [technicalOpen,setTechnicalOpen]=useActivityDisclosure(`technical:${runId}:${event.id}`,false);
+  const [scriptOpen,setScriptOpen]=useActivityDisclosure(`script:${runId}:${event.id}`,false);
   const duration=eventDuration(event);
   return <div className={`agent-activity-step agent-step-${event.state}`}>
-    <details className="agent-tool-activity agent-script-step" onToggle={change=>setOpen(change.currentTarget.open)}>
+    <details className="agent-tool-activity agent-script-step" open={open} onToggle={change=>setOpen(change.currentTarget.open)}>
       <summary title={event.label}>
         <ActivityIcon event={event}/>
         <span className="agent-script-label">{event.label}</span>
@@ -151,13 +156,94 @@ function RecordedToolActivity({event, resultRef, scope}: {event:ActivityEvent;re
       {open && <>
         {event.detail && event.detail!=="脚本执行成功" && <p>{event.detail}</p>}
         {event.toolName && event.toolName!==event.label && <p className="agent-note">工具 · {event.toolName}</p>}
-        <AgentToolResult value={resultRef} scope={scope} embedded scriptState={["analyzeFiles","compute"].includes(event.operation??"") ? event.state : undefined}/>
+        <AgentToolResult value={resultRef} scope={scope} embedded scriptState={["analyzeFiles","compute"].includes(event.operation??"") ? event.state : undefined}
+          disclosure={{technicalOpen,setTechnicalOpen,scriptOpen,setScriptOpen}}/>
       </>}
     </details>
   </div>;
 }
 
+function PatchDetails({stateKey,title,value,children}: {stateKey:string;title:string;value:PatchPreview;children?:ReactNode}) {
+  const [open,setOpen]=useActivityDisclosure(stateKey,false);
+  let previous=0, next=0, inHunk=false;
+  return <details className="agent-technical-record agent-patch-details" open={open} onToggle={event=>setOpen(event.currentTarget.open)}>
+    <summary>{title}{value.added!=null && value.removed!=null && <small className="agent-patch-counts"><span>+{value.added}</span> <span>−{value.removed}</span></small>}</summary>
+    {open && <>
+      {value.patch ? <pre className="agent-receipt-text agent-patch" aria-label="文件差异" tabIndex={0}><code>{value.patch.replace(/\r?\n$/,"").split(/\r?\n/).map((line,index)=>{
+        const head=line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+        if (head) [previous,next,inHunk]=[Number(head[1]),Number(head[2]),true];
+        if (line.startsWith("diff --git ")) inHunk=false;
+        const added=inHunk && line.startsWith("+"), removed=inHunk && line.startsWith("-"), context=inHunk && line.startsWith(" ");
+        return <span key={index} className={added ? "agent-patch-added" : removed ? "agent-patch-removed" : undefined}>
+          <span className="agent-patch-number" aria-hidden="true">{removed || context ? previous++ : ""}</span><span className="agent-patch-number" aria-hidden="true">{added || context ? next++ : ""}</span>{line}{"\n"}
+        </span>;
+      })}</code></pre> : <p className="agent-note">这条回执未保留可显示的差异。</p>}
+      {value.truncated && <p className="agent-note">仅显示差异预览，完整内容超出保留范围。</p>}
+      {children}
+    </>}
+  </details>;
+}
+
+function ReceiptFile({sequence,index,runId,scope}: {sequence:number;index:number;runId:string;scope:ToolResultScope}) {
+  const [file,setFile]=useState<{title:string;content:string;truncated:boolean}|null>(null);
+  const [status,setStatus]=useState("");
+  const opener=useRef<HTMLButtonElement>(null);
+  const dialog=useRef<HTMLDialogElement>(null);
+  const request=useRef(0);
+  const {workId,currentWorkRevision,authorizationVersion}=scope;
+  useEffect(()=>()=>{request.current++;if(dialog.current?.open)dialog.current.close();},[workId,currentWorkRevision,authorizationVersion,runId,sequence,index]);
+  async function openFile() {
+    const job=++request.current;
+    setFile(null);setStatus("正在读取当前工作区文件…");dialog.current?.showModal();
+    try {
+      const preview=await invoke<NonNullable<typeof file>>("agent_investigation",{args:{action:"activityFilePreview",id:workId,runId,sequence,index,
+        expectedWorkRevision:currentWorkRevision,expectedAuthorizationVersion:authorizationVersion}});
+      if (request.current===job) {setFile(preview);setStatus("");}
+    } catch {
+      if (request.current===job) setStatus("当前文件无法预览，历史差异仍可回看。");
+    }
+  }
+  return <>
+    <button ref={opener} type="button" className="agent-receipt-open-file" onClick={()=>void openFile()}>查看当前文件</button>
+    <dialog ref={dialog} className="agent-receipt-dialog agent-file-receipt" aria-label="当前工作区文件"
+      onKeyDown={event=>{if(event.key==="Escape")event.stopPropagation();}}
+      onClose={()=>{request.current++;opener.current?.focus();}}>
+      <form method="dialog"><button type="submit">关闭文件</button></form>
+      {status && <p role="status">{status}</p>}
+      {file && <><p><strong>{file.title}</strong>{file.truncated && " · 文本预览"}</p><pre className="agent-receipt-text" tabIndex={0} aria-label="当前工作区文件内容">{file.content}</pre></>}
+    </dialog>
+  </>;
+}
+
+function ReceiptImage({sequence,index,runId,scope}: {sequence:number;index:number;runId:string;scope:ToolResultScope}) {
+  const [image,setImage]=useState<{title:string;url:string}|null>(null);
+  const [error,setError]=useState(false);
+  const thumbnail=useRef<HTMLButtonElement>(null);
+  const dialog=useRef<HTMLDialogElement>(null);
+  const {workId,currentWorkRevision,authorizationVersion}=scope;
+  useEffect(()=>{
+    let current=true;
+    if(dialog.current?.open)dialog.current.close();
+    setImage(null);setError(false);
+    void invoke<{title:string;url:string}>("agent_investigation",{args:{action:"activityImagePreview",id:workId,runId,sequence,index,
+      expectedWorkRevision:currentWorkRevision,expectedAuthorizationVersion:authorizationVersion}})
+      .then(result=>{if(current)setImage(result);},()=>{if(current)setError(true);});
+    return ()=>{current=false;};
+  },[workId,runId,sequence,index,currentWorkRevision,authorizationVersion]);
+  if (!image) return <p className="agent-note" role="status">{error ? "这张图像暂不可回读，来源或授权可能已变化。" : "正在读取图像预览…"}</p>;
+  return <>
+    <button className="agent-receipt-thumbnail" ref={thumbnail} type="button" aria-label={`放大 ${image.title}`} onClick={()=>dialog.current?.showModal()}><img src={image.url} alt={image.title}/></button>
+    <dialog className="agent-receipt-dialog" ref={dialog} aria-label={image.title}
+      onKeyDown={event=>{if(event.key==="Escape")event.stopPropagation();}}
+      onClose={()=>thumbnail.current?.focus()}>
+      <form method="dialog"><button type="submit">关闭图片</button></form><img src={image.url} alt={image.title}/>
+    </dialog>
+  </>;
+}
+
 function ActivityEventView({ event, scope, runId }: { event: ActivityEvent; scope: ToolResultScope | null; runId:string }) {
+  const [detailOpen,setDetailOpen]=useActivityDisclosure(`detail:${runId}:${event.id}`,false);
+  const [commandOpen,setCommandOpen]=useActivityDisclosure(`command:${runId}:${event.id}`,false);
   const span=event.readSpan;
   event={
     ...event,
@@ -168,10 +254,16 @@ function ActivityEventView({ event, scope, runId }: { event: ActivityEvent; scop
   if (event.kind === "unpublishedAnswer") return <UnpublishedAnswer text={event.label} truncated={event.truncated}/>;
   if (event.kind === "webSearch") return <WebActivity event={event} runId={runId} workId={scope?.workId}/>;
   if (event.kind==="tool" && (event.operation || event.toolName) && !event.agentIds?.length && event.resultRef && scope) {
-    return <RecordedToolActivity event={event} resultRef={event.resultRef} scope={scope}/>;
+    return <RecordedToolActivity event={event} resultRef={event.resultRef} scope={scope} runId={runId}/>;
   }
   if (event.kind === "plan") return <details className="agent-reasoning"><summary>工作计划<ChevronDown className="agent-reasoning-chevron" size={13} aria-hidden="true"/></summary><div><PublicText text={event.label}/></div></details>;
-  if (event.kind === "context") return <div className="agent-activity-step agent-context-event"><ActivityIcon event={event}/>{event.detail ? <details><summary>{event.label}</summary><p>{event.detail}</p></details> : <span>{event.label}</span>}</div>;
+  if (event.operation==="imageInput" || event.operation==="viewImage") return <div className="agent-activity-step agent-context-event">
+    <ActivityIcon event={event}/><details open={detailOpen} onToggle={change=>setDetailOpen(change.currentTarget.open)}>
+      <summary>{event.label}<ChevronDown className="agent-reasoning-chevron" size={12} aria-hidden="true"/></summary>
+      {detailOpen && (scope && event.imageCount && event.sequence!=null ? <div className="agent-receipt-thumbnails">{Array.from({length:event.imageCount},(_,index)=><ReceiptImage key={index} sequence={event.sequence!} index={index} runId={runId} scope={scope}/>)}</div>
+        : <p className="agent-note">这条回执没有可回读的图像引用。</p>)}
+    </details></div>;
+  if (event.kind === "context") return <div className="agent-activity-step agent-context-event"><ActivityIcon event={event}/>{event.detail ? <details open={detailOpen} onToggle={change=>setDetailOpen(change.currentTarget.open)}><summary>{event.label}</summary><p>{event.detail}</p></details> : <span>{event.label}</span>}</div>;
   if (event.kind === "message") return <div className="agent-commentary"><PublicText text={event.label}/></div>;
   if(event.kind==="status") {
     const label=(event.state==="failed"?"未完成：":event.state==="interrupted"?"已中断：":"")+event.label;
@@ -190,12 +282,19 @@ function ActivityEventView({ event, scope, runId }: { event: ActivityEvent; scop
   const exitLine = command && Number.isInteger(event.exitCode) ? `退出码 ${event.exitCode}` : undefined;
   return <div className={"agent-activity-step agent-step-" + event.state}>
     <ActivityIcon event={event}/><ActivityIdentity events={[event]} workId={scope?.workId} primaryIcon={event}/>
-    <div>{event.detail || rawTool || event.agentIds?.length || (event.resultRef && scope) || event.label.length>72 ? <details className="agent-tool-activity">
+    <div>{command || event.fileChanges?.length || event.detail || rawTool || event.agentIds?.length || (event.resultRef && scope) || event.label.length>72 ? <details className="agent-tool-activity" open={detailOpen} onToggle={change=>setDetailOpen(change.currentTarget.open)}>
       <summary title={event.label}><span>{event.label}</span>{eventDuration(event)&&<small className="agent-operation-duration">{eventDuration(event)}</small>}{eventStateLabel(event)&&<span className="agent-step-state">{eventStateLabel(event)}</span>}<ChevronDown size={12} className="agent-reasoning-chevron" aria-hidden="true"/></summary>
       {event.label.length>72 && <p>{event.label}</p>}
       {rawTool && <p className="agent-note">工具 · {rawTool}</p>}
-      {exitLine && <p className="agent-script-status">{exitLine}</p>}
-      {event.detail && (command ? <details className="agent-technical-record"><summary>查看命令</summary><pre>{exitLine && event.detail.endsWith("\n"+exitLine) ? event.detail.slice(0,-exitLine.length).trimEnd() : event.detail}</pre></details> : <p>{event.detail}</p>)}
+      {command && <>
+        <p className="agent-script-status">{event.state==="completed" ? "执行完成" : eventStateLabel(event)}{exitLine && ` · ${exitLine}`}</p>
+        {event.commandOutput && <pre className="agent-receipt-text" tabIndex={0} aria-label={event.state==="running" ? "当前命令输出" : "命令输出"}><code>{event.commandOutput}</code></pre>}
+        {event.outputTruncated || event.truncated && event.commandOutput ? <p className="agent-note">命令输出为截断预览。</p> : !event.commandOutput && event.state!=="running" && <p className="agent-note">这条回执未保留命令输出。</p>}
+      </>}
+      {event.fileChanges?.length ? event.fileChanges.map((file,index)=><PatchDetails key={index} stateKey={`patch:${runId}:${event.id}:${index}`} title={file.path} value={file}>
+        {scope && event.sequence!=null && <ReceiptFile sequence={event.sequence} index={index} runId={runId} scope={scope}/>}
+      </PatchDetails>)
+        : event.detail && (command ? <details className="agent-technical-record" open={commandOpen} onToggle={change=>setCommandOpen(change.currentTarget.open)}><summary>查看命令</summary><pre>{exitLine && event.detail.endsWith("\n"+exitLine) ? event.detail.slice(0,-exitLine.length).trimEnd() : event.detail}</pre></details> : <p>{event.detail}</p>)}
       {!!event.agentIds?.length&&<ul aria-label="子代理状态">{event.agentIds.map(id=><li key={id}>{id.slice(-6)} · {({running:"进行中",completed:"已结束",failed:"未完成",errored:"未完成",interrupted:"已中断",pendingInit:"正在启动",shutdown:"已关闭"} as Record<string,string>)[event.agentStates?.[id]?.status??""]||"状态待核验"}</li>)}</ul>}
       {event.resultRef && scope && <AgentToolResult value={event.resultRef} scope={scope}/>}
     </details> : <span>{event.label}{eventStateLabel(event)&&<span className="agent-step-state"> · {eventStateLabel(event)}</span>}{eventDuration(event)&&<small className="agent-operation-duration">{eventDuration(event)}</small>}</span>}</div>
@@ -363,7 +462,7 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
 }
 function ActivityTimeline({events,scope,running,segmented,settled,runId}:{events:ActivityEvent[];scope:ToolResultScope|null;running:boolean;segmented:boolean;settled:boolean;runId:string}) {
   const groups:ActivityEvent[][]=[];
-  const boundary=(event:ActivityEvent)=>!isOperation(event) && !isCodexSummary(event);
+  const boundary=(event:ActivityEvent)=>event.operation==="imageInput" || event.operation==="viewImage" || !isOperation(event) && !isCodexSummary(event);
   for(const event of events){
     const previous=groups[groups.length-1];
     if(!boundary(event)&&previous&&!boundary(previous[0]))previous.push(event);
@@ -458,6 +557,7 @@ export function AgentActivity({ value, onRecheck, requestText }: { value: Activi
   const clippedProgress=processEvents.filter(event=>["message","reasoning","plan"].includes(event.kind));
   const clippingInText=clippedProgress.some(event=>event.label.trimEnd().endsWith(progressClippingNotice));
   const clipped=clippingInText || clippedProgress.some(event=>event.truncated);
+  const workspace = !value.validity && value.workspaceChanges?.files ? value.workspaceChanges : undefined;
   const timeControl = canDisclose ? <button type="button" className="agent-activity-toggle" title={processOpen ? "收起工作过程" : "展开工作过程"} aria-expanded={processOpen} aria-controls={processOpen ? detailsId : undefined} onClick={()=>{
     if (hasTimeline) {
       setReviewing(true);
@@ -491,5 +591,6 @@ export function AgentActivity({ value, onRecheck, requestText }: { value: Activi
     {clipped && (!expanded || !clippingInText) && <p className="agent-note" role="status" aria-label="过程显示限制">过程消息超过显示上限，后续内容未展示。</p>}
     {!expanded && unpublished && <ActivityEventView event={unpublished} scope={null} runId={value.runId}/>}
     {value.running && answer && <div className="agent-report agent-answer agent-native-answer" aria-label="正在生成回答" aria-busy="true">{answer.origin==="deepseek"&&<p className="agent-note">{answer.truncated?"回答预览已达显示上限，仍在接收；完整回答核验后交付":"回答预览 · 完整接收并核验后交付"}</p>}<PublicText text={answer.label}/></div>}
+    {workspace && <PatchDetails stateKey={`workspace:${value.runId}`} title={`本轮文件变更 · ${workspace.files} 个文件`} value={workspace}/>}
   </section>;
 }

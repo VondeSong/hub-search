@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useRef,useState} from 'react';
-import {AppWindow,BookOpen,Check,ChevronDown,FilePenLine,FileText,FolderOpen,Globe2,MessagesSquare,Search,SquareTerminal as Terminal,TriangleAlert} from 'lucide-react';
+import {AppWindow,BookOpen,Check,ChevronDown,FilePenLine,FileText,FolderOpen,Globe2,Images,MessagesSquare,Search,SquareTerminal as Terminal,TriangleAlert} from 'lucide-react';
 
 const examples = [
   ['timeline', '同题回放'],
@@ -8,6 +8,7 @@ const examples = [
   ['read', '读取与恢复'],
   ['web', '网页检索'],
   ['tools', '浏览器与应用'],
+  ['receipts', '文件与图像'],
   ['script', '脚本检查'],
   ['files', '分批分析'],
 ] as const;
@@ -106,6 +107,39 @@ function MixedToolExample() {
   </div>;
 }
 
+function WorkspaceReceiptsExample() {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const thumbnail = useRef<HTMLButtonElement>(null);
+  return <div className="ha-replay-body">
+    <p className="ha-process-meta">工作区回执示例</p>
+    <details className="ha-replay-process" open>
+      <summary>用时 34 秒<ChevronDown size={13} aria-hidden="true"/></summary>
+      <p>先检查配置，再回读预览。</p>
+      <ProcessGroup title="编辑了文件、运行了命令、查看了图像" icon={FilePenLine}>
+        {[['compact: false', 'compact: true'], ['compact: true', 'compact: auto']].map(([before, after], index) => <details className="ha-process-batch" key={after}>
+          <summary><FilePenLine size={15} aria-hidden="true"/>编辑 settings.yml · 第 {index + 1} 次<ChevronDown size={12} aria-hidden="true"/></summary>
+          <details className="ha-receipt-diff"><summary>config/settings.yml · +1 −1</summary><pre tabIndex={0} aria-label="文件差异"><span className="ha-diff-deleted">- {before}</span>{'\n'}<span className="ha-diff-added">+ {after}</span></pre></details>
+        </details>)}
+        <details className="ha-process-batch">
+          <summary><Terminal size={15} aria-hidden="true"/>运行了配置检查<ChevronDown size={12} aria-hidden="true"/></summary>
+          <p className="ha-script-status">执行成功 · 退出码 0</p>
+          <div className="ha-script-region"><pre tabIndex={0} aria-label="命令输出">已读取配置。检查通过。</pre></div>
+        </details>
+        <details className="ha-process-batch">
+          <summary><Images size={15} aria-hidden="true"/>已查看 1 张图像<ChevronDown size={12} aria-hidden="true"/></summary>
+          <button ref={thumbnail} type="button" className="ha-receipt-thumbnail" onClick={() => dialog.current?.showModal()} aria-label="放大工作台预览"><img src="/hub-workspace-preview.jpg" alt="工作台预览"/></button>
+        </details>
+      </ProcessGroup>
+      <p>配置已通过检查，预览已回读。</p>
+    </details>
+    <p>配置文件已更新，并已核对预览。</p>
+    <details className="ha-process-permissions"><summary>本轮文件变更 · 1 个文件 · +1 −1</summary><p>config/settings.yml</p></details>
+    <dialog ref={dialog} className="ha-receipt-dialog" aria-label="工作台预览" onClose={() => thumbnail.current?.focus()}>
+      <form method="dialog"><button type="submit">关闭图片</button></form><img src="/hub-workspace-preview.jpg" alt="工作台预览"/>
+    </dialog>
+  </div>;
+}
+
 function AttachmentReplay() {
   const [step,setStep] = useState(0);
   const [playing,setPlaying] = useState(true);
@@ -185,6 +219,7 @@ export function AssistantProcessDemo({onClose}: {onClose: () => void}) {
       </>}
       {scenario === 'web' && <AssistantProcess webEnabled seconds={36}/>}
       {scenario === 'tools' && <MixedToolExample/>}
+      {scenario === 'receipts' && <WorkspaceReceiptsExample/>}
       {scenario === 'script' && <>
         <p className="ha-process-commentary">先读取附件的文件头，确认格式和架构。</p>
         <ProcessGroup title="已使用 Python 检查附件格式和架构" icon={Terminal}>

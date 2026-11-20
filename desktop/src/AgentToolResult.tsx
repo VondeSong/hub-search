@@ -39,7 +39,8 @@ function RecordText({page}: {page:Page}) {
     }) : text}</pre></div>;
 }
 
-export function AgentToolResult({ value, scope, scriptState, embedded=false }: { value: ToolResultRef; scope: ToolResultScope; scriptState?:string; embedded?:boolean }) {
+type ReceiptDisclosure = { technicalOpen:boolean; setTechnicalOpen:(open:boolean)=>void; scriptOpen:boolean; setScriptOpen:(open:boolean)=>void };
+export function AgentToolResult({ value, scope, scriptState, embedded=false, disclosure }: { value: ToolResultRef; scope: ToolResultScope; scriptState?:string; embedded?:boolean; disclosure?:ReceiptDisclosure }) {
   const inlineScript=scriptState!==undefined;
   const inline=embedded || inlineScript;
   const identity=JSON.stringify([scope.workId,scope.currentWorkRevision,scope.authorizationVersion,value.recordId,value.sha256]);
@@ -49,10 +50,12 @@ export function AgentToolResult({ value, scope, scriptState, embedded=false }: {
   const [result,setResult]=useState<{identity:string;page:Page}|null>(null);
   const [scriptResult,setScriptResult]=useState<{identity:string;preview?:ScriptPreview}|null>(null);
   const [busy,setBusy]=useState(false), [error,setError]=useState("");
-  const [technical,setTechnical]=useState(false);
+  const [localTechnical,setLocalTechnical]=useState(false);
+  const technical=disclosure?.technicalOpen ?? localTechnical;
+  const setTechnical=disclosure?.setTechnicalOpen ?? setLocalTechnical;
   useEffect(()=>{
     job.current++;
-    setShown(null);setResult(null);setScriptResult(null);setBusy(false);setError("");setTechnical(false);
+    setShown(null);setResult(null);setScriptResult(null);setBusy(false);setError("");setLocalTechnical(false);
     if(inline) void read(0);
   },[identity,inline,inlineScript]);
   useEffect(()=>()=>{job.current++;},[]);
@@ -99,7 +102,7 @@ export function AgentToolResult({ value, scope, scriptState, embedded=false }: {
         {scriptStatus && <p className="agent-script-status">{scriptStatus}{script?.exitCode!=null ? ` · 退出码 ${script.exitCode}` : ""}</p>}
         <div className="agent-transcript" role="region" aria-label="脚本与输出" tabIndex={0}>
           {script?.output && <ScriptBlock title="输出" text={script.output} output/>}
-          {script?.script && <details className="agent-technical-record">
+          {script?.script && <details className="agent-technical-record" open={disclosure?.scriptOpen} onToggle={event=>disclosure?.setScriptOpen(event.currentTarget.open)}>
             <summary>查看 {script.language} 脚本</summary><ScriptBlock title={script.language} text={script.script}/>
           </details>}
         </div>
