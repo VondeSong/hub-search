@@ -96,15 +96,17 @@ export function AgentToolResult({ value, scope, scriptState, embedded=false }: {
       {busy && !scriptLoaded && <p role="status">正在核对记录与授权…</p>}
       {error && <p role="alert">{error}</p>}
       {inlineScript && scriptLoaded && <div className="agent-script-result">
-        <div className="agent-transcript" role="region" aria-label="脚本与输出" tabIndex={0}>
-        {script?.script ? <ScriptBlock title={script.language} text={script.script}/> : <p>这条记录没有可显示的脚本正文。</p>}
-        {script?.output && <ScriptBlock title="输出" text={script.output} output/>}
-        </div>
         {scriptStatus && <p className="agent-script-status">{scriptStatus}{script?.exitCode!=null ? ` · 退出码 ${script.exitCode}` : ""}</p>}
+        <div className="agent-transcript" role="region" aria-label="脚本与输出" tabIndex={0}>
+          {script?.output && <ScriptBlock title="输出" text={script.output} output/>}
+          {script?.script && <details className="agent-technical-record">
+            <summary>查看 {script.language} 脚本</summary><ScriptBlock title={script.language} text={script.script}/>
+          </details>}
+        </div>
       </div>}
       {page?.sourcePreview && <div aria-label="读取的原文片段"><strong>{page.sourcePreview.title || "原文片段"}</strong><p style={{whiteSpace:"pre-wrap"}}>{page.sourcePreview.content}</p><p className="agent-note">本次读取片段 {page.sourcePreview.totalChars} 字符{page.sourcePreview.truncated ? "，预览前 4000 字符；完整记录见技术详情" : ""}</p></div>}
       {page?.methodPreview && <div aria-label="读取的技能说明"><strong>{page.methodPreview.title || "技能说明"}</strong><p className="agent-note">本次读取的方法说明，不是资料来源，也不代表已核对事实。</p><ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={{img:()=>null,a:({children})=><span>{children}</span>}}>{page.methodPreview.content}</ReactMarkdown>{page.methodPreview.truncated && <p className="agent-note">预览前 4000 字符；完整说明见技术详情。</p>}</div>}
-      {inline ? record : (page || technical && busy) && <details className="agent-technical-record" open={technical} onToggle={event=>setTechnical(event.currentTarget.open)}>
+      {(page || technical && busy) && <details className="agent-technical-record" open={technical} onToggle={event=>setTechnical(event.currentTarget.open)}>
         <summary>技术记录</summary>{technical && record}
       </details>}
       {error && <button type="button" disabled={busy} onClick={()=>void read(0)}>重新核对记录</button>}

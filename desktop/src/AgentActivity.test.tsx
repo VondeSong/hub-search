@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { AgentActivity, type ActivityRun } from "./AgentActivity";
+import { ActivityDisclosureProvider, AgentActivity, type ActivityRun } from "./AgentActivity";
 import { AgentConversation, type Conversation, type Report } from "./AgentDelivery";
 
 let host:HTMLDivElement,root:Root;
@@ -43,17 +43,79 @@ it("shows connected operations and permissions without opening the underlying re
  await expandProcess();
  expect(host.querySelector(".agent-activity-toggle")?.textContent).toMatch(/^用时 /);
  expect(host.querySelector(".agent-operation-group")).toBeNull();
- const step=host.querySelector<HTMLDetailsElement>(".agent-tool-activity")!;
- expect(step.querySelector("summary")?.textContent).toContain("browser_navigate");
+ const step=[...host.querySelectorAll<HTMLDetailsElement>(".agent-tool-activity")].find(element=>element.querySelector("summary")?.textContent?.includes("打开网页"))!;
+ expect(step.querySelector("summary")?.textContent).toContain("打开网页");
  await act(async()=>step.querySelector("summary")!.click());
  expect(step.open).toBe(true);
  expect(step.textContent).toContain("已打开 · developers.openai.com/plugins/concepts/skills");
+ expect(step.textContent).toContain("工具 · browser_navigate");
  expect(host.querySelector(".agent-runtime-details")).toBeNull();
  await act(async()=>host.querySelector<HTMLButtonElement>(".agent-runtime-toggle")!.click());
  const settings=host.querySelector(".agent-runtime-details")!;
  expect(settings.textContent).toContain("内置网页搜索 · 关闭");
  expect(settings.textContent).toContain("GitHub · 读取议题、准备评论草稿");
  expect(settings.textContent).toContain("独立浏览器 · https://developers.openai.com");
+});
+
+it("shows the query in the closed row and only attributes explicit matches",async()=>{
+ const event:ActivityRun["events"][number]={
+  id:"search-with-sources",kind:"webSearch",action:"search",state:"completed",label:"搜索网页",createdAt:2100,
+  queries:["第一条问题","第二条问题"],sourceRefs:[
+   {url:"https://example.org/from-second",title:"第二条的结果",query:"第二条问题"},
+   {url:"https://example.com/batch",title:'<table id="e1">'},
+   {url:"https://example.net/unknown",title:"来源归属未知",query:"第三条问题"},
+  ],
+ };
+ await act(async()=>root.render(<AgentActivity value={{...run,events:[event]}}/>));
+ const group=host.querySelector<HTMLDetailsElement>(".agent-operation-group")!;
+ await act(async()=>group.querySelector("summary")!.click());
+ const batch=group.querySelector<HTMLDetailsElement>(".agent-web-activity")!;
+ expect(batch.open).toBe(false);
+ expect(batch.querySelector("summary")?.textContent).toBe("搜索网页 · 第一条问题另 1 条查询");
+ await act(async()=>batch.querySelector("summary")!.click());
+ const queries=[...batch.querySelectorAll(".agent-web-queries > li")];
+ expect(queries[0].querySelector("a")).toBeNull();
+ expect(queries[1].querySelector("a")?.getAttribute("href")).toBe("https://example.org/from-second");
+ const unassigned=batch.querySelector('[aria-label="本批返回的来源"]')!;
+ expect(unassigned.closest("details")?.querySelector("summary")?.textContent).toBe("本批来源 · 2");
+ expect(unassigned.querySelector("a")?.textContent).toBe("example.com");
+ expect(unassigned.textContent).toContain("来源归属未知");
+ await act(async()=>root.render(<AgentActivity value={{...run,events:[{...event,queries:["第二条问题"]}]}}/>));
+ expect(batch.querySelectorAll(".agent-web-queries a")).toHaveLength(3);
+ expect(batch.querySelector('[aria-label="本批返回的来源"]')).toBeNull();
+});
+
+it("puts a recorded exit code above the closed native command",async()=>{
+ const command:ActivityRun["events"][number]={id:"cmd",kind:"tool",operation:"command",origin:"codex-native",
+  state:"failed",label:"运行工作区命令",detail:"git status --short\n退出码 9",exitCode:9,createdAt:2100};
+ await act(async()=>root.render(<AgentActivity value={{...run,native:true,events:[command]}}/>));
+ await act(async()=>host.querySelector<HTMLDetailsElement>(".agent-operation-group")!.querySelector("summary")!.click());
+ const step=host.querySelector<HTMLDetailsElement>(".agent-tool-activity")!;
+ expect(step.querySelector("summary")?.textContent).toContain("运行工作区命令 · git status");
+ expect(step.querySelector(".agent-script-status")?.textContent).toBe("退出码 9");
+ expect(step.querySelector<HTMLDetailsElement>("details")?.open).toBe(false);
+ expect(step.querySelector("pre")?.textContent).toBe("git status --short");
+ await act(async()=>root.render(<AgentActivity value={{...run,native:true,events:[{...command,exitCode:undefined}]}}/>));
+ expect(step.querySelector(".agent-script-status")).toBeNull();
+ expect(step.querySelector("pre")?.textContent).toContain("退出码 9");
+});
+
+it.each(["following","reading above","opened a step"])("decides once at the first answer when %s",async mode=>{
+ const render=(value:ActivityRun)=>act(async()=>root.render(<ActivityDisclosureProvider isFollowing={()=>mode!=="reading above"}>
+   <AgentActivity value={value}/>
+ </ActivityDisclosureProvider>));
+ await render(run);
+ const timer=host.querySelector<HTMLButtonElement>(".agent-activity-toggle")!;
+ const group=host.querySelector<HTMLDetailsElement>(".agent-operation-group")!;
+ if(mode==="opened a step") await act(async()=>group.querySelector("summary")!.click());
+ const firstAnswer={id:"stream-answer",kind:"answer" as const,state:"running",label:"首段答复",createdAt:3000};
+ await render({...run,events:[...run.events,firstAnswer]});
+ expect(timer.getAttribute("aria-expanded")).toBe(mode==="following" ? "false" : "true");
+ if(mode==="opened a step") expect(group.open).toBe(true);
+ if(mode==="following") await act(async()=>timer.click());
+ await render({...run,events:[...run.events,{...firstAnswer,label:"首段答复与增量"}]});
+ expect(timer.getAttribute("aria-expanded")).toBe("true");
+ expect(host.querySelector('[aria-label="正在生成回答"]')?.textContent).toBe("首段答复与增量");
 });
 it("keeps public reasoning visible between collapsed tool groups in chronological order",async()=>{
  const events:ActivityRun['events']=[run.events[1],{id:'reason',kind:'reasoning',state:'running',label:'核对两份来源的差异',createdAt:1750},run.events[2]];

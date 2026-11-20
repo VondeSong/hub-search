@@ -144,8 +144,16 @@ impl Events {
                     else {
                         continue;
                     };
-                    let source =
+                    let mut source =
                         json!({"url":url.to_string(),"title":public_text(&result["title"],200)});
+                    if action == "search" {
+                        if let Some(query) = result["query"]
+                            .as_str()
+                            .filter(|query| queries.contains(query))
+                        {
+                            source["query"] = json!(query);
+                        }
+                    }
                     let size = source.to_string().len();
                     if sources.len() >= 64 || bytes + size > 16_384 {
                         omitted += 1;
@@ -260,6 +268,26 @@ mod tests {
             .receive(&item, true, Mode::Live, "turn")
             .unwrap()
             .is_none());
+    }
+
+    #[test]
+    fn search_result_keeps_only_an_explicit_query_from_its_own_batch() {
+        let item = json!({
+            "id":"query-attribution",
+            "action":{"type":"search","queries":["first","second"]},
+            "results":[
+                {"type":"text_result","url":"https://example.org/a","title":"Valid","query":"second"},
+                {"type":"text_result","url":"https://example.org/b","title":"Unmapped","query":"unknown"},
+                {"type":"text_result","url":"https://example.org/c","title":"No attribution"}
+            ]
+        });
+        let event = Events::default()
+            .receive(&item, true, Mode::Live, "turn")
+            .unwrap()
+            .unwrap();
+        assert_eq!(event["sourceRefs"][0]["query"], "second");
+        assert!(event["sourceRefs"][1].get("query").is_none());
+        assert!(event["sourceRefs"][2].get("query").is_none());
     }
 
     #[test]

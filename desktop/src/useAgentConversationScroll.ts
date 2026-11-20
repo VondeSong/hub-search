@@ -40,5 +40,5 @@ export function useAgentConversationScroll(open: boolean, workId: string | undef
     setShowLatest(!follow.current);
   };
   const holdPosition = () => { follow.current = false; setShowLatest(awayFromLatest()); };
-  return { element, content, showLatest, onScroll, scrollToLatest, holdPosition };
+  return { element, content, showLatest, onScroll, scrollToLatest, holdPosition, isFollowing: () => follow.current };
 }

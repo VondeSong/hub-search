@@ -1,5 +1,5 @@
 "use client";
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {AppWindow,BookOpen,Check,ChevronDown,FilePenLine,FileText,FolderOpen,Globe2,MessagesSquare,Search,SquareTerminal as Terminal,TriangleAlert} from 'lucide-react';
 
 const examples = [
@@ -64,6 +64,24 @@ function ProcessGroup({title, icon: Icon, children}: {
   </details>;
 }
 
+type SearchSource = {domain:string; title?:string; query?:string};
+
+function SearchReceipt({queries, sources}: {queries:string[]; sources:SearchSource[]}) {
+  const title = `搜索网页 · ${queries[0]}${queries.length > 1 ? ` · 另 ${queries.length-1} 条查询` : ''}`;
+  const chips = (items:SearchSource[]) => <ul className="ha-search-sources">{items.map(source=>
+    <li key={source.domain}><a href={`https://${source.domain}`} target="_blank" rel="noreferrer"><Globe2 size={14} aria-hidden="true"/>{source.title && !/^\s*</.test(source.title) ? source.title : source.domain}</a></li>
+  )}</ul>;
+  const batch = queries.length === 1 ? [] : sources.filter(source => !queries.includes(source.query ?? ''));
+  return <details className="ha-process-batch">
+    <summary title={title}><Search size={15} aria-hidden="true"/><span className="ha-process-label">{title}</span><ChevronDown size={12} aria-hidden="true"/></summary>
+    {queries.map(query => {
+      const matches = queries.length === 1 ? sources : sources.filter(source => source.query === query);
+      return <div key={query}><p>{query}</p>{matches.length > 0 && chips(matches)}</div>;
+    })}
+    {batch.length > 0 && <details open><summary>本批来源 · {batch.length} 项</summary>{chips(batch)}</details>}
+  </details>;
+}
+
 function MixedToolExample() {
   const orderedKinds = Object.keys(toolKinds) as (keyof typeof toolKinds)[];
   const kinds = orderedKinds.filter(kind => toolSteps.some(step => step.kind === kind));
@@ -93,9 +111,18 @@ function AttachmentReplay() {
   const [playing,setPlaying] = useState(true);
   const [revision,setRevision] = useState(0);
   const [processOpen,setProcessOpen] = useState(true);
+  const review = useRef(false);
+  const replay = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!playing || step === 5) return;
-    const timer = window.setTimeout(() => setStep(value => value + 1), step === 0 ? 2400 : 3200);
+    const timer = window.setTimeout(() => {
+      if (step === 3) {
+        const viewport = replay.current?.closest('.ha-messages');
+        const following = !viewport || viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 80;
+        if (following && !review.current) setProcessOpen(false);
+      }
+      setStep(value => value + 1);
+    }, step === 0 ? 2400 : 3200);
     return () => window.clearTimeout(timer);
   }, [step,playing,revision]);
   const seconds = step === 0 ? 0 : Math.round((2400 + (step - 1) * 3200) / 1000);
@@ -104,9 +131,11 @@ function AttachmentReplay() {
     <div className="ha-replay-toolbar">
       <span>附件分析 · 录屏回放示例</span>
       {step < 5 && <button type="button" onClick={() => setPlaying(value => !value)}>{playing ? '暂停回放' : '继续回放'}</button>}
-      <button type="button" onClick={() => { setRevision(value => value+1); setStep(0); setPlaying(true); setProcessOpen(true); }}>重播</button>
+      <button type="button" onClick={() => { review.current = false; setRevision(value => value+1); setStep(0); setPlaying(true); setProcessOpen(true); }}>重播</button>
     </div>
-    <div key={revision} className="ha-replay-body">
+    <div key={revision} ref={replay} className="ha-replay-body" onClickCapture={event => {
+      if ((event.target as Element).closest('summary')) review.current = true;
+    }}>
       <details className="ha-replay-process" open={processOpen} onToggle={event => setProcessOpen(event.currentTarget.open)}>
         <summary>{step < 4 ? '已处理' : '用时'} {seconds} 秒<ChevronDown size={13} aria-hidden="true"/></summary>
         <div className="ha-replay-activity">
@@ -118,10 +147,10 @@ function AttachmentReplay() {
           </ProcessGroup>}
           {step >= 2 && <p>两个文件的版本一致。接下来查找公开的分发和使用记录。</p>}
           {step >= 2 && <ProcessGroup title={step === 2 ? '正在搜索网页' : step === 3 ? '正在核对网页来源' : '已检索网页并核对来源'} icon={Search}>
-            <details className="ha-process-batch"><summary>搜索网页 <ChevronDown size={12}/></summary>
-              <p>vcruntime140_1.dll 与 vcruntime140.dll 成对分发</p>
-              {step >= 3 && <div className="ha-replay-sites"><span><Globe2 size={12}/>Spotfire 发布说明</span><span><Globe2 size={12}/>Microsoft C++ 团队</span></div>}
-            </details>
+            <SearchReceipt queries={['vcruntime140_1.dll 与 vcruntime140.dll 成对分发']} sources={step >= 3 ? [
+              {domain:'spotfire.com',title:'Spotfire 发布说明'},
+              {domain:'learn.microsoft.com',title:'Microsoft C++ 团队'},
+            ] : []}/>
             {step >= 3 && <details className="ha-process-batch"><summary><TriangleAlert size={14}/>命令未完成 <ChevronDown size={12}/></summary><p>这一步未取得结果，已保留其他来源。</p></details>}
           </ProcessGroup>}
           {step === 0 && <p role="status" className="ha-current-action"><span className={playing ? 'ha-active-ink' : ''}>正在思考</span></p>}
@@ -167,19 +196,18 @@ export function AssistantProcessDemo({onClose}: {onClose: () => void}) {
               <ChevronDown size={12} aria-hidden="true"/>
             </summary>
             <div className="ha-script-result">
-              <div className="ha-script-region">
-                <p>Python 示例脚本</p>
-                <pre role="region" aria-label="Python 示例脚本" tabIndex={0}><code>{attachmentScript}</code></pre>
-              </div>
+              <div className="ha-script-status"><Check size={14} aria-hidden="true"/>执行成功 · 退出码 0</div>
               <div className="ha-script-region">
                 <p>输出</p>
                 <pre role="region" aria-label="示例输出" tabIndex={0}>{'Machine: 0x8664\nOptional header: 0x020B\nSize: 204,288 bytes'}</pre>
               </div>
               <details className="ha-process-technical">
+                <summary>查看 Python 示例脚本</summary><pre role="region" aria-label="Python 示例脚本" tabIndex={0}><code>{attachmentScript}</code></pre>
+              </details>
+              <details className="ha-process-technical">
                 <summary>技术记录 · JSON</summary>
                 <pre tabIndex={0}>{JSON.stringify({file:'quazip.dll', machine:'0x8664', bytes:204288, exitCode:0}, null, 2)}</pre>
               </details>
-              <div className="ha-script-status"><Check size={14} aria-hidden="true"/>执行成功</div>
             </div>
           </details>
         </ProcessGroup>
@@ -221,11 +249,11 @@ export function AssistantProcess({steps,webEnabled=false,seconds}:{steps?:string
       <details className="ha-process-group">
         <summary><Search size={16} aria-hidden="true"/><span className="ha-process-label">网页检索 · 2 步</span><span className="ha-process-sites"><img src="/agent-icons/github.svg" alt="GitHub"/><img src="/agent-icons/notion.svg" alt="Notion"/></span><small>另 2 个站点</small><ChevronDown size={12} aria-hidden="true"/></summary>
         <div className="ha-process-children">
-          <details className="ha-process-batch">
-            <summary><Search size={15} aria-hidden="true"/><span>搜索网页</span><ChevronDown size={12} aria-hidden="true"/></summary>
-            <p>本批返回 8 项搜索结果。</p>
-            <details><summary>返回来源 · 4 个站点</summary><ul><li>github.com</li><li>notion.so</li><li>developers.openai.com</li><li>modelcontextprotocol.io</li></ul></details>
-          </details>
+          <SearchReceipt queries={['Codex App Server 事件','连接器权限与工具回执']} sources={[
+            {domain:'developers.openai.com',title:'Codex App Server',query:'Codex App Server 事件'},
+            {domain:'modelcontextprotocol.io',title:'工具定义',query:'连接器权限与工具回执'},
+            {domain:'github.com',title:'<table id="example">'},
+          ]}/>
           <details className="ha-process-batch">
             <summary><Globe2 size={15} aria-hidden="true"/><span>{required ? '打开指定网页' : '在网页内查找'}</span><ChevronDown size={12} aria-hidden="true"/></summary>
             {!required && <p>查找内容：页面历史。返回 4 条来源记录。</p>}

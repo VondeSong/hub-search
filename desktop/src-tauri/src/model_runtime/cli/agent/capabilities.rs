@@ -145,6 +145,11 @@ pub(super) fn activity(item: &Value, completed: bool) -> Option<Value> {
         String::new()
     };
     let mut event = json!({"id":format!("native-{key}"),"kind":"tool","operation":operation,"text":label,"detail":detail,"state":state,"origin":"codex-native"});
+    if operation == "command" {
+        if let Some(exit_code) = item["exitCode"].as_i64() {
+            event["exitCode"] = json!(exit_code);
+        }
+    }
     if operation == "delegate" {
         event["agentIds"] = json!(item["receiverThreadIds"]
             .as_array()
@@ -211,6 +216,7 @@ mod tests {
         let e=activity(&json!({"id":"cmd","type":"commandExecution","command":"exit 9","exitCode":9,"status":"failed"}),true).unwrap();
         assert_eq!(e["state"], "failed");
         assert_eq!(e["operation"], "command");
+        assert_eq!(e["exitCode"], 9);
         let e=activity(&json!({"id":"a","type":"collabAgentToolCall","receiverThreadIds":["child"],"agentsStates":{"child":{"status":"errored"}}}),true).unwrap();
         assert_eq!(e["agentIds"][0], "child");
         assert!(activity(

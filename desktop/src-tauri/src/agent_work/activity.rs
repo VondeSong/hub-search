@@ -270,7 +270,7 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
                 "agentStream" => {
                     if body["text"].as_str().is_some_and(|s| !s.trim().is_empty()) {
                         events.push(json!({"id":sequence.to_string(),"kind":body["kind"],"state":body["state"],"label":body["text"],"url":body["url"],"createdAt":time,"sequence":sequence,"updatedAt":body["updatedAt"],"finishedAt":body["finishedAt"],"operation":body["operation"],"detail":body["detail"],"agentIds":body["agentIds"],"agentStates":body["agentStates"],"origin":body["origin"].as_str().unwrap_or("codex-app-server"),
-                            "truncated":body["truncated"]==true,"action":body["action"],"queries":body["queries"],"pattern":body["pattern"],"sourceRefs":body["sourceRefs"],"resultCount":body["resultCount"],"errorCount":body["errorCount"],"errors":body["errors"],"omittedSourceCount":body["omittedSourceCount"]}));
+                            "truncated":body["truncated"]==true,"action":body["action"],"queries":body["queries"],"pattern":body["pattern"],"sourceRefs":body["sourceRefs"],"resultCount":body["resultCount"],"errorCount":body["errorCount"],"errors":body["errors"],"omittedSourceCount":body["omittedSourceCount"],"exitCode":body["exitCode"]}));
                     }
                 }
                 "activity" => {

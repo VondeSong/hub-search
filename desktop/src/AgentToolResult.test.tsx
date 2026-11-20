@@ -89,10 +89,14 @@ it("opens the authorized script and output from the step and drops a delayed res
   expect(host.querySelector('[aria-label="Python"]')?.textContent).toBe("print('<script>')");
   expect(host.querySelector('[aria-label="输出"]')?.textContent).toBe("x86-64");
   expect(host.querySelector(".agent-operation-group")).toBeNull();
+  const receipt=host.querySelector(".agent-script-result")!;
+  expect(receipt.firstElementChild?.textContent).toBe("执行成功 · 退出码 0");
+  expect(receipt.querySelector("details")?.open).toBe(false);
+  const technical=host.querySelector<HTMLDetailsElement>(".agent-tool-result > section > details")!;
+  expect(technical.open).toBe(false);
+  await act(async()=>{technical.open=true;technical.dispatchEvent(new Event("toggle"));});
   expect(host.querySelector(".agent-json-key")?.textContent).toBe('"kind"');
   expect(host.querySelector(".agent-json-string")?.textContent).toBe('"analysis"');
-  expect(host.querySelector(".agent-transcript")?.querySelectorAll("pre")).toHaveLength(2);
-  expect(host.textContent).toContain("执行成功 · 退出码 0");
   expect(host.querySelector("script")).toBeNull();
   expect(host.textContent).not.toMatch(/查看完整工具记录|返回工作过程|脚本执行成功/);
 });
