@@ -461,32 +461,56 @@ pub(crate) fn comment_write(
         &json!({"repo_full_name":repo,"issue_number":args["pr_number"]}),
         control,
     )?;
-    verification_result(&result)?;
+    let receipt = verified_comment_receipt(
+        &result,
+        repo,
+        args["pr_number"].as_u64().ok_or("Issue 编号无效")?,
+        action,
+        &marker,
+        &body,
+    )?;
+    check()?;
+    Ok(receipt)
+}
+
+fn verified_comment_receipt(
+    result: &Value,
+    repo: &str,
+    issue: u64,
+    action: &str,
+    marker: &str,
+    body: &str,
+) -> Result<Value, String> {
+    verification_result(result)?;
     let comments = result["structuredContent"]["comments"]
         .as_array()
         .ok_or("评论回读缺失，结果仍待核对")?;
-    let matches: Vec<_> = comments.iter().filter(|c| c["body"] == body).collect();
-    if matches.len() != 1 {
-        return Err(if matches.is_empty() {
-            "尚未回读到匹配评论；结果未知，不会自动重发"
-        } else {
-            "发现多条匹配评论；请人工核对，不会继续写入"
-        }
-        .into());
+    let mut matches = comments.iter().filter(|comment| {
+        comment["body"]
+            .as_str()
+            .is_some_and(|text| text.contains(marker))
+    });
+    let comment = matches
+        .next()
+        .ok_or("尚未回读到匹配评论；结果未知，不会自动重发")?;
+    if matches.next().is_some() {
+        return Err("发现多条评论含相同动作标记；请人工核对，不会继续写入".into());
     }
-    let comment = matches[0];
+    if comment["body"] != body {
+        return Err("远端评论正文与确认内容不一致，结果仍待核对".into());
+    }
+    let comment_id = comment["id"]
+        .as_u64()
+        .filter(|id| *id != 0)
+        .ok_or("评论回执缺少有效编号，结果仍待核对")?;
+    let expected_url =
+        format!("https://github.com/{repo}/issues/{issue}#issuecomment-{comment_id}");
     let url = comment["url"]
         .as_str()
-        .filter(|u| {
-            u.starts_with(&format!(
-                "https://github.com/{repo}/issues/{}#issuecomment-",
-                args["pr_number"]
-            ))
-        })
+        .filter(|u| *u == expected_url)
         .ok_or("评论目标身份不匹配，结果仍待核对")?;
-    check()?;
     Ok(
-        json!({"domain":"githubIssueComment","actionId":action,"commentId":comment["id"],"url":url,"bodySha256":digest(&json!(body)),"verified":true,"confirmedBy":"user","goalCompleted":false}),
+        json!({"domain":"githubIssueComment","actionId":action,"commentId":comment_id,"url":url,"bodySha256":digest(&json!(body)),"verified":true,"confirmedBy":"user","goalCompleted":false}),
     )
 }
 

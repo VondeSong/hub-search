@@ -67,6 +67,75 @@ fn long_comment_threads_are_host_verification_data_and_do_not_expand_model_resul
     failed["isError"] = json!(true);
     assert!(verification_result(&failed).is_err());
 }
+
+#[test]
+fn comment_readback_requires_one_marker_with_exact_content_and_identity() {
+    let repo = "VondeSong/hub-search";
+    let marker = "<!-- hub-action:action-1 -->";
+    let body = format!("验收记录\n\n{marker}");
+    let comment = json!({"id":42,"url":format!("https://github.com/{repo}/issues/58#issuecomment-42"),"body":body});
+    let verify = |comments| {
+        verified_comment_receipt(
+            &json!({"content":[],"structuredContent":{"comments":comments}}),
+            repo,
+            58,
+            "action-1",
+            marker,
+            &body,
+        )
+    };
+    assert_eq!(verify(vec![comment.clone()]).unwrap()["commentId"], 42);
+    let mut edited = comment.clone();
+    edited["body"] = json!(format!("其他正文\n\n{marker}"));
+    assert!(verify(vec![edited.clone()]).unwrap_err().contains("正文"));
+    assert!(verify(vec![comment.clone(), edited])
+        .unwrap_err()
+        .contains("相同动作标记"));
+    let mut mismatched = comment.clone();
+    mismatched["id"] = json!(43);
+    assert!(verify(vec![mismatched]).unwrap_err().contains("身份"));
+    let mut missing_id = comment;
+    missing_id["id"] = Value::Null;
+    assert!(verify(vec![missing_id]).unwrap_err().contains("有效编号"));
+    assert!(verify(vec![]).unwrap_err().contains("结果未知"));
+}
+
+#[test]
+#[ignore = "explicit daily root and existing verified action; uses the production read-only GitHub recovery path"]
+fn real_github_comment_readback_reuses_verified_action_identity() {
+    let root =
+        PathBuf::from(std::env::var_os("HUB_NATIVE_ACCEPTANCE_ROOT").expect("daily data root"));
+    let action = std::env::var("HUB_EXISTING_PLUGIN_ACTION").expect("existing verified action");
+    let read = || {
+        let c = crate::source_evidence::open_read_database(&root).unwrap();
+        c.query_row(
+            "SELECT payload_json,receipt_json FROM agent_actions WHERE id=?1 AND kind='pluginWrite' AND state='verified'",
+            [&action],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        ).unwrap()
+    };
+    let (plan_text, receipt_text) = read();
+    let plan: Value = serde_json::from_str(&plan_text).unwrap();
+    let old: Value = serde_json::from_str(&receipt_text).unwrap();
+    let result = comment_write(
+        &root,
+        &plan,
+        &action,
+        false,
+        &Control::bounded(Duration::from_secs(120)),
+        || Ok(()),
+    )
+    .unwrap();
+    for field in ["actionId", "commentId", "url", "bodySha256", "verified"] {
+        assert_eq!(result[field], old[field], "{field}");
+    }
+    assert_eq!(read(), (plan_text, receipt_text));
+    println!(
+        "Production GitHub readback confirmed one unchanged remote comment: {}",
+        result["commentId"]
+    );
+}
+
 #[test]
 #[ignore = "requires explicit HUB_NATIVE_ACCEPTANCE_ROOT; reads current connected GitHub and the real project Issue, writes no sources"]
 fn issue14_native_connected_apps_real_read() {
