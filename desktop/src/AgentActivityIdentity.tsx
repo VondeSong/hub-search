@@ -1,12 +1,12 @@
 import {useEffect,useState} from "react";
 import {invoke} from "@tauri-apps/api/core";
-import {BookOpen,Circle,Download,FileSearch,FileText,Globe2,MousePointer2,Network,Pencil,Search,Shrink,Terminal,TriangleAlert,Wrench} from "lucide-react";
+import {AppWindow,BookOpen,Circle,Download,FilePenLine,FileSearch,FileText,Globe2,MessagesSquare,Network,Search,Shrink,SquareTerminal,TriangleAlert,Wrench} from "lucide-react";
 import {publicWebHref} from "./AgentWebSources";
 import type {ActivityEvent} from "./AgentActivity";
 import github from "./assets/agent-services/github.svg";
 import notion from "./assets/agent-services/notion.svg";
 
-export type ActivityOperation="search"|"read"|"command"|"compute"|"edit"|"skill"|"context"|"delegate"|"mcp"|"browser"|"download"|"webSearch"|"webOpen"|"webFind"|"webUnknown"|"tool";
+export type ActivityOperation="search"|"read"|"command"|"compute"|"edit"|"readChat"|"renameChat"|"skill"|"context"|"delegate"|"mcp"|"browser"|"download"|"webSearch"|"webOpen"|"webFind"|"webUnknown"|"tool";
 /** The same resolver feeds rows and collapsed groups. Labels are legacy only. */
 export function activityOperation(event:ActivityEvent):ActivityOperation {
   const operation=event.operation;
@@ -28,6 +28,7 @@ export function activityOperation(event:ActivityEvent):ActivityOperation {
   if(operation==="command")return "command";
   if(operation==="delegate")return "delegate";
   if(operation==="edit")return "edit";
+  if(operation==="readChat" || operation==="renameChat")return operation;
   if(operation==="mcp")return event.serviceId?.startsWith("browser:")?"browser":"mcp";
   if(operation==="read" || operation==="traceResult" || operation==="toolSchema")return "read";
   if(event.kind==="context")return event.origin==="publicLifecycle"?"context":"read";
@@ -38,16 +39,23 @@ export function activityOperation(event:ActivityEvent):ActivityOperation {
   if(/读取|原文|材料/.test(event.label))return "read";
   return "tool";
 }
-export const operationLabels:Record<ActivityOperation,string>={search:"搜索资料",read:"读取资料",command:"运行命令",compute:"运行计算脚本",edit:"编辑文件",skill:"使用技能",context:"整理上下文",delegate:"协调子代理",mcp:"使用外部工具",browser:"操作浏览器",download:"获取资料文件",webSearch:"搜索网页",webOpen:"打开网页",webFind:"在网页内查找",webUnknown:"处理网页",tool:"调用工具"};
+export const operationLabels:Record<ActivityOperation,string>={search:"搜索资料",read:"读取资料",command:"运行命令",compute:"运行计算脚本",edit:"编辑文件",readChat:"读取聊天",renameChat:"重命名聊天",skill:"使用技能",context:"整理上下文",delegate:"协调子代理",mcp:"使用外部工具",browser:"操作浏览器",download:"获取资料文件",webSearch:"搜索网页",webOpen:"打开网页",webFind:"在网页内查找",webUnknown:"处理网页",tool:"调用工具"};
 export function activityLabel(event:ActivityEvent) {
   if (event.kind==="tool" && event.operation==="analyzeFiles" && event.label==="分析数据并生成文件") return "分析附件";
   return event.kind==="tool" && event.operation==="compute" ? operationLabels.compute : event.label;
 }
 export function ActivityIcon({event}:{event:ActivityEvent}) {
   if(event.kind==="reasoning"||event.kind==="status")return null;
-  const icons={search:Search,read:FileText,command:Terminal,compute:Terminal,edit:Pencil,skill:BookOpen,context:Shrink,delegate:Network,mcp:Globe2,browser:MousePointer2,download:Download,webSearch:Search,webOpen:Globe2,webFind:FileSearch,webUnknown:Globe2,tool:Wrench};
-  const Icon=event.state==="failed"||event.errorCount?TriangleAlert:event.state==="interrupted"?Circle:icons[activityOperation(event)];
-  return <Icon size={16} aria-hidden="true" data-activity-icon={event.state==="failed"?"failed":activityOperation(event)}/>;
+  const operation = activityOperation(event);
+  const brand = operation === "mcp" && event.serviceId ? brands[event.serviceId] : undefined;
+  if (brand && event.state !== "failed" && event.state !== "interrupted" && !event.errorCount) {
+    return <span className="agent-service-icon" aria-hidden="true" data-activity-icon={operation} data-activity-brand={brand.title}>
+      <img src={brand.src} alt="" width={16} height={16}/>
+    </span>;
+  }
+  const icons={search:Search,read:FileText,command:SquareTerminal,compute:SquareTerminal,edit:FilePenLine,readChat:MessagesSquare,renameChat:FilePenLine,skill:BookOpen,context:Shrink,delegate:Network,mcp:Globe2,browser:AppWindow,download:Download,webSearch:Search,webOpen:Globe2,webFind:FileSearch,webUnknown:Globe2,tool:Wrench};
+  const Icon=event.state==="failed"||event.errorCount?TriangleAlert:event.state==="interrupted"?Circle:icons[operation];
+  return <Icon size={16} aria-hidden="true" data-activity-icon={event.state==="failed"?"failed":operation}/>;
 }
 export function activitySites(events:ActivityEvent[]) {
   const sites=new Map<string,{url:string;title:string}>();
@@ -94,11 +102,13 @@ const brands:Record<string,{src:string;title:string}>={github:{src:github,title:
 export function activityServiceTitle(server:string,events:ActivityEvent[]) {
   return brands[server]?.title ?? events.find(event=>event.serviceId===server && event.serviceTitle)?.serviceTitle;
 }
-export function ActivityIdentity({events,workId}:{events:ActivityEvent[];workId?:string}) {
+export function ActivityIdentity({events,workId,primaryIcon}:{events:ActivityEvent[];workId?:string;primaryIcon?:ActivityEvent}) {
   const sites=activitySites(events);
   const services=[...new Set(events.map(e=>e.serviceId).filter((s):s is string=>!!s))];
   const agents=[...new Set(events.flatMap(e=>e.agentIds??[]))];
-  const identities=[...services.flatMap(id=>brands[id]?[{id,...brands[id]}]:[])];
+  const primaryBrand = primaryIcon && activityOperation(primaryIcon) === "mcp" && !primaryIcon.errorCount
+    && !["failed", "interrupted"].includes(primaryIcon.state) ? brands[primaryIcon.serviceId ?? ""] : undefined;
+  const identities=services.flatMap(id=>brands[id] && brands[id].src !== primaryBrand?.src ? [{id,...brands[id]}] : []);
   if(!sites.length&&!agents.length&&!identities.length)return null;
   return <span className="agent-activity-identities" aria-label="活动来源">
     {identities.slice(0,3).map(service=><span key={service.id} className="agent-service-icon" title={service.title}><img src={service.src} alt={service.title} width={16} height={16}/></span>)}

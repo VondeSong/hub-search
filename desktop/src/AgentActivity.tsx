@@ -1,7 +1,7 @@
 import { publicWebHref } from "./AgentWebSources";
 import { createContext, memo, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Ellipsis, TriangleAlert } from "lucide-react";
-import { ActivityIcon, ActivityIdentity, WebsiteIcon, activityLabel, activityOperation, activityServiceTitle, operationLabels } from "./AgentActivityIdentity";
+import { ActivityIcon, ActivityIdentity, WebsiteIcon, activityLabel, activityOperation, activityServiceTitle, operationLabels, type ActivityOperation } from "./AgentActivityIdentity";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AgentToolResult, type ToolResultRef, type ToolResultScope } from "./AgentToolResult";
@@ -154,7 +154,7 @@ function ActivityEventView({ event, scope, runId }: { event: ActivityEvent; scop
     return <details className="agent-reasoning"><summary>{icon}<span>{prefix}{characters.slice(0,72).join("")}…</span><ChevronDown className="agent-reasoning-chevron" size={13} aria-hidden="true"/></summary><div><PublicText text={event.label}/></div></details>;
   }
   return <div className={"agent-activity-step agent-step-" + event.state}>
-    <ActivityIcon event={event}/><ActivityIdentity events={[event]} workId={scope?.workId}/>
+    <ActivityIcon event={event}/><ActivityIdentity events={[event]} workId={scope?.workId} primaryIcon={event}/>
     <div>{event.detail || event.agentIds?.length || (event.resultRef && scope) || event.label.length>72 ? <details className="agent-tool-activity"><summary title={event.label}><span>{event.label}</span>{eventDuration(event)&&<small className="agent-operation-duration">{eventDuration(event)}</small>}<span className="agent-step-state">{eventStateLabel(event)}</span><ChevronDown size={12} className="agent-reasoning-chevron" aria-hidden="true"/></summary>{event.label.length>72 && <p>{event.label}</p>}{event.detail && <p>{event.detail}</p>}{!!event.agentIds?.length&&<ul aria-label="子代理状态">{event.agentIds.map(id=><li key={id}>{id.slice(-6)} · {({running:"进行中",completed:"已结束",failed:"未完成",errored:"未完成",interrupted:"已中断",pendingInit:"正在启动",shutdown:"已关闭"} as Record<string,string>)[event.agentStates?.[id]?.status??""]||"状态待核验"}</li>)}</ul>}{event.resultRef && scope && <AgentToolResult value={event.resultRef} scope={scope}/>}</details> : <span>{event.label}{eventStateLabel(event)&&<span className="agent-step-state"> · {eventStateLabel(event)}</span>}{eventDuration(event)&&<small className="agent-operation-duration">{eventDuration(event)}</small>}</span>}</div>
   </div>;
 }
@@ -192,6 +192,40 @@ function externalPhaseTitle(operations:ActivityEvent[]) {
   return actions.length <= 2 ? actions.join(" · ") : `${actions[0]} · ${operations.length} 步`;
 }
 
+const mixedPhaseActions = new Map<ActivityOperation,string>([
+  ["browser", "浏览了网页"],
+  ["command", "运行了命令"],
+  ["edit", "编辑了文件"],
+  ["readChat", "读取了聊天"],
+  ["renameChat", "重命名了聊天"],
+]);
+
+function mixedPhaseOverview(operations:ActivityEvent[]) {
+  const services = new Map<string,ActivityEvent[]>();
+  const actions = new Map<ActivityOperation,ActivityEvent[]>();
+  for (const event of operations) {
+    if (event.toolName === "catalog") continue;
+    const operation = activityOperation(event);
+    const service = operation === "mcp" && event.serviceId ? activityServiceTitle(event.serviceId, operations) : undefined;
+    if (service) {
+      const entries = services.get(service) ?? [];
+      entries.push(event);
+      services.set(service, entries);
+    } else {
+      const entries = actions.get(operation) ?? [];
+      entries.push(event);
+      actions.set(operation, entries);
+    }
+  }
+  if (services.size + actions.size < 2 || (!services.size && ![...actions.keys()].some(key=>mixedPhaseActions.has(key)))) return undefined;
+  const completed = (events:ActivityEvent[]) => events.every(event=>event.state === "completed" && !operationFailed(event));
+  const parts = [
+    ...[...services].map(([service,events])=>completed(events) ? `使用了 ${service}` : `${service} 工具`),
+    ...[...actions].map(([action,events])=>(completed(events) ? mixedPhaseActions.get(action) : undefined) ?? operationLabels[action]),
+  ];
+  return {title:parts.join("、"), icon:([...services.values(),...actions.values()])[0][0]};
+}
+
 function OperationPhase({events,scope,current,live,segmented,settled,runId}:{events:ActivityEvent[];scope:ToolResultScope|null;current?:ActivityEvent;live:boolean;segmented:boolean;settled:boolean;runId:string}) {
   const [open,setOpen]=useActivityDisclosure(`group:${runId}:${events[0].id}`,false);
   const [summariesOpen,setSummariesOpen]=useActivityDisclosure(`summaries:${runId}:${events[0].id}`,false);
@@ -206,18 +240,19 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
   const active=current?.state==="running";
   const labels = [...new Set(operations.map(event => operationLabels[activityOperation(event)]))];
   const mixedWeb = labels.length > 1 && operations.every(event=>event.kind==="webSearch");
-  const summaryIcon=labels.length>1 && !mixedWeb
-    ? {...operations[0],kind:"tool" as const,operation:"mixed"} : operations[0];
+  const mixed = mixedPhaseOverview(operations);
+  const summaryIcon=mixed?.icon ?? (labels.length>1 && !mixedWeb
+    ? {...operations[0],kind:"tool" as const,operation:"mixed"} : operations[0]);
   const readSpan=operations.length===1 ? operations[0].readSpan : undefined;
   const attachmentTitle=operations.length===1 && operations[0].operation==="analyzeFiles"
     ? activityLabel(operations[0]) : undefined;
   const overview=!operations.length ? "公开思考摘要" : mixedWeb ? `网页检索 · ${operations.length} 步`
-    : externalPhaseTitle(operations) ?? (operations.every(event=>event.state==="completed"&&!event.errorCount)?"已":"")+(attachmentTitle ?? labels.join("、"))+(readSpan?.title ? ` · ${readSpan.title}` : "");
+    : mixed?.title ?? externalPhaseTitle(operations) ?? (operations.every(event=>event.state==="completed"&&!event.errorCount)?"已":"")+(attachmentTitle ?? labels.join("、"))+(readSpan?.title ? ` · ${readSpan.title}` : "");
   const latest=current ?? (live && operations.length>1 ? operations[operations.length-1] : undefined);
   let summary=overview;
   if(latest) {
     const label=latest.kind==="webSearch" ? webLabel(latest) : phaseToolLabels.get(latest.toolName ?? "") ?? activityLabel(latest);
-    const verb=/^(读取|搜索|打开|访问|运行|执行|检查|核对|验证|编辑|加载|查找|整理|分析|生成|保存|创建|准备)/.test(label);
+    const verb=/^(读取|重命名|搜索|打开|访问|运行|执行|检查|核对|验证|编辑|加载|查找|整理|分析|生成|保存|创建|准备)/.test(label);
     if(latest.state==="running")summary=verb ? "正在"+label : label;
     else if(latest.state==="queued")summary="等待："+label;
     else if(operationFailed(latest))summary=label+" · "+(eventStateLabel(latest)||"部分未完成");
@@ -232,11 +267,12 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
     </details> : summaries.map(event=><ActivityEventView key={event.id} event={event} scope={scope} runId={runId}/>))}
   </div>;
   if(!segmented && !summaries.length && operations.every(event=>event.kind==="tool" && (event.operation || event.toolName)))return steps;
+  const headingIcon = latest ?? (summaryIcon && {...summaryIcon,state:"completed",errorCount:0});
   return <details className={`agent-operation-group${active?" agent-operation-active":""}`} open={open} onToggle={event=>setOpen(event.currentTarget.open)}>
     <summary title={summary}>
-      {summaryIcon && <ActivityIcon event={latest ?? {...summaryIcon,state:"completed",errorCount:0}}/>}
+      {headingIcon && <ActivityIcon event={headingIcon}/>}
       <span className="agent-phase-label">{summary}</span>
-      <ActivityIdentity events={operations} workId={scope?.workId}/>
+      <ActivityIdentity events={operations} workId={scope?.workId} primaryIcon={headingIcon}/>
       <ChevronDown className="agent-reasoning-chevron" size={12} aria-hidden="true"/>
       {failed&&!open&&<small className="agent-phase-warning" role="status"><TriangleAlert size={12} aria-hidden="true"/>部分未完成</small>}
     </summary>

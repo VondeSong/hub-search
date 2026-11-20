@@ -40,6 +40,32 @@ it("AC03 a mixed phase retains both kinds without borrowing the first operation 
  expect(summary.textContent).toContain("已读取资料、搜索资料");
  expect(summary.querySelector("[data-activity-icon]")?.getAttribute("data-activity-icon")).toBe("tool");
 });
+it("summarizes mixed connected work without reordering the individual receipts",async()=>{
+ await render([
+  event({id:"command",operation:"command",label:"检查工作区",detail:"退出码 0"}),
+  event({id:"edit",operation:"edit",label:"编辑说明",createdAt:2000}),
+  event({id:"chat",operation:"readChat",label:"读取聊天",createdAt:3000}),
+  event({id:"rename",operation:"renameChat",label:"重命名聊天",createdAt:4000,state:"failed"}),
+  event({id:"git",operation:"mcp",serviceId:"github",toolName:"github.fetch_issue",createdAt:5000}),
+  event({id:"git2",operation:"mcp",serviceId:"github",toolName:"github.fetch_issue_comments",createdAt:6000}),
+ ],true,{native:true});
+ const group=host.querySelector<HTMLDetailsElement>(".agent-operation-group")!;
+ const summary=group.querySelector("summary")!;
+ expect(summary.querySelector(".agent-phase-label")?.textContent).toBe("使用了 GitHub、运行了命令、编辑了文件、读取了聊天、重命名聊天");
+ expect(summary.querySelector('[data-activity-brand="GitHub"]')).not.toBeNull();
+ expect(summary.querySelectorAll("img")).toHaveLength(1);
+ expect(summary.querySelector(".agent-phase-warning")?.textContent).toBe("部分未完成");
+ await act(async()=>summary.click());
+ const rows=[...group.querySelectorAll(".agent-activity-step")];
+ expect(rows.map(row=>row.textContent)).toEqual([
+  expect.stringContaining("检查工作区"),expect.stringContaining("编辑说明"),expect.stringContaining("读取聊天"),
+  expect.stringContaining("重命名聊天"),expect.stringContaining("github.fetch_issue"),expect.stringContaining("github.fetch_issue_comments"),
+ ]);
+ expect(rows[0].querySelector(".lucide-square-terminal")).not.toBeNull();
+ expect(rows[1].querySelector(".lucide-file-pen-line")).not.toBeNull();
+ expect(rows[2].querySelector(".lucide-messages-square")).not.toBeNull();
+ expect(rows[4].querySelectorAll("img")).toHaveLength(1);
+});
 it.each(["failed","interrupted"])("AC04 a %s external tool stays visible with the entire successful process collapsed",async state=>{
  await render([event({state,operation:"mcp",label:"读取 GitHub 议题",detail:"实际工具未返回结果"}),event({id:"recovered",label:"读取另一份来源",createdAt:3000})],false);
  const warning=host.querySelector('[aria-label="工具操作未完成"]');

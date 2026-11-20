@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useState} from 'react';
-import {BookOpen,Check,ChevronDown,FileText,FolderOpen,Globe2,Search,Terminal,TriangleAlert} from 'lucide-react';
+import {AppWindow,BookOpen,Check,ChevronDown,FilePenLine,FileText,FolderOpen,Globe2,MessagesSquare,Search,SquareTerminal as Terminal,TriangleAlert} from 'lucide-react';
 
 const examples = [
   ['timeline', '同题回放'],
@@ -30,15 +30,62 @@ const batches = Array.from({length:14}, (_, index) => {
   return {first, last, file: `analysis_${first}_${last}.csv`};
 });
 
+function GitHubMark() {
+  return <span className="ha-process-brand" aria-hidden="true"/>;
+}
+
+const toolKinds = {
+  github: {icon: GitHubMark, caption: '使用了 GitHub'},
+  browser: {icon: AppWindow, caption: '浏览了网页'},
+  command: {icon: Terminal, caption: '运行了命令'},
+  edit: {icon: FilePenLine, caption: '编辑了文件'},
+  readChat: {icon: MessagesSquare, caption: '读取了聊天'},
+  renameChat: {icon: FilePenLine, caption: '重命名了聊天'},
+};
+
+const toolSteps = [
+  {kind:'command', title:'检查工作区', receipt:'执行成功 · 退出码 0'},
+  {kind:'edit', title:'编辑工作区文件', receipt:'已更新说明文档'},
+  {kind:'browser', title:'打开网页', receipt:'打开成功 · developers.openai.com'},
+  {kind:'readChat', title:'读取聊天', receipt:'读取成功'},
+  {kind:'renameChat', title:'重命名聊天', receipt:'重命名成功'},
+  {kind:'github', title:'准备 GitHub 评论草稿', receipt:'草稿已准备，等待确认发布。'},
+  {kind:'github', title:'读取 GitHub 评论', receipt:'已读取评论。'},
+] as const;
+
 function ProcessGroup({title, icon: Icon, children}: {
   title: string;
-  icon: typeof FileText;
+  icon: typeof FileText | typeof GitHubMark;
   children: React.ReactNode;
 }) {
   return <details className="ha-process-group">
     <summary><Icon size={16} aria-hidden="true"/><span className="ha-process-label">{title}</span><ChevronDown size={13} aria-hidden="true"/></summary>
     <div className="ha-process-children">{children}</div>
   </details>;
+}
+
+function MixedToolExample() {
+  const orderedKinds = Object.keys(toolKinds) as (keyof typeof toolKinds)[];
+  const kinds = orderedKinds.filter(kind => toolSteps.some(step => step.kind === kind));
+  const header = kinds.map(kind => toolKinds[kind].caption).join('、');
+  return <div className="ha-replay-body">
+    <details className="ha-replay-process" open>
+      <summary>用时 2 分 4 秒<ChevronDown size={13} aria-hidden="true"/></summary>
+      <div className="ha-replay-activity">
+        <p>先核对工作区和聊天，再回读 GitHub 记录。</p>
+        <ProcessGroup title={header} icon={toolKinds[kinds[0]].icon}>
+          {toolSteps.map(step => {
+            const Icon = toolKinds[step.kind].icon;
+            return <details key={step.title} className="ha-process-batch">
+              <summary><Icon size={15} aria-hidden="true"/><span>{step.title}</span><ChevronDown size={12} aria-hidden="true"/></summary>
+              <p>{step.receipt}</p>
+            </details>;
+          })}
+        </ProcessGroup>
+      </div>
+    </details>
+    <details className="ha-process-permissions"><summary>本轮工具与权限</summary><ul><li>GitHub · 读取评论、准备评论草稿</li><li>独立浏览器 · developers.openai.com</li><li>内置网页搜索关闭</li></ul></details>
+  </div>;
 }
 
 function AttachmentReplay() {
@@ -108,15 +155,7 @@ export function AssistantProcessDemo({onClose}: {onClose: () => void}) {
         <p role="status">{readAgain ? '当前版本已读取，可以继续核对。' : '正在等待重新核对这份资料。'}</p>
       </>}
       {scenario === 'web' && <AssistantProcess webEnabled seconds={36}/>}
-      {scenario === 'tools' && <>
-        <div className="ha-process-time"><span className="ha-process-meta">用时 2 分 4 秒</span>
-          <details><summary>本轮工具与权限</summary><ul><li>GitHub · 读取议题、准备评论草稿</li><li>独立浏览器 · developers.openai.com</li><li>内置网页搜索关闭</li></ul></details>
-        </div>
-        <ProcessGroup title="已使用 GitHub 和浏览器读取议题、浏览网页并准备评论草稿" icon={Globe2}>
-          <details className="ha-process-batch"><summary>打开网页 <ChevronDown size={12} aria-hidden="true"/></summary><p>Skills · developers.openai.com</p><p>打开成功</p><details className="ha-process-technical"><summary>技术记录</summary><p>浏览器导航回执 · 展示示例</p></details></details>
-          <details className="ha-process-batch"><summary><FileText size={15} aria-hidden="true"/>准备 GitHub 评论草稿<ChevronDown size={12} aria-hidden="true"/></summary><p>草稿已准备，等待确认发布。</p></details>
-        </ProcessGroup>
-      </>}
+      {scenario === 'tools' && <MixedToolExample/>}
       {scenario === 'script' && <>
         <p className="ha-process-commentary">先读取附件的文件头，确认格式和架构。</p>
         <ProcessGroup title="已使用 Python 检查附件格式和架构" icon={Terminal}>
