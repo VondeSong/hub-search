@@ -97,7 +97,7 @@ fn title(request: &Value, catalog: &mut Option<Value>) -> String {
             }
         ),
         "read" => "读取原文".into(),
-        "analyzeFiles" => "分析数据并生成文件".into(),
+        "analyzeFiles" => "分析附件".into(),
         "fetchFile" => "获取公开资料文件".into(),
         "compute" => "运行计算脚本".into(),
         "goalState" => "核对任务状态（内部）".into(),
@@ -364,6 +364,14 @@ pub(super) fn read_on(root: &Path, c: &Connection, w: &Work) -> Result<Value, St
                                 "completed"
                             });
                             events[index]["finishedAt"] = json!(time);
+                            if body["request"]["operation"] == "analyzeFiles" {
+                                if let Some([input]) = body["inputs"].as_array().map(Vec::as_slice) {
+                                    if let Some(name) = input["title"].as_str().filter(|name| !name.is_empty()) {
+                                        let name = name.chars().take(100).collect::<String>();
+                                        events[index]["label"] = json!(format!("分析附件 · {name}"));
+                                    }
+                                }
+                            }
                             if body["request"]["operation"] == "read" && !body["error"].is_string() {
                                 if let Some(source) = &excerpt {
                                     events[index]["readSpan"] = json!({

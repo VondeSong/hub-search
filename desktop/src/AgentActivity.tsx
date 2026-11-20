@@ -103,6 +103,27 @@ function isThinkingPlaceholder(event:ActivityEvent) {
 function eventStateLabel(event:ActivityEvent) {
   return ({failed:"未完成",running:"进行中",interrupted:"已中断",queued:"等待执行"} as Record<string,string>)[event.state] ?? "";
 }
+
+function ScriptActivity({event, resultRef, scope}: {event:ActivityEvent;resultRef:ToolResultRef;scope:ToolResultScope}) {
+  const [open,setOpen]=useState(false);
+  const duration=eventDuration(event);
+  return <div className={`agent-activity-step agent-step-${event.state}`}>
+    <ActivityIcon event={event}/>
+    <details className="agent-tool-activity agent-script-step" onToggle={change=>setOpen(change.currentTarget.open)}>
+      <summary title={event.label}>
+        <span>{event.label}</span>
+        {duration && <small className="agent-operation-duration">{duration}</small>}
+        {eventStateLabel(event) && <span className="agent-step-state">{eventStateLabel(event)}</span>}
+        <ChevronDown size={12} className="agent-reasoning-chevron" aria-hidden="true"/>
+      </summary>
+      {open && <>
+        {event.state==="completed" && event.detail && event.detail!=="脚本执行成功" && <p>{event.detail}</p>}
+        <AgentToolResult value={resultRef} scope={scope} scriptState={event.state}/>
+      </>}
+    </details>
+  </div>;
+}
+
 function ActivityEventView({ event, scope, runId }: { event: ActivityEvent; scope: ToolResultScope | null; runId:string }) {
   const span=event.readSpan;
   event={
@@ -113,6 +134,9 @@ function ActivityEventView({ event, scope, runId }: { event: ActivityEvent; scop
   if (event.label === "核对任务状态（内部）" && event.state === "completed") return <details className="agent-reasoning"><summary>已核对任务状态</summary><div>{event.resultRef && scope && <AgentToolResult value={event.resultRef} scope={scope}/>}</div></details>;
   if (event.kind === "unpublishedAnswer") return <UnpublishedAnswer text={event.label} truncated={event.truncated}/>;
   if (event.kind === "webSearch") return <WebActivity event={event} runId={runId}/>;
+  if (event.kind==="tool" && (event.operation==="analyzeFiles" || event.operation==="compute") && event.resultRef && scope) {
+    return <ScriptActivity event={event} resultRef={event.resultRef} scope={scope}/>;
+  }
   if (event.kind === "plan") return <details className="agent-reasoning"><summary>工作计划<ChevronDown className="agent-reasoning-chevron" size={13} aria-hidden="true"/></summary><div><PublicText text={event.label}/></div></details>;
   if (event.kind === "context") return <div className="agent-activity-step agent-context-event"><ActivityIcon event={event}/>{event.detail ? <details><summary>{event.label}</summary><p>{event.detail}</p></details> : <span>{event.label}</span>}</div>;
   if (event.kind === "message") return <div className="agent-commentary"><PublicText text={event.label}/></div>;

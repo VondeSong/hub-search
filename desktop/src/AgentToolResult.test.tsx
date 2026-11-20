@@ -67,6 +67,32 @@ it("offers expansion only for a complete result with the current Work scope",asy
   expect(Array.from(host.querySelectorAll("button")).some(b=>b.textContent==="查看完整工具记录")).toBe(false);
 });
 
+it("opens the authorized script and output from the step and drops a delayed response on collapse",async()=>{
+  let resolve!:(v:unknown)=>void;
+  const result={...page('{"kind":"analysis"}'),scriptPreview:{language:"Python",
+    script:{content:"print('<script>')",truncated:false},output:{content:"x86-64",truncated:false},exitCode:0}};
+  mock.mockReturnValueOnce(new Promise(r=>{resolve=r;})).mockResolvedValueOnce(result);
+  const run={runId:"script-test",revision:1,state:"completed",running:false,startedAt:1,finishedAt:2,steps:1,
+    events:[{id:"1",kind:"tool" as const,state:"completed",operation:"analyzeFiles",label:"分析附件 · example.dll",
+      detail:"脚本执行成功",createdAt:1,finishedAt:2,resultRef:ref}]};
+  await act(async()=>root.render(<AgentActivity value={{...run,...scope}}/>));
+  await act(async()=>host.querySelector<HTMLButtonElement>(".agent-activity-toggle")!.click());
+  expect(mock).not.toHaveBeenCalled();
+  const disclosure=host.querySelector<HTMLDetailsElement>(".agent-script-step")!;
+  const toggle=async(open:boolean)=>{await act(async()=>{disclosure.open=open;disclosure.dispatchEvent(new Event("toggle"));});};
+  await toggle(true);
+  expect(mock.mock.calls[0][1]).toMatchObject({args:{action:"readToolResult",includeScriptPreview:true,expectedAuthorizationVersion:2}});
+  await toggle(false);
+  await act(async()=>resolve(result));
+  expect(host.querySelector("pre")).toBeNull();
+  await toggle(true);
+  expect(host.querySelector('[aria-label="Python"]')?.textContent).toBe("print('<script>')");
+  expect(host.querySelector('[aria-label="输出"]')?.textContent).toBe("x86-64");
+  expect(host.textContent).toContain("执行成功 · 退出码 0");
+  expect(host.querySelector("script")).toBeNull();
+  expect(host.textContent).not.toMatch(/查看完整工具记录|返回工作过程|脚本执行成功/);
+});
+
 it("shows the authorized source separately from collapsed technical JSON",async()=>{
  mock.mockResolvedValue({...page('{"metadata":true}'),sourcePreview:{title:"原文标题",content:"<script>正文</script>",totalChars:19,truncated:false}});
  await render();await click("查看完整工具记录");

@@ -346,6 +346,79 @@ pub(in crate::agent_work) fn read_for_work(
     start: usize,
     limit: usize,
 ) -> Result<Value, String> {
+    read_page(root, work, id, expected, start, limit, false)
+}
+
+fn script_preview(
+    c: &Connection,
+    work: &str,
+    id: &str,
+    value: &Value,
+) -> Result<Option<Value>, String> {
+    let row: Option<(String, Option<String>)> = c.query_row(
+        "SELECT json_extract(result.body_json,'$.request.operation'), call.body_json
+         FROM agent_records result
+         LEFT JOIN agent_records call ON call.work_id=result.work_id AND call.run_id=result.run_id
+           AND call.kind='toolCall'
+           AND json_extract(call.body_json,'$.stepId')=json_extract(result.body_json,'$._hubTrace.callId')
+           AND json_extract(call.body_json,'$.operation')=json_extract(result.body_json,'$.request.operation')
+         WHERE result.id=?1 AND result.work_id=?2 AND result.kind IN ('toolResult','evidence')
+           AND json_extract(result.body_json,'$.request.operation') IN ('analyzeFiles','compute')
+         ORDER BY call.rowid DESC LIMIT 1",
+        params![id, work],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    ).optional().map_err(|e| e.to_string())?;
+    let Some((operation, call)) = row else {
+        return Ok(None);
+    };
+    let analysis = operation == "analyzeFiles";
+    let recorded_hash = value["scriptSha256"].as_str();
+    let request = call.and_then(|text| serde_json::from_str::<Value>(&text).ok());
+    let script = request
+        .as_ref()
+        .and_then(|request| request["script"].as_str())
+        .filter(|script| {
+            !script.is_empty()
+                && recorded_hash.is_none_or(|expected| {
+                    format!("{:x}", Sha256::digest(script.as_bytes())) == expected
+                })
+        });
+    let output = if analysis {
+        &value["output"]["output"]
+    } else {
+        &value["output"]
+    };
+    let output = match output {
+        Value::Null => value["error"].as_str().map(str::to_owned),
+        Value::String(text) => Some(text.clone()),
+        value => serde_json::to_string_pretty(value).ok(),
+    };
+    let preview = |text: &str, max_chars| {
+        let content: String = text.chars().take(max_chars).collect();
+        json!({"truncated":content.len()<text.len(),"content":content})
+    };
+    let exit_code = if analysis {
+        value["output"]["exitCode"].as_i64()
+    } else {
+        value["exitCode"].as_i64()
+    };
+    Ok(Some(json!({
+        "language":if analysis { "Python" } else { "PowerShell" },
+        "script":script.map(|text| preview(text, 32000)),
+        "output":output.as_deref().map(|text| preview(text, 4000)),
+        "exitCode":exit_code
+    })))
+}
+
+fn read_page(
+    root: &Path,
+    work: &Work,
+    id: &str,
+    expected: &str,
+    start: usize,
+    limit: usize,
+    include_script: bool,
+) -> Result<Value, String> {
     if id.is_empty()
         || id.len() > 150
         || expected.len() != 64
@@ -396,10 +469,14 @@ pub(in crate::agent_work) fn read_for_work(
         .skip(start)
         .take(end - start)
         .collect::<String>();
-    Ok(
-        json!({"kind":"historicalToolResult","recordId":id,"sha256":expected,"content":content,"startChar":start,"endChar":end,"totalChars":total,"nextStartChar":if end<total{Some(end)}else{None},
-        "sourcePreview":source_preview,"methodPreview":method_preview,"historical":true,"currentEvidence":false,"policy":"历史工具结果仅用于恢复过程；当前事实与引用须重新取证。读取不会重发原操作。"}),
-    )
+    let mut page = json!({"kind":"historicalToolResult","recordId":id,"sha256":expected,"content":content,"startChar":start,"endChar":end,"totalChars":total,"nextStartChar":if end<total{Some(end)}else{None},
+        "sourcePreview":source_preview,"methodPreview":method_preview,"historical":true,"currentEvidence":false,"policy":"历史工具结果仅用于恢复过程；当前事实与引用须重新取证。读取不会重发原操作。"});
+    if include_script && start == 0 {
+        if let Some(script) = script_preview(&c, &current.id, id, &value)? {
+            page["scriptPreview"] = script;
+        }
+    }
+    Ok(page)
 }
 
 /// Cached transport replies retain the same historical dependency boundary as
@@ -452,7 +529,7 @@ pub(in crate::agent_work) fn read_ui(root: &Path, args: &Value) -> Result<Value,
     {
         return Err("事项或授权状态已变化，请刷新后重读".into());
     }
-    read_for_work(
+    read_page(
         root,
         &w,
         args["recordId"].as_str().ok_or("历史结果身份缺失")?,
@@ -465,6 +542,7 @@ pub(in crate::agent_work) fn read_ui(root: &Path, args: &Value) -> Result<Value,
             .as_u64()
             .and_then(|v| usize::try_from(v).ok())
             .ok_or("历史结果范围无效")?,
+        args["includeScriptPreview"] == true,
     )
 }
 

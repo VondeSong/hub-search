@@ -49,6 +49,46 @@ fn count(f: &Fixture, kind: &str) -> i64 {
 }
 
 #[test]
+fn script_preview_joins_the_admitted_call_and_verified_result_for_the_ui() {
+    let (f, w, r) = setup();
+    let script = "print('🙂')\n".repeat(500);
+    let request = json!({"operation":"analyzeFiles","stepId":"inspect","script":script});
+    record(&f.root, &r, "toolCall", &request).unwrap();
+    let result = json!({
+        "scriptSha256":format!("{:x}", Sha256::digest(script.as_bytes())),
+        "output":{"exitCode":0,"output":{"machine":"x86-64"}},
+        "files":[]
+    });
+    let reference = capture(&f.root, &w.id, &r, &request, &result).unwrap();
+    let mut args = json!({
+        "action":"readToolResult","id":w.id,"expectedWorkRevision":w.revision,
+        "expectedAuthorizationVersion":w.authorization_version,
+        "recordId":reference["recordId"],"expectedSha256":reference["sha256"],
+        "startChar":0,"maxChars":4000,"includeScriptPreview":true
+    });
+    let preview = ui(&f.root, &args).unwrap();
+    assert_eq!(preview["scriptPreview"]["script"]["content"], script);
+    assert_eq!(preview["scriptPreview"]["script"]["truncated"], false);
+    assert_eq!(preview["scriptPreview"]["exitCode"], 0);
+    assert_eq!(
+        serde_json::from_str::<Value>(
+            preview["scriptPreview"]["output"]["content"]
+                .as_str()
+                .unwrap()
+        )
+        .unwrap(),
+        result["output"]["output"]
+    );
+    assert!(!preview["content"].as_str().unwrap().contains("print"));
+    assert!(reload(&f, &w, &reference, 0, 4000)
+        .unwrap()
+        .get("scriptPreview")
+        .is_none());
+    args["expectedAuthorizationVersion"] = json!(w.authorization_version + 1);
+    assert!(ui(&f.root, &args).is_err());
+}
+
+#[test]
 fn trace_skill_preview_is_historical_bounded_and_preserves_original_json() {
     let (f, w, r) = setup();
     let request = call(&f, &r, "skill-preview");
