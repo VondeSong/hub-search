@@ -634,3 +634,23 @@
 .ha-native-site{display:grid;gap:6px;margin:10px 0}
 .ha-native-site input{box-sizing:border-box;min-width:0;width:100%;border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--surface);color:var(--text);font:inherit}
 .ha-native-connections>button{border:1px solid var(--line);border-radius:6px;padding:5px 8px;background:var(--surface);color:var(--text);font:inherit}
+
+.ha-current-action { margin: 10px 0 16px; color: var(--subtle); font-size: 14px; line-height: 1.6; }
+@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  @supports (background-clip: text) {
+    .ha-active-ink {
+      background: linear-gradient(90deg,var(--subtle) 36%,white 50%,var(--subtle) 64%) 100% center / 240% 100%;
+      background-clip: text;
+      color: transparent;
+      animation: ha-running-ink 1.8s linear infinite;
+    }
+  }
+}
+@keyframes ha-running-ink { from { background-position: 100% center; } 75%,to { background-position: 0% center; } }
+.ha-replay-toolbar,.ha-replay-sites { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ha-replay-toolbar { color: var(--subtle); font-size: 12px; }
+.ha-replay-toolbar span { margin-inline-end: auto; }
+.ha-replay-body > p { margin-block: 14px 8px; }
+.ha-replay-sites span { display: inline-flex; align-items: center; gap: 4px; border-radius: 12px; background: var(--surface-2); padding: 2px 7px; }
+.ha-replay-table { width: 100%; border-collapse: collapse; }
+.ha-replay-table :is(th,td) { padding: 6px; border-bottom: 1px solid var(--line); text-align: start; overflow-wrap: anywhere; }

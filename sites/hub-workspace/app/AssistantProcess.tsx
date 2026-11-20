@@ -1,8 +1,9 @@
 "use client";
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
 import {BookOpen,Check,ChevronDown,FileText,FolderOpen,Globe2,Search,Terminal,TriangleAlert} from 'lucide-react';
 
 const examples = [
+  ['timeline', '同题回放'],
   ['short', '简短问答'],
   ['read', '读取与恢复'],
   ['web', '网页检索'],
@@ -40,8 +41,45 @@ function ProcessGroup({title, icon: Icon, children}: {
   </details>;
 }
 
+function AttachmentReplay() {
+  const [step,setStep] = useState(0);
+  const [playing,setPlaying] = useState(true);
+  const [revision,setRevision] = useState(0);
+  useEffect(() => {
+    if (!playing || step === 5) return;
+    const timer = window.setTimeout(() => setStep(value => value + 1), step === 0 ? 2400 : 3200);
+    return () => window.clearTimeout(timer);
+  }, [step,playing,revision]);
+
+  return <>
+    <div className="ha-replay-toolbar">
+      <span>附件分析 · 录屏回放示例</span>
+      {step < 5 && <button type="button" onClick={() => setPlaying(value => !value)}>{playing ? '暂停回放' : '继续回放'}</button>}
+      <button type="button" onClick={() => { setRevision(value => value+1); setStep(0); setPlaying(true); }}>重播</button>
+    </div>
+    <div key={revision} className="ha-replay-body">
+      {step >= 1 && <p>先核对两个附件的架构、版本及签名。</p>}
+      {step >= 2 && <ProcessGroup title="已检查两个附件" icon={Terminal}>
+        <details className="ha-process-batch"><summary>读取文件版本 <ChevronDown size={12}/></summary>
+          <div className="ha-script-region"><p>PowerShell · 示例</p><pre tabIndex={0}><code>{'(Get-Item .\\vcruntime140.dll).VersionInfo.FileVersion\n14.29.30147.0'}</code></pre><small>退出码 0</small></div>
+        </details>
+      </ProcessGroup>}
+      {step >= 2 && <p>两个文件的版本一致。接下来查找公开的分发和使用记录。</p>}
+      {step >= 3 && <ProcessGroup title="已检索网页并核对来源" icon={Search}>
+        <details className="ha-process-batch"><summary>搜索网页 <ChevronDown size={12}/></summary>
+          <p>vcruntime140_1.dll 与 vcruntime140.dll 成对分发</p>
+          <div className="ha-replay-sites"><span><Globe2 size={12}/>Spotfire 发布说明</span><span><Globe2 size={12}/>Microsoft C++ 团队</span></div>
+        </details>
+        <details className="ha-process-batch"><summary><TriangleAlert size={14}/>命令未完成 <ChevronDown size={12}/></summary><p>这一步未取得结果，已保留其他来源。</p></details>
+      </ProcessGroup>}
+      {step < 4 && <p role="status" className="ha-current-action"><span className={playing ? 'ha-active-ink' : ''}>{['正在思考','正在检查文件版本','正在搜索网页','正在整理结果'][step]}</span></p>}
+      {step >= 4 && <p>这两个附件是 x64 Visual C++ 运行库组件，文件版本均为 14.29.30147.0。</p>}
+      {step === 5 && <table className="ha-replay-table"><thead><tr><th>附件</th><th>大小</th></tr></thead><tbody><tr><td>vcruntime140.dll</td><td>98,208 字节</td></tr><tr><td>vcruntime140_1.dll</td><td>38,304 字节</td></tr></tbody></table>}
+    </div>
+  </>;
+}
 export function AssistantProcessDemo({onClose}: {onClose: () => void}) {
-  const [scenario,setScenario] = useState<(typeof examples)[number][0]>('read');
+  const [scenario,setScenario] = useState<(typeof examples)[number][0]>('timeline');
   const [readAgain,setReadAgain] = useState(false);
   const [visibleBatches,setVisibleBatches] = useState(5);
   return <section className="ha-process-review ha-process-demo" aria-label="工作过程示例">
@@ -50,6 +88,7 @@ export function AssistantProcessDemo({onClose}: {onClose: () => void}) {
       {examples.map(([id,label]) => <button type="button" key={id} aria-pressed={scenario===id} onClick={()=>setScenario(id)}>{label}</button>)}
     </div>
     <div key={scenario} className="ha-process-example">
+      {scenario === 'timeline' && <AttachmentReplay/>}
       {scenario === 'short' && <><p className="ha-process-meta">用时 12 秒</p><p>这份清单按资料、核对项和待确认问题分成三部分。</p></>}
       {scenario === 'read' && <>
         <p className="ha-process-commentary">先核对资料版本，再找出需要复查的段落。</p>

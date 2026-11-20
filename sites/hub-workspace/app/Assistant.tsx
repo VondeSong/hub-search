@@ -4,7 +4,7 @@ import { useCallback, useEffect, useReducer, useRef, useState, type ChangeEvent,
 import {
   ArrowUp, ArrowUpRight, Check, ChevronDown, ChevronRight, FileText, Layers,
   Paperclip, Play, Sparkles, Square, X, Copy, FilePlus2,
-  ListPlus, PencilLine, CornerDownRight, Link2, LoaderCircle, WandSparkles, BookOpen, CircleHelp, Tags, Search,
+  ListPlus, PencilLine, CornerDownRight, Link2, WandSparkles, BookOpen, CircleHelp, Tags, Search,
 } from 'lucide-react';
 
 import { parseTagRequest, tagIntents, tagPrompt, tagRuleLibrary, type TagReviewModel, type TagTask } from './tag-assistant';
@@ -49,6 +49,7 @@ type Message = {
   text: string;
   context?: AssistantContext | null;
   sections?: Section[];
+  processWebEnabled?: boolean;
   model?: Model;
   attachmentNames?: string[]; resources?: ResourceDraft; tagTask?: TagTask; tagResult?: TagResult;
 };
@@ -180,7 +181,7 @@ function readSession(value: unknown): Session {
     const result = plain(message.tagResult);
     return [{
       id: message.id, role: message.role as Message['role'], text: message.text.slice(0, 12000),
-      context: readContext(message.context), sections, model: readSettings(message).model,
+      context: readContext(message.context), sections, processWebEnabled: message.processWebEnabled === true, model: readSettings(message).model,
       attachmentNames: strings(message.attachmentNames), resources: readResources(message.resources), tagTask:readTagTask(message.tagTask),
       tagResult: typeof result?.message === 'string' ? { ids: strings(result.ids, 31), message: result.message, next: result.next === 'scope' || result.next === 'definition' ? result.next : undefined, process: strings(result.process, 12) } : undefined,
     }];
@@ -407,7 +408,7 @@ function reducer(state: Session, action: Action): Session {
   }
   if (action.type === 'complete') {
     if (!state.active || state.active.id !== action.id || state.active.status !== 'running') return state;
-    const messages = [...state.messages, demoReply(state.active)].slice(-50);
+    const messages = [...state.messages, { ...demoReply(state.active), processWebEnabled: state.active.webSearch !== 'disabled' && state.active.researchPolicy !== 'materials-only' && state.active.model !== 'deepseek' }].slice(-50);
     if (state.queue.length && !state.frozen) {
       const [next, ...queue] = state.queue;
       return { ...state, messages: [...messages, userMessage(next)].slice(-50), active: { ...next, status: 'running', revision: 0 }, queue };
@@ -1081,6 +1082,7 @@ function AssistantConversation({
                 {!session.active&&<button className="ha-edit-message" type="button" onClick={()=>{if(input.trim()){notify('请先发送或保留当前草稿，再编辑这条消息');return;}setInput(message.text);setInputContext(message.context||null);setResources({...message.resources||emptyResources(),pages:[...new Map([...(message.context?[message.context]:[]),...(message.resources?.pages||[])].map(page=>[page.id,page])).values()]});setAttachmentNames(message.attachmentNames||[]);setOmittedId(context?.id||null);composer.current?.focus();}}>编辑</button>}
                 {!!message.attachmentNames?.length && <div className="ha-message-files">{message.attachmentNames.map(name => <span key={name}><Paperclip size={10} />{name}</span>)}</div>}
               </> : <>
+                {!message.tagTask && !message.tagResult && <AssistantProcess webEnabled={message.processWebEnabled === true}/>}
                 {answerBody(message)}
                 {message.tagResult && <>
                   {message.tagResult.next && <div className="ha-message-actions">
@@ -1091,15 +1093,16 @@ function AssistantConversation({
                   {!!message.tagResult.process?.length&&<AssistantProcess steps={message.tagResult.process}/>}
                 </>}
                 {message.tagTask && !message.tagResult && <div className="ha-message-actions"><button type="button" onClick={() => { setTagMode(true); setTag(message.tagTask!.tag); setTagRefs(refs=>[...new Set([...refs,message.tagTask!.tag])]); prepareTag(message.tagTask!.intent); }}>在标签助手继续</button></div>}
-                {!message.tagTask && !message.tagResult && <><AssistantProcess webEnabled={effectiveWebSearch !== 'disabled'}/>
+                {!message.tagTask && !message.tagResult && <>
                 <div className="ha-message-actions"><button type="button" className="ha-copy-answer" aria-label={copied === message.id ? '已复制回答' : '复制回答'} title={copied === message.id ? '已复制' : '复制回答'} onClick={async () => { try { await navigator.clipboard.writeText([message.text, ...(message.sections || []).map(item => item.heading + '\n' + item.body)].join('\n\n')); setCopied(message.id); } catch { notify('复制失败，请重试或选择正文复制。'); } }}>{copied === message.id ? <Check size={16}/> : <Copy size={16}/>}</button>{onInsertPage && <button type="button" onClick={() => setInsertion({ body: [message.text, ...(message.sections || []).map(item => item.heading + '\n' + item.body)].join('\n\n'), source: message.context || null })}><FilePlus2 size={14}/>插入页面</button>}<button type="button" title="将回答另存为独立笔记" onClick={() => prepare(message, 'note')}><PencilLine size={14}/>新建笔记</button><button type="button" title="将回答转为可编辑的待办草稿" onClick={() => prepare(message, 'task')}><ListPlus size={14}/>创建任务</button></div></>}
               </>}
             </article>)}
 
             {tagMode && !tagIntent && !reading && !!session.messages.length && !contextBlocked && <details className="ha-tag-prompts"><summary>标签助手建议</summary><div className="ha-prompts">{tagSuggestions}</div></details>}
-            {session.active && <div className={'ha-run-status'  + (paused ? ' ha-is-paused' : '')} role="status">
-              {running ? <LoaderCircle size={15} className="ha-spinner" /> : <Square size={13} />}
-              <div><strong>{activeBlocked ? '来源不可用 · 已暂停' : paused ? '已暂停' : ['读取示例上下文', '整理材料中的要点', '准备可编辑的结果'][stage]}</strong><small>{activeBlocked ? '恢复来源后再核对，或移除本次演示请求' : paused ? '当前输入和队列已保留' : '演示运行 · 可随时停止或补充条件'}</small></div>
+            {session.active && running && !activeBlocked && <div className="ha-current-action" role="status"><span className="ha-active-ink">{['正在思考', '正在整理示例材料', '正在准备回答'][stage]}</span></div>}
+            {session.active && (paused || activeBlocked) && <div className={'ha-run-status'  + (paused ? ' ha-is-paused' : '')} role="status">
+              <Square size={13}/>
+              <div><strong>{activeBlocked ? '来源不可用 · 已暂停' : '已暂停'}</strong><small>{activeBlocked ? '恢复来源后再核对，或移除本次演示请求' : '当前输入和队列已保留'}</small></div>
               {activeBlocked ? <button type="button" onClick={() => { dispatch({ type: 'discard-active' }); notify('未完成的演示请求已移除，历史记录保留'); }}><X size={12}/>移除请求</button> : <button type="button" onClick={() => dispatch({ type: paused ? 'continue' : 'stop' })}>{paused ? <><Play size={12} />继续</> : <><Square size={11} />停止</>}</button>}
             </div>}
           </div>
