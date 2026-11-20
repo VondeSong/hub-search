@@ -127,16 +127,51 @@ it("keeps public reasoning visible between collapsed tool groups in chronologica
  expect(reasoning.nextElementSibling?.classList.contains('agent-operation-group')).toBe(true);
  expect([...host.querySelectorAll<HTMLDetailsElement>('.agent-operation-group')].every(group=>!group.open)).toBe(true);
 });
-it("uses the current action as the heading while keeping history oldest first",async()=>{
+it("keeps unknown web actions grouped and history oldest first",async()=>{
  const events:ActivityRun['events']=[{id:'new',kind:'webSearch',state:'running',label:'最新网页操作',createdAt:3000},{id:'old',kind:'webSearch',state:'completed',label:'最早网页操作',createdAt:1000}];
  await act(async()=>root.render(<AgentActivity value={{...run,events}}/>));
  const phase=host.querySelector<HTMLDetailsElement>('.agent-operation-group')!;
- expect(phase.querySelector('summary')?.textContent).toBe('最新网页操作');
+ expect(phase.querySelector('summary')?.textContent).toBe('网页操作 · 2 步');
  await act(async()=>phase.querySelector('summary')!.click());
  const rows=phase.querySelectorAll('.agent-web-activity > summary');
  expect(rows[0].textContent).toContain('最早网页操作');
  expect(rows[1].textContent).toContain('最新网页操作');
  expect(host.textContent).not.toContain('联网记录说明');
+});
+
+it("keeps the live web summary steady across successive queries and publishes the final site count",async()=>{
+ const sources=(first:number)=>Array.from({length:4},(_,index)=>({url:`https://site-${first+index}.example.org/article`}));
+ const search:ActivityRun['events'][number]={id:'first',kind:'webSearch',action:'search',state:'completed',label:'搜索网页',queries:['第一批查询'],sourceRefs:sources(1),errorCount:1,createdAt:3000};
+ const next:ActivityRun['events'][number]={...search,id:'second',action:'other',state:'running',queries:[],sourceRefs:[],errorCount:0,createdAt:4000};
+ const draw=(events:ActivityRun['events'],running=true)=>act(async()=>root.render(<AgentActivity value={{...run,events,running,state:running?'investigating':'completed',finishedAt:running?null:6000}}/>));
+ await draw([]);
+ expect(host.querySelector('.agent-live-status')?.textContent).toBe('正在思考');
+ await draw([search]);
+ const phase=host.querySelector<HTMLDetailsElement>('.agent-operation-group')!;
+ const summary=phase.querySelector('summary')!;
+ const label=summary.querySelector('.agent-phase-label')!;
+ expect(label.textContent).toBe('网页检索 · 1 步');
+ expect(phase.querySelector('.agent-web-details')?.textContent).toContain('本批 1 项未能获取');
+ expect(summary.querySelectorAll('.agent-site-icon')).toHaveLength(3);
+ expect(summary.textContent).not.toContain('个站点');
+ expect(host.querySelector('.agent-live-status')).toBeNull();
+ await act(async()=>summary.click());
+ await draw([search,next]);
+ expect(label.textContent).toBe('网页检索 · 2 步');
+ expect(phase.classList.contains('agent-operation-active')).toBe(true);
+ expect(host.querySelector('.agent-live-status')).toBeNull();
+ await draw([search,{...next,action:'search',state:'completed',queries:['第二批查询'],sourceRefs:sources(5)}]);
+ expect(label.textContent).toBe('网页检索 · 2 步');
+ expect(phase.classList.contains('agent-operation-active')).toBe(false);
+ expect(host.querySelector('.agent-live-status')).toBeNull();
+ expect(summary.textContent).not.toContain('个站点');
+ expect(phase.open).toBe(true);
+ const queries=[...phase.querySelectorAll('.agent-web-activity > summary')].map(row=>row.textContent);
+ expect(queries).toEqual(['搜索网页 · 第一批查询','搜索网页 · 第二批查询']);
+ await draw([search,{...next,action:'search',state:'completed',queries:['第二批查询'],sourceRefs:sources(5)}],false);
+ expect(label.textContent).toBe('网页检索 · 2 步');
+ expect(summary.textContent).toContain('另 5 个站点');
+ expect(phase.open).toBe(true);
 });
 it("updates a phase title and preserves its disclosure when tools and summaries arrive",async()=>{
  const initial:ActivityRun={...run,events:[run.events[0],{...run.events[1],state:'running'}]};

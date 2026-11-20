@@ -102,7 +102,7 @@ const brands:Record<string,{src:string;title:string}>={github:{src:github,title:
 export function activityServiceTitle(server:string,events:ActivityEvent[]) {
   return brands[server]?.title ?? events.find(event=>event.serviceId===server && event.serviceTitle)?.serviceTitle;
 }
-export function ActivityIdentity({events,workId,primaryIcon}:{events:ActivityEvent[];workId?:string;primaryIcon?:ActivityEvent}) {
+export function ActivityIdentity({events,workId,primaryIcon,showRemainingSites=true}:{events:ActivityEvent[];workId?:string;primaryIcon?:ActivityEvent;showRemainingSites?:boolean}) {
   const sites=activitySites(events);
   const services=[...new Set(events.map(e=>e.serviceId).filter((s):s is string=>!!s))];
   const agents=[...new Set(events.flatMap(e=>e.agentIds??[]))];
@@ -113,7 +113,7 @@ export function ActivityIdentity({events,workId,primaryIcon}:{events:ActivityEve
   return <span className="agent-activity-identities" aria-label="活动来源">
     {identities.slice(0,3).map(service=><span key={service.id} className="agent-service-icon" title={service.title}><img src={service.src} alt={service.title} width={16} height={16}/></span>)}
     {sites.slice(0,3).map(site=><WebsiteIcon key={new URL(site.url).hostname} {...site} workId={workId}/>)}
-    {sites.length > 3 && <small title={sites.slice(3).flatMap(site => site.hosts).join("、")}>另 {sites.length - 3} 个站点</small>}
+    {showRemainingSites && sites.length > 3 && <small title={sites.slice(3).flatMap(site => site.hosts).join("、")}>另 {sites.length - 3} 个站点</small>}
     {agents.slice(0,3).map(id=>{
       const hash=Array.from(id).reduce((n,c)=>(n*31+c.charCodeAt(0))>>>0,0);
       return <svg key={id} width="16" height="16" viewBox="0 0 16 16" role="img" aria-label={`子代理 ${id.slice(-6)}`} className="agent-avatar" style={{color:`hsl(${[205,160,330,270,35][hash%5]} 64% 58%)`}}><title>{id}</title>{Array.from({length:6},(_,i)=><path key={i} d="M8 8 6 1h4Z" fill="currentColor" opacity={i%2?0.6:1} transform={`rotate(${i*60+(hash%2?30:0)} 8 8)`}/>)}</svg>;

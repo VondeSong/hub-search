@@ -54,7 +54,8 @@ it("CN04 native web activity remains visible without claiming full-text reading"
  value.events.push({id:"empty",kind:"webSearch",state:"completed",label:"Codex 搜索网页： ",createdAt:2},{id:"failed",kind:"webSearch",state:"failed",label:"Codex 搜索网页：新闻",createdAt:3});
  await act(async()=>root.render(<AgentActivity value={value}/>));await act(async()=>host.querySelector<HTMLButtonElement>("button")!.click());
  expect(host.textContent).not.toContain("调用已结束");expect(host.textContent).not.toContain("搜索网页： ·");
- expect(host.textContent).toContain("搜索网页 · 未完成");
+ expect(host.querySelector(".agent-phase-warning")?.textContent).toBe("部分未完成");
+ expect(host.querySelector('.agent-web-activity > summary[title="搜索网页 · 未完成"] small')?.textContent).toBe("未完成");
  expect(host.querySelector(".agent-web-provenance")).toBeNull();
  expect(host.textContent).not.toContain("已读全文");
  expect(host.textContent).toContain("这条记录未提供逐项返回结果");

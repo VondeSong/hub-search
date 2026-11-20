@@ -316,19 +316,21 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
     if(visibleCount>visible)setVisible(visibleCount);
   },[visibleCount,visible]);
   const summaries=events.filter(isCodexSummary);
+  const webPhase=operations.length>0 && operations.every(event=>event.kind==="webSearch");
   const failed=operations.some(event=>operationFailed(event) && (event.kind!=="webSearch" || settled));
   const active=current?.state==="running";
   const labels = [...new Set(operations.map(event => operationLabels[activityOperation(event)]))];
-  const mixedWeb = labels.length > 1 && operations.every(event=>event.kind==="webSearch");
+  const webOverview = webPhase && (operations.length>1 || live && labels.includes(operationLabels.webSearch));
+  const webTitle = labels.every(label=>label===operationLabels.webUnknown) ? "网页操作" : "网页检索";
   const mixed = mixedPhaseOverview(operations);
-  const summaryIcon=mixed?.icon ?? (labels.length>1 && !mixedWeb
+  const summaryIcon=mixed?.icon ?? (labels.length>1 && !webPhase
     ? {...operations[0],kind:"tool" as const,operation:"mixed"} : operations[0]);
   const readSpan=operations.length===1 ? operations[0].readSpan : undefined;
   const attachmentTitle=operations.length===1 && operations[0].operation==="analyzeFiles"
     ? activityLabel(operations[0]) : undefined;
-  const overview=!operations.length ? "公开思考摘要" : mixedWeb ? `网页检索 · ${operations.length} 步`
+  const overview=!operations.length ? "公开思考摘要" : webOverview ? `${webTitle} · ${operations.length} 步`
     : mixed?.title ?? externalPhaseTitle(operations) ?? (operations.every(event=>event.state==="completed"&&!event.errorCount)?"已":"")+(attachmentTitle ?? labels.join("、"))+(readSpan?.title ? ` · ${readSpan.title}` : "");
-  const latest=current ?? (live && operations.length>1 ? operations[operations.length-1] : undefined);
+  const latest=webOverview ? undefined : current ?? (live && operations.length>1 ? operations[operations.length-1] : undefined);
   let summary=overview;
   if(latest) {
     const label=latest.kind==="webSearch" ? webLabel(latest) : toolActivityLabel(latest);
@@ -352,7 +354,7 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
     <summary title={summary}>
       {headingIcon && <ActivityIcon event={headingIcon}/>}
       <span className="agent-phase-label">{summary}</span>
-      <ActivityIdentity events={operations} workId={scope?.workId} primaryIcon={headingIcon}/>
+      <ActivityIdentity events={operations} workId={scope?.workId} primaryIcon={headingIcon} showRemainingSites={!live || !webPhase}/>
       <ChevronDown className="agent-reasoning-chevron" size={12} aria-hidden="true"/>
       {failed&&!open&&<small className="agent-phase-warning" role="status"><TriangleAlert size={12} aria-hidden="true"/>部分未完成</small>}
     </summary>
@@ -371,11 +373,12 @@ function ActivityTimeline({events,scope,running,segmented,settled,runId}:{events
   const current=running ? [...latest].reverse().find(event=>isOperation(event) && event.state==="running")
     ?? latest.find(event=>isOperation(event) && event.state==="queued") : undefined;
   const reportedStatus=latest.some(event=>boundary(event) && event.state==="running");
+  const continuingWebPhase=latest.some(event=>event.kind==="webSearch");
   return <>
     {groups.map(group=>boundary(group[0])
       ? <ActivityEventView key={group[0].id} event={group[0]} scope={scope} runId={runId}/>
       : <OperationPhase key={group[0].id} events={group} scope={scope} runId={runId} segmented={segmented} settled={settled} live={running && group===latest} current={group===latest ? current : undefined}/>)}
-    {running && !current && !reportedStatus && <p className="agent-live-status" role="status"><span>正在思考</span></p>}
+    {running && !current && !reportedStatus && !continuingWebPhase && <p className="agent-live-status" role="status"><span>正在思考</span></p>}
   </>;
 }
 
