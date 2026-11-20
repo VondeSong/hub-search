@@ -1,14 +1,27 @@
 "use client";
 import {useState} from 'react';
-import {BookOpen,ChevronDown,FileText,FolderOpen,Globe2,Search,Terminal,TriangleAlert} from 'lucide-react';
+import {BookOpen,Check,ChevronDown,FileText,FolderOpen,Globe2,Search,Terminal,TriangleAlert} from 'lucide-react';
 
 const examples = [
   ['short', '简短问答'],
   ['read', '读取与恢复'],
   ['web', '网页检索'],
   ['tools', '浏览器与应用'],
+  ['script', '脚本检查'],
   ['files', '分批分析'],
 ] as const;
+
+const attachmentScript = `from pathlib import Path
+from struct import unpack_from
+
+data = Path("quazip.dll").read_bytes()
+pe_offset = unpack_from("<I", data, 0x3c)[0]
+assert data[pe_offset:pe_offset + 4] == b"PE\\0\\0"
+machine = unpack_from("<H", data, pe_offset + 4)[0]
+magic = unpack_from("<H", data, pe_offset + 24)[0]
+print(f"Machine: 0x{machine:04X}")
+print(f"Optional header: 0x{magic:04X}")
+print(f"Size: {len(data):,} bytes")`;
 
 const batches = Array.from({length:14}, (_, index) => {
   const first = index * 1100 + 1;
@@ -57,6 +70,31 @@ export function AssistantProcessDemo({onClose}: {onClose: () => void}) {
           <details className="ha-process-batch"><summary>打开网页 <ChevronDown size={12} aria-hidden="true"/></summary><p>Skills · developers.openai.com</p><p>打开成功</p><details className="ha-process-technical"><summary>技术记录</summary><p>浏览器导航回执 · 展示示例</p></details></details>
         </ProcessGroup>
         <ProcessGroup title="准备 GitHub 评论草稿" icon={FileText}><p>草稿已准备，等待确认发布。</p></ProcessGroup>
+      </>}
+      {scenario === 'script' && <>
+        <p className="ha-process-commentary">先读取附件的文件头，确认格式和架构。</p>
+        <ProcessGroup title="检查附件 · quazip.dll" icon={Terminal}>
+          <details className="ha-process-batch ha-process-script">
+            <summary>
+              <Terminal size={15} aria-hidden="true"/>
+              <span>读取文件结构</span>
+              <small>13 秒</small>
+              <ChevronDown size={12} aria-hidden="true"/>
+            </summary>
+            <div className="ha-script-result">
+              <div className="ha-script-region">
+                <p>Python 示例脚本</p>
+                <pre role="region" aria-label="Python 示例脚本" tabIndex={0}><code>{attachmentScript}</code></pre>
+              </div>
+              <div className="ha-script-region">
+                <p>输出</p>
+                <pre role="region" aria-label="示例输出" tabIndex={0}>{'Machine: 0x8664\nOptional header: 0x020B\nSize: 204,288 bytes'}</pre>
+              </div>
+              <div className="ha-script-status"><Check size={14} aria-hidden="true"/>执行成功</div>
+            </div>
+          </details>
+        </ProcessGroup>
+        <p>附件是一个 64 位 Windows DLL，文件大小为 204,288 字节。</p>
       </>}
       {scenario === 'files' && <>
         <p className="ha-process-meta">用时 1 分 22 秒</p>
