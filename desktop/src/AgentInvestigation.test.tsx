@@ -2310,12 +2310,12 @@ it.each([false,true])("preserves user process collapse=%s through focus revalida
  const toggle=()=>document.querySelector<HTMLButtonElement>(".agent-activity-toggle")!;
  await act(async()=>toggle().click());
  if(!collapsed)await act(async()=>toggle().click());
- if(!collapsed){const group=document.querySelector<HTMLDetailsElement>(".agent-operation-group")!;await act(async()=>group.querySelector("summary")!.click());}
+ if(!collapsed)expect(document.querySelector(".agent-activity-step")?.textContent).toContain("读取原文");
  visibility.value=false;await act(async()=>root.render(<AgentInvestigation result={result}/>));
  current={...makeView(),activity:[{...activity,running:false,state:"completed",finishedAt:5000}],conversation:{...conversation,messages:[...conversation.messages,{id:"a",role:"assistant",runId:activity.runId,revision:1,createdAt:5000,report}]}};
  visibility.value=true;await act(async()=>root.render(<AgentInvestigation result={result}/>));
  expect(toggle().getAttribute("aria-expanded")).toBe(String(!collapsed));
- if(!collapsed)expect(document.querySelector<HTMLDetailsElement>(".agent-operation-group")!.open).toBe(true);
+ if(!collapsed)expect(document.querySelector(".agent-activity-step")?.textContent).toContain("读取原文");
  expect(document.body.textContent).toContain("历史记录要求保持 M6");
  expect(invoke.mock.calls.some(([,v])=>v.args.action==="respond")).toBe(false);
 });

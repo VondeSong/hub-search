@@ -24,20 +24,19 @@ it.each([
  ["mcp","使用外部工具","mcp"],["future-operation","调用工具","tool"],
 ])("AC01 %s keeps the same semantic icon in its group and row",async(operation,title,icon)=>{
  await render([event({operation,label:"Search 修改 运行 — a misleading bilingual title",detail:"真实回执"})]);
- const group=host.querySelector<HTMLDetailsElement>(".agent-operation-group")!;
- expect(group.querySelector("summary")?.textContent).toContain("已"+title);
- expect(group.querySelector("summary [data-activity-icon]")?.getAttribute("data-activity-icon")).toBe(icon);
- await act(async()=>group.querySelector("summary")!.click());
- expect(group.querySelector(".agent-activity-step [data-activity-icon]")?.getAttribute("data-activity-icon")).toBe(icon);
+ const heading=host.querySelector(".agent-activity-toggle")!;
+ expect(heading.textContent).toContain("已"+title);
+ expect(heading.querySelector("[data-activity-icon]")?.getAttribute("data-activity-icon")).toBe(icon);
+ expect(host.querySelector(".agent-activity-step [data-activity-icon]")?.getAttribute("data-activity-icon")).toBe(icon);
 });
 it("AC02 browser metadata selects the browser icon and preserves the actual source",async()=>{
  await render([event({operation:"mcp",serviceId:"browser:https://developers.openai.com",sourceRefs:[{url:"https://developers.openai.com/plugins/concepts/skills",title:"Skills"}]})]);
- expect(host.querySelector("summary [data-activity-icon]")?.getAttribute("data-activity-icon")).toBe("browser");
+ expect(host.querySelector(".agent-activity-toggle [data-activity-icon]")?.getAttribute("data-activity-icon")).toBe("browser");
  expect(host.querySelector('[aria-label="developers.openai.com"]')).not.toBeNull();
 });
 it("AC03 a mixed phase retains both kinds without borrowing the first operation icon",async()=>{
  await render([event({id:"read"}),event({id:"search",operation:"search",createdAt:2500})]);
- const summary=host.querySelector(".agent-operation-group > summary")!;
+ const summary=host.querySelector(".agent-activity-toggle")!;
  expect(summary.textContent).toContain("已读取资料、搜索资料");
  expect(summary.querySelector("[data-activity-icon]")?.getAttribute("data-activity-icon")).toBe("tool");
 });
@@ -51,15 +50,13 @@ it.each(["failed","interrupted"])("AC04 a %s external tool stays visible with th
 });
 it.each([["failed","未完成"],["running","进行中"],["queued","等待执行"]])("AC05 a short %s tool has a textual state even with no detail or receipt",async(state,label)=>{
  await render([event({state,finishedAt:undefined})],true,{state:state==="running"?"investigating":"completed",running:state==="running"});
- const group=host.querySelector<HTMLDetailsElement>(".agent-operation-group")!;
- await act(async()=>group.querySelector("summary")!.click());
- expect(group.querySelector(".agent-activity-step")?.textContent).toContain(label);
+ expect(host.querySelector(".agent-activity-step")?.textContent).toContain(label);
 });
 it("AC06 a successful retry does not erase the previous failed call or report every call as successful",async()=>{
  const events=[event({id:"first",state:"failed",detail:"连接暂时不可用"}),event({id:"retry",label:"重试读取",createdAt:3000})];
  await render(events);
- expect(host.querySelector(".agent-operation-group > summary")?.textContent).toContain("部分未完成");
- expect(host.querySelector(".agent-operation-group > summary")?.textContent).not.toContain("已读取资料");
+ expect(host.querySelector(".agent-activity-toggle")?.textContent).toContain("部分未完成");
+ expect(host.querySelector(".agent-activity-toggle")?.textContent).not.toContain("已读取资料");
 });
 it("AC07 source and agent decorations cannot be invented by a model label",async()=>{
  await act(async()=>root.render(<ActivityIdentity events={[event({label:"GitHub、Notion 和两个代理已完成",serviceId:"unknown-service"})]}/>));

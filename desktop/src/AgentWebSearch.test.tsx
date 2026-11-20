@@ -90,7 +90,7 @@ it("shows batch outcomes and separate details without turning unknown web action
   {id:"find",kind:"webSearch",state:"completed",label:"在网页内查找",action:"findInPage",pattern:"65,853,514",createdAt:4}
  ]};
  await act(async()=>root.render(<AgentActivity value={value}/>));
- expect(host.querySelector('.agent-activity-toggle')?.textContent).toBe('用时 1 秒');
+ expect(host.querySelector('.agent-run-time')?.textContent).toBe('用时 1 秒');
  await act(async()=>host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!.click());
  expect(host.querySelector('.agent-operation-group > summary')?.textContent).toContain('网页检索 · 3 步');
  const summaries=Array.from(host.querySelectorAll('.agent-activity-step summary')).map(s=>s.textContent);

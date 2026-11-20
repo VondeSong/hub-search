@@ -104,7 +104,7 @@ function eventStateLabel(event:ActivityEvent) {
   return ({failed:"未完成",running:"进行中",interrupted:"已中断",queued:"等待执行"} as Record<string,string>)[event.state] ?? "";
 }
 
-function ScriptActivity({event, resultRef, scope}: {event:ActivityEvent;resultRef:ToolResultRef;scope:ToolResultScope}) {
+function RecordedToolActivity({event, resultRef, scope}: {event:ActivityEvent;resultRef:ToolResultRef;scope:ToolResultScope}) {
   const [open,setOpen]=useState(false);
   const duration=eventDuration(event);
   return <div className={`agent-activity-step agent-step-${event.state}`}>
@@ -117,8 +117,8 @@ function ScriptActivity({event, resultRef, scope}: {event:ActivityEvent;resultRe
         <ChevronDown size={12} className="agent-reasoning-chevron" aria-hidden="true"/>
       </summary>
       {open && <>
-        {event.state==="completed" && event.detail && event.detail!=="脚本执行成功" && <p>{event.detail}</p>}
-        <AgentToolResult value={resultRef} scope={scope} scriptState={event.state}/>
+        {event.detail && event.detail!=="脚本执行成功" && <p>{event.detail}</p>}
+        <AgentToolResult value={resultRef} scope={scope} embedded scriptState={["analyzeFiles","compute"].includes(event.operation??"") ? event.state : undefined}/>
       </>}
     </details>
   </div>;
@@ -128,14 +128,14 @@ function ActivityEventView({ event, scope, runId }: { event: ActivityEvent; scop
   const span=event.readSpan;
   event={
     ...event,
-    label:span?.title ? `读取原文 · ${span.title}` : activityLabel(event),
+    label:event.toolName && event.kind==="tool" ? event.toolName : span?.title ? `读取原文 · ${span.title}` : activityLabel(event),
     detail:span && span.end>span.start ? `已读取 ${span.start+1}–${span.end} / ${span.total} 字符` : event.detail,
   };
   if (event.label === "核对任务状态（内部）" && event.state === "completed") return <details className="agent-reasoning"><summary>已核对任务状态</summary><div>{event.resultRef && scope && <AgentToolResult value={event.resultRef} scope={scope}/>}</div></details>;
   if (event.kind === "unpublishedAnswer") return <UnpublishedAnswer text={event.label} truncated={event.truncated}/>;
   if (event.kind === "webSearch") return <WebActivity event={event} runId={runId}/>;
-  if (event.kind==="tool" && (event.operation==="analyzeFiles" || event.operation==="compute") && event.resultRef && scope) {
-    return <ScriptActivity event={event} resultRef={event.resultRef} scope={scope}/>;
+  if (event.kind==="tool" && (event.operation || event.toolName) && !event.agentIds?.length && event.resultRef && scope) {
+    return <RecordedToolActivity event={event} resultRef={event.resultRef} scope={scope}/>;
   }
   if (event.kind === "plan") return <details className="agent-reasoning"><summary>工作计划<ChevronDown className="agent-reasoning-chevron" size={13} aria-hidden="true"/></summary><div><PublicText text={event.label}/></div></details>;
   if (event.kind === "context") return <div className="agent-activity-step agent-context-event"><ActivityIcon event={event}/>{event.detail ? <details><summary>{event.label}</summary><p>{event.detail}</p></details> : <span>{event.label}</span>}</div>;
@@ -167,6 +167,23 @@ function elapsed(milliseconds: number) {
 }
 
 const isOperation=(event:ActivityEvent)=>["context","tool","skill","webSearch"].includes(event.kind);
+function runOverview(events:ActivityEvent[]) {
+  const operations=events.filter(isOperation);
+  const actions=new Set<string>();
+  const services=new Set<string>();
+  for(const event of operations) {
+    const kind=activityOperation(event);
+    const service=kind==="mcp" && event.serviceId && activityServiceTitle(event.serviceId,operations);
+    if(service) services.add(service);
+    else actions.add(event.operation==="analyzeFiles" ? "分析附件" : operationLabels[kind]);
+  }
+  const parts=[...(services.size ? ["使用 "+[...services].join("、")+" 集成"] : []),...actions];
+  if(!parts.length)return "";
+  const completed=operations.every(event=>event.state==="completed" && !event.errorCount);
+  const partial=operations.some(event=>event.state==="failed" || event.state==="interrupted" || event.errorCount);
+  return (completed?"已":"")+parts.join("、")+(partial?" · 部分未完成":"");
+}
+
 function externalPhaseTitle(operations:ActivityEvent[]) {
   const actions = [...new Set(operations.flatMap(event => {
     if (event.toolName === "catalog") return [];
@@ -203,6 +220,10 @@ function OperationPhase({events,scope,running,runId}:{events:ActivityEvent[];sco
   const currentTitle=current && (current.kind === "webSearch" ? webLabel(current) : activityLabel(current));
   const currentLabel=currentTitle && (/^(读取|搜索|访问|运行|执行|检查|核对|验证|编辑|加载|查找|整理|分析|生成|保存|创建)/.test(currentTitle)?"正在"+currentTitle:currentTitle);
   const summary=current ? pending&&!active?"等待："+currentTitle:currentLabel! : overview;
+  const steps=<div className="agent-operation-children">{events.slice(0,visible).map(event=><ActivityEventView key={event.id} event={event} scope={scope} runId={runId}/>)}
+      {visible<events.length && <button type="button" className="agent-show-more" onClick={()=>setVisible(count=>count+8)}>显示更多步骤 · 另 {events.length-visible} 项</button>}
+    </div>;
+  if(operations.every(event=>event.kind==="tool" && (event.operation || event.toolName)))return steps;
   return <details className={`agent-operation-group${active?" agent-operation-active":""}`} open={open} onToggle={event=>setOpen(event.currentTarget.open)}>
     <summary title={summary}>
       <ActivityIcon event={current ?? {...summaryIcon,state:"completed",errorCount:0}}/>
@@ -211,9 +232,7 @@ function OperationPhase({events,scope,running,runId}:{events:ActivityEvent[];sco
       <ChevronDown className="agent-reasoning-chevron" size={12} aria-hidden="true"/>
       {otherFailure&&!open&&<small className="agent-phase-warning" role="status"><TriangleAlert size={12} aria-hidden="true"/>部分未完成</small>}
     </summary>
-    <div className="agent-operation-children">{events.slice(0,visible).map(event=><ActivityEventView key={event.id} event={event} scope={scope} runId={runId}/>)}
-      {visible<events.length && <button type="button" className="agent-show-more" onClick={()=>setVisible(count=>count+8)}>显示更多步骤 · 另 {events.length-visible} 项</button>}
-    </div>
+    {steps}
   </details>;
 }
 function ActivityTimeline({events,scope,running,runId}:{events:ActivityEvent[];scope:ToolResultScope|null;running:boolean;runId:string}) {
@@ -286,8 +305,13 @@ export function AgentActivity({ value, onRecheck, requestText }: { value: Activi
   const clippedProgress=processEvents.filter(event=>["message","reasoning","plan"].includes(event.kind));
   const clippingInText=clippedProgress.some(event=>event.label.trimEnd().endsWith(progressClippingNotice));
   const clipped=clippingInText || clippedProgress.some(event=>event.truncated);
+  const firstOperation=processEvents.find(isOperation);
+  const mixedOperations=firstOperation && processEvents.some(event=>isOperation(event) && activityOperation(event)!==activityOperation(firstOperation));
+  const overviewIcon=firstOperation && (mixedOperations ? {...firstOperation,kind:"tool" as const,operation:"mixed"} : firstOperation);
+  const overview=value.validity ? "" : runOverview(processEvents);
   const timeControl = hasProcess ? <button type="button" className="agent-activity-toggle" aria-expanded={expanded} aria-controls={detailsId} onClick={()=>setExpanded(!expanded)}>
-      <span>{timeLabel} {duration}{stateLabel}</span><ChevronDown className={expanded ? "" : "agent-collapsed"} size={12} aria-hidden="true"/>
+      {overview && overviewIcon && <><ActivityIcon event={overviewIcon}/><span className="agent-run-overview" title={overview}>{overview}</span></>}
+      <span className="agent-run-time">{timeLabel} {duration}{stateLabel}</span><ChevronDown className={expanded ? "" : "agent-collapsed"} size={12} aria-hidden="true"/>
     </button> : (!value.running || answer || value.capabilities) && <p className="agent-elapsed">{timeLabel} {duration}{stateLabel}</p>;
   return <section className="agent-activity" aria-label="本轮工作过程">
     {value.capabilities ? <>

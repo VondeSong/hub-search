@@ -12,7 +12,7 @@ it("keeps one time disclosure above the timeline and preserves the user's collap
  await act(async()=>root.render(<AgentActivity value={run}/>));
  const toggle=host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!;
  expect(host.querySelector('section')?.firstElementChild).toBe(toggle);
- expect(toggle.textContent).toMatch(/^已处理 /);
+ expect(toggle.querySelector('.agent-run-time')?.textContent).toMatch(/^已处理 /);
  expect(toggle.getAttribute('aria-expanded')).toBe('true');
  expect(host.querySelector('.agent-spinning')).toBeNull();
  await act(async()=>toggle.click());
@@ -41,10 +41,10 @@ it("shows connected operations and permissions without opening the underlying re
   {server:browser,tools:["browser_navigate","browser_snapshot"]},
  ]}}}/>));
  await expandProcess();
- const group=host.querySelector<HTMLDetailsElement>(".agent-operation-group")!;
- expect(group.querySelector(".agent-phase-label")?.textContent).toBe("读取 GitHub 议题 · 浏览网页");
- await act(async()=>group.querySelector("summary")!.click());
- const step=group.querySelector<HTMLDetailsElement>(".agent-tool-activity")!;
+ expect(host.querySelector(".agent-run-overview")?.textContent).toBe("已使用 GitHub 集成、操作浏览器");
+ expect(host.querySelector(".agent-operation-group")).toBeNull();
+ const step=host.querySelector<HTMLDetailsElement>(".agent-tool-activity")!;
+ expect(step.querySelector("summary")?.textContent).toContain("browser_navigate");
  await act(async()=>step.querySelector("summary")!.click());
  expect(step.open).toBe(true);
  expect(step.textContent).toContain("已打开 · developers.openai.com/plugins/concepts/skills");
@@ -428,15 +428,15 @@ it("replays waiting, tools, answer streaming and completion without resetting ei
  const finished=[run.events[0],{...tool,state:'completed'},{...run.events[2],state:'completed'}];
  const answer={id:'a',kind:'answer' as const,state:'running',label:'已核对',createdAt:7000};
  await draw([...finished,answer]);
- expect(host.querySelector('.agent-activity-toggle')?.textContent).toBe('用时 6 秒');
+ expect(host.querySelector('.agent-run-time')?.textContent).toBe('用时 6 秒');
  await act(async()=>vi.advanceTimersByTime(2000));
- expect(host.querySelector('.agent-activity-toggle')?.textContent).toBe('用时 6 秒');
+ expect(host.querySelector('.agent-run-time')?.textContent).toBe('用时 6 秒');
  expect(host.querySelector('[aria-label="正在生成回答"]')?.closest('.agent-activity-events')).toBeNull();
  await draw([...finished,{...answer,state:'completed'}],false);
  expect(phase.open&&detail.open).toBe(true);
  expect(title.textContent).toBe('已读取资料、调用工具');
  expect(host.textContent).not.toContain('正在思考');
- expect(host.querySelector('.agent-activity-toggle')?.textContent).toBe('用时 8 秒');
+ expect(host.querySelector('.agent-run-time')?.textContent).toBe('用时 8 秒');
 });
 
 it("closes a previous phase at a public update while the newest phase owns the live status",async()=>{

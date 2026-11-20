@@ -19,20 +19,18 @@ it("uses structured operation for both collapsed heading and expanded row",async
  const e=event();expect(activityOperation(e)).toBe("search");
  await act(async()=>root.render(<AgentActivity value={run([e])}/>));
  await act(async()=>host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!.click());
- const group=host.querySelector<HTMLDetailsElement>('.agent-operation-group')!;
- expect(group.querySelector('summary [data-activity-icon]')?.getAttribute('data-activity-icon')).toBe('search');
- await act(async()=>group.querySelector('summary')!.click());
- expect(group.querySelector('.agent-activity-step [data-activity-icon]')?.getAttribute('data-activity-icon')).toBe('search');
- expect(group.textContent).toContain('已搜索资料');
+ expect(host.querySelector('.agent-activity-toggle [data-activity-icon]')?.getAttribute('data-activity-icon')).toBe('search');
+ expect(host.querySelector('.agent-activity-step [data-activity-icon]')?.getAttribute('data-activity-icon')).toBe('search');
+ expect(host.querySelector('.agent-run-overview')?.textContent).toBe('已搜索资料');
 });
 it("keeps first sequence and user disclosure when a streamed item has a later update time",async()=>{
- const early=event({id:"early",createdAt:9000,sequence:1,label:"首次事件"});
+ const early=event({id:"early",createdAt:9000,sequence:1,label:"首次事件",detail:"操作详情"});
  const later=event({id:"later",kind:"message",createdAt:2000,sequence:2,label:"后续说明"});
  await act(async()=>root.render(<AgentActivity value={{...run([later,early]),running:true}}/>));
- const group=host.querySelector<HTMLDetailsElement>('.agent-operation-group')!;
+ const group=host.querySelector<HTMLDetailsElement>('.agent-tool-activity')!;
  await act(async()=>group.querySelector('summary')!.click());expect(group.open).toBe(true);
  await act(async()=>root.render(<AgentActivity value={{...run([later,{...early,updatedAt:20000,label:"首次事件更新"}]),running:true}}/>));
- expect(host.querySelector('.agent-activity-events')?.firstElementChild).toBe(group);
+ expect(host.querySelector('.agent-activity-events')?.firstElementChild?.contains(group)).toBe(true);
  expect(group.open).toBe(true);expect(group.textContent).toContain('首次事件更新');
 });
 it("deduplicates real public origins and refuses unsafe website references",()=>{
