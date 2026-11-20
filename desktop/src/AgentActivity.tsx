@@ -108,10 +108,10 @@ function ScriptActivity({event, resultRef, scope}: {event:ActivityEvent;resultRe
   const [open,setOpen]=useState(false);
   const duration=eventDuration(event);
   return <div className={`agent-activity-step agent-step-${event.state}`}>
-    <ActivityIcon event={event}/>
     <details className="agent-tool-activity agent-script-step" onToggle={change=>setOpen(change.currentTarget.open)}>
       <summary title={event.label}>
-        <span>{event.label}</span>
+        <ActivityIcon event={event}/>
+        <span className="agent-script-label">{event.label}</span>
         {duration && <small className="agent-operation-duration">{duration}</small>}
         {eventStateLabel(event) && <span className="agent-step-state">{eventStateLabel(event)}</span>}
         <ChevronDown size={12} className="agent-reasoning-chevron" aria-hidden="true"/>
@@ -196,8 +196,10 @@ function OperationPhase({events,scope,running,runId}:{events:ActivityEvent[];sco
   const pending=running?operations.find(event=>event.state==="queued"):undefined;
   const current=active??pending;
   const readSpan=operations.length===1 ? operations[0].readSpan : undefined;
+  const attachmentTitle=operations.length===1 && operations[0].operation==="analyzeFiles"
+    ? activityLabel(operations[0]) : undefined;
   const overview=mixedWeb ? `网页检索 · ${operations.length} 步`
-    : externalPhaseTitle(operations) ?? (operations.every(event=>event.state==="completed"&&!event.errorCount)?"已":"")+labels.join("、")+(readSpan?.title ? ` · ${readSpan.title}` : "");
+    : externalPhaseTitle(operations) ?? (operations.every(event=>event.state==="completed"&&!event.errorCount)?"已":"")+(attachmentTitle ?? labels.join("、"))+(readSpan?.title ? ` · ${readSpan.title}` : "");
   const currentTitle=current && (current.kind === "webSearch" ? webLabel(current) : activityLabel(current));
   const currentLabel=currentTitle && (/^(读取|搜索|访问|运行|执行|检查|核对|验证|编辑|加载|查找|整理|分析|生成|保存|创建)/.test(currentTitle)?"正在"+currentTitle:currentTitle);
   const summary=current ? pending&&!active?"等待："+currentTitle:currentLabel! : overview;
