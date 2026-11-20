@@ -66,7 +66,7 @@ pub(super) fn import(root: &Path, args: &Value) -> Result<Value, String> {
     }
     let data_file = matches!(ext, Some("csv" | "json" | "xlsx"));
     verify(root, &origin)?;
-    super::stage_bytes(root, &title, &data, !data_file, &origin)
+    super::stage_bytes(root, &title, &data, !data_file, &origin, None)
 }
 
 pub(super) fn cached_pdf_pages(

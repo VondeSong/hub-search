@@ -106,6 +106,8 @@ mod attachment_download_cache;
 mod attachment_download_cache_tests;
 mod attachment_download_failures;
 mod attachment_evidence;
+#[cfg(windows)]
+mod attachment_folders;
 #[cfg(test)]
 mod attachment_generation_tests;
 mod attachment_queue;
@@ -34822,6 +34824,8 @@ pub fn run() {
         .register_uri_scheme_protocol("craft-media", |context, request| {
             craft_media_response(context.app_handle(), request)
         });
+    #[cfg(windows)]
+    let builder = builder.plugin(attachment_folders::plugin());
     #[cfg(target_os = "android")]
     let builder = builder.plugin(
         tauri::plugin::Builder::<tauri::Wry>::new("source-opener")

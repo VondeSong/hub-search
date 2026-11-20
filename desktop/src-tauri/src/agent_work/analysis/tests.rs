@@ -378,7 +378,7 @@ fn file_staging_is_explicit_immutable_and_rejects_unsafe_inputs() {
 fn original_attachment_needs_a_real_file_grant() {
     let f = crate::source_evidence::tests::Fixture::new();
     let bytes = b"arbitrary original bytes";
-    let file = stage(&f.root, &json!({"action":"stageOriginalFile","title":"slides.pptx","base64":base64::engine::general_purpose::STANDARD.encode(bytes)})).unwrap();
+    let file = stage(&f.root, &json!({"action":"stageOriginalFile","title":"slides.pptx","sourceFolders":["distribution","example"],"base64":base64::engine::general_purpose::STANDARD.encode(bytes)})).unwrap();
     let locator: EvidenceLocator = serde_json::from_value(file["locator"].clone()).unwrap();
     let body = crate::source_evidence::local_text::selected_body(&f.root, &locator).unwrap();
     let imitation = crate::source_evidence::local_text::stage(
@@ -397,6 +397,7 @@ fn original_attachment_needs_a_real_file_grant() {
     assert_eq!(files[0].0, "input-1.pptx");
     assert_eq!(std::fs::read(&files[0].1).unwrap(), bytes);
     assert_eq!(files[0].2["locator"], json!(locator));
+    assert_eq!(files[0].2["sourceFolder"], "distribution/example");
     assert!(attachment_format(&serde_json::from_str(&body).unwrap()).is_none());
     std::fs::write(&files[0].1, b"different original").unwrap();
     assert!(selected_inputs(&f.root, &grant).is_err());
@@ -415,6 +416,7 @@ fn nine_attachments_keep_the_chat_open_and_only_the_selected_files_are_read() {
             data.as_bytes(),
             true,
             &Value::Null,
+            None,
         )
         .unwrap();
         work.grant

@@ -29,6 +29,7 @@ import { AgentActiveTopic, AgentResearchPolicy, AgentResearchTopics, policyNames
 import { AgentTagWorkspace, suggestedTagTask, AgentTagReferences, AgentTagRelated, AgentTagResult, useTagPreparation, tagTaskNames, type TagTaskRecord } from "./AgentTagWorkspace";
 import { userProfileStorage } from "./UserProfileStorage";
 import {AgentNativeContext,type NativeContext} from "./AgentNativeContext";
+import {attachmentFolders} from "./agentAttachmentFolders";
 import {AgentImageCards,AgentTextFileCard,isTextAttachment,fileUseHint,prepareImage,readDataUrl,readTextFile} from "./AgentFileInputs";
 import {AgentImages,type ImageGrant,type ImageChange} from "./AgentImages";
 import { AgentMaterials, materialKey, type AgentMaterial } from "./AgentMaterials";
@@ -657,7 +658,9 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     importingFiles.current=true;setFilePreparing(true);setError("");
     const ticket=sequence.current;const images=[...selectedImages];const notes=[...materials];const errors:string[]=[];
     try{
-      for(const file of files.slice(0,8)){
+      const selected = files.slice(0,8);
+      const folders = await attachmentFolders(selected);
+      for(const [index,file] of selected.entries()){
         try{
           if(/^image\/(png|jpeg|webp)$/.test(file.type)){
             if(images.length>=8)throw new Error("每个对话最多8张图片或PDF页面，请先移除已有图片。");
@@ -675,8 +678,8 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
             if(notes.length+(view?.work.grant.notes?.length||0)>=31)throw new Error("本次对话材料数量已满，请先移除部分资料。");
             const title = file.name.slice(0, 200);
             const staged = await call<AgentMaterial>(textFile
-              ? {action:"stageTextFile",title,text:await readTextFile(file)}
-              : {action:tableFile?"stageAnalysisFile":"stageOriginalFile",title,base64:(await readDataUrl(file)).split(",")[1]});
+              ? {action:"stageTextFile",title,sourceFolders:folders[index],text:await readTextFile(file)}
+              : {action:tableFile?"stageAnalysisFile":"stageOriginalFile",title,sourceFolders:folders[index],base64:(await readDataUrl(file)).split(",")[1]});
             if(!notes.some(n=>materialKey(n.locator)===materialKey(staged.locator))&&!view?.work.grant.notes?.some(n=>materialKey(n as AgentMaterial["locator"])===materialKey(staged.locator)))notes.push(staged);
           }
         }catch(reason){errors.push(file.name+"："+String(reason));}

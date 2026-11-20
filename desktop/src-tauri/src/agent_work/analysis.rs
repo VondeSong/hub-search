@@ -85,7 +85,14 @@ pub(super) fn stage(root: &Path, args: &Value) -> Result<Value, String> {
     let data = base64::engine::general_purpose::STANDARD
         .decode(encoded)
         .map_err(|_| "文件内容编码无效")?;
-    stage_bytes(root, &title, &data, original, &Value::Null)
+    stage_bytes(
+        root,
+        &title,
+        &data,
+        original,
+        &Value::Null,
+        crate::source_evidence::local_text::folder_hint(args),
+    )
 }
 
 fn stage_bytes(
@@ -94,6 +101,7 @@ fn stage_bytes(
     data: &[u8],
     original: bool,
     source: &Value,
+    folder: Option<String>,
 ) -> Result<Value, String> {
     if !valid_name(title) {
         return Err("分析文件名无效".into());
@@ -116,9 +124,12 @@ fn stage_bytes(
         crate::data_portability::atomic_write(&path, data).map_err(|_| "无法保存分析文件")?;
     }
     let marker = if original { ORIGINAL_MARKER } else { MARKER };
-    let body =
-        json!({"format":marker,"title":title,"sha256":hash,"bytes":data.len(),"source":source})
-            .to_string();
+    let mut manifest =
+        json!({"format":marker,"title":title,"sha256":hash,"bytes":data.len(),"source":source});
+    if let Some(folder) = folder {
+        manifest["sourceFolder"] = folder.into();
+    }
+    let body = manifest.to_string();
     crate::source_evidence::local_text::stage_file_manifest(
         root,
         &json!({"title":title,"text":body}),
@@ -267,7 +278,7 @@ fn selected_inputs(root: &Path, grant: &Grant) -> Result<Vec<(String, PathBuf, V
         result.push((
             format!("input-{}.{}", result.len() + 1, ext),
             path,
-            json!({"locator":locator,"title":title,"sha256":hash,"bytes":size,"source":v["source"],"originalAttachment":original}),
+            json!({"locator":locator,"title":title,"sha256":hash,"bytes":size,"source":v["source"],"sourceFolder":v["sourceFolder"],"originalAttachment":original}),
         ));
     }
     Ok(result)
@@ -500,7 +511,7 @@ pub(super) fn context(root: &Path, work: &Work) -> Value {
 pub(super) fn facts(root: &Path, work: &Work) -> Value {
     let selected = inputs(root, work);
     let input_files = match &selected {
-        Ok(values) => values.iter().map(|(_,_,meta)|json!({"inputId":meta["inputId"],"title":meta["title"],"sha256":meta["sha256"],"bytes":meta["bytes"],"originalAttachment":meta["originalAttachment"],"available":true,"unavailableReason":null})).collect::<Vec<_>>(),
+        Ok(values) => values.iter().map(|(_,_,meta)|json!({"inputId":meta["inputId"],"title":meta["title"],"sha256":meta["sha256"],"bytes":meta["bytes"],"sourceFolder":meta["sourceFolder"],"originalAttachment":meta["originalAttachment"],"available":true,"unavailableReason":null})).collect::<Vec<_>>(),
         Err(_) => dependencies::catalog(root,work),
     };
     let has_available_input = input_files.iter().any(|file| file["available"] == true);

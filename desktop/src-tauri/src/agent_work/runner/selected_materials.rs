@@ -48,6 +48,9 @@ pub(super) fn inspect_data(
             .flatten()
             .find(|v| v["inputId"] == key);
         file["title"] = entry.map_or(Value::Null, |v| v["title"].clone());
+        if let Some(folder) = entry.and_then(|v| v["sourceFolder"].as_str()) {
+            file["sourceFolder"] = json!(folder);
+        }
         if !native || facts["callableWithCurrentInputs"] != true {
             file["readError"] = facts["unavailableReason"]
                 .as_str()

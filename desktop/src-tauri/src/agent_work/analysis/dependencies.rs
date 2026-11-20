@@ -123,7 +123,7 @@ pub(super) fn catalog(root: &Path, work: &Work) -> Vec<Value> {
         }
         let key = id(&json!({"locator":locator}));
         let check = select(root, work, Some(&[key.clone()]));
-        result.push(json!({"inputId":key,"title":meta["title"],"sha256":meta["sha256"],"bytes":meta["bytes"],"available":check.is_ok(),"unavailableReason":check.err(),"originalAttachment":meta["format"] == ORIGINAL_MARKER}));
+        result.push(json!({"inputId":key,"title":meta["title"],"sha256":meta["sha256"],"bytes":meta["bytes"],"sourceFolder":meta["sourceFolder"],"available":check.is_ok(),"unavailableReason":check.err(),"originalAttachment":meta["format"] == ORIGINAL_MARKER}));
     }
     for receipt in store::records(root, &work.id, "publicFileAcquisition", 64).unwrap_or_default() {
         let file = &receipt["file"];
