@@ -640,8 +640,7 @@ body.agent-sidebar-open > #root { width:calc(100% - min(var(--agent-panel-width,
 .agent-runtime-details :is(p,li), .agent-web-details li { overflow-wrap:anywhere; }
 .agent-operation-group > summary > svg { flex-shrink:0; }
 .agent-operation-children { border-inline-start:1px solid var(--hub-separator); margin-inline-start:8px; padding:4px 0 4px 14px; overflow-wrap:anywhere; }
-.agent-activity .agent-tool-activity > summary { color:var(--hub-text-primary); }
-.agent-activity .agent-script-step:not([open]) > summary:not(:hover,:focus-visible) { color:var(--hub-text-secondary); }
+.agent-activity .agent-tool-activity > summary { color:var(--hub-text-secondary); }
 .agent-activity .agent-process-failure { flex-wrap:wrap; }
 .agent-activity .agent-show-more { margin-block:6px 2px; }
 .agent-analysis-files { margin-block:16px; border-block-start:1px solid var(--hub-separator); padding-block-start:8px; }
@@ -680,10 +679,7 @@ body.agent-sidebar-open > #root { width:calc(100% - min(var(--agent-panel-width,
 .agent-operation-duration { margin-inline-start:8px; white-space:nowrap; color:var(--hub-text-secondary); font-size:12px; font-weight:400; }
 .agent-operation-group .agent-step-running { color:var(--hub-text-tertiary); }
 .agent-live-status { overflow-wrap:anywhere; }
-.agent-activity :is(.agent-operation-group,.agent-reasoning,.agent-tool-activity) > summary:is(:hover,:focus-visible) {
-  background:var(--hub-control-fill);
-  color:var(--hub-text-primary);
-}
+.agent-activity-events summary:is(:hover,:focus-visible),
 .agent-body .agent-activity-toggle:is(:hover,:focus-visible) { color:var(--hub-text-primary); }
 .agent-activity summary > .agent-reasoning-chevron { opacity:.65; }
 .agent-activity details[open] > summary > .agent-reasoning-chevron { transform:none; }

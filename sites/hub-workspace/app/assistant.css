@@ -565,6 +565,8 @@
 .ha-answer-table caption{text-align:start;color:var(--subtle,var(--text));padding-block:0 8px}
 .ha-process-demo summary::-webkit-details-marker{display:none}
 .ha-process-demo svg,.ha-process-demo img{flex-shrink:0}
+.ha-process-demo :is(.ha-process-group,.ha-process-batch)>summary{color:var(--subtle)}
+.ha-process-demo :is(.ha-process-group,.ha-process-batch)>summary:is(:hover,:focus-visible){color:var(--text)}
 .ha-process-demo summary>svg:last-child{margin-inline-start:0;transition:transform .15s}
 .ha-process-demo details:not([open])>summary>svg:last-child,.ha-activity.ha-process-demo:not([open])>summary>svg:last-child{transform:rotate(-90deg)}
 .ha-process-commentary{margin-block:12px;color:var(--text);line-height:1.6;font-size:14px}

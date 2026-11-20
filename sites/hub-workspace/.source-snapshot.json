@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "3299b5edec2f3dc8dcdde97728df535e54face02",
-  "published_version": 119,
-  "deployment_id": "appgdep_6b00637c1120819185d578f8db3272fb",
+  "source_commit": "6094a6e8ebdec89187a74e524834aa10485e1c04",
+  "published_version": 120,
+  "deployment_id": "appgdep_6b0066d16be88191a6a17f0cbb27fb4a",
   "files": {
     ".gitignore": {
       "sha256": "ca0e1575efb181d784f15bf6c86e3c012fd5c7ede4daa34b924d0d8b590d4e77",
@@ -253,9 +253,9 @@
       "bytes": 1644
     },
     "app/assistant.css": {
-      "sha256": "f201d6647baa8d5174f1d1a81e53f932c709a6634d3917cc04dc933ca8f0b83f",
+      "sha256": "02b6ba8ffeb049505e8fc6592c20f4639c48db2cc1d9a107461276b6b21f9e06",
       "mode": "100644",
-      "bytes": 65421
+      "bytes": 65619
     },
     "app/calendar-period.ts": {
       "sha256": "fb67e7bd1f4e04ccfd14ffb7ef8bb59fb448b0ed2080a698e9b331fe12b1224d",
@@ -1343,5 +1343,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-20T15:15:05.483141+00:00"
+  "imported_at": "2026-11-20T15:28:09.585884+00:00"
 }
