@@ -643,12 +643,8 @@ body.agent-sidebar-open > #root { width:calc(100% - min(var(--agent-panel-width,
 .agent-operation-duration { margin-inline-start:8px; white-space:nowrap; color:var(--hub-text-secondary); font-size:12px; font-weight:400; }
 .agent-operation-group .agent-step-running { color:var(--hub-text-tertiary); }
 .agent-live-status { overflow-wrap:anywhere; }
-.agent-activity :is(.agent-operation-group,.agent-reasoning,.agent-tool-activity) > summary {
-  border-radius:5px;
-}
 .agent-activity :is(.agent-operation-group,.agent-reasoning,.agent-tool-activity) > summary:is(:hover,:focus-visible),
 .agent-body .agent-activity-toggle:is(:hover,:focus-visible) {
-  background:var(--hub-control-fill);
   color:var(--hub-text-primary);
 }
 .agent-activity summary > .agent-reasoning-chevron { opacity:.65; }
