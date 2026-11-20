@@ -41,7 +41,7 @@ it("shows connected operations and permissions without opening the underlying re
   {server:browser,tools:["browser_navigate","browser_snapshot"]},
  ]}}}/>));
  await expandProcess();
- expect(host.querySelector(".agent-run-overview")?.textContent).toBe("已使用 GitHub 集成、操作浏览器");
+ expect(host.querySelector(".agent-activity-toggle")?.textContent).toMatch(/^用时 /);
  expect(host.querySelector(".agent-operation-group")).toBeNull();
  const step=host.querySelector<HTMLDetailsElement>(".agent-tool-activity")!;
  expect(step.querySelector("summary")?.textContent).toContain("browser_navigate");
@@ -404,15 +404,20 @@ it("keeps long tool labels and records inside one disclosure without losing full
 
 it("replays waiting, tools, answer streaming and completion without resetting either disclosure",async()=>{
  vi.useFakeTimers();vi.setSystemTime(5000);
- const draw=async(events:ActivityRun['events'],running=true)=>act(async()=>root.render(<AgentActivity value={{...run,events,running,state:running?'investigating':'completed',finishedAt:running?null:9000}}/>));
+ const draw=async(events:ActivityRun['events'],running=true)=>act(async()=>root.render(<AgentActivity value={{...run,events,running,capabilities:{webSearch:'live'},state:running?'investigating':'completed',finishedAt:running?null:9000}}/>));
  await draw([]);
+ const section=host.querySelector('.agent-activity')!;
+ const heading=section.querySelector('.agent-activity-heading')!;
  expect(host.querySelector('.agent-activity-toggle')).toBeNull();
- expect(host.textContent).toBe('正在思考');
+ expect(heading.querySelector('.agent-elapsed')?.textContent).toBe('已处理 4 秒');
+ expect(section.firstElementChild).toBe(heading);
+ expect(host.querySelector('.agent-live-status')?.textContent).toBe('正在思考');
  const tool={...run.events[1],state:'running',detail:'原文已分段读取'};
  await draw([run.events[0],tool]);
  const phase=host.querySelector<HTMLDetailsElement>('.agent-operation-group')!;
  const title=phase.querySelector('summary')!;
  expect(title.textContent).toBe('正在读取原文');
+ expect(heading.querySelector('.agent-activity-toggle')?.textContent).toBe('已处理 4 秒');
  await act(async()=>{title.click();});
  const detail=phase.querySelector<HTMLDetailsElement>('.agent-tool-activity')!;
  await act(async()=>{detail.querySelector('summary')!.click();});
@@ -429,6 +434,7 @@ it("replays waiting, tools, answer streaming and completion without resetting ei
  const answer={id:'a',kind:'answer' as const,state:'running',label:'已核对',createdAt:7000};
  await draw([...finished,answer]);
  expect(host.querySelector('.agent-run-time')?.textContent).toBe('用时 6 秒');
+ expect(section.firstElementChild).toBe(heading);
  await act(async()=>vi.advanceTimersByTime(2000));
  expect(host.querySelector('.agent-run-time')?.textContent).toBe('用时 6 秒');
  expect(host.querySelector('[aria-label="正在生成回答"]')?.closest('.agent-activity-events')).toBeNull();
@@ -437,6 +443,7 @@ it("replays waiting, tools, answer streaming and completion without resetting ei
  expect(title.textContent).toBe('已读取资料、调用工具');
  expect(host.textContent).not.toContain('正在思考');
  expect(host.querySelector('.agent-run-time')?.textContent).toBe('用时 8 秒');
+ expect(section.firstElementChild).toBe(heading);
 });
 
 it("closes a previous phase at a public update while the newest phase owns the live status",async()=>{
@@ -490,7 +497,7 @@ it("keeps a failed search in its phase after the streamed answer is replaced by 
     {id:"report",role:"assistant",runId:run.runId,revision:1,createdAt:3000,report:{status:"completed",summary:"已核对可访问的来源",findings:[],nextSteps:[],questions:[],limitations:[],waitCondition:""}},
   ]};
   await act(async()=>root.render(<AgentConversation conversation={conversation} activity={[activity]} revoked={false} onOpenCitation={()=>{}}/>));
-  expect(host.querySelector(".agent-run-overview")?.textContent).toBe("搜索网页");
+  expect(host.querySelector(".agent-activity-toggle")?.textContent).toMatch(/^用时 [^·]+$/);
   await expandProcess();
   expect(host.querySelector(".agent-phase-warning")?.textContent).toBe("部分未完成");
   expect(host.querySelector('[aria-label="助手回答"]')?.textContent).toContain("已核对可访问的来源");

@@ -15,13 +15,12 @@ beforeEach(()=>{Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});host=d
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();});
 const event=(patch:Partial<ActivityEvent>={}):ActivityEvent=>({id:"search",kind:"tool",operation:"search",label:"读取（旧标题）",state:"completed",createdAt:3000,sequence:1,...patch});
 const run=(events:ActivityEvent[]):ActivityRun=>({runId:"r",revision:1,state:"completed",running:false,startedAt:0,finishedAt:5000,steps:events.length,events});
-it("uses structured operation for both collapsed heading and expanded row",async()=>{
+it("uses the structured operation icon in the timeline and leaves the timer independent",async()=>{
  const e=event();expect(activityOperation(e)).toBe("search");
  await act(async()=>root.render(<AgentActivity value={run([e])}/>));
  await act(async()=>host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!.click());
- expect(host.querySelector('.agent-activity-toggle [data-activity-icon]')?.getAttribute('data-activity-icon')).toBe('search');
+ expect(host.querySelector('.agent-activity-toggle')?.textContent).toBe('用时 5 秒');
  expect(host.querySelector('.agent-activity-step [data-activity-icon]')?.getAttribute('data-activity-icon')).toBe('search');
- expect(host.querySelector('.agent-run-overview')?.textContent).toBe('已搜索资料');
 });
 it("keeps first sequence and user disclosure when a streamed item has a later update time",async()=>{
  const early=event({id:"early",createdAt:9000,sequence:1,label:"首次事件",detail:"操作详情"});
