@@ -637,7 +637,7 @@ body.agent-sidebar-open > #root { width:calc(100% - min(var(--agent-panel-width,
 .agent-activity-toggle .agent-collapsed { transform:rotate(-90deg); }
 .agent-activity .agent-context-event { background:none; border:0; border-radius:0; padding:0; color:var(--hub-text-secondary); overflow-wrap:anywhere; }
 .agent-context-event details { min-width:0; flex:1; }
-.agent-context-event summary { display:flex; align-items:center; gap:6px; list-style:none; }
+.agent-context-event summary { display:flex; align-items:center; gap:6px; list-style:none; cursor:pointer; }
 .agent-activity .agent-commentary { margin-block:10px 8px; font-size:14px; line-height:1.7; }
 .agent-activity-events > :first-child { margin-block-start:0; }
 .agent-activity summary { min-height:24px; }
@@ -732,7 +732,7 @@ body.agent-sidebar-open > #root { width:calc(100% - min(var(--agent-panel-width,
 .agent-activity details[open] > summary > .agent-reasoning-chevron { transform:none; }
 .agent-activity details > summary:is(:hover,:focus-visible) > .agent-reasoning-chevron { opacity:1; }
 @media (hover:hover) {
-  .agent-activity .agent-operation-group > summary:not(:hover,:focus-visible) > .agent-reasoning-chevron { opacity:0; }
+  .agent-activity :is(.agent-operation-group,.agent-context-event > details) > summary:not(:hover,:focus-visible) > .agent-reasoning-chevron { opacity:0; }
 }
 @media (prefers-reduced-motion:no-preference) and (forced-colors:none) {
   @supports (background-clip:text) {

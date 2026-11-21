@@ -125,11 +125,12 @@ function WorkspaceReceiptsExample() {
           <p className="ha-script-status">执行成功 · 退出码 0</p>
           <div className="ha-script-region"><pre tabIndex={0} aria-label="命令输出">已读取配置。检查通过。</pre></div>
         </details>
-        <details className="ha-process-batch">
+        <details className="ha-process-batch ha-image-receipt">
           <summary><Images size={15} aria-hidden="true"/>已查看 1 张图像<ChevronDown size={12} aria-hidden="true"/></summary>
           <button ref={thumbnail} type="button" className="ha-receipt-thumbnail" onClick={() => dialog.current?.showModal()} aria-label="放大工作台预览"><img src="/hub-workspace-preview.jpg" alt="工作台预览"/></button>
         </details>
       </ProcessGroup>
+      <p className="ha-process-meta">核对预览中的布局</p>
       <p>配置已通过检查，预览已回读。</p>
     </details>
     <p>配置文件已更新，并已核对预览。</p>

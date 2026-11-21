@@ -248,6 +248,12 @@ function ReceiptImage({sequence,index,runId,scope}: {sequence:number;index:numbe
   return <AgentImagePreview image={image}/>;
 }
 
+function reasoningPreview(event:ActivityEvent) {
+  const text=event.label.replace(/[#*\n]/g," ").trim() || "正在思考";
+  const prefix=event.state==="interrupted"?"已中断：":event.state==="failed"?"未完成：":"";
+  return prefix+text;
+}
+
 function ActivityEventView({ event, scope, runId }: { event: ActivityEvent; scope: ToolResultScope | null; runId:string }) {
   const [detailOpen,setDetailOpen]=useActivityDisclosure(`detail:${runId}:${event.id}`,false);
   const [commandOpen,setCommandOpen]=useActivityDisclosure(`command:${runId}:${event.id}`,false);
@@ -277,12 +283,10 @@ function ActivityEventView({ event, scope, runId }: { event: ActivityEvent; scop
     return event.detail || (event.resultRef&&scope) ? <details className="agent-reasoning"><summary><span>{label}</span><ChevronDown size={12} aria-hidden="true"/></summary><div>{event.detail&&<p>{event.detail}</p>}{event.resultRef&&scope&&<AgentToolResult value={event.resultRef} scope={scope}/>}</div></details> : <p className="agent-reasoning">{label}</p>;
   }
   if (event.kind === "reasoning") {
-    const text=event.label.replace(/[#*\n]/g," ").trim();
+    const text=reasoningPreview(event);
     const characters=Array.from(text);
-    const icon=null;
-    const prefix=event.state==="interrupted"?"已中断：":event.state==="failed"?"未完成：":"";
-    if(characters.length<=72) return <div className="agent-activity-step agent-reasoning" aria-label="思考摘要">{icon}<span>{prefix}{text || "正在思考"}</span></div>;
-    return <details className="agent-reasoning"><summary>{icon}<span>{prefix}{characters.slice(0,72).join("")}…</span><ChevronDown className="agent-reasoning-chevron" size={13} aria-hidden="true"/></summary><div><PublicText text={event.label}/></div></details>;
+    if(characters.length<=72) return <div className="agent-activity-step agent-reasoning" aria-label="思考摘要"><span>{text}</span></div>;
+    return <details className="agent-reasoning"><summary><span>{characters.slice(0,72).join("")}…</span><ChevronDown className="agent-reasoning-chevron" size={13} aria-hidden="true"/></summary><div><PublicText text={event.label}/></div></details>;
   }
   const rawTool = event.toolName && event.toolName!==event.label ? event.toolName : undefined;
   const command = activityOperation(event)==="command" && event.origin==="codex-native";
@@ -444,7 +448,8 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
     ? activityLabel(operations[0]) : undefined;
   const complete=operations.every(event=>event.state==="completed"&&!event.errorCount);
   const commandBatch=operations.length>1 && labels.length===1 && labels[0]===operationLabels.command;
-  const overview=!operations.length ? "公开思考摘要" : materialGroup ? `资料准备 · ${operations.length} 项` : webOverview ? `${webTitle} · ${operations.length} 步`
+  const summaryOnly=operations.length===0;
+  const overview=summaryOnly ? reasoningPreview(events[0]) : materialGroup ? `资料准备 · ${operations.length} 项` : webOverview ? `${webTitle} · ${operations.length} 步`
     : commandBatch ? `${complete?"已运行命令":"运行命令"} · ${operations.length} 条`
     : mixed?.title ?? externalPhaseTitle(operations) ?? (complete?"已":"")+(attachmentTitle ?? labels.join("、"))+(readSpan?.title ? ` · ${readSpan.title}` : "");
   const latest=webOverview || materialGroup ? undefined : current ?? (!commandBatch && live && operations.length>1 ? operations[operations.length-1] : undefined);
@@ -457,8 +462,9 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
     else if(operationFailed(latest))summary=label+" · "+(eventStateLabel(latest)||"部分未完成");
     else summary=latest.state==="completed" && verb ? "已"+label : label;
   }
+  const firstInHeading=summaryOnly && Array.from(overview).length<=72;
   const steps=<div className="agent-operation-children">
-    {events.slice(0,visibleCount).map(event=><ActivityEventView key={event.id} event={event} scope={scope} runId={runId}/>)}
+    {events.slice(firstInHeading ? 1 : 0,visibleCount).map(event=><ActivityEventView key={event.id} event={event} scope={scope} runId={runId}/>)}
     {visibleCount<events.length && <button type="button" className="agent-show-more" onClick={()=>setVisible(count=>count+activityPageSize)}>显示更多 · 另 {events.length-visibleCount} 项</button>}
   </div>;
   if(!segmented && operations.length===events.length && operations.every(event=>event.kind==="tool" && (event.operation || event.toolName)))return steps;
@@ -467,6 +473,7 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
     <summary title={summary}>
       {headingIcon && <ActivityIcon event={headingIcon}/>}
       <span className="agent-phase-label">{summary}</span>
+      {summaryOnly && <small>另 {events.length-1} 条</small>}
       <ActivityIdentity events={operations} workId={scope?.workId} primaryIcon={headingIcon} showRemainingSites={!live || !webPhase}/>
       <ChevronDown className="agent-reasoning-chevron" size={12} aria-hidden="true"/>
       {failed&&!open&&<small className="agent-phase-warning" role="status"><TriangleAlert size={12} aria-hidden="true"/>部分未完成</small>}
@@ -488,7 +495,7 @@ function ActivityTimeline({events,scope,running,segmented,settled,runId}:{events
   const reportedStatus=latest.some(event=>boundary(event) && event.state==="running");
   const continuingWebPhase=latest.some(event=>event.kind==="webSearch");
   return <>
-    {groups.map(group=>boundary(group[0]) || (group.length===1 && isMaterialContext(group[0]))
+    {groups.map(group=>boundary(group[0]) || (group.length===1 && (isMaterialContext(group[0]) || isCodexSummary(group[0])))
       ? <ActivityEventView key={group[0].id} event={group[0]} scope={scope} runId={runId}/>
       : <OperationPhase key={group[0].id} events={group} scope={scope} runId={runId} segmented={segmented} settled={settled} live={running && group===latest} current={group===latest ? current : undefined}/>)}
     {running && !current && !reportedStatus && !continuingWebPhase && <p className="agent-live-status" role="status"><span>正在思考</span></p>}

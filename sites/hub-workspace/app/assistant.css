@@ -606,6 +606,12 @@
 .ha-process-review button:focus-visible,.ha-process-review a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .ha-process-example{border-top:1px solid var(--line);padding-top:12px;font-size:14px}
 .ha-process-batch>summary{display:flex;gap:8px;align-items:center;overflow-wrap:anywhere;min-height:30px;cursor:pointer}
+.ha-image-receipt>summary{color:var(--subtle)}
+.ha-image-receipt>summary:is(:hover,:focus-visible){color:var(--text)}
+.ha-image-receipt:not([open])>summary>svg:last-child{transform:rotate(-90deg)}
+@media (hover:hover){
+  .ha-image-receipt>summary:not(:hover,:focus-visible)>svg:last-child{opacity:0}
+}
 .ha-process-script>summary{color:var(--subtle)}
 .ha-process-script>summary:is(:hover,:focus-visible),.ha-process-script[open]>summary{color:var(--text)}
 .ha-process-script>summary>small{font-variant-numeric:tabular-nums;color:var(--subtle)}

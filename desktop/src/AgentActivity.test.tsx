@@ -726,6 +726,36 @@ it("keeps Codex summaries in order with the receipts of the open native tool gro
   expect(host.querySelector(".agent-show-more")).toBeNull();
 });
 
+it("shows a lone Codex summary directly after an independent image receipt",async()=>{
+  const events:ActivityRun["events"]=[
+    {id:"image",kind:"context",operation:"imageInput",state:"completed",label:"已发送 1 张授权原图",createdAt:1300},
+    {id:"reason",kind:"reasoning",origin:"codex-app-server",state:"completed",label:"Assessing screenshot evidence",createdAt:1400},
+  ];
+  await act(async()=>root.render(<AgentActivity value={{...run,native:true,running:false,events}}/>));
+  await expandProcess();
+  const image=host.querySelector(".agent-context-event");
+  const note=host.querySelector('[aria-label="思考摘要"]');
+  expect(image?.querySelector("summary")?.textContent).toBe(events[0].label);
+  expect(image?.nextElementSibling).toBe(note);
+  expect(note?.textContent).toBe(events[1].label);
+  expect(host.querySelector(".agent-operation-group")).toBeNull();
+});
+
+it("uses the first summary as the heading when a phase contains only multiple summaries",async()=>{
+  const events:ActivityRun["events"]=["核对截图里的标题","回看证据边界"].map((label,index)=>({
+    id:`reason-${index}`,kind:"reasoning",origin:"codex-app-server",state:"completed",label,createdAt:1300+index,
+  }));
+  await act(async()=>root.render(<AgentActivity value={{...run,native:true,running:false,events}}/>));
+  await expandProcess();
+  const group=host.querySelector<HTMLDetailsElement>(".agent-operation-group")!;
+  expect(group.open).toBe(false);
+  expect(group.querySelector(".agent-phase-label")?.textContent).toBe(events[0].label);
+  expect(group.querySelector("summary small")?.textContent).toBe("另 1 条");
+  await act(async()=>group.querySelector("summary")!.click());
+  expect(group.open).toBe(true);
+  expect(group.querySelector(".agent-operation-children")?.textContent).toBe(events[1].label);
+});
+
 it("keeps a failed search in its phase after the streamed answer is replaced by the published report",async()=>{
   const search={id:"search",kind:"webSearch" as const,state:"completed",label:"搜索网页",action:"search",errorCount:1,createdAt:1300};
   const activity={...run,native:true,events:[run.events[0],search],running:false,state:"completed"};
