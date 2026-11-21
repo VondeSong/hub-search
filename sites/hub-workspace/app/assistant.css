@@ -193,11 +193,9 @@
 .ha-history-filter > label { display:flex; align-items:center; flex:1; gap:8px; min-width:0; padding:7px 9px; border:1px solid var(--line); border-radius:9px; color:var(--muted); background:var(--surface-2); }
 .ha-history-filter input { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--text); font: inherit; }
 .ha-history-row { display: flex; align-items: center; gap: 3px; }
-.ha-history-open { display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 0; min-height: 54px; border: 0; padding: 8px; border-radius: 8px; background: transparent; color: var(--text); text-align: left; }
-.ha-history-copy { display: grid; gap: 3px; flex: 1; min-width: 0; }
-.ha-history-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font-size: .875rem; font-weight: 600; line-height: 1.4; }
-.ha-history-meta { color: var(--muted); font-size: .75rem; line-height: 1.35; }
-.ha-history-open > svg { flex-shrink: 0; margin-top: 2px; color: var(--muted); }
+.ha-history-open { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; min-height: 48px; border: 0; padding: 6px 4px; border-radius: 8px; background: transparent; color: var(--text); text-align: left; }
+.ha-history-open > span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ha-history-open > svg { flex-shrink: 0; color: var(--muted); }
 .ha-history-open:hover, .ha-history-open[aria-current] { background: var(--surface-2); }
 .ha-history-row > .ha-icon { flex-basis: 26px; width: 26px; }
 .ha-scope-trigger { display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 120px; height: 32px; border: 0; padding: 0 4px; border-radius: 7px; background: transparent; color: var(--muted); font-size: 12px; }
@@ -271,11 +269,11 @@
 .ha-resource-chips > span { display: flex; align-items: center; gap: 8px; max-width: min(260px, 100%); padding: 8px 10px; }
 .ha-resource-chips > span > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ha-resource-chips button { display: grid; place-items: center; flex-shrink: 0; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: inherit; }
-.ha-history-empty { display: flex; align-items: flex-start; gap: 10px; padding: 14px 10px; color: var(--muted); }
-.ha-history-empty > svg { flex-shrink: 0; margin-top: 2px; }
-.ha-history-empty p { margin: 0 0 4px; color: var(--text); font-size: .875rem; line-height: 1.4; }
-.ha-history-empty small { display: block; font-size: .75rem; line-height: 1.5; }
+.ha-history-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 24px 12px; color: var(--muted); font-size: 12px; }
+.ha-history-empty p { margin: 0; }
+.ha-history-empty small { font-size: 11px; }
 .ha-history-row { flex-wrap: wrap; }
+.ha-history-row time { flex-shrink: 0; color: var(--muted); font-size: 11px; }
 .ha-history-action-menu { display: flex; flex-direction: column; flex: 0 0 calc(100% - 40px); margin: 0 0 8px 40px; padding: 5px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 5px 16px color-mix(in srgb, var(--text) 8%, transparent); }
 .ha-history-action-menu button { display: flex; align-items: center; gap: 8px; min-height: 34px; border: 0; border-radius: 7px; background: transparent; color: var(--text); padding: 6px 9px; text-align: left; }
 .ha-history-action-menu button:hover { background: var(--surface-2); }

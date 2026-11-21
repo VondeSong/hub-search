@@ -11,9 +11,7 @@
   --ha-control-edge: color-mix(in srgb, var(--text) 11%, transparent);
   --ha-divider: color-mix(in srgb, var(--text) 9%, transparent);
   --ha-secondary-ink: color-mix(in srgb, var(--muted) 76%, var(--text));
-  --ha-history-surface: color-mix(in srgb, var(--surface-2) 32%, var(--surface));
   --ha-frame-shadow: 0 2px 7px rgb(0 0 0 / .08), 0 20px 44px -16px rgb(0 0 0 / .30);
-  --ha-popover-shadow: 0 4px 9px rgb(0 0 0 / .09), 0 18px 32px -12px rgb(0 0 0 / .30);
   font-size: var(--ha-control-size);
 }
 .ha-panel :is(button, input, textarea, select) { font-family: inherit; }
@@ -21,7 +19,7 @@
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
-/* The floating shell, the input and the history menu sit at different elevations. */
+/* The floating shell and the input have separate surface treatments. */
 .ha-panel:not(.ha-expanded) {
   border-color: var(--ha-frame-edge);
   border-radius: var(--ha-frame-radius);
@@ -33,37 +31,10 @@
   min-height: 36px;
   padding-inline: 11px;
   border-color: var(--ha-control-edge);
-  font-size: 1rem;
-  font-weight: 650;
-  line-height: 1.3;
 }
 .ha-panel .ha-mode-label { color: var(--ha-secondary-ink); font-size: .75rem; }
-.ha-panel .ha-prompts h3 { font-size: .9375rem; line-height: 1.4; }
-.ha-panel .ha-prompts button { color: var(--ha-secondary-ink); font-size: .9375rem; line-height: 1.45; }
+.ha-panel .ha-prompts button { color: var(--ha-secondary-ink); }
 .ha-panel .ha-prompts button:is(:hover, :focus-visible) { color: var(--text); }
-
-.ha-panel .ha-history {
-  border-color: var(--ha-control-edge);
-  border-radius: 18px;
-  background: var(--ha-history-surface);
-  box-shadow: var(--ha-popover-shadow);
-}
-@supports (backdrop-filter: blur(1px)) {
-  @media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
-    .ha-panel .ha-history {
-      background: color-mix(in srgb, var(--ha-history-surface) 90%, transparent);
-      backdrop-filter: blur(16px);
-    }
-  }
-}
-.ha-panel .ha-history-heading { padding-inline: 10px 5px; border-block-end: 1px solid var(--ha-divider); }
-.ha-panel .ha-history-heading > strong { font-size: 1rem; font-weight: 650; line-height: 1.35; }
-.ha-panel .ha-history-heading-actions > .ha-icon:last-child { border-radius: 50%; background: var(--surface-2); }
-.ha-panel .ha-history-heading-actions > .ha-icon:last-child:hover { background: var(--surface-3); color: var(--text); }
-.ha-panel .ha-history .ha-menu-subtitle { padding-inline: 8px; font-size: .75rem; }
-.ha-panel .ha-history-title { font-size: .9375rem; }
-.ha-panel .ha-history-meta { color: var(--ha-secondary-ink); font-size: .8125rem; font-variant-numeric: tabular-nums; }
-.ha-panel .ha-history-empty small { color: var(--ha-secondary-ink); font-size: .8125rem; }
 
 .ha-panel .ha-message { margin-block-end: 28px; }
 .ha-panel .ha-user-bubble { font-size: .9375rem; line-height: 1.65; padding: 11px 14px; }
@@ -120,7 +91,6 @@
   box-shadow: 0 4px 14px rgb(0 0 0 / .045);
 }
 .ha-panel .ha-composer:focus-within { border-color: color-mix(in srgb, var(--text) 31%, transparent); }
-.ha-panel .ha-composer > textarea { font-size: 1rem; line-height: 1.55; }
 .ha-panel .ha-composer > textarea::placeholder { color: var(--ha-secondary-ink); opacity: 1; }
 .ha-panel .ha-composer > textarea:focus-visible { outline: none; }
 .ha-panel .ha-composer .ha-token { border: 1px solid var(--ha-divider); border-radius: 10px; }

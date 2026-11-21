@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "5ca722345ced33721c13e56177cad0f8c12c364c",
-  "published_version": 138,
-  "deployment_id": "appgdep_6b01926518bc8191820b4b4b18bc0446",
+  "source_commit": "7fb3007384e58da2c2597001b6e5807aa70159d0",
+  "published_version": 139,
+  "deployment_id": "appgdep_6b01942869608191b60a13defb700b0d",
   "files": {
     ".gitignore": {
       "sha256": "ca0e1575efb181d784f15bf6c86e3c012fd5c7ede4daa34b924d0d8b590d4e77",
@@ -28,9 +28,9 @@
       "bytes": 31055
     },
     "app/Assistant.tsx": {
-      "sha256": "32ad8f4621fdb13a75e3667e3390d8ed0c6e4f5f2a12590adc351df0917f317b",
+      "sha256": "c1e40aa1192db5dce85552430d44235669c64f5dcaa00371e6a387912e1380ae",
       "mode": "100644",
-      "bytes": 119416
+      "bytes": 119371
     },
     "app/AssistantAnswerActions.tsx": {
       "sha256": "ec540e4d24aa72ec5929c948146dc1e14f9c53b75983f97be2c8fdffec24916d",
@@ -43,9 +43,9 @@
       "bytes": 13776
     },
     "app/AssistantChrome.tsx": {
-      "sha256": "c16579a5ebe9780370452b4695c22684bc367d342f16139e5ee07c9e68929c89",
+      "sha256": "1a25e6c5010035229f99d5f07fcc87bf4419783edb05e12e4c972ce60e7727a5",
       "mode": "100644",
-      "bytes": 11517
+      "bytes": 11495
     },
     "app/AssistantCloudHandoff.tsx": {
       "sha256": "7e25f2eed3a620ced94fe1e1cae5bca934d2004f78a13078e3d973e96dfaeaa2",
@@ -63,9 +63,9 @@
       "bytes": 7921
     },
     "app/AssistantHistory.tsx": {
-      "sha256": "39572352e793e271dfd7430870a72e5e9c90898f56fe99940de1947b54bf5921",
+      "sha256": "2e68eda6b2bf9feb7adaa5486df30ad714ccac0dda68fb95b194e9334d193f14",
       "mode": "100644",
-      "bytes": 8091
+      "bytes": 6663
     },
     "app/AssistantInsert.tsx": {
       "sha256": "02678b08dd79d81eee5ee694b08714d63821860877a1089182777ee82f6d133f",
@@ -288,14 +288,14 @@
       "bytes": 7635
     },
     "app/assistant-ui.css": {
-      "sha256": "a9716b1cd41c5c1b59ea0cede942d2bae5c8e4f91062cf8a9b95b9880ce7d9d9",
+      "sha256": "6e7038dd6859b461f8e2bb8a0a418e41460cb745ceb146c740d9ff197738a887",
       "mode": "100644",
-      "bytes": 26584
+      "bytes": 24923
     },
     "app/assistant.css": {
-      "sha256": "16998e172917e3602755e01fa768c3a548245622595a6c3c3d2d0ad96caa6816",
+      "sha256": "a5f39c9393f42b99371351dad1d905c13afefce0792428d93675ada7fb9a79bf",
       "mode": "100644",
-      "bytes": 73109
+      "bytes": 72802
     },
     "app/calendar-period.ts": {
       "sha256": "fb67e7bd1f4e04ccfd14ffb7ef8bb59fb448b0ed2080a698e9b331fe12b1224d",
@@ -1388,5 +1388,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-21T12:46:00.950834+00:00"
+  "imported_at": "2026-11-21T12:53:47.924888+00:00"
 }
