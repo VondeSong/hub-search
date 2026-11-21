@@ -6,12 +6,12 @@
   --ha-control-height: 36px;
   --ha-ui-radius: 10px;
   --ha-overlay-radius: 16px;
-  --ha-frame-radius: 22px;
+  --ha-frame-radius: 20px;
   --ha-frame-edge: color-mix(in srgb, var(--text) 16%, transparent);
   --ha-control-edge: color-mix(in srgb, var(--text) 11%, transparent);
   --ha-divider: color-mix(in srgb, var(--text) 9%, transparent);
   --ha-secondary-ink: color-mix(in srgb, var(--muted) 76%, var(--text));
-  --ha-frame-shadow: 0 2px 7px rgb(0 0 0 / .08), 0 20px 44px -16px rgb(0 0 0 / .30);
+  --ha-frame-shadow: 0 1px 3px rgb(14 26 42 / 8%), 0 18px 38px -14px rgb(14 26 42 / 27%);
   font-size: var(--ha-control-size);
 }
 .ha-panel :is(button, input, textarea, select) { font-family: inherit; }
@@ -27,6 +27,23 @@
 }
 .ha-panel:not(.ha-expanded) .ha-header { border-radius: calc(var(--ha-frame-radius) - 1px) calc(var(--ha-frame-radius) - 1px) 0 0; }
 .ha-panel:not(.ha-expanded) .ha-composer-area { border-radius: 0 0 calc(var(--ha-frame-radius) - 1px) calc(var(--ha-frame-radius) - 1px); }
+@supports (backdrop-filter: blur(18px)) {
+  @media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
+    .ha-panel:not(.ha-expanded),
+    .ha-panel:not(.ha-expanded) :is(.ha-header, .ha-composer-area) { background: transparent; }
+    /* Keep the filter on the surface layer so fixed descendants keep their positioning. */
+    .ha-panel:not(.ha-expanded)::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      border-radius: calc(var(--ha-frame-radius) - 1px);
+      background: color-mix(in srgb, var(--surface) 85%, transparent);
+      backdrop-filter: blur(18px) saturate(.85);
+    }
+  }
+}
 .ha-panel .ha-mode-trigger {
   min-height: 36px;
   padding-inline: 11px;
@@ -35,6 +52,22 @@
 .ha-panel .ha-mode-label { color: var(--ha-secondary-ink); font-size: .75rem; }
 .ha-panel .ha-prompts button { color: var(--ha-secondary-ink); }
 .ha-panel .ha-prompts button:is(:hover, :focus-visible) { color: var(--text); }
+.ha-panel .ha-welcome .ha-prompts { gap: 0; }
+.ha-panel .ha-welcome .ha-prompts h3 { margin-bottom: 5px; }
+.ha-panel .ha-welcome .ha-prompts button {
+  min-height: 36px;
+  padding: 6px 9px;
+  margin-inline-start: -9px;
+  border-radius: 7px;
+  gap: 9px;
+}
+.ha-panel .ha-welcome .ha-prompts button > svg:first-child { width: 15px; height: 15px; }
+.ha-panel .ha-welcome .ha-prompts button:is(:hover, :focus-visible) {
+  background: color-mix(in srgb, var(--text) 5%, var(--surface));
+}
+@media (pointer: coarse) {
+  .ha-panel .ha-welcome .ha-prompts button { min-height: 44px; }
+}
 
 .ha-panel .ha-message { margin-block-end: 28px; }
 .ha-panel .ha-user-bubble { font-size: .9375rem; line-height: 1.65; padding: 11px 14px; }
@@ -87,10 +120,14 @@
 .ha-panel .ha-unplaced-references { margin-block-start: 16px; font-size: .8125rem; }
 .ha-panel .ha-composer {
   border-color: var(--ha-control-edge);
-  border-radius: 15px;
-  box-shadow: 0 4px 14px rgb(0 0 0 / .045);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 3px 12px rgb(23 35 45 / 7%);
 }
-.ha-panel .ha-composer:focus-within { border-color: color-mix(in srgb, var(--text) 31%, transparent); }
+.ha-panel .ha-composer:focus-within {
+  border-color: color-mix(in srgb, var(--text) 31%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 19%, transparent);
+}
 .ha-panel .ha-composer > textarea::placeholder { color: var(--ha-secondary-ink); opacity: 1; }
 .ha-panel .ha-composer > textarea:focus-visible { outline: none; }
 .ha-panel .ha-composer .ha-token { border: 1px solid var(--ha-divider); border-radius: 10px; }
