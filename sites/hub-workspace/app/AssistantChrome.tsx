@@ -13,7 +13,7 @@ import { memoryUseLabel } from './assistant-memory';
 import type { AssistantContext, AssistantSettings } from './Assistant';
 
 export type AssistantMenu = 'history' | 'details' | 'usage' | 'add' | 'materials' | 'skills' | 'permissions' | 'memory' | 'model' | 'effort' | 'mode' | 'topics' | 'topic-review' | 'tags' | 'tag-materials' | null;
-export type HistoryItem = { id: string; title: string; pinned: boolean; archived: boolean; blocked: boolean; updatedAt?: number };
+export type HistoryItem = { id: string; title: string; messageCount: number; pinned: boolean; archived: boolean; blocked: boolean; updatedAt?: number };
 type MenuProps = { menu: AssistantMenu; setMenu: (value: AssistantMenu) => void };
 
 export function clampPanelSize(value: number, available: number, minimum: number, maximum: number) {

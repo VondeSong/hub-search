@@ -20,6 +20,11 @@
 .ha-messages[data-running="true"] { container-type: size; }
 .ha-messages[data-running="true"]::after { content: ""; display: block; block-size: clamp(24px, 22cqh, 144px); }
 .ha-welcome { margin: clamp(20px, 5cqh, 46px) auto 22px; max-width: 600px; }
+.ha-messages[data-starting] { display: flex; flex-direction: column; }
+.ha-messages[data-starting] > * { flex-shrink: 0; }
+.ha-messages[data-starting] .ha-welcome { width: 100%; margin: auto auto 0; padding-top: 12px; }
+.ha-messages[data-starting] .ha-prompts { margin-top: 0; }
+.ha-welcome > .ha-goal-starter { margin-bottom: 12px; }
 .ha-welcome h2 { margin: 0 0 7px; font-size: 25px; line-height: 1.32; font-weight: 650; color: var(--text); }
 .ha-welcome > p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
 .ha-prompts { display: grid; gap: 1px; margin-top: 22px; }
@@ -188,9 +193,11 @@
 .ha-history-filter > label { display:flex; align-items:center; flex:1; gap:8px; min-width:0; padding:7px 9px; border:1px solid var(--line); border-radius:9px; color:var(--muted); background:var(--surface-2); }
 .ha-history-filter input { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--text); font: inherit; }
 .ha-history-row { display: flex; align-items: center; gap: 3px; }
-.ha-history-open { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; min-height: 48px; border: 0; padding: 6px 4px; border-radius: 8px; background: transparent; color: var(--text); text-align: left; }
-.ha-history-open > span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ha-history-open > svg { flex-shrink: 0; color: var(--muted); }
+.ha-history-open { display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 0; min-height: 54px; border: 0; padding: 8px; border-radius: 8px; background: transparent; color: var(--text); text-align: left; }
+.ha-history-copy { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.ha-history-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font-size: .875rem; font-weight: 600; line-height: 1.4; }
+.ha-history-meta { color: var(--muted); font-size: .75rem; line-height: 1.35; }
+.ha-history-open > svg { flex-shrink: 0; margin-top: 2px; color: var(--muted); }
 .ha-history-open:hover, .ha-history-open[aria-current] { background: var(--surface-2); }
 .ha-history-row > .ha-icon { flex-basis: 26px; width: 26px; }
 .ha-scope-trigger { display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 120px; height: 32px; border: 0; padding: 0 4px; border-radius: 7px; background: transparent; color: var(--muted); font-size: 12px; }
@@ -264,11 +271,11 @@
 .ha-resource-chips > span { display: flex; align-items: center; gap: 8px; max-width: min(260px, 100%); padding: 8px 10px; }
 .ha-resource-chips > span > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ha-resource-chips button { display: grid; place-items: center; flex-shrink: 0; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: inherit; }
-.ha-history-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 24px 12px; color: var(--muted); font-size: 12px; }
-.ha-history-empty p { margin: 0; }
-.ha-history-empty small { font-size: 11px; }
+.ha-history-empty { display: flex; align-items: flex-start; gap: 10px; padding: 14px 10px; color: var(--muted); }
+.ha-history-empty > svg { flex-shrink: 0; margin-top: 2px; }
+.ha-history-empty p { margin: 0 0 4px; color: var(--text); font-size: .875rem; line-height: 1.4; }
+.ha-history-empty small { display: block; font-size: .75rem; line-height: 1.5; }
 .ha-history-row { flex-wrap: wrap; }
-.ha-history-row time { flex-shrink: 0; color: var(--muted); font-size: 11px; }
 .ha-history-action-menu { display: flex; flex-direction: column; flex: 0 0 calc(100% - 40px); margin: 0 0 8px 40px; padding: 5px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 5px 16px color-mix(in srgb, var(--text) 8%, transparent); }
 .ha-history-action-menu button { display: flex; align-items: center; gap: 8px; min-height: 34px; border: 0; border-radius: 7px; background: transparent; color: var(--text); padding: 6px 9px; text-align: left; }
 .ha-history-action-menu button:hover { background: var(--surface-2); }
@@ -571,6 +578,15 @@
 @media(pointer:coarse){.ha-token summary,.ha-token-remove{min-height:44px}.ha-token-remove{width:36px}}
 
 .ha-token summary{min-height:30px;line-height:18px;box-sizing:border-box;padding-block:5px}
+.ha-token-page { display: grid; gap: 2px; padding-block: 2px; }
+.ha-token-page > span { color: var(--text); font-weight: 550; overflow: hidden; text-overflow: ellipsis; }
+.ha-token-page > small { color: var(--muted); font-size: .75rem; line-height: 1.25; }
+.ha-searchable-scope, .ha-selected-excerpts > strong { margin: 6px 0 0; font-size: .75rem; line-height: 1.5; color: var(--muted); }
+.ha-searchable-scope { display: flex; gap: 8px; align-items: baseline; }
+.ha-searchable-scope > strong { flex-shrink: 0; font-weight: 550; }
+.ha-searchable-scope > span { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ha-selected-excerpts > strong { display: block; font-weight: 550; }
+.ha-selected-excerpts .ha-attachment-list { margin-top: 3px; }
 
 /* #56: reference-aligned activity identities; every prototype event is labelled. */
 .ha-process-demo{color:var(--text)}

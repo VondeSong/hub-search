@@ -76,8 +76,6 @@ export function PinShortcut({ kind, title, pinned, onToggle }: { kind: '技能' 
   return <button type="button" className="ha-icon ha-pin-shortcut" aria-pressed={pinned} aria-label={label} title={label} onClick={onToggle}>{pinned ? <PinOff size={15}/> : <Pin size={15}/>}</button>;
 }
 
-export function MaterialScopeButton({ open, onToggle, libraries, pages }: { open: boolean; onToggle: () => void; libraries: number; pages: number }) {
-  const scope = [pages ? pages + ' 份材料' : '', libraries ? libraries + ' 个库' : ''].filter(Boolean).join(' · ');
-  const label = scope ? '资料范围：' + scope : '资料范围';
-  return <button type="button" className="ha-scope-trigger" aria-label={label} title={label} aria-expanded={open} onClick={onToggle}><Search size={16}/><span>{scope || '资料范围'}</span><ChevronDown size={12}/></button>;
+export function MaterialScopeButton({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  return <button type="button" className="ha-scope-trigger" aria-label="资料范围" title="资料范围" aria-expanded={open} onClick={onToggle}><Search size={16}/><span>资料范围</span><ChevronDown size={12}/></button>;
 }

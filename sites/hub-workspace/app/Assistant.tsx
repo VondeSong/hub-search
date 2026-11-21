@@ -23,7 +23,7 @@ import { AssistantHeader, AssistantTools, clampPanelSize, type AssistantMenu, ty
 import { AssistantSelectionActions } from './AssistantSelectionActions';
 import AssistantAnswerContent from './AssistantAnswerContent';
 import { AssistantAnswerActions } from './AssistantAnswerActions';
-import { AssistantMemoryManager, MemoryFeedback, MemoryProposalCard, useAssistantMemory, type AssistantMemoryModel } from './AssistantMemory';
+import { AssistantMemoryManager, MemoryFeedback, useAssistantMemory, type AssistantMemoryModel } from './AssistantMemory';
 import { loadMemoryPreference, rememberMemoryPreference } from './assistant-memory';
 
 export type AssistantEvidence = { id: string; title: string; source?: string; excerpt?: string };
@@ -535,7 +535,7 @@ export default function Assistant(props: AssistantProps) {
     ] } });
   }
   initial ??= readConversation(loadMemoryPreference());
-  const history: HistoryItem[] = Object.entries(conversations.current).filter(([id, value]) => !historyMeta.current[id]?.deleted && (value.session.messages.length || value.session.active)).map(([id, value]) => ({ id, updatedAt: value.updatedAt, title: value.title, pinned: historyMeta.current[id]?.pinned || false, archived: historyMeta.current[id]?.archived || false, blocked: value.contexts.some(context => !(props.canUseContext || allowContext)(context)) || value.session.messages.some(message => !(props.canUseContext || allowContext)(message.context)) || value.resources.pages.some(context => !(props.canUseContext || allowContext)(context)) })).reverse();
+  const history: HistoryItem[] = Object.entries(conversations.current).filter(([id, value]) => !historyMeta.current[id]?.deleted && (value.session.messages.length || value.session.active)).map(([id, value]) => ({ id, updatedAt: value.updatedAt, title: value.title, messageCount: value.session.messages.length, pinned: historyMeta.current[id]?.pinned || false, archived: historyMeta.current[id]?.archived || false, blocked: value.contexts.some(context => !(props.canUseContext || allowContext)(context)) || value.session.messages.some(message => !(props.canUseContext || allowContext)(message.context)) || value.resources.pages.some(context => !(props.canUseContext || allowContext)(context)) })).reverse();
   const currentContext = selected ? (selected.fresh ? selected.entry || null : initial.contexts[0] || null) : initial.session.messages.length ? initial.contexts[0] || null : props.context;
   return <>{props.open && storageError && <p className="ha-storage-error" role="status">{storageError}</p>}<AssistantConversation key={workKey} {...props} context={currentContext} browsingContext={props.context} workKey={workKey} initial={initial} onPersist={persist} onSideQuote={text => {
       if (text.length > 2500) { props.notify('每份摘录最多 2500 字，请缩小选区。'); return false; }
@@ -1039,7 +1039,7 @@ function AssistantConversation({
     </div>;
   }
 
-  const suggestions = hasDraftSources ? [
+  const suggestions = hasDraftSources || selectedText.length ? [
     { icon: FileText, label: '概括主要内容', prompt: '概括当前材料的主要内容，列出关键观点，并引用原文依据。' },
     { icon: ListPlus, label: '找出待办与待确认事项', prompt: '梳理当前材料中的行动项、未解决的问题和需要确认的事项，并给出原文依据。' },
     { icon: Link2, label: '核对依据与遗漏', prompt: '检查当前材料中哪些结论有依据、哪些还缺少证据或验证，说明依据和局限。' },
@@ -1098,6 +1098,13 @@ function AssistantConversation({
     : settings.model === 'deepseek' ? 'DeepSeek 不支持联网搜索。公开链接可直接贴入；原型仅记录地址。'
     : '公开链接可直接贴入。按研究策略使用网页，原型不实际联网。';
   const accessibleCatalog = catalog.filter(item => canUseContext(item));
+  const searchableLibraries = turnResources.libraryIds.map(id => {
+    const library = accessibleCatalog.find(page => page.libraryId === id);
+    return library ? library.libraryName || 'Hub' : '不可用资料库';
+  });
+  const searchableLibrariesLabel = searchableLibraries.length > 2
+    ? searchableLibraries.slice(0, 2).join('、') + ' 等 ' + searchableLibraries.length + ' 个库'
+    : searchableLibraries.join('、');
   const reviewedTopic = menu === 'topic-review' ? topics.find(item => item.id === topicReview?.id) : undefined;
   const scopeResources = topicEdit?.resources || resources;
   const scopeMaterial = topicEdit ? null : material;
@@ -1148,6 +1155,8 @@ function AssistantConversation({
 
   if (!open) return null;
 
+  const showStarters = !activityDemo && !session.messages.length && !contextBlocked;
+
   return <>
     <section ref={panel} style={{ '--ha-width': panelSize.width + 'px', '--ha-height': panelSize.height ? panelSize.height + 'px' : 'clamp(460px, 80dvh, 704px)' } as import('react').CSSProperties} className={'ha-panel' + (extraPane ? ' ha-extra-pane' : '') + (expanded ? ' ha-expanded' : '') + (reading ? ' ha-report-reading' : '')} aria-label={extraPane ? "第二个助手面板" : "Hub 助手"} data-work-id={context?.workId || 'general'} inert={draft !== null || insertion !== null}>
       <div role="separator" aria-label="调整助手宽度" aria-orientation="vertical" tabIndex={0} className="ha-width-resizer" title="拖动调整宽度，双击恢复默认" {...resize('width')}/>
@@ -1162,14 +1171,17 @@ function AssistantConversation({
         <div className="ha-conversation">
           {tagIntent&&!reading&&!contextBlocked&&<TagTaskSelector intent={tagIntent} onChange={prepareTag} onCancel={()=>{setTagIntent(null);setTagError('');composer.current?.focus({preventScroll:true});}}/>}
           <div className="ha-message-viewport">
-          <div className="ha-messages" data-running={running && !activeBlocked || undefined} ref={scrollArea} role="log" aria-label="助手讨论记录" aria-live="polite" aria-relevant="additions" tabIndex={0} onScroll={event => { const el = event.currentTarget; setJump(el.scrollHeight - el.scrollTop - el.clientHeight > 2); }}>
+          <div className="ha-messages" data-starting={showStarters && !tagMode && !tagIntent || undefined} data-running={running && !activeBlocked || undefined} ref={scrollArea} role="log" aria-label="助手讨论记录" aria-live="polite" aria-relevant="additions" tabIndex={0} onScroll={event => { const el = event.currentTarget; setJump(el.scrollHeight - el.scrollTop - el.clientHeight > 2); }}>
             {isUiDemo && <div className="ha-ui-demo-note"><strong>排版示例 · 不调用模型</strong><span>固定示例内容，用于检查短回答、代码、表格与操作菜单。</span><a href="?assistant=source-demo">查看来源示例</a></div>}
             {activityDemo && <AssistantProcessDemo onClose={()=>onCloseActivityDemo?.()} onWorkingChange={setReplayWorking}/>}
             {browsingContext && context && browsingContext.id !== context.id && <div className="ha-source-notice">正在讨论「{context.title}」。当前浏览：{canUseContext(browsingContext) ? browsingContext.title : '来源不可用'}<button type="button" disabled={!!session.active || !canUseContext(browsingContext)} onClick={onNewWithContext}>用当前材料新建对话</button></div>}
             {contextBlocked && <div className="ha-access-note" role="status"><FileText size={17}/><div><strong>相关来源当前不可用</strong><p>正文、引文与依赖这些来源的历史内容已隐藏。恢复访问并核对后，可以继续。</p></div></div>}
-            {!activityDemo && !session.messages.length && !contextBlocked && <div className="ha-welcome">
-              <h2>{tagIntent ? tagIntents.find(([intent])=>intent===tagIntent)?.[1] : tagMode ? '你想怎么整理标签？' : hasDraftSources ? '从这份材料开始' : '有什么可以帮你？'}</h2>
-              <p>{tagIntent ? tagIntent==='definition'?'根据选定资料起草定义，确认后保存。':tagIntent==='missing'?'按已确认定义查找候选，逐项核对。':'比较标签的适用边界，并核对原文依据。' : tagMode ? '选择一个场景开始，也可以直接输入 #标签名 提问。' : hasDraftSources ? '提一个问题，或选一条建议开始。' : goalMode ? '写下要完成的事和你用来判断完成的条件。' : '直接提问，也可以先选资料再讨论。'}</p>
+            {showStarters && <div className="ha-welcome">
+              {(tagIntent || tagMode) && <>
+                <h2>{tagIntent ? tagIntents.find(([intent]) => intent === tagIntent)?.[1] : '你想怎么整理标签？'}</h2>
+                <p>{tagIntent ? tagIntent === 'definition' ? '根据选定资料起草定义，确认后保存。' : tagIntent === 'missing' ? '按已确认定义查找候选，逐项核对。' : '比较标签的适用边界，并核对原文依据。' : '选择一个场景开始，也可以直接输入 #标签名 提问。'}</p>
+              </>}
+              {goalMode && <p className="ha-goal-starter">写下要完成的事和你用来判断完成的条件。</p>}
               {!tagIntent&&<div className="ha-prompts" role="group" aria-label="建议">
                 <h3>建议</h3>
                 {tagMode ? tagSuggestions : prompts.map(({ icon: Icon, label, prompt }) => <button type="button" key={label} onClick={() => { setInput(value => value.trim() ? (value + '\n\n' + prompt).slice(0, 8000) : prompt); setInputContext(value => value || material); composer.current?.focus(); }}><Icon size={17} aria-hidden="true"/><span>{label}</span><ChevronRight className="ha-prompt-arrow" size={14} aria-hidden="true"/></button>)}
@@ -1199,10 +1211,7 @@ function AssistantConversation({
               </>}
             </article>)}
 
-            {!tagMode && !activityDemo && !isUiDemo && !reading && !contextBlocked && memoryModel.ready && !memoryModel.error && <>
-              {memoryModel.state.proposals.slice(0, 1).map(item => <MemoryProposalCard key={item.id} item={item} model={memoryModel} disabled={!!session.active}/>)}
-              {menu !== 'memory' && <MemoryFeedback model={memoryModel} disabled={!!session.active}/>}
-            </>}
+            {!tagMode && !activityDemo && !isUiDemo && !reading && !contextBlocked && memoryModel.ready && !memoryModel.error && menu !== 'memory' && <MemoryFeedback model={memoryModel} disabled={!!session.active}/>}
 
             {tagMode && !tagIntent && !reading && !!session.messages.length && !contextBlocked && <details className="ha-tag-prompts"><summary>标签助手建议</summary><div className="ha-prompts">{tagSuggestions}</div></details>}
             {session.active && running && !activeBlocked && <div className="ha-current-action" role="status"><span className="ha-active-ink">{['正在思考', '正在整理示例材料', '正在准备回答'][stage]}</span></div>}
@@ -1251,7 +1260,11 @@ function AssistantConversation({
               {scopeTooLarge && <p className="ha-link-policy-note" role="status">本轮资料超过上限，请减少已选资料。</p>}
               {resourcesBlocked && <p role="status">部分本轮资料已不可用，移除后再发送。</p>}
               <AssistantTokens resources={resources} context={material} canShowPage={canUseContext} onChange={setResources} onOpenSource={onOpenSource} onRemoveContext={()=>{setOmittedId(material!.id);composer.current?.focus();}}/>
-              {!!selectedText.length && <div className="ha-attachment-list" aria-label="待发送摘录">{selectedText.map(text => <span key={text}><FileText size={12}/><span title={text}>{text}</span><button type="button" className="ha-chip-remove" aria-label="移除摘录" onClick={() => setSelectedText(values => values.filter(value => value !== text))}><X size={12}/></button></span>)}</div>}
+              {searchableLibrariesLabel && <p className="ha-searchable-scope"><strong>可检索资料库</strong><span title={searchableLibraries.join('、')}>{searchableLibrariesLabel}</span></p>}
+              {!!selectedText.length && <div className="ha-selected-excerpts" aria-label="待发送摘录">
+                <strong>选中摘录 · {selectedText.length} 段</strong>
+                <div className="ha-attachment-list">{selectedText.map((text, index) => <span key={text}><FileText size={12}/><span title={text}>{text}</span><button type="button" className="ha-chip-remove" aria-label={'移除摘录 ' + (index + 1)} onClick={() => setSelectedText(values => values.filter(value => value !== text))}><X size={12}/></button></span>)}</div>
+              </div>}
               {!!attachmentNames.length && !inputBlocked && !contextBlocked && <div className="ha-attachment-list" aria-label="附件名称，文件内容未上传">{attachmentNames.map(name => <span key={name}><Paperclip size={10} /><span title={name}>{name}</span><button type="button" className="ha-chip-remove" aria-label={'移除附件 ' + name} onClick={() => setAttachmentNames(previous => previous.filter(item => item !== name))}><X size={10} /></button></span>)}</div>}
               </div>
               {tagIntent && <section className="ha-tag-task" aria-label="标签任务准备">
@@ -1282,7 +1295,7 @@ function AssistantConversation({
               <div className="ha-input-actions">
                 <input type="file" hidden multiple ref={fileInput} aria-label="选择附件，仅显示文件名" onChange={attachFileNames} />
                 <AssistantTools menu={menu} setMenu={value=>{if(value==='tags')setTagPickerRole('references');changeMenu(value);}} settings={settings} setSettings={changeSettings} material={material} disabled={!!session.active} memoryPending={memoryModel.state.proposals.length} onManageMemory={() => changeMenu('memory')} resources={resources} onResources={setResources} skillPins={pins.skills} onPinSkill={id => onPin('skills', id)}
-                  scopeButton={<MaterialScopeButton open={menu === 'materials'} onToggle={() => changeMenu(menu === 'materials' ? null : 'materials')} pages={new Set([...(material ? [material.id] : []), ...turnResources.pages.map(item => item.id)]).size} libraries={turnResources.libraryIds.length}/>}
+                  scopeButton={<MaterialScopeButton open={menu === 'materials'} onToggle={() => changeMenu(menu === 'materials' ? null : 'materials')}/>}
                   materialPanel={menu === 'materials' && <AssistantMaterialScope catalog={accessibleCatalog} resources={scopeResources} onChange={next => {setTagError("");topicEdit ? setTopicEdit({ ...topicEdit, resources: next }) : setResources(next);}} material={scopeMaterial}
                     current={scopeCurrent} topicScope={!topicEdit && activeTopic ? activeTopic.scope : undefined}
                     manualOnce={!topicEdit && activeTopic ? { checked: activeTopic.useManualOnce, count: manualSourceCount, onChange: checked => setActiveTopic(value => value && ({ ...value, useManualOnce: checked })) } : undefined}
