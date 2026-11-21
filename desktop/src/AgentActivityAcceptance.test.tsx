@@ -2,7 +2,7 @@
 import {act} from "react";
 import {createRoot,type Root} from "react-dom/client";
 import {afterEach,beforeEach,expect,it,vi} from "vitest";
-import {AgentActivity,type ActivityEvent,type ActivityRun} from "./AgentActivity";
+import {AgentActivity,ActivityDisclosureProvider,type ActivityEvent,type ActivityRun} from "./AgentActivity";
 import {ActivityIdentity} from "./AgentActivityIdentity";
 
 vi.mock("@tauri-apps/api/core",()=>({invoke:vi.fn().mockRejectedValue(new Error("offline"))}));
@@ -15,6 +15,26 @@ async function render(events:ActivityEvent[],expanded=true,extra:Partial<Activit
  await act(async()=>root.render(<AgentActivity value={run(events,extra)}/>));
  if(expanded&&host.querySelector(".agent-activity-toggle")?.getAttribute("aria-expanded")==="false")await act(async()=>host.querySelector<HTMLButtonElement>(".agent-activity-toggle")!.click());
 }
+
+it("only the paused run receives the recovery controls and its own unverified draft", async()=>{
+ const current=run([event({id:"partial",kind:"unpublishedAnswer",state:"unverified",label:"本轮草稿"})],{runId:"paused-run",state:"interrupted"});
+ const previous=run([event({id:"older",kind:"unpublishedAnswer",state:"unverified",label:"旧轮草稿"})],{runId:"previous-run",state:"interrupted"});
+ const onScope=vi.fn(), onResume=vi.fn();
+ await act(async()=>root.render(<ActivityDisclosureProvider recovery={{runId:current.runId,reason:"正在等待手动恢复",canResume:true,onScope,onResume}}>
+   <AgentActivity value={previous}/><AgentActivity value={current}/>
+ </ActivityDisclosureProvider>));
+ const cards=host.querySelectorAll(".agent-recovery-card");
+ expect(cards).toHaveLength(1);
+ expect(cards[0].textContent).not.toContain("本轮草稿");
+ const [resume, scope, preview]=cards[0].querySelectorAll("button");
+ await act(async()=>preview.click());
+ expect(cards[0].textContent).toContain("本轮草稿");
+ expect(cards[0].textContent).not.toContain("旧轮草稿");
+ await act(async()=>scope.click());
+ expect(onScope).toHaveBeenCalledWith(scope);
+ await act(async()=>resume.click());
+ expect(onResume).toHaveBeenCalledOnce();
+});
 
 it.each([
  ["search","搜索资料","search"],["read","读取资料","read"],

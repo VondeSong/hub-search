@@ -549,7 +549,7 @@ it("keeps an unsaved supplement after commit failure without reporting saved or 
  expect(invoke.mock.calls.some(([,p])=>p?.args?.action==="respond")).toBe(false);
 });
 it("uses permitted standard execution automatically without a manual mode picker",async()=>{
- current={...makeView("failed"),lifecycle:quotaLifecycle(true,false)};invoke.mockImplementation(async(_,{args})=>args.action==="list"?{works:[{id:"work-1",goal:current.work.goal,state:current.work.state}]}:current);await open();expect(button("继续调查").disabled).toBe(false);await fill("investigationGoal","在既有额度内处理");await click("发送");const calls=invoke.mock.calls.filter(([,p])=>p?.args?.action==="respond");expect(calls).toHaveLength(1);expect(calls[0][1].args.mode).toBe("quick");expect(document.body.querySelector('.agent-mode-badge')?.textContent).toBe('标准');expect(document.body.querySelector('.agent-mode-menu select')).toBeNull();
+ current={...makeView("failed"),lifecycle:quotaLifecycle(true,false)};invoke.mockImplementation(async(_,{args})=>args.action==="list"?{works:[{id:"work-1",goal:current.work.goal,state:current.work.state}]}:current);await open();expect(button("继续调查").disabled).toBe(false);await fill("investigationGoal","在既有额度内处理");await click("发送");const calls=invoke.mock.calls.filter(([,p])=>p?.args?.action==="respond");expect(calls).toHaveLength(1);expect(calls[0][1].args.mode).toBe("quick");expect(document.body.querySelector('.agent-task-mode .agent-mode-title')?.textContent).toBe('标准');expect(document.body.querySelector('.agent-mode-menu select')).toBeNull();
 });
 
 function historyFixture():typeof current {
@@ -1977,7 +1977,7 @@ it("takes Escape before a focused page input can clear its own query",async()=>{
 
 it("switches floating and sidebar presentation without losing draft and resets the new chat title",async()=>{
  await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
- const title=()=>document.querySelector('.agent-task-mode .agent-mode-title')?.textContent;
+ const title=()=>document.querySelector('.agent-chat-title')?.textContent;
  expect(title()).toBe("新聊天");
  await fill("investigationGoal","总结正文，提取待办事项");
  expect(title()).toBe("总结正文，提取待办事项");
@@ -1995,7 +1995,7 @@ it("keeps the saved conversation title while composing a follow-up",async()=>{
  invoke.mockImplementation(async(_,{args})=>args.action==="list"?{works:[{id:current.work.id,goal:current.work.goal,state:current.work.state}]}:current);
  await act(async()=>root.render(<AgentInvestigation result={result}/>));await click("调查这篇笔记");
  await fill("investigationGoal","继续分析另一个问题");
- expect(document.querySelector('.agent-task-mode .agent-mode-title')?.textContent).toBe(current.work.goal);
+ expect(document.querySelector('.agent-chat-title')?.textContent).toBe(current.work.goal);
 });
 
 
@@ -2301,7 +2301,7 @@ it("keeps global history in a fresh page chat without resuming an unrelated work
  await open();
  await openHistory();
  expect(document.querySelector('.agent-conversations')?.textContent).toContain('另一篇资料的历史对话');
- expect(document.querySelector('.agent-task-mode .agent-mode-title')?.textContent).toBe('新聊天');
+ expect(document.querySelector('.agent-chat-title')?.textContent).toBe('新聊天');
  expect(invoke.mock.calls.some(([,p])=>p?.args?.action==='status')).toBe(false);
  await click('新对话');
  await openHistory();

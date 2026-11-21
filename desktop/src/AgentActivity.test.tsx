@@ -364,7 +364,7 @@ it("groups adjacent material receipts apart from commands and preserves an open 
   await vi.waitFor(()=>expect(host.querySelector('.agent-context-event details[open]')).not.toBeNull());
   await draw([rule,preview,missed,progress,command,{...command,id:"command-2",createdAt:1500}]);
   const [materials,commands]=host.querySelectorAll<HTMLDetailsElement>('.agent-operation-group');
-  expect(materials.querySelector('.agent-phase-label')?.textContent).toBe('资料准备 · 3 项');
+  expect(materials.querySelector('.agent-phase-label')?.textContent).toBe('已载入上下文 · 2 项材料回执 · 1 条规则');
   expect(materials.open).toBe(true);
   expect(materials.querySelector('.agent-context-event details[open] p')?.textContent).toBe(rule.detail);
   expect(materials.querySelectorAll('.agent-context-event > span')).toHaveLength(1);

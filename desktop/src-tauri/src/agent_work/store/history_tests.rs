@@ -67,6 +67,24 @@ fn ids(value: &Value) -> Vec<String> {
 }
 
 #[test]
+fn rename_preserves_original_goal_and_survives_history_changes() {
+    let c = database();
+    work(&c, "renamed", "原始问题", 10);
+    preference(&c, "renamed", json!({"title":"  可搜索的新标题  "})).unwrap();
+    preference(&c, "renamed", json!({"pinned":true})).unwrap();
+    assert_eq!(
+        title_on(&c, "renamed").unwrap().as_deref(),
+        Some("可搜索的新标题")
+    );
+    let row = &page(&c, "新标题", false, None)["works"][0];
+    assert_eq!(row["goal"], "原始问题");
+    assert_eq!(row["title"], "可搜索的新标题");
+    assert_eq!(row["pinned"], true);
+    assert_eq!(ids(&page(&c, "原始问题", false, None)), vec!["renamed"]);
+    assert!(change(&json!({"title":"   "})).is_err());
+}
+
+#[test]
 fn title_search_filters_all_stored_rows_before_paging_and_ignores_answer_bodies() {
     let c = database();
     for n in 0..60 {

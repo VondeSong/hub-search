@@ -18,7 +18,8 @@ export function AgentTaskMode({ title, disabled, tagMode = false, goalMode = fal
   const mode = tagMode ? "标签" : goalMode ? "目标" : activeTopic ? "专题" : "标准";
   return <details ref={popover.ref} className="agent-task-mode" name="hub-agent-header" onToggle={event=>{if(event.target===event.currentTarget&&event.currentTarget.open){setError("");void invoke<{topics:ResearchTopic[]}>("agent_investigation",{args:{action:"researchTopics"}}).then(v=>setTopics(Array.isArray(v?.topics)?v.topics:[])).catch(e=>{setTopics([]);setError(String(e));});}}}>
     <summary aria-label="任务模式" title={tagMode ? "标签助手" : activeTopic?.title || title} aria-description={`当前模式：${mode}`}>
-      {tagMode ? <Tags size={15}/> : goalMode ? <Goal size={15}/> : activeTopic ? <FolderBookmark size={15}/> : null}<span className="agent-mode-title">{tagMode ? "标签助手" : activeTopic?.title || title}</span><small className="agent-mode-badge">{mode}</small><ChevronDown size={13}/>
+      {mode!=="标准" && <i className="agent-mode-dot" data-mode={mode} aria-hidden="true"/>}
+      <span className="agent-mode-title">{activeTopic && mode==="专题" ? activeTopic.title : mode}</span><ChevronDown size={13} aria-hidden="true"/>
     </summary>
     <section className="agent-mode-menu" aria-label="任务模式">
       <div className="agent-mode-heading"><strong>任务模式</strong><button type="button" aria-label="关闭任务模式" onClick={() => popover.close(true)}><X size={16}/></button></div>

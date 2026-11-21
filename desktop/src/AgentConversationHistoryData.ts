@@ -1,6 +1,7 @@
 export type WorkSummary = {
   id: string;
   goal: string;
+  title?: string | null;
   state: string;
   messageCount?: number;
   updatedAt?: number;
@@ -8,7 +9,7 @@ export type WorkSummary = {
   archived?: boolean;
 };
 
-export type HistoryChange = { pinned?: boolean; deleted?: boolean; archived?: boolean };
+export type HistoryChange = { pinned?: boolean; deleted?: boolean; archived?: boolean; title?: string };
 export type HistoryGroup = { key: "pinned" | "today" | "recent" | "earlier"; label: string; works: WorkSummary[] };
 
 function validTime(time?: number): time is number {
@@ -16,7 +17,7 @@ function validTime(time?: number): time is number {
 }
 
 export function conversationTitle(work: WorkSummary) {
-  return work.goal.replace(/\s+/g, " ").trim() || "未命名对话";
+  return (work.title || work.goal).replace(/\s+/g, " ").trim() || "未命名对话";
 }
 
 export function groupConversations(works: WorkSummary[], now = Date.now(), archived = false): HistoryGroup[] {

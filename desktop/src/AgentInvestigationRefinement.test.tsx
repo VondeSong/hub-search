@@ -21,7 +21,7 @@ vi.mock("./CodexSuite", async importOriginal => ({
 }));
 
 type Grant = { libraryIds: string[]; notes?: unknown[]; readingItemKeys?: string[] };
-type Request = { action: string; goal?: string; anchor?: unknown; grant?: Grant; setLibraryIds?: string[]; query?: string; archived?: boolean };
+type Request = { action: string; goal?: string; title?: string; anchor?: unknown; grant?: Grant; setLibraryIds?: string[]; query?: string; archived?: boolean };
 type Page = { works: WorkSummary[]; nextCursor: null };
 const libraries: LibrarySummary[] = [
   { id: "library-a", name: "资料库 A", provider: "obsidian", connected: true, documentCount: 12, excludedPaths: [] },
@@ -35,6 +35,7 @@ const source: SearchResult = {
 function makeView(goal = "新的普通对话", grant: Grant = { libraryIds: [], notes: [], readingItemKeys: [] }, anchor: unknown = null) {
   return {
     work: { id: "new-work", goal, anchor, grant, revision: 1, authorizationVersion: 1, state: "ready", report: null },
+    conversationTitle: undefined as string | undefined,
     evidence: [], decisions: [], run: null, validity: "", runActive: false, actionActive: false,
   };
 }
@@ -58,6 +59,7 @@ async function native(command: string, payload?: { args: Request }) {
       current = { ...current, work: { ...current.work, revision: current.work.revision + 1, grant: { ...current.work.grant, libraryIds: args.setLibraryIds ?? current.work.grant.libraryIds } } };
       return current;
     case "respond": current = { ...current, work: { ...current.work, state: "completed" } }; return current;
+    case "setHistoryPreference": current = { ...current, conversationTitle: args.title }; return {};
     case "status":
     case "configureAssistant": return current;
     case "materials": return { notes: [], total: 0, nextOffset: null, snapshot: "fixture" };
@@ -196,6 +198,20 @@ function deferred<T>() {
 }
 
 describe("assistant refinement integration", () => {
+  it("keeps a draft title local until the first question and stores it separately from the question", async () => {
+    await render(<StandaloneInvestigation initiallyOpen/>);
+    const titleButton = () => select<HTMLButtonElement>('button[aria-label="重命名对话"]');
+    await activate(titleButton());
+    await type(select<HTMLInputElement>('input[aria-label="对话标题"]'), "本周材料复核");
+    await act(async () => select<HTMLInputElement>('input[aria-label="对话标题"]').blur());
+    expect(titleButton().textContent).toBe("本周材料复核");
+    expect(calls("setHistoryPreference")).toHaveLength(0);
+    await submit("核对这些材料的日期");
+    expect(calls("create")).toEqual([expect.objectContaining({goal:"核对这些材料的日期"})]);
+    expect(calls("setHistoryPreference")).toEqual([{action:"setHistoryPreference",id:"new-work",title:"本周材料复核"}]);
+    expect(titleButton().textContent).toBe("本周材料复核");
+  });
+
   it("closes history immediately and keeps old output hidden while opening another chat", async () => {
     const pending = deferred<ReturnType<typeof makeView>>();
     list = async () => ({works:[{id:current.work.id,goal:current.work.goal,state:"ready"},{id:"other",goal:"另一段对话",state:"ready"}],nextCursor:null});
@@ -211,14 +227,14 @@ describe("assistant refinement integration", () => {
     expect(document.body.textContent).not.toContain("正在恢复对话");
     await act(async () => pending.resolve({...makeView("另一段对话"),work:{...makeView().work,id:"other",goal:"另一段对话"}}));
     expect(select<HTMLTextAreaElement>('[name="investigationGoal"]').disabled).toBe(false);
-    expect(select('.agent-task-mode').textContent).toContain("另一段对话");
+    expect(select('.agent-chat-title').textContent).toContain("另一段对话");
   });
   it("returns to the original conversation when another conversation cannot be read", async () => {
     list = async () => ({works:[{id:current.work.id,goal:current.work.goal,state:"ready"},{id:"unavailable",goal:"无法读取的对话",state:"ready"}],nextCursor:null});
     invoke.mockImplementation((command,payload) => payload?.args?.action === "status" && payload.args.id === "unavailable" ? Promise.reject(new Error("暂时无法读取所选对话")) : native(command,payload));
     await render(<StandaloneInvestigation initiallyOpen/>);
     await openHistory();await activate(select<HTMLButtonElement>('[data-work-id="unavailable"]'));
-    expect(select('.agent-task-mode').textContent).toContain(current.work.goal);
+    expect(select('.agent-chat-title').textContent).toContain(current.work.goal);
     expect(select<HTMLElement>('.agent-conversation').hidden).toBe(false);
     expect(select<HTMLTextAreaElement>('[name="investigationGoal"]').disabled).toBe(false);
     expect(document.body.textContent).toContain("暂时无法读取所选对话");
@@ -236,7 +252,7 @@ describe("assistant refinement integration", () => {
     const undo = select<HTMLButtonElement>('.agent-history-undo button');
     expect(undo.disabled).toBe(false);
     expect(select<HTMLTextAreaElement>('[name="investigationGoal"]').disabled).toBe(false);
-    expect(select('.agent-task-mode').textContent).toContain("新聊天");
+    expect(select('.agent-chat-title').textContent).toContain("新聊天");
     await act(async () => pending.resolve({works:[],nextCursor:null}));
   });
   it("waits for the admitted run before enabling stop and refreshes its control identity before cancelling",async()=>{

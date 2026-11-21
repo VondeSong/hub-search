@@ -16,7 +16,7 @@ import { useAgentLibraryRegistry, resolveAgentLibraries } from "./useAgentLibrar
 import type { CitationLocation } from "./AgentCitationPreview";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { AgentActivity, ActivityDisclosureProvider, type ActivityRun } from "./AgentActivity";
+import { AgentActivity, AgentRecoveryCard, ActivityDisclosureProvider, type ActivityRun } from "./AgentActivity";
 import { AgentNativeInput, type NativeInput } from "./AgentNativeInput";
 import { AgentSkills, skillTitle, skillPurpose } from "./AgentSkills";
 import { AgentTopics, type TopicWorkSource } from "./AgentTopics";
@@ -40,7 +40,7 @@ import { AgentScopeCoverage } from "./AgentScopeCoverage";
 import { useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { AssistantSelectionActions } from "./AgentSelectionActions";
 import { createPortal } from "react-dom";
-import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronDown, ChevronRight, WandSparkles, FileText, Image, ListChecks, Maximize2, Menu, MessageSquare, Minimize2, PanelRight, PanelsTopLeft, MoreHorizontal, Quote, Plus, Search, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronDown, ChevronRight, WandSparkles, FileText, Image, ListChecks, Maximize2, Menu, MessageSquare, Minimize2, PanelRight, PanelRightOpen, PanelsTopLeft, Quote, Plus, Search, X } from "lucide-react";
 import type { SearchResult } from "./SearchTypes";
 import { isTaskPreviewResult } from "./TaskResultIdentity";
 import { runtimeCapabilities } from "./RuntimePlatform";
@@ -80,7 +80,7 @@ type TaskLocator = { kind: "task"; libraryId: string; sourceId: string };
 type AttachmentLocator = { kind: "attachment"; libraryId: string; documentId: string; sourceItemId: string; chunkId: string; pageNumber: number };
 export type InvestigationLocator = NoteLocator | ReadingLocator | TaskLocator | AttachmentLocator;
 type ReportContinuation = { expectedWorkRevision:number; expectedAuthorizationVersion:number; artifactId:string; artifactRevision:number; expectedContentHash:string };
-type View = { goalMode?: {round:number;maximumRounds:number;stopReason?:string|null} | null; fileAnalyses?:FileAnalysis[]; answerSaves?:AnswerSave[];tagTasks?:TagTaskRecord[]; followups?:Followup[]; codexAccountBinding?:{scopeId:string;historyShared?:boolean}|null; nativeContext?:NativeContext|null; nativeInputs?: NativeInput[]; contextCompaction?:NativeCompaction; materialBudget?:MaterialBudget|null; workingState?: WorkingState; lifecycle?: Lifecycle; goalRevision?: GoalRevision; taskTree?: TaskTree; goalAssessment?: GoalAssessment; analysisArtifacts?: AnalysisChart[]; sleepDatasets?: SleepDatasetItem[]; activity?:ActivityRun[]; recordVersion?:number; assistantOptions?: AssistantOptions; draftRequest?: {runId:string;kind:string} | null; work: { id: string; anchor?:InvestigationLocator|null; actionTarget?:NoteLocator|null; actionTargetIdentity?:string; goal: string; revision?: number; authorizationVersion?: number; state: string; report: Report | null; grant: { images?:ImageGrant[]; libraryIds: string[]; notes?: NoteLocator[]; sources?:InvestigationLocator[]; readingItemKeys?:string[]; manifest?: {members:NoteLocator[];selection:SourceSelection;snapshot:string} } }; evidence: Evidence[]; decisions: { text: string; author: string }[]; run: { id?: string; error?: string; usage: { agentSessions?: number; modelCalls?: number; modelRetries?: number; outputRepairs?: number; entitiesRead?: number; bodyChars?: number; localScanDocuments?: number; localScanBytes?: number } } | null; validity: string; conversation?: Conversation; progress?: Progress | null; history?: HistoricalDelivery[]; runActive?: boolean; actionActive?: boolean; actions?: AgentActions; watch?: AgentCondition | null; memoryUse?: MemoryUse | null; modelSelection?: CodexSettings | null; modelExecutions?: ModelExecution[] };
+type View = { conversationTitle?: string | null; goalMode?: {round:number;maximumRounds:number;stopReason?:string|null} | null; fileAnalyses?:FileAnalysis[]; answerSaves?:AnswerSave[];tagTasks?:TagTaskRecord[]; followups?:Followup[]; codexAccountBinding?:{scopeId:string;historyShared?:boolean}|null; nativeContext?:NativeContext|null; nativeInputs?: NativeInput[]; contextCompaction?:NativeCompaction; materialBudget?:MaterialBudget|null; workingState?: WorkingState; lifecycle?: Lifecycle; goalRevision?: GoalRevision; taskTree?: TaskTree; goalAssessment?: GoalAssessment; analysisArtifacts?: AnalysisChart[]; sleepDatasets?: SleepDatasetItem[]; activity?:ActivityRun[]; recordVersion?:number; assistantOptions?: AssistantOptions; draftRequest?: {runId:string;kind:string} | null; work: { id: string; anchor?:InvestigationLocator|null; actionTarget?:NoteLocator|null; actionTargetIdentity?:string; goal: string; revision?: number; authorizationVersion?: number; state: string; report: Report | null; grant: { images?:ImageGrant[]; libraryIds: string[]; notes?: NoteLocator[]; sources?:InvestigationLocator[]; readingItemKeys?:string[]; manifest?: {members:NoteLocator[];selection:SourceSelection;snapshot:string} } }; evidence: Evidence[]; decisions: { text: string; author: string }[]; run: { id?: string; error?: string; usage: { agentSessions?: number; modelCalls?: number; modelRetries?: number; outputRepairs?: number; entitiesRead?: number; bodyChars?: number; localScanDocuments?: number; localScanBytes?: number } } | null; validity: string; conversation?: Conversation; progress?: Progress | null; history?: HistoricalDelivery[]; runActive?: boolean; actionActive?: boolean; actions?: AgentActions; watch?: AgentCondition | null; memoryUse?: MemoryUse | null; modelSelection?: CodexSettings | null; modelExecutions?: ModelExecution[] };
 function historyViewScope(view: View | null) {
   return view ? JSON.stringify([view.work.id,view.work.revision,view.work.authorizationVersion,view.work.grant,view.work.state,view.recordVersion]) : "";
 }
@@ -187,6 +187,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const detailsReturn=useRef<HTMLElement|null>(null);
   const detailsPopover=useAgentPopover({triggerRef:detailsTrigger,returnFocusRef:detailsReturn,deferEscapeSelector:".agent-history-search input, .agent-history-action-menu, .agent-details-sections .agent-popover[open]"});
   const detailsMenu=detailsPopover.ref;
+  const windowPopover=useAgentPopover();
   const [detailsMemoryOpener,setDetailsMemoryOpener]=useState<HTMLButtonElement|null>(null);
   const [historyExpanded,setHistoryExpanded]=useState(true);
   const [taskStatusOnly,setTaskStatusOnly]=useState(false);
@@ -358,11 +359,15 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const dockKey = extra ? "hub-agent-extra-docked" : "hub-agent-docked";
   const canDock = !!extra || !onDismiss;
   const [docked, setDocked] = useState(() => canDock && sessionStorage.getItem(dockKey) === "true");
+  const [panelPreset, setPanelPreset] = useState<"focus" | "full" | null>(null);
+  const [titleEdit,setTitleEdit] = useState<{id:string; value:string} | null>(null);
+  const [draftTitle,setDraftTitle] = useState("");
   const panelResize = useAgentPanelResize(open, panel, "width", !!extra);
   const panelHeightResize = useAgentPanelResize(open && !docked, panel, "height", !!extra);
   useEffect(() => { if (canDock) sessionStorage.setItem(dockKey, String(docked)); }, [docked, canDock, dockKey]);
   const titleQuestion=(view?.work.goal||questionText).replace(/^(?:\$[a-z0-9]+(?:-[a-z0-9]+)*(?:\s+|$))+/g, "").trim();
-  const chatTitle = research?.topic.title || (titleQuestion || "新聊天").replace(/\s+/g, " ");
+  const chatTitle = (view ? view.conversationTitle : draftTitle) || (titleQuestion || "新聊天").replace(/\s+/g, " ");
+  const titleScope = view?.work.id ?? draftSession;
   useEffect(() => {
     if (!accountVisible || extra) return;
     document.body.classList.toggle("agent-sidebar-open", open && docked);
@@ -601,9 +606,22 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       void reloadWorks();
     }catch(reason){if(alive.current)setWorksError(String(reason));throw reason;}finally{if(alive.current)setBusy(false);}
   };
+  async function saveConversationTitle(nextTitle: string) {
+    setTitleEdit(null);
+    const title=nextTitle.replace(/\s+/g," ").trim();
+    if(!title || title===chatTitle || busy || active)return;
+    if(!view){setDraftTitle(title);return;}
+    const {id,goal,state}=view.work;
+    const summary=works.find(item=>item.id===id) ?? {id,goal,state};
+    try{
+      await changeHistory(summary,{title});
+      if(alive.current)setView(current=>current?.work.id===id ? {...current,conversationTitle:title} : current);
+    }catch(reason){if(alive.current)setError(String(reason));}
+  }
   const openHistoryWork = async (work: WorkSummary, draft = "") => {
     if(detailsMenu.current)detailsMenu.current.open=false;
     if(work.id===view?.work.id)return;
+    setTitleEdit(null);
     setLibraryDraft(null);setError("");setGoal(draft);setMaterials([]);setDropped([]);setSnippets([]);resetImageDraft();setRemovals([]);clearSourcePreview();
     setBusy(true);setLoadingConversation(true);
     try { await refresh(work.id); }
@@ -973,7 +991,15 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       setPublicUrl("");
       boundMaterial.current=primaryMaterial || null;
       if(tagMode||tagPreparation.references.length)tagPending.current=tagPreparation;
-      setView(value); if(research)researchPending.current={...research,manual,includeManual:false}; void reloadWorks();
+      setView(value); if(research)researchPending.current={...research,manual,includeManual:false};
+      if(draftTitle) {
+        await call({action:"setHistoryPreference",id:value.work.id,title:draftTitle});
+        if(!alive.current)return;
+        value={...value,conversationTitle:draftTitle};
+        setView(value);
+        setDraftTitle("");
+      }
+      void reloadWorks();
       if(anchor){setMaterials([]);setDropped([]);} setRemovals([]);
       if(research){
         value=await call<View>({action:"replaceResearchScope",id:value.work.id,grant:effectiveGrant,expectedRevision:value.work.revision,expectedAuthorizationVersion:value.work.authorizationVersion});
@@ -1230,6 +1256,8 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     setDropped(current=>current.some(m=>JSON.stringify(m.locator)===key)?current:[...current,{locator,title:(entry.title||entry.result?.title||"阅读条目").slice(0,200)}]);
   };
   const newInvestigation = (preserveHistory=false) => {
+    setTitleEdit(null);
+    setDraftTitle("");
     setDraftSession(crypto.randomUUID());
     sequence.current++; setLibraryDraft(null); setView(null); setPublicUrl(""); setAssistantOptions(loadAgentPreferences()); setGoal(""); setCompletionCriteria(""); setWholeLibrary(false); setMaterials([]);setDropped([]);setSnippets([]);resetImageDraft(); setRemovals([]);
     setMemorySelection(loadMemoryPreference()); setConfirmMessage(false); setError("");  setSourcePreview(null); setSourceError(""); setSourceLoading(false); sourceSequence.current++; messageIdentity.current=null;
@@ -1269,6 +1297,14 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     {!!view.run?.usage.modelRetries && <p className="agent-note">模型超时后已重试 {view.run.usage.modelRetries} 次，计入本轮调用次数与总时限。</p>}
     {!!view.run?.usage.outputRepairs && <p className="agent-note">结果核验后已纠错 {view.run.usage.outputRepairs} 次，计入本轮调用次数与总时限。</p>}
   </details>;
+  const recovery = view && !active && view.work.state!=="revoked" && view.lifecycle?.requiresExplicitResume ? {
+    runId: view.run?.id,
+    reason: view.lifecycle.reason,
+    canResume: !busy && !businessCheck && view.lifecycle.canResume && canRunMode(view.lifecycle,mode),
+    onResume: () => { uiTiming.begin("resume"); void run(view.work.id,view.lifecycle); },
+    onScope: !busy && !filePreparing && !publicUrl ? openMaterialScope : undefined,
+  } : undefined;
+  const recoveryInTimeline = recovery?.runId && view?.activity?.some(item=>item.runId===recovery.runId && !item.running && !item.validity);
   const conversationDetails = view ? <>
         {!!view.decisions.length && <details><summary>你确认的决定（{view.decisions.length}）</summary><ul>{[...view.decisions].reverse().map((item, index) => <li key={index}>{item.text}</li>)}</ul></details>}
         <details className="agent-more-tools agent-detail-row" open={canEditNote && (view.work.goal === "修改当前 Obsidian 笔记" || !!view.actions?.items.some(item => item.kind === "obsidianEdit"))}><summary><AgentDetailSummary icon={<NotebookPen size={16}/>} title="成果与保存"/></summary><p className="agent-note">从回答下方插入页面、创建笔记或任务。保存前可查看并修改草稿。</p>
@@ -1300,9 +1336,9 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       if (!loaded.current) { loaded.current = true; void load(); }
     }}><span className="agent-launcher-orb" aria-hidden="true"/>助手</button>, document.body)}
     {loaded.current && createPortal(<>
-      <div data-agent-extra={extra ? "" : undefined} data-agent-docked={docked} hidden={!open || docked} className="agent-panel-height-resizer" role="separator" aria-label="调整助手高度" aria-controls={panelId} aria-orientation="horizontal" aria-valuemin={panelHeightResize.minimum} aria-valuemax={panelHeightResize.maximum} aria-valuenow={panelHeightResize.width} aria-valuetext={`${panelHeightResize.width} 像素`} tabIndex={0} title="拖动调整高度，双击恢复默认" onPointerDown={panelHeightResize.onPointerDown} onKeyDown={panelHeightResize.onKeyDown} onDoubleClick={panelHeightResize.reset}/>
-      <div data-agent-extra={extra ? "" : undefined} data-agent-docked={docked} hidden={!open} className="agent-panel-resizer" role="separator" aria-label="调整助手宽度" aria-controls={panelId} aria-orientation="vertical" aria-valuemin={panelResize.minimum} aria-valuemax={panelResize.maximum} aria-valuenow={panelWidth} aria-valuetext={`${panelWidth} 像素`} tabIndex={0} title="拖动调整宽度，双击恢复默认" onPointerDown={panelResize.onPointerDown} onKeyDown={panelResize.onKeyDown} onDoubleClick={panelResize.reset}/>
-      <aside id={panelId} ref={panel} hidden={!open} data-agent-extra={extra ? "" : undefined} data-agent-source-visible={sourceVisible} data-agent-reading={reportReading} data-agent-docked={docked} data-hub-keyboard-scope="assistant" className="agent-investigation agent-panel" aria-label={extra ? "第二个助手面板" : "Hub 助手"} onDragOver={event=>{if(event.dataTransfer.types.includes("application/x-hub-tag")||event.dataTransfer.types.includes(libraryDragType)||event.dataTransfer.types.includes("application/x-hub-agent-source")||event.dataTransfer.types.includes("Files")){event.preventDefault();event.dataTransfer.dropEffect="copy";}}} onDrop={event=>{
+      <div data-agent-extra={extra ? "" : undefined} data-agent-docked={docked} hidden={!open || docked || !!panelPreset} className="agent-panel-height-resizer" role="separator" aria-label="调整助手高度" aria-controls={panelId} aria-orientation="horizontal" aria-valuemin={panelHeightResize.minimum} aria-valuemax={panelHeightResize.maximum} aria-valuenow={panelHeightResize.width} aria-valuetext={`${panelHeightResize.width} 像素`} tabIndex={0} title="拖动调整高度，双击恢复默认" onPointerDown={panelHeightResize.onPointerDown} onKeyDown={panelHeightResize.onKeyDown} onDoubleClick={panelHeightResize.reset}/>
+      <div data-agent-extra={extra ? "" : undefined} data-agent-docked={docked} hidden={!open || !!panelPreset} className="agent-panel-resizer" role="separator" aria-label="调整助手宽度" aria-controls={panelId} aria-orientation="vertical" aria-valuemin={panelResize.minimum} aria-valuemax={panelResize.maximum} aria-valuenow={panelWidth} aria-valuetext={`${panelWidth} 像素`} tabIndex={0} title="拖动调整宽度，双击恢复默认" onPointerDown={panelResize.onPointerDown} onKeyDown={panelResize.onKeyDown} onDoubleClick={panelResize.reset}/>
+      <aside id={panelId} ref={panel} hidden={!open} data-agent-extra={extra ? "" : undefined} data-agent-source-visible={sourceVisible} data-agent-reading={reportReading} data-agent-docked={docked} data-agent-preset={panelPreset ?? undefined} data-hub-keyboard-scope="assistant" className="agent-investigation agent-panel" aria-label={extra ? "第二个助手面板" : "Hub 助手"} onDragOver={event=>{if(event.dataTransfer.types.includes("application/x-hub-tag")||event.dataTransfer.types.includes(libraryDragType)||event.dataTransfer.types.includes("application/x-hub-agent-source")||event.dataTransfer.types.includes("Files")){event.preventDefault();event.dataTransfer.dropEffect="copy";}}} onDrop={event=>{
         const tagData=event.dataTransfer.types?.includes("application/x-hub-tag")?event.dataTransfer.getData("application/x-hub-tag"):"";
         if(tagData){event.preventDefault();event.stopPropagation();try{const v=JSON.parse(tagData);if(typeof v.tagId!=="string"||typeof v.label!=="string"||v.tagId.length>200)throw Error("无法识别标签");setTagPreparation({...tagPreparation,references:[...tagPreparation.references.filter(t=>t.tagId!==v.tagId),v].slice(0,16)});}catch(reason){setError(String(reason));}return;}
         const libraryData=event.dataTransfer.types?.includes(libraryDragType)?event.dataTransfer.getData(libraryDragType):"";
@@ -1368,10 +1404,24 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         </div></details>
           <button type="button" title="新对话" aria-label="新对话" disabled={busy || !!active} onClick={()=>newInvestigation()}><Plus size={19} /></button>
         </div>
-        <AgentTaskMode activeTopic={research?.topic} onUnpinTopic={async topic=>{const scope=selectionScope.current;const saved=await call<ResearchTopic>({action:"saveResearchTopic",topic:{...topic,pinned:false}});if(alive.current&&selectionScope.current===scope&&research?.topic.id===saved.id)setResearch({...research,topic:{...research.topic,revision:saved.revision,pinned:false}});}} title={chatTitle} disabled={busy || !!active} tagMode={tagMode} goalMode={goalMode} goalDisabled={(scopeOptions.model ?? runtime.settings)?.provider === "deepseek"} onGeneral={()=>{setTagMode(false);if(scopeOptions.goalMode)void saveAssistantOptions({...scopeOptions,goalMode:false},false).catch(reason=>setError(String(reason)));}} onGoal={()=>{setTagMode(false);void saveAssistantOptions({...scopeOptions,goalMode:true},false).catch(reason=>setError(String(reason)));}} onTag={enableTagMode} selectedSkills={selectedSkills.map(token=>token.slice(1))} onTopics={()=>{setRequestedTopic(undefined);setTopicSave(false);setTopicsOpen(true);}} onTopic={topic=>{setRequestedTopic(topic.id);setTopicSave(false);setTopicsOpen(true);}} onUsage={()=>{detailsReturn.current=document.getElementById(panelId)?.querySelector<HTMLElement>(".agent-task-mode>summary")||null;setTaskStatusOnly(true);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current)workControls.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-heading button")?.focus();},0);}}/>
+        {titleEdit && titleEdit.id===titleScope
+          ? <input autoFocus className="agent-chat-title" aria-label="对话标题" maxLength={100} value={titleEdit.value}
+              onChange={event=>setTitleEdit({...titleEdit,value:event.target.value})} onBlur={event=>void saveConversationTitle(event.currentTarget.value)}
+              onKeyDown={event=>{if(event.nativeEvent.isComposing)return;if(event.key==="Enter"){event.preventDefault();event.currentTarget.blur();}if(event.key==="Escape"){event.preventDefault();event.stopPropagation();setTitleEdit(null);}}}/>
+          : <button type="button" className="agent-chat-title" title={chatTitle} aria-label="重命名对话" disabled={busy||!!active} onClick={()=>setTitleEdit({id:titleScope,value:chatTitle.slice(0,100)})}><span>{chatTitle}</span></button>}
         <div className="agent-header-end">
-          {canDock && <button type="button" aria-label={docked?"切换为浮窗":"展开为侧边栏"} title={docked?"切换为浮窗":"展开为侧边栏"} onClick={()=>{setDocked(value=>!value);detailsPopover.close();}}>{docked?<PanelsTopLeft size={18}/>:<PanelRight size={18}/>}</button>}
-          <button ref={detailsTrigger} type="button" title="对话详情" aria-label="对话详情" onClick={event=>{if(detailsMenu.current?.open&&!historyExpanded){detailsPopover.close();event.currentTarget.focus();return;}detailsReturn.current=event.currentTarget;setTaskStatusOnly(false);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-sections .agent-details-heading button")?.focus();},0);}}><MoreHorizontal size={18}/></button>
+          {canDock && <button type="button" aria-label={docked?"切换为浮窗":"展开为侧边栏"} title={docked?"切换为浮窗":"展开为侧边栏"} onClick={()=>{setPanelPreset(null);setDocked(value=>!value);detailsPopover.close();}}>{docked?<PanelsTopLeft size={18}/>:<PanelRightOpen size={18}/>}</button>}
+          {canDock && !extra && <details ref={windowPopover.ref} name="hub-agent-header" className="agent-window-menu">
+            <summary aria-label="助手视图" title="助手视图"><ChevronDown size={13} aria-hidden="true"/></summary>
+            <div className="agent-window-presets" role="group" aria-label="助手视图">
+              <button type="button" aria-pressed={docked} onClick={()=>{panelResize.setWidth(480);setPanelPreset(null);setDocked(true);windowPopover.close(true);}}>侧栏 480px</button>
+              <button type="button" aria-pressed={panelPreset==="focus"} onClick={()=>{setDocked(false);setPanelPreset("focus");windowPopover.close(true);}}>专注 780px</button>
+              <button type="button" aria-pressed={panelPreset==="full"} onClick={()=>{setDocked(false);setPanelPreset("full");windowPopover.close(true);}}>全屏</button>
+              {panelPreset && <button type="button" onClick={()=>{setPanelPreset(null);windowPopover.close(true);}}>恢复浮窗</button>}
+            </div>
+          </details>}
+        <AgentTaskMode activeTopic={research?.topic} onUnpinTopic={async topic=>{const scope=selectionScope.current;const saved=await call<ResearchTopic>({action:"saveResearchTopic",topic:{...topic,pinned:false}});if(alive.current&&selectionScope.current===scope&&research?.topic.id===saved.id)setResearch({...research,topic:{...research.topic,revision:saved.revision,pinned:false}});}} title={chatTitle} disabled={busy || !!active} tagMode={tagMode} goalMode={goalMode} goalDisabled={(scopeOptions.model ?? runtime.settings)?.provider === "deepseek"} onGeneral={()=>{setTagMode(false);if(scopeOptions.goalMode)void saveAssistantOptions({...scopeOptions,goalMode:false},false).catch(reason=>setError(String(reason)));}} onGoal={()=>{setTagMode(false);void saveAssistantOptions({...scopeOptions,goalMode:true},false).catch(reason=>setError(String(reason)));}} onTag={enableTagMode} selectedSkills={selectedSkills.map(token=>token.slice(1))} onTopics={()=>{setRequestedTopic(undefined);setTopicSave(false);setTopicsOpen(true);}} onTopic={topic=>{setRequestedTopic(topic.id);setTopicSave(false);setTopicsOpen(true);}} onUsage={()=>{detailsReturn.current=document.getElementById(panelId)?.querySelector<HTMLElement>(".agent-task-mode>summary")||null;setTaskStatusOnly(true);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current)workControls.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-heading button")?.focus();},0);}}/>
+          <button ref={detailsTrigger} type="button" title="对话详情" aria-label="对话详情" onClick={event=>{if(detailsMenu.current?.open&&!historyExpanded){detailsPopover.close();event.currentTarget.focus();return;}detailsReturn.current=event.currentTarget;setTaskStatusOnly(false);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-sections .agent-details-heading button")?.focus();},0);}}><PanelRight size={17}/></button>
           <button type="button" title={extra ? "关闭第二个助手（Esc）" : "关闭助手（Esc）"} aria-label={extra ? "关闭第二个助手" : "关闭助手"} onClick={closePanel}><X size={19} /></button>
         </div>
       </header>
@@ -1380,9 +1430,9 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       {loadingConversation && <div className="agent-conversation-loading" role="status" aria-label="正在打开对话"><span/><span/><span/></div>}
       <div className="agent-conversation" data-running={running && !reportReading || undefined} hidden={loadingConversation || (sourceScope.current===sourceScopeKey && (!!sourcePreview || !!sourceError || sourceLoading))} ref={conversationScroll.element} tabIndex={0} aria-label="对话与报告" onScroll={conversationScroll.onScroll} onClickCapture={event=>{if((event.target as Element).closest(".agent-activity-toggle,details > summary"))conversationScroll.holdPosition();}}>
       <div className="agent-conversation-content" ref={conversationScroll.content}>
-      <ActivityDisclosureProvider key={view?.work.id||"new"} isFollowing={()=>!sourceVisible && !reportReading && conversationScroll.isFollowing()}>
+      <ActivityDisclosureProvider key={view?.work.id||"new"} recovery={recovery} isFollowing={()=>!sourceVisible && !reportReading && conversationScroll.isFollowing()}>
 
-      {controlsNeedAttention && view?.work.state!=="revoked" && <div className="agent-task-notice" role="status"><span>{view?.materialBudget?.preflight?.allowed===false || !!view?.materialBudget?.overrunBytes ? "资料处理容量不足" : view?.lifecycle?.requiresExplicitResume ? "任务已暂停，需手动恢复" : view?.lifecycle?.usageCompleteness==="incomplete" ? "部分模型用量尚未返回" : "任务状态需要处理"}</span><button type="button" onClick={()=>{setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current){workControls.current.open=true;workControls.current.querySelector("summary")?.focus();setTimeout(()=>workControls.current?.querySelector("summary")?.focus(),0);}}}>查看任务详情</button></div>}
+      {controlsNeedAttention && (!recovery || reportReading) && view?.work.state!=="revoked" && <div className="agent-task-notice" role="status"><span>{view?.materialBudget?.preflight?.allowed===false || !!view?.materialBudget?.overrunBytes ? "资料处理容量不足" : view?.lifecycle?.requiresExplicitResume ? "任务已暂停，需手动恢复" : view?.lifecycle?.usageCompleteness==="incomplete" ? "部分模型用量尚未返回" : "任务状态需要处理"}</span><button type="button" onClick={()=>{setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current){workControls.current.open=true;workControls.current.querySelector("summary")?.focus();setTimeout(()=>workControls.current?.querySelector("summary")?.focus(),0);}}}>查看任务详情</button></div>}
 
       {newSource && <div className="agent-notice"><p>正在讨论「{sourceTitle || currentObjectLabel}」。当前浏览：{newSource.title}</p><button type="button" disabled={busy || !!active} onClick={newSource.use}>用当前材料新建对话</button></div>}
       {tagMode&&<AgentTagWorkspace value={tagPreparation} disabled={busy||!!active} onChange={setTagPreparation} onCancel={()=>setTagMode(false)}/>}
@@ -1399,6 +1449,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         {view.run?.error && ["failed","interrupted"].includes(view.work.state) && <section className="agent-notice" aria-label="本轮恢复说明"><p>问题与资料选择保留在本对话中。可从输入框下方的“资料”核对范围，处理失败原因后再继续；不会自动反复重试。</p>{view.activity?.some(run=>run.runId===view.run?.id && run.events.some(event=>event.kind==="unpublishedAnswer")) && <p>模型答复已保留在本轮工作过程中，但尚未完成交付核验，不能当作已保存成果。</p>}</section>}
         {view.conversation && <AgentConversation workId={view.work.id} recordVersion={view.recordVersion} conversation={view.conversation} revoked={view.work.state==="revoked"} onOpenCitation={(...args)=>void openCitation(...args)} onOpenMaterial={item=>void openMaterial(item)} onEdit={!busy&&!active?editMessage:undefined} onRecheck={!businessDisabled&&!saveOnly&&!questionText.trim()&&view.work.state!=="revoked"?prepareSourceRecheck:undefined} onLoadEarlier={()=>void loadEarlier()} earlierLoading={historyLoadingScope===historyScope.current} earlierError={historyNotice?.scope===historyScope.current ? historyNotice.text : ""} renderAfter={inlineOutcomes} renderActions={message=>message.role==="assistant"&&message.report&&message.runId&&view&&<AgentAnswerSave workId={view.work.id} runId={message.runId} current={saveTarget} disabled={businessDisabled||!!active||!!view.lifecycle?.requiresExplicitResume||message.artifactState==="unavailable"} records={view.answerSaves} onChanged={()=>void refresh(view.work.id)}/>} activity={view.activity}/> }
         {view.work.state!=="revoked" && view.activity?.filter(run=>!view.conversation?.messages.some(message=>message.runId===run.runId || message.revision===run.revision)).map(run=><AgentActivity key={run.runId} value={run}/>)}
+        {recovery && !recoveryInTimeline && <AgentRecoveryCard controls={recovery}/>}
         {view.work.state!=="revoked" && view.nativeInputs?.map(input=><AgentNativeInput key={input.key} value={input} disabled={busy||stopping||(!running&&input.delivery!=="async")} onAnswer={async(answers,cancel)=>{
           const ticket=sequence.current;
           const receipt=await call<{workId:string;runId:string;key:string;saved:boolean;startNewTurn?:boolean}>({action:"answerNativeInput",id:view.work.id,runId:input.runId,key:input.key,answers,cancel,expectedRevision:view.work.revision,expectedAuthorizationVersion:view.work.authorizationVersion});

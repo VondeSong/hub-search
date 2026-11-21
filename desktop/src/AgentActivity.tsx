@@ -1,7 +1,7 @@
 import { publicWebHref } from "./AgentWebSources";
 import { invoke } from "@tauri-apps/api/core";
 import { createContext, memo, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, Ellipsis, TriangleAlert } from "lucide-react";
+import { ChevronDown, Ellipsis, Layers, Play, TriangleAlert } from "lucide-react";
 import { ActivityIcon, ActivityIdentity, WebsiteIcon, activityLabel, activityOperation, activityServiceTitle, operationLabels, type ActivityOperation } from "./AgentActivityIdentity";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -20,11 +20,19 @@ const DisclosureContext=createContext<{
   phaseRows:Map<string,number>;
 }|null>(null);
 const FollowConversationContext = createContext<(() => boolean) | undefined>(undefined);
+type RecoveryControls = {
+  runId?: string | null;
+  reason: string;
+  canResume: boolean;
+  onResume: () => void;
+  onScope?: (opener: HTMLButtonElement) => void;
+};
+const RecoveryContext = createContext<RecoveryControls | undefined>(undefined);
 // Keep disclosure choices across remounts within the active chat.
-export function ActivityDisclosureProvider({children, isFollowing}:{children:ReactNode;isFollowing?:()=>boolean}) {
+export function ActivityDisclosureProvider({children, isFollowing, recovery}:{children:ReactNode;isFollowing?:()=>boolean; recovery?:RecoveryControls}) {
   const [choices]=useState(()=>({expanded:new Map<string,boolean>(),phaseRows:new Map<string,number>()}));
   return <FollowConversationContext.Provider value={isFollowing}>
-    <DisclosureContext.Provider value={choices}>{children}</DisclosureContext.Provider>
+    <DisclosureContext.Provider value={choices}><RecoveryContext.Provider value={recovery}>{children}</RecoveryContext.Provider></DisclosureContext.Provider>
   </FollowConversationContext.Provider>;
 }
 function rememberActivityChoice<T>(choices:Map<string,T>|undefined,key:string,value:T) {
@@ -53,6 +61,29 @@ function UnpublishedAnswer({text,truncated}:{text:string;truncated?:boolean}) {
     <summary>查看未发布的模型答复<ChevronDown size={13} aria-hidden="true"/></summary>
     {open && <div><p className="agent-note">{truncated?"仅保留了部分回答预览，尚未通过交付核验；其中的表述不代表操作已执行或目标已完成。":"原始答复已保留，但尚未通过交付核验；其中的表述不代表操作已执行或目标已完成。"}</p><pre>{text}</pre></div>}
   </details>;
+}
+
+export function AgentRecoveryCard({controls, draft, truncated, runId}: {
+  controls: RecoveryControls; draft?: string; truncated?: boolean; runId?: string;
+}) {
+  const [open, setOpen] = useActivityDisclosure(`recovery-draft:${runId ?? controls.runId ?? "current"}`, false);
+  const previewId = useId();
+  return <section className="agent-recovery-card" aria-label="暂停后的操作">
+    <div className="agent-recovery-heading">
+      <span className="agent-recovery-icon"><TriangleAlert size={15} aria-hidden="true"/></span>
+      <div><strong>{draft ? "未完成最终核验，已保留草稿" : "任务已暂停"}</strong>
+        {controls.reason && <p>{controls.reason}</p>}</div>
+    </div>
+    <div className="agent-recovery-actions">
+      <button type="button" className="agent-recovery-resume" disabled={!controls.canResume} onClick={controls.onResume}><Play size={13} aria-hidden="true"/>继续完成</button>
+      {controls.onScope && <button type="button" onClick={event=>controls.onScope?.(event.currentTarget)}><Layers size={14} aria-hidden="true"/>核对资料范围</button>}
+      {draft && <button type="button" className="agent-recovery-preview-toggle" aria-expanded={open} aria-controls={open ? previewId : undefined} onClick={()=>setOpen(!open)}>{open ? "收起草稿" : "查看草稿预览"}<ChevronDown size={13} aria-hidden="true"/></button>}
+    </div>
+    {draft && open && <div className="agent-recovery-preview" id={previewId}>
+      <div><strong>答复草稿</strong><small>{truncated ? "部分预览 · 未核验" : "仅预览 · 未核验"}</small></div>
+      <PublicText text={draft}/>
+    </div>}
+  </section>;
 }
 function webQueries(event:ActivityEvent) {
   return [...new Set((event.queries ?? []).map(query=>query.trim()).filter(Boolean))];
@@ -450,7 +481,9 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
   const complete=operations.every(event=>event.state==="completed"&&!event.errorCount);
   const commandBatch=operations.length>1 && labels.length===1 && labels[0]===operationLabels.command;
   const summaryOnly=operations.length===0;
-  const overview=summaryOnly ? reasoningPreview(events[0]) : materialGroup ? `资料准备 · ${operations.length} 项` : webOverview ? `${webTitle} · ${operations.length} 步`
+  const rules=materialGroup ? events.filter(event=>event.label==="已加载知识库工作规则").length : 0;
+  const contextLabel = rules ? ["已载入上下文", ...(events.length>rules ? [`${events.length-rules} 项材料回执`] : []), `${rules} 条规则`].join(" · ") : `资料准备 · ${operations.length} 项`;
+  const overview=summaryOnly ? reasoningPreview(events[0]) : materialGroup ? contextLabel : webOverview ? `${webTitle} · ${operations.length} 步`
     : commandBatch ? `${complete?"已运行命令":"运行命令"} · ${operations.length} 条`
     : mixed?.title ?? externalPhaseTitle(operations) ?? (complete?"已":"")+(attachmentTitle ?? labels.join("、"))+(readSpan?.title ? ` · ${readSpan.title}` : "");
   const latest=webOverview || materialGroup ? undefined : current ?? (!commandBatch && live && operations.length>1 ? operations[operations.length-1] : undefined);
@@ -534,6 +567,7 @@ export function AgentActivity({ value, onRecheck, requestText }: { value: Activi
   const [expanded, setExpanded] = useActivityDisclosure(`run:${value.runId}`,value.running || !!hasNativeSegments);
   const [reviewing, setReviewing] = useActivityDisclosure(`reviewing:${value.runId}`,false);
   const isFollowing = useContext(FollowConversationContext);
+  const recovery = useContext(RecoveryContext);
   const waitingRun = useRef<string | undefined>(undefined);
   const [emptyOpen, setEmptyOpen] = useActivityDisclosure(`empty:${value.runId}`,false);
   const [permissionsOpen, setPermissionsOpen] = useActivityDisclosure(`permissions:${value.runId}`,false);
@@ -558,13 +592,14 @@ export function AgentActivity({ value, onRecheck, requestText }: { value: Activi
     waitingRun.current = undefined;
     if (expanded && !reviewing && isFollowing?.()) setExpanded(false);
   },[answer,value.running,value.runId,expanded,reviewing,isFollowing,setExpanded]);
-  const unpublished = newest.find(event=>event.kind==="unpublishedAnswer");
+  const unpublished = newest.find(event=>event.kind==="unpublishedAnswer" && event.label.trim());
+  const showRecovery = !!recovery && recovery.runId===value.runId && !value.running && !value.validity;
   const answerStartedAt=value.events.find(event=>event.kind==="answer"&&event.label.trim())?.createdAt;
   const duration=elapsed((value.finishedAt ?? answerStartedAt ?? now)-value.startedAt);
   const processing=value.running && !answer;
   const timeLabel=processing ? "已处理" : "用时";
   const publicSummaries=value.events.filter(event=>event.kind==="reasoning"&&event.origin==="deepseek");
-  const processEvents=value.events.filter(event=>event.kind!=="answer"&&!isThinkingPlaceholder(event)&&!(event.kind==="message"&&publicSummaries.some(summary=>summary.label.trim()===event.label.trim()&&summary.createdAt<=event.createdAt))).sort((a,b)=>a.sequence!=null&&b.sequence!=null?a.sequence-b.sequence:a.createdAt-b.createdAt);
+  const processEvents=value.events.filter(event=>event.kind!=="answer"&&!(showRecovery&&event.kind==="unpublishedAnswer")&&!isThinkingPlaceholder(event)&&!(event.kind==="message"&&publicSummaries.some(summary=>summary.label.trim()===event.label.trim()&&summary.createdAt<=event.createdAt))).sort((a,b)=>a.sequence!=null&&b.sequence!=null?a.sequence-b.sequence:a.createdAt-b.createdAt);
   const stopped = !value.running && ["failed","interrupted","needsDecision"].includes(value.state);
   const failure = stopped ? newest.find(event=>event.state==="failed" || event.state==="interrupted") : undefined;
   const toolIssues=processEvents.filter(event=>isOperation(event)&&event.kind!=="webSearch"&&(event.state==="failed"||event.state==="interrupted"));
@@ -573,7 +608,7 @@ export function AgentActivity({ value, onRecheck, requestText }: { value: Activi
   const hasTimeline=hasProcess || processing;
   const canDisclose=hasProcess || !!(value.native || value.capabilities);
   const processOpen=hasTimeline ? expanded : emptyOpen;
-  const stateLabel = !value.running && (value.state==="needsDecision" ? " · 待确认" : value.state==="interrupted" ? " · 已暂停" : value.state==="failed" ? " · 未完成" : "");
+  const stateLabel = !value.running ? (value.state==="needsDecision" ? "待确认" : showRecovery || value.state==="interrupted" ? "已暂停" : value.state==="failed" ? "未完成" : "") : "";
   const webIssue=!value.running && !value.validity && (specifiedPageIssue(newest,requestText)
     ?? (failure?.kind==="webSearch" ? {label:[webLabel(failure),eventStateLabel(failure)].filter(Boolean).join(" · "),detail:failure.detail} : undefined));
   const clippedProgress=processEvents.filter(event=>["message","reasoning","plan"].includes(event.kind));
@@ -586,8 +621,8 @@ export function AgentActivity({ value, onRecheck, requestText }: { value: Activi
       setExpanded(!processOpen);
     } else setEmptyOpen(!processOpen);
   }}>
-      <span className="agent-run-time">{timeLabel} {duration}{stateLabel}</span><ChevronDown className={processOpen ? "" : "agent-collapsed"} size={13} aria-hidden="true"/>
-    </button> : (!processing || value.capabilities) && <p className="agent-elapsed">{timeLabel} {duration}{stateLabel}</p>;
+      <span className="agent-run-time">{timeLabel} {duration}</span>{stateLabel && <span className="agent-activity-state">{stateLabel}</span>}<ChevronDown className={processOpen ? "" : "agent-collapsed"} size={13} aria-hidden="true"/>
+    </button> : (!processing || value.capabilities) && <p className="agent-elapsed">{timeLabel} {duration}{stateLabel && <> · {stateLabel}</>}</p>;
   return <section className="agent-activity" data-live={processing || undefined} aria-label="本轮工作过程">
     {value.capabilities ? <>
       <div className="agent-activity-heading">
@@ -611,7 +646,8 @@ export function AgentActivity({ value, onRecheck, requestText }: { value: Activi
     {!expanded && lastToolIssue && <p className="agent-process-failure" role="status" aria-label="工具操作未完成"><TriangleAlert size={14} aria-hidden="true"/><span>{toolIssues.length>1&&`${toolIssues.length} 项工具操作未完成 · `}{lastToolIssue.label} · {eventStateLabel(lastToolIssue)}{lastToolIssue.detail ? `：${lastToolIssue.detail}` : ""}</span></p>}
     {!expanded && failure && failure.kind!=="webSearch" && !isOperation(failure) && <p className="agent-process-failure" role="status"><TriangleAlert size={14} aria-hidden="true"/><span>{failure.label} · {failure.state==="failed" ? "未完成" : "已中断"}{failure.detail ? `：${failure.detail}` : ""}</span></p>}
     {clipped && (!expanded || !clippingInText) && <p className="agent-note" role="status" aria-label="过程显示限制">过程消息超过显示上限，后续内容未展示。</p>}
-    {!expanded && unpublished && <ActivityEventView event={unpublished} scope={null} runId={value.runId}/>}
+    {showRecovery && <AgentRecoveryCard controls={recovery} draft={unpublished?.label} truncated={unpublished?.truncated} runId={value.runId}/>}
+    {!showRecovery && !expanded && unpublished && <ActivityEventView event={unpublished} scope={null} runId={value.runId}/>}
     {value.running && answer && <div className="agent-report agent-answer agent-native-answer" aria-label="正在生成回答" aria-busy="true">{answer.origin==="deepseek"&&<p className="agent-note">{answer.truncated?"回答预览已达显示上限，仍在接收；完整回答核验后交付":"回答预览 · 完整接收并核验后交付"}</p>}<PublicText text={answer.label}/></div>}
     {workspace && <PatchDetails stateKey={`workspace:${value.runId}`} title={`本轮文件变更 · ${workspace.files} 个文件`} value={workspace}/>}
   </section>;

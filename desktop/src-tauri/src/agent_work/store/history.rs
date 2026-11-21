@@ -147,12 +147,13 @@ pub(super) fn list_on(
             LEFT JOIN agent_records p ON p.rowid=h.latest
         ), visible AS (
             SELECT *, COALESCE(json_extract(preference,'$.pinned'),0) AS pinned,
-                COALESCE(json_extract(preference,'$.archived'),0) AS archived
+                COALESCE(json_extract(preference,'$.archived'),0) AS archived,
+                json_extract(preference,'$.title') AS title
             FROM history WHERE COALESCE(json_extract(preference,'$.deleted'),0)=0
         ), matching AS (
             SELECT *, CASE WHEN ?5 THEN 0 ELSE pinned END AS sort_pinned
             FROM visible WHERE (?1='null' OR anchor_json=?1) AND archived=?5
-                AND (?6='' OR instr(lower(goal),lower(?6))>0 OR (
+                AND (?6='' OR instr(lower(COALESCE(title,'')),lower(?6))>0 OR instr(lower(goal),lower(?6))>0 OR (
                     state<>'revoked' AND EXISTS(SELECT 1 FROM agent_records r
                         WHERE r.work_id=visible.id AND {request_rows}
                         AND instr(lower({request_text}),lower(?6))>0)))
@@ -165,7 +166,7 @@ pub(super) fn list_on(
         SELECT id,goal,state,updated_at,
             1+(SELECT COUNT(*) FROM agent_records r WHERE r.work_id=page.id
                AND r.kind IN ('userMessage','userDecision','steering','delivery')),
-            pinned,archived
+            pinned,archived,title
         FROM page ORDER BY sort_pinned DESC,updated_at DESC,id"
     );
     let mut q = c.prepare(&sql).map_err(|e| e.to_string())?;
@@ -184,7 +185,7 @@ pub(super) fn list_on(
                     json!({"id":r.get::<_,String>(0)?,"goal":r.get::<_,String>(1)?,
             "state":r.get::<_,String>(2)?,"updatedAt":r.get::<_,i64>(3)?,
             "messageCount":r.get::<_,i64>(4)?,"pinned":r.get::<_,bool>(5)?,
-            "archived":r.get::<_,bool>(6)?}),
+            "archived":r.get::<_,bool>(6)?,"title":r.get::<_,Option<String>>(7)?}),
                 )
             },
         )
@@ -209,6 +210,7 @@ pub(super) struct HistoryChange {
     pub(super) pinned: Option<bool>,
     pub(super) deleted: Option<bool>,
     pub(super) archived: Option<bool>,
+    title: Option<String>,
 }
 
 pub(super) fn change(args: &Value) -> Result<HistoryChange, String> {
@@ -217,12 +219,28 @@ pub(super) fn change(args: &Value) -> Result<HistoryChange, String> {
             .map(|value| value.as_bool().ok_or_else(|| error.to_string()))
             .transpose()
     };
+    let title = args
+        .get("title")
+        .map(|value| {
+            let value = value.as_str().ok_or("对话标题无效")?;
+            let title = value.split_whitespace().collect::<Vec<_>>().join(" ");
+            if title.is_empty() || title.chars().count() > 100 {
+                return Err("对话标题需要 1–100 个字符");
+            }
+            Ok(title)
+        })
+        .transpose()?;
     let change = HistoryChange {
         pinned: boolean("pinned", "置顶状态无效")?,
         deleted: boolean("deleted", "删除状态无效")?,
         archived: boolean("archived", "归档状态无效")?,
+        title,
     };
-    if change.pinned.is_none() && change.deleted.is_none() && change.archived.is_none() {
+    if change.pinned.is_none()
+        && change.deleted.is_none()
+        && change.archived.is_none()
+        && change.title.is_none()
+    {
         return Err("缺少历史操作".into());
     }
     Ok(change)
@@ -236,6 +254,24 @@ pub(super) fn preference_on(
     change: &HistoryChange,
     append: impl FnOnce(&Value) -> Result<(), String>,
 ) -> Result<Value, String> {
+    let old = read_preference(c, id)?;
+    let mut next = json!({"pinned":change.pinned.unwrap_or(old["pinned"]==true),
+        "deleted":change.deleted.unwrap_or(old["deleted"]==true),
+        "archived":change.archived.unwrap_or(old["archived"]==true)});
+    if let Some(title) = change.title.as_deref().or_else(|| old["title"].as_str()) {
+        next["title"] = json!(title);
+    }
+    if next != old {
+        append(&next)?;
+    }
+    Ok(next)
+}
+
+pub(super) fn title_on(c: &Connection, id: &str) -> Result<Option<String>, String> {
+    Ok(read_preference(c, id)?["title"].as_str().map(str::to_owned))
+}
+
+fn read_preference(c: &Connection, id: &str) -> Result<Value, String> {
     let old: Option<String> = c
         .query_row(
             "SELECT body_json FROM agent_records WHERE work_id=?1 AND kind='historyPreference'
@@ -249,15 +285,12 @@ pub(super) fn preference_on(
         .map(|value| serde_json::from_str(&value).map_err(|_| "历史偏好损坏"))
         .transpose()?
         .unwrap_or(json!({}));
-    let old = json!({"pinned":old["pinned"]==true,"deleted":old["deleted"]==true,
+    let mut result = json!({"pinned":old["pinned"]==true,"deleted":old["deleted"]==true,
         "archived":old["archived"]==true});
-    let next = json!({"pinned":change.pinned.unwrap_or(old["pinned"]==true),
-        "deleted":change.deleted.unwrap_or(old["deleted"]==true),
-        "archived":change.archived.unwrap_or(old["archived"]==true)});
-    if next != old {
-        append(&next)?;
+    if let Some(title) = old["title"].as_str() {
+        result["title"] = json!(title);
     }
-    Ok(next)
+    Ok(result)
 }
 
 #[cfg(test)]
