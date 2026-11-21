@@ -1,14 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 /** Native details keeps disclosure semantics; dismissal never submits a form. */
-export function useAgentPopover(options: { deferEscapeSelector?: string; triggerRef?: RefObject<HTMLElement | null>; returnFocusRef?: RefObject<HTMLElement | null>; aboveComposer?: boolean } = {}) {
+export function useAgentPopover(options: { deferEscapeSelector?: string; onEscape?: () => boolean; triggerRef?: RefObject<HTMLElement | null>; returnFocusRef?: RefObject<HTMLElement | null>; aboveComposer?: boolean } = {}) {
   const ref = useRef<HTMLDetailsElement>(null);
   const [element, setElement] = useState<HTMLDetailsElement | null>(null);
   const deferredEscape = useRef(options.deferEscapeSelector);
+  const handleEscape = useRef(options.onEscape);
   const trigger = options.triggerRef;
   const returnFocus = options.returnFocusRef;
   const aboveComposer = options.aboveComposer;
   deferredEscape.current = options.deferEscapeSelector;
+  handleEscape.current = options.onEscape;
   // The assistant's disclosures mount after its launcher is first opened.
   useLayoutEffect(() => { if (ref.current !== element) setElement(ref.current); });
   function close(restoreFocus = false) {
@@ -38,7 +40,7 @@ export function useAgentPopover(options: { deferEscapeSelector?: string; trigger
       if (deferredEscape.current && event.target instanceof Element && event.target.closest(deferredEscape.current)) return;
       event.preventDefault();
       event.stopPropagation();
-      close(true);
+      if (!handleEscape.current?.()) close(true);
     };
     const blur=()=>{if(!nativeDialogOpen())close();};
     window.addEventListener("blur",blur);

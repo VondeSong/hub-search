@@ -32,7 +32,7 @@ import { userProfileStorage } from "./UserProfileStorage";
 import {AgentNativeContext,type NativeContext} from "./AgentNativeContext";
 import {attachmentFolders} from "./agentAttachmentFolders";
 import {AgentImageCards,AgentTextFileCard,isTextAttachment,fileUseHint,prepareImage,readDataUrl,readTextFile} from "./AgentFileInputs";
-import {AgentImages,type ImageGrant,type ImageChange} from "./AgentImages";
+import {AgentImages,type ImageGrant} from "./AgentImages";
 import { AgentMaterials, materialKey, type AgentMaterial } from "./AgentMaterials";
 import {AgentLibraryScope,libraryDragType,readLibraryDrop,type AgentLibrary} from "./AgentLibraryScope";
 import { AgentSourceScope, type SourceSelection } from "./AgentSourceScope";
@@ -191,17 +191,17 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const [taskStatusOnly,setTaskStatusOnly]=useState(false);
   const workControls=useRef<HTMLDetailsElement>(null);
   const materialReturn=useRef<HTMLElement|null>(null);
-  const materialPopover=useAgentPopover({returnFocusRef:materialReturn});
+  const materialPopover=useAgentPopover({returnFocusRef:materialReturn,onEscape:backInMaterials});
   const [addMenuOpen,setAddMenuOpen]=useState(false);
   const [addPage,setAddPage]=useState<"home"|"materials"|"scope"|"skills"|"web"|"images"|"pages"|"files">("home");
   const addBack=useRef<HTMLButtonElement>(null);
   useEffect(()=>{
     if(!addMenuOpen)return;
     const panel=materialPopover.ref.current;
-    const focus=addPage==="pages" ? panel?.querySelector<HTMLInputElement>(".agent-material-search input:not(:disabled)") :
-      ["scope","materials","skills"].includes(addPage) ? panel?.querySelector<HTMLButtonElement>(".agent-popover-header>button:last-child") :
+    const focus=["pages","files","images","skills"].includes(addPage) ? panel?.querySelector<HTMLInputElement>("[data-material-focus] input[type='search']:not(:disabled), .agent-material-search input:not(:disabled), .agent-skill-search input") :
+      ["scope","materials"].includes(addPage) ? panel?.querySelector<HTMLButtonElement>(".agent-scope-overview>button") :
       addPage==="home" ? panel?.querySelector<HTMLButtonElement>(".agent-add-choices button:not(:disabled)") : addBack.current;
-    (focus??addBack.current)?.focus({preventScroll:true});
+    (focus??addBack.current??panel?.querySelector<HTMLButtonElement>(".agent-popover-header>button:last-child"))?.focus({preventScroll:true});
   },[addPage,addMenuOpen]);
   const panelId = useId();
   const launcher = useRef<HTMLButtonElement>(null);
@@ -264,15 +264,27 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     removals:NoteLocator[];
     images:ImageGrant[]|null;
   }|null>(null);
+  const [pickerFilePending,setPickerFilePending]=useState(false);
   const pickerScope=selectionScope.current;
   const selection=materialSelection?.scope===pickerScope?materialSelection:null;
   const pickerCount=selection?selection.materials.length+selection.dropped.length+Number(!view&&selection.pageAttached&&!!pageAnchor):0;
+  const pickerFiles=selection?.materials.filter(item=>item.fileBytes!==undefined) ?? [];
+  const pickerPageCount=pickerCount-pickerFiles.length;
+  function cancelCoreMaterials() {
+    setMaterialSelection(null);
+    setAddPage("scope");
+  }
+  function backInMaterials() {
+    if(addPage==="files"||addPage==="images"){setAddPage("pages");return true;}
+    if(addPage==="pages"||addPage==="web"){cancelCoreMaterials();return true;}
+    return false;
+  }
   function openCoreMaterials(pendingRemovals=removals) {
     setMaterialSelection({scope:pickerScope,pageAttached,materials,dropped,removals:pendingRemovals,images:null});
     setAddPage("pages");
   }
   function finishCoreMaterials() {
-    if(!selection || pickerDisabled || selection.removals.length)return;
+    if(!selection || pickerDisabled || pickerFilePending || selection.removals.length)return;
     setMaterials(selection.materials);
     setDropped(selection.dropped);
     setRemovals(selection.removals);
@@ -708,10 +720,6 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const hasImage=(images:ImageGrant[],image:ImageGrant)=>images.some(grant=>sameImage(grant,image));
   const imageChanges={addImages:selectedImages.filter(g=>!hasImage(currentImages,g)||hasImage(reattachedImages,g)),removeImages:currentImages.filter(g=>!hasImage(selectedImages,g))};
   const imagesChanged=!!(imageChanges.addImages.length||imageChanges.removeImages.length);
-  const updateImages=async (changes:ImageChange)=>{
-    setMaterialSelection(draft=>draft&&{...draft,images:[...pickerImages.filter(g=>!changes.removeImages.some(r=>sameImage(r,g))),...changes.addImages]});
-    setAddPage("pages");
-  };
   const addFiles=async(files:File[])=>{
     if(busy||importingFiles.current||businessCheck||confirmMessage||view?.work.grant.manifest||publicUrl){setError("请先完成当前操作，再添加图片或文件。");return;}
     importingFiles.current=true;setFilePreparing(true);setError("");
@@ -1134,9 +1142,9 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const visibleEntry=browsing?.entry;
   const currentPage=visibleEntry
     ? "result" in visibleEntry
-      ? {locator:investigationAnchor(visibleEntry.result),title:visibleEntry.result.title}
-      : {locator:{kind:"reading" as const,itemKey:visibleEntry.itemKey},title:visibleEntry.title||"当前阅读条目"}
-    : !view && pageAnchor ? {locator:pageAnchor,title:pageTitle||currentObjectLabel} : null;
+      ? {locator:investigationAnchor(visibleEntry.result),title:visibleEntry.result.title,subtitle:[visibleEntry.result.libraryName,visibleEntry.result.path].filter(Boolean).join(" · ")}
+      : {locator:{kind:"reading" as const,itemKey:visibleEntry.itemKey},title:visibleEntry.title||"当前阅读条目",subtitle:"阅读"}
+    : !view && pageAnchor ? {locator:pageAnchor,title:pageTitle||currentObjectLabel,subtitle:pageLibraryName} : null;
   const currentKey=JSON.stringify(currentPage?.locator);
   const usePageAnchor=!!currentPage?.locator && !view && currentKey===JSON.stringify(pageAnchor);
   const selectedCurrent=!!selection && !!currentPage?.locator && (usePageAnchor && selection.pageAttached ||
@@ -1474,8 +1482,8 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
               <summary aria-label="添加附件" title="添加附件" onClick={()=>{materialReturn.current=null;}}><Plus size={20} aria-hidden="true"/></summary>
               <div className={`agent-add-content${["materials","scope","pages","files","images"].includes(addPage)?" agent-add-materials":addPage==="skills"?" agent-add-skills":""}`}>
                 <div className="agent-popover-header">
-                  {!["home","scope","materials","skills"].includes(addPage)&&<button type="button" className="agent-menu-back" ref={addBack} aria-label={["files","images"].includes(addPage)?"返回材料列表":"返回资料范围"} onClick={()=>{if(["files","images"].includes(addPage))setAddPage("pages");else{setMaterialSelection(null);setAddPage("scope");}}}><ArrowLeft size={16}/></button>}
-                  <strong>{addPage==="home"?"添加到本次对话":addPage==="skills"?"技能":addPage==="pages"?"选择材料":addPage==="files"?"资料库文件":addPage==="images"?"资料库图片与 PDF":addPage==="web"?"公共链接":"资料范围"}</strong>
+                  {!["home","scope","materials","skills"].includes(addPage)&&<button type="button" className="agent-menu-back" ref={addBack} aria-label={["files","images"].includes(addPage)?"返回材料列表":"返回资料范围"} onClick={backInMaterials}><ArrowLeft size={16}/></button>}
+                  <strong>{addPage==="home"?"添加到本次对话":addPage==="skills"?"技能":addPage==="pages"?"选择材料":addPage==="files"?"资料库文件":addPage==="images"?"图片与 PDF 页面":addPage==="web"?"公共链接":"资料范围"}</strong>
                   <button type="button" aria-label="关闭添加菜单" title="关闭" onClick={()=>materialPopover.close(true)}><X size={16}/></button>
                 </div>
                 {addPage==="home" && <div className="agent-add-choices">
@@ -1483,11 +1491,14 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
                   <button type="button" className="agent-menu-choice" onClick={()=>{setTagSearchOpen(true);materialPopover.close();}}><Tags size={18}/><span><strong>添加标签</strong><small>引用标签参与讨论</small></span><ChevronRight size={15}/></button>
                   <p className="agent-note">资料库里的图片和文档可直接拖入，也可通过「资料范围」查找。</p>
                 </div>}
-                {addMenuOpen && addPage==="images" && selection && <div className="agent-scope-body"><AgentImages current={pickerImages} disabled={pickerDisabled || !!view?.work.grant.manifest} onApply={updateImages}/></div>}
+                {addMenuOpen && addPage==="images" && selection && <div className="agent-scope-body">
+                  <AgentImages current={currentImages} selected={pickerImages} disabled={pickerDisabled || !!view?.work.grant.manifest} onChange={images=>setMaterialSelection(draft=>draft&&{...draft,images})}/>
+                </div>}
                 {addMenuOpen && addPage==="files" && selection && <div className="agent-scope-body">
-                  <AgentAnalysisInputs disabled={pickerDisabled||!!view?.work.grant.manifest||pickerCount>=31} onSelect={item=>{
+                  <AgentAnalysisInputs disabled={pickerDisabled||!!view?.work.grant.manifest} limitReached={pickerCount>=31} selected={pickerFiles} onPreparing={setPickerFilePending} onRemove={item=>{
+                    setMaterialSelection(draft=>draft&&{...draft,materials:draft.materials.filter(note=>materialKey(note.locator)!==materialKey(item.locator))});
+                  }} onSelect={item=>{
                     setMaterialSelection(draft=>draft&&!draft.materials.some(note=>materialKey(note.locator)===materialKey(item.locator))?{...draft,materials:[...draft.materials,item]}:draft);
-                    setAddPage("pages");
                   }}/>
                 </div>}
                 {addMenuOpen && addPage==="web" && <div className="agent-add-section"><label>公共网页地址<input type="url" aria-label="公共网页地址" value={publicUrl} disabled={busy} onChange={event=>setPublicUrl(event.target.value)} placeholder="https://example.org/article"/></label><p className="agent-note">发送问题即读取并保存此公开网页。仅支持 HTTPS 文本与 HTML 源码；不登录、不跟随跳转，不加载脚本和图片。每次最多 256 KiB，30 秒超时。遇到代理虚拟地址时向 Cloudflare 加密查询域名，不发送正文。</p><button type="button" onClick={()=>{materialPopover.close(true);goalInput.current?.focus();}}>返回填写问题</button></div>}
@@ -1517,30 +1528,40 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
               onWithdraw={view&&!active ? ()=>{setRemovals(selection.removals);void withdrawMaterials(selection.removals,selection.materials);} : undefined}
               picker={{
                 count:pickerCount,
+                selectedCount:pickerPageCount,
                 advanced:scopeVerification,
                 excluded:new Set([
-                  currentPage?.locator,
                   !view&&selection.pageAttached?pageAnchor:null,
                   ...selection.dropped.map(item=>item.locator),
                 ].flatMap(locator=>locator?.kind==="note"?[materialKey(locator)]:[])),
-                currentPage:currentPage?.locator&&currentPage.locator.kind!=="attachment"&&<label className="agent-material-choice agent-material-current">
-                  <input type="checkbox" aria-label="添加当前页面" checked={selectedCurrent||authorizedCurrent} disabled={pickerDisabled||authorizedCurrent||(!selectedCurrent&&pickerCount>=31)} onChange={toggleCurrentPage}/>
-                  <FileText size={16} aria-hidden="true"/><span><strong>当前页面</strong><small>{currentPage.title}</small></span>
-                </label>,
-                extraSelected:<>
-                  {!view&&selection.pageAttached&&pageAnchor&&<label className="agent-material-choice"><input type="checkbox" checked disabled={pickerDisabled} onChange={()=>setMaterialSelection(draft=>draft&&{...draft,pageAttached:false})}/><FileText size={16} aria-hidden="true"/><span><strong>{pageTitle||currentObjectLabel}</strong></span></label>}
-                  {selection.dropped.map(item=><label key={JSON.stringify(item.locator)} className="agent-material-choice"><input type="checkbox" checked disabled={pickerDisabled} onChange={()=>setMaterialSelection(draft=>draft&&{...draft,dropped:draft.dropped.filter(note=>note!==item)})}/><FileText size={16} aria-hidden="true"/><span><strong>{item.title}</strong></span></label>)}
-                </>,
+                currentPage:currentPage?.locator&&currentPage.locator.kind!=="attachment"?{
+                  catalogKey:currentPage.locator.kind==="note"?materialKey(currentPage.locator):undefined,
+                  row:<label className="agent-material-choice">
+                    <input type="checkbox" aria-label="添加当前页面" checked={selectedCurrent||authorizedCurrent} disabled={pickerDisabled||authorizedCurrent||(!selectedCurrent&&pickerCount>=31)} onChange={toggleCurrentPage}/>
+                    <span><strong>{currentPage.title}</strong>{currentPage.subtitle&&<small>{currentPage.subtitle}</small>}</span>
+                  </label>,
+                }:undefined,
+                extraSelected:[
+                  ...(!view&&selection.pageAttached&&pageAnchor?[{
+                    title:pageTitle||currentObjectLabel,
+                    row:<label key="current" className="agent-material-choice"><input type="checkbox" checked disabled={pickerDisabled} onChange={()=>setMaterialSelection(draft=>draft&&{...draft,pageAttached:false})}/><span><strong>{pageTitle||currentObjectLabel}</strong></span></label>,
+                  }]:[]),
+                  ...selection.dropped.map(item=>({
+                    title:item.title,
+                    row:<label key={JSON.stringify(item.locator)} className="agent-material-choice"><input type="checkbox" checked disabled={pickerDisabled} onChange={()=>setMaterialSelection(draft=>draft&&{...draft,dropped:draft.dropped.filter(note=>note!==item)})}/><span><strong>{item.title}</strong></span></label>,
+                  })),
+                ],
                 tools:<div className="agent-scope-extra">
-                  <button type="button" disabled={pickerDisabled} onClick={()=>setAddPage("files")}><FileText size={16}/>选择资料库文件<ChevronRight size={14}/></button>
-                  <button type="button" disabled={pickerDisabled} onClick={()=>setAddPage("images")}><Image size={16}/>选择资料库图片<ChevronRight size={14}/></button>
-                  {!view&&!hasDraftSources&&assistantOptions.researchPolicy!=="materials-only"&&<button type="button" onClick={()=>setAddPage("web")}><Globe2 size={16}/>读取公共链接<ChevronRight size={14}/></button>}
+                  <h4 className="agent-material-group-title">其他材料</h4>
+                  <button type="button" aria-label="选择资料库文件" disabled={pickerDisabled} onClick={()=>setAddPage("files")}><FileText size={16}/><span>资料库文件</span><small>{pickerFiles.length}</small><ChevronRight size={14}/></button>
+                  <button type="button" aria-label="选择资料库图片" disabled={pickerDisabled} onClick={()=>setAddPage("images")}><Image size={16}/><span>图片与 PDF 页面</span><small>{pickerImages.length}</small><ChevronRight size={14}/></button>
+                  {!view&&!hasDraftSources&&assistantOptions.researchPolicy!=="materials-only"&&<button type="button" onClick={()=>setAddPage("web")}><Globe2 size={16}/><span>读取公共链接</span><small/><ChevronRight size={14}/></button>}
                 </div>,
               }}/>}
             </div>}
-            {addMenuOpen&&addPage==="pages"&&selection&&<footer className="agent-scope-footer">
-              <p className="agent-note"><strong aria-live="polite">已选 {pickerCount} 份{pickerImages.length>0&&`、${pickerImages.length} 张图片或 PDF 页面`}</strong><span>完成后放进输入框，发送前仍可移除。</span></p>
-              <div><button type="button" onClick={()=>{setMaterialSelection(null);setAddPage("scope");}}>取消</button><button type="button" className="agent-scope-done" disabled={pickerDisabled||!!selection.removals.length} onClick={finishCoreMaterials}>完成选择</button></div>
+            {addMenuOpen&&["pages","files","images"].includes(addPage)&&selection&&<footer className="agent-scope-footer">
+              <p className="agent-note"><strong aria-live="polite">已选 {pickerPageCount} 页{pickerFiles.length+pickerImages.length>0&&`、${pickerFiles.length+pickerImages.length} 个附件`}</strong><span>完成后附带到输入框，不会发送。</span></p>
+              <div><button type="button" onClick={cancelCoreMaterials}>取消</button><button type="button" className="agent-scope-done" disabled={pickerDisabled||pickerFilePending||!!selection.removals.length} onClick={finishCoreMaterials}>完成选择</button></div>
             </footer>}
             {addMenuOpen&&["materials","scope"].includes(addPage)&&<footer className="agent-scope-footer"><p className="agent-note">{hasEffectiveMaterials?"所选范围用于下一轮。":needsMaterials?"":"未选资料，可直接提问。"}</p><div><button type="button" disabled={busy||!!active||!!view?.work.grant.manifest||!hasDraftSources&&!research} onClick={()=>{materialPopover.close();setRequestedTopic(undefined);setTopicSave(true);setTopicsOpen(true);}}><FolderBookmark size={14}/>保存为专题</button><button type="button" className="agent-scope-done" onClick={()=>{materialPopover.close();goalInput.current?.focus();}}>完成</button></div></footer>}
 

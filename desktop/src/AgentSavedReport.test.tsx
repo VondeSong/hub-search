@@ -66,7 +66,7 @@ it("renders fenced code with its language and copies the exact code without rewr
     await act(async()=>block.querySelector<HTMLButtonElement>('button[aria-label="自动换行"]')!.click());
     expect(block.getAttribute("data-wrap")).toBe("true");
     await act(async()=>block.querySelector<HTMLButtonElement>('button[aria-label="复制代码"]')!.click());
-    expect(writeText).toHaveBeenCalledExactlyOnceWith(script);
+    expect(writeText).toHaveBeenCalledExactlyOnceWith(script+"\n");
   } finally {
     if(clipboard)Object.defineProperty(navigator,"clipboard",clipboard);
     else Reflect.deleteProperty(navigator,"clipboard");

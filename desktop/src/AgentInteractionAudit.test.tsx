@@ -15,11 +15,10 @@ it.each(["materials","images","mcp"])("%s Enter respects Chinese composition bef
  let finishInitialImages:(()=>void)|undefined;
  if(kind==="images")invoke.mockImplementationOnce(()=>new Promise(resolve=>{finishInitialImages=()=>resolve(page);}));
  try {
-  await act(async()=>root.render(kind==="materials"?<AgentMaterials selected={[]} disabled={false} onChange={changed}/>:kind==="images"?<AgentImages current={[]} disabled={false} onApply={changed}/>:<AgentMcpServices value={[]} disabled={false} onChange={changed}/>));
+  await act(async()=>root.render(kind==="materials"?<AgentMaterials selected={[]} disabled={false} onChange={changed}/>:kind==="images"?<AgentImages current={[]} selected={[]} disabled={false} onChange={changed}/>:<AgentMcpServices value={[]} disabled={false} onChange={changed}/>));
   const input=host.querySelector<HTMLInputElement>("input")!;
   if(kind==="images"){
    expect(invoke.mock.calls).toEqual([["agent_investigation",{args:{action:"imageMaterials",query:"",page:1}}]]);
-   expect(input.disabled).toBe(true);
    await act(async()=>finishInitialImages!());
    expect(input.disabled).toBe(false);
   }

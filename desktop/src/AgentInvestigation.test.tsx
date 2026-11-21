@@ -1809,7 +1809,7 @@ it("CN05B standalone image authorization preserves options, draft and saves with
  });
  await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));await fill("investigationGoal","请解读这张图");await openAddPage("从资料库添加图片");await click("查找缓存图片");
  const checkbox=[...document.body.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(c=>c.parentElement?.textContent?.includes("图像样本"))!;
- await act(async()=>checkbox.click());await click("添加到问题");await click("完成选择");
+ await act(async()=>checkbox.click());await click("完成选择");
  const mutations=invoke.mock.calls.map(([,p])=>p.args).filter(a=>["create","configureAssistant","message","respond","resume"].includes(a.action));
  expect(mutations).toEqual([]);
  expect(document.body.querySelector<HTMLTextAreaElement>('[name="investigationGoal"]')!.value).toBe("请解读这张图");
@@ -2187,7 +2187,10 @@ it("keeps the explicit page grant when adding cached images before the first que
  invoke.mockImplementation(async(_,{args})=>args.action==='list'?{works:[]}:args.action==='imageMaterials'?{images:[{grant:image,title:'图像样本',mime:'image/png'}],hasMore:false}:current);
  await open();await openAddPage('从资料库添加图片');await click('查找缓存图片');
  await act(async()=>Array.from(document.querySelectorAll<HTMLInputElement>('.agent-scope-body .agent-material-choice input')).find(e=>e.type==='checkbox')!.click());
- await click('添加到问题');
+ expect(document.querySelector('.agent-scope-footer')?.textContent).toContain('1 个附件');
+ const search=document.querySelector<HTMLInputElement>('.agent-scope-body input[type="search"]')!;
+ await act(async()=>{search.focus();search.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true,cancelable:true}));});
+ expect(document.querySelector('.agent-add-menu .agent-popover-header')?.textContent).toBe('选择材料');
   expect(document.querySelector('.agent-composer .agent-image-card')).toBeNull();
   await click('完成选择');
  expect(invoke.mock.calls.some(([,p])=>['create','message','respond'].includes(p?.args?.action))).toBe(false);
@@ -2215,13 +2218,15 @@ it("keeps selections from different searches until Done and discards abandoned c
    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(search,title);
    search.dispatchEvent(new Event("input",{bubbles:true}));
   });
-  await act(async()=>document.querySelector<HTMLButtonElement>(".agent-material-search button")!.click());
+  await act(async()=>search.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true,cancelable:true})));
  }
  await search("甲");
  await act(async()=>checkboxes()[0].click());
  await search("乙");
  await act(async()=>checkboxes()[0].click());
  await click("已选 2");
+ expect(checkboxes()).toHaveLength(1);
+ await click("清空材料搜索");
  expect(checkboxes().map(input=>input.checked)).toEqual([true,true]);
  expect(document.querySelector(".agent-pending-materials")).toBeNull();
  await click("取消");
@@ -2230,6 +2235,31 @@ it("keeps selections from different searches until Done and discards abandoned c
  await act(async()=>checkboxes()[0].click());
  await click("完成选择");
  expect(document.querySelector(".agent-pending-materials")?.textContent).toContain("甲页");
+ expect(invoke.mock.calls.some(([,p])=>["create","message","respond"].includes(p?.args?.action))).toBe(false);
+});
+
+it("keeps the file page open while choosing several files and discards them on cancel",async()=>{
+ const files=["表一.csv","表二.csv"].map((title,index)=>({
+  title,parentTitle:"原笔记",source:{libraryId:"notes",sourceItemId:`file-${index}`},
+ }));
+ const fallback=invoke.getMockImplementation()!;
+ invoke.mockImplementation(async(command,payload)=>{
+  const args=payload.args;
+  if(args.action==="analysisMaterials")return {files,hasMore:false};
+  if(args.action==="stageAnalysisFile")return {
+   locator:{kind:"note",libraryId:"notes",documentId:args.source.sourceItemId,pageId:null},
+   title:files.find(file=>file.source.sourceItemId===args.source.sourceItemId)!.title,
+   libraryName:"本地文件附件",path:"",fileBytes:12,
+  };
+  return fallback(command,payload);
+ });
+ await open();await openAddPage("从笔记库添加");await click("选择资料库文件");await click("查找文件");
+ await click("添加文件 表一.csv");await click("添加文件 表二.csv");
+ expect(document.querySelector('[aria-label="已选文件"]')?.textContent).toContain("表一.csv");
+ expect(document.querySelector('[aria-label="已选文件"]')?.textContent).toContain("表二.csv");
+ expect(document.querySelector(".agent-scope-footer")?.textContent).toContain("2 个附件");
+ await click("取消");
+ expect(document.querySelector(".agent-pending-materials")?.textContent).not.toMatch(/表[一二]\.csv/);
  expect(invoke.mock.calls.some(([,p])=>["create","message","respond"].includes(p?.args?.action))).toBe(false);
 });
 it("captures preview selection as text and queues a flashcard snapshot through the shared launcher",async()=>{

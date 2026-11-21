@@ -2,23 +2,23 @@
 .agent-memory-trigger>span{font-size:12px;white-space:nowrap}
 .agent-memory-trigger .agent-memory-trigger-full{display:none}
 .agent-memory-trigger[data-memory-enabled=true]::after{content:"";position:absolute;width:4px;height:4px;border-radius:50%;background:var(--hub-accent);top:4px;left:20px}
-.agent-panel .agent-memory-permissions{width:min(350px,calc(100cqw - 32px));right:auto;max-height:min(560px,calc(100cqh - 160px));padding:10px 12px}
+.agent-panel .agent-memory-permissions{width:min(370px,calc(100cqw - 24px));right:auto;max-height:min(590px,calc(100cqh - 150px));padding:10px 12px}
 .agent-memory-permissions .agent-popover-header{padding-bottom:10px}
 .agent-memory-settings-section{padding:0 4px 10px}
-.agent-memory-settings-section h3,.agent-memory-saving h3{margin:0 0 5px;font-size:11px;font-weight:500;color:var(--hub-text-secondary)}
-.agent-memory-settings-section p,.agent-memory-saving p{margin:5px 0 0;color:var(--hub-text-secondary);font-size:11px;line-height:1.5}
-.agent-memory-switch{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:34px;font-size:13px}
+.agent-memory-settings-section h3,.agent-memory-saving h3{margin:0 0 8px;font-size:12px;font-weight:550;color:var(--hub-text-secondary)}
+.agent-memory-settings-section p,.agent-memory-saving p{margin:7px 0 0;color:var(--hub-text-secondary);font-size:12px;line-height:1.6}
+.agent-memory-switch{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:36px;font-size:14px}
 .agent-memory-switch>span{min-width:0;overflow-wrap:anywhere}
 .agent-memory-switch>input{appearance:none;position:relative;flex:none;width:34px;height:21px;margin:0;border:1px solid var(--hub-separator);border-radius:20px;background:var(--hub-control-fill);cursor:pointer}
 .agent-memory-switch>input::before{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:var(--hub-text-secondary)}
 .agent-memory-switch>input:checked{background:var(--hub-accent);border-color:var(--hub-accent)}
 .agent-memory-switch>input:checked::before{left:15px;background:var(--hub-on-accent,#fff)}
 .agent-memory-switch>input:disabled{cursor:not-allowed;opacity:.5}
-.agent-memory-scope-setting{display:grid;grid-template-columns:28px minmax(0,1fr);align-items:center;gap:9px;margin-top:5px;font-size:12px;color:var(--hub-text-secondary)}
+.agent-memory-scope-setting{display:grid;grid-template-columns:32px minmax(0,1fr);align-items:center;gap:9px;margin-top:8px;font-size:13px;color:var(--hub-text-secondary)}
 .agent-memory-scope-setting>select,.agent-memory-manager-controls>select{width:100%;min-width:0;padding:6px 8px;border:1px solid var(--hub-separator);border-radius:8px;background:var(--hub-content-surface);color:var(--hub-text-primary);font:inherit;text-overflow:ellipsis}
 .agent-memory-scope-setting>select:disabled{opacity:.55}
 .agent-memory-saving{border-top:1px solid var(--hub-separator);padding:10px 4px}
-.agent-memory-save-status{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px}
+.agent-memory-save-status{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:14px}
 .agent-memory-save-status>svg{flex:none;color:var(--hub-text-secondary)}
 .agent-memory-permissions .agent-memory-saving>.agent-menu-choice{padding:7px 0;min-height:38px}
 .agent-memory-auto-confirm{margin-top:7px;padding:7px 10px;border:1px solid var(--hub-separator);border-radius:8px;background:var(--hub-control-fill);color:var(--hub-text-primary);font-size:12px}
@@ -97,18 +97,20 @@
 .agent-panel .agent-memory-manager > .agent-popover-header { flex:none; }
 .agent-memory-manager > .agent-popover-header .agent-memory-actions { margin:0; }
 .agent-memory-manager > .agent-popover-header .agent-memory-actions > button { display:inline-grid; place-items:center; padding:4px; min-width:30px; }
-.agent-composer .agent-memory-disclosure .agent-memory-permissions { box-sizing:border-box; gap:0; bottom:calc(100% + 8px + var(--agent-popover-offset,0px)); max-height:min(560px,var(--agent-popover-room,480px)); }
+.agent-composer .agent-memory-disclosure .agent-memory-permissions { box-sizing:border-box; gap:0; bottom:calc(100% + 8px + var(--agent-popover-offset,0px)); max-height:min(590px,var(--agent-popover-room,480px)); }
 .agent-composer .agent-memory-disclosure[open] .agent-memory-permissions { display:flex; flex-direction:column; overflow:hidden; padding:0; }
-.agent-memory-permissions > .agent-popover-header { flex:none; padding:8px 12px; border-block-end:1px solid var(--hub-separator); }
-.agent-memory-permissions-body { min-height:0; overflow:auto; overscroll-behavior:contain; padding:2px 12px; }
-.agent-memory-permissions-footer { flex:none; padding:6px 12px; border-block-start:1px solid var(--hub-separator); }
+.agent-memory-permissions > .agent-popover-header { flex:none; min-height:54px; padding:10px 16px; border-block-end:1px solid var(--hub-separator); }
+.agent-memory-permissions > .agent-popover-header>strong { font-size:15px; font-weight:650; }
+.agent-memory-permissions-body { min-height:0; overflow:auto; overscroll-behavior:contain; padding:14px 12px 2px; }
+.agent-memory-permissions-footer { flex:none; padding:6px 16px; border-block-start:1px solid var(--hub-separator); }
 .agent-memory-permissions .agent-memory-switch { flex-direction:row; }
 .agent-memory-permissions .agent-memory-scope-setting { display:grid; }
 .agent-panel .agent-memory-tools { padding:10px 0; border-bottom:1px solid var(--hub-separator); }
 .agent-memory-tools form,.agent-memory-tools > label { margin:6px 0; }
 .agent-memory-tools input:not([type=checkbox]) { box-sizing:border-box; max-width:100%; }
 .agent-memory-tabs > .agent-memory-more { margin-left:auto; }
-.agent-body .agent-memory-permissions .agent-memory-manage-link { min-height:34px; padding:10px 4px 4px; border:0; border-top:1px solid var(--hub-separator); border-radius:0; background:transparent; }
+.agent-body .agent-memory-permissions .agent-memory-manage-link { min-height:34px; padding:2px 0 5px; border:0; border-radius:0; background:transparent; }
+.agent-memory-permissions .agent-memory-manage-link>span { font-size:14px; }
 .agent-body .agent-memory-permissions .agent-memory-manage-link:hover { background:var(--hub-control-fill); }
 .agent-panel .agent-details-content .agent-detail-memory-link { width:100%; min-height:39px; padding:4px 5px; border:0; background:transparent; }
 .agent-panel .agent-details-content .agent-detail-memory-link:hover { background:var(--hub-control-fill); }

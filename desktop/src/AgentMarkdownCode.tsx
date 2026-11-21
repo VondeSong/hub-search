@@ -1,5 +1,5 @@
 import { useState, type ComponentProps } from "react";
-import { Code, WrapText } from "lucide-react";
+import { WrapText } from "lucide-react";
 import type { ExtraProps } from "react-markdown";
 import { AgentAnswerActions } from "./AgentAnswerActions";
 
@@ -21,14 +21,14 @@ export function AgentMarkdownCode({ node, children }: ComponentProps<"pre"> & Ex
   const name = typeof language === "string" ? language.slice("language-".length) : "";
   const normalized = name.toLowerCase();
   const title = (Object.prototype.hasOwnProperty.call(languageNames, normalized) ? languageNames[normalized] : name) || "代码";
-  const text = code.children.map(child => child.type === "text" ? child.value : "").join("").replace(/\n$/, "");
+  const text = code.children.map(child => child.type === "text" ? child.value : "").join("");
 
   return <div className="agent-markdown-code" data-wrap={wrap}>
     <div className="agent-markdown-code-bar">
-      <span className="agent-markdown-code-language"><Code size={15} aria-hidden="true"/>{title}</span>
+      <span className="agent-markdown-code-language">{title}</span>
       <div className="agent-markdown-code-actions">
-        <button type="button" aria-pressed={wrap} aria-label="自动换行" title={wrap ? "关闭自动换行" : "自动换行"} onClick={() => setWrap(value => !value)}><WrapText size={15} aria-hidden="true"/></button>
-        <AgentAnswerActions text={text} label="代码"/>
+        <button type="button" aria-pressed={wrap} aria-label="自动换行" title={wrap ? "关闭自动换行" : "自动换行"} onClick={() => setWrap(value => !value)}><WrapText size={15} aria-hidden="true"/>换行</button>
+        <AgentAnswerActions text={text} label="代码" showLabel/>
       </div>
     </div>
     <pre tabIndex={0} aria-label={title === "代码" ? title : `${title}代码`}>{children}</pre>
