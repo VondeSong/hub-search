@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { Brain, Check, ChevronDown, ChevronRight, Plus, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, Brain, Check, ChevronDown, ChevronRight, Plus, ShieldCheck, X } from "lucide-react";
 import type { AssistantOptions } from "./AgentAssistantOptions";
 import { useAgentPopover } from "./useAgentPopover";
 import { readMemoryHistory, type MemoryContent, type MemoryEntry, type MemoryKind, type MemoryProposal, type MemoryUse, type MemoryVersion, type SharedMemoryModel } from "./useSharedMemory";
@@ -221,7 +221,7 @@ function Audit({usage,model}: {usage:MemoryUse;model:SharedMemoryModel}) {
   </details>;
 }
 
-export function MemoryManager({model,materialsOnly,usage}: {model:SharedMemoryModel;materialsOnly:boolean;usage?:MemoryUse|null}) {
+export function MemoryManager({model,materialsOnly,usage,onBack,onClose=model.closeManager}: {model:SharedMemoryModel;materialsOnly:boolean;usage?:MemoryUse|null;onBack?:()=>void;onClose?:()=>void}) {
   const scopeId=useId();
   const [tab,setTab]=useState<"saved"|"pending">("saved");
   const [editing,setEditing]=useState<{id:string,entry?:MemoryEntry}|null>(null);
@@ -245,15 +245,17 @@ export function MemoryManager({model,materialsOnly,usage}: {model:SharedMemoryMo
   function keys(event:React.KeyboardEvent<HTMLElement>) {
     if(event.key==="Escape" && !event.nativeEvent.isComposing) {
       event.preventDefault();event.stopPropagation();
-      if(!editing&&!model.busy)model.closeManager();
+      if(!editing&&!model.busy)(onBack??onClose)();
     }
     wrapDialogTab(event);
   }
   const switchBlocked=!!editing||model.busy;
   return <section ref={dialog} className="agent-memory-manager" role="dialog" aria-modal="true" aria-label="管理记忆" onKeyDown={keys}>
-    <header className="agent-popover-header"><strong>管理记忆</strong><div className="agent-memory-actions">
+    <header className="agent-popover-header">
+      {onBack&&<button type="button" className="agent-memory-back" aria-label="返回对话详情" title="返回对话详情" disabled={switchBlocked} onClick={onBack}><ArrowLeft size={17} aria-hidden="true"/></button>}
+      <strong>管理记忆</strong><div className="agent-memory-actions">
       <button type="button" title="新增记忆" aria-label="新增记忆" disabled={switchBlocked||model.blocked||!model.view} onClick={()=>{setTab("saved");setEditing({id:"new"});}}><Plus size={16}/></button>
-      <button ref={closeButton} type="button" aria-label="关闭记忆管理" disabled={switchBlocked} onClick={model.closeManager}><X size={17}/></button>
+      <button ref={closeButton} type="button" aria-label="关闭记忆管理" disabled={switchBlocked} onClick={onClose}><X size={17}/></button>
     </div></header>
     <div className="agent-memory-manager-controls">
       <label htmlFor={scopeId}>查看范围</label><select id={scopeId} value={model.browseScope} disabled={switchBlocked||!model.view} onChange={event=>model.browseProject(event.target.value)}>

@@ -477,6 +477,40 @@ describe("assistant refinement integration", () => {
     expect(document.querySelector('[aria-label="Hub 助手"]')).not.toBeNull();
   });
 
+  it("opens the existing scope picker from details and returns focus to the details trigger on completion", async () => {
+    await render(<StandaloneInvestigation initiallyOpen startFresh />);
+    const trigger = select<HTMLButtonElement>('button[aria-label="对话详情"]');
+    await activate(trigger);
+    await activate(select<HTMLButtonElement>(".agent-detail-scope-link"));
+
+    expect(select<HTMLDetailsElement>(".agent-dialogue-details").open).toBe(false);
+    expect(select<HTMLDetailsElement>(".agent-add-menu").open).toBe(true);
+    expect(select(".agent-scope-overview").textContent).toContain("核心材料");
+    await activate(select<HTMLButtonElement>(".agent-scope-done"));
+    expect(select<HTMLDetailsElement>(".agent-add-menu").open).toBe(false);
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("returns from memory to the same expanded details and restores its row focus on Escape", async () => {
+    await render(<StandaloneInvestigation initiallyOpen startFresh />);
+    await activate(select<HTMLButtonElement>('button[aria-label="对话详情"]'));
+    const menu = select<HTMLDetailsElement>(".agent-dialogue-details");
+    const advanced = select<HTMLDetailsElement>(".agent-connection-advanced", menu);
+    await activate(select(".agent-connection-settings", menu).parentElement!.querySelector("summary")!);
+    await activate(select("summary", advanced));
+    const row = select<HTMLButtonElement>(".agent-detail-memory-link", menu);
+    await activate(row);
+
+    expect(menu.open).toBe(false);
+    expect(select('[aria-label="返回对话详情"]')).toBeTruthy();
+    await escape();
+    await act(async () => { await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); });
+
+    expect(menu.open).toBe(true);
+    expect(advanced.open).toBe(true);
+    expect(document.activeElement).toBe(row);
+  });
+
   it("reaches skills through the bottom toolbar and applies the selected skill to the next message", async () => {
     await render(<StandaloneInvestigation initiallyOpen startFresh />);
     await activate(select<HTMLButtonElement>('button[aria-label="添加技能"]'));
