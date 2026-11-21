@@ -16,6 +16,8 @@
 .ha-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; border-radius: 0 0 20px 20px; }
 .ha-conversation { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 .ha-messages { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 24px 18px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.ha-messages[data-running="true"] { container-type: size; }
+.ha-messages[data-running="true"]::after { content: ""; display: block; block-size: clamp(24px, 22cqh, 144px); }
 .ha-welcome { margin: clamp(20px, 5cqh, 46px) auto 22px; max-width: 600px; }
 .ha-welcome h2 { margin: 0 0 7px; font-size: 25px; line-height: 1.32; font-weight: 650; color: var(--text); }
 .ha-welcome > p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.65; }

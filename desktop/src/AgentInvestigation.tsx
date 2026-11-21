@@ -1183,7 +1183,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       <div className="agent-body">
       <div className="agent-conversation-wrap" aria-busy={loadingConversation || sourceLoading}>
       {loadingConversation && <div className="agent-conversation-loading" role="status" aria-label="正在打开对话"><span/><span/><span/></div>}
-      <div className="agent-conversation" hidden={loadingConversation || (sourceScope.current===sourceScopeKey && (!!sourcePreview || !!sourceError || sourceLoading))} ref={conversationScroll.element} tabIndex={0} aria-label="对话与报告" onScroll={conversationScroll.onScroll} onClickCapture={event=>{if((event.target as Element).closest(".agent-activity-toggle,details > summary"))conversationScroll.holdPosition();}}>
+      <div className="agent-conversation" data-running={running && !reportReading || undefined} hidden={loadingConversation || (sourceScope.current===sourceScopeKey && (!!sourcePreview || !!sourceError || sourceLoading))} ref={conversationScroll.element} tabIndex={0} aria-label="对话与报告" onScroll={conversationScroll.onScroll} onClickCapture={event=>{if((event.target as Element).closest(".agent-activity-toggle,details > summary"))conversationScroll.holdPosition();}}>
       <div className="agent-conversation-content" ref={conversationScroll.content}>
       <ActivityDisclosureProvider key={view?.work.id||"new"} isFollowing={()=>!sourceVisible && !reportReading && conversationScroll.isFollowing()}>
 
