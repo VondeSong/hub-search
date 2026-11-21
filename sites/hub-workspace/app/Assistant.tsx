@@ -1063,7 +1063,7 @@ function AssistantConversation({
       <div className="ha-workspace">
         <div className="ha-conversation">
           {tagIntent&&!reading&&!contextBlocked&&<TagTaskSelector intent={tagIntent} onChange={prepareTag} onCancel={()=>{setTagIntent(null);setTagError('');composer.current?.focus({preventScroll:true});}}/>}
-          <div className="ha-messages" data-running={running && !activeBlocked || undefined} ref={scrollArea} role="log" aria-label="助手讨论记录" aria-live="polite" aria-relevant="additions" tabIndex={0} onScroll={event => { const el = event.currentTarget; setJump(el.scrollHeight - el.scrollTop - el.clientHeight > 80); }}>
+          <div className="ha-messages" data-running={running && !activeBlocked || undefined} ref={scrollArea} role="log" aria-label="助手讨论记录" aria-live="polite" aria-relevant="additions" tabIndex={0} onScroll={event => { const el = event.currentTarget; setJump(el.scrollHeight - el.scrollTop - el.clientHeight > 2); }}>
             {activityDemo && <AssistantProcessDemo onClose={()=>onCloseActivityDemo?.()}/>}
             {browsingContext && context && browsingContext.id !== context.id && <div className="ha-source-notice">正在讨论「{context.title}」。当前浏览：{canUseContext(browsingContext) ? browsingContext.title : '来源不可用'}<button type="button" disabled={!!session.active || !canUseContext(browsingContext)} onClick={onNewWithContext}>用当前材料新建对话</button></div>}
             {contextBlocked && <div className="ha-access-note" role="status"><FileText size={17}/><div><strong>相关来源当前不可用</strong><p>正文、引文与依赖这些来源的历史内容已隐藏。恢复访问并核对后，可以继续。</p></div></div>}

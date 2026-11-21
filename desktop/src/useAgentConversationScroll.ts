@@ -4,21 +4,26 @@ export function useAgentConversationScroll(open: boolean, workId: string | undef
   const element = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
+  const lastScrollTop = useRef(0);
   const [showLatest, setShowLatest] = useState(false);
   const awayFromLatest = () => {
     const node = element.current;
-    return !!node && node.scrollHeight - Math.max(0, node.scrollTop) - node.clientHeight >= 80;
+    return !!node && node.scrollHeight - Math.max(0, node.scrollTop) - node.clientHeight > 2;
+  };
+  const pinToLatest = () => {
+    const node = element.current;
+    if (!node) return;
+    node.scrollTop = node.scrollHeight;
+    lastScrollTop.current = node.scrollTop;
   };
   const syncPosition = () => {
-    if (follow.current && element.current) element.current.scrollTop = element.current.scrollHeight;
-    const away = awayFromLatest();
-    if (!away) follow.current = true;
-    setShowLatest(away);
+    if (follow.current) pinToLatest();
+    setShowLatest(awayFromLatest());
   };
   const scrollToLatest = () => {
     follow.current = true;
     setShowLatest(false);
-    if (element.current) element.current.scrollTop = element.current.scrollHeight;
+    pinToLatest();
   };
   const jumpToLatest = () => {
     scrollToLatest();
@@ -40,8 +45,12 @@ export function useAgentConversationScroll(open: boolean, workId: string | undef
   const onScroll = () => {
     const node = element.current;
     if (!node) return;
-    follow.current = !awayFromLatest();
-    setShowLatest(!follow.current);
+    const away = awayFromLatest();
+    if (away) follow.current = false;
+    // A shorter layout can move scrollTop backwards to the bottom by itself.
+    else if (node.scrollTop > lastScrollTop.current) follow.current = true;
+    lastScrollTop.current = node.scrollTop;
+    setShowLatest(away);
   };
   const holdPosition = () => { follow.current = false; setShowLatest(awayFromLatest()); };
   return { element, content, showLatest, onScroll, scrollToLatest, jumpToLatest, holdPosition, isFollowing: () => follow.current };

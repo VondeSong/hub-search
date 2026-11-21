@@ -34,6 +34,21 @@ it("preserves a reader's position through new results, then follows again only a
  expect(document.activeElement).toBe(pane);
  height=2100;await act(async()=>resize());expect(pane.scrollTop).toBe(2100);
 });
+it("pauses after a small upward scroll and follows again after scrolling down to the bottom",async()=>{
+ await act(async()=>root.render(<Conversation/>));const pane=host.firstElementChild as HTMLElement;
+ pane.scrollTop=750;await act(async()=>pane.dispatchEvent(new Event('scroll')));
+ expect(host.querySelector('button')?.textContent).toBe('回到最新内容');
+ await act(async()=>root.render(<Conversation version={2}/>));
+ expect(pane.scrollTop).toBe(750);
+ height=955;await act(async()=>resize());
+ expect(pane.scrollTop).toBe(750);
+ height=1300;await act(async()=>root.render(<Conversation version={3}/>));
+ expect(pane.scrollTop).toBe(750);
+ pane.scrollTop=1099;await act(async()=>pane.dispatchEvent(new Event('scroll')));
+ expect(host.querySelector('button')).toBeNull();
+ height=1500;await act(async()=>resize());
+ expect(pane.scrollTop).toBe(1500);
+});
 it("opens another Work at its latest content and releases the observer on unmount",async()=>{
  await act(async()=>root.render(<Conversation/>));const pane=host.firstElementChild as HTMLElement;
  pane.scrollTop=100;await act(async()=>pane.dispatchEvent(new Event('scroll',{bubbles:true})));
@@ -44,11 +59,14 @@ it("does not offer a jump just because a disclosure was clicked with no overflow
  await act(async()=>host.querySelector('summary')!.click());await act(async()=>resize());
  expect(host.querySelector('button')).toBeNull();
 });
-it("clears the jump after a collapsed process fits the viewport and resumes following",async()=>{
+it("keeps reading paused if a resize clamps the viewport to the bottom",async()=>{
  await act(async()=>root.render(<Conversation/>));const pane=host.firstElementChild as HTMLElement;
  pane.scrollTop=120;await act(async()=>pane.dispatchEvent(new Event('scroll',{bubbles:true})));
  expect(host.querySelector('button')).not.toBeNull();
- await act(async()=>host.querySelector('summary')!.click());height=150;await act(async()=>resize());
+ height=150;pane.scrollTop=0;await act(async()=>resize());
+ await act(async()=>pane.dispatchEvent(new Event('scroll')));
  expect(host.querySelector('button')).toBeNull();
- height=900;await act(async()=>resize());expect(pane.scrollTop).toBe(900);
+ height=900;await act(async()=>resize());
+ expect(pane.scrollTop).toBe(0);
+ expect(host.querySelector('button')?.textContent).toBe('回到最新内容');
 });

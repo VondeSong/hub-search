@@ -152,7 +152,7 @@ function AttachmentReplay() {
     const timer = window.setTimeout(() => {
       if (step === 3) {
         const viewport = replay.current?.closest('.ha-messages');
-        const following = !viewport || viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 80;
+        const following = !viewport || viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <= 2;
         if (following && !review.current) setProcessOpen(false);
       }
       setStep(value => value + 1);
