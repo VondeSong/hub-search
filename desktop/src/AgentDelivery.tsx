@@ -8,6 +8,8 @@ import { AgentArtifactRevision } from "./AgentArtifactRevision";
 import { createContext, Fragment, memo, useContext, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import type { Element, Root, Text } from "hast";
+import { AgentMarkdownCode } from "./AgentMarkdownCode";
 import { AgentActivity, type ActivityRun } from "./AgentActivity";
 import type { ImageGrant } from "./AgentImages";
 export type Citation = { evidenceId: string; quote: string };
@@ -43,13 +45,40 @@ function ReportLink({ href, children }: { href?: string; children?: ReactNode })
 const reportMarkdownComponents = {
   a: ReportLink,
   img: ({ alt }: { alt?: string }) => <span>{alt}</span>,
+  pre: AgentMarkdownCode,
   table: ({ children }: { children?: ReactNode }) => <div className="agent-table-scroll" role="region" aria-label="回答表格，可横向滚动" tabIndex={0}><table>{children}</table></div>,
 };
 const reportRemarkPlugins = [remarkGfm];
+function reportCitations(citationCount: number) {
+  return (tree: Root) => {
+    function replaceIn(parent: Root | Element) {
+      for (let index = 0; index < parent.children.length; index++) {
+        const child = parent.children[index];
+        if (child.type === "element" && !["a", "code", "pre"].includes(child.tagName)) replaceIn(child);
+        if (child.type !== "text") continue;
+        const parts: (Text | Element)[] = [];
+        let start = 0;
+        for (const match of child.value.matchAll(/\[(\d+)\](?!\()/g)) {
+          const citation = Number(match[1]);
+          if (citation < 1 || citation > citationCount) continue;
+          const offset = match.index!;
+          if (offset > start) parts.push({ type: "text", value: child.value.slice(start, offset) });
+          parts.push({ type: "element", tagName: "a", properties: { href: "#hub-citation-" + citation }, children: [{ type: "text", value: match[1] }] });
+          start = offset + match[0].length;
+        }
+        if (parts.length === 0) continue;
+        if (start < child.value.length) parts.push({ type: "text", value: child.value.slice(start) });
+        parent.children.splice(index, 1, ...parts);
+        index += parts.length - 1;
+      }
+    }
+    replaceIn(tree);
+  };
+}
 // Keep unchanged parsed markup and table nodes. Citation consumers still receive
 // the latest source eligibility and opening handler through their local context.
-const ReportMarkdown = memo(function ReportMarkdown({ markdown }: { markdown: string }) {
-  return <ReactMarkdown remarkPlugins={reportRemarkPlugins} skipHtml components={reportMarkdownComponents}>{markdown}</ReactMarkdown>;
+const ReportMarkdown = memo(function ReportMarkdown({ markdown, citationCount }: { markdown: string; citationCount: number }) {
+  return <ReactMarkdown remarkPlugins={reportRemarkPlugins} rehypePlugins={citationCount ? [[reportCitations, citationCount]] : []} skipHtml components={reportMarkdownComponents}>{markdown}</ReactMarkdown>;
 });
 
 function SourceExcerpt({ value }: { value: Evidence }) {
@@ -59,13 +88,12 @@ function SourceExcerpt({ value }: { value: Evidence }) {
 function ReportContent({ value, evidence, runId, onOpenCitation, actions }: { value: Report; evidence: Evidence[]; runId?: string; onOpenCitation?: CitationOpening; actions?:ReactNode }) {
   if (value.prose) {
     const prose=value.prose;
-    const markdown=prose.markdown.replace(/\[(\d+)\](?!\()/g,(all,index:string)=>Number(index)>0 && Number(index)<=prose.citations.length ? "[" + index + "](#hub-citation-" + index + ")" : all);
     const copySources=prose.citations.map((citation,index)=>{
       const source=evidence[Number(citation.evidenceId.slice(1))-1];
       return `[${index+1}] ${source?.title || "引用原文"}${source?.sourcePath ? `（${source.sourcePath}）` : ""}：${citation.quote}`;
     });
     return <div className="agent-report agent-answer">
-      <ReportCitationContext.Provider value={{ citations: prose.citations, evidence, runId, onOpenCitation }}><ReportMarkdown markdown={markdown} /></ReportCitationContext.Provider>
+      <ReportCitationContext.Provider value={{ citations: prose.citations, evidence, runId, onOpenCitation }}><ReportMarkdown markdown={prose.markdown} citationCount={prose.citations.length} /></ReportCitationContext.Provider>
       <AgentWebSources sources={prose.webSources??[]}/>
       {!!value.limitations.length && <p className="agent-note">{value.limitations.join("；")}</p>}
       <div className="agent-answer-toolbar"><AgentAnswerActions text={[prose.markdown,...value.limitations,copySources.length ? "来源：\n"+copySources.join("\n") : ""].filter(Boolean).join("\n\n")}/>{actions}</div>

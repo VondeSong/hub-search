@@ -290,6 +290,11 @@ it("shows honest waiting then a direct answer without an empty or invented proce
  expect(host.textContent).not.toContain('正在思考');
  expect(host.querySelector('[aria-label="完整工作过程"]')).toBeNull();
  expect(host.querySelector('[aria-label="正在生成回答"]')?.textContent).toBe('直接回答的正文');
+ const streamingCode={...answer,label:'下面是脚本。\n\n```python\nprint("就绪")'};
+ await act(async()=>render({...run,events:[streamingCode]}));
+ const streamingBlock=host.querySelector('[aria-label="正在生成回答"] .agent-markdown-code');
+ expect(streamingBlock?.querySelector('.agent-markdown-code-language')?.textContent).toBe('Python');
+ expect(streamingBlock?.querySelector('pre code')?.textContent).toBe('print("就绪")\n');
  await act(async()=>render({...run,running:false,state:'completed',finishedAt:5000,events:[answer]},[...user,{id:'a',role:'assistant',runId:'r',revision:1,createdAt:5000,report:{status:'completed',summary:'直接回答的正文',findings:[],nextSteps:[],questions:[],limitations:[],waitCondition:''}}]));
  expect(host.textContent?.match(/直接回答的正文/g)).toHaveLength(1);
  expect(host.querySelector('[aria-label="完整工作过程"]')).toBeNull();

@@ -48,3 +48,27 @@ it("keeps only numbered source navigation and gates it on source availability",a
  const denied=conversation();denied.messages[0].evidence=[];await render(denied,open,2);expect([...host.querySelectorAll<HTMLButtonElement>('.agent-inline-citation')].every(button=>button.disabled)).toBe(true);
  await render(denied,open,3,true);expect(host.querySelector('.agent-citation-book')).toBeNull();
 });
+
+it("renders fenced code with its language and copies the exact code without rewriting array indexes as citations",async()=>{
+  const value=conversation();
+  const script="$scores = 58, 72, 91, 60, 45\n\n  $scores[1]";
+  value.messages[0].report!.prose!.markdown="关联说明 [1]。行内代码 `$scores[1]`。\n\n```powershell\n"+script+"\n```";
+  const writeText=vi.fn().mockResolvedValue(undefined);
+  const clipboard=Object.getOwnPropertyDescriptor(navigator,"clipboard");
+  Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText}});
+  try {
+    await render(value);
+    expect(host.querySelectorAll(".agent-inline-citation")).toHaveLength(1);
+    expect(host.querySelector(".agent-report p code")?.textContent).toBe("$scores[1]");
+    const block=host.querySelector(".agent-markdown-code")!;
+    expect(block.querySelector(".agent-markdown-code-language")?.textContent).toBe("PowerShell");
+    expect(block.querySelector("pre code")?.textContent).toBe(script+"\n");
+    await act(async()=>block.querySelector<HTMLButtonElement>('button[aria-label="自动换行"]')!.click());
+    expect(block.getAttribute("data-wrap")).toBe("true");
+    await act(async()=>block.querySelector<HTMLButtonElement>('button[aria-label="复制代码"]')!.click());
+    expect(writeText).toHaveBeenCalledExactlyOnceWith(script);
+  } finally {
+    if(clipboard)Object.defineProperty(navigator,"clipboard",clipboard);
+    else Reflect.deleteProperty(navigator,"clipboard");
+  }
+});

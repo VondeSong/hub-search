@@ -7,6 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AgentToolResult, type ToolResultRef, type ToolResultScope } from "./AgentToolResult";
 import { AgentImagePreview } from "./AgentFileInputs";
+import { AgentMarkdownCode } from "./AgentMarkdownCode";
 
 type ActivitySource = {url:string;title?:string|null;query?:string|null};
 type PatchPreview = {patch?:string|null;truncated?:boolean; added?:number|null; removed?:number|null};
@@ -43,7 +44,7 @@ function useActivityDisclosure(key:string,initial:boolean):[boolean,(value:boole
 }
 
 const PublicText = memo(function PublicText({ text }: { text: string }) {
-  return <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={{img:()=>null,a:({children})=><span>{children}</span>,table:({children})=><div className="agent-table-scroll"><table>{children}</table></div>}}>{text}</ReactMarkdown>;
+  return <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={{img:()=>null,a:({children})=><span>{children}</span>,pre:AgentMarkdownCode,table:({children})=><div className="agent-table-scroll"><table>{children}</table></div>}}>{text}</ReactMarkdown>;
 });
 
 function UnpublishedAnswer({text,truncated}:{text:string;truncated?:boolean}) {
