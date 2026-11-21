@@ -310,7 +310,7 @@
 .ha-source-preview-bar button:hover { color: var(--accent); background: var(--accent-soft); }
 .ha-source-notice { margin-block: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); font-size: 12px; line-height: 1.7; }
 .ha-source-notice button { display: block; margin-top: 6px; padding: 5px; border: 0; border-radius: 6px; background: var(--surface-2); color: var(--text); }
-.ha-report-reading .ha-composer-area, .ha-report-reading .ha-welcome, .ha-report-reading .ha-message:not([data-latest-answer]) { display: none; }
+.ha-report-reading .ha-composer-area:not(:has(.ha-material-menu)), .ha-report-reading .ha-welcome, .ha-report-reading .ha-message:not([data-latest-answer]) { display: none; }
 .ha-report-reading .ha-messages { padding-inline: clamp(16px, 4%, 44px); }
 .ha-report-reading .ha-reply { max-width: 74ch; margin-inline: auto; font-size: 14px; }
 .ha-storage-error { position: fixed; z-index: 240; right: 24px; bottom: 72px; max-width: min(400px, calc(100vw - 48px)); padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--text); font-size: 12px; line-height: 1.7; box-shadow: 0 5px 20px #0002; }

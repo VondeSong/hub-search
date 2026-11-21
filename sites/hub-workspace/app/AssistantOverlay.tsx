@@ -95,7 +95,7 @@ export function AssistantOverlay({ title, className = '', bodyClassName = '', bo
 
   return <section ref={root} data-assistant-overlay className={'ha-menu ha-overlay ' + className} style={placement} role="dialog" aria-labelledby={titleId} onKeyDown={keys}>
     <header className="ha-overlay-header ha-menu-heading">
-      {onBack && <button type="button" className="ha-icon" aria-label={backLabel} onClick={onBack}><ArrowLeft size={17}/></button>}
+      {onBack && <button type="button" className="ha-icon" aria-label={backLabel} disabled={closeDisabled} onClick={onBack}><ArrowLeft size={17}/></button>}
       <h3 id={titleId}>{title}</h3>
       <button data-overlay-close type="button" className="ha-icon" aria-label={'关闭' + title} disabled={closeDisabled} onClick={onClose}><X size={18}/></button>
     </header>

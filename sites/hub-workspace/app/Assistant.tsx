@@ -628,6 +628,8 @@ function AssistantConversation({
   const [contextOpen, setContextOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [menu, setMenu] = useState<AssistantMenu>(null);
+  const memoryFromDetails = menu === 'memory-from-details';
+  const memoryOpen = menu === 'memory' || memoryFromDetails;
   const [topicEdit, setTopicEdit] = useState<{ topic: ResearchTopic; resources: ResourceDraft; policy: ResearchPolicy } | null>(null);
   const [topicReview, setTopicReview] = useState<{ id: string; from: 'mode' | 'topics' } | null>(null);
   const menuReturn = useRef<HTMLElement | null>(null);
@@ -640,6 +642,10 @@ function AssistantConversation({
     }
     setMenu(value);
     if (!value) requestAnimationFrame(() => { if (menuReturn.current?.isConnected) menuReturn.current.focus({ preventScroll: true }); });
+  }
+  function returnToDetails() {
+    changeMenu('details');
+    requestAnimationFrame(() => panel.current?.querySelector<HTMLButtonElement>('.ha-detail-memory-link')?.focus({ preventScroll: true }));
   }
   const panel = useRef<HTMLElement>(null);
   const [panelSize, setPanelSize] = useState({ width: 480, height: 0 });
@@ -764,7 +770,7 @@ function AssistantConversation({
       event.stopPropagation();
       if (callback.current.draft) setDraft(null);
       else if (callback.current.menu || callback.current.sourcesOpen || callback.current.contextOpen) {
-        const memoryMenu = callback.current.menu === 'permissions' || callback.current.menu === 'memory';
+        const memoryMenu = callback.current.menu === 'permissions' || callback.current.menu === 'memory' || callback.current.menu === 'memory-from-details';
         setMenu(null); setTopicEdit(null); setSourcesOpen(false); setContextOpen(false);
         if (memoryMenu && menuReturn.current?.isConnected) menuReturn.current.focus({ preventScroll: true }); else composer.current?.focus();
       } else if (callback.current.reading) setReading(false);
@@ -806,11 +812,11 @@ function AssistantConversation({
   }, [!!draft, open]);
 
   useEffect(() => {
-    if (!menu || !open || menu === 'memory') return;
+    if (!menu || !open || memoryOpen) return;
     const outside = (event: PointerEvent) => { const target = event.target; if (!(target instanceof Element)) return; const owner = target.closest('.ha-panel'); if (owner && owner !== panel.current) return; if (!target.closest('.ha-menu, .ha-header, .ha-input-actions')) { setMenu(null); setTopicEdit(null); } };
     document.addEventListener('pointerdown', outside);
     return () => document.removeEventListener('pointerdown', outside);
-  }, [menu, open]);
+  }, [menu, open, memoryOpen]);
 
   function tagTurn(text: string, explicit: AssistantContext[], catalog: AssistantContext[], prepared?: TagTask) {
     if (!tagModel.ready || session.active) { notify('请等当前任务完成后，再发送标签请求'); return false; }
@@ -1165,9 +1171,9 @@ function AssistantConversation({
         onBack={() => changeMenu(topicReview?.from || 'topics')} onClose={() => changeMenu(null)} onApply={() => applyTopic(reviewedTopic)} onEdit={() => editTopicScope(reviewedTopic)}/> : (menu === 'mode' || menu === 'topics') && <AssistantTaskModes tagActive={tagMode} goalActive={goalMode} onGoal={() => { setTagMode(false); setGoalMode(true); changeMenu(null); }} onTag={() => { setGoalMode(false); setTagMode(true); changeMenu(null); }} topics={topics} pins={pins} activeTopic={activeTopic?.id || null} skills={resources.skills} allTopics={menu === 'topics'} disabled={!!session.active}
         onPin={onPin} onSkill={id => { setResources(value => ({ ...value, skills: [...new Set([...value.skills, id])] })); changeMenu(null); }}
         onGeneral={() => { setGoalMode(false); setTagMode(false); changeMenu(null); }}
-        onTopic={topic => { setTopicReview({ id: topic.id, from: menu === 'topics' ? 'topics' : 'mode' }); changeMenu('topic-review'); }} onAllTopics={() => changeMenu(menu === 'topics' ? 'mode' : 'topics')} onUsage={() => changeMenu('usage')} onClose={() => changeMenu(null)}/>} taskStatus={session.active?.status} menu={menu} setMenu={changeMenu} title={chatTitle} settings={settings} setSettings={changeSettings} expanded={expanded} onExpand={onExpand} onClose={onClose} history={history} currentId={workKey} onNew={onNew} onSelect={onSelect} onHistoryChange={onHistoryChange} disabled={!!session.active} hasReport={session.messages.some(item => item.role === 'assistant' && canUseContext(item.context))} reading={reading} onReading={() => setReading(value => !value)} messageCount={session.messages.length} materialCount={turnResources.pages.length + Number(!!material)} libraryCount={turnResources.libraryIds.length} hasMaterials={hasMaterials} memoryPending={memoryModel.state.proposals.length} onManageMemory={() => changeMenu('memory')}/>
-      {menu === 'memory' && <AssistantMemoryManager model={memoryModel} enabled={settings.memoryEnabled} scope={settings.memoryScope} disabled={!!session.active} materialsOnly={settings.researchPolicy === 'materials-only'} onClose={() => changeMenu(null)}/>}
-      <div className="ha-workspace" inert={menu === 'memory'}>
+        onTopic={topic => { setTopicReview({ id: topic.id, from: menu === 'topics' ? 'topics' : 'mode' }); changeMenu('topic-review'); }} onAllTopics={() => changeMenu(menu === 'topics' ? 'mode' : 'topics')} onUsage={() => changeMenu('usage')} onClose={() => changeMenu(null)}/>} taskStatus={session.active?.status} menu={menu} setMenu={changeMenu} title={chatTitle} settings={settings} setSettings={changeSettings} expanded={expanded} onExpand={onExpand} onClose={onClose} history={history} currentId={workKey} onNew={onNew} onSelect={onSelect} onHistoryChange={onHistoryChange} disabled={!!session.active} hasReport={session.messages.some(item => item.role === 'assistant' && canUseContext(item.context))} reading={reading} onReading={() => setReading(value => !value)} messageCount={session.messages.length} materialCount={turnResources.pages.length + Number(!!material)} libraryCount={turnResources.libraryIds.length} memoryPending={memoryModel.state.proposals.length}/>
+      {memoryOpen && <AssistantMemoryManager model={memoryModel} enabled={settings.memoryEnabled} scope={settings.memoryScope} disabled={!!session.active} materialsOnly={settings.researchPolicy === 'materials-only'} onClose={() => changeMenu(null)} onBack={memoryFromDetails ? returnToDetails : undefined}/>}
+      <div className="ha-workspace" inert={memoryOpen}>
         <div className="ha-conversation">
           {tagIntent&&!reading&&!contextBlocked&&<TagTaskSelector intent={tagIntent} onChange={prepareTag} onCancel={()=>{setTagIntent(null);setTagError('');composer.current?.focus({preventScroll:true});}}/>}
           <div className="ha-message-viewport">
@@ -1211,7 +1217,7 @@ function AssistantConversation({
               </>}
             </article>)}
 
-            {!tagMode && !activityDemo && !isUiDemo && !reading && !contextBlocked && memoryModel.ready && !memoryModel.error && menu !== 'memory' && <MemoryFeedback model={memoryModel} disabled={!!session.active}/>}
+            {!tagMode && !activityDemo && !isUiDemo && !reading && !contextBlocked && memoryModel.ready && !memoryModel.error && !memoryOpen && <MemoryFeedback model={memoryModel} disabled={!!session.active}/>}
 
             {tagMode && !tagIntent && !reading && !!session.messages.length && !contextBlocked && <details className="ha-tag-prompts"><summary>标签助手建议</summary><div className="ha-prompts">{tagSuggestions}</div></details>}
             {session.active && running && !activeBlocked && <div className="ha-current-action" role="status"><span className="ha-active-ink">{['正在思考', '正在整理示例材料', '正在准备回答'][stage]}</span></div>}

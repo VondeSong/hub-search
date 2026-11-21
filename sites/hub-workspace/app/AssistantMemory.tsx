@@ -126,7 +126,7 @@ function MemoryEntryCard({ entry, model, disabled, onEditingChange }: { entry: M
   </details>;
 }
 
-export function AssistantMemoryManager({ model, enabled, scope, disabled, materialsOnly, onClose }: { model: AssistantMemoryModel; enabled: boolean; scope: string; disabled: boolean; materialsOnly: boolean; onClose: () => void }) {
+export function AssistantMemoryManager({ model, enabled, scope, disabled, materialsOnly, onClose, onBack }: { model: AssistantMemoryModel; enabled: boolean; scope: string; disabled: boolean; materialsOnly: boolean; onClose: () => void; onBack?: () => void }) {
   // Browsing this list never writes the conversation's scope or new-chat preference.
   const [browseScope, setBrowseScope] = useState<MemoryScope>(scope === 'hub' ? 'hub' : 'general');
   const [tab, setTab] = useState<'saved' | 'pending'>('saved');
@@ -140,7 +140,13 @@ export function AssistantMemoryManager({ model, enabled, scope, disabled, materi
     <div className="ha-memory-tabs" aria-label="记忆列表"><button type="button" aria-pressed={tab === 'saved'} disabled={editing} onClick={() => setTab('saved')}>已保存<small>{entries.length}</small></button><button type="button" aria-pressed={tab === 'pending'} disabled={editing} onClick={() => setTab('pending')}>待确认{proposals.length > 0 && <small>{proposals.length}</small>}</button></div>
     {editing && <p className="ha-memory-edit-notice" role="status">先保存或取消当前编辑，再切换范围或关闭。</p>}</>;
   const footer = <><MemoryFeedback model={model} disabled={disabled || editing}/><div className="ha-memory-manager-footer"><span>{materialsOnly ? '本轮不使用记忆（只用所选资料）' : '本对话记忆：' + memoryUseLabel(enabled, scope)}</span><small>查看其他范围不会更改本对话。</small></div></>;
-  return <AssistantOverlay title="管理记忆" className="ha-memory-manager" bodyClassName="ha-memory-list" toolbar={toolbar} footer={footer} onClose={onClose} closeDisabled={editing} trapFocus onEscape={root => { const editor = root.querySelector<HTMLTextAreaElement>('[data-memory-editor] textarea'); if (editor) editor.focus({ preventScroll: true }); else onClose(); }}>
+  return <AssistantOverlay title="管理记忆" className="ha-memory-manager" bodyClassName="ha-memory-list" toolbar={toolbar} footer={footer}
+    onClose={onClose} onBack={onBack} backLabel="返回对话详情" closeDisabled={editing} trapFocus
+    onEscape={root => {
+      const editor = root.querySelector<HTMLTextAreaElement>('[data-memory-editor] textarea');
+      if (editor) editor.focus({ preventScroll: true });
+      else if (!editing) (onBack ?? onClose)();
+    }}>
       {!model.ready ? <p className="ha-memory-empty">正在读取记忆示例…</p> : model.error ? <p role="status">{model.error}</p> : tab === 'saved' ? entries.length ? entries.map(entry => <MemoryEntryCard key={entry.id} entry={entry} model={model} disabled={disabled} onEditingChange={reportEditing}/>) : <p className="ha-memory-empty">此范围还没有已保存的记忆。</p> : proposals.length ? proposals.map(item => <MemoryProposalCard key={item.id} item={item} model={model} disabled={disabled} onEditingChange={reportEditing}/>) : <p className="ha-memory-empty">此范围没有待确认的建议。</p>}
   </AssistantOverlay>;
 }
