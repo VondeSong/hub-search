@@ -2,6 +2,7 @@
 
 ## 通用流程与本项目授权
 
+- Agents 的通用 UI 与交互规则统一原位维护在 [Agents UI 与交互主方案](desktop/docs/AGENTS_UI_INTERACTION_PLAN.md)，长期任务为 [#64](https://github.com/VondeSong/hub-search/issues/64)，归属 Agents 模块 #43。后续相关方案在此基础上增、删、改、查：先读取现状与专题索引，更新对应章节、验收编号、示例图和版本记录；移除规则时保留退役原因，不按日期反复新建同级总方案。方案、原型、桌面实现和实际验收分别标记，不能互相替代。新专题可独立成文，但必须在主方案登记职责与链接。
 - 助手思维链（公开工作过程、时间线）的展示方案、交互细节、Codex 对照、截图和后续取舍统一原位更新到[思维链展示方案](desktop/docs/AGENTS_PROCESS_VIDEO_REVIEW_20261120.md)。沿用此文件路径和已有图片目录；README、Issue #56 和看板只链接本页并按需记录进度。新一轮录像或设计调整继续更新同一页，已过时的状态标为历史。
 
 - 仓库接入、检查后保存同步及明确要求的版本发布使用 `git-github-workflow` skill 的通用流程；本文件保留 hub-search 的项目配置、用户授权及 Issues/看板约定。
