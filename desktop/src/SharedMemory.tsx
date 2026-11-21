@@ -1,166 +1,302 @@
-import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { loadMemoryPreference, rememberMemoryPreference, type MemorySelection } from "./AgentPreferences";
-export type { MemorySelection } from "./AgentPreferences";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { Brain, Check, ChevronDown, ChevronRight, Plus, ShieldCheck, X } from "lucide-react";
+import type { AssistantOptions } from "./AgentAssistantOptions";
+import { useAgentPopover } from "./useAgentPopover";
+import { readMemoryHistory, type MemoryContent, type MemoryEntry, type MemoryKind, type MemoryProposal, type MemoryUse, type MemoryVersion, type SharedMemoryModel } from "./useSharedMemory";
+import "./SharedMemory.css";
 
-type MemorySource = { origin: string; workId?: string; runId?: string; sourceRecordId?: string; proposedBy?: string; confirmedAt?: number; changeReason?: string };
-type Proposal = { id: string; projectId: string; expectedVersion: number; candidate: { title: string; topicKey: string; kind: "rule" | "decision"; body: string; reason: string }; source: MemorySource };
-type Entry = {
-  id: string; revisionId: string; topicKey: string; title: string; projectId: string;
-  kind: "rule" | "decision"; version: number; state: string; body: string | null; detail?: string; source?: MemorySource; updatedAt?: number;
-  history?: { version: number; source: MemorySource | null }[];
-};
-type View = {
-  configured: boolean; runtimeDetail?: string | null; entries: Entry[]; proposals?: Proposal[]; projects: { id: string; name: string }[];
-  selection: { projectId: string; enabled: boolean };
-};
-export type MemoryUse = { projectId: string; omissions?: {notRetrieved: number; budget: number}; notice?: string | null; items: { id: string; version: number; kind: string; reason: string }[] };
-const call = (args: Record<string, unknown>) => invoke<View>("shared_memory", { args });
-const states: Record<string, string> = {
-  pending: "等待索引核验", active: "已生效", inactive: "已停用", deleting: "已停止使用，正在清除", review: "恢复的历史记忆，需要重新确认",
-};
+const usageLabel = (kind: string) => kind === "rule" ? "每次使用" : "相关时参考";
+const labels: Record<string,string> = {pending:"等待核验", inactive:"已停用", review:"待重新确认", deleting:"清理未完成"};
+const date = (time?:number) => time ? new Date(time).toLocaleString("zh-CN",{dateStyle:"short",timeStyle:"short"}) : "";
 
-export function SharedMemory({ workId, disabled, onSelectionChange, initialSelection, usage, compact = false, summary }: { summary?: (selection: MemorySelection | undefined) => ReactNode; compact?: boolean; workId?: string; disabled: boolean; initialSelection?: MemorySelection; onSelectionChange?: (selection: MemorySelection) => void; usage?: MemoryUse | null }) {
-  const [expanded, setExpanded] = useState(false);
-  const [view, setView] = useState<View | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [selectionNotice, setSelectionNotice] = useState("");
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [kind, setKind] = useState<"rule" | "decision">("decision");
-  const [edit, setEdit] = useState<Entry | null>(null);
-  const [proposal, setProposal] = useState<Proposal | null>(null);
-  const [changeReason, setChangeReason] = useState("");
-  const [projectName, setProjectName] = useState("");
-  const alive = useRef(true);
-  const currentWork = useRef(workId); currentWork.current = workId;
-  useEffect(() => { setView(null); setEdit(null); setProposal(null); setTitle(""); setBody(""); setChangeReason(""); request.current = null; if (expanded) void perform({ action: "status" }); }, [workId]);
-  const draftSelection = useRef<MemorySelection>(initialSelection ?? loadMemoryPreference());
-  if (!workId && initialSelection) draftSelection.current = initialSelection;
-  useEffect(() => {
-    if (!workId && initialSelection) setView(current => current ? { ...current, selection: initialSelection } : current);
-  }, [workId, initialSelection?.projectId, initialSelection?.enabled]);
-  // Retain the identity after an interrupted submission. Changed content gets a
-  // new request identity; exact retry reconciles the accepted version.
-  const request = useRef<{ payload: string; key: string } | null>(null);
-  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  async function perform(args: Record<string, unknown>, rememberSelection = false) {
-    setBusy(true); setError("");
-    try {
-      let next = await call({ ...(!workId ? { projectId: draftSelection.current.projectId } : {}), ...(args.action==="status"?{prepareRuntime:false}:{}), ...args, workId });
-      if (!workId && typeof args.projectId === "string" && args.projectId !== draftSelection.current.projectId) {
-        next = await call({ action: "status", projectId: draftSelection.current.projectId, prepareRuntime: false });
-      }
-      if (alive.current && currentWork.current === workId) {setView(workId ? next : { ...next, selection: draftSelection.current }); if(workId) onSelectionChange?.(next.selection); if(rememberSelection) rememberMemoryPreference(next.selection);}
-      return true;
-    } catch (reason) {
-      if (alive.current && currentWork.current === workId) {
-        setError(String(reason));
-        try {
-          let next = await call({ action: "status", workId, prepareRuntime: false });
-          if (!workId && draftSelection.current.projectId && !next.projects.some(project => project.id === draftSelection.current.projectId)) {
-            if (alive.current && currentWork.current === workId) {
-              draftSelection.current = { projectId: "", enabled: false };
-              rememberMemoryPreference(draftSelection.current); onSelectionChange?.(draftSelection.current);
-              setError(""); setSelectionNotice("上次选择的记忆项目已不可用，已关闭记忆。请重新选择范围。");
-            }
-          } else if (!workId && draftSelection.current.projectId) {
-            next = await call({ action: "status", projectId: draftSelection.current.projectId, prepareRuntime: false });
-          }
-          if (alive.current && currentWork.current === workId) {setView(workId ? next : { ...next, selection: draftSelection.current }); if(workId) onSelectionChange?.(next.selection);}
-        } catch { /* Preserve the original failure. */ }
-      }
-      return false;
-    } finally { if (alive.current && currentWork.current === workId) setBusy(false); }
+function wrapDialogTab(event:React.KeyboardEvent<HTMLElement>) {
+  if(event.key!=="Tab")return;
+  const fields=Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary')).filter(item=>item.getClientRects().length>0);
+  if(!fields.length)return;
+  const first=fields[0],last=fields[fields.length-1];
+  if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+  if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+}
+
+function MemoryStatus({model, showNotice=true}: {model:SharedMemoryModel;showNotice?:boolean}) {
+  if (model.error) return <div className="agent-memory-feedback" role="alert"><span>{model.error}</span><button type="button" disabled={model.busy} onClick={()=>void model.retryRead()}>重试读取</button></div>;
+  if (model.busy || model.loading || showNotice && model.notice) return <p className="agent-memory-feedback" role="status" tabIndex={-1}>{model.busy?"正在更新记忆…":model.loading?"正在读取记忆设置…":model.notice}</p>;
+  return null;
+}
+
+function ManageLink({model,onClick}: {model:SharedMemoryModel;onClick:()=>void}) {
+  const pending = model.view?.proposals?.length ?? 0;
+  return <button type="button" className="agent-memory-manage-link" onClick={onClick}>
+    <span>管理记忆{pending>0 && <small>此范围 {pending} 条待确认</small>}</span><ChevronRight size={15} aria-hidden="true"/>
+  </button>;
+}
+
+export function MemoryAndSavePopover({model,value,canAuto,materialsOnly,disabled,onSave}: {
+  model:SharedMemoryModel;value:AssistantOptions;canAuto:boolean;materialsOnly:boolean;disabled:boolean;onSave:(value:AssistantOptions)=>Promise<void>;
+}) {
+  const popover=useAgentPopover({aboveComposer:true});
+  const trigger=useRef<HTMLElement|null>(null);
+  const closeButton=useRef<HTMLButtonElement>(null);
+  const [auto,setAuto]=useState(value.autoFlashcardInbox);
+  const [saving,setSaving]=useState(false);
+  const [saveError,setSaveError]=useState("");
+  const options=model.view?.projects ?? [];
+  const unavailable = model.view && !model.view.configured;
+  const canSwitch = !disabled && !model.blocked && !model.loading && !!model.view && !materialsOnly;
+  const activeProject = model.selection.projectId;
+  async function commit() {
+    if (saving || disabled) return;
+    setSaving(true); setSaveError("");
+    try { await onSave({...value,autoFlashcardInbox:auto}); popover.close(true); }
+    catch(reason) { setSaveError(String(reason)); }
+    finally { setSaving(false); }
   }
-  function select(selection: MemorySelection) {
-    setSelectionNotice("");
-    setProposal(null); setEdit(null); setTitle(""); setBody(""); setChangeReason(""); request.current = null;
-    if (workId) { void perform({ action: "selectScope", ...selection }, true); return; }
-    draftSelection.current = selection;
-    rememberMemoryPreference(selection);
-    setView(current => current ? { ...current, selection } : current);
-    onSelectionChange?.(selection);
-    void perform({ action: "status", projectId: selection.projectId });
-  }
-  async function save(event: React.FormEvent) {
-    event.preventDefault();
-    if (!view) return;
-    const payload = { action: "put", title: title.trim(), body: body.trim(), kind,
-      topicKey: proposal?.candidate.topicKey ?? edit?.topicKey ?? title.trim(), projectId: proposal?.projectId ?? edit?.projectId ?? view.selection.projectId,
-      expectedVersion: proposal?.expectedVersion ?? edit?.version ?? 0, confirmed: true,
-      ...(proposal ? { proposalId: proposal.id } : {}), changeReason: changeReason.trim() || "用户确认保存" };
-    const identity = JSON.stringify(payload);
-    if (request.current?.payload !== identity) request.current = { payload: identity, key: crypto.randomUUID() };
-    if (await perform({ ...payload, requestKey: request.current.key })) {
-      setTitle(""); setBody(""); setEdit(null); setProposal(null); setChangeReason(""); request.current = null;
-    }
-  }
-  const blocked = disabled || busy;
-  return <details className={`agent-run-details${summary?" agent-detail-row":""}`} onToggle={event => {
-    const next = event.currentTarget.open;
-    setExpanded(next);
-    if (next && !busy) void perform({ action: "status" });
+  return <details ref={popover.ref} className="agent-assistant-options agent-popover agent-memory-disclosure" data-hub-keyboard-scope="memory-settings" name="hub-agent-preference" onToggle={event=>{
+    if(event.target!==event.currentTarget)return;
+    const open=event.currentTarget.open;
+    model.setSettingsOpen(open);
+    if(open){setAuto(value.autoFlashcardInbox);setSaveError("");closeButton.current?.focus({preventScroll:true});}
   }}>
-    <summary>{summary ? summary(view?.selection ?? (workId?undefined:initialSelection)) : compact && view ? `记忆 · ${view.selection.enabled ? "已启用" : "未启用"}` : "共享记忆"}{view?.proposals?.length ? ` · ${view.proposals.length} 条待确认` : ""}</summary>
-    {expanded && <>
-      <p className="agent-note">新对话沿用你上次选择的开关和范围。这里管理你确认过的规则和决定。查找旧聊天请用「对话历史」。</p>
-      {selectionNotice && <p role="status">{selectionNotice}</p>}
-      {!view && busy && <p role="status">正在读取记忆设置…</p>}
-      {view && <>
-        <button type="button" disabled={blocked} onClick={() => void perform({ action: "status" })}>刷新记忆</button>
-        <p>{view.configured ? "本地记忆已就绪。" : view.runtimeDetail || "本地记忆尚未准备完成。"} <button type="button" disabled={blocked} onClick={() => void perform(view.configured ? { action: "repair" } : { action: "status", prepareRuntime: true })}>{busy ? "请稍候…" : view.configured ? "修复本地记忆" : "准备本地记忆"}</button></p>
-        <label>本事项的记忆范围<select value={view.selection.projectId} disabled={blocked} onChange={event => select({ projectId: event.target.value, enabled: view.selection.enabled })}>
-          <option value="">仅个人通用</option>
-          {view.projects.map(project => <option value={project.id} key={project.id}>{project.name}＋个人通用</option>)}
+    <summary ref={trigger} className="agent-memory-trigger" data-memory-enabled={model.selection.enabled&&!materialsOnly} aria-label="记忆与保存" title="记忆与保存">
+      <ShieldCheck size={18} aria-hidden="true"/><span className="agent-memory-trigger-full">记忆与保存</span><span className="agent-memory-trigger-short">记忆</span>
+    </summary>
+    <section className="agent-assistant-settings agent-memory-permissions" role="dialog" aria-modal="true" aria-label="记忆与保存" onKeyDown={wrapDialogTab}>
+      <header className="agent-popover-header"><strong>记忆与保存</strong><button ref={closeButton} type="button" aria-label="关闭记忆与保存" onClick={()=>popover.close(true)}><X size={16}/></button></header>
+      <section className="agent-memory-settings-section" aria-label="记忆">
+        <h3>记忆</h3>
+        <label className="agent-memory-switch"><span>使用已保存记忆</span><input type="checkbox" role="switch" checked={model.selection.enabled&&!materialsOnly} disabled={!canSwitch} onChange={event=>model.select({...model.selection,enabled:event.target.checked})}/></label>
+        <label className="agent-memory-scope-setting"><span>范围</span><select aria-label="本对话的记忆范围" value={activeProject} disabled={!canSwitch} onChange={event=>model.select({...model.selection,projectId:event.target.value})}>
+          <option value="">个人通用</option>
+          {activeProject && !options.some(p=>p.id===activeProject) && <option value={activeProject}>{model.view?"原项目不可用":"正在读取项目"}</option>}
+          {options.map(project=><option key={project.id} value={project.id}>{project.name}＋个人通用</option>)}
         </select></label>
-        <label><input type="checkbox" checked={view.selection.enabled} disabled={blocked || !view.configured}
-          onChange={event => select({ projectId: view.selection.projectId, enabled: event.target.checked })} />{workId ? "下一轮" : "首轮调查"}使用此范围内的记忆</label>
-        {usage && <section aria-label="本轮记忆使用记录"><p>本轮向模型提供 {usage.items.length} 条共享记忆。</p><ul>{usage.items.map(item => <li key={item.id}>{view.entries.find(entry => entry.id === item.id)?.title || item.id} · 第 {item.version} 版 · {item.kind === "rule" ? "范围内规则" : "相关决定候选"}</li>)}</ul>{usage.omissions && <p className="agent-note">未被检索选中 {usage.omissions.notRetrieved} 条；受容量限制未提供 {usage.omissions.budget} 条。未开启、其他项目、停用或待确认的内容不会提供。</p>}{usage.notice && <p className="agent-note">{usage.notice}</p>}<p className="agent-note">此处记录实际送入模型的版本，是否采纳仍需结合回答核对。记忆有变化时，旧上下文不能继续交付；请停止当前轮再继续。</p></section>}
-        <form onSubmit={event => { event.preventDefault(); if (projectName.trim()) void perform({ action: "createProject", name: projectName.trim() }).then(ok => { if (ok) setProjectName(""); }); }}>
-          <label>新建记忆项目<input value={projectName} maxLength={60} onChange={event => setProjectName(event.target.value)} placeholder="例如：Hub 开发" /></label>
-          <button type="submit" disabled={blocked || !projectName.trim()}>创建项目</button>
-        </form>
-        <section aria-label="待确认记忆建议"><h4>待确认建议</h4><p className="agent-note">模型建议尚未生效，不会被其他对话使用。检查内容和项目后再确认。</p>
-          {(view.proposals ?? []).filter(item => item.projectId === view.selection.projectId).map(item => <div key={item.id}>
-            <strong>{item.candidate.title}</strong><p>{item.candidate.body}</p><p className="agent-note">{item.candidate.reason} · 来自 {item.source.proposedBy || "模型"} 的建议</p>
-            <details><summary>查看建议来源</summary><p>事项：{item.source.workId}；消息：{item.source.sourceRecordId}；运行：{item.source.runId}</p></details>
-            <button type="button" disabled={blocked} onClick={() => { setProposal(item); setEdit(null); setTitle(item.candidate.title); setBody(item.candidate.body); setKind(item.candidate.kind); setChangeReason(item.candidate.reason); request.current = null; }}>检查并修改建议</button>
-            <button type="button" disabled={blocked} onClick={() => void perform({ action: "dismissProposal", proposalId: item.id }).then(ok => { if (ok && proposal?.id === item.id) { setProposal(null); setTitle(""); setBody(""); } })}>忽略建议</button>
-          </div>)}
-          {!(view.proposals ?? []).some(item => item.projectId === view.selection.projectId) && <p className="agent-note">此范围暂无待确认建议。</p>}
-        </section>
-        <form onSubmit={save}>
-          <label>{proposal ? "确认模型建议" : edit ? "修改记忆" : "记忆主题"}<input value={title} required maxLength={90} onChange={event => setTitle(event.target.value)} placeholder="用稳定的名称标识这项规则或决定" /></label>
-          <label>类型<select value={kind} onChange={event => setKind(event.target.value as "rule" | "decision")}>
-            <option value="decision">决定 · 相关时参考</option><option value="rule">规则 · 每次加载</option>
-          </select></label>
-          <label>确认的内容<textarea value={body} required maxLength={1800} onChange={event => setBody(event.target.value)} /></label>
-          {(edit || proposal) && <label>修改或确认原因<input value={changeReason} maxLength={280} onChange={event => setChangeReason(event.target.value)} placeholder="例如：新方案替代旧方案" /></label>}
-          <p className="agent-note">保存到：{(proposal?.projectId ?? edit?.projectId ?? view.selection.projectId) ? view.projects.find(p => p.id === (proposal?.projectId ?? edit?.projectId ?? view.selection.projectId))?.name : "个人通用"}。修改后旧版本停止使用；外部改动需要重新确认。</p>
-          <button type="submit" disabled={blocked || !view.configured || !title.trim() || !body.trim()}>确认并保存记忆</button>
-          {(edit || proposal) && <button type="button" disabled={blocked} onClick={() => { setEdit(null); setProposal(null); setTitle(""); setBody(""); setChangeReason(""); request.current = null; }}>取消修改</button>}
-        </form>
-        <ul>{view.entries.filter(entry => !entry.projectId || entry.projectId === view.selection.projectId).map(entry => <li key={entry.id}>
-          <strong>{entry.title}</strong> · {states[entry.state] || entry.state} · 第 {entry.version} 版
-          {entry.updatedAt && <p className="agent-note">更新于 {new Date(entry.updatedAt).toLocaleString()}</p>}
-          {entry.body && <p>{entry.body}</p>}
-          <details><summary>来源与修订记录</summary><p>{entry.source?.origin === "modelProposal" ? "模型建议，经用户确认" : "用户明确确认"}{entry.source?.confirmedAt ? ` · ${new Date(entry.source.confirmedAt).toLocaleString()}` : " · 旧记录未保存确认时间"}</p>
-            {entry.source?.workId && <p>来源事项：{entry.source.workId}；消息：{entry.source.sourceRecordId || "手动填写"}；运行：{entry.source.runId || "无"}</p>}
-            <ul>{entry.history?.map(item => <li key={item.version}>第 {item.version} 版：{item.source?.changeReason || "旧记录未保存修改原因"}{item.source?.confirmedAt ? ` · ${new Date(item.source.confirmedAt).toLocaleString()}` : ""}</li>)}</ul>
-          </details>
-          {entry.detail && <p className="agent-note">{entry.detail}</p>}
-          {entry.state === "pending" && <button type="button" disabled={blocked} onClick={() => void perform({ action: "retry", id: entry.id })}>重试核验</button>}
-          {["active", "inactive", "review"].includes(entry.state) && <button type="button" disabled={blocked} onClick={() => { setProposal(null); setChangeReason(""); setEdit(entry); setTitle(entry.title); setKind(entry.kind); setBody(entry.body || ""); request.current = null; }}>修改</button>}
-          {entry.state === "active" && <button type="button" disabled={blocked} onClick={() => void perform({ action: "deactivate", id: entry.id })}>停用</button>}
-          <button type="button" disabled={blocked} onClick={() => {
-            if (window.confirm(`遗忘“${entry.title}”及其历史正文？已有备份文件不会被改写。`)) void perform({ action: "forget", id: entry.id, confirmed: true });
-          }}>遗忘</button>
-        </li>)}</ul>
-        {busy && <p role="status">正在处理记忆，完成核验后才会生效。首次准备或重建索引可能需要约两分钟…</p>}
-      </>}
-      {error && <p role="alert">{error}</p>}
-    </>}
+        <p>{materialsOnly?"当前只用所选资料，本轮不使用记忆。":disabled?"回答结束后可更改。":unavailable && model.selection.enabled?"本地记忆暂时不可用，请在「管理记忆」中准备或检查。":model.selection.enabled?"新增记忆仍需确认。":"开启后使用此范围。新增记忆仍需确认。"}</p>
+        <MemoryStatus model={model}/>
+      </section>
+      <section className="agent-memory-saving" aria-label="保存成果">
+        <h3>保存成果</h3>
+        {canAuto || value.autoFlashcardInbox ? <>
+          <button type="button" className="agent-menu-choice" aria-pressed={!auto} disabled={disabled||saving} onClick={()=>setAuto(false)}><span><strong>保存前确认</strong><small>先查看草稿，再确认保存。</small></span>{!auto&&<Check size={16}/>}</button>
+          {canAuto&&<button type="button" className="agent-menu-choice" aria-pressed={auto} disabled={disabled||saving} onClick={()=>setAuto(true)}><span><strong>自动导入闪卡收件箱</strong><small>仅限本对话，仍需审核后才能复习。</small></span>{auto&&<Check size={16}/>}</button>}
+          {auto!==value.autoFlashcardInbox&&<button type="button" className="agent-memory-auto-confirm" disabled={disabled||saving} onClick={()=>void commit()}>{saving?"正在应用…":auto?"确认本对话的自动导入授权":"应用到本对话"}</button>}
+        </> : <><div className="agent-memory-save-status"><span>保存前确认</span><Check size={16} aria-hidden="true"/></div><p>先查看草稿，再确认保存。</p></>}
+        {saveError&&<p role="alert">{saveError}</p>}
+      </section>
+      <ManageLink model={model} onClick={()=>{popover.close();if(trigger.current) model.openManager(trigger.current);}}/>
+    </section>
   </details>;
+}
+
+function MemoryEditor({initial,scope,projects,onCancel,onSave,action,disabled,fixed}: {
+  initial:MemoryContent;scope:string;projects:{id:string;name:string}[];onCancel:()=>void;onSave:(content:MemoryContent,scope:string)=>Promise<boolean>;
+  action:string;disabled:boolean;fixed:boolean;
+}) {
+  const [draft,setDraft]=useState(initial);
+  const [project,setProject]=useState(scope);
+  const field=useRef<HTMLTextAreaElement>(null);
+  const saving=useRef(false);
+  useEffect(()=>{field.current?.focus({preventScroll:true});},[]);
+  async function submit(event:FormEvent) {
+    event.preventDefault();
+    if(disabled || saving.current || !draft.title.trim() || !draft.body.trim())return;
+    saving.current=true;
+    try { if(await onSave({...draft,title:draft.title.trim(),body:draft.body.trim()},project)) onCancel(); }
+    finally { saving.current=false; }
+  }
+  return <form className="agent-memory-editor" onSubmit={event=>void submit(event)} onKeyDown={event=>{
+    if(event.key==="Escape"&&!event.nativeEvent.isComposing){event.preventDefault();event.stopPropagation();if(!disabled)onCancel();}
+  }}>
+    <label>标题<input required maxLength={90} disabled={disabled} value={draft.title} onChange={event=>setDraft({...draft,title:event.target.value})}/></label>
+    <label>记忆内容<textarea ref={field} rows={3} required maxLength={1800} disabled={disabled} value={draft.body} onChange={event=>setDraft({...draft,body:event.target.value})}/></label>
+    <label>使用方式<select disabled={disabled} value={draft.kind} onChange={event=>setDraft({...draft,kind:event.target.value as MemoryKind})}><option value="decision">相关时参考</option><option value="rule">每次使用</option></select></label>
+    {fixed ? <p>保存到：{projects.find(item=>item.id===project)?.name || (project?"原记忆项目":"个人通用")}</p> :
+      <label>保存到<select disabled={disabled} value={project} onChange={event=>setProject(event.target.value)}><option value="">个人通用</option>{projects.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
+    <div className="agent-memory-actions"><button type="submit" className="agent-memory-primary" disabled={disabled||!draft.title.trim()||!draft.body.trim()}>{action}</button><button type="button" disabled={disabled} onClick={onCancel}>取消</button></div>
+  </form>;
+}
+
+export function MemoryProposalCard({model,item,editing,onEdit,onCancel,onResult}: {
+  model:SharedMemoryModel;item:MemoryProposal;editing:boolean;onEdit:()=>void;onCancel:()=>void;onResult?:(message:string)=>void;
+}) {
+  const editButton=useRef<HTMLButtonElement>(null);
+  const cancel=()=>{onCancel();requestAnimationFrame(()=>editButton.current?.focus({preventScroll:true}));};
+  const scope=item.projectName||model.projectLabel(item.projectId);
+  const save=async ({title,body,kind}:MemoryContent)=>{
+    const message="已记住 · "+scope;
+    const ok=await model.save({title,body,kind},{projectId:item.projectId,topicKey:item.candidate.topicKey,expectedVersion:item.expectedVersion,proposalId:item.id},message);
+    if(ok)onResult?.(message);
+    return ok;
+  };
+  const dismiss=async()=>{
+    const message="已忽略这条建议";
+    if(await model.perform({action:"dismissProposal",proposalId:item.id},message))onResult?.(message);
+  };
+  return <section className="agent-memory-proposal" aria-label="建议记住">
+    <div className="agent-memory-eyebrow"><Brain size={13} aria-hidden="true"/><span>建议记住</span></div>
+    {editing ? <MemoryEditor initial={item.candidate} fixed scope={item.projectId} projects={item.projectId?[{id:item.projectId,name:scope}]:[]} disabled={model.blocked} action="确认并记住" onSave={save} onCancel={cancel}/> : <>
+      <p className="agent-memory-content">{item.candidate.body}</p>
+      <p className="agent-memory-meta">保存到 {scope} · {usageLabel(item.candidate.kind)}</p>
+      <p className="agent-memory-source">{item.candidate.reason}</p>
+      <details className="agent-memory-origin"><summary>查看建议来源</summary><p>{item.source.proposedBy||"助手"} · {date(item.source.proposedAt)}{item.source.sourceRecordId&&" · 消息 "+item.source.sourceRecordId}</p></details>
+      <div className="agent-memory-actions">
+        <button type="button" className="agent-memory-primary" disabled={model.blocked} onClick={()=>void save(item.candidate)}>记住</button>
+        <button ref={editButton} type="button" disabled={model.blocked} onClick={onEdit}>编辑</button>
+        <button type="button" disabled={model.blocked} onClick={()=>void dismiss()}>忽略</button>
+      </div>
+    </>}
+    {onResult && <MemoryStatus model={model} showNotice={false}/>}
+  </section>;
+}
+
+function VersionBody({item,label}: {item:MemoryVersion;label:string}) {
+  return <div><small>{label} · 第 {item.version} 版{item.kind&&" · "+usageLabel(item.kind)}</small>{item.title&&<strong>{item.title}</strong>}
+    <p>{item.body??"此版本的正文不可核验"}</p></div>;
+}
+
+function MemoryHistory({entry}: {entry:MemoryEntry}) {
+  const [versions,setVersions]=useState<MemoryVersion[]|null>(null);
+  const [error,setError]=useState("");
+  const [loading,setLoading]=useState(false);
+  const alive=useRef(true);
+  useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
+  async function load() {
+    setError("");setLoading(true);
+    try {const data=await readMemoryHistory(entry.id);if(alive.current)setVersions(data.versions);}
+    catch(reason){if(alive.current)setError(String(reason));}
+    finally{if(alive.current)setLoading(false);}
+  }
+  return <details className="agent-memory-history" onToggle={event=>{if(event.target===event.currentTarget&&event.currentTarget.open&&!versions&&!loading)void load();}}>
+    <summary>修改记录 · {(entry.history?.length??1)-1}</summary>
+    {loading&&<p role="status">正在读取修改记录…</p>}
+    {error&&<p role="alert">{error} <button type="button" onClick={()=>void load()}>重试</button></p>}
+    {versions&&<ol>{versions.slice(0,-1).map((after,index)=><li key={after.version}><time>{date(after.source?.confirmedAt)} {after.source?.changeReason}</time>
+      <VersionBody label="修改前" item={versions[index+1]}/><VersionBody label="修改后" item={after}/>
+    </li>)}</ol>}
+    {versions?.length===21&&<p>显示最近 20 次修改。</p>}
+  </details>;
+}
+
+function EntryCard({model,entry,editing,onEdit,onCancel}: {
+  model:SharedMemoryModel;entry:MemoryEntry;editing:boolean;onEdit:()=>void;onCancel:()=>void;
+}) {
+  const [forgetting,setForgetting]=useState(false);
+  const editButton=useRef<HTMLButtonElement>(null);
+  const cancelButton=useRef<HTMLButtonElement>(null);
+  const forgetButton=useRef<HTMLButtonElement>(null);
+  const action=entry.state==="inactive"||entry.state==="review"?"重新确认":"保存修改";
+  const identity={id:entry.id,expectedVersion:entry.version};
+  const cancel=()=>{onCancel();requestAnimationFrame(()=>editButton.current?.focus({preventScroll:true}));};
+  useEffect(()=>{if(forgetting)cancelButton.current?.focus({preventScroll:true});},[forgetting]);
+  return <details className="agent-memory-entry" data-memory-state={entry.state}>
+    <summary><span>{entry.title}</span>{labels[entry.state]&&<small>{labels[entry.state]}</small>}<ChevronDown size={14} aria-hidden="true"/></summary>
+    <div className="agent-memory-entry-body">
+      {editing ? <MemoryEditor key={entry.id} initial={{title:entry.title,body:entry.body??"",kind:entry.kind}} scope={entry.projectId} fixed projects={model.view?.projects??[]} action={action} disabled={model.blocked}
+        onCancel={cancel} onSave={content=>model.save(content,{projectId:entry.projectId,topicKey:entry.topicKey,expectedVersion:entry.version},"已保存新版本")}/> : <>
+        <p className="agent-memory-content">{entry.body??entry.detail??"正文暂不可用"}</p>
+        <p className="agent-memory-meta">{model.projectLabel(entry.projectId)} · {usageLabel(entry.kind)} · 第 {entry.version} 版</p>
+        <p className="agent-memory-source">{entry.source?.origin==="modelProposal"?"模型建议，经用户确认":"用户确认"} {date(entry.updatedAt)}</p>
+        {(entry.history?.length??0)>1&&entry.state!=="deleting"&&<MemoryHistory key={entry.version} entry={entry}/>}
+        {entry.source?.workId&&<details className="agent-memory-origin"><summary>查看来源</summary><p>事项 {entry.source.workId}{entry.source.sourceRecordId&&" · 消息 "+entry.source.sourceRecordId}</p></details>}
+        {forgetting ? <div className="agent-memory-forget" onKeyDown={event=>{if(event.key==="Escape"){event.preventDefault();event.stopPropagation();setForgetting(false);requestAnimationFrame(()=>forgetButton.current?.focus());}}}>
+          <p>遗忘这条记忆及其历史正文？清理后无法从这里恢复，已有备份仍保留。</p>
+          <div className="agent-memory-actions"><button type="button" className="agent-memory-danger" disabled={model.blocked} onClick={()=>void model.perform({action:"forget",...identity,confirmed:true},"已遗忘这条记忆").then(()=>setForgetting(false))}>确认遗忘</button><button ref={cancelButton} type="button" onClick={()=>{setForgetting(false);requestAnimationFrame(()=>forgetButton.current?.focus());}}>取消</button></div>
+        </div> : <div className="agent-memory-actions">
+          {["active","inactive","review"].includes(entry.state)&&<button ref={editButton} type="button" disabled={model.blocked} onClick={onEdit}>{action==="保存修改"?"编辑":action}</button>}
+          {entry.state==="active"&&<button type="button" disabled={model.blocked} onClick={()=>void model.perform({action:"deactivate",...identity},"已停用这条记忆")}>停用</button>}
+          {entry.state==="pending"&&<button type="button" disabled={model.blocked} onClick={()=>void model.perform({action:"retry",id:entry.id},"已完成索引核验")}>重试核验</button>}
+          <button ref={forgetButton} type="button" disabled={model.blocked} onClick={()=>setForgetting(true)}>{entry.state==="deleting"?"重试遗忘":"遗忘"}</button>
+        </div>}
+      </>}
+    </div>
+  </details>;
+}
+
+function Audit({usage,model}: {usage:MemoryUse;model:SharedMemoryModel}) {
+  return <details className="agent-memory-origin"><summary>本轮提供 {usage.items.length} 条记忆</summary>
+    <ul>{usage.items.map(item=><li key={item.id}>{model.view?.entries.find(entry=>entry.id===item.id)?.title??item.id} · 第 {item.version} 版 · {usageLabel(item.kind)}</li>)}</ul>
+    {usage.omissions&&<p>检索未选中 {usage.omissions.notRetrieved} 条；受容量限制未提供 {usage.omissions.budget} 条。</p>}
+    {usage.notice&&<p>{usage.notice}</p>}{!!usage.items.length&&<p>是否采纳可结合回答核对。</p>}
+  </details>;
+}
+
+export function MemoryManager({model,materialsOnly,usage}: {model:SharedMemoryModel;materialsOnly:boolean;usage?:MemoryUse|null}) {
+  const scopeId=useId();
+  const [tab,setTab]=useState<"saved"|"pending">("saved");
+  const [editing,setEditing]=useState<{id:string,entry?:MemoryEntry}|null>(null);
+  const [utility,setUtility]=useState(false);
+  const [query,setQuery]=useState("");
+  const [projectName,setProjectName]=useState("");
+  const [inactive,setInactive]=useState(false);
+  const dialog=useRef<HTMLElement>(null);
+  const closeButton=useRef<HTMLButtonElement>(null);
+  const projects=model.view?.projects??[];
+  const loaded=model.view?.entries??[];
+  const entries=loaded.filter(item=>item.projectId===model.browseScope && (!inactive||item.state==="inactive") &&
+    (!query.trim()||(item.title+" "+(item.body??"")).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())));
+  const proposals=(model.browseProposals??[]).filter(item=>!query.trim()||(item.candidate.title+" "+item.candidate.body).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
+  useEffect(()=>{closeButton.current?.focus({preventScroll:true});},[]);
+  useEffect(()=>{
+    if (model.notice && !model.busy && !editing && !dialog.current?.contains(document.activeElement)) {
+      dialog.current?.querySelector<HTMLElement>(".agent-memory-feedback")?.focus({preventScroll:true});
+    }
+  },[model.notice,model.busy,editing]);
+  function keys(event:React.KeyboardEvent<HTMLElement>) {
+    if(event.key==="Escape" && !event.nativeEvent.isComposing) {
+      event.preventDefault();event.stopPropagation();
+      if(!editing&&!model.busy)model.closeManager();
+    }
+    wrapDialogTab(event);
+  }
+  const switchBlocked=!!editing||model.busy;
+  return <section ref={dialog} className="agent-memory-manager" role="dialog" aria-modal="true" aria-label="管理记忆" onKeyDown={keys}>
+    <header className="agent-popover-header"><strong>管理记忆</strong><div className="agent-memory-actions">
+      <button type="button" title="新增记忆" aria-label="新增记忆" disabled={switchBlocked||model.blocked||!model.view} onClick={()=>{setTab("saved");setEditing({id:"new"});}}><Plus size={16}/></button>
+      <button ref={closeButton} type="button" aria-label="关闭记忆管理" disabled={switchBlocked} onClick={model.closeManager}><X size={17}/></button>
+    </div></header>
+    <div className="agent-memory-manager-controls">
+      <label htmlFor={scopeId}>查看范围</label><select id={scopeId} value={model.browseScope} disabled={switchBlocked||!model.view} onChange={event=>model.browseProject(event.target.value)}>
+        <option value="">个人通用</option>{projects.map(project=><option key={project.id} value={project.id}>{project.name}</option>)}
+      </select>
+    </div>
+    <div className="agent-memory-tabs" aria-label="记忆列表">
+      <button type="button" aria-pressed={tab==="saved"} disabled={switchBlocked} onClick={()=>setTab("saved")}>已保存{tab==="saved"&&!!entries.length&&<small>{entries.length}</small>}</button>
+      <button type="button" aria-pressed={tab==="pending"} disabled={switchBlocked} onClick={()=>setTab("pending")}>待确认{(model.browseProposals?.length??0)>0&&<small>{model.browseProposals?.length}</small>}</button>
+      <button className="agent-memory-more" type="button" aria-expanded={utility} disabled={switchBlocked} onClick={()=>setUtility(!utility)}>更多</button>
+    </div>
+    {editing&&<p className="agent-memory-edit-notice" role="status">先保存或取消当前编辑，再切换范围或关闭。</p>}
+    <div className="agent-memory-list">
+      {utility&&<section className="agent-memory-tools" aria-label="记忆管理选项">
+        <label>搜索记忆<input type="search" disabled={switchBlocked} value={query} onChange={event=>setQuery(event.target.value)}/></label>
+        {tab==="saved"&&<label><input type="checkbox" checked={inactive} disabled={switchBlocked} onChange={event=>setInactive(event.target.checked)}/>仅显示已停用</label>}
+        <form onSubmit={event=>{event.preventDefault();if(projectName.trim())void model.perform({action:"createProject",name:projectName.trim()},"已创建项目").then(ok=>{if(ok)setProjectName("");});}}>
+          <label>新建记忆项目<input maxLength={60} disabled={model.blocked||switchBlocked} value={projectName} onChange={event=>setProjectName(event.target.value)}/></label><button type="submit" disabled={model.blocked||switchBlocked||!projectName.trim()}>创建项目</button>
+        </form>
+        <details className="agent-memory-origin"><summary>诊断</summary><p>{model.view?.configured?"本地记忆已就绪":model.view?.runtimeDetail||"需要准备本地记忆"}</p>
+          <button type="button" disabled={model.blocked||switchBlocked} onClick={()=>void model.perform(model.view?.configured?{action:"repair"}:{action:"status",prepareRuntime:true},"已完成本地记忆检查")}>{model.view?.configured?"修复本地记忆":"准备本地记忆"}</button>
+        </details>
+      </section>}
+      {editing?.id==="new"&&<MemoryEditor initial={{title:"",body:"",kind:"decision"}} scope={model.browseScope} projects={projects} fixed={false} disabled={model.blocked} action="确认并记住" onCancel={()=>setEditing(null)}
+        onSave={(content,projectId)=>model.save(content,{projectId,topicKey:content.title,expectedVersion:0},"已记住 · "+model.projectLabel(projectId))}/>}
+      {!model.view ? <p className="agent-memory-empty">{model.loading?"正在读取记忆…":model.error?"暂时无法读取记忆。":"正在读取记忆…"}</p> :
+        tab==="saved" ? entries.length ? entries.map(entry=><EntryCard key={entry.id} entry={editing?.entry?.id===entry.id?editing.entry:entry} model={model}
+          editing={editing?.id===entry.id} onEdit={()=>{if(!editing)setEditing({id:entry.id,entry});}} onCancel={()=>setEditing(null)}/>) : !editing&&<p className="agent-memory-empty">{query?"没有匹配的记忆。":"此范围还没有已保存的记忆。"}</p>
+        : !model.browseProposals ? <p className="agent-memory-empty">正在读取建议…</p> : proposals.length ? proposals.map(item=><MemoryProposalCard key={item.id} item={item} model={model} editing={editing?.id===item.id}
+          onEdit={()=>{if(!editing)setEditing({id:item.id});}} onCancel={()=>setEditing(null)}/>) : <p className="agent-memory-empty">此范围没有待确认的建议。</p>}
+      {loaded.length>=200 && <p className="agent-memory-meta">当前显示最近加载的 200 条记忆中的匹配项。</p>}
+    </div>
+    <MemoryStatus model={model}/>
+    <footer className="agent-memory-manager-footer">
+      <span>{materialsOnly?"本轮不使用记忆（只用所选资料）":"本对话记忆："+(model.selection.enabled?model.projectLabel(model.selection.projectId)+(model.selection.projectId?"＋个人通用":""):"关闭")}</span>
+      <small>查看其他范围不会更改本对话。</small>
+      {usage&&<Audit usage={usage} model={model}/>}
+    </footer>
+  </section>;
+}
+
+export function InlineMemoryProposals({model,items}: {model:SharedMemoryModel;items:MemoryProposal[]}) {
+  const [editing,setEditing]=useState<string|null>(null);
+  const [result,setResult]=useState("");
+  const resultRef=useRef<HTMLParagraphElement>(null);
+  useEffect(()=>{if(result&&document.activeElement===document.body)resultRef.current?.focus({preventScroll:true});},[result]);
+  return <>{items.map(item=><MemoryProposalCard key={item.id} model={model} item={item} editing={editing===item.id} onEdit={()=>setEditing(item.id)} onCancel={()=>setEditing(null)} onResult={setResult}/>)}{result&&<p ref={resultRef} className="agent-memory-feedback" role="status" tabIndex={-1}>{result}</p>}</>;
 }

@@ -79,20 +79,29 @@ pub(crate) fn propose(
 }
 
 pub(super) fn list(c: &Connection, project: &str) -> Result<Vec<Value>, String> {
-    let mut q=c.prepare("SELECT id,project_id,expected_version,body_json,source_json FROM memory_proposals WHERE state='awaitingConfirmation' AND project_id=?1 ORDER BY created_at DESC LIMIT 50").map_err(|e|e.to_string())?;
+    pending(c, project, false)
+}
+
+pub(super) fn for_work(c: &Connection, work: &str) -> Result<Vec<Value>, String> {
+    pending(c, work, true)
+}
+
+fn pending(c: &Connection, scope: &str, by_work: bool) -> Result<Vec<Value>, String> {
+    let mut q=c.prepare("SELECT p.id,p.project_id,p.expected_version,p.body_json,p.source_json,m.name FROM memory_proposals p LEFT JOIN memory_projects m ON m.id=p.project_id WHERE p.state='awaitingConfirmation' AND CASE WHEN ?2 THEN json_extract(p.source_json,'$.workId')=?1 ELSE p.project_id=?1 END ORDER BY p.created_at DESC LIMIT 50").map_err(|e|e.to_string())?;
     let rows = q
-        .query_map([project], |r| {
+        .query_map(params![scope, by_work], |r| {
             Ok((
                 r.get::<_, String>(0)?,
                 r.get::<_, String>(1)?,
                 r.get::<_, i64>(2)?,
                 r.get::<_, String>(3)?,
                 r.get::<_, String>(4)?,
+                r.get::<_, Option<String>>(5)?,
             ))
         })
         .map_err(|e| e.to_string())?;
-    rows.map(|r|{let(id,project,version,body,source)=r.map_err(|e|e.to_string())?;
-        Ok(json!({"id":id,"projectId":project,"expectedVersion":version,"candidate":serde_json::from_str::<Value>(&body).map_err(|_|"建议损坏")?,"source":serde_json::from_str::<Value>(&source).map_err(|_|"建议来源损坏")?}))}).collect()
+    rows.map(|r|{let(id,project,version,body,source,project_name)=r.map_err(|e|e.to_string())?;
+        Ok(json!({"id":id,"projectId":project,"projectName":project_name,"expectedVersion":version,"candidate":serde_json::from_str::<Value>(&body).map_err(|_|"建议损坏")?,"source":serde_json::from_str::<Value>(&source).map_err(|_|"建议来源损坏")?}))}).collect()
 }
 
 pub(super) fn source(

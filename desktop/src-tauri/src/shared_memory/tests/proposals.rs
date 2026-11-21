@@ -25,6 +25,21 @@ fn model_suggestion_requires_user_confirmation_and_retains_exact_source() {
         proposed["proposalId"]
     );
     assert_eq!(proposals::list(&f.c(), "").unwrap().len(), 1);
+    let inline = ui(
+        &f.root,
+        &json!({"action":"workProposals","workId":id,"prepareRuntime":false}),
+    )
+    .unwrap();
+    assert_eq!(inline["proposals"][0]["id"], proposed["proposalId"]);
+    assert_eq!(inline["proposals"][0]["source"]["runId"], "proposal-run");
+    assert_eq!(
+        ui(
+            &f.root,
+            &json!({"action":"workProposals","workId":"another-work","prepareRuntime":false})
+        )
+        .unwrap()["proposals"],
+        json!([])
+    );
     let mut backend = Local::new(&f);
     assert!(select(&f.root, "", "报告", &mut backend)
         .unwrap()

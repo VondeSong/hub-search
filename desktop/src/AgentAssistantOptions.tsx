@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ShieldCheck, X } from "lucide-react";
 import { useCodexSuite, type CodexSettings } from "./CodexSuite";
-import { useAgentPopover } from "./useAgentPopover";
 import { AgentModelMenu } from "./AgentModelMenu";
 import {AgentMcpServices,type McpGrant} from "./AgentMcpServices";
 import {invoke} from "@tauri-apps/api/core";
@@ -11,42 +9,34 @@ export type ResearchPolicy = "material-first" | "materials-only" | "open";
 export type AssistantOptions = { researchPolicy?:ResearchPolicy; model: CodexSettings | null; autoFlashcardInbox: boolean; externalMcp?:boolean; goalMode?:boolean; knowledgeReview?:boolean; nativeCapabilities?:{workspace:boolean;multiAgent:boolean}; webSearch?:"disabled"|"cached"|"live";mcpServices?:McpGrant[] };
 export const defaultAssistantOptions: AssistantOptions = {model:null,autoFlashcardInbox:false};
 export const webSearchNames = { disabled: "关闭", cached: "缓存搜索", live: "实时搜索" };
-type Section = "model" | "permissions" | "connection";
+type Section = "model" | "connection";
 
 type Props = {workId?:string;section?:Section;value:AssistantOptions;disabled:boolean;canAuto:boolean;onSave:(value:AssistantOptions)=>Promise<void>};
 export function AgentAssistantOptions(props:Props) {
-  return props.section==="permissions" || props.section==="connection" ? <AgentSaveOptions {...props}/> : <AgentModelMenu value={props.value} disabled={props.disabled} onSave={props.onSave}/>;
+  return props.section==="connection" ? <AgentConnectionOptions {...props}/> : <AgentModelMenu value={props.value} disabled={props.disabled} onSave={props.onSave}/>;
 }
-function AgentSaveOptions({value,disabled,canAuto,onSave,section,workId}:Props) {
+function AgentConnectionOptions({value,disabled,onSave,section,workId}:Props) {
   const runtime = useCodexSuite();
   const effective = value.model ?? (runtime.loaded ? runtime.settings : null);
   const [draft,setDraft]=useState(value);
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState("");
   const alive=useRef(true);
-  const popover=useAgentPopover();
   useEffect(()=>{alive.current=true;return ()=>{alive.current=false;};},[]);
   useEffect(()=>{setDraft(value);},[value]);
-  async function save(next:AssistantOptions, close=true) {
+  async function save(next:AssistantOptions) {
     if(disabled || saving)return;
     setSaving(true);setError("");
-    try {await onSave(next);if(alive.current && close)popover.close(true);}
+    try {await onSave(next);}
     catch(reason){if(alive.current)setError(String(reason));}
     finally {if(alive.current)setSaving(false);}
   }
-  const title=section==="permissions"?"保存权限":"工具连接";
   const changed=JSON.stringify(draft)!==JSON.stringify(value);
   const materialsOnly = draft.researchPolicy === "materials-only";
   const deepseek = effective?.provider === "deepseek";
   const searchBlocked = materialsOnly || deepseek;
   const webStatus = materialsOnly ? "当前对话只使用所选资料。" : deepseek ? "当前模型不支持网页搜索。" : "";
   const contents=<>
-    {section==="permissions" && <>
-      <p className="agent-note">控制成果如何保存，不改变助手可读取的资料范围。</p>
-      <button type="button" className="agent-menu-choice" disabled={disabled||saving} aria-pressed={!draft.autoFlashcardInbox} onClick={()=>setDraft(current=>({...current,autoFlashcardInbox:false}))}><span><strong>保存前确认</strong><small>先准备草稿，由你查看并确认保存。</small></span>{!draft.autoFlashcardInbox && <Check size={17} aria-hidden="true"/>}</button>
-      {canAuto && <button type="button" className="agent-menu-choice" disabled={disabled||saving} aria-pressed={draft.autoFlashcardInbox} onClick={()=>setDraft(current=>({...current,autoFlashcardInbox:true}))}><span><strong>自动导入闪卡收件箱</strong><small>仅限本对话；仍需审核后才能复习。</small></span>{draft.autoFlashcardInbox && <Check size={17} aria-hidden="true"/>}</button>}
-      <p className="agent-note">笔记修改与远端归档仍需预览确认。读取授权资料与分析不需要逐次确认。</p>
-    </>}
     {section==="connection" && <>
       <label>联网搜索<select value={searchBlocked ? "disabled" : draft.webSearch ?? "disabled"} disabled={disabled || saving || searchBlocked} onChange={event=>setDraft(current=>{const next={...current};if(event.target.value==="disabled")delete next.webSearch;else next.webSearch=event.target.value as "cached"|"live";return next;})}>
         <option value="disabled">{webSearchNames.disabled}</option><option value="cached">{webSearchNames.cached}</option><option value="live">{webSearchNames.live}</option>
@@ -79,14 +69,5 @@ function AgentSaveOptions({value,disabled,canAuto,onSave,section,workId}:Props) 
     {changed && <button type="button" disabled={disabled||saving} onClick={()=>void save(draft)}>{saving?"正在应用…":draft.autoFlashcardInbox&&!value.autoFlashcardInbox?"确认本对话的自动导入授权":"应用到本对话"}</button>}
     {error && <p role="alert">{error}</p>}
   </>;
-  if(section==="connection")return <div className="agent-connection-settings">{contents}</div>;
-  return <details ref={popover.ref} className={`agent-assistant-options agent-popover agent-option-${section}`} name="hub-agent-preference" onToggle={event=>{
-    if(event.target===event.currentTarget && event.currentTarget.open){setDraft(value);setError("");}
-  }}>
-    <summary aria-label={`保存权限：${value.autoFlashcardInbox?"闪卡自动导入":"保存前确认"}`} title={value.autoFlashcardInbox?"仅自动导入闪卡收件箱":"保存前确认"}><ShieldCheck size={18} aria-hidden="true"/></summary>
-    <div className="agent-assistant-settings">
-      <div className="agent-popover-header"><strong>{title}</strong><button type="button" aria-label="关闭对话设置" onClick={()=>popover.close(true)}><X size={16} aria-hidden="true"/></button></div>
-      {contents}
-    </div>
-  </details>;
+  return <div className="agent-connection-settings">{contents}</div>;
 }

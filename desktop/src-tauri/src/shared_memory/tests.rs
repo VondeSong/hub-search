@@ -116,6 +116,23 @@ fn immutable_versions_and_idempotent_replay_never_overwrite_accepted_markdown() 
     );
     assert_ne!(first.revision_id, second.revision_id);
     assert_eq!(body(&f.root, &first).unwrap(), "使用 Basic Memory。");
+    let history = ui(
+        &f.root,
+        &json!({"action":"history","id":second.id,"prepareRuntime":false}),
+    )
+    .unwrap();
+    assert_eq!(
+        history["versions"][0]["body"],
+        "Basic Memory 保存 Markdown，Hub 管理确认。"
+    );
+    assert_eq!(history["versions"][1]["body"], "使用 Basic Memory。");
+    assert_eq!(history["versions"][1]["title"], "后端决定");
+    assert!(ui(
+        &f.root,
+        &json!({"action":"deactivate","id":second.id,"expectedVersion":1,"prepareRuntime":false})
+    )
+    .is_err());
+    assert_eq!(load(&f.c(), &second.id).unwrap().state, "active");
     assert!(verify(&f.root, &old_context).is_err());
     let context = select(&f.root, "", "后端", &mut b).unwrap();
     assert_eq!(context.decisions.len(), 1);

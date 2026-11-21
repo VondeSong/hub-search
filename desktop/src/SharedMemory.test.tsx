@@ -1,173 +1,178 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { SharedMemory } from "./SharedMemory";
+import { InlineMemoryProposals, MemoryAndSavePopover, MemoryManager } from "./SharedMemory";
 import { loadMemoryPreference, rememberMemoryPreference } from "./AgentPreferences";
-const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
-vi.mock("@tauri-apps/api/core", () => ({ invoke }));
-vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
-let host: HTMLDivElement, root: Root;
-const empty = { configured: true, entries: [], projects: [{ id: "p1", name: "Hub" }], selection: { projectId: "", enabled: false } };
-beforeEach(() => {
-  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-  host = document.createElement("div"); document.body.append(host); root = createRoot(host);
-  invoke.mockReset().mockResolvedValue(empty);
-  localStorage.clear();
-});
-afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
-it("restores draft defaults after remount and remembers manual scope and off changes", async () => {
-  rememberMemoryPreference({projectId:"p1",enabled:true});
-  const view = {...empty, projects:[...empty.projects,{id:"p2",name:"第二项目"}]};
-  invoke.mockResolvedValue(view);
-  async function draft() {
-    await act(async () => root.render(<SharedMemory disabled={false} />));
-    await act(async () => { const details=host.querySelector('details')!; details.open=true; details.dispatchEvent(new Event('toggle')); });
-  }
-  await draft();
-  expect(host.querySelector('select')!.value).toBe('p1');
-  expect(host.querySelector<HTMLInputElement>('[type="checkbox"]')!.checked).toBe(true);
-  await act(async () => { const select=host.querySelector('select')!; select.value='p2'; select.dispatchEvent(new Event('change',{bubbles:true})); });
-  await act(async () => host.querySelector<HTMLInputElement>('[type="checkbox"]')!.click());
-  expect(loadMemoryPreference()).toEqual({projectId:'p2',enabled:false});
-  await act(async () => root.unmount()); root=createRoot(host);
-  await draft();
-  expect(host.querySelector('select')!.value).toBe('p2');
-  expect(host.querySelector<HTMLInputElement>('[type="checkbox"]')!.checked).toBe(false);
-  expect(invoke.mock.calls.every(([,{args}])=>args.action==='status')).toBe(true);
-});
-it("reads an old work without changing defaults and remembers only a successful manual choice", async () => {
-  rememberMemoryPreference({projectId:'p2',enabled:true});
-  invoke.mockImplementation(async (_,{args}) => ({...empty,selection:args.action==='selectScope'?{projectId:args.projectId,enabled:args.enabled}:{projectId:'p1',enabled:false}}));
-  await open();
-  expect(host.querySelector('select')!.value).toBe('p1');
-  expect(loadMemoryPreference()).toEqual({projectId:'p2',enabled:true});
-  await act(async () => host.querySelector<HTMLInputElement>('[type="checkbox"]')!.click());
-  expect(loadMemoryPreference()).toEqual({projectId:'p1',enabled:true});
-  invoke.mockImplementation(async (_,{args}) => {if(args.action==='selectScope') throw new Error('运行中不能修改'); return {...empty,selection:{projectId:'p1',enabled:true}};});
-  await act(async () => host.querySelector<HTMLInputElement>('[type="checkbox"]')!.click());
-  expect(loadMemoryPreference()).toEqual({projectId:'p1',enabled:true});
-  expect(host.textContent).toContain('运行中不能修改');
-});
-it("disables a deleted remembered project and shows a warning without enabling another scope", async () => {
-  rememberMemoryPreference({projectId:'deleted',enabled:true});
-  invoke.mockImplementation(async (_,{args}) => {if(args.projectId==='deleted') throw new Error('请选择已创建的记忆项目'); return empty;});
-  const onSelectionChange=vi.fn();
-  await act(async () => root.render(<SharedMemory disabled={false} onSelectionChange={onSelectionChange} />));
-  await act(async () => {const d=host.querySelector('details')!;d.open=true;d.dispatchEvent(new Event('toggle'));});
-  expect(host.textContent).toContain('上次选择的记忆项目已不可用');
-  expect(host.querySelector('select')!.value).toBe('');
-  expect(host.querySelector<HTMLInputElement>('[type="checkbox"]')!.checked).toBe(false);
-  expect(loadMemoryPreference()).toEqual({projectId:'',enabled:false});
-  expect(onSelectionChange).toHaveBeenLastCalledWith({projectId:'',enabled:false});
-  expect(invoke.mock.calls.every(([,{args}])=>args.action==='status')).toBe(true);
-});
-async function open() {
-  await act(async () => root.render(<SharedMemory workId="work-1" disabled={false} />));
-  await act(async () => {
-    const detail = host.querySelector("details")!; detail.open = true; detail.dispatchEvent(new Event("toggle"));
-  });
+import { useSharedMemory } from "./useSharedMemory";
+
+const { invoke }=vi.hoisted(()=>({invoke:vi.fn()}));
+vi.mock("@tauri-apps/api/core",()=>({invoke}));
+const empty={configured:true,entries:[],proposals:[],projects:[{id:"p1",name:"Hub"},{id:"p2",name:"另一项目"}],selection:{projectId:"",enabled:false}};
+const proposal={id:"proposal-1",projectId:"p1",expectedVersion:3,candidate:{topicKey:"format",title:"报告格式",body:"报告用中文",kind:"decision" as const,reason:"供后续使用"},source:{origin:"modelProposal",workId:"work-1",sourceRecordId:"message-1",runId:"run-1"}};
+let host: HTMLDivElement,root:Root;
+const calls=()=>invoke.mock.calls.map(([,argument])=>argument.args);
+const button=(label:string)=>[...host.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.getAttribute("aria-label")===label||b.textContent?.trim()===label)!;
+const click=async(label:string)=>{await act(async()=>button(label).click());};
+function Assistant({workId,materialsOnly=false,active=false,canAuto=false,onSave=async()=>{}}: {workId?:string;materialsOnly?:boolean;active?:boolean;canAuto?:boolean;onSave?:(value:{autoFlashcardInbox:boolean})=>Promise<void>}) {
+  const [selection,setSelection]=useState(loadMemoryPreference);
+  const model=useSharedMemory({workId,active,blocked:active,selection,onSelectionChange:setSelection});
+  return <>
+    <button type="button" onClick={event=>model.openManager(event.currentTarget)}>打开管理记忆</button>
+    <MemoryAndSavePopover model={model} value={{model:null,autoFlashcardInbox:false}} disabled={active} canAuto={canAuto} materialsOnly={materialsOnly} onSave={onSave}/>
+    <InlineMemoryProposals model={model} items={model.proposals}/>
+    <output>{JSON.stringify(selection)}</output>
+    {model.managerOpen&&<MemoryManager model={model} materialsOnly={materialsOnly}/>}
+  </>;
 }
-it("does not load or enable memory until the user opens and opts in", async () => {
-  await act(async () => root.render(<SharedMemory workId="work-1" disabled={false} />));
-  expect(invoke).not.toHaveBeenCalled();
-  await open();
-  expect(invoke.mock.calls.every(([, { args }]) => args.action === "status")).toBe(true);
-  expect(host.querySelector<HTMLInputElement>('[type="checkbox"]')!.checked).toBe(false);
-  await act(async () => host.querySelector<HTMLInputElement>('[type="checkbox"]')!.click());
-  expect(invoke).toHaveBeenLastCalledWith("shared_memory", { args: {
-    action: "selectScope", workId: "work-1", projectId: "", enabled: true,
-  } });
+beforeEach(()=>{
+  Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});
+  host=document.createElement("div");document.body.append(host);root=createRoot(host);
+  localStorage.clear();
+  invoke.mockReset().mockImplementation(async (_, {args})=>args.action==="workProposals"?{proposals:[]}:empty);
 });
-it("reads settings first and prepares built-in memory only after the user asks", async () => {
-  invoke.mockImplementation(async (_,{args}) => args.prepareRuntime===false ? {...empty,configured:false} : empty);
-  await open();
-  expect(invoke.mock.calls.every(([, {args}])=>args.prepareRuntime===false)).toBe(true);
-  expect(host.querySelector<HTMLInputElement>('[type="checkbox"]')!.disabled).toBe(true);
-  const prepare = Array.from(host.querySelectorAll("button")).find(button => button.textContent === "准备本地记忆")!;
-  await act(async () => prepare.click());
-  expect(invoke).toHaveBeenLastCalledWith("shared_memory", { args: { action: "status", prepareRuntime: true, workId: "work-1" } });
-  expect(host.textContent).toContain("本地记忆已就绪");
-  expect(host.textContent).not.toMatch(/选择.*Python|连接本地记忆环境|模型缓存目录/);
-  const repair = Array.from(host.querySelectorAll("button")).find(button => button.textContent === "修复本地记忆")!;
-  await act(async () => repair.click());
-  expect(invoke).toHaveBeenLastCalledWith("shared_memory", { args: { action: "repair", workId: "work-1" } });
+afterEach(async()=>{await act(async()=>root.unmount());host.remove();});
+async function openSettings() {
+  const menu=host.querySelector<HTMLDetailsElement>(".agent-memory-disclosure")!;
+  await act(async()=>{menu.open=true;menu.dispatchEvent(new Event("toggle"));});
+  return menu;
+}
+async function change(select:HTMLSelectElement,value:string) {
+  await act(async()=>{select.value=value;select.dispatchEvent(new Event("change",{bubbles:true}));});
+}
+const turnScope=()=>host.querySelector<HTMLSelectElement>('[aria-label="本对话的记忆范围"]')!;
+const enabled=()=>host.querySelector<HTMLInputElement>('[role="switch"]')!;
+
+it("requires separate confirmation for flashcard auto-import and preserves the memory choice",async()=>{
+  const save=vi.fn(async()=>{});
+  rememberMemoryPreference({projectId:"p1",enabled:true});
+  await act(async()=>root.render(<Assistant canAuto onSave={save}/>));
+  await openSettings();
+  const choice=[...host.querySelectorAll<HTMLButtonElement>(".agent-memory-saving button")].find(item=>item.textContent?.includes("自动导入闪卡收件箱"))!;
+  await act(async()=>choice.click());
+  expect(save).not.toHaveBeenCalled();
+  await click("确认本对话的自动导入授权");
+  expect(save).toHaveBeenCalledExactlyOnceWith({model:null,autoFlashcardInbox:true});
+  expect(loadMemoryPreference()).toEqual({projectId:"p1",enabled:true});
 });
-it("preserves the exact submission identity after a transport interruption", async () => {
-  await open();
-  const inputs = Array.from(host.querySelectorAll("input")).filter(input => input.type !== "checkbox");
-  const title = inputs[1];
-  const content = host.querySelector("textarea")!;
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(title, "后端决定");
-    title.dispatchEvent(new Event("input", { bubbles: true }));
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(content, "采用 Basic Memory");
-    content.dispatchEvent(new Event("input", { bubbles: true }));
+
+it("returns focus to the shield when closing settings and never submits on Escape",async()=>{
+  await act(async()=>root.render(<Assistant/>));
+  const menu=await openSettings();
+  await click("关闭记忆与保存");
+  expect(menu.open).toBe(false);expect(document.activeElement).toBe(menu.querySelector("summary"));
+  await openSettings();
+  await act(async()=>document.activeElement?.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",isComposing:true,bubbles:true})));
+  expect(menu.open).toBe(true);
+  await act(async()=>document.activeElement?.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true})));
+  expect(menu.open).toBe(false);expect(document.activeElement).toBe(menu.querySelector("summary"));
+  expect(calls().every(args=>args.action==="status")).toBe(true);
+});
+
+it("loads memory and save controls without initializing the runtime or changing the draft choice",async()=>{
+  rememberMemoryPreference({projectId:"p1",enabled:true});
+  await act(async()=>root.render(<Assistant/>));
+  await openSettings();
+  expect(calls()).toEqual([{action:"status",workId:undefined,prepareRuntime:false}]);
+  expect(turnScope().value).toBe("p1");expect(enabled().checked).toBe(true);
+  await change(turnScope(),"p2");
+  await act(async()=>enabled().click());
+  expect(loadMemoryPreference()).toEqual({projectId:"p2",enabled:false});
+  expect(calls()).toHaveLength(1);
+  expect(host.querySelector(".agent-memory-saving")?.textContent).toContain("保存前确认");
+});
+it("keeps existing works separate from the last explicit preference until selection succeeds",async()=>{
+  rememberMemoryPreference({projectId:"p2",enabled:true});
+  invoke.mockImplementation(async (_, {args})=>args.action==="workProposals"?{proposals:[]}:
+    {...empty,selection:args.action==="selectScope"?{projectId:args.projectId,enabled:args.enabled}:{projectId:"p1",enabled:false}});
+  await act(async()=>root.render(<Assistant workId="work-1"/>));
+  await openSettings();
+  expect(turnScope().value).toBe("p1");expect(enabled().checked).toBe(false);
+  expect(loadMemoryPreference()).toEqual({projectId:"p2",enabled:true});
+  await act(async()=>enabled().click());
+  expect(calls().slice(-1)[0]).toMatchObject({action:"selectScope",workId:"work-1",projectId:"p1",enabled:true,prepareRuntime:false});
+  expect(loadMemoryPreference()).toEqual({projectId:"p1",enabled:true});
+});
+
+it("browses another project without changing the current scope or preference",async()=>{
+  rememberMemoryPreference({projectId:"p1",enabled:true});
+  invoke.mockImplementation(async (_, {args})=>({...empty,proposals:args.projectId==="p2"?[{...proposal,projectId:"p2"}]:[]}));
+  await act(async()=>root.render(<Assistant/>));
+  await click("打开管理记忆");
+  await change(host.querySelector(".agent-memory-manager select")!,"p2");
+  await act(async()=>host.querySelectorAll<HTMLButtonElement>(".agent-memory-tabs button")[1].click());
+  expect(host.querySelector(".agent-memory-manager-footer")?.textContent).toContain("Hub＋个人通用");
+  expect(host.querySelector(".agent-memory-manager [aria-label='建议记住']")?.textContent).toContain("另一项目");
+  expect(calls().every(args=>args.action==="status"&&args.prepareRuntime===false)).toBe(true);
+  expect(loadMemoryPreference()).toEqual({projectId:"p1",enabled:true});
+});
+
+it("opens the newly created project for browsing without using it in the conversation",async()=>{
+  rememberMemoryPreference({projectId:"p1",enabled:false});
+  let projects=empty.projects;
+  invoke.mockImplementation(async (_, {args})=>{
+    if(args.action==="createProject")projects=[...projects,{id:"new-project",name:args.name}];
+    return {...empty,projects};
   });
-  invoke.mockImplementation(async (_, { args }) => { if (args.action === "put") throw new Error("连接中断"); return empty; });
-  const save = Array.from(host.querySelectorAll("button")).find(b => b.textContent === "确认并保存记忆")!;
-  await act(async () => save.click());
-  await act(async () => save.click());
-  const calls = invoke.mock.calls.filter(([, { args }]) => args.action === "put");
-  expect(calls).toHaveLength(2);
-  expect(calls[0][1].args.requestKey).toBe(calls[1][1].args.requestKey);
-  expect(calls[0][1].args.confirmed).toBe(true);
-  expect(host.querySelector('[role="alert"]')?.textContent).toContain("连接中断");
-});
-it("keeps a new investigation selection local until its work identity exists", async () => {
-  const selection = vi.fn();
-  await act(async () => root.render(<SharedMemory disabled={false} onSelectionChange={selection} />));
-  await act(async () => { const detail = host.querySelector('details')!; detail.open = true; detail.dispatchEvent(new Event('toggle')); });
-  await act(async () => host.querySelector<HTMLInputElement>('[type="checkbox"]')!.click());
-  expect(selection).toHaveBeenLastCalledWith({ projectId: '', enabled: true });
-  expect(invoke.mock.calls.every(([, { args }]) => args.action === 'status')).toBe(true);
+  await act(async()=>root.render(<Assistant/>));
+  await click("打开管理记忆");await click("更多");
+  const field=host.querySelector<HTMLInputElement>(".agent-memory-tools form input")!;
+  await act(async()=>{
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(field,"复查");
+    field.dispatchEvent(new Event("input",{bubbles:true}));
+  });
+  await click("创建项目");
+  expect(host.querySelector<HTMLSelectElement>(".agent-memory-manager select")!.value).toBe("new-project");
+  expect(calls().some(args=>args.action==="status"&&args.projectId==="new-project")).toBe(true);
+  expect(loadMemoryPreference()).toEqual({projectId:"p1",enabled:false});
 });
 
-it("keeps model proposals separate and requires an explicit reviewed save", async () => {
-  const proposal = { id: "proposal-1", projectId: "", expectedVersion: 0,
-    candidate: { topicKey: "format", title: "报告格式", kind: "decision", body: "报告用中文", reason: "供后续项目复用" },
-    source: { origin: "modelProposal", proposedBy: "deepseek", workId: "source-work", sourceRecordId: "source-message", runId: "source-run" } };
-  invoke.mockResolvedValue({ ...empty, proposals: [proposal] });
-  await open();
-  expect(host.textContent).toContain("模型建议尚未生效");
-  expect(host.textContent).toContain("source-message");
-  expect(invoke.mock.calls.some(([, { args }]) => args.action === "put")).toBe(false);
-  await act(async () => Array.from(host.querySelectorAll("button")).find(b => b.textContent === "检查并修改建议")!.click());
-  expect(host.querySelector<HTMLTextAreaElement>("textarea")!.value).toBe("报告用中文");
-  expect(invoke.mock.calls.some(([, { args }]) => args.action === "put")).toBe(false);
-  await act(async () => Array.from(host.querySelectorAll("button")).find(b => b.textContent === "确认并保存记忆")!.click());
-  const saved = invoke.mock.calls.find(([, { args }]) => args.action === "put")![1].args;
-  expect(saved).toMatchObject({ confirmed: true, proposalId: "proposal-1", expectedVersion: 0, topicKey: "format", body: "报告用中文" });
-});
-it("dismisses a proposal without saving memory", async () => {
-  invoke.mockResolvedValue({ ...empty, proposals: [{ id: "p-2", projectId: "", expectedVersion: 0, candidate: { title: "临时安排", body: "一次性", reason: "建议", kind: "decision", topicKey: "temporary" }, source: { origin: "modelProposal" } }] });
-  await open();
-  await act(async () => Array.from(host.querySelectorAll("button")).find(b => b.textContent === "忽略建议")!.click());
-  expect(invoke).toHaveBeenLastCalledWith("shared_memory", { args: { action: "dismissProposal", proposalId: "p-2", workId: "work-1" } });
-  expect(invoke.mock.calls.some(([, { args }]) => args.action === "put")).toBe(false);
-});
-it("rejects a late memory response belonging to the previous work", async () => {
-  let finish: (value: unknown) => void = () => {};
-  invoke.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
-  await open();
-  invoke.mockResolvedValue({ ...empty, entries: [] });
-  await act(async () => root.render(<SharedMemory workId="work-2" disabled={false} />));
-  await act(async () => finish({ ...empty, entries: [{ id: "old", title: "旧事项的迟到内容", body: "不应显示", state: "active", version: 1, projectId: "", kind: "decision" }] }));
-  expect(host.textContent).not.toContain("旧事项的迟到内容");
+it("locks use for materials-only turns while keeping management accessible",async()=>{
+  rememberMemoryPreference({projectId:"p1",enabled:true});
+  await act(async()=>root.render(<Assistant materialsOnly/>));
+  await openSettings();
+  expect(enabled().disabled).toBe(true);expect(turnScope().disabled).toBe(true);
+  expect(host.querySelector(".agent-memory-permissions")?.textContent).toContain("本轮不使用记忆");
+  await act(async()=>host.querySelector<HTMLButtonElement>(".agent-memory-manage-link")!.click());
+  expect(host.querySelector("[aria-label='管理记忆']")).not.toBeNull();
+  expect(loadMemoryPreference().enabled).toBe(true);
 });
 
-it("refreshes the selected project's proposals before a new work exists", async () => {
-  const proposal = { id: "project-proposal", projectId: "p1", expectedVersion: 0,
-    candidate: { title: "项目内待确认建议", topicKey: "format", kind: "decision", body: "项目内容", reason: "用户要求" }, source: { origin: "modelProposal" } };
-  invoke.mockImplementation(async (_, { args }) => ({ ...empty, entries: [{ id:"common-memory", revisionId:"common-v1", topicKey:"common", title:"个人通用规则", body:"正文", kind:"decision", version:1, state:"active", projectId:"" }], proposals: args.projectId === "p1" ? [proposal] : [] }));
-  await act(async () => root.render(<SharedMemory disabled={false} />));
-  await act(async () => { const detail = host.querySelector("details")!; detail.open = true; detail.dispatchEvent(new Event("toggle")); });
-  await act(async () => { const select = host.querySelector("select")!; select.value = "p1"; select.dispatchEvent(new Event("change", {bubbles:true})); });
-  expect(host.textContent).toContain("项目内待确认建议");
-  expect(invoke).toHaveBeenLastCalledWith("shared_memory", { args: { action: "status", projectId: "p1", prepareRuntime: false, workId: undefined } });
-  expect(invoke.mock.calls.some(([, {args}]) => args.action === "selectScope")).toBe(false);
-  await act(async () => Array.from(host.querySelectorAll("button")).find(b => b.textContent === "修改")!.click());
-  await act(async () => Array.from(host.querySelectorAll("button")).find(b => b.textContent === "确认并保存记忆")!.click());
-  expect(invoke.mock.calls.some(([, {args}]) => args.action === "put" && args.projectId === "")).toBe(true);
-  expect(host.textContent).toContain("项目内待确认建议");
+it("confirms exactly the displayed proposal scope and version and retries with the same request identity",async()=>{
+  let writes=0;
+  invoke.mockImplementation(async (_, {args})=>{
+    if(args.action==="workProposals")return {proposals:[proposal]};
+    if(args.action==="put"&&++writes===1)throw Error("暂时无法写入");
+    return empty;
+  });
+  await act(async()=>root.render(<Assistant workId="work-1"/>));
+  expect(host.querySelector("[aria-label='建议记住']")?.textContent).toContain("报告用中文");
+  expect(calls().some(args=>args.action==="put")).toBe(false);
+  await click("记住");
+  await click("记住");
+  const saves=calls().filter(args=>args.action==="put");
+  expect(saves).toHaveLength(2);
+  expect(saves[0]).toMatchObject({action:"put",workId:"work-1",confirmed:true,projectId:"p1",expectedVersion:3,proposalId:"proposal-1",topicKey:"format",body:"报告用中文",prepareRuntime:false});
+  expect(saves[0].requestKey).toBe(saves[1].requestKey);
+  expect(host.querySelector("[aria-label='建议记住']")).toBeNull();
+});
+it("cancels editing and ignores a suggestion without writing a memory",async()=>{
+  invoke.mockImplementation(async (_, {args})=>args.action==="workProposals"?{proposals:[proposal]}:empty);
+  await act(async()=>root.render(<Assistant workId="work-1"/>));
+  await click("编辑");
+  expect(host.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe("报告用中文");
+  await click("取消");await click("忽略");
+  expect(calls().some(args=>args.action==="dismissProposal"&&args.proposalId==="proposal-1")).toBe(true);
+  expect(calls().some(args=>args.action==="put")).toBe(false);
+});
+
+it("rejects a late scope response for the previous work",async()=>{
+  let resolve!: (value:unknown)=>void;
+  invoke.mockImplementation(async (_, {args})=>args.action==="workProposals"?{proposals:[]}:
+    args.workId==="work-1"?new Promise(value=>{resolve=value;}):empty);
+  await act(async()=>root.render(<Assistant workId="work-1"/>));
+  await openSettings();
+  await act(async()=>root.render(<Assistant workId="work-2"/>));
+  await act(async()=>resolve({...empty,selection:{projectId:"p1",enabled:true}}));
+  expect(turnScope().value).toBe("");expect(enabled().checked).toBe(false);
 });

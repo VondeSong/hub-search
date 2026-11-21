@@ -275,7 +275,9 @@ fn stage(root: &Path, args: &Value) -> Result<Item, String> {
         }
         return load(&c, &old_id);
     }
-    let source = proposals::source(&c, args, &id, expected)?;
+    let mut source = proposals::source(&c, args, &id, expected)?;
+    source["title"] = json!(&title);
+    source["kind"] = json!(&kind);
     let old = load(&c, &id).ok();
     if old.as_ref().map(|v| v.version).unwrap_or(0) != expected {
         return Err("记忆版本已变化，请刷新后再确认".into());
@@ -445,6 +447,57 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
     let work = args["workId"].as_str();
     match args["action"].as_str().unwrap_or("status") {
         "status" => (),
+        "workProposals" => {
+            let id = work.ok_or("请选择一个调查事项")?;
+            let c = database(root)?;
+            let visible: bool = c
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM agent_works WHERE id=?1 AND state!='revoked')",
+                    [id],
+                    |row| row.get(0),
+                )
+                .map_err(|e| e.to_string())?;
+            return Ok(
+                json!({"proposals": if visible { proposals::for_work(&c, id)? } else { Vec::new() }}),
+            );
+        }
+        "history" => {
+            let c = database(root)?;
+            let item = load(&c, &text(args, "id", 100)?)?;
+            if matches!(item.state.as_str(), "deleting" | "forgotten") {
+                return Err("这条记忆的历史正在清除或已遗忘".into());
+            }
+            let mut query = c.prepare("SELECT v.id,v.version,v.body_hash,s.source_json FROM memory_versions v LEFT JOIN memory_sources s ON s.revision_id=v.id WHERE v.memory_id=?1 ORDER BY v.version DESC LIMIT 21").map_err(|e| e.to_string())?;
+            let rows = query
+                .query_map([&item.id], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, Option<String>>(3)?,
+                    ))
+                })
+                .map_err(|e| e.to_string())?;
+            let mut versions = Vec::new();
+            for row in rows {
+                let (revision_id, version, body_hash, raw) = row.map_err(|e| e.to_string())?;
+                let source = raw
+                    .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+                    .unwrap_or_default();
+                let revision = Item {
+                    revision_id,
+                    version,
+                    body_hash,
+                    ..item.clone()
+                };
+                versions.push(json!({
+                    "version":version, "body":body(root, &revision).ok(), "source":source,
+                    "title":if version == item.version { json!(&item.title) } else { source["title"].clone() },
+                    "kind":if version == item.version { json!(&item.kind) } else { source["kind"].clone() },
+                }));
+            }
+            return Ok(json!({"versions":versions}));
+        }
         "repair" => {
             runtime::repair(root)?;
         }
@@ -510,6 +563,11 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
         "deactivate" => {
             let id = text(args, "id", 100)?;
             write(root, |c| {
+                if args["expectedVersion"].as_i64().is_some_and(|version| {
+                    load(c, &id).map_or(true, |item| item.version != version)
+                }) {
+                    return Err("记忆版本已变化，请重新查看".into());
+                }
                 c.execute("UPDATE memory_entries SET state='inactive' WHERE id=?1 AND state IN ('active','pending')",[id]).map_err(|e|e.to_string())?;
                 bump(c)
             })?;
@@ -519,9 +577,15 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
                 return Err("请确认遗忘该记忆及其历史正文".into());
             }
             let id = text(args, "id", 100)?;
-            load(&database(root)?, &id)?;
             // Eligibility is withdrawn even if the backend is currently offline.
             write(root, |c| {
+                let item = load(c, &id)?;
+                if args["expectedVersion"]
+                    .as_i64()
+                    .is_some_and(|version| item.version != version)
+                {
+                    return Err("记忆版本已变化，请重新查看".into());
+                }
                 c.execute(
                     "UPDATE memory_entries SET state='deleting' WHERE id=?1",
                     [&id],

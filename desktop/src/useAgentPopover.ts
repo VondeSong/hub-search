@@ -1,12 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 /** Native details keeps disclosure semantics; dismissal never submits a form. */
-export function useAgentPopover(options: { deferEscapeSelector?: string; triggerRef?: RefObject<HTMLElement | null>; returnFocusRef?: RefObject<HTMLElement | null> } = {}) {
+export function useAgentPopover(options: { deferEscapeSelector?: string; triggerRef?: RefObject<HTMLElement | null>; returnFocusRef?: RefObject<HTMLElement | null>; aboveComposer?: boolean } = {}) {
   const ref = useRef<HTMLDetailsElement>(null);
   const [element, setElement] = useState<HTMLDetailsElement | null>(null);
   const deferredEscape = useRef(options.deferEscapeSelector);
   const trigger = options.triggerRef;
   const returnFocus = options.returnFocusRef;
+  const aboveComposer = options.aboveComposer;
   deferredEscape.current = options.deferEscapeSelector;
   // The assistant's disclosures mount after its launcher is first opened.
   useLayoutEffect(() => { if (ref.current !== element) setElement(ref.current); });
@@ -26,8 +27,9 @@ export function useAgentPopover(options: { deferEscapeSelector?: string; trigger
       if (!nativeDialogOpen() && event.target instanceof Node && !ref.current?.contains(event.target) && !trigger?.current?.contains(event.target)) close();
     };
     const escape = (event: KeyboardEvent) => {
-      if (nativeDialogOpen() || event.key !== "Escape" || event.isComposing || event.defaultPrevented || !ref.current?.open ||
-          !(event.target instanceof Node) || !ref.current.contains(event.target)) return;
+      if (nativeDialogOpen() || event.key !== "Escape" || event.isComposing || event.defaultPrevented || !element.open) return;
+      const retargeted = event.target === document.body && element.matches('details[data-hub-keyboard-scope]:not([hidden] *)');
+      if (!retargeted && (!(event.target instanceof Node) || !element.contains(event.target))) return;
       // Let a nested search field or action menu consume its first Escape.
       if (deferredEscape.current && event.target instanceof Element && event.target.closest(deferredEscape.current)) return;
       event.preventDefault();
@@ -41,6 +43,7 @@ export function useAgentPopover(options: { deferEscapeSelector?: string; trigger
     document.addEventListener("keydown", escape, true);
     const controls = element?.closest(".agent-composer-controls");
     const body = element?.closest(".agent-body");
+    const composer = controls?.closest(".agent-composer");
     const header = element?.closest(".agent-panel-header");
     const panel = element?.closest(".agent-panel");
     const fit = () => {
@@ -52,7 +55,10 @@ export function useAgentPopover(options: { deferEscapeSelector?: string; trigger
       if (!controls || !body) return;
       // The scroll clip starts below the panel header, not at the viewport edge.
       if (panel) element.style.setProperty("--agent-skill-height", `${Math.floor(panel.getBoundingClientRect().height / 2)}px`);
-      const available = controls.getBoundingClientRect().top - Math.max(8, body.getBoundingClientRect().top) - 8;
+      const controlTop = controls.getBoundingClientRect().top;
+      const top = aboveComposer && composer ? composer.getBoundingClientRect().top : controlTop;
+      if (aboveComposer) element.style.setProperty("--agent-popover-offset", `${Math.max(0, controlTop-top)}px`);
+      const available = top - Math.max(8, body.getBoundingClientRect().top) - 8;
       element.style.setProperty("--agent-popover-room", `${Math.max(0, Math.floor(available))}px`);
     };
     element?.addEventListener("toggle", fit);
@@ -60,7 +66,6 @@ export function useAgentPopover(options: { deferEscapeSelector?: string; trigger
     const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fit);
     if (controls && body) {
       resize?.observe(body);
-      const composer = controls.closest(".agent-composer");
       if (composer) resize?.observe(composer);
     }
     if (header && panel) {
@@ -77,6 +82,6 @@ export function useAgentPopover(options: { deferEscapeSelector?: string; trigger
       window.removeEventListener("resize", fit);
       resize?.disconnect();
     };
-  }, [element, trigger, returnFocus]);
+  }, [element, trigger, returnFocus, aboveComposer]);
   return { ref, close };
 }

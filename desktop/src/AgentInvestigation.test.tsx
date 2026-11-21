@@ -1196,7 +1196,8 @@ it("keeps stop available while the native model invocation is pending", async ()
 it("withdraws the source grant without changing source business objects", async () => {
   await open(); await fill("investigationGoal", "核对方案"); await click("开始调查"); await click("撤回来源授权");
   expect(document.body.textContent).toContain("授权已撤回");
-  expect(invoke.mock.calls.every(([command]) => command === "agent_investigation")).toBe(true);
+  expect(invoke.mock.calls.every(([command,params]) => command === "agent_investigation" ||
+    command === "shared_memory" && params.args.action === "workProposals")).toBe(true);
 });
 it.each(["paused","cancelled","failed"])("verifies lifecycle before reporting a late run error after stop (%s)",async state=>{
  let rejectRun!:(reason:Error)=>void;
@@ -2060,6 +2061,16 @@ it("keeps Escape inside a focused disclosure surface without closing the assista
  expect(document.activeElement).toBe(menu);
  await act(async()=>document.activeElement!.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})));
  expect(menu.open).toBe(false);expect(panel.hidden).toBe(false);
+ expect(document.activeElement).toBe(menu.querySelector('summary'));
+});
+it("closes only memory settings when WebView delivers Escape to the document body",async()=>{
+ await open();
+ const menu=document.querySelector<HTMLDetailsElement>('.agent-memory-disclosure')!;
+ const panel=document.querySelector<HTMLElement>('.agent-panel')!;
+ await act(async()=>{menu.open=true;menu.dispatchEvent(new Event('toggle'));});
+ await act(async()=>document.body.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})));
+ expect(menu.open).toBe(false);
+ expect(panel.hidden).toBe(false);
  expect(document.activeElement).toBe(menu.querySelector('summary'));
 });
 it("dismisses header details after outside interaction or losing window focus without closing the assistant",async()=>{

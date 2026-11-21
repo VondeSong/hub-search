@@ -11,8 +11,9 @@ let host:HTMLDivElement,root:Root;
 const save=vi.fn(async()=>{});
 beforeEach(()=>{resetCodexSuiteForTests();localStorage.clear();Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});host=document.createElement("div");document.body.append(host);root=createRoot(host);invoke.mockReset().mockImplementation(async (_command,{args})=>({models:[{id:"real-model",name:"实际模型",reasoningLevels:["low","high"],defaultReasoning:"high",fastDescription:"提供方支持 Fast"}].map(model=>args.provider==="deepseek"?{...model,id:"deepseek-real",name:"DeepSeek 实际模型"}:model)}));save.mockReset();save.mockResolvedValue();});
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();});
-async function render(section:"model"|"permissions"|"connection"="model",canAuto=true,value:AssistantOptions=defaultAssistantOptions,disabled=false){await act(async()=>root.render(<AgentAssistantOptions section={section} value={value} disabled={disabled} canAuto={canAuto} onSave={save}/>));}
+async function render(section:"model"|"connection"="model",canAuto=true,value:AssistantOptions=defaultAssistantOptions,disabled=false){await act(async()=>root.render(<AgentAssistantOptions section={section} value={value} disabled={disabled} canAuto={canAuto} onSave={save}/>));}
 const button=(text:string)=>[...host.querySelectorAll("button")].find(b=>b.textContent?.includes(text)&&!b.textContent?.includes("DeepSeek"))!;
+const workspaceFields=()=>[...host.querySelectorAll('.agent-connection-explanation input[type="checkbox"]')].filter(input=>/独立工作区|工作区子任务/.test(input.closest("label")?.textContent??"")) as HTMLInputElement[];
 const modelSummary=()=>host.querySelector<HTMLElement>(".agent-option-model > summary")!;
 const modelDetails=()=>host.querySelector<HTMLDetailsElement>(".agent-option-model")!;
 
@@ -25,7 +26,7 @@ it("shows the actual default level while resetting preserves an omitted override
 async function click(text:string){await act(async()=>button(text).click());}
 it("grants workspace and delegation only after applying and revokes them together",async()=>{
  await render("connection");
- const fields=()=>[...host.querySelectorAll<HTMLInputElement>('.agent-connection-explanation input[type="checkbox"]')];
+ const fields=workspaceFields;
  expect(fields()).toHaveLength(2);expect(fields()[1].disabled).toBe(true);
  await act(async()=>fields()[0].click());expect(save).not.toHaveBeenCalled();
  await act(async()=>fields()[1].click());await click("应用到本对话");
@@ -42,26 +43,12 @@ it("preloads the actual catalog and reuses it on opening, then saves only this c
  await click("实际模型");expect(save).toHaveBeenCalledExactlyOnceWith({model:{provider:"codex",model:"real-model",reasoningEffort:"high",fast:false,maxConcurrent:2},autoFlashcardInbox:false});
  expect(invoke.mock.calls.every(([,a])=>a.args.action!=="save")).toBe(true);
 });
-it("stages expanded saving permission until explicit confirmation, and hides it for reading sources",async()=>{
- await render("permissions");await click("自动导入闪卡收件箱");
- expect(save).not.toHaveBeenCalled();expect(host.textContent).toContain("仍需审核后才能复习");
- await click("确认本对话的自动导入授权");expect(save).toHaveBeenCalledExactlyOnceWith({model:null,autoFlashcardInbox:true});
- await render("permissions",false);expect(button("自动导入闪卡收件箱")).toBeUndefined();
-});
 it("keeps model on catalog failure and offers retry",async()=>{
  invoke.mockRejectedValue(new Error("目录暂不可用"));await render();await open();
  expect(host.querySelector('[role="alert"]')?.textContent).toContain("目录暂不可用");expect(save).not.toHaveBeenCalled();
  expect(modelSummary().textContent).toContain("actual-global");
  invoke.mockResolvedValue({models:[{id:"available",name:"可用"}]});await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="刷新可用模型"]')!.click());
  expect(host.textContent).toContain("可用");expect(host.querySelector('[role="alert"]')).toBeNull();
-});
-it("dismisses without changing settings and restores focus",async()=>{
- await render("permissions");const details=host.querySelector("details")!,summary=host.querySelector("summary")!;
- await open();await act(async()=>{summary.focus();host.querySelector<HTMLButtonElement>('[aria-label="关闭对话设置"]')!.click();});
- expect(details.open).toBe(false);expect(document.activeElement).toBe(summary);
- await open();await act(async()=>{summary.focus();summary.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}));});
- expect(details.open).toBe(false);expect(document.activeElement).toBe(summary);
- await open();await act(async()=>document.body.dispatchEvent(new Event("pointerdown",{bubbles:true})));expect(details.open).toBe(false);expect(save).not.toHaveBeenCalled();
 });
 it("keeps the menu and current model on failed save",async()=>{
  await render();await open();save.mockRejectedValueOnce(new Error("保存失败"));await click("实际模型");
@@ -91,10 +78,10 @@ it("revokes native grants in the draft when selecting the alternative MCP channe
  const select=host.querySelector<HTMLSelectElement>(".agent-diagnostics select")!;
  await act(async()=>{select.value="mcp";select.dispatchEvent(new Event("change",{bubbles:true}));});
  expect(save).not.toHaveBeenCalled();
- expect([...host.querySelectorAll<HTMLInputElement>('.agent-connection-explanation input')].every(field=>!field.checked&&field.disabled)).toBe(true);
+ expect(workspaceFields().every(field=>!field.checked&&field.disabled)).toBe(true);
  await click("应用到本对话");expect(save).toHaveBeenLastCalledWith({...defaultAssistantOptions,externalMcp:true});
  await act(async()=>{select.value="native";select.dispatchEvent(new Event("change",{bubbles:true}));});
- expect([...host.querySelectorAll<HTMLInputElement>('.agent-connection-explanation input')].every(field=>!field.checked)).toBe(true);
+ expect(workspaceFields().every(field=>!field.checked)).toBe(true);
 });
 it("returns to inherited settings without replacing other options",async()=>{
  await render("model",true,{model:{model:"local",provider:"codex",reasoningEffort:"high",fast:false,maxConcurrent:2},autoFlashcardInbox:true,externalMcp:true});
@@ -122,12 +109,6 @@ it("keeps the accepted effort selected on failed save and allows retry",async()=
  await render("model",true,{model:{provider:"codex",model:"real-model",reasoningEffort:"high",fast:false,maxConcurrent:2},autoFlashcardInbox:false});await open("effort");save.mockRejectedValueOnce(new Error("保存失败"));const choice=host.querySelector<HTMLButtonElement>('.agent-effort-levels button')!;
  await act(async()=>choice.click());expect(host.querySelector('.agent-effort-levels [aria-pressed=true]')?.textContent).toContain("高");expect(host.querySelector('.agent-effort-menu [role="alert"]')?.textContent).toContain("保存失败");await act(async()=>choice.click());expect(save).toHaveBeenCalledTimes(2);
 });
-it("Escape during text composition does not dismiss preferences",async()=>{
- await render("permissions");await open();const summary=host.querySelector("summary")!;
- await act(async()=>{summary.focus();summary.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",isComposing:true,bubbles:true}));});
- expect(host.querySelector("details")!.open).toBe(true);expect(save).not.toHaveBeenCalled();
-});
-
 it("uses adjacent independent model and effort triggers without changing settings",async()=>{
  await render("model",true,{model:{provider:"codex",model:"real-model",reasoningEffort:"high",fast:false,maxConcurrent:2},autoFlashcardInbox:false});await open();
  expect(host.querySelectorAll("details:not([hidden]) > summary")).toHaveLength(2);
