@@ -134,6 +134,27 @@ fn local_image_staging_does_not_grant_and_exact_bytes_survive_message_binding() 
 }
 
 #[test]
+fn sent_images_are_bound_to_their_request_and_follow_current_authorization() {
+    let f = Fixture::new();
+    let staged = ui(&f.root, &json!({"action":"stageImage","title":"本地截图.png","mime":"image/png","base64":base64::engine::general_purpose::STANDARD.encode(PNG)})).unwrap();
+    let grant: ImageGrant = serde_json::from_value(staged["grant"].clone()).unwrap();
+    let first = ui(&f.root, &json!({"action":"create","goal":"请查看附件","successCriteria":"","grant":{"libraryIds":[],"notes":[],"readingItemKeys":[]}})).unwrap();
+    let id = first["work"]["id"].as_str().unwrap();
+    let sent = ui(&f.root, &json!({"action":"message","id":id,"expectedRevision":1,"initialRequest":true,"clientMessageId":"first-image","text":"请查看附件","addImages":[grant]})).unwrap();
+    let messages = sent["conversation"]["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0]["images"], json!([grant]));
+    let followed = ui(&f.root, &json!({"action":"message","id":id,"clientMessageId":"explicit-repeat","text":"请查看附件"})).unwrap();
+    let messages = followed["conversation"]["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 2);
+    assert_eq!(messages[0]["images"], json!([grant]));
+    assert_eq!(messages[1]["images"], json!([]));
+    ui(&f.root, &message(&f, id, &grant, true, 3)).unwrap();
+    let reopened = ui(&f.root, &json!({"action":"status","id":id})).unwrap();
+    assert_eq!(reopened["conversation"]["messages"][0]["images"], json!([]));
+}
+
+#[test]
 fn timeline_image_preview_uses_the_recorded_grant_and_current_scope() {
     let f = Fixture::new();
     let grant = seed(&f);

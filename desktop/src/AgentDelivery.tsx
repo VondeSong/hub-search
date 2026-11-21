@@ -9,6 +9,7 @@ import { createContext, Fragment, memo, useContext, type ReactNode } from "react
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AgentActivity, type ActivityRun } from "./AgentActivity";
+import type { ImageGrant } from "./AgentImages";
 export type Citation = { evidenceId: string; quote: string };
 export type Evidence = { title: string; sourcePath: string; content: string; startChar: number; endChar: number; totalChars: number; truncated: boolean };
 export type Report = { status: string; summary: string; findings: { text: string; citations: Citation[] }[]; nextSteps: { action: string; reason: string; citations: Citation[] }[]; questions: string[]; limitations: string[]; waitCondition: string; prose?: { markdown: string; citations: Citation[]; webSources?:WebSource[] } };
@@ -18,7 +19,7 @@ type Reopening = { workId?: string; recordVersion?: number };
 type ArtifactBinding = { artifactRefs?: ArtifactReference[]; artifactState?: "current" | "stale" | "unavailable" };
 export type HistoricalDelivery = ArtifactBinding & { runId: string; createdAt: number; report: Report | null; evidence: Evidence[]; validity: string };
 export type MessageMaterial = {kind:MaterialKind;title:string;sourcePath?:string|null;locator?:InvestigationLocator;available:boolean};
-export type ConversationMessage = ArtifactBinding & { displayText?:string;skills?:MessageSkill[];materials?: MessageMaterial[]; revision?: number; id: string; role: "user" | "assistant"; text?: string; kind?: "request" | "decision" | "scope"; runId?: string; report?: Report | null; evidence?: Evidence[]; validity?: string; createdAt: number };
+export type ConversationMessage = ArtifactBinding & { displayText?:string;skills?:MessageSkill[];materials?: MessageMaterial[]; images?: ImageGrant[]; revision?: number; id: string; role: "user" | "assistant"; text?: string; kind?: "request" | "decision" | "scope"; runId?: string; report?: Report | null; evidence?: Evidence[]; validity?: string; createdAt: number };
 export type Conversation = { messages: ConversationMessage[]; hasEarlier: boolean; nextCursor?: string | null };
 export function prependConversation(current: Conversation, older: Conversation): Conversation {
   const known = new Set(current.messages.map(message => message.id));

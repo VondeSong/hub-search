@@ -1,4 +1,4 @@
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import {invoke} from "@tauri-apps/api/core";
 import type {ImageGrant} from "./AgentImages";
 import type {AgentMaterial,NoteLocator} from "./AgentMaterials";
@@ -41,11 +41,27 @@ export async function readTextFile(file:File):Promise<string>{
  if(Array.from(text).length>500_000)throw new Error("文本附件最多50万字符，请拆分文件后添加；原文未截断。");
  return text;
 }
-export function AgentImageCards({images,disabled,pending,onRemove}:{images:ImageGrant[];disabled:boolean;pending:boolean;onRemove:(grant:ImageGrant)=>void}){
- return <div className="agent-image-cards" aria-label="图片资料">{images.map(grant=><ImageCard key={JSON.stringify(grant)} grant={grant} disabled={disabled} pending={pending} onRemove={()=>onRemove(grant)}/>)}</div>;
+export function AgentImageCards({images,disabled,pending,onRemove}:{images:ImageGrant[];disabled?:boolean;pending?:boolean;onRemove?:(grant:ImageGrant)=>void}){
+ return <div className="agent-image-cards" aria-label={pending?"待发送图片":onRemove?"已授权图片":"已发送图片"}>{images.map(grant=><ImageCard key={JSON.stringify(grant)} grant={grant} disabled={disabled} pending={pending} onRemove={onRemove?()=>onRemove(grant):undefined}/>)}</div>;
 }
-function ImageCard({grant,disabled,pending,onRemove}:{grant:ImageGrant;disabled:boolean;pending:boolean;onRemove:()=>void}){
+function ImageCard({grant,disabled,pending,onRemove}:{grant:ImageGrant;disabled?:boolean;pending?:boolean;onRemove?:()=>void}){
  const [preview,setPreview]=useState<{title:string;url:string}|null>(null),[error,setError]=useState("");
- useEffect(()=>{let alive=true;void invoke<{title:string;url:string}>("agent_investigation",{args:{action:"imagePreview",grant}}).then(value=>{if(alive)setPreview(value);},()=>{if(alive)setError("预览不可用，请重新添加");});return()=>{alive=false;};},[JSON.stringify(grant)]);
+ useEffect(()=>{let alive=true;void invoke<{title:string;url:string}>("agent_investigation",{args:{action:"imagePreview",grant}}).then(value=>{if(alive)setPreview(value);},()=>{if(alive)setError("图片预览不可用");});return()=>{alive=false;};},[JSON.stringify(grant)]);
+ if(!onRemove) return preview?<AgentImagePreview image={preview} showTitle/>:<span className="agent-image-card" role="status">{error||"正在读取图片…"}</span>;
  return <div className="agent-image-card">{preview?.url&&<img src={preview.url} alt={preview.title}/>}<span><strong>{preview?.title||"图片"}</strong><small>{error||(pending?"随问题发送 · 图片分析":"已添加 · 图片分析")}</small></span><button type="button" disabled={disabled} aria-label={`移除图片 ${preview?.title||"图片"}`} onClick={onRemove}>×</button></div>;
+}
+
+export function AgentImagePreview({image,showTitle=false}:{image:{title:string;url:string};showTitle?:boolean}){
+ const thumbnail=useRef<HTMLButtonElement>(null);
+ const dialog=useRef<HTMLDialogElement>(null);
+ return <>
+  <button className={showTitle?"agent-image-card agent-sent-image":"agent-receipt-thumbnail"} ref={thumbnail} type="button" aria-label={`放大 ${image.title}`} onClick={()=>dialog.current?.showModal()}>
+   <img src={image.url} alt={image.title}/>{showTitle&&<span><strong>{image.title}</strong></span>}
+  </button>
+  <dialog className="agent-receipt-dialog" ref={dialog} aria-label={image.title}
+   onKeyDown={event=>{if(event.key==="Escape")event.stopPropagation();}}
+   onClose={()=>thumbnail.current?.focus()}>
+   <form method="dialog"><button type="submit">关闭图片</button></form><img src={image.url} alt={image.title}/>
+  </dialog>
+ </>;
 }

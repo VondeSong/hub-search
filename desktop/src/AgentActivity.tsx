@@ -6,6 +6,7 @@ import { ActivityIcon, ActivityIdentity, WebsiteIcon, activityLabel, activityOpe
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AgentToolResult, type ToolResultRef, type ToolResultScope } from "./AgentToolResult";
+import { AgentImagePreview } from "./AgentFileInputs";
 
 type ActivitySource = {url:string;title?:string|null;query?:string|null};
 type PatchPreview = {patch?:string|null;truncated?:boolean; added?:number|null; removed?:number|null};
@@ -163,11 +164,12 @@ function RecordedToolActivity({event, resultRef, scope, runId}: {event:ActivityE
   </div>;
 }
 
-function PatchDetails({stateKey,title,value,children}: {stateKey:string;title:string;value:PatchPreview;children?:ReactNode}) {
+function PatchDetails({stateKey,title,path,value,children}: {stateKey:string;title:string;path?:string;value:PatchPreview;children?:ReactNode}) {
   const [open,setOpen]=useActivityDisclosure(stateKey,false);
+  const [pathOpen,setPathOpen]=useActivityDisclosure(`${stateKey}:path`,false);
   let previous=0, next=0, inHunk=false;
   return <details className="agent-technical-record agent-patch-details" open={open} onToggle={event=>setOpen(event.currentTarget.open)}>
-    <summary>{title}{value.added!=null && value.removed!=null && <small className="agent-patch-counts"><span>+{value.added}</span> <span>−{value.removed}</span></small>}</summary>
+    <summary title={path}>{title}{value.added!=null && value.removed!=null && <small className="agent-patch-counts"><span>+{value.added}</span> <span>−{value.removed}</span></small>}</summary>
     {open && <>
       {value.patch ? <pre className="agent-receipt-text agent-patch" aria-label="文件差异" tabIndex={0}><code>{value.patch.replace(/\r?\n$/,"").split(/\r?\n/).map((line,index)=>{
         const head=line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
@@ -180,6 +182,7 @@ function PatchDetails({stateKey,title,value,children}: {stateKey:string;title:st
       })}</code></pre> : <p className="agent-note">这条回执未保留可显示的差异。</p>}
       {value.truncated && <p className="agent-note">仅显示差异预览，完整内容超出保留范围。</p>}
       {children}
+      {path && path!==title && <details className="agent-technical-record" open={pathOpen} onToggle={event=>setPathOpen(event.currentTarget.open)}><summary>完整路径</summary><pre>{path}</pre></details>}
     </>}
   </details>;
 }
@@ -218,12 +221,9 @@ function ReceiptFile({sequence,index,runId,scope}: {sequence:number;index:number
 function ReceiptImage({sequence,index,runId,scope}: {sequence:number;index:number;runId:string;scope:ToolResultScope}) {
   const [image,setImage]=useState<{title:string;url:string}|null>(null);
   const [error,setError]=useState(false);
-  const thumbnail=useRef<HTMLButtonElement>(null);
-  const dialog=useRef<HTMLDialogElement>(null);
   const {workId,currentWorkRevision,authorizationVersion}=scope;
   useEffect(()=>{
     let current=true;
-    if(dialog.current?.open)dialog.current.close();
     setImage(null);setError(false);
     void invoke<{title:string;url:string}>("agent_investigation",{args:{action:"activityImagePreview",id:workId,runId,sequence,index,
       expectedWorkRevision:currentWorkRevision,expectedAuthorizationVersion:authorizationVersion}})
@@ -231,14 +231,7 @@ function ReceiptImage({sequence,index,runId,scope}: {sequence:number;index:numbe
     return ()=>{current=false;};
   },[workId,runId,sequence,index,currentWorkRevision,authorizationVersion]);
   if (!image) return <p className="agent-note" role="status">{error ? "这张图像暂不可回读，来源或授权可能已变化。" : "正在读取图像预览…"}</p>;
-  return <>
-    <button className="agent-receipt-thumbnail" ref={thumbnail} type="button" aria-label={`放大 ${image.title}`} onClick={()=>dialog.current?.showModal()}><img src={image.url} alt={image.title}/></button>
-    <dialog className="agent-receipt-dialog" ref={dialog} aria-label={image.title}
-      onKeyDown={event=>{if(event.key==="Escape")event.stopPropagation();}}
-      onClose={()=>thumbnail.current?.focus()}>
-      <form method="dialog"><button type="submit">关闭图片</button></form><img src={image.url} alt={image.title}/>
-    </dialog>
-  </>;
+  return <AgentImagePreview image={image}/>;
 }
 
 function ActivityEventView({ event, scope, runId }: { event: ActivityEvent; scope: ToolResultScope | null; runId:string }) {
@@ -291,7 +284,7 @@ function ActivityEventView({ event, scope, runId }: { event: ActivityEvent; scop
         {event.commandOutput && <pre className="agent-receipt-text" tabIndex={0} aria-label={event.state==="running" ? "当前命令输出" : "命令输出"}><code>{event.commandOutput}</code></pre>}
         {event.outputTruncated || event.truncated && event.commandOutput ? <p className="agent-note">命令输出为截断预览。</p> : !event.commandOutput && event.state!=="running" && <p className="agent-note">这条回执未保留命令输出。</p>}
       </>}
-      {event.fileChanges?.length ? event.fileChanges.map((file,index)=><PatchDetails key={index} stateKey={`patch:${runId}:${event.id}:${index}`} title={file.path} value={file}>
+      {event.fileChanges?.length ? event.fileChanges.map((file,index)=><PatchDetails key={index} stateKey={`patch:${runId}:${event.id}:${index}`} title={file.path.split(/[\\/]/).pop()||file.path} path={file.path} value={file}>
         {scope && event.sequence!=null && <ReceiptFile sequence={event.sequence} index={index} runId={runId} scope={scope}/>}
       </PatchDetails>)
         : event.detail && (command ? <details className="agent-technical-record" open={commandOpen} onToggle={change=>setCommandOpen(change.currentTarget.open)}><summary>查看命令</summary><pre>{exitLine && event.detail.endsWith("\n"+exitLine) ? event.detail.slice(0,-exitLine.length).trimEnd() : event.detail}</pre></details> : <p>{event.detail}</p>)}

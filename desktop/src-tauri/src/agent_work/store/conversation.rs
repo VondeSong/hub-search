@@ -114,10 +114,8 @@ pub(in crate::agent_work) fn message_on(
             || work.anchor.is_some()
             || work.revision != 1
             || content != work.goal
-            || library_ids.is_none()
-            || !additions.is_empty()
+            || (library_ids.is_none() && additions.is_empty() && add_images.is_empty())
             || !removals.is_empty()
-            || !add_images.is_empty()
             || !remove_images.is_empty()
         {
             return Err("初次资料范围绑定不能替代已有对话或改变问题".into());
@@ -290,16 +288,6 @@ fn page_on_cached(
     let initial_presentation = initial_presentation
         .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
         .unwrap_or_else(|| crate::agent_work::skills::request_presentation(&work.goal));
-    let initial_materials = super::materials::grant_at(c, work, 1)
-        .map(|grant| {
-            super::materials::message_cards(
-                delivery_reads.root(),
-                c,
-                work,
-                &super::materials::explicit_locators(&grant),
-            )
-        })
-        .unwrap_or(json!([]));
     let has_initial_request: bool = c.query_row(
         "SELECT EXISTS(SELECT 1 FROM agent_records WHERE work_id=?1 AND kind='userMessage' AND json_extract(body_json,'$.initialRequest')=1)",
         [&work.id], |r|r.get(0),
@@ -307,8 +295,39 @@ fn page_on_cached(
     let mut messages = if has_initial_request {
         Vec::new()
     } else {
+        let original_scope = super::materials::grant_at(c, work, 1).ok();
+        let initial_materials = original_scope
+            .as_ref()
+            .map(|grant| {
+                super::materials::message_cards(
+                    delivery_reads.root(),
+                    c,
+                    work,
+                    &super::materials::explicit_locators(grant),
+                )
+            })
+            .unwrap_or(json!([]));
+        let recorded_images: Option<String> = c.query_row(
+            "SELECT json_extract(body_json,'$.images') FROM agent_records WHERE work_id=?1 AND kind='conversationCreated' ORDER BY rowid LIMIT 1",
+            [&work.id], |r| r.get(0),
+        ).optional().map_err(|e|e.to_string())?.flatten();
+        let mut initial_images: Vec<images::ImageGrant> = match recorded_images {
+            Some(raw) => serde_json::from_str(&raw).map_err(|_| "初始图片记录损坏")?,
+            None if work.revision == 1 => work.grant.images.clone(),
+            None => {
+                // Older conversations did not store the creation-time image list.
+                let previous: Option<String> = c.query_row(
+                    "SELECT json_extract(body_json,'$.scopeBefore.images') FROM agent_records WHERE work_id=?1 AND kind='userMessage' AND json_type(body_json,'$.scopeBefore')='object' ORDER BY rowid LIMIT 1",
+                    [&work.id], |r| r.get(0),
+                ).optional().map_err(|e|e.to_string())?.flatten();
+                previous
+                    .and_then(|raw| serde_json::from_str(&raw).ok())
+                    .unwrap_or_default()
+            }
+        };
+        initial_images.retain(|grant| work.grant.images.contains(grant));
         vec![
-            json!({"id":format!("{}-goal",work.id),"role":"user","text":work.goal,"displayText":initial_presentation["text"],"skills":initial_presentation["skills"],"createdAt":created_at,"revision":1,"kind":"request","materials":initial_materials}),
+            json!({"id":format!("{}-goal",work.id),"role":"user","text":work.goal,"displayText":initial_presentation["text"],"skills":initial_presentation["skills"],"createdAt":created_at,"revision":1,"kind":"request","materials":initial_materials,"images":initial_images}),
         ]
     };
     for (id, kind, raw, created_at, run_id, authorization, revision) in rows {
@@ -329,7 +348,9 @@ fn page_on_cached(
             let presentation = body.get("presentation").cloned().unwrap_or_else(|| {
                 crate::agent_work::skills::request_presentation(body["text"].as_str().unwrap_or(""))
             });
-            messages.push(json!({"id":id,"role":"user","text":body["text"],"displayText":presentation["text"],"skills":presentation["skills"],"createdAt":created_at,"revision":body["revision"],"kind":if scope_only {"scope"} else if kind=="userDecision" {"decision"} else {"request"},"materials":materials}));
+            let mut attached_images = images::selection(&body, "addImages")?;
+            attached_images.retain(|grant| work.grant.images.contains(grant));
+            messages.push(json!({"id":id,"role":"user","text":body["text"],"displayText":presentation["text"],"skills":presentation["skills"],"createdAt":created_at,"revision":body["revision"],"kind":if scope_only {"scope"} else if kind=="userDecision" {"decision"} else {"request"},"materials":materials,"images":attached_images}));
             continue;
         }
         let verified = (|| {

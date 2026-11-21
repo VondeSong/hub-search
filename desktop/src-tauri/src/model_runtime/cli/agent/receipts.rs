@@ -58,7 +58,12 @@ pub(super) fn edits(changes: &Value) -> Value {
         let patch = change["diff"].as_str().filter(|patch| !patch.is_empty());
         let preview = patch.map(|patch| prefix(patch, remaining)).filter(|preview| !preview.is_empty());
         remaining -= preview.map_or(0, str::len);
-        let counts = patch.and_then(patch_counts);
+        let counts = match change["kind"]["type"].as_str() {
+            // The app server returns the actual file body for adds/deletes.
+            Some("add") => Some((patch.map_or(0, |body| body.lines().count()), 0)),
+            Some("delete") => Some((0, patch.map_or(0, |body| body.lines().count()))),
+            _ => patch.and_then(patch_counts),
+        };
         Some(json!({"path":prefix(path,1024),"patch":preview,"truncated":patch.is_some_and(|p| p.len() > preview.map_or(0,str::len)),"added":counts.map(|c| c.0),"removed":counts.map(|c| c.1)}))
     }).take(20).collect::<Vec<_>>();
     json!(files)
@@ -174,6 +179,24 @@ mod tests {
         assert_eq!(values[0]["added"], 1);
         assert_eq!(values[1]["truncated"], true);
         assert!(values[1]["patch"].as_str().unwrap().len() <= PATCH_BYTES - patch.len());
+    }
+
+    #[test]
+    fn counts_file_bodies_for_add_and_delete() {
+        let files = edits(&json!([
+            {"path":"created.md","kind":{"type":"add"},"diff":"# Entry\r\n\r\nDescription\r\n"},
+            {"path":"removed.txt","kind":{"type":"delete"},"diff":"old\nsecond"},
+            {"path":"empty","kind":{"type":"add"},"diff":""}
+        ]));
+        assert_eq!(
+            (files[0]["added"].as_u64(), files[0]["removed"].as_u64()),
+            (Some(3), Some(0))
+        );
+        assert_eq!(
+            (files[1]["added"].as_u64(), files[1]["removed"].as_u64()),
+            (Some(0), Some(2))
+        );
+        assert_eq!(files[2]["added"], 0);
     }
 
     #[test]

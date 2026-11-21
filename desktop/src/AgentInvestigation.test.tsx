@@ -2021,12 +2021,17 @@ it("stages pasted pixels locally, retains them after a failed send and retries t
  const image={libraryId:'__hub_chat_images',documentId:'h',sourceItemId:'h',inputVersion:'h',blobHash:'h'};
  const prepare=vi.spyOn(fileInputs,'prepareImage').mockResolvedValue({mime:'image/png',base64:'sample'});
  let attempts=0;
+ const accepted={...current,work:{...current.work,grant:{...current.work.grant,images:[image]}},conversation:{messages:[
+  {id:'older',role:'user',text:'先前的问题',createdAt:1},
+  {id:'with-image',role:'user',text:'分析截图',images:[image],createdAt:2},
+ ],hasEarlier:false}};
+ let saved=false;
  invoke.mockImplementation(async(_,{args})=>{
   if(args.action==='list')return {works:[{id:current.work.id,goal:current.work.goal,state:'ready'}]};
   if(args.action==='stageImage')return {grant:image};
   if(args.action==='imagePreview')return {title:'截图.png',url:'data:image/png;base64,sample'};
-  if(args.action==='message'&&attempts++===0)throw new Error('发送失败');
-  return current;
+  if(args.action==='message'){if(attempts++===0)throw new Error('发送失败');saved=true;}
+  return saved?accepted:current;
  });
  try{
   await open();
@@ -2038,6 +2043,9 @@ it("stages pasted pixels locally, retains them after a failed send and retries t
   await click('发送追问');
   const messages=invoke.mock.calls.filter(([,p])=>p?.args?.action==='message').map(([,p])=>p.args);
   expect(messages).toHaveLength(2);expect(messages[1]).toEqual(messages[0]);expect(messages[1].addImages).toEqual([image]);
+  await vi.waitFor(()=>expect(document.querySelector('.agent-user-message-content .agent-sent-image')?.textContent).toBe('截图.png'));
+  expect(document.querySelectorAll('.agent-user-message-content .agent-sent-image')).toHaveLength(1);
+  expect(document.querySelector('.agent-composer .agent-image-card')).toBeNull();
  }finally{prepare.mockRestore();}
 });
 it("keeps the explicit page grant when adding cached images before the first question",async()=>{

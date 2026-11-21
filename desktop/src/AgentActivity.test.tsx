@@ -42,6 +42,11 @@ it("preserves an open diff and two command receipts across a parent toggle and p
  await open(host.querySelector('.agent-operation-group')!);
  for (const item of [...host.querySelectorAll<HTMLDetailsElement>('.agent-tool-activity')]) await open(item);
  await open(host.querySelector('.agent-tool-activity .agent-patch-details')!);
+ const fileSummary='.agent-tool-activity .agent-patch-details > summary';
+ expect(select(fileSummary).textContent).toContain('settings.yml');
+ expect(select(fileSummary).textContent).not.toContain('config/');
+ expect(select(fileSummary).title).toBe('config/settings.yml');
+ await open(host.querySelector('.agent-patch-details .agent-technical-record')!);
  expect(select('.agent-patch-added').textContent).toContain('+compact: true');
  expect(select('pre[aria-label="当前命令输出"]').textContent).toBe('正在检查');
  expect(select('pre[aria-label="命令输出"]').textContent).toBe('检查完成');
@@ -51,6 +56,7 @@ it("preserves an open diff and two command receipts across a parent toggle and p
  await click('.agent-activity-toggle');
  expect(host.querySelectorAll('.agent-tool-activity[open]')).toHaveLength(3);
  expect(select('.agent-patch-added').textContent).toContain('+compact: true');
+ expect(select('.agent-patch-details .agent-technical-record[open] pre').textContent).toBe('config/settings.yml');
  const progress:ActivityRun['events'][number]={id:'progress',kind:'message',state:'completed',label:'已核对配置，接着检查预览。',createdAt:2200};
  await draw([edit,previous,{...command,state:'completed',exitCode:0},progress,{...command,id:'new',createdAt:2300}]);
  expect(host.querySelectorAll('.agent-operation-group')).toHaveLength(2);

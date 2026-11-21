@@ -70,6 +70,7 @@ impl NativeCapabilities {
         for (key, enabled) in [
             ("shell_tool", true),
             ("unified_exec", true),
+            ("view_image", true),
             ("multi_agent", self.multi_agent),
             ("multi_agent_v2", false),
         ] {

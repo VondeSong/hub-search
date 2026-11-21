@@ -392,6 +392,9 @@ body.resizing-agent-panel * { cursor: col-resize !important; user-select: none !
 .agent-image-card strong { max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
 .agent-image-card small { font-size:11px; color:var(--hub-text-secondary); }
 .agent-image-card button { flex-shrink:0; }
+.agent-user-message-content .agent-image-cards { margin:8px 0 0; }
+.agent-sent-image { cursor:pointer; color:inherit; background:var(--hub-content-surface); }
+.agent-sent-image:hover { border-color:var(--hub-text-secondary); }
 .agent-selected-skills > span { display:inline-flex; align-items:center; gap:6px; max-width:100%; padding:4px 8px; border-radius:6px; background:var(--hub-control-fill); font-size:12px; overflow-wrap:anywhere; }
 .agent-selected-skills button { display:inline-flex; align-items:center; justify-content:center; min-width:24px; min-height:24px; padding:3px; }
 .agent-skill-choice > button[aria-pressed="true"] { background:var(--hub-control-fill); }
