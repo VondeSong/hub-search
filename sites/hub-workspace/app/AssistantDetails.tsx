@@ -14,8 +14,8 @@ function DetailRow({ icon, title, status, children }: { icon: ReactNode; title: 
   </details>;
 }
 
-export function AssistantDetails({ settings, setSettings, disabled, hasReport, reading, onReading, onClose, messageCount, materialCount, libraryCount, hasMaterials, usageOpen = false, taskStatus }: {
-  settings: AssistantSettings; setSettings: (value: AssistantSettings) => void; disabled: boolean; hasReport: boolean; reading: boolean; onReading: () => void; onClose: () => void; messageCount: number; materialCount: number; libraryCount: number; hasMaterials: boolean; usageOpen?: boolean; taskStatus?: 'running' | 'paused';
+export function AssistantDetails({ settings, setSettings, disabled, hasReport, reading, onReading, onClose, messageCount, materialCount, libraryCount, hasMaterials, usageOpen = false, taskStatus, memoryPending, onManageMemory }: {
+  memoryPending: number; onManageMemory: () => void; settings: AssistantSettings; setSettings: (value: AssistantSettings) => void; disabled: boolean; hasReport: boolean; reading: boolean; onReading: () => void; onClose: () => void; messageCount: number; materialCount: number; libraryCount: number; hasMaterials: boolean; usageOpen?: boolean; taskStatus?: 'running' | 'paused';
 }) {
   const [review, setReview] = useState(false);
   const [frequency, setFrequency] = useState('weekly');
@@ -61,11 +61,7 @@ export function AssistantDetails({ settings, setSettings, disabled, hasReport, r
           </details>
           <p>此处演示设置，搜索和工具调用由桌面端执行。</p>
         </DetailRow>
-        <DetailRow icon={<Brain size={16}/>} title="共享记忆" status={settings.memoryEnabled ? '已启用' : '未启用'}>
-          <label className="ha-detail-setting"><span>下一轮使用共享记忆</span><input type="checkbox" disabled={disabled} checked={settings.memoryEnabled} onChange={event => setSettings({ ...settings, memoryEnabled: event.target.checked })}/></label>
-          <label className="ha-detail-setting"><span>记忆范围</span><select aria-label="本事项的记忆范围" value={settings.memoryScope} disabled={disabled} onChange={event => setSettings({ ...settings, memoryScope: event.target.value })}><option value="general">通用 · 示例</option><option value="hub">Hub 原型 · 示例</option></select></label>
-          <p>此处保存原型偏好，不读取或修改本地共享记忆。</p>
-        </DetailRow>
+        <button type="button" className="ha-detail-memory-link" onClick={onManageMemory}><span className="ha-detail-icon" aria-hidden="true"><Brain size={16}/></span><span>管理记忆</span>{memoryPending > 0 && <small>{memoryPending} 条待确认</small>}<ChevronDown size={14} aria-hidden="true" style={{ transform: 'rotate(-90deg)' }}/></button>
       </section>
       <section className="ha-detail-section" aria-label="进度与成果"><h3>进度与成果</h3>
         <DetailRow icon={<Activity size={16}/>} title="任务状态" status={progress}>{taskDetails}</DetailRow>

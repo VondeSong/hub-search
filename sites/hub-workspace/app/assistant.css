@@ -712,3 +712,47 @@
 .ha-related-actions { display:flex; flex-wrap:wrap; gap:4px; }
 .ha-related-actions button { min-height:28px; background:transparent; color:inherit; cursor:pointer; }
 .ha-related-actions button:disabled { opacity:.55; cursor:default; }
+
+.ha-messages :is(.ha-reply, .ha-user-text) { user-select: text; }
+.assistant-selection-actions {
+  --selection-border: var(--line);
+  --selection-surface: var(--surface);
+  --selection-text: var(--text);
+  --selection-hover: color-mix(in srgb, var(--text) 8%, var(--surface));
+  --selection-focus: var(--accent);
+}
+.assistant-selection-actions {
+  position: fixed;
+  z-index: 260;
+  display: flex;
+  flex-wrap: wrap;
+  max-width: calc(100vw - 16px);
+  padding: 4px;
+  gap: 2px;
+  border: 1px solid var(--selection-border);
+  border-radius: 10px;
+  background: var(--selection-surface);
+  color: var(--selection-text);
+  box-shadow: 0 4px 18px rgb(0 0 0 / 16%);
+  user-select: none;
+}
+.assistant-selection-actions > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: 500 13px system-ui, sans-serif;
+  cursor: pointer;
+}
+.assistant-selection-actions > button:hover { background: var(--selection-hover); }
+.assistant-selection-actions > button:focus-visible { outline: 2px solid var(--selection-focus); outline-offset: -2px; }
+.ha-panel.ha-side-chat { z-index: 205; height: auto; }
+.ha-side-chat > header { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 14px; border-bottom:1px solid var(--line); }
+.ha-side-chat > .ha-messages { flex:1; overflow:auto; padding:16px; }
+.ha-side-chat > .ha-composer { margin:10px; padding:10px; }
+.ha-side-footer { display:flex; align-items:center; justify-content:space-between; }

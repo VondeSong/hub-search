@@ -17,6 +17,9 @@ const { publicUrl } = await loadFunctions('../app/AssistantResources.tsx', ['pub
 const { historyGroup } = await loadFunctions('../app/AssistantHistory.tsx', ['historyGroup']);
 const { resolveTopicSources } = await loadFunctions('../app/AssistantResearch.tsx', ['resolveTopicSources']);
 const { cleanTagStarter, prepareTagTask } = await loadFunctions('../app/tag-task.ts', ['cleanTagStarter','prepareTagTask']);
+const memorySource = readFileSync(new URL('../app/assistant-memory.ts', import.meta.url), 'utf8');
+const memoryCode = ts.transpileModule(memorySource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
+const memory = await import('data:text/javascript;base64,' + Buffer.from(memoryCode).toString('base64'));
 assert.equal(cleanTagStarter('查找可能漏标的内容：'),'');
 assert.equal(cleanTagStarter('请比较 #方法 和 #工具，重点看边界'),'请比较 #方法 和 #工具，重点看边界');
 assert.ok('error' in prepareTagTask('definition',['方法'],'方法','',false,false));
@@ -176,5 +179,56 @@ check('新请求默认自动，旧暂停和排队请求保留冻结的执行模�
   assert.equal(old.input, '保留草稿'); assert.equal(old.session.active.taskMode, 'standard');
   assert.equal(old.session.active.status, 'paused'); assert.equal(old.session.queue[0].taskMode, 'extended');
   assert.equal(old.session.frozen, true);
+});
+check('记忆首次关闭，主动偏好与旧聊天快照独立；失效范围不会扩大授权', () => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const saved = new Map();
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: key => saved.get(key) ?? null, setItem: (key, value) => saved.set(key, value) } });
+  try {
+    assert.deepEqual(memory.loadMemoryPreference(), { memoryEnabled: false, memoryScope: 'general' });
+    assert.equal(memory.rememberMemoryPreference({ memoryEnabled: true, memoryScope: 'hub' }), true);
+    const old = readConversation({ memoryEnabled: false, memoryScope: 'general', input: '保留原聊天' });
+    assert.equal(old.memoryEnabled, false);
+    assert.equal(old.memoryScope, 'general');
+    assert.deepEqual(memory.loadMemoryPreference(), { memoryEnabled: true, memoryScope: 'hub' });
+    const fresh = readConversation(memory.loadMemoryPreference());
+    assert.equal(fresh.memoryEnabled, true); assert.equal(fresh.memoryScope, 'hub');
+    memory.rememberMemoryPreference({ memoryEnabled: false, memoryScope: 'hub' });
+    assert.deepEqual(memory.loadMemoryPreference(), { memoryEnabled: false, memoryScope: 'hub' });
+    assert.equal(readSettings({ memoryEnabled: true, memoryScope: 'removed-project' }).memoryEnabled, false);
+    assert.deepEqual(memory.readMemoryPreference({ memoryEnabled: true, memoryScope: 'removed-project' }), { memoryEnabled: false, memoryScope: 'general' });
+  } finally { if (previous) Object.defineProperty(globalThis, 'localStorage', previous); else delete globalThis.localStorage; }
+});
+check('确认建议仅保存一次且固定项目；忽略不生成记忆，存储往返保持状态', () => {
+  const initial = memory.createMemoryDemoState();
+  const proposal = initial.proposals[0];
+  const ignored = memory.changeMemoryState(initial, { type: 'dismiss', id: proposal.id });
+  assert.equal(ignored.proposals.length, 0); assert.equal(ignored.entries.length, initial.entries.length);
+  const accepted = memory.changeMemoryState(initial, { type: 'accept', id: proposal.id });
+  assert.equal(accepted.proposals.length, 0); assert.equal(accepted.entries.length, initial.entries.length + 1);
+  assert.equal(accepted.entries.at(-1).scope, 'hub'); assert.equal(accepted.entries.at(-1).use, 'relevant');
+  assert.equal(memory.changeMemoryState(accepted, { type: 'accept', id: proposal.id }), accepted);
+  assert.deepEqual(memory.readMemoryState(JSON.parse(JSON.stringify(accepted))), accepted);
+});
+check('修改记忆保留前后记录和停用状态，遗忘同时移除正文与修改历史', () => {
+  const initial = memory.createMemoryDemoState(), entry = initial.entries[0];
+  const inactive = memory.changeMemoryState(initial, { type: 'toggle', id: entry.id });
+  const edited = memory.changeMemoryState(inactive, { type: 'edit', id: entry.id, title: entry.title, body: '先列结论，再用表格展示依据。', use: 'relevant' });
+  const current = edited.entries.find(item => item.id === entry.id);
+  assert.equal(current.state, 'inactive'); assert.equal(current.scope, 'general');
+  assert.equal(current.history[0].before.body, entry.body); assert.equal(current.history[0].after.body, current.body);
+  assert.deepEqual(memory.readMemoryState(JSON.parse(JSON.stringify(edited))), edited);
+  const forgotten = memory.changeMemoryState(edited, { type: 'forget', id: entry.id });
+  assert.equal(forgotten.entries.some(item => item.id === entry.id), false);
+  assert.equal(JSON.stringify(forgotten).includes(current.body), false); assert.equal(JSON.stringify(forgotten).includes(entry.body), false);
+});
+check('损坏记忆快照保留为不可读取，容量边界不会写入下次无法恢复的数据', () => {
+  const initial = memory.createMemoryDemoState();
+  assert.equal(memory.readMemoryState({ ...initial, version: 9 }), null);
+  assert.equal(memory.readMemoryState({ ...initial, entries: [initial.entries[0], initial.entries[0]] }), null);
+  assert.equal(memory.readMemoryState({ ...initial, entries: [{ ...initial.entries[0], history: [{ at: 1, before: {}, after: {} }] }] }), null);
+  const full = { ...initial, entries: Array.from({ length: 80 }, (_, index) => ({ ...initial.entries[0], id: 'entry-' + index })) };
+  assert.ok(memory.readMemoryState(full));
+  assert.equal(memory.changeMemoryState(full, { type: 'accept', id: initial.proposals[0].id }), full);
 });
 console.log(`${checks} 项助手状态检查通过。`);

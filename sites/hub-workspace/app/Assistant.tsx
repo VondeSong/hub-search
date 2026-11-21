@@ -20,6 +20,9 @@ import { AssistantMaterialScope } from './AssistantMaterialScope';
 import { ResourceChips, demoSkills, emptyResources, publicLinkIn, type ResourceDraft } from './AssistantResources';
 import { libraryDragType } from './assistant-library-drag';
 import { AssistantHeader, AssistantTools, clampPanelSize, type AssistantMenu, type HistoryItem } from './AssistantChrome';
+import { AssistantSelectionActions, useAssistantSidePosition } from './AssistantSelectionActions';
+import { AssistantMemoryManager, MemoryFeedback, MemoryProposalCard, useAssistantMemory, type AssistantMemoryModel } from './AssistantMemory';
+import { loadMemoryPreference, rememberMemoryPreference } from './assistant-memory';
 
 export type AssistantEvidence = { id: string; title: string; source?: string; excerpt?: string };
 export type AssistantContext = {
@@ -142,7 +145,7 @@ function readSettings(value: unknown, preserveRequestMode = false): Settings {
     reasoningDefault: raw.reasoningDefault !== false,
     autoFlashcardInbox: raw.autoFlashcardInbox === true,
     mcpServices: strings(raw.mcpServices).filter(item => ['Craft', 'Obsidian', '滴答清单'].includes(item)),
-    memoryEnabled: raw.memoryEnabled === true, memoryScope: raw.memoryScope === 'hub' ? 'hub' : 'general',
+    memoryEnabled: raw.memoryEnabled === true && (raw.memoryScope == null || raw.memoryScope === 'general' || raw.memoryScope === 'hub'), memoryScope: raw.memoryScope === 'hub' ? 'hub' : 'general',
     inputLimit: Number.isSafeInteger(raw.inputLimit) && Number(raw.inputLimit) > 0 ? Number(raw.inputLimit) : 0,
     outputLimit: Number.isSafeInteger(raw.outputLimit) && Number(raw.outputLimit) > 0 ? Number(raw.outputLimit) : 0,
   };
@@ -421,6 +424,7 @@ function reducer(state: Session, action: Action): Session {
 // A single dock is shared by the whole Hub. Work-linked findings have independent
 // conversations; regular reading keeps the existing general conversation.
 export default function Assistant(props: AssistantProps) {
+  const memoryModel = useAssistantMemory(props.notify);
   const conversations = useRef<Record<string, Conversation>>({});
   const [ready, setReady] = useState(false);
   const [topics, setTopics] = useState<ResearchTopic[]>([]);
@@ -504,11 +508,11 @@ export default function Assistant(props: AssistantProps) {
       });
     }
   }
-  initial ??= readConversation(null);
+  initial ??= readConversation(loadMemoryPreference());
   const history: HistoryItem[] = Object.entries(conversations.current).filter(([id, value]) => !historyMeta.current[id]?.deleted && (value.session.messages.length || value.session.active)).map(([id, value]) => ({ id, updatedAt: value.updatedAt, title: value.title, pinned: historyMeta.current[id]?.pinned || false, archived: historyMeta.current[id]?.archived || false, blocked: value.contexts.some(context => !(props.canUseContext || allowContext)(context)) || value.session.messages.some(message => !(props.canUseContext || allowContext)(message.context)) || value.resources.pages.some(context => !(props.canUseContext || allowContext)(context)) })).reverse();
   const currentContext = selected ? (selected.fresh ? selected.entry || null : initial.contexts[0] || null) : initial.session.messages.length ? initial.contexts[0] || null : props.context;
   return <>{props.open && storageError && <p className="ha-storage-error" role="status">{storageError}</p>}<AssistantConversation key={workKey} {...props} context={currentContext} browsingContext={props.context} workKey={workKey} initial={initial} onPersist={persist}
-    topics={topics} pins={pins} onPin={togglePin} onSaveTopic={saveTopic}
+    topics={topics} pins={pins} onPin={togglePin} onSaveTopic={saveTopic} memoryModel={memoryModel}
     history={history} readHistory={id=>conversations.current[id]} onNewWithContext={() => setSelection({ route, id: 'chat:' + uniqueId(), fresh: true, entry: props.context })} onNew={() => setSelection({ route, id: 'chat:' + uniqueId(), fresh: true })}
     onSelect={(id,draft) => {
       const old=conversations.current[id];
@@ -521,9 +525,9 @@ export default function Assistant(props: AssistantProps) {
 }
 
 function AssistantConversation({
-  activityDemo, onCloseActivityDemo,
+  activityDemo, onCloseActivityDemo, memoryModel,
   open, expanded, context, canUseContext = allowContext, onClose, onExpand, onOpenSource, onCreateDraft, notify, workKey, initial, onPersist, history, readHistory, onNew, onSelect, onHistoryChange, catalog = [], browsingContext, onNewWithContext, currentPageId, onInsertPage, topics, pins, onPin, onSaveTopic, onOpenTagQueue, tagEntry, onTagEntryHandled, tagModel,
-}: AssistantProps & { topics: ResearchTopic[]; pins: WorkPins; onPin: (kind: keyof WorkPins, id: string) => void; onSaveTopic: (config: Omit<ResearchTopic, 'id'>, updateId?: string) => boolean; workKey: string; initial: Conversation; onPersist: (key: string, conversation: Conversation) => void; browsingContext: AssistantContext | null; onNewWithContext: () => void; history: HistoryItem[]; readHistory: (id:string) => Conversation|undefined; onNew: () => void; onSelect: (id: string, draft?:string) => void; onHistoryChange: (id: string, change: 'pin' | 'archive' | 'delete') => void }) {
+}: AssistantProps & { memoryModel: AssistantMemoryModel; topics: ResearchTopic[]; pins: WorkPins; onPin: (kind: keyof WorkPins, id: string) => void; onSaveTopic: (config: Omit<ResearchTopic, 'id'>, updateId?: string) => boolean; workKey: string; initial: Conversation; onPersist: (key: string, conversation: Conversation) => void; browsingContext: AssistantContext | null; onNewWithContext: () => void; history: HistoryItem[]; readHistory: (id:string) => Conversation|undefined; onNew: () => void; onSelect: (id: string, draft?:string) => void; onHistoryChange: (id: string, change: 'pin' | 'archive' | 'delete') => void }) {
   const [session, dispatch] = useReducer(reducer, initial.session);
   const [input, setInput] = useState(initial.tagIntent ? cleanTagStarter(initial.input) : initial.input);
   const [tagMode, setTagMode] = useState(initial.tagMode);
@@ -539,6 +543,12 @@ function AssistantConversation({
   const [tagPageIds,setTagPageIds]=useState<string[]>([]);
   const handledTagEntry = useRef<typeof tagEntry>(null);
   const [historyReference,setHistoryReference]=useState<{id:string;title:string;excerpt:string}|null>(null);
+  const [selectedText, setSelectedText] = useState<string[]>([]);
+  const [sideOpen, setSideOpen] = useState(false);
+  const [sideQuote, setSideQuote] = useState('');
+  const [sideInput, setSideInput] = useState('');
+  const [sideTurns, setSideTurns] = useState<{ question: string; reply: Message }[]>([]);
+  const sideComposer = useRef<HTMLTextAreaElement>(null);
   const draftQuery=input.trim().toLowerCase();
   const queryWords=draftQuery.match(/[a-z0-9]{4,}|[一-鿿]{4,}/g)||[];
   const related=!session.messages.length&&!session.active&&!tagMode&&draftQuery.length>=4
@@ -555,6 +565,15 @@ function AssistantConversation({
     }).slice(0,3) : [];
   const [inputContext, setInputContext] = useState<AssistantContext | null>(initial.inputContext);
   const [settings, setSettings] = useState<Settings>(() => readSettings(initial));
+  function changeSettings(next: Settings) {
+    if (session.active) return;
+    // Only an explicit memory control change becomes the new-chat default.
+    // Restoring history and browsing memory content never pass through here.
+    if (next.memoryEnabled !== settings.memoryEnabled || next.memoryScope !== settings.memoryScope) {
+      if (!rememberMemoryPreference({ memoryEnabled: next.memoryEnabled, memoryScope: next.memoryScope === 'hub' ? 'hub' : 'general' })) notify('本对话记忆已更新，但浏览器未能保存新聊天的默认选择。');
+    }
+    setSettings(next);
+  }
   const [omittedId, setOmittedId] = useState<string | null>(initial.omittedId);
   const [contexts, setContexts] = useState(() => includeContext(initial.contexts, context));
   const [attachmentNames, setAttachmentNames] = useState(initial.attachmentNames);
@@ -579,6 +598,7 @@ function AssistantConversation({
     if (!value) requestAnimationFrame(() => { if (menuReturn.current?.isConnected) menuReturn.current.focus({ preventScroll: true }); });
   }
   const panel = useRef<HTMLElement>(null);
+  const sideStyle = useAssistantSidePosition(sideOpen ? panel : undefined);
   const [panelSize, setPanelSize] = useState({ width: 480, height: 0 });
   useEffect(() => {
     const root = panel.current?.closest<HTMLElement>('.hub-app');
@@ -686,12 +706,14 @@ function AssistantConversation({
     const element = document.activeElement as HTMLElement | null;
     const timer = setTimeout(() => composer.current?.focus({ preventScroll: true }), 80);
     const keys = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.isComposing || event.defaultPrevented || document.querySelector('.ha-receipt-dialog[open]') || (event.target instanceof Element && event.target.closest('.ha-token'))) return;
+      if (event.key !== 'Escape' || event.isComposing || event.defaultPrevented || document.querySelector('.ha-receipt-dialog[open]') || (event.target instanceof Element && event.target.closest('.ha-token,.ha-side-chat,.assistant-selection-actions'))) return;
       event.preventDefault();
       event.stopPropagation();
       if (callback.current.draft) setDraft(null);
       else if (callback.current.menu || callback.current.sourcesOpen || callback.current.contextOpen) {
-        setMenu(null); setTopicEdit(null); setSourcesOpen(false); setContextOpen(false); composer.current?.focus();
+        const memoryMenu = callback.current.menu === 'permissions' || callback.current.menu === 'memory';
+        setMenu(null); setTopicEdit(null); setSourcesOpen(false); setContextOpen(false);
+        if (memoryMenu && menuReturn.current?.isConnected) menuReturn.current.focus({ preventScroll: true }); else composer.current?.focus();
       } else if (callback.current.reading) setReading(false);
       else callback.current.onClose();
     };
@@ -731,7 +753,7 @@ function AssistantConversation({
   }, [!!draft, open]);
 
   useEffect(() => {
-    if (!menu || !open) return;
+    if (!menu || !open || menu === 'memory') return;
     const outside = (event: PointerEvent) => { if (!(event.target as Element).closest('.ha-menu, .ha-header, .ha-input-actions')) { setMenu(null); setTopicEdit(null); } };
     document.addEventListener('pointerdown', outside);
     return () => document.removeEventListener('pointerdown', outside);
@@ -843,11 +865,12 @@ function AssistantConversation({
           webSearch: effectiveWebSearch,
           mcpServices: [],
           context: requestContext, resources: { ...turnResources, url: settings.researchPolicy === 'materials-only' ? '' : publicLinkIn(value) || turnResources.url },
-          additions: historyReference ? [`旧对话摘录 · ${historyReference.title}\n${historyReference.excerpt}`] : [], attachmentNames: turnAttachments,
+          additions: [...selectedText, ...(historyReference ? [`旧对话摘录 · ${historyReference.title}\n${historyReference.excerpt}`] : [])], attachmentNames: turnAttachments,
         },
       });
     }
     setInput(''); setInputContext(null); setHistoryReference(null);
+    if (!session.active && !tagMode && !tagIntent) setSelectedText([]);
     if (useManualSources) {
       setAttachmentNames([]);
       setResources(current => ({ ...current, pages: current.pages.filter(item => !isMediaReference(item)), url: '', images: [], dataFiles: [] }));
@@ -1080,8 +1103,9 @@ function AssistantConversation({
         onBack={() => changeMenu(topicReview?.from || 'topics')} onClose={() => changeMenu(null)} onApply={() => applyTopic(reviewedTopic)} onEdit={() => editTopicScope(reviewedTopic)}/> : (menu === 'mode' || menu === 'topics') && <AssistantTaskModes tagActive={tagMode} goalActive={goalMode} onGoal={() => { setTagMode(false); setGoalMode(true); changeMenu(null); }} onTag={() => { setGoalMode(false); setTagMode(true); changeMenu(null); }} topics={topics} pins={pins} activeTopic={activeTopic?.id || null} skills={resources.skills} allTopics={menu === 'topics'} disabled={!!session.active}
         onPin={onPin} onSkill={id => { setResources(value => ({ ...value, skills: [...new Set([...value.skills, id])] })); changeMenu(null); }}
         onGeneral={() => { setGoalMode(false); setTagMode(false); changeMenu(null); }}
-        onTopic={topic => { setTopicReview({ id: topic.id, from: menu === 'topics' ? 'topics' : 'mode' }); changeMenu('topic-review'); }} onAllTopics={() => changeMenu(menu === 'topics' ? 'mode' : 'topics')} onUsage={() => changeMenu('usage')} onClose={() => changeMenu(null)}/>} taskStatus={session.active?.status} menu={menu} setMenu={changeMenu} title={chatTitle} settings={settings} setSettings={value => { if (!session.active) setSettings(value); }} expanded={expanded} onExpand={onExpand} onClose={onClose} history={history} currentId={workKey} onNew={onNew} onSelect={onSelect} onHistoryChange={onHistoryChange} disabled={!!session.active} hasReport={session.messages.some(item => item.role === 'assistant' && canUseContext(item.context))} reading={reading} onReading={() => setReading(value => !value)} messageCount={session.messages.length} materialCount={turnResources.pages.length + Number(!!material)} libraryCount={turnResources.libraryIds.length} hasMaterials={hasMaterials}/>
-      <div className="ha-workspace">
+        onTopic={topic => { setTopicReview({ id: topic.id, from: menu === 'topics' ? 'topics' : 'mode' }); changeMenu('topic-review'); }} onAllTopics={() => changeMenu(menu === 'topics' ? 'mode' : 'topics')} onUsage={() => changeMenu('usage')} onClose={() => changeMenu(null)}/>} taskStatus={session.active?.status} menu={menu} setMenu={changeMenu} title={chatTitle} settings={settings} setSettings={changeSettings} expanded={expanded} onExpand={onExpand} onClose={onClose} history={history} currentId={workKey} onNew={onNew} onSelect={onSelect} onHistoryChange={onHistoryChange} disabled={!!session.active} hasReport={session.messages.some(item => item.role === 'assistant' && canUseContext(item.context))} reading={reading} onReading={() => setReading(value => !value)} messageCount={session.messages.length} materialCount={turnResources.pages.length + Number(!!material)} libraryCount={turnResources.libraryIds.length} hasMaterials={hasMaterials} memoryPending={memoryModel.state.proposals.length} onManageMemory={() => changeMenu('memory')}/>
+      {menu === 'memory' && <AssistantMemoryManager model={memoryModel} enabled={settings.memoryEnabled} scope={settings.memoryScope} disabled={!!session.active} materialsOnly={settings.researchPolicy === 'materials-only'} onClose={() => changeMenu(null)}/>}
+      <div className="ha-workspace" inert={menu === 'memory'}>
         <div className="ha-conversation">
           {tagIntent&&!reading&&!contextBlocked&&<TagTaskSelector intent={tagIntent} onChange={prepareTag} onCancel={()=>{setTagIntent(null);setTagError('');composer.current?.focus({preventScroll:true});}}/>}
           <div className="ha-message-viewport">
@@ -1100,7 +1124,7 @@ function AssistantConversation({
 
             {session.messages.map(message => !canUseContext(message.context) ? <article key={message.id} className="ha-message ha-message-unavailable"><FileText size={14}/><span>这段记录的来源当前不可用，内容已隐藏。</span></article> : <article key={message.id} data-latest-answer={message.id === session.messages.filter(item => item.role === 'assistant' && canUseContext(item.context)).at(-1)?.id || undefined} className={'ha-message ha-' + message.role}>
               {message.role === 'user' ? <>
-                <div className="ha-user-bubble"><div>{message.text}</div><AssistantTokens context={message.context} resources={message.resources||emptyResources()} canShowPage={canUseContext} onOpenSource={onOpenSource}/></div>
+                <div className="ha-user-bubble"><div className="ha-user-text">{message.text}</div><AssistantTokens context={message.context} resources={message.resources||emptyResources()} canShowPage={canUseContext} onOpenSource={onOpenSource}/></div>
                 {!session.active&&<button className="ha-edit-message" type="button" onClick={()=>{if(input.trim()){notify('请先发送或保留当前草稿，再编辑这条消息');return;}setInput(message.text);setInputContext(message.context||null);setResources({...message.resources||emptyResources(),pages:[...new Map([...(message.context?[message.context]:[]),...(message.resources?.pages||[])].map(page=>[page.id,page])).values()]});setAttachmentNames(message.attachmentNames||[]);setOmittedId(context?.id||null);composer.current?.focus();}}>编辑</button>}
                 {!!message.attachmentNames?.length && <div className="ha-message-files">{message.attachmentNames.map(name => <span key={name}><Paperclip size={10} />{name}</span>)}</div>}
               </> : <>
@@ -1120,6 +1144,11 @@ function AssistantConversation({
               </>}
             </article>)}
 
+            {!tagMode && !activityDemo && !reading && !contextBlocked && memoryModel.ready && !memoryModel.error && <>
+              {memoryModel.state.proposals.slice(0, 1).map(item => <MemoryProposalCard key={item.id} item={item} model={memoryModel} disabled={!!session.active}/>)}
+              {menu !== 'memory' && <MemoryFeedback model={memoryModel} disabled={!!session.active}/>}
+            </>}
+
             {tagMode && !tagIntent && !reading && !!session.messages.length && !contextBlocked && <details className="ha-tag-prompts"><summary>标签助手建议</summary><div className="ha-prompts">{tagSuggestions}</div></details>}
             {session.active && running && !activeBlocked && <div className="ha-current-action" role="status"><span className="ha-active-ink">{['正在思考', '正在整理示例材料', '正在准备回答'][stage]}</span></div>}
             {session.active && (paused || activeBlocked) && <div className={'ha-run-status'  + (paused ? ' ha-is-paused' : '')} role="status">
@@ -1128,6 +1157,18 @@ function AssistantConversation({
               {activeBlocked ? <button type="button" onClick={() => { dispatch({ type: 'discard-active' }); notify('未完成的演示请求已移除，历史记录保留'); }}><X size={12}/>移除请求</button> : <button type="button" onClick={() => dispatch({ type: paused ? 'continue' : 'stop' })}>{paused ? <><Play size={12} />继续</> : <><Square size={11} />停止</>}</button>}
             </div>}
           </div>
+          <AssistantSelectionActions scroll={scrollArea} selector=".ha-reply,.ha-user-text" onAdd={text => {
+            if (selectedText.includes(text)) { composer.current?.focus({preventScroll:true}); return true; }
+            if (text.length > 2500 || selectedText.length >= 8 || selectedText.join('').length + text.length > 3000) { notify('每份摘录最多 2500 字，合计最多 3000 字。'); return false; }
+            setSelectedText(value => [...value, text]);
+            composer.current?.focus({preventScroll:true});
+            return true;
+          }} onSide={text => {
+            if (text.length > 2500) { notify('每份摘录最多 2500 字，请缩小选区。'); return false; }
+            setSideQuote(text); setSideOpen(true);
+            requestAnimationFrame(() => sideComposer.current?.focus({preventScroll:true}));
+            return true;
+          }}/>
 
           {jump && <button type="button" className="ha-jump-latest" aria-label="回到最新内容" title="回到最新内容" data-working={jumpWorking || undefined} onClick={() => {
             const viewport = scrollArea.current;
@@ -1160,6 +1201,7 @@ function AssistantConversation({
               {scopeTooLarge && <p className="ha-link-policy-note" role="status">本轮资料超过上限，请减少已选资料。</p>}
               {resourcesBlocked && <p role="status">部分本轮资料已不可用，移除后再发送。</p>}
               <AssistantTokens resources={resources} context={material} canShowPage={canUseContext} onChange={setResources} onOpenSource={onOpenSource} onRemoveContext={()=>{setOmittedId(material!.id);composer.current?.focus();}}/>
+              {!!selectedText.length && <div className="ha-attachment-list" aria-label="待发送摘录">{selectedText.map(text => <span key={text}><FileText size={12}/><span title={text}>{text}</span><button type="button" className="ha-chip-remove" aria-label="移除摘录" onClick={() => setSelectedText(values => values.filter(value => value !== text))}><X size={12}/></button></span>)}</div>}
               {!!attachmentNames.length && !inputBlocked && !contextBlocked && <div className="ha-attachment-list" aria-label="附件名称，文件内容未上传">{attachmentNames.map(name => <span key={name}><Paperclip size={10} /><span title={name}>{name}</span><button type="button" className="ha-chip-remove" aria-label={'移除附件 ' + name} onClick={() => setAttachmentNames(previous => previous.filter(item => item !== name))}><X size={10} /></button></span>)}</div>}
               </div>
               {tagIntent && <section className="ha-tag-task" aria-label="标签任务准备">
@@ -1189,7 +1231,7 @@ function AssistantConversation({
               {linkInDraft && !needsMaterial && !inputBlocked && !contextBlocked && settings.researchPolicy === 'materials-only' && <p className="ha-link-policy-note" role="status">当前策略仅依据材料，链接会保留在消息中，网页不会读取。</p>}
               <div className="ha-input-actions">
                 <input type="file" hidden multiple ref={fileInput} aria-label="选择附件，仅显示文件名" onChange={attachFileNames} />
-                <AssistantTools menu={menu} setMenu={value=>{if(value==='tags')setTagPickerRole('references');changeMenu(value);}} settings={settings} setSettings={value => { if (!session.active) setSettings(value); }} material={material} disabled={!!session.active} resources={resources} onResources={setResources} skillPins={pins.skills} onPinSkill={id => onPin('skills', id)}
+                <AssistantTools menu={menu} setMenu={value=>{if(value==='tags')setTagPickerRole('references');changeMenu(value);}} settings={settings} setSettings={changeSettings} material={material} disabled={!!session.active} memoryPending={memoryModel.state.proposals.length} onManageMemory={() => changeMenu('memory')} resources={resources} onResources={setResources} skillPins={pins.skills} onPinSkill={id => onPin('skills', id)}
                   scopeButton={<MaterialScopeButton open={menu === 'materials'} onToggle={() => changeMenu(menu === 'materials' ? null : 'materials')} pages={new Set([...(material ? [material.id] : []), ...turnResources.pages.map(item => item.id)]).size} libraries={turnResources.libraryIds.length}/>}
                   materialPanel={menu === 'materials' && <AssistantMaterialScope catalog={accessibleCatalog} resources={scopeResources} onChange={next => {setTagError("");topicEdit ? setTopicEdit({ ...topicEdit, resources: next }) : setResources(next);}} material={scopeMaterial}
                     current={scopeCurrent} topicScope={!topicEdit && activeTopic ? activeTopic.scope : undefined}
@@ -1217,6 +1259,26 @@ function AssistantConversation({
         </div>
       </div>
     </section>
+    {sideOpen && <section className="ha-panel ha-side-chat" style={sideStyle} aria-label="侧边聊天" onKeyDown={event => {
+      if (event.key === 'Escape') { event.stopPropagation(); setSideOpen(false); scrollArea.current?.focus({preventScroll:true}); }
+    }}>
+      <header><strong>侧边聊天</strong><button type="button" className="ha-icon" aria-label="关闭侧边聊天" onClick={() => { setSideOpen(false); scrollArea.current?.focus({preventScroll:true}); }}><X size={18}/></button></header>
+      <div className="ha-messages" role="log" aria-label="侧边聊天记录">{sideTurns.map(({ question, reply }) => <div key={reply.id}>
+        <article className="ha-message ha-user"><div className="ha-user-bubble">{question}</div></article>
+        <article className="ha-message ha-assistant">{answerBody(reply)}</article>
+      </div>)}</div>
+      <form className="ha-composer" onSubmit={event => {
+        event.preventDefault();
+        const question = sideInput.trim();
+        if (!question) return;
+        const reply = demoReply({ ...settings, webSearch: 'disabled', id: uniqueId(), text: question, context: null, additions: sideQuote ? [sideQuote] : [], attachmentNames: [], status: 'running', revision: 1 });
+        setSideTurns(turns => [...turns, { question, reply }]); setSideInput(''); setSideQuote('');
+      }}>
+        {sideQuote && <div className="ha-attachment-list" aria-label="待发送摘录"><span><FileText size={12}/><span title={sideQuote}>{sideQuote}</span><button type="button" className="ha-chip-remove" aria-label="移除摘录" onClick={() => setSideQuote('')}><X size={12}/></button></span></div>}
+        <textarea ref={sideComposer} value={sideInput} onChange={event=>setSideInput(event.target.value)} aria-label="侧边聊天问题" placeholder="就这段内容提问…" rows={2}/>
+        <div className="ha-side-footer"><small>演示模式</small><button type="submit" className="ha-primary-button" disabled={!sideInput.trim()}>发送</button></div>
+      </form>
+    </section>}
 
     {insertion && onInsertPage && <AssistantInsert body={insertion.body} source={insertion.source} catalog={catalog} currentPageId={currentPageId} allowed={canUseContext} onInsert={onInsertPage} onClose={() => setInsertion(null)}/>}
     {draft && <div className="ha-draft-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setDraft(null); }}>

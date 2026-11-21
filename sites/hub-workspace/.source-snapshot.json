@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "69c88d392672292e0d0ceca1bf96c8d18fd25be3",
-  "published_version": 132,
-  "deployment_id": "appgdep_6b01493683c48191904cebd9b878b957",
+  "source_commit": "6d025add6e328b49e7f08c28d1065d91a7a24200",
+  "published_version": 134,
+  "deployment_id": "appgdep_6b015738764c81918c174ffaf2a58c08",
   "files": {
     ".gitignore": {
       "sha256": "ca0e1575efb181d784f15bf6c86e3c012fd5c7ede4daa34b924d0d8b590d4e77",
@@ -28,14 +28,14 @@
       "bytes": 31055
     },
     "app/Assistant.tsx": {
-      "sha256": "513422122a635c61a4209fe2ec0753b6882c650a86993542e68d3bfe85dc0a26",
+      "sha256": "231e844422643f12c04c26b1332a3fd8880053ea552a055656f24d877403a021",
       "mode": "100644",
-      "bytes": 110501
+      "bytes": 116625
     },
     "app/AssistantChrome.tsx": {
-      "sha256": "646f7d5b632c03c97792d5518948dca4aeeb51dcc67b09052110ca2e6a6291cc",
+      "sha256": "7219150ebb61ffd099299a79f9f555591e8e0e3581e4727228a69e0acc859ef2",
       "mode": "100644",
-      "bytes": 9626
+      "bytes": 12689
     },
     "app/AssistantCloudHandoff.tsx": {
       "sha256": "7e25f2eed3a620ced94fe1e1cae5bca934d2004f78a13078e3d973e96dfaeaa2",
@@ -48,9 +48,9 @@
       "bytes": 2620
     },
     "app/AssistantDetails.tsx": {
-      "sha256": "7ce6f5283836f99d628df09c709f7d0957d811fbe5d3b12019abc0ffd79b13f5",
+      "sha256": "800808b1c4dcd4c612cf3f91643816d719c39360046f83de327e55073e4aa9b6",
       "mode": "100644",
-      "bytes": 8499
+      "bytes": 8075
     },
     "app/AssistantHistory.tsx": {
       "sha256": "2e68eda6b2bf9feb7adaa5486df30ad714ccac0dda68fb95b194e9334d193f14",
@@ -66,6 +66,11 @@
       "sha256": "982edc8dd95d095907034d18509fca27196f7889f3f632c5ca9948b84ab6c788",
       "mode": "100644",
       "bytes": 13678
+    },
+    "app/AssistantMemory.tsx": {
+      "sha256": "8b240e155b32839e49424e4f67f3f2609aa2f3672eac60795f84e27d6c81f325",
+      "mode": "100644",
+      "bytes": 17770
     },
     "app/AssistantModels.tsx": {
       "sha256": "cd6260eb60f8681c67680551a54848bf06c53822f705033714654021c93ca244",
@@ -91,6 +96,11 @@
       "sha256": "bd1b5523829701fdbe58b4f7abbad37ec9faaf06105a67340dae890f05f7ce34",
       "mode": "100644",
       "bytes": 8824
+    },
+    "app/AssistantSelectionActions.tsx": {
+      "sha256": "ddb8ff7432f824aa8807783de96af3ee59627d9d0e7046f7d2f7ad033cfd8534",
+      "mode": "100644",
+      "bytes": 5164
     },
     "app/AssistantTaskModes.tsx": {
       "sha256": "09a6fd111a9ebfffa099a71a3127377f719f045d9253b09c273707e2039be0d6",
@@ -252,10 +262,20 @@
       "mode": "100644",
       "bytes": 1644
     },
-    "app/assistant.css": {
-      "sha256": "b2e5c202c69111eb50f412758b7153a4869fef4a87e411364dfd7d57be8e66b6",
+    "app/assistant-memory.css": {
+      "sha256": "3d2156a7ce0f25bbd4f4bb5e4800d4e51d294aacce02e34571bb2fdf9d7c2bdd",
       "mode": "100644",
-      "bytes": 69299
+      "bytes": 9908
+    },
+    "app/assistant-memory.ts": {
+      "sha256": "fa144f4c0c8379bc245a6e9ca0cfb8c94f77050e5c34f6c116d47a7c23c06c1c",
+      "mode": "100644",
+      "bytes": 7635
+    },
+    "app/assistant.css": {
+      "sha256": "706cc5e31bed721abb209c9e32fc3dad673868b0d19f423d404a22fecad0112f",
+      "mode": "100644",
+      "bytes": 70896
     },
     "app/calendar-period.ts": {
       "sha256": "fb67e7bd1f4e04ccfd14ffb7ef8bb59fb448b0ed2080a698e9b331fe12b1224d",
@@ -1148,9 +1168,9 @@
       "bytes": 133251
     },
     "scripts/assistant-check.mjs": {
-      "sha256": "2b11c5f75dac122cadbc469dda071967cd66c0bad3721f2ab508d5f0f70a3d46",
+      "sha256": "6fec1abcb7a8f889f513d8589d0b6f9fcfac5a28a1be7c2cc72db84962b0ba6f",
       "mode": "100644",
-      "bytes": 16396
+      "bytes": 21187
     },
     "scripts/assistant-insert-check.mjs": {
       "sha256": "eaafc2d2c26ddcfd71fa071921e82a487225c3d22cb63f4b70f82e6a88f106dc",
@@ -1343,5 +1363,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-21T07:35:15.474831+00:00"
+  "imported_at": "2026-11-21T08:35:14.999267+00:00"
 }
