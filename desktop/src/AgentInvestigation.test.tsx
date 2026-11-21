@@ -1471,7 +1471,7 @@ it("creates a confirmed frozen source scope without a model and hides single-not
  await act(async()=>consent.click());await click("确认范围并建立对话");
  expect(invoke.mock.calls.filter(([,p])=>p?.args?.action==="createWithSourceScope")).toHaveLength(1);
  expect(invoke.mock.calls.some(([,p])=>["respond","run","create"].includes(p?.args?.action))).toBe(false);
- expect(document.body.textContent).toContain("已固定授权 1 份资料");expect(document.body.textContent).not.toContain("按标题或路径查找");
+ expect(document.body.textContent).toContain("已固定授权 1 份资料");expect(document.querySelector('.agent-material-browser input[type="search"]')).toBeNull();
 });
 
 it("refreshes frozen scope in the same Work and retries the same confirmation without model dispatch",async()=>{
@@ -2206,14 +2206,14 @@ it("keeps selections from different searches until Done and discards abandoned c
  invoke.mockImplementation(async(command,payload)=>{
   if(payload.args.action!=="materials")return fallback(command,payload);
   const query=payload.args.query.query;
-  const results=notes.filter(note=>note.title.includes(query));
+  const results=notes.filter(note=>note.title.includes(query)||(payload.args.query.searchLibraryName && note.libraryName.includes(query)));
   return {notes:results,total:results.length,nextOffset:null,snapshot:query};
  });
  await open();await click("移除当前页面");
  await openAddPage("从笔记库添加");
  const checkboxes=()=>[...document.querySelectorAll<HTMLInputElement>(".agent-material-results > div > .agent-material-choice input")];
  async function search(title:string){
-  const search=document.querySelector<HTMLInputElement>('[aria-label="按标题或路径查找"]')!;
+  const search=document.querySelector<HTMLInputElement>('[aria-label="按标题、路径或资料库名查找"]')!;
   await act(async()=>{
    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(search,title);
    search.dispatchEvent(new Event("input",{bubbles:true}));
@@ -2231,10 +2231,14 @@ it("keeps selections from different searches until Done and discards abandoned c
  expect(document.querySelector(".agent-pending-materials")).toBeNull();
  await click("取消");
  await click("核心材料");
+ await search("笔记库");
  expect(checkboxes().map(input=>input.checked)).toEqual([false,false]);
  await act(async()=>checkboxes()[0].click());
+ await click("已选 1");
+ expect(checkboxes().map(input=>input.checked)).toEqual([true]);
  await click("完成选择");
  expect(document.querySelector(".agent-pending-materials")?.textContent).toContain("甲页");
+ expect(document.querySelector(".agent-pending-materials")?.textContent).not.toContain("乙页");
  expect(invoke.mock.calls.some(([,p])=>["create","message","respond"].includes(p?.args?.action))).toBe(false);
 });
 
@@ -2418,7 +2422,7 @@ it("opens the primary materials picker for a task and sends selected notes along
  invoke.mockImplementation(async(command,options)=>options.args.action==='materials'?{notes:[note],total:1,nextOffset:null,snapshot:'task-notes'}:original(command,options));
  const task={...result,contentType:'task',sourceType:'craft_task',provider:'craft' as const,taskSourceId:'task-with-notes',blockId:'display'};
  await act(async()=>root.render(<AgentInvestigation result={task}/>));await click('调查这项任务');
- await click('添加资料');expect(document.body.querySelector('input[aria-label="按标题或路径查找"]')).not.toBeNull();
+ await click('添加资料');expect(document.body.querySelector('input[aria-label="按标题、路径或资料库名查找"]')).not.toBeNull();
  await act(async()=>document.body.querySelector<HTMLInputElement>('.agent-material-results > div > .agent-material-choice input')!.click());
  await click('完成选择');await fill('investigationGoal','结合参考笔记核对任务');await click('开始调查');
  const grant=invoke.mock.calls.find(([,p])=>p?.args?.action==='create')![1].args.grant;

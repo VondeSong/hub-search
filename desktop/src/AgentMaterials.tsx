@@ -8,7 +8,7 @@ export type AgentMaterial = { locator: NoteLocator; title: string; path: string;
 type Page = { notes: AgentMaterial[]; total: number; nextOffset: number | null; snapshot: string };
 type Picker = {
   currentPage?: { row: ReactNode; catalogKey?: string };
-  extraSelected?: { row: ReactNode; title: string }[];
+  extraSelected?: { row: ReactNode; title: string; libraryName?: string }[];
   count: number;
   selectedCount: number;
   tools?: ReactNode;
@@ -36,7 +36,7 @@ export function AgentMaterials({ description, onPreview, anchor, anchorIncluded=
     const ticket = ++request.current;
     setLoading(true); setError("");
     try {
-      const value = await invoke<Page>("agent_investigation", { args: { action: "materials", query: { query: query.trim(), offset, limit: picker ? 12 : 20, ...(offset && page ? { expectedSnapshot: page.snapshot } : {}) } } });
+      const value = await invoke<Page>("agent_investigation", { args: { action: "materials", query: { query: query.trim(), offset, limit: picker ? 12 : 20, ...(picker ? { searchLibraryName: true } : {}), ...(offset && page ? { expectedSnapshot: page.snapshot } : {}) } } });
       if (!value || !Array.isArray(value.notes) || typeof value.snapshot!=="string" || !Number.isSafeInteger(value.total)) throw new Error("笔记清单返回格式无效");
       if (alive.current && ticket === request.current) {
         if (picker && !query.trim()) setTotal(value.total);
@@ -60,7 +60,9 @@ export function AgentMaterials({ description, onPreview, anchor, anchorIncluded=
     setError("");
   }
   const keyword = query.trim().toLocaleLowerCase();
-  const extra = selectedOnly ? picker?.extraSelected?.filter(item=>item.title.toLocaleLowerCase().includes(keyword)) : undefined;
+  const searchLabel = picker ? "按标题、路径或资料库名查找" : "按标题或路径查找";
+  const noMatches = picker ? "没有找到匹配页面，试试更短的关键词。" : "没有找到匹配页面，试试更短的标题或路径。";
+  const extra = selectedOnly ? picker?.extraSelected?.filter(item=>[item.title,item.libraryName].some(value=>value?.toLocaleLowerCase().includes(keyword))) : undefined;
   const current = !selectedOnly && !keyword ? picker?.currentPage : undefined;
   const notes = selectedOnly
     ? selected.filter(note=>note.fileBytes===undefined && [note.title,note.path,note.libraryName].some(text=>text.toLocaleLowerCase().includes(keyword)))
@@ -71,7 +73,7 @@ export function AgentMaterials({ description, onPreview, anchor, anchorIncluded=
   const content=<div className={`agent-skill-menu agent-material-picker${picker ? " agent-material-browser" : ""}`} aria-label="选择分析材料">
       {!embedded && <div className="agent-popover-header"><strong>一起分析的资料</strong><button type="button" onClick={()=>popover.close(true)} aria-label="关闭材料选择">关闭</button></div>}
       {!picker && <p className="agent-note">{description??"选择要一起分析的笔记，随下一条消息发送。仅添加所选笔记，不授权整个资料库。"}</p>}
-      <div className="agent-material-search">{picker && <Search size={17} aria-hidden="true"/>}<input ref={input} aria-label="按标题或路径查找" placeholder="搜索页面标题或路径" type="search" value={query} maxLength={200} disabled={disabled} onCompositionStart={()=>setComposing(true)} onCompositionEnd={()=>setComposing(false)} onChange={event=>changeQuery(event.target.value)} onKeyDown={event => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); event.stopPropagation(); if(!selectedOnly)void load(); } }} />
+      <div className="agent-material-search">{picker && <Search size={17} aria-hidden="true"/>}<input ref={input} aria-label={searchLabel} placeholder={picker ? "搜索标题、路径或资料库名" : "搜索页面标题或路径"} type="search" value={query} maxLength={200} disabled={disabled} onCompositionStart={()=>setComposing(true)} onCompositionEnd={()=>setComposing(false)} onChange={event=>changeQuery(event.target.value)} onKeyDown={event => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); event.stopPropagation(); if(!selectedOnly)void load(); } }} />
         {picker ? !!query&&<button type="button" aria-label="清空材料搜索" disabled={disabled} onClick={()=>{changeQuery("");input.current?.focus();}}><X size={15}/></button> : <button type="button" disabled={disabled || loading} onClick={() => void load()}>搜索</button>}
       </div>
       {picker && <div className="agent-material-filter" aria-label="材料列表筛选"><button type="button" aria-pressed={!selectedOnly} onClick={()=>setSelectedOnly(false)}>全部页面{total!==undefined&&<small>{total}</small>}</button><button type="button" aria-pressed={selectedOnly} onClick={()=>setSelectedOnly(true)}>已选 <small>{picker.selectedCount}</small></button></div>}
@@ -87,7 +89,7 @@ export function AgentMaterials({ description, onPreview, anchor, anchorIncluded=
       {!picker && !page && !loading && !error && !query.trim() && <p className="agent-note">输入关键词，或点击搜索浏览笔记。</p>}
       {!picker && page && <p className="agent-note">{keyword?`找到 ${page.total} 份笔记`:`浏览笔记 · 共 ${page.total} 份`} · 本页 {page.notes.length} 份</p>}
       {picker && (selectedOnly || !!page) && <h4 className="agent-material-group-title">{keyword?"搜索结果":selectedOnly?"已选页面":"页面列表"} <span>{selectedOnly?(notes?.length||0)+(extra?.length||0):page?.total}</span></h4>}
-      {((!selectedOnly && page?.total===0 && !current) || (selectedOnly && !notes?.length && !extra?.length)) && <p className="agent-note">{keyword?"没有找到匹配页面，试试更短的标题或路径。":"还没有选择页面。勾选需要的页面，完成后再随消息发送。"}</p>}
+      {((!selectedOnly && page?.total===0 && !current) || (selectedOnly && !notes?.length && !extra?.length)) && <p className="agent-note">{keyword ? noMatches : "还没有选择页面。勾选需要的页面，完成后再随消息发送。"}</p>}
       {extra?.map(item=>item.row)}
       {notes?.map(note => {
         const primary = (anchor && anchorIncluded && materialKey(note.locator) === materialKey(anchor)) || retained?.some(n => n.libraryId===note.locator.libraryId && n.documentId===note.locator.documentId && (n.pageId===null || n.pageId===note.locator.pageId));

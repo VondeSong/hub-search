@@ -177,6 +177,42 @@ fn enumeration_remembers_one_scope_across_pages_and_detects_new_documents() {
 }
 
 #[test]
+fn library_name_search_pages_only_through_authorized_notes() {
+    let f = Fixture::new();
+    f.note("notes", "first", "正文甲");
+    f.note("notes", "second", "正文乙");
+    f.note("notes", "unselected", "不在授权范围");
+    let scope = EvidenceScope::new(vec![], vec![])
+        .unwrap()
+        .with_notes(vec![note("first"), note("second")])
+        .unwrap();
+    let mut session = Session::new(&f.root, Some(scope)).unwrap();
+    let list = "hub_list_note_sources";
+    let legacy = session.call(list, &json!({"query":"nOtEs"}), "").unwrap();
+    assert_eq!(legacy["total"], 0);
+    let first = session
+        .call(
+            list,
+            &json!({"query":"nOtEs","searchLibraryName":true,"limit":1}),
+            "",
+        )
+        .unwrap();
+    assert_eq!(first["total"], 2);
+    assert_eq!(first["nextOffset"], 1);
+    assert_eq!(first["notes"][0]["locator"], json!(note("first")));
+    let next = session
+        .call(list, &json!({"query":"nOtEs","searchLibraryName":true,"offset":1,"limit":1,"expectedSnapshot":first["snapshot"]}), "")
+        .unwrap();
+    assert_eq!(next["notes"][0]["locator"], json!(note("second")));
+    assert_eq!(next["nextOffset"], Value::Null);
+    assert_eq!(next["bodyRead"], false);
+    f.c()
+        .execute("UPDATE libraries SET name='Renamed' WHERE id='notes'", [])
+        .unwrap();
+    assert!(session.verify().is_err());
+}
+
+#[test]
 fn mcp_and_embedded_catalogs_have_identical_definitions_and_one_domain_executor() {
     let f = Fixture::new();
     let mut external = Session::new(&f.root, None).unwrap();

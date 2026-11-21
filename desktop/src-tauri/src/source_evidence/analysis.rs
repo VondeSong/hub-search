@@ -61,6 +61,7 @@ fn sources(
     if query.chars().count() > 200 {
         return Err("材料筛选最多 200 个字符".into());
     }
+    let search_library_name = args["searchLibraryName"] == true;
     let mut stmt = c.prepare("SELECT d.space_id,d.id,d.title,d.path,d.content_hash,d.blob_hash,length(d.markdown),l.name FROM documents d JOIN libraries l ON l.id=d.space_id WHERE l.enabled=1 AND d.provider IN ('craft','obsidian','feishu') AND (d.space_id IN (SELECT value FROM json_each(?1)) OR EXISTS(SELECT 1 FROM json_each(?2) n WHERE json_extract(n.value,'$.libraryId')=d.space_id AND json_extract(n.value,'$.documentId')=d.id)) ORDER BY d.space_id,d.id").map_err(|e|e.to_string())?;
     let mut rows = stmt
         .query(params![
@@ -78,9 +79,11 @@ fn sources(
         }
         let title: String = row.get(2).map_err(|e| e.to_string())?;
         let path: String = row.get(3).map_err(|e| e.to_string())?;
+        let library_name: String = row.get(7).map_err(|e| e.to_string())?;
         if !query.is_empty()
             && !title.to_lowercase().contains(&query)
             && !path.to_lowercase().contains(&query)
+            && !(search_library_name && library_name.to_lowercase().contains(&query))
         {
             continue;
         }
@@ -101,7 +104,7 @@ fn sources(
                 locator,
                 title: title.clone(),
                 path: path.clone(),
-                library: row.get(7).map_err(|e| e.to_string())?,
+                library: library_name.clone(),
                 version: json!([
                     row.get::<_, String>(4).map_err(|e| e.to_string())?,
                     row.get::<_, Option<String>>(5).map_err(|e| e.to_string())?,
@@ -109,9 +112,7 @@ fn sources(
                 ]),
             });
             if result.len() > MAX_NOTES {
-                return Err(
-                    "材料超过 5000 份，请缩小资料库或标题/路径筛选范围；未返回抽样统计".into(),
-                );
+                return Err("材料超过 5000 份，请缩小筛选范围；未返回抽样统计".into());
             }
         }
     }
@@ -179,6 +180,9 @@ pub(crate) fn execute(reader: &EvidenceReader, name: &str, args: &Value) -> Resu
     if name == "hub_create_analysis_snapshot" {
         return snapshots::create(reader, args);
     }
+    if args["searchLibraryName"] == true && snapshots::is_frozen(&args["expectedSnapshot"]) {
+        return Err("按资料库名查找仅用于实时材料清单".into());
+    }
     if name == "hub_read_analysis_snapshot" || snapshots::is_frozen(&args["expectedSnapshot"]) {
         return snapshots::execute(reader, name, args);
     }
@@ -191,7 +195,8 @@ pub(crate) fn execute(reader: &EvidenceReader, name: &str, args: &Value) -> Resu
             let limit = args["limit"].as_u64().unwrap_or(30).clamp(1,50) as usize;
             let notes = items.iter().skip(offset).take(limit).map(|s|json!({"locator":s.locator,"title":s.title,"path":s.path,"libraryName":s.library})).collect::<Vec<_>>();
             let end = offset.saturating_add(notes.len());
-            return Ok(json!({"notes":notes,"total":items.len(),"nextOffset":if end<items.len(){Some(end)}else{None},"snapshot":snapshot,"coverage":"authorizedLocalCache","filter":"titleOrPathContains","bodyRead":false}));
+            let filter = if args["searchLibraryName"] == true { "titlePathOrLibraryNameContains" } else { "titleOrPathContains" };
+            return Ok(json!({"notes":notes,"total":items.len(),"nextOffset":if end<items.len(){Some(end)}else{None},"snapshot":snapshot,"coverage":"authorizedLocalCache","filter":filter,"bodyRead":false}));
         }
         analyze(reader,c,visible,&items,args,&snapshot,None)
     })

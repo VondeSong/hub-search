@@ -81,8 +81,8 @@ pub(crate) fn catalog() -> Value {
         ),
         (
             "hub_list_note_sources",
-            "分页枚举授权笔记清单，按标题/路径筛选，不依赖检索排名。expectedSnapshot 为分析快照时枚举固定输入，否则检查实时清单指纹、变化后重新枚举；不返回正文。",
-            json!({"libraryId":{"type":"string"},"query":{"type":"string"},"offset":{"type":"integer","minimum":0,"maximum":5000},"limit":{"type":"integer","minimum":1,"maximum":50},"expectedSnapshot":{"type":"string"}}),
+            "分页枚举授权笔记清单，按标题/路径筛选。实时清单可用 searchLibraryName 同时匹配资料库名。expectedSnapshot 为分析快照时枚举固定输入，否则检查实时清单指纹、变化后重新枚举；不返回正文。",
+            json!({"libraryId":{"type":"string"},"query":{"type":"string"},"searchLibraryName":{"type":"boolean"},"offset":{"type":"integer","minimum":0,"maximum":5000},"limit":{"type":"integer","minimum":1,"maximum":50},"expectedSnapshot":{"type":"string"}}),
             json!([]),
         ),
         (
@@ -554,6 +554,9 @@ impl Session {
             | "hub_read_analysis_snapshot" => {
                 let reader = self.analysis_reader()?;
                 let mut dependency = json!({"libraryId":args["libraryId"],"query":args["query"]});
+                if args["searchLibraryName"] == true {
+                    dependency["searchLibraryName"] = json!(true);
+                }
                 if let Some(id) = args["expectedSnapshot"]
                     .as_str()
                     .filter(|s| s.starts_with("analysis-v1:"))

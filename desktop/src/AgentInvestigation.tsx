@@ -1544,10 +1544,12 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
                 extraSelected:[
                   ...(!view&&selection.pageAttached&&pageAnchor?[{
                     title:pageTitle||currentObjectLabel,
+                    libraryName:pageLibraryName,
                     row:<label key="current" className="agent-material-choice"><input type="checkbox" checked disabled={pickerDisabled} onChange={()=>setMaterialSelection(draft=>draft&&{...draft,pageAttached:false})}/><span><strong>{pageTitle||currentObjectLabel}</strong></span></label>,
                   }]:[]),
                   ...selection.dropped.map(item=>({
                     title:item.title,
+                    libraryName:libraryRegistry.libraries.find(library=>"libraryId" in item.locator&&library.id===item.locator.libraryId)?.name,
                     row:<label key={JSON.stringify(item.locator)} className="agent-material-choice"><input type="checkbox" checked disabled={pickerDisabled} onChange={()=>setMaterialSelection(draft=>draft&&{...draft,dropped:draft.dropped.filter(note=>note!==item)})}/><span><strong>{item.title}</strong></span></label>,
                   })),
                 ],
