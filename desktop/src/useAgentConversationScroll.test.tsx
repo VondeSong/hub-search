@@ -8,7 +8,7 @@ let root:Root,host:HTMLDivElement,resize:()=>void,disconnect:ReturnType<typeof v
 let height=1000;
 function Conversation({work="one",version=1}:{work?:string;version?:number}) {
  const scroll=useAgentConversationScroll(true,work,version);
- return <><div ref={scroll.element} onScroll={scroll.onScroll}><div ref={scroll.content}><details onClickCapture={scroll.holdPosition}><summary>处理过程</summary>保存的正文</details></div></div>{scroll.showLatest&&<button onClick={scroll.scrollToLatest}>回到最新内容</button>}</>;
+ return <><div ref={scroll.element} tabIndex={0} onScroll={scroll.onScroll}><div ref={scroll.content}><details onClickCapture={scroll.holdPosition}><summary>处理过程</summary>保存的正文</details></div></div>{scroll.showLatest&&<button onClick={scroll.jumpToLatest}>回到最新内容</button>}</>;
 }
 beforeEach(()=>{
  Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});height=1000;
@@ -31,6 +31,7 @@ it("preserves a reader's position through new results, then follows again only a
  height=1800;await act(async()=>root.render(<Conversation version={2}/>));await act(async()=>resize());
  expect(pane.scrollTop).toBe(120);expect(host.querySelector('button')?.textContent).toBe('回到最新内容');
  await act(async()=>host.querySelector('button')!.click());expect(pane.scrollTop).toBe(1800);
+ expect(document.activeElement).toBe(pane);
  height=2100;await act(async()=>resize());expect(pane.scrollTop).toBe(2100);
 });
 it("opens another Work at its latest content and releases the observer on unmount",async()=>{

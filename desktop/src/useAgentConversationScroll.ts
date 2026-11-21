@@ -20,6 +20,10 @@ export function useAgentConversationScroll(open: boolean, workId: string | undef
     setShowLatest(false);
     if (element.current) element.current.scrollTop = element.current.scrollHeight;
   };
+  const jumpToLatest = () => {
+    scrollToLatest();
+    element.current?.focus({ preventScroll: true });
+  };
   useLayoutEffect(() => { follow.current = true; setShowLatest(false); }, [workId]);
   useLayoutEffect(() => {
     if (!open || !element.current || !content.current) return;
@@ -40,5 +44,5 @@ export function useAgentConversationScroll(open: boolean, workId: string | undef
     setShowLatest(!follow.current);
   };
   const holdPosition = () => { follow.current = false; setShowLatest(awayFromLatest()); };
-  return { element, content, showLatest, onScroll, scrollToLatest, holdPosition, isFollowing: () => follow.current };
+  return { element, content, showLatest, onScroll, scrollToLatest, jumpToLatest, holdPosition, isFollowing: () => follow.current };
 }

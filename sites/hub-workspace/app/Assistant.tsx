@@ -1107,7 +1107,14 @@ function AssistantConversation({
             </div>}
           </div>
 
-          {jump && <button type="button" className="ha-jump-latest" onClick={() => { if (scrollArea.current) scrollArea.current.scrollTop = scrollArea.current.scrollHeight; setJump(false); }}>回到最新消息 ↓</button>}
+          {jump && <button type="button" className="ha-jump-latest" onClick={() => {
+            const viewport = scrollArea.current;
+            if (viewport) {
+              viewport.scrollTop = viewport.scrollHeight;
+              viewport.focus({preventScroll: true});
+            }
+            setJump(false);
+          }}>回到最新消息 ↓</button>}
           <div className="ha-composer-area">
             {session.queue.length > 0 && <div className="ha-queue"><div className="ha-queue-heading"><CornerDownRight size={12} /><span>下一条 · {session.queue.length}</span>{paused && <small>已暂停</small>}</div>{session.queue.map(item => <div className="ha-queued" key={item.id}><span>{canUseContext(item.context) ? item.text : '来源不可用 · 内容已隐藏'}</span><button type="button" className="ha-icon" onClick={() => dispatch({ type: 'remove', id: item.id })} aria-label={canUseContext(item.context) ? '移出队列：' + item.text : '移除来源不可用的请求'} title="移出队列"><X size={12} /></button></div>)}</div>}
             {!session.active && session.queue.length > 0 && <button type="button" className="ha-resume-queue" disabled={!canUseContext(session.queue[0].context)} onClick={() => { if (canUseContext(session.queue[0].context)) dispatch({ type: 'continue' }); }}><Play size={12} />继续队列</button>}
