@@ -569,8 +569,12 @@
 .ha-process-demo :is(.ha-process-group,.ha-process-batch)>summary:is(:hover,:focus-visible){color:var(--text)}
 .ha-process-demo summary>svg:last-child{margin-inline-start:0;transition:transform .15s}
 .ha-process-demo details:not([open])>summary>svg:last-child,.ha-activity.ha-process-demo:not([open])>summary>svg:last-child{transform:rotate(-90deg)}
+@media (hover:hover){
+  .ha-process-demo .ha-process-group>summary:not(:hover,:focus-visible)>svg:last-child{opacity:0}
+}
 .ha-process-commentary{margin-block:12px;color:var(--text);line-height:1.6;font-size:14px}
 .ha-process-row{display:flex;align-items:flex-start;gap:8px;margin-block:8px;line-height:1.6}
+.ha-process-children>.ha-process-row{color:var(--subtle)}
 .ha-process-group{margin-block:12px}
 .ha-process-group>div{padding-block:4px;padding-inline-start:24px}
 .ha-process-group>.ha-process-children{border-inline-start:1px solid var(--line);margin-inline-start:8px;padding-inline-start:14px;overflow-wrap:anywhere}
