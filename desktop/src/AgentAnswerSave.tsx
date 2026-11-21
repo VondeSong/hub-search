@@ -100,6 +100,7 @@ export function AgentAnswerSave({workId,runId,current,disabled,records=[],onChan
   const destinations=useRef<HTMLDivElement>(null);
   const dialog=useRef<HTMLElement>(null);
   const restoreProject=useRef("");
+  const dialogTitleId=useId();
   const owner=destinations.current?.closest(".agent-panel") ?? document.body;
   useModalFocus({active:open,containerRef:dialog,onDismiss:close});
   useEffect(()=>()=>{epoch.current++;},[]);
@@ -108,12 +109,37 @@ export function AgentAnswerSave({workId,runId,current,disabled,records=[],onChan
   function close(){if(busy)return;epoch.current++;setOpen(false);}
   async function prepare(){const ticket=epoch.current;setBusy(true);setError("");try{const args={action:"prepareAnswerSave",id:workId,runId,mode,title,text,sourceHash,libraryId:mode==="append"?target?.locator.libraryId:library,...(mode==="append"?{target:target?.locator}:{}),...(project?{projectId:project}:{})};const key=JSON.stringify(args);if(identity.current?.key!==key)identity.current={key,id:crypto.randomUUID()};const next=await call<AnswerSave>({...args,saveId:identity.current.id});if(ticket===epoch.current){setPreview(next);onChanged();}}catch(e){setError(String(e));}finally{setBusy(false);}}
   async function submit(item:AnswerSave){const ticket=epoch.current;setBusy(true);setError("");try{const next=await call<AnswerSave>({action:"submitAnswerSave",id:workId,saveId:item.saveId,confirmationToken:item.confirmationToken});if(ticket===epoch.current){setPreview(next);onChanged();}}catch(e){setError(String(e));}finally{setBusy(false);}}
-  async function inspect(item:AnswerSave){setBusy(true);setError("");try{const next=await call<AnswerSave>({action:"inspectAnswerSave",id:workId,saveId:item.saveId,...(existingId.trim()?{objectId:existingId.trim()}:{})});setPreview(next);onChanged();}catch(e){setError(String(e));}finally{setBusy(false);}}
-  const receipt=(item:AnswerSave)=><div key={item.saveId} className="agent-answer-save-receipt"><strong>{item.state==="verified"?"已保存并核验":item.state==="prepared"?"保存预览已准备":"保存结果待核对"} · {item.targetName}</strong><p>{item.receipt?.path||item.targetPath||item.targetTitle||item.projectName||item.receipt?.objectId||item.title}</p>{item.state==="verified"&&<button type="button" disabled={busy||disabled} onClick={()=>{setMode(item.mode);setOpen(true);void inspect(item);}}>查看保存结果</button>}{item.receipt?.indexed===false&&<p>原文件已保存，搜索索引尚待更新。</p>}{item.error&&<p role="alert">{item.error}</p>}{item.state==="unknown"||item.state==="executing"?<><p>可能已有写入，核对只读取结果，不会再次创建。</p>{!item.receipt?.objectId&&!item.receipt?.path&&<input aria-label="已创建页面或任务的 ID" placeholder="远端页面或任务 ID（有保存身份时无需填写）" value={existingId} onChange={e=>setExistingId(e.target.value)}/>}<button type="button" disabled={busy||disabled} onClick={()=>{setMode(item.mode);setOpen(true);void inspect(item);}}>核对保存结果</button></>:item.state==="prepared"&&<button type="button" disabled={busy||disabled} onClick={()=>{setMode(item.mode);setPreview(item);setOpen(true);}}>查看保存预览</button>}</div>;
+  async function inspect(item:AnswerSave){setBusy(true);setError("");try{const objectId=manualReceiptId(item)?existingId.trim():"";const next=await call<AnswerSave>({action:"inspectAnswerSave",id:workId,saveId:item.saveId,...(objectId?{objectId}:{})});setPreview(next);onChanged();}catch(e){setError(String(e));}finally{setBusy(false);}}
+  function manualReceiptId(item:AnswerSave) {
+    return (item.state==="unknown"||item.state==="executing")&&!item.receipt?.objectId&&!item.receipt?.path;
+  }
+  function openReceipt(item:AnswerSave) {
+    setMode(item.mode);
+    setPreview(item);
+    setError("");
+    setOpen(true);
+    if(item.state!=="prepared")void inspect(item);
+  }
+  function receipt(item:AnswerSave,inDialog=false) {
+    return <div key={item.saveId} className="agent-answer-save-receipt">
+      <strong>{item.state==="verified"?"已保存并核验":item.state==="prepared"?"保存预览已准备":"保存结果待核对"} · {item.targetName}</strong>
+      <p>{item.receipt?.path||item.targetPath||item.targetTitle||item.projectName||item.receipt?.objectId||item.title}</p>
+      {!inDialog&&item.state==="verified"&&<button type="button" disabled={busy||disabled} onClick={()=>openReceipt(item)}>查看保存结果</button>}
+      {item.receipt?.indexed===false&&<p>原文件已保存，搜索索引尚待更新。</p>}
+      {item.error&&<p role="alert">{item.error}</p>}
+      {item.state==="unknown"||item.state==="executing"?<>
+        <p>可能已有写入，核对只读取结果，不会再次创建。</p>
+        {manualReceiptId(item)&&<input aria-label="已创建页面或任务的 ID" placeholder="远端页面或任务 ID（有保存身份时无需填写）" value={existingId} onChange={e=>setExistingId(e.target.value)}/>}
+        <button type="button" disabled={busy||disabled} onClick={()=>openReceipt(item)}>核对保存结果</button>
+      </>:!inDialog&&item.state==="prepared"&&<button type="button" disabled={busy||disabled} onClick={()=>openReceipt(item)}>查看保存预览</button>}
+    </div>;
+  }
+  const dialogTitle=preview ? preview.state==="verified"?"保存结果":preview.state==="prepared"?"保存预览":"核对保存结果" :
+    mode==="append"?"插入页面":mode==="task"?"创建任务":"新建笔记";
   return <div ref={destinations} className="agent-answer-destinations"><AnswerSaveMenu disabled={disabled} onSelect={next=>{setSearch(false);void show(next);}}/>
-    {records.filter(r=>r.runId===runId).map(receipt)}
-    {open&&createPortal(<section ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label="保存回答" className="agent-answer-save" onKeyDown={e=>{if(e.key==="Escape"){e.preventDefault();e.stopPropagation();close();}}}><header className="agent-popover-header"><strong>{mode==="append"?"插入页面":mode==="task"?"创建任务":"新建笔记"}</strong><button type="button" aria-label="关闭保存回答" disabled={busy} onClick={close}><X size={16}/></button></header>
-      <div className="agent-answer-save-body">{preview?<>{receipt(preview)}<h3>{preview.title}</h3><pre>{preview.text}</pre></>:<>
+    {records.filter(r=>r.runId===runId).map(item=>receipt(item))}
+    {open&&createPortal(<section ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={dialogTitleId} className="agent-answer-save" onKeyDown={e=>{if(e.key==="Escape"){e.preventDefault();e.stopPropagation();close();}}}><header className="agent-popover-header"><strong id={dialogTitleId}>{dialogTitle}</strong><button type="button" aria-label="关闭保存回答" disabled={busy} onClick={close}><X size={16}/></button></header>
+      <div className="agent-answer-save-body">{preview?<>{receipt(preview,true)}<h3>{preview.title}</h3><pre>{preview.text}</pre></>:<>
         {mode==="append"?<><button type="button" onClick={()=>setSearch(v=>!v)}>{target?`${target.title} · ${target.libraryName}`:"搜索并选择目标页面"}</button>{current&&<button type="button" onClick={()=>{setTarget({locator:current,title:"当前页面",path:current.documentId,libraryName:libraries.find(l=>l.id===current.libraryId)?.name||""});setSearch(false);}}>使用当前页面</button>}{search&&<AgentMaterials embedded selected={target?[target]:[]} disabled={busy} onChange={items=>{setTarget(items[items.length-1]||null);setSearch(false);}} onDone={()=>setSearch(false)}/>}</>:<><label>保存到<select aria-label="保存资料库" value={library} disabled={busy} onChange={e=>{restoreProject.current="";setLibrary(e.target.value);}}><option value="">选择资料库</option>{libraries.filter(l=>mode!=="task"||l.provider==="dida365").map(l=><option key={l.id} value={l.id}>{l.name}</option>)}</select></label>{libraries.find(l=>l.id===library)?.provider==="dida365"&&<label>滴答清单<select aria-label="目标滴答清单" disabled={busy} value={project} onChange={e=>setProject(e.target.value)}><option value="">选择清单</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}</>}
         <label>{mode==="task"?"任务名称":"标题"}<input aria-label="保存标题" value={title} maxLength={100} disabled={busy} onChange={e=>setTitle(e.target.value)}/></label><label>正文<textarea aria-label="保存正文" rows={10} value={text} maxLength={32000} disabled={busy} onChange={e=>setText(e.target.value)}/></label><p className="agent-note">{mode==="append"?"只向你选定的目标追加；保存前再次核对页面版本。":mode==="task"?"创建可完成的滴答行动任务，不作为资料笔记保存。":"创建新笔记。Obsidian 保存在所选库根目录，Craft 保存在未分类。"}</p>
       </>}{busy&&<p role="status">正在核对保存内容…</p>}{error&&<p role="alert">{error}</p>}</div>

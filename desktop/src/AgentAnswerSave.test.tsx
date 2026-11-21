@@ -121,9 +121,12 @@ it("asks for a target again for a legacy preview without a locator and never def
  expect(invoke.mock.calls.some(([,p])=>p.args.action==="prepareAnswerSave")).toBe(false);
 });
 it("rechecks an already verified save by reading its receipt without submitting another write",async()=>{
- const saved={...preview,state:"verified",receipt:{verified:true,objectId:"actual-task"}};
+ const saved={...preview,mode:"task" as const,state:"verified",receipt:{verified:true,objectId:"actual-task"}};
  await act(async()=>root.render(<AgentAnswerSave workId="work" runId="historical-run" records={[saved]} disabled={false} onChanged={changed}/>));
  await act(async()=>button("查看保存结果").click());
+ const dialog=document.querySelector<HTMLElement>('[role="dialog"]')!;
+ expect(document.getElementById(dialog.getAttribute("aria-labelledby")!)?.textContent).toBe("保存结果");
+ expect(dialog.querySelector("button:not([aria-label='关闭保存回答'])")).toBeNull();
  expect(invoke.mock.calls.find(([,p])=>p.args.action==="inspectAnswerSave")![1].args).toEqual({action:"inspectAnswerSave",id:"work",saveId:"save"});
  expect(invoke.mock.calls.some(([,p])=>p.args.action==="submitAnswerSave"||p.args.action==="prepareAnswerSave")).toBe(false);
 });
