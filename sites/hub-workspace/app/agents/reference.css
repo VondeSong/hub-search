@@ -1,0 +1,61 @@
+@import "tailwindcss" source(none);
+@source "./ReferenceAgent.jsx";
+
+@theme {
+  --color-canvas: #FCFCFB;
+  --color-surface: #FFFFFF;
+  --color-subtle: #F4F4F2;
+  --color-hover: #EFEFEA;
+  --color-primary: #1A1918;
+  --color-secondary: #6B6965;
+  --color-muted: #9A9893;
+  --color-border: #E7E6E2;
+  --color-accent-indigo: #5E6AD2;
+  --color-accent-green: #16A34A;
+  --color-accent-amber: #D97706;
+  --color-accent-rose: #E11D48;
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  --shadow-2xs: 0 1px 1px rgba(28, 25, 23, 0.03);
+  --shadow-xs: 0 1px 2px rgba(28, 25, 23, 0.05);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-card: 0 1px 2px rgba(28, 25, 23, 0.035), 0 0 0 1px rgba(28, 25, 23, 0.045);
+  --shadow-composer: 0 8px 28px -6px rgba(28, 25, 23, 0.07), 0 2px 6px -1px rgba(28, 25, 23, 0.035), 0 0 0 1px rgba(28, 25, 23, 0.06);
+  --shadow-popover: 0 14px 36px -6px rgba(28, 25, 23, 0.11), 0 4px 12px -2px rgba(28, 25, 23, 0.05), 0 0 0 1px rgba(28, 25, 23, 0.06);
+  --shadow-sheet: 0 24px 60px -12px rgba(28, 25, 23, 0.16), 0 0 0 1px rgba(28, 25, 23, 0.06);
+}
+
+@layer base {
+  *, ::before, ::after, ::backdrop, ::file-selector-button {
+    border-color: #e5e7eb;
+  }
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+* { box-sizing: border-box; }
+:host {
+  display: block;
+  margin: 0;
+  background-color: #F3F3F1;
+  color: #1A1918;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+.glass {
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(28, 25, 23, 0.14); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(28, 25, 23, 0.24); }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-fadeIn { animation: fadeIn 0.16s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
