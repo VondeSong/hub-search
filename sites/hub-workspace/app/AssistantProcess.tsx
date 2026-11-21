@@ -140,13 +140,18 @@ function WorkspaceReceiptsExample() {
   </div>;
 }
 
-function AttachmentReplay() {
+function AttachmentReplay({onWorkingChange}: {onWorkingChange: (working: boolean) => void}) {
   const [step,setStep] = useState(0);
   const [playing,setPlaying] = useState(true);
   const [revision,setRevision] = useState(0);
   const [processOpen,setProcessOpen] = useState(true);
   const review = useRef(false);
   const replay = useRef<HTMLDivElement>(null);
+  const working = playing && step < 5;
+  useEffect(() => {
+    onWorkingChange(working);
+    return () => onWorkingChange(false);
+  }, [working, onWorkingChange]);
   useEffect(() => {
     if (!playing || step === 5) return;
     const timer = window.setTimeout(() => {
@@ -199,7 +204,7 @@ function AttachmentReplay() {
     </div>
   </>;
 }
-export function AssistantProcessDemo({onClose}: {onClose: () => void}) {
+export function AssistantProcessDemo({onClose, onWorkingChange}: {onClose: () => void; onWorkingChange: (working: boolean) => void}) {
   const [scenario,setScenario] = useState<(typeof examples)[number][0]>('timeline');
   const [readAgain,setReadAgain] = useState(false);
   const [visibleBatches,setVisibleBatches] = useState(5);
@@ -209,7 +214,7 @@ export function AssistantProcessDemo({onClose}: {onClose: () => void}) {
       {examples.map(([id,label]) => <button type="button" key={id} aria-pressed={scenario===id} onClick={()=>setScenario(id)}>{label}</button>)}
     </div>
     <div key={scenario} className="ha-process-example">
-      {scenario === 'timeline' && <AttachmentReplay/>}
+      {scenario === 'timeline' && <AttachmentReplay onWorkingChange={onWorkingChange}/>}
       {scenario === 'short' && <div className="ha-replay-body"><details className="ha-replay-process"><summary>用时 12 秒<ChevronDown size={13} aria-hidden="true"/></summary><div className="ha-replay-activity"><p className="ha-process-meta">本轮暂无可回看的公开过程。</p></div></details><p>这份清单按资料、核对项和待确认问题分成三部分。</p></div>}
       {scenario === 'read' && <>
         <p className="ha-process-commentary">先核对资料版本，再找出需要复查的段落。</p>

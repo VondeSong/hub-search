@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState, type ChangeEvent, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
 import {
-  ArrowUp, ArrowUpRight, Check, ChevronDown, ChevronRight, FileText, Layers,
+  ArrowDown, ArrowUp, ArrowUpRight, Check, ChevronDown, ChevronRight, FileText, Layers,
   Paperclip, Play, Sparkles, Square, X, Copy, FilePlus2,
   ListPlus, PencilLine, CornerDownRight, Link2, WandSparkles, BookOpen, CircleHelp, Tags, Search,
 } from 'lucide-react';
@@ -543,6 +543,7 @@ function AssistantConversation({
   const [activeTopic, setActiveTopic] = useState(initial.activeTopic);
   const [dropReady, setDropReady] = useState(false);
   const [reading, setReading] = useState(false), [copied, setCopied] = useState<string | null>(null), [jump, setJump] = useState(false);
+  const [replayWorking, setReplayWorking] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [menu, setMenu] = useState<AssistantMenu>(null);
@@ -628,6 +629,7 @@ function AssistantConversation({
   const effectiveWebSearch = settings.researchPolicy === 'materials-only' || settings.model === 'deepseek' ? 'disabled' : settings.webSearch;
   const evidence = collectEvidence(readableContexts);
   const running = session.active?.status === 'running';
+  const jumpWorking = (running && !activeBlocked) || (activityDemo && replayWorking);
   const paused = session.active?.status === 'paused';
   const chatTitle = contextBlocked ? '来源不可用' : (session.messages.find(item => item.role === 'user')?.text || input.trim() || '新聊天').replace(/\s+/g, ' ');
   const snapshot: Conversation = { ...settings, session, input, inputContext, attachmentNames, contexts, omittedId, title: context?.workTitle || chatTitle.slice(0, 60), resources, activeTopic, tagMode, tag, tagRefs, tagIntent, tagOther };
@@ -1063,8 +1065,9 @@ function AssistantConversation({
       <div className="ha-workspace">
         <div className="ha-conversation">
           {tagIntent&&!reading&&!contextBlocked&&<TagTaskSelector intent={tagIntent} onChange={prepareTag} onCancel={()=>{setTagIntent(null);setTagError('');composer.current?.focus({preventScroll:true});}}/>}
+          <div className="ha-message-viewport">
           <div className="ha-messages" data-running={running && !activeBlocked || undefined} ref={scrollArea} role="log" aria-label="助手讨论记录" aria-live="polite" aria-relevant="additions" tabIndex={0} onScroll={event => { const el = event.currentTarget; setJump(el.scrollHeight - el.scrollTop - el.clientHeight > 2); }}>
-            {activityDemo && <AssistantProcessDemo onClose={()=>onCloseActivityDemo?.()}/>}
+            {activityDemo && <AssistantProcessDemo onClose={()=>onCloseActivityDemo?.()} onWorkingChange={setReplayWorking}/>}
             {browsingContext && context && browsingContext.id !== context.id && <div className="ha-source-notice">正在讨论「{context.title}」。当前浏览：{canUseContext(browsingContext) ? browsingContext.title : '来源不可用'}<button type="button" disabled={!!session.active || !canUseContext(browsingContext)} onClick={onNewWithContext}>用当前材料新建对话</button></div>}
             {contextBlocked && <div className="ha-access-note" role="status"><FileText size={17}/><div><strong>相关来源当前不可用</strong><p>正文、引文与依赖这些来源的历史内容已隐藏。恢复访问并核对后，可以继续。</p></div></div>}
             {!activityDemo && !session.messages.length && !contextBlocked && <div className="ha-welcome">
@@ -1107,14 +1110,18 @@ function AssistantConversation({
             </div>}
           </div>
 
-          {jump && <button type="button" className="ha-jump-latest" onClick={() => {
+          {jump && <button type="button" className="ha-jump-latest" aria-label="回到最新内容" title="回到最新内容" data-working={jumpWorking || undefined} onClick={() => {
             const viewport = scrollArea.current;
             if (viewport) {
               viewport.scrollTop = viewport.scrollHeight;
               viewport.focus({preventScroll: true});
             }
             setJump(false);
-          }}>回到最新消息 ↓</button>}
+          }}>
+            <ArrowDown size={18} aria-hidden="true"/>
+            {jumpWorking && <span className="ha-jump-dots" aria-hidden="true"><span/><span/><span/></span>}
+          </button>}
+          </div>
           <div className="ha-composer-area">
             {session.queue.length > 0 && <div className="ha-queue"><div className="ha-queue-heading"><CornerDownRight size={12} /><span>下一条 · {session.queue.length}</span>{paused && <small>已暂停</small>}</div>{session.queue.map(item => <div className="ha-queued" key={item.id}><span>{canUseContext(item.context) ? item.text : '来源不可用 · 内容已隐藏'}</span><button type="button" className="ha-icon" onClick={() => dispatch({ type: 'remove', id: item.id })} aria-label={canUseContext(item.context) ? '移出队列：' + item.text : '移除来源不可用的请求'} title="移出队列"><X size={12} /></button></div>)}</div>}
             {!session.active && session.queue.length > 0 && <button type="button" className="ha-resume-queue" disabled={!canUseContext(session.queue[0].context)} onClick={() => { if (canUseContext(session.queue[0].context)) dispatch({ type: 'continue' }); }}><Play size={12} />继续队列</button>}

@@ -1242,7 +1242,10 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       </div>
       </div>
       {view && !businessCheck?.scopeChanging && sourceScope.current===sourceScopeKey && view.work.state!=="revoked" && (sourcePreview || sourceError || sourceLoading) && <section ref={sourcePreviewElement} className="agent-source-preview" aria-label="引用原文"><header><strong>{sourcePreview?.excerpt.title || (sourceLoading?"正在核对引用来源…":"引用暂不可读取")}</strong><button type="button" aria-label="关闭引用原文" onClick={returnFromCitation}>关闭</button></header>{sourceLoading ? <p role="status">正在读取当前版本的原文…</p> : sourceError ? <p role="alert">{sourceError}。可核对来源后重新打开引用。</p> : sourcePreview && <><p className="agent-note">{sourcePreview.excerpt.sourcePath} · 第 {sourcePreview.excerpt.startChar+1}–{sourcePreview.excerpt.endChar} 字符{sourcePreview.excerpt.truncated?"（原文节选）":""}</p><blockquote>{sourcePreview.excerpt.content.includes(sourcePreview.quote)?<>{sourcePreview.excerpt.content.slice(0,sourcePreview.excerpt.content.indexOf(sourcePreview.quote))}<mark>{sourcePreview.quote}</mark>{sourcePreview.excerpt.content.slice(sourcePreview.excerpt.content.indexOf(sourcePreview.quote)+sourcePreview.quote.length)}</>:sourcePreview.excerpt.content}</blockquote></>}</section>}
-      {conversationScroll.showLatest && !reportReading && !citationOpen && <button type="button" className="agent-jump-latest" onClick={conversationScroll.jumpToLatest}><ArrowDown size={14} aria-hidden="true"/>回到最新内容</button>}
+      {conversationScroll.showLatest && !reportReading && !citationOpen && <button type="button" className="agent-jump-latest" aria-label="回到最新内容" title="回到最新内容" data-working={running || undefined} onClick={conversationScroll.jumpToLatest}>
+        <ArrowDown size={18} aria-hidden="true"/>
+        {running && <span className="agent-jump-dots" aria-hidden="true"><span/><span/><span/></span>}
+      </button>}
       </div>
       {businessCheck?.uncertain && <section className="agent-notice" aria-label="操作结果待核对" role="alert">
         <strong>结果待核对</strong><p>这次操作可能已经完成。为避免重复保存，已暂停再次提交；请先核对当前结果。</p>
