@@ -1,7 +1,8 @@
 "use client";
 import type { ReactNode } from 'react';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
+import { AssistantOverlay } from './AssistantOverlay';
 import { ChevronDown, Check, ChevronRight, FileText, FolderBookmark, Menu, MoreHorizontal, PanelRight, PanelsTopLeft, Plus, Tags, ShieldCheck, WandSparkles, X } from 'lucide-react';
 import { AssistantHistory, type HistoryChange } from './AssistantHistory';
 import { AssistantResources, type ResourceDraft } from './AssistantResources';
@@ -60,37 +61,16 @@ export function AssistantTools({ menu, setMenu, settings, setSettings, material,
       <button type="button" className="ha-menu-choice" onClick={() => { setMenu(null); onFiles(); }}><FileText size={18}/><span><strong>添加图片或文件</strong><small>也可以直接拖入或粘贴到输入框</small></span><ChevronRight size={15}/></button>
       <button type="button" className="ha-menu-choice" onClick={() => setMenu('tags')}><Tags size={18}/><span><strong>添加标签</strong><small>引用标签参与讨论</small></span><ChevronRight size={15}/></button><p>资料库里的图片和文档可直接拖入。也可通过「资料范围」查找。</p>
     </section>}
-    {menu === 'skills' && <section className="ha-menu ha-composer-menu ha-skills-menu" aria-label="技能">
-      <MenuHeading title="技能" close={() => setMenu(null)}/>
+    {menu === 'skills' && <AssistantOverlay title="技能" className="ha-composer-menu ha-skills-menu" bodyClassName="ha-skills-body" onClose={() => setMenu(null)} initialFocus='.ha-skills-search input' composerAnchored>
       <AssistantResources resources={resources} onChange={onResources} disabled={disabled} skillPins={skillPins} onPinSkill={onPinSkill} onDone={() => setMenu(null)}/>
-    </section>}
+    </AssistantOverlay>}
     {menu === 'permissions' && <Permissions settings={settings} setSettings={setSettings} disabled={disabled} canAuto={material?.kind === 'note' && material.libraryId === 'obsidian'} memoryPending={memoryPending} onManageMemory={onManageMemory} onClose={() => setMenu(null)}/>}
   </>;
 }
 
 function Permissions({ settings, setSettings, disabled, canAuto, memoryPending, onManageMemory, onClose }: { settings: AssistantSettings; setSettings: (value: AssistantSettings) => void; disabled: boolean; canAuto: boolean; memoryPending: number; onManageMemory: () => void; onClose: () => void }) {
   const [auto, setAuto] = useState(settings.autoFlashcardInbox);
-  const panel = useRef<HTMLElement>(null);
-  const close = useRef(onClose); close.current = onClose;
-  useEffect(() => {
-    const root = panel.current;
-    root?.querySelector<HTMLButtonElement>('.ha-menu-heading button')?.focus({ preventScroll: true });
-    const keys = (event: globalThis.KeyboardEvent) => {
-      if (event.defaultPrevented || event.isComposing) return;
-      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close.current(); return; }
-      if (event.key !== 'Tab') return;
-      const fields = Array.from(root?.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled])') || []).filter(item => item.getClientRects().length > 0);
-      const first = fields[0], last = fields[fields.length - 1];
-      if (!first) return;
-      if (!root?.contains(document.activeElement)) { event.preventDefault(); first.focus(); }
-      else if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    };
-    document.addEventListener('keydown', keys, true);
-    return () => document.removeEventListener('keydown', keys, true);
-  }, []);
-  return <section ref={panel} className="ha-menu ha-composer-menu ha-permissions-menu ha-memory-permissions" role="dialog" aria-modal="true" aria-label="记忆与保存">
-    <MenuHeading title="记忆与保存" close={onClose}/>
+  return <AssistantOverlay title="记忆与保存" className="ha-composer-menu ha-permissions-menu ha-memory-permissions" onClose={onClose} initialFocus=".ha-memory-switch input" composerAnchored footer={<><MemoryManageLink pending={memoryPending} onClick={onManageMemory}/><p className="ha-memory-save-note">交互示例 · 不读取真实记忆或保存成果</p></>}>
     <MemorySettings enabled={settings.memoryEnabled} scope={settings.memoryScope} blocked={disabled} materialsOnly={settings.researchPolicy === 'materials-only'} onChange={(memoryEnabled, memoryScope) => setSettings({ ...settings, memoryEnabled, memoryScope })}/>
     <section className="ha-memory-saving" aria-label="保存成果">
       <h3>保存成果</h3>
@@ -100,7 +80,5 @@ function Permissions({ settings, setSettings, disabled, canAuto, memoryPending, 
         {auto !== settings.autoFlashcardInbox && <button type="button" className="ha-memory-auto-confirm" disabled={disabled} onClick={() => { setSettings({ ...settings, autoFlashcardInbox: auto }); onClose(); }}>{auto ? '确认本对话的自动导入授权' : '应用到本对话'}</button>}
       </> : <><div className="ha-memory-save-status"><span>保存前确认</span><Check size={16} aria-hidden="true"/></div><p>先查看草稿，再确认保存。</p></>}
     </section>
-    <MemoryManageLink pending={memoryPending} onClick={onManageMemory}/>
-    <p className="ha-memory-save-note">交互示例 · 不读取真实记忆或保存成果</p>
-  </section>;
+  </AssistantOverlay>;
 }

@@ -21,6 +21,8 @@ import { ResourceChips, demoSkills, emptyResources, publicLinkIn, type ResourceD
 import { libraryDragType } from './assistant-library-drag';
 import { AssistantHeader, AssistantTools, clampPanelSize, type AssistantMenu, type HistoryItem } from './AssistantChrome';
 import { AssistantSelectionActions } from './AssistantSelectionActions';
+import AssistantAnswerContent from './AssistantAnswerContent';
+import { AssistantAnswerActions } from './AssistantAnswerActions';
 import { AssistantMemoryManager, MemoryFeedback, MemoryProposalCard, useAssistantMemory, type AssistantMemoryModel } from './AssistantMemory';
 import { loadMemoryPreference, rememberMemoryPreference } from './assistant-memory';
 
@@ -83,6 +85,7 @@ export type AssistantProps = {
   tagEntry: { tag?: string; task?: TagTask } | null; onTagEntryHandled: () => void; tagModel: TagReviewModel;
   open: boolean;
   sourceDemo?: boolean;
+  uiDemo?: boolean;
   activityDemo?: boolean;
   onCloseActivityDemo?: () => void;
   expanded: boolean;
@@ -484,7 +487,7 @@ export default function Assistant(props: AssistantProps) {
   }, []);
 
   if (!ready) return null;
-  const route = props.sourceDemo ? 'demo:source-preview' : props.context?.workId ? 'work:' + props.context.workId : 'general';
+  const route = props.uiDemo ? 'demo:ui-foundation-v1' : props.sourceDemo ? 'demo:source-preview' : props.context?.workId ? 'work:' + props.context.workId : 'general';
   const selected = selection?.route === route ? selection : null;
   const workKey = selected?.id || route;
   let initial = conversations.current[workKey];
@@ -510,6 +513,27 @@ export default function Assistant(props: AssistantProps) {
       });
     }
   }
+  if (!initial && workKey === 'demo:ui-foundation-v1') {
+    initial = readConversation({ title: '排版示例 · 不调用模型', session: { messages: [
+      { id: 'ui-demo-question-short', role: 'user', text: '哪些分数通过了筛选？' },
+      { id: 'ui-demo-answer-short', role: 'assistant', text: '通过筛选的是 **72、91、60**，共 **3 / 5** 个分数。' },
+      { id: 'ui-demo-question-long', role: 'user', text: '用代码、步骤和表格说明为什么是 3 / 5。' },
+      { id: 'ui-demo-answer-long', role: 'assistant', text: [
+        '# 把筛选结果解释清楚',
+        '这里有 **5 个原始分数**。条件 `$_ -ge 60` 保留大于或等于 60 的值，所以恰好 60 分也通过。',
+        '## 先看这段代码',
+        '```powershell\n$scores = 58, 72, 91, 60, 45\n$passingScores = $scores | Where-Object { $_ -ge 60 }\n"及格人数: $($passingScores.Count) / $($scores.Count)"\n```',
+        '### 逐步核对',
+        '1. `$scores` 保存原来的 5 个分数。\n2. `Where-Object` 逐个检查，只保留满足条件的分数。\n3. 用 `.Count` 分别读取及格数与总数，得到 **3 / 5**。',
+        '## 用表格复核',
+        '| 分数 | 是否达到 60 | 处理结果 |\n| ---: | :---: | --- |\n| 58 | 否 | 排除 |\n| 72 | 是 | 保留 |\n| 91 | 是 | 保留 |\n| 60 | 是 | 保留，等于阈值也通过 |\n| 45 | 否 | 排除 |',
+        '> 阈值包含等号。把 `-ge` 改成 `-gt` 后，60 分就不会保留。',
+        '## 还可以检查什么',
+        '- 先确认及格线是否包含等号。\n- 复制代码时保留变量名、引号和缩进。\n- 如需查语法，可打开 [PowerShell 官方 Where-Object 文档](https://learn.microsoft.com/powershell/module/microsoft.powershell.core/where-object)。',
+      ].join('\n\n'),
+      },
+    ] } });
+  }
   initial ??= readConversation(loadMemoryPreference());
   const history: HistoryItem[] = Object.entries(conversations.current).filter(([id, value]) => !historyMeta.current[id]?.deleted && (value.session.messages.length || value.session.active)).map(([id, value]) => ({ id, updatedAt: value.updatedAt, title: value.title, pinned: historyMeta.current[id]?.pinned || false, archived: historyMeta.current[id]?.archived || false, blocked: value.contexts.some(context => !(props.canUseContext || allowContext)(context)) || value.session.messages.some(message => !(props.canUseContext || allowContext)(message.context)) || value.resources.pages.some(context => !(props.canUseContext || allowContext)(context)) })).reverse();
   const currentContext = selected ? (selected.fresh ? selected.entry || null : initial.contexts[0] || null) : initial.session.messages.length ? initial.contexts[0] || null : props.context;
@@ -529,7 +553,7 @@ export default function Assistant(props: AssistantProps) {
     {extra && <AssistantConversation key={`extra:${extra.id}`} {...props} extraPane incomingQuote={extra.quote}
       open={extra.open} expanded={extraDocked} context={conversations.current[extra.id]?.contexts[0] ?? null}
       browsingContext={props.context} workKey={extra.id} initial={conversations.current[extra.id] ?? readConversation(null)}
-      tagEntry={null} activityDemo={false} sourceDemo={false} onPersist={persist}
+      tagEntry={null} activityDemo={false} sourceDemo={false} uiDemo={false} onPersist={persist}
       onClose={() => setExtra(value => value && {...value, open:false})} onExpand={() => setExtraDocked(value => !value)}
       topics={topics} pins={pins} onPin={togglePin} onSaveTopic={saveTopic} memoryModel={memoryModel}
       history={history} readHistory={id=>conversations.current[id]}
@@ -548,10 +572,11 @@ export default function Assistant(props: AssistantProps) {
 }
 
 function AssistantConversation({
-  activityDemo, onCloseActivityDemo, memoryModel, extraPane = false, incomingQuote, onSideQuote,
+  activityDemo, uiDemo, onCloseActivityDemo, memoryModel, extraPane = false, incomingQuote, onSideQuote,
   open, expanded, context, canUseContext = allowContext, onClose, onExpand, onOpenSource, onCreateDraft, notify, workKey, initial, onPersist, history, readHistory, onNew, onSelect, onHistoryChange, catalog = [], browsingContext, onNewWithContext, currentPageId, onInsertPage, topics, pins, onPin, onSaveTopic, onOpenTagQueue, tagEntry, onTagEntryHandled, tagModel,
 }: AssistantProps & { extraPane?: boolean; incomingQuote?: { text:string }; onSideQuote?: (text:string) => boolean; memoryModel: AssistantMemoryModel; topics: ResearchTopic[]; pins: WorkPins; onPin: (kind: keyof WorkPins, id: string) => void; onSaveTopic: (config: Omit<ResearchTopic, 'id'>, updateId?: string) => boolean; workKey: string; initial: Conversation; onPersist: (key: string, conversation: Conversation) => void; browsingContext: AssistantContext | null; onNewWithContext: () => void; history: HistoryItem[]; readHistory: (id:string) => Conversation|undefined; onNew: () => void; onSelect: (id: string, draft?:string) => void; onHistoryChange: (id: string, change: 'pin' | 'archive' | 'delete') => void }) {
   const [session, dispatch] = useReducer(reducer, initial.session);
+  const isUiDemo = uiDemo && workKey === 'demo:ui-foundation-v1';
   const [input, setInput] = useState(initial.tagIntent ? cleanTagStarter(initial.input) : initial.input);
   const [tagMode, setTagMode] = useState(initial.tagMode);
   const [goalMode, setGoalMode] = useState(false);
@@ -607,6 +632,7 @@ function AssistantConversation({
   const [topicReview, setTopicReview] = useState<{ id: string; from: 'mode' | 'topics' } | null>(null);
   const menuReturn = useRef<HTMLElement | null>(null);
   function changeMenu(value: AssistantMenu) {
+    panel.current?.dispatchEvent(new Event('ha-answer-menu-close'));
     if (value !== 'materials') setTopicEdit(null);
     if (value) {
       if (!menu) menuReturn.current = document.activeElement as HTMLElement;
@@ -781,7 +807,7 @@ function AssistantConversation({
 
   useEffect(() => {
     if (!menu || !open || menu === 'memory') return;
-    const outside = (event: PointerEvent) => { if (!(event.target as Element).closest('.ha-menu, .ha-header, .ha-input-actions')) { setMenu(null); setTopicEdit(null); } };
+    const outside = (event: PointerEvent) => { const target = event.target; if (!(target instanceof Element)) return; const owner = target.closest('.ha-panel'); if (owner && owner !== panel.current) return; if (!target.closest('.ha-menu, .ha-header, .ha-input-actions')) { setMenu(null); setTopicEdit(null); } };
     document.addEventListener('pointerdown', outside);
     return () => document.removeEventListener('pointerdown', outside);
   }, [menu, open]);
@@ -1001,14 +1027,14 @@ function AssistantConversation({
 
   function answerBody(message: Message) {
     const citations = replyCitations(message);
-    return <div className="ha-reply"><p>{message.text}</p>{message.sections?.map((section, index) => <div className="ha-reply-section" key={index}><h4>{section.heading}</h4><p>{section.body}{citations.sections[index]?.map(item => {
+    return <div className="ha-reply"><AssistantAnswerContent text={message.text}/>{message.sections?.map((section, index) => <section className="ha-reply-section" key={index}><h3>{section.heading}</h3><AssistantAnswerContent text={section.body}/>{!!citations.sections[index]?.length && <div className="ha-section-citations"><span>来源</span>{citations.sections[index]?.map(item => {
       const number = citations.numbers.get(item.id);
       const available = sourceAvailable(item);
       const label = '引用 ' + number + '：' + (available ? item.title : '来源当前不可用');
       return <span key={item.id} className="ha-citation-pair">
         <button type="button" className="ha-inline-citation" disabled={!available || !onOpenSource} aria-label={label} title={available ? '打开来源页面：' + item.title : label} onClick={() => openEvidence(item.id)}>{number}</button>
       </span>;
-    })}</p></div>)}
+    })}</div>}</section>)}
       {!!citations.unplaced.length && <details className="ha-unplaced-references"><summary>相关资料（{citations.unplaced.length}）</summary>{citations.unplaced.map(referenceButton)}</details>}
     </div>;
   }
@@ -1076,7 +1102,7 @@ function AssistantConversation({
   const scopeResources = topicEdit?.resources || resources;
   const scopeMaterial = topicEdit ? null : material;
   const scopePolicy = topicEdit?.policy || settings.researchPolicy;
-  const scopeCurrent = contextBlocked ? null : browsingContext && canUseContext(browsingContext) ? browsingContext : context;
+  const scopeCurrent = currentPageId ? accessibleCatalog.find(page => page.id === currentPageId) || null : null;
   const activeTopicName = topics.find(topic => topic.id === activeTopic?.id)?.name || activeTopic?.name;
   const topicPages = activeTopic?.scope.pages || [];
   const topicLibraries = activeTopic?.scope.libraryIds || [];
@@ -1137,6 +1163,7 @@ function AssistantConversation({
           {tagIntent&&!reading&&!contextBlocked&&<TagTaskSelector intent={tagIntent} onChange={prepareTag} onCancel={()=>{setTagIntent(null);setTagError('');composer.current?.focus({preventScroll:true});}}/>}
           <div className="ha-message-viewport">
           <div className="ha-messages" data-running={running && !activeBlocked || undefined} ref={scrollArea} role="log" aria-label="助手讨论记录" aria-live="polite" aria-relevant="additions" tabIndex={0} onScroll={event => { const el = event.currentTarget; setJump(el.scrollHeight - el.scrollTop - el.clientHeight > 2); }}>
+            {isUiDemo && <div className="ha-ui-demo-note"><strong>排版示例 · 不调用模型</strong><span>固定示例内容，用于检查短回答、代码、表格与操作菜单。</span><a href="?assistant=source-demo">查看来源示例</a></div>}
             {activityDemo && <AssistantProcessDemo onClose={()=>onCloseActivityDemo?.()} onWorkingChange={setReplayWorking}/>}
             {browsingContext && context && browsingContext.id !== context.id && <div className="ha-source-notice">正在讨论「{context.title}」。当前浏览：{canUseContext(browsingContext) ? browsingContext.title : '来源不可用'}<button type="button" disabled={!!session.active || !canUseContext(browsingContext)} onClick={onNewWithContext}>用当前材料新建对话</button></div>}
             {contextBlocked && <div className="ha-access-note" role="status"><FileText size={17}/><div><strong>相关来源当前不可用</strong><p>正文、引文与依赖这些来源的历史内容已隐藏。恢复访问并核对后，可以继续。</p></div></div>}
@@ -1155,7 +1182,7 @@ function AssistantConversation({
                 {!session.active&&<button className="ha-edit-message" type="button" onClick={()=>{if(input.trim()){notify('请先发送或保留当前草稿，再编辑这条消息');return;}setInput(message.text);setInputContext(message.context||null);setResources({...message.resources||emptyResources(),pages:[...new Map([...(message.context?[message.context]:[]),...(message.resources?.pages||[])].map(page=>[page.id,page])).values()]});setAttachmentNames(message.attachmentNames||[]);setOmittedId(context?.id||null);composer.current?.focus();}}>编辑</button>}
                 {!!message.attachmentNames?.length && <div className="ha-message-files">{message.attachmentNames.map(name => <span key={name}><Paperclip size={10} />{name}</span>)}</div>}
               </> : <>
-                {!message.tagTask && !message.tagResult && <AssistantProcess webEnabled={message.processWebEnabled === true}/>}
+                {!message.tagTask && !message.tagResult && !isUiDemo && <AssistantProcess webEnabled={message.processWebEnabled === true}/>}
                 {answerBody(message)}
                 {message.tagResult && <>
                   {message.tagResult.next && <div className="ha-message-actions">
@@ -1167,11 +1194,12 @@ function AssistantConversation({
                 </>}
                 {message.tagTask && !message.tagResult && <div className="ha-message-actions"><button type="button" onClick={() => { setTagMode(true); setTag(message.tagTask!.tag); setTagRefs(refs=>[...new Set([...refs,message.tagTask!.tag])]); prepareTag(message.tagTask!.intent); }}>在标签助手继续</button></div>}
                 {!message.tagTask && !message.tagResult && <>
-                <div className="ha-message-actions"><button type="button" className="ha-copy-answer" aria-label={copied === message.id ? '已复制回答' : '复制回答'} title={copied === message.id ? '已复制' : '复制回答'} onClick={async () => { try { await navigator.clipboard.writeText([message.text, ...(message.sections || []).map(item => item.heading + '\n' + item.body)].join('\n\n')); setCopied(message.id); } catch { notify('复制失败，请重试或选择正文复制。'); } }}>{copied === message.id ? <Check size={16}/> : <Copy size={16}/>}</button>{onInsertPage && <button type="button" onClick={() => setInsertion({ body: [message.text, ...(message.sections || []).map(item => item.heading + '\n' + item.body)].join('\n\n'), source: message.context || null })}><FilePlus2 size={14}/>插入页面</button>}<button type="button" title="将回答另存为独立笔记" onClick={() => prepare(message, 'note')}><PencilLine size={14}/>新建笔记</button><button type="button" title="将回答转为可编辑的待办草稿" onClick={() => prepare(message, 'task')}><ListPlus size={14}/>创建任务</button></div></>}
+                <AssistantAnswerActions copied={copied === message.id} onCopy={async () => { try { await navigator.clipboard.writeText([message.text, ...(message.sections || []).map(item => item.heading + '\n' + item.body)].join('\n\n')); setCopied(message.id); } catch { notify('复制失败，请重试或选择正文复制。'); } }} onInsert={onInsertPage ? () => setInsertion({ body: [message.text, ...(message.sections || []).map(item => item.heading + '\n' + item.body)].join('\n\n'), source: message.context || null }) : undefined} onNote={() => prepare(message, 'note')} onTask={() => prepare(message, 'task')}/></>}
+
               </>}
             </article>)}
 
-            {!tagMode && !activityDemo && !reading && !contextBlocked && memoryModel.ready && !memoryModel.error && <>
+            {!tagMode && !activityDemo && !isUiDemo && !reading && !contextBlocked && memoryModel.ready && !memoryModel.error && <>
               {memoryModel.state.proposals.slice(0, 1).map(item => <MemoryProposalCard key={item.id} item={item} model={memoryModel} disabled={!!session.active}/>)}
               {menu !== 'memory' && <MemoryFeedback model={memoryModel} disabled={!!session.active}/>}
             </>}

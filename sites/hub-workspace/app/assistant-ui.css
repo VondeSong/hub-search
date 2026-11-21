@@ -1,0 +1,231 @@
+/* Agents UI foundation. Business state and process timing remain in their owners. */
+.ha-panel {
+  --ha-body-size: 1rem;
+  --ha-control-size: .875rem;
+  --ha-meta-size: .8125rem;
+  --ha-control-height: 36px;
+  --ha-ui-radius: 10px;
+  --ha-overlay-radius: 16px;
+  font-size: var(--ha-control-size);
+}
+.ha-panel :is(button, input, textarea, select) { font-family: inherit; }
+.ha-panel :is(button, input, textarea, select, summary, a):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.ha-panel .ha-message { margin-block-end: 28px; }
+.ha-panel .ha-user-bubble { font-size: .9375rem; line-height: 1.65; padding: 11px 14px; }
+.ha-panel .ha-reply { max-inline-size: 74ch; font-size: var(--ha-body-size); line-height: 1.75; color: var(--text); }
+.ha-panel .ha-reply-section { margin-block-start: 22px; }
+.ha-panel .ha-reply-section > h3 { margin: 0 0 8px; color: var(--text); font-size: 1.0625rem; line-height: 1.5; font-weight: 650; }
+.ha-panel .ha-answer-content { min-width: 0; overflow-wrap: anywhere; color: var(--text); }
+.ha-answer-content > :first-child { margin-block-start: 0; }
+.ha-answer-content > :last-child { margin-block-end: 0; }
+.ha-panel .ha-answer-content p { margin: 0 0 14px; white-space: pre-wrap; color: var(--text); }
+.ha-answer-content :is(h1, h2, h3) { color: var(--text); font-weight: 650; line-height: 1.45; letter-spacing: -.01em; }
+.ha-answer-content h1 { font-size: 1.25rem; margin: 26px 0 12px; }
+.ha-answer-content h2 { font-size: 1.125rem; margin: 24px 0 10px; }
+.ha-answer-content h3 { font-size: 1rem; margin: 20px 0 8px; }
+.ha-answer-content strong { font-weight: 650; }
+.ha-answer-content :is(ul, ol) { padding-inline-start: 1.4em; margin-block: 0 16px; }
+.ha-answer-content ol { list-style: decimal outside; }
+.ha-answer-content ul { list-style: disc outside; }
+.ha-answer-content ul ul { list-style-type: circle; }
+.ha-answer-content ul ul ul { list-style-type: square; }
+.ha-answer-content ol ol { list-style-type: lower-alpha; }
+.ha-answer-content li { padding-inline-start: .1em; margin-block: 6px; }
+.ha-answer-content li > p { margin-block-end: 5px; }
+.ha-answer-content li > :last-child { margin-block-end: 0; }
+.ha-answer-content li :is(ul, ol) { margin-block: 6px; }
+.ha-answer-content blockquote { margin: 18px 0; padding: 3px 0 3px 14px; border-inline-start: 3px solid var(--line); }
+.ha-answer-content blockquote > :last-child { margin-block-end: 0; }
+.ha-answer-content a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.ha-answer-content a:hover { text-decoration-thickness: 2px; }
+.ha-answer-content :not(pre) > code { padding: .08em .28em; border-radius: 4px; background: var(--surface-2); color: var(--text); font: .91em/1.6 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; box-decoration-break: clone; }
+.ha-answer-code { margin: 18px 0; min-width: 0; border: 1px solid var(--line); border-radius: var(--ha-ui-radius); overflow: hidden; background: var(--surface-2); }
+.ha-answer-code-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 10px; border-block-end: 1px solid var(--line); color: var(--muted); font-size: .75rem; user-select: none; }
+.ha-answer-code-language { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ha-answer-code-actions { display: flex; gap: 4px; flex: none; }
+.ha-panel .ha-answer-code-actions button { display: inline-flex; gap: 5px; align-items: center; min-height: 28px; padding: 3px 6px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: .75rem; }
+.ha-answer-code-actions button:hover, .ha-answer-code-actions button[aria-pressed=true] { background: var(--surface); color: var(--text); }
+.ha-answer-code pre { margin: 0; padding: 13px 14px; max-height: 28rem; overflow: auto; white-space: pre; tab-size: 2; color: var(--text); font: .8125rem/1.7 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
+.ha-answer-code pre.is-wrapped { white-space: pre-wrap; overflow-wrap: anywhere; }
+.ha-answer-code pre code { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; }
+.ha-answer-code-feedback { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.ha-answer-code-feedback.is-error { position: static; display: block; width: auto; height: auto; padding: 8px 12px; clip-path: none; font-size: .8125rem; color: var(--text); }
+.ha-answer-table-wrap { max-width: 100%; overflow-x: auto; margin: 18px 0; border: 1px solid var(--line); border-radius: var(--ha-ui-radius); scrollbar-width: thin; }
+.ha-answer-content table { width: 100%; min-width: 340px; border-collapse: collapse; font-size: .875rem; line-height: 1.6; }
+.ha-answer-content :is(th, td) { padding: 10px 12px; border-block-end: 1px solid var(--line); text-align: start; vertical-align: top; }
+.ha-answer-content th { color: var(--text); background: var(--surface-2); font-weight: 600; }
+.ha-answer-content tr:last-child td { border-block-end: 0; }
+.ha-answer-content :is(th, td) + :is(th, td) { border-inline-start: 1px solid var(--line); }
+.ha-panel .ha-section-citations { display: flex; align-items: center; gap: 5px; margin-top: 6px; color: var(--muted); font-size: .75rem; }
+.ha-panel .ha-section-citations .ha-inline-citation { min-width: 23px; min-height: 23px; font-size: .75rem; }
+.ha-panel .ha-unplaced-references { margin-block-start: 16px; font-size: .8125rem; }
+.ha-panel .ha-composer:focus-within { border-color: color-mix(in srgb, var(--accent) 65%, var(--line)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 10%, transparent); }
+.ha-panel .ha-composer > textarea:focus-visible { outline: none; }
+
+/* Ordinary answer actions are separate from tag-assistant business actions. */
+.ha-answer-actions { display: flex; align-items: center; gap: 4px; max-inline-size: 46rem; margin-top: 10px; user-select: none; }
+.ha-panel .ha-answer-actions > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 5px 8px; border: 0; border-radius: 7px; color: var(--muted); background: transparent; font-size: .75rem; }
+.ha-answer-actions > button:hover, .ha-answer-actions > button[aria-expanded=true] { color: var(--text); background: var(--surface-2); }
+.ha-panel .ha-answer-menu { position: absolute; z-index: 35; display: flex; flex-direction: column; gap: 2px; padding: 5px; overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 12%, transparent); background: var(--surface); font-size: .875rem; }
+.ha-answer-menu > button { display: flex; align-items: center; gap: 10px; flex: none; width: 100%; min-height: 54px; padding: 8px 10px; border: 0; border-radius: 8px; text-align: start; color: var(--text); background: transparent; }
+.ha-answer-menu > button:hover, .ha-answer-menu > button:focus-visible { background: var(--surface-2); }
+.ha-answer-menu > button > svg { color: var(--muted); flex: none; }
+.ha-answer-menu small { display: block; margin-top: 2px; color: var(--muted); font-size: .75rem; line-height: 1.45; }
+.ha-ui-demo-note { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; margin: 0 0 24px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); color: var(--muted); font-size: .75rem; line-height: 1.55; }
+.ha-ui-demo-note strong { color: var(--text); font-weight: 550; font-size: .8125rem; }
+.ha-ui-demo-note a { color: var(--accent); text-underline-offset: 3px; }
+
+/* One shell, with separate small-setting, picker and manager sizes. */
+.ha-panel .ha-overlay { display: flex; flex-direction: column; padding: 0; overflow: hidden; min-width: 0; border: 1px solid var(--line); border-radius: var(--ha-overlay-radius); background: var(--surface); color: var(--text); box-shadow: 0 10px 32px color-mix(in srgb, var(--text) 11%, transparent); font-size: var(--ha-control-size); line-height: 1.6; }
+.ha-panel .ha-overlay-header { display: flex; flex: none; align-items: center; gap: 8px; min-height: 54px; padding: 10px 16px; border-block-end: 1px solid var(--line); }
+.ha-overlay-header h3 { flex: 1; min-width: 0; margin: 0; color: var(--text); font-size: .9375rem; line-height: 1.4; font-weight: 650; }
+.ha-panel .ha-overlay-header .ha-icon { width: 32px; height: 32px; flex-basis: 32px; border: 0; color: var(--muted); background: transparent; }
+.ha-panel .ha-overlay-header .ha-icon:hover { color: var(--text); background: var(--surface-2); }
+.ha-overlay-toolbar { flex: none; padding: 12px 16px 0; }
+.ha-panel .ha-overlay-body { flex: 1; min-height: 0; min-width: 0; padding: 12px 16px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.ha-panel .ha-overlay-footer { flex: none; padding: 12px 16px; border-block-start: 1px solid var(--line); background: var(--surface); }
+.ha-overlay :is(.ha-primary-button, .ha-secondary-button) { display: inline-flex; justify-content: center; align-items: center; gap: 6px; min-height: var(--ha-control-height); padding: 7px 12px; border-radius: 8px; font-size: var(--ha-control-size); line-height: 1.4; }
+.ha-overlay .ha-primary-button { border: 1px solid var(--accent); color: var(--on-accent, #fff); background: var(--accent); }
+.ha-overlay .ha-secondary-button { border: 1px solid var(--line); color: var(--text); background: var(--surface); }
+.ha-overlay .ha-secondary-button:hover { background: var(--surface-2); }
+.ha-panel .ha-overlay .ha-resource-choice { min-height: 50px; gap: 10px; padding: 9px 10px; font-size: var(--ha-control-size); }
+.ha-overlay .ha-resource-choice input:is([type=checkbox], [type=radio]) { flex: none; width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--accent); }
+.ha-panel .ha-overlay .ha-resource-choice strong { font-size: var(--ha-control-size); font-weight: 500; line-height: 1.5; }
+.ha-panel .ha-overlay .ha-resource-choice small { margin-top: 3px; color: var(--muted); font-size: .75rem; line-height: 1.5; overflow-wrap: anywhere; }
+.ha-panel .ha-overlay .ha-scope-hint { font-size: .8125rem; line-height: 1.6; margin: 6px 0; }
+.ha-panel .ha-overlay :is(input, select, textarea):not([type=checkbox], [type=radio]) { font-size: var(--ha-control-size); }
+
+/* Materials: fixed search + filters, one result scroller, fixed selection footer. */
+.ha-panel .ha-overlay.ha-material-menu { inset: 8px 12px 10px; width: auto; height: auto; max-height: none; }
+.ha-panel .ha-material-menu:has(.ha-scope-overview), .ha-panel .ha-material-menu:has(.ha-scope-topic) { inset: auto 12px 10px; max-height: calc(100cqh - 90px); }
+.ha-panel .ha-material-menu .ha-overlay-toolbar { padding-bottom: 0; }
+.ha-panel .ha-material-menu .ha-scope-body { padding: 8px 10px 14px; }
+.ha-panel .ha-material-search { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); background: var(--surface); }
+.ha-panel .ha-material-search:focus-within { border-color: var(--accent); outline: 2px solid color-mix(in srgb, var(--accent) 16%, transparent); }
+.ha-panel .ha-material-search input { flex: 1; min-width: 0; width: 100%; min-height: 40px; padding: 8px 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: .875rem; }
+.ha-material-search input::-webkit-search-cancel-button { display: none; }
+.ha-panel .ha-material-search .ha-icon { flex: 0 0 26px; width: 26px; height: 26px; border: 0; background: transparent; padding: 0; }
+.ha-material-filter { display: flex; align-items: center; gap: 4px; margin-top: 10px; padding-bottom: 9px; border-block-end: 1px solid var(--line); }
+.ha-material-filter > button { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 5px 10px; border: 0; border-radius: 7px; color: var(--muted); background: transparent; font-size: .8125rem; }
+.ha-material-filter > button[aria-pressed=true] { color: var(--text); background: var(--surface-2); font-weight: 550; }
+.ha-material-filter small { font-size: .75rem; font-weight: 400; font-variant-numeric: tabular-nums; }
+.ha-material-group { margin: 0; padding: 3px 0 7px; }
+.ha-material-group + .ha-material-group { border-block-start: 1px solid var(--line); padding-top: 9px; }
+.ha-panel .ha-material-group > h4, .ha-panel .ha-material-attachments > h4 { display: flex; align-items: center; gap: 8px; margin: 4px 10px 5px; font-size: .75rem; color: var(--muted); font-weight: 500; }
+.ha-material-group h4 > span { font-variant-numeric: tabular-nums; }
+.ha-panel .ha-material-page-row { align-items: flex-start; border-radius: 9px; cursor: pointer; }
+.ha-material-page-row:hover { background: var(--surface-2); }
+.ha-material-page-row[data-selected] { background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+.ha-material-page-row > span { min-width: 0; overflow-wrap: anywhere; }
+.ha-panel .ha-material-load-more { display: block; width: 100%; min-height: 36px; padding: 8px 10px; margin: 6px 0 0; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: .8125rem; text-align: start; }
+.ha-material-load-more:hover { background: var(--surface-2); color: var(--text); }
+.ha-material-attachments { border-block-start: 1px solid var(--line); padding-top: 12px; margin-top: 6px; }
+.ha-material-attachments > button { display: flex; align-items: center; gap: 10px; min-height: 44px; width: 100%; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text); text-align: start; }
+.ha-material-attachments > button:hover { background: var(--surface-2); }
+.ha-material-attachments > button > span { flex: 1; min-width: 0; }
+.ha-material-attachments > button :is(small, svg) { color: var(--muted); flex: none; }
+.ha-scope-footer-content > p { margin: 0 0 10px; color: var(--muted); font-size: .75rem; line-height: 1.55; }
+.ha-scope-footer-content > p > strong { display: block; color: var(--text); font-size: .8125rem; font-weight: 500; }
+.ha-scope-footer-content > p > span { display: block; margin-top: 2px; }
+.ha-scope-footer-content > div { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.ha-scope-footer-content > div > button:first-child:not(:only-child) { margin-inline-end: auto; }
+.ha-panel .ha-overlay .ha-scope-overview > button { min-height: 52px; padding-inline: 10px; }
+.ha-panel .ha-overlay .ha-scope-overview > button > strong { font-size: .875rem; }
+.ha-panel .ha-overlay .ha-scope-overview > button > span { font-size: .75rem; }
+.ha-picker-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 30px 18px; color: var(--muted); }
+.ha-picker-empty strong { color: var(--text); font-size: .875rem; font-weight: 500; }
+.ha-picker-empty p { margin: 0; max-width: 24em; font-size: .8125rem; line-height: 1.6; }
+
+/* Details and skills share the shell without sharing business controls. */
+.ha-panel .ha-overlay.ha-details { max-height: calc(100cqh - 80px); width: min(430px, calc(100cqw - 24px)); }
+.ha-panel .ha-details .ha-overlay-body { padding: 4px 12px 12px; }
+.ha-panel .ha-details .ha-detail-section { padding: 12px 0 8px; }
+.ha-panel .ha-details .ha-detail-section > h3 { font-size: .75rem; line-height: 1.5; font-weight: 550; margin: 0 8px 6px; }
+.ha-panel .ha-detail-row > summary, .ha-panel .ha-details .ha-detail-memory-link { min-height: 46px; padding: 8px; gap: 9px; font-size: .875rem; }
+.ha-panel .ha-detail-row > summary small, .ha-panel .ha-details .ha-detail-memory-link small { font-size: .75rem; line-height: 1.45; }
+.ha-panel .ha-detail-body { padding: 3px 9px 12px 34px; font-size: .8125rem; line-height: 1.6; }
+.ha-panel .ha-detail-body :is(p, label, select, input) { font-size: .8125rem; }
+.ha-panel .ha-detail-reading .ha-detail-actions button { min-height: 38px; font-size: .875rem; }
+.ha-panel .ha-overlay.ha-skills-menu { width: min(420px, calc(100cqw - 24px)); left: 12px; right: auto; max-height: min(580px, calc(100cqh - 150px)); }
+.ha-panel .ha-skills-menu .ha-skills-body { display: flex; padding: 0; overflow: hidden; }
+.ha-panel .ha-skills-toolbar { padding: 12px 16px 0; gap: 8px; }
+.ha-panel .ha-skills-search { border-radius: 9px; padding-inline: 10px; }
+.ha-panel .ha-skills-menu .ha-skills-search > input { min-height: 40px; padding-block: 8px; font-size: .875rem; }
+.ha-panel .ha-skills-menu .ha-skills-hint { margin: 9px 16px 7px; font-size: .75rem; line-height: 1.55; }
+.ha-panel .ha-skills-scroll { padding: 0 10px 12px; }
+.ha-panel .ha-skills-group > h3 { margin: 10px 8px 5px; font-size: .75rem; }
+.ha-panel .ha-skills-group > h3 > span { font-size: .75rem; }
+.ha-panel .ha-skills-menu .ha-skill-row > .ha-menu-choice { min-height: 66px; padding: 10px 8px; gap: 10px; }
+.ha-panel .ha-skills-menu .ha-skill-row strong { font-size: .875rem; font-weight: 500; }
+.ha-panel .ha-skills-menu .ha-skill-row small { font-size: .75rem; line-height: 1.5; }
+.ha-panel .ha-skills-menu .ha-skill-symbol { width: 24px; flex-basis: 24px; height: 28px; background: transparent; }
+.ha-panel .ha-skills-menu .ha-pin-shortcut { width: 32px; height: 32px; flex-basis: 32px; }
+.ha-panel .ha-skills-detail { padding: 12px 16px 18px; font-size: .875rem; }
+.ha-panel .ha-skills-menu .ha-skills-back { font-size: .8125rem; min-height: 34px; margin-bottom: 8px; }
+.ha-panel .ha-skills-detail h3 { font-size: 1rem; line-height: 1.5; }
+.ha-panel .ha-skills-detail p { font-size: .8125rem; line-height: 1.65; }
+
+/* Memory keeps its edit guards and state model; only reusable surfaces change. */
+.ha-panel .ha-overlay.ha-memory-permissions { width: min(370px, calc(100cqw - 24px)); left: 12px; max-height: min(590px, calc(100cqh - 150px)); padding: 0; }
+.ha-panel .ha-memory-permissions .ha-overlay-body { padding: 14px 16px; }
+.ha-panel .ha-memory-settings-section { padding: 0 0 14px; }
+.ha-panel .ha-memory-settings-section h3, .ha-panel .ha-memory-saving h3 { margin: 0 0 8px; font-size: .75rem; font-weight: 550; }
+.ha-panel .ha-memory-switch { min-height: 36px; font-size: .875rem; }
+.ha-panel .ha-memory-scope-setting { grid-template-columns: 32px minmax(0, 1fr); margin-top: 8px; font-size: .8125rem; }
+.ha-panel .ha-memory-settings-section p, .ha-panel .ha-memory-saving p { margin-top: 7px; font-size: .75rem; line-height: 1.6; }
+.ha-panel .ha-memory-saving { padding: 14px 0 0; }
+.ha-panel .ha-memory-save-status { font-size: .875rem; }
+.ha-panel .ha-memory-manage-link { padding: 2px 0 5px; border: 0; min-height: 34px; }
+.ha-panel .ha-memory-manage-link > span { font-size: .875rem; }
+.ha-panel .ha-memory-manage-link small { font-size: .75rem; }
+.ha-panel .ha-memory-permissions .ha-memory-save-note { margin: 5px 0 0; font-size: .75rem; line-height: 1.5; }
+.ha-panel .ha-overlay.ha-memory-manager { inset: 8px; max-height: none; width: auto; padding: 0; }
+.ha-panel .ha-memory-manager .ha-overlay-toolbar { padding: 12px 16px 0; }
+.ha-panel .ha-memory-manager .ha-memory-demo-note { margin: 0 0 12px; font-size: .75rem; }
+.ha-panel .ha-memory-manager-controls { grid-template-columns: 64px minmax(0, 1fr); font-size: .8125rem; margin-bottom: 10px; }
+.ha-panel .ha-memory-manager-controls > select { min-height: 36px; }
+.ha-panel .ha-memory-tabs { gap: 8px; }
+.ha-panel .ha-memory-tabs > button { min-height: 38px; font-size: .875rem; padding-inline: 8px; }
+.ha-panel .ha-memory-tabs small { font-size: .75rem; }
+.ha-panel .ha-memory-manager .ha-memory-list { padding: 4px 16px 12px; }
+.ha-panel .ha-memory-entry > summary { min-height: 52px; padding: 12px 2px; }
+.ha-panel .ha-memory-entry > summary > span { font-size: .875rem; line-height: 1.5; }
+.ha-panel .ha-memory-entry > summary > small { font-size: .75rem; }
+.ha-panel .ha-memory-content { font-size: .875rem; line-height: 1.7; }
+.ha-panel :is(.ha-memory-meta, .ha-memory-source, .ha-memory-eyebrow, .ha-memory-editor > p, .ha-memory-editor > label, .ha-memory-edit-notice, .ha-memory-feedback, .ha-memory-history) { font-size: .75rem; line-height: 1.6; }
+.ha-panel .ha-memory-actions > button, .ha-panel .ha-memory-feedback > button { min-height: 34px; padding-inline: 10px; font-size: .8125rem; }
+.ha-panel .ha-memory-manager-footer { margin: 0; padding: 0; border: 0; gap: 3px; font-size: .8125rem; }
+.ha-panel .ha-memory-manager-footer > small { font-size: .75rem; }
+.ha-panel .ha-memory-feedback { padding: 0 0 8px; }
+.ha-panel .ha-memory-empty { font-size: .8125rem; line-height: 1.6; }
+
+/* Process hierarchy changes typography only, never event order or collapse state. */
+.ha-panel .ha-process-demo { font-size: .875rem; line-height: 1.65; }
+.ha-panel .ha-process-meta, .ha-panel .ha-replay-process > summary, .ha-panel .ha-process-group > summary { font-size: .8125rem; }
+.ha-panel .ha-replay-activity > p:not(.ha-process-meta) { color: var(--text); font-size: .875rem; line-height: 1.7; }
+
+@container hub-assistant (max-width: 390px) {
+  .ha-panel .ha-messages { padding-inline: 16px; }
+  .ha-panel .ha-overlay-header { padding-inline: 12px; }
+  .ha-panel .ha-overlay-toolbar, .ha-panel .ha-overlay-footer { padding-inline: 12px; }
+  .ha-panel .ha-overlay-body { padding-inline: 12px; }
+  .ha-panel .ha-overlay.ha-material-menu { inset-inline: 8px; }
+  .ha-panel .ha-skills-menu .ha-skills-body { padding: 0; }
+  .ha-panel .ha-skills-toolbar { padding-inline: 12px; }
+  .ha-panel .ha-scope-overview > button { grid-template-columns: 16px minmax(0, auto) minmax(0, 1fr) 14px; gap: 6px; }
+  .ha-panel .ha-detail-body { padding-inline-start: 12px; }
+  .ha-panel .ha-memory-manager .ha-memory-list { padding-inline: 12px; }
+  .ha-answer-code-toolbar { padding-inline: 7px; gap: 6px; }
+}
+@media (pointer: coarse) {
+  .ha-panel { --ha-control-height: 44px; }
+  .ha-panel .ha-answer-actions > button, .ha-panel .ha-overlay-header .ha-icon, .ha-panel .ha-material-filter > button { min-height: 44px; }
+  .ha-panel .ha-answer-menu > button { min-height: 56px; }
+}
+@media (forced-colors: active) {
+  .ha-material-page-row[data-selected], .ha-material-filter > button[aria-pressed=true] { outline: 1px solid Highlight; outline-offset: -2px; }
+  .ha-answer-code, .ha-answer-table-wrap, .ha-panel .ha-overlay { border-color: CanvasText; }
+}

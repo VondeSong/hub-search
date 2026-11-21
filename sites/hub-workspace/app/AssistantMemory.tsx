@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { Brain, ChevronDown, ChevronRight, X } from 'lucide-react';
 import { changeMemoryState, createMemoryDemoState, memoryScopeLabel, memoryStorageKey, memoryUseLabel, readMemoryState, type MemoryAction, type MemoryContent, type MemoryEntry, type MemoryScope, type MemoryState, type MemoryUse } from './assistant-memory';
 import './assistant-memory.css';
+import { AssistantOverlay } from './AssistantOverlay';
 
 export function useAssistantMemory(notify: (message: string) => void) {
   const [state, setState] = useState<MemoryState>(createMemoryDemoState);
@@ -132,43 +133,16 @@ export function AssistantMemoryManager({ model, enabled, scope, disabled, materi
   const [editingIds, setEditingIds] = useState<string[]>([]);
   const reportEditing = useCallback((id: string, editing: boolean) => setEditingIds(ids => editing ? ids.includes(id) ? ids : [...ids, id] : ids.includes(id) ? ids.filter(value => value !== id) : ids), []);
   const editing = editingIds.length > 0;
-  const section = useRef<HTMLElement>(null);
-  const close = useRef(onClose); close.current = onClose;
-  useEffect(() => {
-    const root = section.current;
-    root?.querySelector<HTMLButtonElement>('[data-memory-close]')?.focus({ preventScroll: true });
-    const handle = (event: globalThis.KeyboardEvent) => {
-      if (event.defaultPrevented || event.isComposing) return;
-      if (event.key === 'Escape' && !(event.target instanceof Element && event.target.closest('[data-memory-editor], .ha-memory-forget'))) {
-        event.preventDefault(); event.stopPropagation();
-        const editor = root?.querySelector<HTMLTextAreaElement>('[data-memory-editor] textarea');
-        if (editor) editor.focus({ preventScroll: true }); else close.current();
-        return;
-      }
-      if (event.key !== 'Tab') return;
-      const buttons = Array.from(root?.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), summary') || []).filter(item => item.getClientRects().length > 0);
-      const first = buttons[0], last = buttons[buttons.length - 1];
-      if (!first) return;
-      if (!root?.contains(document.activeElement)) { event.preventDefault(); first.focus(); }
-      else if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    };
-    document.addEventListener('keydown', handle, true);
-    return () => document.removeEventListener('keydown', handle, true);
-  }, []);
+  const scopeId = useId();
   const entries = model.state.entries.filter(item => item.scope === browseScope), proposals = model.state.proposals.filter(item => item.scope === browseScope);
-  return <section ref={section} className="ha-menu ha-memory-manager" role="dialog" aria-modal="true" aria-labelledby="ha-memory-manager-title">
-    <header className="ha-menu-heading"><strong id="ha-memory-manager-title">管理记忆</strong><button data-memory-close type="button" className="ha-icon" aria-label="关闭记忆管理" disabled={editing} onClick={onClose}><X size={17}/></button></header>
-    <p className="ha-memory-demo-note">交互示例 · 不连接真实记忆</p>
-    <div className="ha-memory-manager-controls"><label htmlFor="ha-memory-browse-scope">查看范围</label><select id="ha-memory-browse-scope" value={browseScope} disabled={editing} onChange={event => setBrowseScope(event.target.value as MemoryScope)}><option value="general">个人通用</option><option value="hub">Hub 开发</option></select></div>
-    <div className="ha-memory-tabs" aria-label="记忆列表"><button type="button" aria-pressed={tab === 'saved'} disabled={editing} onClick={() => setTab('saved')}>已保存{tab === 'saved' && <small>{entries.length}</small>}</button><button type="button" aria-pressed={tab === 'pending'} disabled={editing} onClick={() => setTab('pending')}>待确认{proposals.length > 0 && <small>{proposals.length}</small>}</button></div>
-    {editing && <p className="ha-memory-edit-notice" role="status">先保存或取消当前编辑，再切换范围或关闭。</p>}
-    <div className="ha-memory-list">
+  const toolbar = <><p className="ha-memory-demo-note">交互示例 · 不连接真实记忆</p>
+    <div className="ha-memory-manager-controls"><label htmlFor={scopeId}>查看范围</label><select id={scopeId} data-overlay-autofocus value={browseScope} disabled={editing} onChange={event => setBrowseScope(event.target.value as MemoryScope)}><option value="general">个人通用</option><option value="hub">Hub 开发</option></select></div>
+    <div className="ha-memory-tabs" aria-label="记忆列表"><button type="button" aria-pressed={tab === 'saved'} disabled={editing} onClick={() => setTab('saved')}>已保存<small>{entries.length}</small></button><button type="button" aria-pressed={tab === 'pending'} disabled={editing} onClick={() => setTab('pending')}>待确认{proposals.length > 0 && <small>{proposals.length}</small>}</button></div>
+    {editing && <p className="ha-memory-edit-notice" role="status">先保存或取消当前编辑，再切换范围或关闭。</p>}</>;
+  const footer = <><MemoryFeedback model={model} disabled={disabled || editing}/><div className="ha-memory-manager-footer"><span>{materialsOnly ? '本轮不使用记忆（只用所选资料）' : '本对话记忆：' + memoryUseLabel(enabled, scope)}</span><small>查看其他范围不会更改本对话。</small></div></>;
+  return <AssistantOverlay title="管理记忆" className="ha-memory-manager" bodyClassName="ha-memory-list" toolbar={toolbar} footer={footer} onClose={onClose} closeDisabled={editing} trapFocus onEscape={root => { const editor = root.querySelector<HTMLTextAreaElement>('[data-memory-editor] textarea'); if (editor) editor.focus({ preventScroll: true }); else onClose(); }}>
       {!model.ready ? <p className="ha-memory-empty">正在读取记忆示例…</p> : model.error ? <p role="status">{model.error}</p> : tab === 'saved' ? entries.length ? entries.map(entry => <MemoryEntryCard key={entry.id} entry={entry} model={model} disabled={disabled} onEditingChange={reportEditing}/>) : <p className="ha-memory-empty">此范围还没有已保存的记忆。</p> : proposals.length ? proposals.map(item => <MemoryProposalCard key={item.id} item={item} model={model} disabled={disabled} onEditingChange={reportEditing}/>) : <p className="ha-memory-empty">此范围没有待确认的建议。</p>}
-    </div>
-    <MemoryFeedback model={model} disabled={disabled || editing}/>
-    <footer className="ha-memory-manager-footer"><span>{materialsOnly ? '本轮不使用记忆（只用所选资料）' : '本对话记忆：' + memoryUseLabel(enabled, scope)}</span><small>查看其他范围不会更改本对话。</small></footer>
-  </section>;
+  </AssistantOverlay>;
 }
 
 export function MemorySettings({ enabled, scope, blocked, materialsOnly, onChange }: { enabled: boolean; scope: string; blocked: boolean; materialsOnly: boolean; onChange: (enabled: boolean, scope: string) => void }) {

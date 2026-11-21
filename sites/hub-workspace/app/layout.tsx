@@ -16,5 +16,6 @@ import "./flashcards-refined.css";
 import "./navigation-layout.css";
 import "./preview-theme.css";
 import "./journal-local/JournalToolbar.css";
+import "./assistant-ui.css";
 export const metadata: Metadata = {title:"Hub · 工作与生活工作台",description:"一个安静、有联系的工作空间。Hub 桌面浏览器交互原型。",icons:{icon:"/favicon.svg",shortcut:"/favicon.svg"}};
 export default function RootLayout({children}:{children:React.ReactNode}) {return <html lang="zh-CN"><body>{children}</body></html>;}

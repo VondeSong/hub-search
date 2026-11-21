@@ -1,5 +1,6 @@
 "use client";
 import { useState } from 'react';
+import { AssistantOverlay } from './AssistantOverlay';
 import {AssistantFileDelivery} from './AssistantDataMaterials';
 import type { ReactNode } from 'react';
 import { Activity, Brain, ChevronDown, Globe2, Layers, Maximize2, Minimize2, NotebookPen, X } from 'lucide-react';
@@ -32,8 +33,7 @@ export function AssistantDetails({ settings, setSettings, disabled, hasReport, r
     <div><dt>对话消息</dt><dd>{messageCount} 条</dd></div>
     <div><dt>上下文占用</dt><dd>原型未提供数据</dd></div>
   </dl>;
-  return <section className={'ha-menu ha-header-menu ha-details' + (usageOpen ? ' ha-task-status-panel' : '')} aria-label={usageOpen ? '任务状态' : '对话详情'}>
-    <header className="ha-menu-heading"><strong>{usageOpen ? '任务状态' : '对话详情'}</strong><button type="button" className="ha-icon" aria-label={usageOpen ? '关闭任务状态' : '关闭对话详情'} onClick={onClose}><X size={16}/></button></header>
+  return <AssistantOverlay title={usageOpen ? '任务状态' : '对话详情'} className={'ha-header-menu ha-details' + (usageOpen ? ' ha-task-status-panel' : '')} bodyClassName="ha-details-body" onClose={onClose}>
     {usageOpen ? <div className="ha-detail-standalone">{taskDetails}</div> : <>
       {hasReport && <section className="ha-detail-section ha-detail-reading" aria-label="阅读">
         <div className="ha-detail-actions"><button type="button" disabled={disabled} aria-pressed={reading} onClick={() => { onReading(); onClose(); }}>{reading ? <Minimize2 size={16}/> : <Maximize2 size={16}/>}<span>{reading ? '返回对话布局' : '只看最新回答'}</span></button></div>
@@ -76,5 +76,5 @@ export function AssistantDetails({ settings, setSettings, disabled, hasReport, r
         </DetailRow>
       </section>
     </>}
-  </section>;
+  </AssistantOverlay>;
 }
