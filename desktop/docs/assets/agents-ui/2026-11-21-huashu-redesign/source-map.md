@@ -1,6 +1,6 @@
 # Agents 源码与设计对应表
 
-本次从桌面入口沿到会话状态、请求组装和写入回执。三套原型共用同一组示例资料。表中的源码说明对应现有实现，设计稿的动作用于评审。
+本次从桌面入口沿到会话状态、请求组装和写入回执。表中的源码说明对应现有实现。最后一列记录旧稿映射，作为问题来源。当前评审结构见下文。
 
 | 模块 | 源码中的职责与边界 | 原型中的入口或状态 |
 | --- | --- | --- |
@@ -24,3 +24,13 @@
 - 记忆、模型和能力。[SharedMemory](../../../../src/SharedMemory.tsx) · [useSharedMemory](../../../../src/useSharedMemory.ts) · [AgentModelMenu](../../../../src/AgentModelMenu.tsx) · [AgentMcpServices](../../../../src/AgentMcpServices.tsx) · [AgentSkills](../../../../src/AgentSkills.tsx)
 - 运行、成果和写入。[AgentActivity](../../../../src/AgentActivity.tsx) · [AgentLifecycle](../../../../src/AgentLifecycle.tsx) · [AgentDelivery](../../../../src/AgentDelivery.tsx) · [AgentAnswerSave](../../../../src/AgentAnswerSave.tsx) · [AgentBusinessActions](../../../../src/AgentBusinessActions.tsx)
 - 记录与云端。[AgentConversationHistory](../../../../src/AgentConversationHistory.tsx) · [CloudAgents](../../../../src/CloudAgents.tsx) · [服务部署及职责](../../../../../services/hub-agents/README.md) · [移交流程](../../../../../services/hub-agents/handoffs.py)
+
+## 本轮重构的读写边界
+
+| 当前源码中的行为 | 重构原型中的数据边界 |
+| --- | --- |
+| `AgentInvestigation.createRequest` 计算研究专题与手选资料合并后的授权，`researchGrant` 合并具体授权对象。标签任务需可检索库，核心页不会自动开放整库。 | `resolveDraft` 计算实际授权配置。`prepareRequest` 做发送预检，创建与草稿完全独立的请求快照。编辑草稿、打开新模板都不会编辑已有的请求。 |
+| 原生运行记录、活动和报告按已有工作和运行读取，引用由 `openCitation(runId, evidenceIndex, quote)` 打开。 | `createTurn` 持有快照、运行状态和回答。回答引用单独按所在轮查找。提交范围与实际引用同时可查，只有引用能定位该轮摘录。 |
+| 排队、转向和继续执行是生命周期命令。运行中有来源变更保护，继续时按授权版本与运行身份校验。 | 排队对象持有提交时请求。继续执行使用原请求。当前仍可另写草稿。原型只演示排队路径，正式接入需保留原生转向、授权校验和恢复。 |
+| 目标工作有完成条件和后端评估，普通问答和标签工作各有交付形态。 | 工作台只追踪明确创建的目标工作。运行产生回答，用户确认完成是另一步。此人工验收是评审提案，尚未迁入原生自动评估。 |
+| `AgentAnswerSave` 读取指定回答、生成预览，经确认写入并回查回执。 | `confirmWrite` 将目标、内容和预览绑定到原回答，状态不明时复用已有回执。界面从原回答进入写入，以回答身份显示回执。 |
