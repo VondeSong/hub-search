@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>C · 磨砂浮窗</title><link rel="stylesheet" href="review.css">
+<template id="treatment"><style>
+.ha-panel:not(.ha-expanded) {
+  --ha-frame-radius: 20px;
+  --ha-frame-shadow: 0 1px 3px rgb(14 26 42 / 8%), 0 18px 38px -14px rgb(14 26 42 / 27%);
+}
+@supports (backdrop-filter: blur(16px)) {
+  @media (prefers-reduced-transparency: no-preference) {
+    .ha-panel:not(.ha-expanded) {
+      background: color-mix(in srgb,var(--surface) 85%,transparent);
+      backdrop-filter: blur(18px) saturate(.85);
+    }
+    .ha-panel:not(.ha-expanded) :is(.ha-header,.ha-composer-area) { background: transparent; }
+  }
+}
+.ha-panel .ha-welcome .ha-prompts { display: flex; flex-wrap: wrap; gap: 6px; max-width: 320px; }
+.ha-panel .ha-welcome .ha-prompts h3 { width: 100%; margin: 0 0 2px; }
+.ha-panel .ha-welcome .ha-prompts button {
+  width: auto; padding: 6px 11px; gap: 6px; min-height: 34px;
+  border: 1px solid var(--ha-control-edge); border-radius: 20px;
+  background: var(--surface); box-shadow: 0 1px 2px rgb(18 30 42 / 4%);
+}
+.ha-panel .ha-welcome .ha-prompts button > svg:first-child { width: 14px; height: 14px; margin: 0; }
+.ha-panel .ha-welcome .ha-prompts .ha-prompt-arrow { display: none; }
+.ha-panel .ha-welcome .ha-prompts button:is(:hover,:focus-visible) { background: var(--surface-2); border-color: var(--muted); }
+.ha-panel .ha-composer { border-radius: 16px; background: var(--surface); box-shadow: 0 3px 12px rgb(23 35 45 / 7%); }
+.ha-panel .ha-composer:focus-within { box-shadow: 0 0 0 2px color-mix(in srgb,var(--accent) 19%,transparent); }
+</style></template><script src="review.js" defer></script></html>

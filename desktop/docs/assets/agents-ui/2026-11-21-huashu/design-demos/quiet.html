@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A · 轻描边</title><link rel="stylesheet" href="review.css">
+<template id="treatment"><style>
+.ha-panel:not(.ha-expanded) {
+  --ha-frame-radius: 18px;
+  --ha-frame-shadow: 0 2px 5px rgb(18 26 34 / 5%), 0 14px 32px -14px rgb(18 26 34 / 25%);
+}
+.ha-panel .ha-welcome .ha-prompts { gap: 0; }
+.ha-panel .ha-welcome .ha-prompts h3 { margin-bottom: 5px; }
+.ha-panel .ha-welcome .ha-prompts button {
+  min-height: 36px; padding: 6px 9px; margin-inline-start: -9px;
+  border-radius: 7px; gap: 9px;
+}
+.ha-panel .ha-welcome .ha-prompts button > svg:first-child { width: 15px; height: 15px; }
+.ha-panel .ha-welcome .ha-prompts button:is(:hover,:focus-visible) {
+  background: color-mix(in srgb,var(--text) 5%,var(--surface));
+}
+.ha-panel .ha-composer { border-radius: 13px; box-shadow: 0 2px 5px rgb(20 24 30 / 4%); }
+.ha-panel .ha-composer:focus-within { border-color: color-mix(in srgb,var(--text) 27%,var(--surface)); }
+.ha-panel .ha-composer > textarea { min-height: 48px; }
+.ha-panel .ha-mode-trigger { background: var(--surface-2); border-color: transparent; }
+</style></template><script src="review.js" defer></script></html>

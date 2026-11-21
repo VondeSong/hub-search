@@ -1,0 +1,10 @@
+* { box-sizing: border-box; }
+html,body { margin: 0; height: 100%; }
+body { display: flex; flex-direction: column; color: #232832; background: #f9fafb; font: 14px/1.4 system-ui,"Microsoft YaHei",sans-serif; }
+nav { display: flex; flex: none; align-items: center; justify-content: center; gap: 3px; padding: 6px; border-bottom: 1px solid #dfe2e6; background: #fff; }
+nav a { border-radius: 7px; color: #555d68; padding: 7px 12px; text-decoration: none; }
+nav a[aria-current] { background: #edf0f3; color: #161c24; font-weight: 550; }
+nav a:hover { background: #f2f4f6; }
+nav a:focus-visible { outline: 2px solid #535f75; }
+iframe { display: block; width: 100%; flex: 1; border: 0; min-height: 0; }
+@media (max-width: 480px) { nav { gap: 0; } nav a { font-size: 12px; padding: 9px 7px; } }
