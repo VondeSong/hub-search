@@ -14,21 +14,30 @@ type FileChange = PatchPreview & {path:string};
 export type ActivityEvent = { id: string; sequence?:number; updatedAt?:number; operation?:string|null; serviceId?:string|null; serviceTitle?:string|null; toolName?:string|null; agentIds?:string[]|null; agentStates?:Record<string,{status:string}>|null; origin?:string; truncated?:boolean; kind: "answer" | "context" | "message" | "reasoning" | "plan" | "unpublishedAnswer" | "webSearch" | "skill" | "tool" | "status"; state: string; label: string; detail?: string | null; url?:string|null; actionId?: string; resultRef?: ToolResultRef; readSpan?: {title:string;start:number;end:number;total:number}; createdAt: number; finishedAt?: number; exitCode?:number|null; commandOutput?:string|null; outputTruncated?:boolean; fileChanges?:FileChange[]|null; imageCount?:number; action?:string|null; queries?:string[]|null; pattern?:string|null; sourceRefs?:ActivitySource[]|null; resultCount?:number|null; errorCount?:number|null; errors?:{refId:string;url?:string|null;reason?:string|null}[]|null; omittedSourceCount?:number|null };
 export type ActivityRun = { workId?:string;currentWorkRevision?:number;authorizationVersion?:number;runId: string; revision: number; state: string; running: boolean; native?:boolean; capabilities?:{externalTools?:{server:string;tools:string[];writeRepository?:string|null}[];webSearch?:string;nativeCapabilities?:{workspace:boolean;multiAgent:boolean}}|null; measurement?:{turnTokens?:{inputTokens?:number|null;cachedInputTokens?:number|null;uncachedInputTokens?:number|null;outputTokens?:number|null}}; canSteer?:boolean; startedAt: number; finishedAt?: number | null; steps: number; events: ActivityEvent[]; workspaceChanges?: (PatchPreview & {files:number})|null; validity?: string };
 
-const DisclosureContext=createContext<Map<string,boolean>|null>(null);
+const DisclosureContext=createContext<{
+  expanded:Map<string,boolean>;
+  phaseRows:Map<string,number>;
+}|null>(null);
 const FollowConversationContext = createContext<(() => boolean) | undefined>(undefined);
-// Cache disclosure choices only while this chat rechecks source access.
+// Keep disclosure choices across remounts within the active chat.
 export function ActivityDisclosureProvider({children, isFollowing}:{children:ReactNode;isFollowing?:()=>boolean}) {
-  const choices=useRef(new Map<string,boolean>());
+  const [choices]=useState(()=>({expanded:new Map<string,boolean>(),phaseRows:new Map<string,number>()}));
   return <FollowConversationContext.Provider value={isFollowing}>
-    <DisclosureContext.Provider value={choices.current}>{children}</DisclosureContext.Provider>
+    <DisclosureContext.Provider value={choices}>{children}</DisclosureContext.Provider>
   </FollowConversationContext.Provider>;
 }
+function rememberActivityChoice<T>(choices:Map<string,T>|undefined,key:string,value:T) {
+  if(!choices)return;
+  choices.delete(key);
+  choices.set(key,value);
+  if(choices.size>256)choices.delete(choices.keys().next().value!);
+}
 function useActivityDisclosure(key:string,initial:boolean):[boolean,(value:boolean)=>void] {
-  const choices=useContext(DisclosureContext);
+  const choices=useContext(DisclosureContext)?.expanded;
   const [open,setOpen]=useState(()=>choices?.get(key)??initial);
   useEffect(()=>{setOpen(choices?.get(key)??initial);},[key,choices]);
   return [open,value=>{
-    if(choices){choices.delete(key);choices.set(key,value);if(choices.size>256)choices.delete(choices.keys().next().value!);}
+    rememberActivityChoice(choices,key,value);
     setOpen(value);
   }];
 }
@@ -107,7 +116,12 @@ function WebActivity({event,runId,workId}:{event:ActivityEvent;runId:string;work
   });
   const label = webLabel(event);
   const metadata = [queries.length>1 ? `另 ${queries.length-1} 条查询` : "",eventStateLabel(event)].filter(Boolean).join(" · ");
-  const [sourcesOpen,setSourcesOpen]=useActivityDisclosure(`web-sources:${runId}:${event.id}`,operation==="webSearch" && !event.errorCount);
+  const choices=useContext(DisclosureContext)?.expanded;
+  const sourcesKey=`web-sources:${runId}:${event.id}`;
+  const [sourcesOpen,setSourcesOpen]=useActivityDisclosure(sourcesKey,operation==="webSearch" && !event.errorCount);
+  useEffect(()=>{
+    if(open && batchSources.length && !choices?.has(sourcesKey))rememberActivityChoice(choices,sourcesKey,sourcesOpen);
+  },[batchSources.length,choices,open,sourcesKey,sourcesOpen]);
   const emptyFind=operation==="webFind" && event.state==="completed" && event.resultCount===0 && !event.errorCount;
   const resultLabel=emptyFind ? "本次未返回页内匹配结果。" : event.resultCount != null
     ? `本批返回 ${event.resultCount} 项${operation==="webSearch" ? "搜索结果" : "结果"}`
@@ -401,16 +415,21 @@ function mixedPhaseOverview(operations:ActivityEvent[]) {
   return {title:parts.join("、"), icon:([...services.values(),...actions.values()])[0][0]};
 }
 
+const activityPageSize=8;
+
 function OperationPhase({events,scope,current,live,segmented,settled,runId}:{events:ActivityEvent[];scope:ToolResultScope|null;current?:ActivityEvent;live:boolean;segmented:boolean;settled:boolean;runId:string}) {
   const materialGroup=events.every(isMaterialContext);
   const choices=useContext(DisclosureContext);
-  const [open,setOpen]=useActivityDisclosure(`group:${runId}:${events[0].id}`,materialGroup && choices?.get(`detail:${runId}:${events[0].id}`)===true);
-  const [visible,setVisible]=useState(8);
+  const groupKey=`group:${runId}:${events[0].id}`;
+  const phaseRows=choices?.phaseRows;
+  const [open,setOpen]=useActivityDisclosure(groupKey,materialGroup && choices?.expanded.get(`detail:${runId}:${events[0].id}`)===true);
+  const [visible,setVisible]=useState(()=>phaseRows?.get(groupKey)??activityPageSize);
   const operations=events.filter(isOperation);
   const visibleCount=live && open ? Math.max(visible,events.length) : visible;
   useEffect(()=>{
+    if(visibleCount>activityPageSize)rememberActivityChoice(phaseRows,groupKey,visibleCount);
     if(visibleCount>visible)setVisible(visibleCount);
-  },[visibleCount,visible]);
+  },[groupKey,phaseRows,visibleCount,visible]);
   const webPhase=operations.length>0 && operations.every(event=>event.kind==="webSearch");
   const failed=operations.some(event=>operationFailed(event) && (event.kind!=="webSearch" || settled));
   const active=current?.state==="running";
@@ -440,7 +459,7 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
   }
   const steps=<div className="agent-operation-children">
     {events.slice(0,visibleCount).map(event=><ActivityEventView key={event.id} event={event} scope={scope} runId={runId}/>)}
-    {visibleCount<events.length && <button type="button" className="agent-show-more" onClick={()=>setVisible(count=>count+8)}>显示更多 · 另 {events.length-visibleCount} 项</button>}
+    {visibleCount<events.length && <button type="button" className="agent-show-more" onClick={()=>setVisible(count=>count+activityPageSize)}>显示更多 · 另 {events.length-visibleCount} 项</button>}
   </div>;
   if(!segmented && operations.length===events.length && operations.every(event=>event.kind==="tool" && (event.operation || event.toolName)))return steps;
   const headingIcon = latest ?? (summaryIcon && {...summaryIcon,state:"completed",errorCount:0});

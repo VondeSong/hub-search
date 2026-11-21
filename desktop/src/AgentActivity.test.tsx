@@ -650,10 +650,12 @@ it("closes a previous phase at a public update while the newest phase owns the l
  expect(host.querySelector('.agent-operation-active')).toBeNull();
 });
 
-it("appends new steps to the open phase and keeps the earlier receipt open",async()=>{
+it("appends new steps and restores a receipt past the first page after folding the run",async()=>{
   const tools:ActivityRun['events']=Array.from({length:8},(_,i)=>({id:`tool-${i}`,kind:'tool',operation:'command',state:'completed',label:`运行命令 ${i+1}`,detail:'运行回执',createdAt:1400+i}));
   const latest={id:'read-comments',kind:'tool' as const,operation:'mcp',toolName:'github.fetch_issue_comments',state:'running',label:'github.fetch_issue_comments',createdAt:1500};
-  const render=(steps:ActivityRun['events'],running=true)=>act(async()=>root.render(<AgentActivity value={{...run,native:true,events:[run.events[0],...steps],running}}/>));
+  const render=(steps:ActivityRun['events'],running=true)=>act(async()=>root.render(
+    <ActivityDisclosureProvider><AgentActivity value={{...run,native:true,events:[run.events[0],...steps],running}}/></ActivityDisclosureProvider>,
+  ));
   await render(tools);
   const phase=host.querySelector<HTMLDetailsElement>('.agent-operation-group')!;
   const title=phase.querySelector('summary')!;
@@ -666,10 +668,37 @@ it("appends new steps to the open phase and keeps the earlier receipt open",asyn
   expect(phase.querySelector('.agent-activity-step:last-child')?.textContent).toContain(latest.toolName);
   await render([...tools,{...latest,state:'completed'}]);
   expect(title.textContent).toBe('已读取 GitHub 评论');
+  const lateReceipt=phase.querySelector<HTMLDetailsElement>('.agent-activity-step:last-child .agent-tool-activity')!;
+  await act(async()=>lateReceipt.querySelector('summary')!.click());
   await render([...tools,{...latest,state:'completed'}],false);
   expect(phase.open && receipt.open).toBe(true);
   expect(phase.querySelector('.agent-tool-activity')).toBe(receipt);
   expect(phase.querySelectorAll('.agent-activity-step')).toHaveLength(9);
+  await act(async()=>host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!.click());
+  await expandProcess();
+  const restored=host.querySelector<HTMLDetailsElement>('.agent-operation-group')!;
+  expect(restored.open).toBe(true);
+  expect(restored.querySelectorAll('.agent-activity-step')).toHaveLength(9);
+  expect(restored.querySelector('.agent-activity-step:first-child .agent-tool-activity[open]')).not.toBeNull();
+  expect(restored.querySelector('.agent-activity-step:last-child .agent-tool-activity[open]')).not.toBeNull();
+});
+
+it("restores the displayed source-list state when an open web receipt was refined",async()=>{
+  const start:ActivityRun['events'][number]={id:'search',kind:'webSearch',action:'other',state:'running',label:'查阅网页资料',createdAt:1300};
+  const result={...start,action:'search',state:'completed',label:'搜索网页',queries:['开放标准','键盘交互'],sourceRefs:[{url:'https://www.w3.org/'}]};
+  const render=(event:ActivityRun['events'][number],running:boolean)=>act(async()=>root.render(
+    <ActivityDisclosureProvider><AgentActivity value={{...run,native:true,running,events:[run.events[0],event]}}/></ActivityDisclosureProvider>,
+  ));
+  await render(start,true);
+  await act(async()=>host.querySelector<HTMLElement>('.agent-operation-group > summary')!.click());
+  await act(async()=>host.querySelector<HTMLElement>('.agent-web-activity > summary')!.click());
+  await render(result,false);
+  const sources=()=>host.querySelector<HTMLDetailsElement>('.agent-web-details > details');
+  expect(sources()?.open).toBe(false);
+  await act(async()=>host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!.click());
+  await expandProcess();
+  expect(host.querySelector('.agent-web-activity[open]')).not.toBeNull();
+  expect(sources()?.open).toBe(false);
 });
 
 
