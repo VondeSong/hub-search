@@ -150,7 +150,6 @@ function RecordedToolActivity({event, resultRef, scope, runId}: {event:ActivityE
       <summary title={event.label}>
         <ActivityIcon event={event}/>
         <span className="agent-script-label">{event.label}</span>
-        {duration && <small className="agent-operation-duration">{duration}</small>}
         {eventStateLabel(event) && <span className="agent-step-state">{eventStateLabel(event)}</span>}
         <ChevronDown size={12} className="agent-reasoning-chevron" aria-hidden="true"/>
       </summary>
@@ -159,6 +158,7 @@ function RecordedToolActivity({event, resultRef, scope, runId}: {event:ActivityE
         {event.toolName && event.toolName!==event.label && <p className="agent-note">工具 · {event.toolName}</p>}
         <AgentToolResult value={resultRef} scope={scope} embedded scriptState={["analyzeFiles","compute"].includes(event.operation??"") ? event.state : undefined}
           disclosure={{technicalOpen,setTechnicalOpen,scriptOpen,setScriptOpen}}/>
+        {duration && <p className="agent-note">耗时 {duration}</p>}
       </>}
     </details>
   </div>;
@@ -256,7 +256,7 @@ function ActivityEventView({ event, scope, runId }: { event: ActivityEvent; scop
       {detailOpen && (scope && event.imageCount && event.sequence!=null ? <div className="agent-receipt-thumbnails">{Array.from({length:event.imageCount},(_,index)=><ReceiptImage key={index} sequence={event.sequence!} index={index} runId={runId} scope={scope}/>)}</div>
         : <p className="agent-note">这条回执没有可回读的图像引用。</p>)}
     </details></div>;
-  if (event.kind === "context") return <div className="agent-activity-step agent-context-event"><ActivityIcon event={event}/>{event.detail ? <details open={detailOpen} onToggle={change=>setDetailOpen(change.currentTarget.open)}><summary>{event.label}</summary><p>{event.detail}</p></details> : <span>{event.label}</span>}</div>;
+  if (event.kind === "context") return <div className="agent-activity-step agent-context-event"><ActivityIcon event={event}/>{event.detail ? <details open={detailOpen} onToggle={change=>setDetailOpen(change.currentTarget.open)}><summary><span>{event.label}</span><ChevronDown className="agent-reasoning-chevron" size={12} aria-hidden="true"/></summary><p>{event.detail}</p></details> : <span>{event.label}</span>}</div>;
   if (event.kind === "message") return <div className="agent-commentary"><PublicText text={event.label}/></div>;
   if(event.kind==="status") {
     const label=(event.state==="failed"?"未完成：":event.state==="interrupted"?"已中断：":"")+event.label;
@@ -273,14 +273,15 @@ function ActivityEventView({ event, scope, runId }: { event: ActivityEvent; scop
   const rawTool = event.toolName && event.toolName!==event.label ? event.toolName : undefined;
   const command = activityOperation(event)==="command" && event.origin==="codex-native";
   const exitLine = command && Number.isInteger(event.exitCode) ? `退出码 ${event.exitCode}` : undefined;
+  const duration = eventDuration(event);
   return <div className={"agent-activity-step agent-step-" + event.state}>
     <ActivityIcon event={event}/><ActivityIdentity events={[event]} workId={scope?.workId} primaryIcon={event}/>
     <div>{command || event.fileChanges?.length || event.detail || rawTool || event.agentIds?.length || (event.resultRef && scope) || event.label.length>72 ? <details className="agent-tool-activity" open={detailOpen} onToggle={change=>setDetailOpen(change.currentTarget.open)}>
-      <summary title={event.label}><span>{event.label}</span>{eventDuration(event)&&<small className="agent-operation-duration">{eventDuration(event)}</small>}{eventStateLabel(event)&&<span className="agent-step-state">{eventStateLabel(event)}</span>}<ChevronDown size={12} className="agent-reasoning-chevron" aria-hidden="true"/></summary>
+      <summary title={event.label}><span>{event.label}</span>{eventStateLabel(event)&&<span className="agent-step-state">{eventStateLabel(event)}</span>}<ChevronDown size={12} className="agent-reasoning-chevron" aria-hidden="true"/></summary>
       {event.label.length>72 && <p>{event.label}</p>}
       {rawTool && <p className="agent-note">工具 · {rawTool}</p>}
       {command && <>
-        <p className="agent-script-status">{event.state==="completed" ? "执行完成" : eventStateLabel(event)}{exitLine && ` · ${exitLine}`}</p>
+        <p className="agent-script-status">{event.state==="completed" ? "执行完成" : eventStateLabel(event)}{exitLine && ` · ${exitLine}`}{duration && ` · 耗时 ${duration}`}</p>
         {event.commandOutput && <pre className="agent-receipt-text" tabIndex={0} aria-label={event.state==="running" ? "当前命令输出" : "命令输出"}><code>{event.commandOutput}</code></pre>}
         {event.outputTruncated || event.truncated && event.commandOutput ? <p className="agent-note">命令输出为截断预览。</p> : !event.commandOutput && event.state!=="running" && <p className="agent-note">这条回执未保留命令输出。</p>}
       </>}
@@ -290,7 +291,8 @@ function ActivityEventView({ event, scope, runId }: { event: ActivityEvent; scop
         : event.detail && (command ? <details className="agent-technical-record" open={commandOpen} onToggle={change=>setCommandOpen(change.currentTarget.open)}><summary>查看命令</summary><pre>{exitLine && event.detail.endsWith("\n"+exitLine) ? event.detail.slice(0,-exitLine.length).trimEnd() : event.detail}</pre></details> : <p>{event.detail}</p>)}
       {!!event.agentIds?.length&&<ul aria-label="子代理状态">{event.agentIds.map(id=><li key={id}>{id.slice(-6)} · {({running:"进行中",completed:"已结束",failed:"未完成",errored:"未完成",interrupted:"已中断",pendingInit:"正在启动",shutdown:"已关闭"} as Record<string,string>)[event.agentStates?.[id]?.status??""]||"状态待核验"}</li>)}</ul>}
       {event.resultRef && scope && <AgentToolResult value={event.resultRef} scope={scope}/>}
-    </details> : <span>{event.label}{eventStateLabel(event)&&<span className="agent-step-state"> · {eventStateLabel(event)}</span>}{eventDuration(event)&&<small className="agent-operation-duration">{eventDuration(event)}</small>}</span>}</div>
+      {!command && duration && <p className="agent-note">耗时 {duration}</p>}
+    </details> : <span title={duration ? `耗时 ${duration}` : undefined}>{event.label}{eventStateLabel(event)&&<span className="agent-step-state"> · {eventStateLabel(event)}</span>}</span>}</div>
   </div>;
 }
 
@@ -303,6 +305,7 @@ function elapsed(milliseconds: number) {
 }
 
 const isOperation=(event:ActivityEvent)=>["context","tool","skill","webSearch"].includes(event.kind);
+const isMaterialContext=(event:ActivityEvent)=>event.kind==="context" && event.origin==="hub-context" && !event.operation;
 const isCodexSummary=(event:ActivityEvent)=>event.kind==="reasoning" && !!event.origin?.startsWith("codex");
 const operationFailed=(event:ActivityEvent)=>event.state==="failed" || event.state==="interrupted" || !!event.errorCount;
 const phaseToolLabels = new Map([
@@ -399,7 +402,9 @@ function mixedPhaseOverview(operations:ActivityEvent[]) {
 }
 
 function OperationPhase({events,scope,current,live,segmented,settled,runId}:{events:ActivityEvent[];scope:ToolResultScope|null;current?:ActivityEvent;live:boolean;segmented:boolean;settled:boolean;runId:string}) {
-  const [open,setOpen]=useActivityDisclosure(`group:${runId}:${events[0].id}`,false);
+  const materialGroup=events.every(isMaterialContext);
+  const choices=useContext(DisclosureContext);
+  const [open,setOpen]=useActivityDisclosure(`group:${runId}:${events[0].id}`,materialGroup && choices?.get(`detail:${runId}:${events[0].id}`)===true);
   const [summariesOpen,setSummariesOpen]=useActivityDisclosure(`summaries:${runId}:${events[0].id}`,false);
   const [visible,setVisible]=useState(8);
   const operations=events.filter(isOperation);
@@ -420,9 +425,12 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
   const readSpan=operations.length===1 ? operations[0].readSpan : undefined;
   const attachmentTitle=operations.length===1 && operations[0].operation==="analyzeFiles"
     ? activityLabel(operations[0]) : undefined;
-  const overview=!operations.length ? "公开思考摘要" : webOverview ? `${webTitle} · ${operations.length} 步`
-    : mixed?.title ?? externalPhaseTitle(operations) ?? (operations.every(event=>event.state==="completed"&&!event.errorCount)?"已":"")+(attachmentTitle ?? labels.join("、"))+(readSpan?.title ? ` · ${readSpan.title}` : "");
-  const latest=webOverview ? undefined : current ?? (live && operations.length>1 ? operations[operations.length-1] : undefined);
+  const complete=operations.every(event=>event.state==="completed"&&!event.errorCount);
+  const commandBatch=operations.length>1 && labels.length===1 && labels[0]===operationLabels.command;
+  const overview=!operations.length ? "公开思考摘要" : materialGroup ? `资料准备 · ${operations.length} 项` : webOverview ? `${webTitle} · ${operations.length} 步`
+    : commandBatch ? `${complete?"已运行命令":"运行命令"} · ${operations.length} 条`
+    : mixed?.title ?? externalPhaseTitle(operations) ?? (complete?"已":"")+(attachmentTitle ?? labels.join("、"))+(readSpan?.title ? ` · ${readSpan.title}` : "");
+  const latest=webOverview || materialGroup ? undefined : current ?? (!commandBatch && live && operations.length>1 ? operations[operations.length-1] : undefined);
   let summary=overview;
   if(latest) {
     const label=latest.kind==="webSearch" ? webLabel(latest) : toolActivityLabel(latest);
@@ -458,7 +466,7 @@ function ActivityTimeline({events,scope,running,segmented,settled,runId}:{events
   const boundary=(event:ActivityEvent)=>event.operation==="imageInput" || event.operation==="viewImage" || !isOperation(event) && !isCodexSummary(event);
   for(const event of events){
     const previous=groups[groups.length-1];
-    if(!boundary(event)&&previous&&!boundary(previous[0]))previous.push(event);
+    if(!boundary(event)&&previous&&!boundary(previous[0])&&isMaterialContext(event)===isMaterialContext(previous[0]))previous.push(event);
     else groups.push([event]);
   }
   const latest=groups[groups.length-1] ?? [];
@@ -467,7 +475,7 @@ function ActivityTimeline({events,scope,running,segmented,settled,runId}:{events
   const reportedStatus=latest.some(event=>boundary(event) && event.state==="running");
   const continuingWebPhase=latest.some(event=>event.kind==="webSearch");
   return <>
-    {groups.map(group=>boundary(group[0])
+    {groups.map(group=>boundary(group[0]) || (group.length===1 && isMaterialContext(group[0]))
       ? <ActivityEventView key={group[0].id} event={group[0]} scope={scope} runId={runId}/>
       : <OperationPhase key={group[0].id} events={group} scope={scope} runId={runId} segmented={segmented} settled={settled} live={running && group===latest} current={group===latest ? current : undefined}/>)}
     {running && !current && !reportedStatus && !continuingWebPhase && <p className="agent-live-status" role="status"><span>正在思考</span></p>}

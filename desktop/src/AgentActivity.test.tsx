@@ -346,6 +346,28 @@ it("labels host-loaded context separately from model tool calls",async()=>{
   expect(host.querySelector('.agent-step-completed')).toBeNull();
   expect(host.querySelector('.agent-activity-toggle')?.textContent).not.toContain('个步骤');
 });
+it("groups adjacent material receipts apart from commands and preserves an open rule when more material arrives",async()=>{
+  const rule:ActivityRun["events"][number]={id:"rule",kind:"context",state:"completed",origin:"hub-context",label:"已加载知识库工作规则",detail:"规则版本 42",createdAt:1000};
+  const preview={...rule,id:"preview",label:"已读取数据预览「表格」",detail:null,createdAt:1100};
+  const missed={...rule,id:"missed",state:"failed",label:"添加的资料未读入",detail:"读取预算已用尽",createdAt:1200};
+  const progress:ActivityRun["events"][number]={id:"progress",kind:"message",state:"completed",label:"已核对范围，开始分析。",createdAt:1300};
+  const command:ActivityRun["events"][number]={id:"command",kind:"tool",operation:"command",origin:"codex-native",state:"completed",label:"运行工作区命令",exitCode:0,createdAt:1400};
+  const draw=(events:ActivityRun["events"])=>act(async()=>root.render(<ActivityDisclosureProvider><AgentActivity value={{...run,native:true,events}}/></ActivityDisclosureProvider>));
+  await draw([rule]);
+  expect(host.querySelector('.agent-operation-group')).toBeNull();
+  await act(async()=>host.querySelector<HTMLElement>('.agent-context-event summary')!.click());
+  await vi.waitFor(()=>expect(host.querySelector('.agent-context-event details[open]')).not.toBeNull());
+  await draw([rule,preview,missed,progress,command,{...command,id:"command-2",createdAt:1500}]);
+  const [materials,commands]=host.querySelectorAll<HTMLDetailsElement>('.agent-operation-group');
+  expect(materials.querySelector('.agent-phase-label')?.textContent).toBe('资料准备 · 3 项');
+  expect(materials.open).toBe(true);
+  expect(materials.querySelector('.agent-context-event details[open] p')?.textContent).toBe(rule.detail);
+  expect(materials.querySelectorAll('.agent-context-event > span')).toHaveLength(1);
+  expect(host.querySelector('.agent-commentary')?.previousElementSibling).toBe(materials);
+  expect(commands.querySelector('.agent-phase-label')?.textContent).toBe('已运行命令 · 2 条');
+  await act(async()=>materials.querySelector('summary')!.click());
+  await vi.waitFor(()=>expect(materials.querySelector('.agent-phase-warning')?.textContent).toBe('部分未完成'));
+});
 it("shows selected-material read coverage and failures without claiming adoption",async()=>{
   await act(async()=>root.render(<AgentActivity value={{...run,steps:0,events:[
     {id:"read",kind:"context",state:"completed",label:"已读取部分资料「笔记」",detail:"已读取 0–6000 / 7000 字符，模型自行判断是否采用",createdAt:1100},

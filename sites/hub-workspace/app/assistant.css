@@ -576,10 +576,10 @@
 }
 .ha-process-commentary{margin-block:12px;color:var(--text);line-height:1.6;font-size:14px}
 .ha-process-row{display:flex;align-items:flex-start;gap:8px;margin-block:8px;line-height:1.6}
-.ha-process-children>.ha-process-row{color:var(--subtle)}
+.ha-process-children>.ha-process-row{color:var(--subtle);margin-block:3px}
 .ha-process-group{margin-block:12px}
 .ha-process-group>div{padding-block:4px;padding-inline-start:24px}
-.ha-process-group>.ha-process-children{border-inline-start:1px solid var(--line);margin-inline-start:8px;padding-inline-start:14px;overflow-wrap:anywhere}
+.ha-process-group>.ha-process-children{padding-block:2px;padding-inline-start:24px;overflow-wrap:anywhere}
 .ha-process-children>p{margin:4px 0 8px}
 .ha-process-meta{color:var(--subtle);font-size:13px}
 .ha-process-review{padding:12px 4px;min-width:0}
@@ -667,8 +667,10 @@
 .ha-replay-process > summary:is(:hover,:focus-visible) { color: var(--text); }
 .ha-replay-process > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ha-process-brand { flex: 0 0 16px; width: 16px; height: 16px; background: currentColor; mask: url('/agent-icons/github.svg') center / contain no-repeat; }
-.ha-replay-activity > p { margin-block: 6px 4px; }
-.ha-replay-activity > .ha-process-group { margin-block: 4px 8px; }
+.ha-replay-activity > p { margin-block: 10px 8px; }
+.ha-replay-activity > p.ha-process-meta { margin-block: 2px 4px; }
+.ha-replay-activity > :is(.ha-process-group,.ha-process-batch) { margin-block: 2px 4px; }
+.ha-replay-activity > :is(.ha-process-group,.ha-process-batch) > summary { min-height: 26px; }
 .ha-replay-sites span { display: inline-flex; align-items: center; gap: 4px; border-radius: 12px; background: var(--surface-2); padding: 2px 7px; }
 .ha-replay-table { width: 100%; border-collapse: collapse; }
 .ha-replay-table :is(th,td) { padding: 6px; border-bottom: 1px solid var(--line); text-align: start; overflow-wrap: anywhere; }

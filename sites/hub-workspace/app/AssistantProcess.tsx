@@ -174,11 +174,15 @@ function AttachmentReplay() {
         <summary>{step < 4 ? '已处理' : '用时'} {seconds} 秒<ChevronDown size={13} aria-hidden="true"/></summary>
         <div className="ha-replay-activity">
           {step >= 1 && <p>先核对两个附件的架构、版本及签名。</p>}
-          {step >= 1 && <ProcessGroup title={step === 1 ? '正在读取文件版本' : '已检查两个附件'} icon={Terminal}>
-            <details className="ha-process-batch"><summary>读取文件版本 <ChevronDown size={12}/></summary>
-              {step >= 2 ? <div className="ha-script-region"><p>PowerShell · 示例</p><pre tabIndex={0}><code>{'(Get-Item .\\vcruntime140.dll).VersionInfo.FileVersion\n14.29.30147.0'}</code></pre><small>退出码 0</small></div> : <p>正在读取 PowerShell 版本信息</p>}
-            </details>
+          {step >= 1 && <ProcessGroup title="资料准备 · 2 项" icon={FileText}>
+            <div className="ha-process-row"><FileText size={15} aria-hidden="true"/><span>已载入附件 · vcruntime140.dll</span></div>
+            <div className="ha-process-row"><FileText size={15} aria-hidden="true"/><span>已载入附件 · vcruntime140_1.dll</span></div>
           </ProcessGroup>}
+          {step === 1 && <p className="ha-process-meta">正在读取文件版本</p>}
+          {step >= 2 && <details className="ha-process-batch ha-process-script">
+            <summary><Terminal size={16} aria-hidden="true"/>已检查文件版本<ChevronDown size={12} aria-hidden="true"/></summary>
+            <div className="ha-script-region"><p>PowerShell · 示例</p><pre tabIndex={0}><code>{'(Get-Item .\\vcruntime140.dll).VersionInfo.FileVersion\n14.29.30147.0'}</code></pre><small>退出码 0</small></div>
+          </details>}
           {step >= 2 && <p>两个文件的版本一致。接下来查找公开的分发和使用记录。</p>}
           {step >= 2 && <ProcessGroup title={step === 2 ? '正在搜索网页' : step === 3 ? '正在核对网页来源' : '已检索网页并核对来源'} icon={Search}>
             <SearchReceipt queries={['vcruntime140_1.dll 与 vcruntime140.dll 成对分发']} sources={step >= 3 ? [
