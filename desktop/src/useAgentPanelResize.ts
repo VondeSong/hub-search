@@ -6,10 +6,11 @@ const DEFAULT_WIDTH = 440;
 const clamp = (value: number, maximum: number, minimum = MIN_WIDTH) => Math.min(maximum, Math.max(minimum, Math.round(value)));
 
 // Both edge handles use the same drag lifecycle; resizing never starts an investigation.
-export function useAgentPanelResize(open: boolean, launcher: RefObject<HTMLButtonElement | null>, axis: "width" | "height" = "width") {
+export function useAgentPanelResize(open: boolean, panel: RefObject<HTMLElement | null>, axis: "width" | "height" = "width", extra = false) {
   const vertical = axis === "height";
   const defaultSize = vertical ? Math.max(320, Math.round(window.innerHeight / 2)) : DEFAULT_WIDTH;
-  const storageKey = `hub.agent.panel.${axis}.v1`;
+  const storageKey = `hub.agent.${extra ? "extra-" : ""}panel.${axis}.v1`;
+  const cssProperty = `--agent-${extra ? "extra-" : ""}panel-${axis}`;
   const readSize = () => {
     try {
       const saved = localStorage.getItem(storageKey);
@@ -23,7 +24,7 @@ export function useAgentPanelResize(open: boolean, launcher: RefObject<HTMLButto
   const finishDrag = useRef<(() => void) | null>(null);
   const minimum = vertical ? Math.min(320, maximum) : MIN_WIDTH;
   const width = clamp(preferredWidth ?? defaultSize, maximum, minimum);
-  const dock = () => launcher.current?.ownerDocument.body;
+  const dock = () => panel.current?.ownerDocument.body;
   const availableWidth = (element: HTMLElement) => {
     if (vertical) return window.innerHeight;
     const style = getComputedStyle(element);
@@ -60,9 +61,9 @@ export function useAgentPanelResize(open: boolean, launcher: RefObject<HTMLButto
   useEffect(() => {
     const element = dock();
     if (!element || !open) return;
-    element.style.setProperty(`--agent-panel-${axis}`, `${width}px`);
-    return () => { element.style.removeProperty(`--agent-panel-${axis}`); };
-  }, [open, width, axis]);
+    element.style.setProperty(cssProperty, `${width}px`);
+    return () => { element.style.removeProperty(cssProperty); };
+  }, [open, width, cssProperty]);
   useEffect(() => () => { finishDrag.current?.(); }, [open]);
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -71,8 +72,8 @@ export function useAgentPanelResize(open: boolean, launcher: RefObject<HTMLButto
     event.preventDefault();
     finishDrag.current?.();
     const target = event.currentTarget, pointer = event.pointerId, startX = vertical ? event.clientY : event.clientX;
-    const panel = document.getElementById(target.getAttribute("aria-controls") || "");
-    const startWidth = (vertical ? panel?.getBoundingClientRect().height : panel?.getBoundingClientRect().width) || width;
+    const bounds = panel.current?.getBoundingClientRect();
+    const startWidth = (vertical ? bounds?.height : bounds?.width) || width;
     const direction = !vertical && getComputedStyle(element).direction === "rtl" ? 1 : -1;
     target.focus({ preventScroll: true });
     target.setPointerCapture?.(pointer);

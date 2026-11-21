@@ -133,6 +133,8 @@ beforeEach(() => {
   localStorage.removeItem("hub.agent.memory-preferences.v1");
   localStorage.removeItem("hub.agent.panel.width.v1");
   localStorage.removeItem("hub.agent.panel.height.v1");
+  localStorage.removeItem("hub.agent.extra-panel.width.v1");
+  localStorage.removeItem("hub.agent.extra-panel.height.v1");
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   host = document.createElement("div"); document.body.append(host); root = createRoot(host); current = makeView(); visibility.value=true; libraryInventory.value=[];
   invoke.mockReset().mockImplementation(async (command, { args }) => {
@@ -185,19 +187,19 @@ const fill = async (name: string, value: string) => {
   const input = document.body.querySelector<HTMLTextAreaElement>(`[name="${name}"]`)!;
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); });
 };
-it("quotes a selection without sending and keeps the main draft when closing the side chat", async () => {
+it("opens a quote in an independent assistant and preserves both chats when docking or closing", async () => {
   const excerpt = "需要保留原设计";
   current.conversation = { hasEarlier: false, messages: [{
     id: "answer", role: "assistant", createdAt: 1,
     report: {...report, prose: {markdown: excerpt, citations: []}},
   }] };
-  await act(async () => root.render(<ExistingWorkInvestigation workId="work-1"/>));
+  await act(async () => root.render(<AgentPanelProvider><ExistingWorkInvestigation workId="work-1"/></AgentPanelProvider>));
   await fill("investigationGoal", "原聊天的草稿");
   const main = document.querySelector<HTMLElement>(".agent-panel")!;
-  const scroll = main.querySelector<HTMLElement>(".agent-conversation")!;
-  vi.spyOn(scroll, "getBoundingClientRect").mockReturnValue(new DOMRect(500, 0, 400, 500));
-  const paragraph = [...main.querySelectorAll(".agent-report p")].find(node => node.textContent === excerpt)!;
   async function selectExcerpt() {
+    const scroll = main.querySelector<HTMLElement>(".agent-conversation")!;
+    vi.spyOn(scroll, "getBoundingClientRect").mockReturnValue(new DOMRect(500, 0, 400, 500));
+    const paragraph = [...main.querySelectorAll(".agent-report p")].find(node => node.textContent === excerpt)!;
     const range = document.createRange();
     range.selectNodeContents(paragraph.firstChild!);
     Object.defineProperty(range, "getClientRects", {value: () => [new DOMRect(540, 80, 120, 18)]});
@@ -213,18 +215,32 @@ it("quotes a selection without sending and keeps the main draft when closing the
   expect(main.querySelector("[aria-label='待添加资料']")?.textContent).toContain(excerpt);
   await selectExcerpt();
   await click("在侧边聊天中提问");
-  const side = document.querySelector<HTMLElement>(".agent-side-chat")!;
+  const side = document.querySelector<HTMLElement>(".agent-panel[data-agent-extra]")!;
   expect(side.hidden).toBe(false);
   expect(side.querySelector("[aria-label='待添加资料']")?.textContent).toContain(excerpt);
   expect(side.querySelector("textarea")?.value).toBe("");
-  await click("关闭侧边聊天");
-  expect(side.hidden).toBe(true);
-  expect(main.hidden).toBe(false);
-  expect(main.querySelector("textarea")?.value).toBe("原聊天的草稿");
+  const dock = async (panel: HTMLElement) => {
+    await act(async () => panel.querySelector<HTMLButtonElement>('[aria-label="展开为侧边栏"],[aria-label="切换为浮窗"]')!.click());
+  };
+  await dock(side);
+  expect(side.dataset.agentDocked).toBe("true");
+  expect(main.dataset.agentDocked).toBe("false");
+  await dock(main);
+  expect(side.dataset.agentDocked).toBe("true");
+  expect(main.dataset.agentDocked).toBe("true");
+  await dock(side);
+  expect(side.dataset.agentDocked).toBe("false");
+  expect(main.dataset.agentDocked).toBe("true");
+  const resizeSide = document.querySelector(`.agent-panel-resizer[aria-controls="${side.id}"]`)!;
+  await act(async () => resizeSide.dispatchEvent(new KeyboardEvent("keydown", {key:"ArrowLeft", bubbles:true})));
+  expect(document.body.style.getPropertyValue("--agent-extra-panel-width")).toBe("450px");
+  expect(document.body.style.getPropertyValue("--agent-panel-width")).toBe("440px");
+  await click("关闭助手");
+  expect(main.hidden).toBe(true);
+  expect(side.hidden).toBe(false);
+  expect(side.querySelector("[aria-label='待添加资料']")?.textContent).toContain(excerpt);
   expect(invoke.mock.calls.some(([,params]) => ["create", "message", "respond"].includes(params.args.action))).toBe(false);
 
-  await selectExcerpt();
-  await click("在侧边聊天中提问");
   const question = "这段说的是什么？";
   await act(async () => {
     const input = side.querySelector<HTMLTextAreaElement>("textarea")!;
@@ -238,6 +254,11 @@ it("quotes a selection without sending and keeps the main draft when closing the
   expect(binding?.initialRequest).toBe(true);
   expect(binding?.text).toContain(JSON.stringify({kind:"conversation", title:"对话摘录", text:excerpt, conversationId:"work-1", selectedFromChat:true}));
   expect(calls.some(args => args.action === "conversationReference")).toBe(false);
+  expect(main.hidden).toBe(true);
+  await act(async () => document.querySelector<HTMLButtonElement>(`.agent-floating-launcher[aria-controls="${main.id}"]`)!.click());
+  await click("关闭第二个助手");
+  expect(side.hidden).toBe(true);
+  expect(main.hidden).toBe(false);
   expect(main.querySelector("textarea")?.value).toBe("原聊天的草稿");
 });
 it("finds related history with memory off and only attaches it on request",async()=>{

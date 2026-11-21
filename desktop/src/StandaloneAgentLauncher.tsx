@@ -1,4 +1,4 @@
-import { createContext, lazy, Suspense, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, createRef, lazy, Suspense, useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Layers,MessageSquare } from "lucide-react";
 import "./StandaloneAgentLauncher.css";
@@ -14,10 +14,14 @@ const Source = lazy(() => import("./AgentInvestigation").then(m => ({ default:m.
 const Standalone = lazy(() => import("./AgentInvestigation").then(m => ({ default:m.StandaloneInvestigation })));
 const Reading = lazy(() => import("./AgentInvestigation").then(m => ({ default:m.PersistentReadingInvestigation })));
 const Existing = lazy(() => import("./AgentInvestigation").then(m => ({ default:m.ExistingWorkInvestigation })));
+const Extra = lazy(() => import("./AgentInvestigation").then(m => ({default:m.ExtraInvestigation})));
 export type Entry = { result:SearchResult } | { itemKey:string; title?:string } | null;
 export type AgentQuestion={id:string;text:string};
 type PanelEntry=Entry|{workId:string;question?:AgentQuestion};
 export type TextMaterial={kind:"text"|"flashcard"|"conversation";title:string;text:string;file?:boolean;conversationId?:string;selectedFromChat?:true};
+export type ExtraAgentControls = {add: (entry: TextMaterial) => boolean; focus: () => void};
+export type ExtraAgentEntry = {open: boolean; firstQuote: TextMaterial; controls: RefObject<ExtraAgentControls | null>};
+export const AgentExtraPanelContext = createContext<((entry: TextMaterial) => boolean) | null>(null);
 export const AgentTextMaterialContext=createContext<{selection:TextMaterial|null;clearSelection:()=>void;pending:TextMaterial|null;setPending:(value:TextMaterial|null)=>void}|null>(null);
 export type AgentTagRequest={tagId:string;label:string;task:"definition"|"missing"|"relations"};
 export const AgentTagRequestContext=createContext<{pending:AgentTagRequest|null;setPending:(v:AgentTagRequest|null)=>void}|null>(null);
@@ -30,6 +34,7 @@ export function AgentPanelProvider({children}:{children:ReactNode}) {
  const [citation,setCitation]=useState<CitationLocation|null>(null);
  const [owner,setOwner]=useState("initial");
  const [entries,setEntries]=useState<Record<string,PanelEntry|undefined>>({});
+ const [extraEntries,setExtraEntries] = useState<Record<string, ExtraAgentEntry>>({});
  const routes=useRef(new Map<string,string>());
  const freshOwners=useRef(new Set<string>());
  const entry=entries[owner];
@@ -64,13 +69,32 @@ export function AgentPanelProvider({children}:{children:ReactNode}) {
   return()=>window.removeEventListener("hub:agent-account-changed",change);
  },[owner,entry]);
  const open=(next:PanelEntry)=>{setEntries(values=>{const current=values[owner];return {...values,[owner]:next&&'workId' in next?next:current===undefined?next:current&&next&&'result' in current&&'result' in next?next:current};});setRequest(n=>n+1);};
+ const openExtra=(quote: TextMaterial) => {
+  const entry = extraEntries[owner];
+  const accepted = entry?.controls.current?.add(quote) ?? true;
+  setExtraEntries(current => ({...current,[owner]: entry ? {...entry,open:true} : {open:true,firstQuote:quote,controls:createRef<ExtraAgentControls>()}}));
+  if (entry?.open) entry.controls.current?.focus();
+  return accepted;
+ };
+ const closeExtra=(key: string) => {
+  setExtraEntries(current => ({...current,[key]:{...current[key],open:false}}));
+  requestAnimationFrame(() => document.querySelector<HTMLElement>(".agent-panel:not([data-agent-extra]):not([hidden]) .agent-conversation")?.focus({preventScroll:true}));
+ };
  useEffect(()=>{if(request)window.dispatchEvent(new Event('hub:show-agent'));},[request,owner]);
  return <AgentTagRequestContext.Provider value={{pending:tagRequest,setPending:setTagRequest}}><AgentCitationContext.Provider value={{value:citation,show:setCitation}}><AgentTextMaterialContext.Provider value={{selection,clearSelection:()=>setSelection(null),pending,setPending}}><AgentBrowsingContext.Provider value={{entry:browsing,setEntry:setBrowsing}}><AgentPanelContext.Provider value={open}>
+  <AgentExtraPanelContext.Provider value={openExtra}>
   {children}
   {runtimeCapabilities.desktop && entry===undefined && createPortal(<button type="button" className="agent-floating-launcher" aria-label="打开助手" aria-expanded={false} title="打开 Hub 助手" onClick={()=>open(null)}><span className="agent-launcher-orb" aria-hidden="true"/>助手</button>,document.body)}
   {runtimeCapabilities.desktop && Object.entries(entries).map(([key,value])=>value===undefined?null:<AgentAccountVisibleContext.Provider key={key} value={key===owner}><div hidden={key!==owner} className="agent-global-owner"><Suspense fallback={<p role="status">正在打开助手…</p>}>
    {value&&'result' in value?<Source result={value.result} initiallyOpen startFresh={freshOwners.current.has(key)}/>:value&&'itemKey' in value?<Reading itemKey={value.itemKey} initiallyOpen startFresh={freshOwners.current.has(key)}/>:value&&'workId' in value?<Existing key={value.workId} workId={value.workId} question={value.question}/>:<Standalone initiallyOpen startFresh={freshOwners.current.has(key)}/>}
   </Suspense></div></AgentAccountVisibleContext.Provider>)}
+  {runtimeCapabilities.desktop && Object.entries(extraEntries).map(([key,value]) =>
+    <AgentAccountVisibleContext.Provider key={key} value={key===owner}><AgentCitationContext.Provider value={null}>
+      <Suspense fallback={key===owner && value.open ? <p role="status">正在打开第二个助手…</p> : null}>
+        <Extra entry={value} onClose={()=>closeExtra(key)}/>
+      </Suspense>
+    </AgentCitationContext.Provider></AgentAccountVisibleContext.Provider>)}
+ </AgentExtraPanelContext.Provider>
  </AgentPanelContext.Provider></AgentBrowsingContext.Provider></AgentTextMaterialContext.Provider></AgentCitationContext.Provider></AgentTagRequestContext.Provider>;
 }
 export function AgentFlashcardMaterial({title,text}:{title:string;text:string}){

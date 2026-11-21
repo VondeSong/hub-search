@@ -3,7 +3,7 @@ import {AgentAnalysisFiles,type FileAnalysis} from "./AgentAnalysisFiles";
 import {AgentPluginWriteRecord} from "./AgentPluginWriteRecord";
 import {AgentFollowups,type Followup} from "./AgentFollowups";
 import { loadAgentPreferences, rememberAgentPreferences, loadCodexWebSearchPreference, loadMemoryPreference, rememberMemoryPreference } from "./AgentPreferences";
-import { AgentTagRequestContext, AgentCitationContext, AgentBrowsingContext, AgentPanelContext,AgentAccountVisibleContext,AgentTextMaterialContext,type TextMaterial,type AgentQuestion } from "./StandaloneAgentLauncher";
+import { AgentTagRequestContext, AgentCitationContext, AgentBrowsingContext, AgentPanelContext,AgentAccountVisibleContext,AgentTextMaterialContext,AgentExtraPanelContext,type ExtraAgentEntry,type TextMaterial,type AgentQuestion } from "./StandaloneAgentLauncher";
 import {AgentMaterialCard} from "./AgentMaterialCard";
 import {AgentConversationHistory,type WorkSummary,type HistoryChange} from "./AgentConversationHistory";
 import { conversationTitle } from "./AgentConversationHistoryData";
@@ -37,8 +37,8 @@ import { AgentMaterials, materialKey, type AgentMaterial } from "./AgentMaterial
 import {AgentLibraryScope,libraryDragType,readLibraryDrop,type AgentLibrary} from "./AgentLibraryScope";
 import { AgentSourceScope, type SourceSelection } from "./AgentSourceScope";
 import { AgentScopeCoverage } from "./AgentScopeCoverage";
-import { useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
-import { AssistantSelectionActions, useAssistantSidePosition } from "./AgentSelectionActions";
+import { useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
+import { AssistantSelectionActions } from "./AgentSelectionActions";
 import { createPortal } from "react-dom";
 import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronDown, ChevronRight, WandSparkles, FileText, ListChecks, Maximize2, Menu, MessageSquare, Minimize2, PanelRight, PanelsTopLeft, MoreHorizontal, Quote, Plus, Search, X } from "lucide-react";
 import type { SearchResult } from "./SearchTypes";
@@ -158,19 +158,18 @@ export function PersistentReadingInvestigation({ itemKey, initiallyOpen=false, s
   return runtimeCapabilities.desktop && context ? <Investigation key={context+":"+newChat} anchor={{ kind: "reading", itemKey: context }} libraryName="当前阅读条目" initialOpen={!!pinned} startNew={startFresh||newChat>0} onNewConversation={startNew} onPin={() => setPinned(context)} newSource={pinned && pinned!==itemKey ? {title:"当前阅读条目",use:startNew} : undefined} /> : null;
 }
 
-type SideChatControls = { add: (entry: TextMaterial) => boolean; focus: () => void };
-type SideChat = { open: boolean; firstQuote: TextMaterial; style?: CSSProperties; controls: RefObject<SideChatControls | null> };
+export function ExtraInvestigation({entry,onClose}: {entry: ExtraAgentEntry; onClose: () => void}) {
+  return <Investigation anchor={null} libraryName="" initialOpen startNew extra={entry} onDismiss={onClose}/>;
+}
 const selectableChatText = ".agent-user-message-content,.agent-report,.agent-commentary";
 
-function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pageLibraryName, sourceTitle: pageTitle, canEditNote: pageCanEditNote = false, compact = false, initialOpen = false, initialWorkId, initialDraft, suggestedQuestion, startNew=false, onDismiss, onNewConversation, onOpenTopicWork, onTopicBack, onPin, newSource, side }: { onPreviewCitation?: (value: CitationLocation | null) => void; anchor: InvestigationLocator|null; libraryName: string; sourceTitle?: string; canEditNote?: boolean; compact?: boolean; initialOpen?: boolean; initialWorkId?:string; initialDraft?:string; suggestedQuestion?:AgentQuestion; startNew?:boolean; onDismiss?:()=>void; onNewConversation?:()=>void; onOpenTopicWork?:(id:string,source:TopicWorkSource,originId?:string,draft?:string)=>void; onTopicBack?:()=>void; onPin?: () => void; newSource?: { title: string; use: () => void }; side?: SideChat }) {
+function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pageLibraryName, sourceTitle: pageTitle, canEditNote: pageCanEditNote = false, compact = false, initialOpen = false, initialWorkId, initialDraft, suggestedQuestion, startNew=false, onDismiss, onNewConversation, onOpenTopicWork, onTopicBack, onPin, newSource, extra }: { onPreviewCitation?: (value: CitationLocation | null) => void; anchor: InvestigationLocator|null; libraryName: string; sourceTitle?: string; canEditNote?: boolean; compact?: boolean; initialOpen?: boolean; initialWorkId?:string; initialDraft?:string; suggestedQuestion?:AgentQuestion; startNew?:boolean; onDismiss?:()=>void; onNewConversation?:()=>void; onOpenTopicWork?:(id:string,source:TopicWorkSource,originId?:string,draft?:string)=>void; onTopicBack?:()=>void; onPin?: () => void; newSource?: { title: string; use: () => void }; extra?: ExtraAgentEntry }) {
   const browsing=useContext(AgentBrowsingContext);
   const tagRequest=useContext(AgentTagRequestContext);
   const textMaterials=useContext(AgentTextMaterialContext);
-  const [snippets,setSnippets]=useState<TextMaterial[]>(() => side ? [side.firstQuote] : []);
+  const [snippets,setSnippets]=useState<TextMaterial[]>(() => extra ? [extra.firstQuote] : []);
   const panel = useRef<HTMLElement>(null);
-  const sideControls = useRef<SideChatControls>(null);
-  const [sideQuote, setSideQuote] = useState<TextMaterial | null>(null);
-  const [sideOpen, setSideOpen] = useState(false);
+  const openExtraPanel = useContext(AgentExtraPanelContext);
   const [imageDraft,setImageDraft]=useState<ImageGrant[]|null>(null);
   const [reattachedImages,setReattachedImages]=useState<ImageGrant[]>([]);
   const resetImageDraft=()=>{setImageDraft(null);setReattachedImages([]);};
@@ -180,9 +179,8 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const accountVisible = useContext(AgentAccountVisibleContext);
   const globalPanel = useContext(AgentPanelContext);
   const [requestedOpen, setOpen] = useState(initialOpen);
-  const open = (side?.open ?? requestedOpen) && accountVisible;
-  const sideStyle = useAssistantSidePosition(open && sideOpen ? panel : undefined);
-  useEffect(()=>{if(side)return;const show=()=>{if(accountVisible)setOpen(true);};window.addEventListener('hub:show-agent',show);return()=>window.removeEventListener('hub:show-agent',show);},[accountVisible,!!side]);
+  const open = (extra?.open ?? requestedOpen) && accountVisible;
+  useEffect(()=>{if(extra)return;const show=()=>{if(accountVisible)setOpen(true);};window.addEventListener('hub:show-agent',show);return()=>window.removeEventListener('hub:show-agent',show);},[accountVisible,!!extra]);
   const detailsTrigger=useRef<HTMLButtonElement>(null);
   const detailsReturn=useRef<HTMLElement|null>(null);
   const detailsPopover=useAgentPopover({triggerRef:detailsTrigger,returnFocusRef:detailsReturn,deferEscapeSelector:".agent-history-search input, .agent-history-action-menu, .agent-details-sections .agent-popover[open]"});
@@ -308,17 +306,19 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       conversationScroll.element.current?.focus({preventScroll:true});
     }
   }
-  const panelResize = useAgentPanelResize(open && !side, launcher);
-  const [docked, setDocked] = useState(() => !onDismiss && sessionStorage.getItem("hub-agent-docked") === "true");
-  const panelHeightResize = useAgentPanelResize(open && !docked && !side, launcher, "height");
-  useEffect(() => { if (!onDismiss) sessionStorage.setItem("hub-agent-docked", String(docked)); }, [docked, onDismiss]);
+  const dockKey = extra ? "hub-agent-extra-docked" : "hub-agent-docked";
+  const canDock = !!extra || !onDismiss;
+  const [docked, setDocked] = useState(() => canDock && sessionStorage.getItem(dockKey) === "true");
+  const panelResize = useAgentPanelResize(open, panel, "width", !!extra);
+  const panelHeightResize = useAgentPanelResize(open && !docked, panel, "height", !!extra);
+  useEffect(() => { if (canDock) sessionStorage.setItem(dockKey, String(docked)); }, [docked, canDock, dockKey]);
   const titleQuestion=(view?.work.goal||questionText).replace(/^(?:\$[a-z0-9]+(?:-[a-z0-9]+)*(?:\s+|$))+/g, "").trim();
   const chatTitle = research?.topic.title || (titleQuestion || "新聊天").replace(/\s+/g, " ");
   useEffect(() => {
-    if (!accountVisible || side) return;
+    if (!accountVisible || extra) return;
     document.body.classList.toggle("agent-sidebar-open", open && docked);
     return () => document.body.classList.remove("agent-sidebar-open");
-  }, [open, docked, accountVisible, !!side]);
+  }, [open, docked, accountVisible, !!extra]);
   const { width: panelWidth } = panelResize;
   const messageIdentity = useRef<{ text: string; id: string } | null>(null);
   const manifestIdentity = useRef<{key:string;id:string}|null>(null);
@@ -354,7 +354,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const running = pendingRun || view?.runActive || view?.work.state === "investigating";
   const acting = !!pendingAction || view?.actionActive;
   const active = running || acting;
-  useEffect(()=>{if(side||!open||!accountVisible||!tagRequest?.pending||active||busy)return;const selected=tagRequest.pending;setTagPreparation({...tagPreparation,active:true,task:selected.task,tag:{tagId:selected.tagId,label:selected.label},resume:false});tagRequest.setPending(null);},[open,accountVisible,tagRequest?.pending,active,busy,!!side]);
+  useEffect(()=>{if(extra||!open||!accountVisible||!tagRequest?.pending||active||busy)return;const selected=tagRequest.pending;setTagPreparation({...tagPreparation,active:true,task:selected.task,tag:{tagId:selected.tagId,label:selected.label},resume:false});tagRequest.setPending(null);},[open,accountVisible,tagRequest?.pending,active,busy,!!extra]);
   const controlsNeedAttention = !!(view?.materialBudget?.preflight?.allowed===false || view?.materialBudget?.overrunBytes || view?.lifecycle?.requiresExplicitResume || view?.lifecycle?.unresolvedActions || view?.lifecycle?.reason || view?.lifecycle?.usageCompleteness==="incomplete");
   const reportChart=view?.analysisArtifacts?.length===1 ? view.analysisArtifacts[0] : undefined;
   const reportHash=reportChart?.content?.contentHash;
@@ -378,16 +378,17 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     clearSourcePreview(); setSourceVisible(false); setOpen(false);
   };
   useEffect(() => {
-    if (!open || side) return;
+    if (!open || extra) return;
     const dismiss = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented || isInsideKeyboardDialog(event.target) || (event.target instanceof Element && event.target.closest(".agent-token-disclosure,.agent-side-chat,.assistant-selection-actions"))) return;
+      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented || isInsideKeyboardDialog(event.target) || (event.target instanceof Element && event.target.closest(".agent-token-disclosure,[data-agent-extra],.assistant-selection-actions"))) return;
+      if (!panel.current?.contains(event.target as Node) && document.querySelector(".agent-panel[data-agent-extra]:not([hidden])")) return;
       event.preventDefault();
       event.stopPropagation();
       closePanel();
     };
     document.addEventListener("keydown", dismiss, true);
     return () => document.removeEventListener("keydown", dismiss, true);
-  }, [open, onPreviewCitation, !!side]);
+  }, [open, onPreviewCitation, !!extra]);
   useEffect(() => { setReportReading(false); }, [view?.work.id, open]);
   useEffect(() => { if (active || view?.work.state==="revoked") {citationReturn.current=null;setReportReading(false);} }, [active, view?.work.state]);
   useEffect(() => {
@@ -1104,25 +1105,17 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     if(!view){setPageAttached(false);setWholeLibrary(false);}
     return true;
   };
-  useImperativeHandle(side?.controls, () => ({
+  useImperativeHandle(extra?.controls, () => ({
     add: addTextMaterial,
     focus: () => goalInput.current?.focus({preventScroll:true}),
   }));
   const quote = (text: string): TextMaterial => ({kind:"conversation", title:"对话摘录", text, conversationId:view!.work.id, selectedFromChat:true});
   function openSideChat(text: string) {
     if (text.length > 2500) { setError("文字资料每份最多 2500 字，请缩小选区。"); return false; }
-    const entry = quote(text);
-    const accepted = sideControls.current?.add(entry) ?? true;
-    if (!sideQuote) setSideQuote(entry);
-    setSideOpen(true);
-    requestAnimationFrame(() => sideControls.current?.focus());
-    return accepted;
+    return openExtraPanel?.(quote(text)) ?? false;
   }
-  function closeSideChat() {
-    setSideOpen(false);
-    requestAnimationFrame(() => conversationScroll.element.current?.focus({preventScroll:true}));
-  }
-  useEffect(()=>{if(!side && open && !busy && textMaterials?.pending){addTextMaterial(textMaterials.pending);textMaterials.setPending(null);}},[open,busy,active,textMaterials?.pending,!!side]);
+  useLayoutEffect(() => { if (open && extra) goalInput.current?.focus({preventScroll:true}); }, [open, !!extra]);
+  useEffect(()=>{if(!extra && open && !busy && textMaterials?.pending){addTextMaterial(textMaterials.pending);textMaterials.setPending(null);}},[open,busy,active,textMaterials?.pending,!!extra]);
   const addExternalMaterial=(entry:{result?:SearchResult;itemKey?:string;title?:string;kind?:string;text?:string})=>{
     if((entry.kind==="text"||entry.kind==="flashcard")&&typeof entry.text==="string"){addTextMaterial({kind:entry.kind,text:entry.text,title:typeof entry.title==="string"?entry.title:"所选文字"});return;}
     if(busy || filePreparing || view?.work.grant.manifest){setError("请等待附件准备完成；固定资料范围需从范围入口调整。");return;}
@@ -1188,18 +1181,21 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     <details className="agent-more-tools agent-detail-row"><summary><AgentDetailSummary icon={<NotebookPen size={16}/>} title="成果与保存"/></summary><p className="agent-note">从回答下方插入页面、创建笔记或任务。保存前可查看并修改草稿。</p><p className="agent-note">发送消息后，可查看结果保存与后续操作；现在可先选择共享记忆。</p></details>
   </>;
   return <>
-    {!side && <button ref={launcher} type="button" className={`agent-launcher${compact ? " agent-launcher-compact" : ""}`} title="打开 Hub 助手" aria-label={entryLabel} aria-expanded={open} aria-controls={panelId} onClick={() => {
+    {!extra && <button ref={launcher} type="button" className={`agent-launcher${compact ? " agent-launcher-compact" : ""}`} title="打开 Hub 助手" aria-label={entryLabel} aria-expanded={open} aria-controls={panelId} onClick={() => {
       if (open) return;
       setOpen(true);
       onPin?.();
       if (!loaded.current) { loaded.current = true; void load(); }
     }}><MessageSquare size={18} aria-hidden="true" />{!compact && <span>询问助手</span>}</button>}
-    {!side && createPortal(<button ref={floatingLauncher} type="button" hidden={open || !accountVisible} className="agent-floating-launcher" title="打开 Hub 助手" aria-label="打开助手" aria-expanded={false} aria-controls={loaded.current ? panelId : undefined} onClick={() => {
+    {!extra && createPortal(<button ref={floatingLauncher} type="button" hidden={open || !accountVisible} className="agent-floating-launcher" title="打开 Hub 助手" aria-label="打开助手" aria-expanded={false} aria-controls={loaded.current ? panelId : undefined} onClick={() => {
       setOpen(true);
       onPin?.();
       if (!loaded.current) { loaded.current = true; void load(); }
     }}><span className="agent-launcher-orb" aria-hidden="true"/>助手</button>, document.body)}
-    {loaded.current && createPortal(<>{!side && <><div hidden={!open || docked} className="agent-panel-height-resizer" role="separator" aria-label="调整助手高度" aria-controls={panelId} aria-orientation="horizontal" aria-valuemin={panelHeightResize.minimum} aria-valuemax={panelHeightResize.maximum} aria-valuenow={panelHeightResize.width} aria-valuetext={`${panelHeightResize.width} 像素`} tabIndex={0} title="拖动调整高度，双击恢复默认" onPointerDown={panelHeightResize.onPointerDown} onKeyDown={panelHeightResize.onKeyDown} onDoubleClick={panelHeightResize.reset}/><div hidden={!open} className="agent-panel-resizer" role="separator" aria-label="调整助手宽度" aria-controls={panelId} aria-orientation="vertical" aria-valuemin={panelResize.minimum} aria-valuemax={panelResize.maximum} aria-valuenow={panelWidth} aria-valuetext={`${panelWidth} 像素`} tabIndex={0} title="拖动调整宽度，双击恢复默认" onPointerDown={panelResize.onPointerDown} onKeyDown={panelResize.onKeyDown} onDoubleClick={panelResize.reset}/></>}<aside id={panelId} ref={panel} hidden={!open} inert={!side && sideOpen && !!sideStyle?.inset} style={side?.style} data-agent-source-visible={sourceVisible} data-agent-reading={reportReading} data-agent-docked={docked} data-hub-keyboard-scope="assistant" className={side ? "agent-investigation agent-panel agent-side-chat" : "agent-investigation agent-panel"} aria-label={side ? "侧边聊天" : "Hub 助手"} onDragOver={event=>{if(event.dataTransfer.types.includes("application/x-hub-tag")||event.dataTransfer.types.includes(libraryDragType)||event.dataTransfer.types.includes("application/x-hub-agent-source")||event.dataTransfer.types.includes("Files")){event.preventDefault();event.dataTransfer.dropEffect="copy";}}} onDrop={event=>{
+    {loaded.current && createPortal(<>
+      <div data-agent-extra={extra ? "" : undefined} data-agent-docked={docked} hidden={!open || docked} className="agent-panel-height-resizer" role="separator" aria-label="调整助手高度" aria-controls={panelId} aria-orientation="horizontal" aria-valuemin={panelHeightResize.minimum} aria-valuemax={panelHeightResize.maximum} aria-valuenow={panelHeightResize.width} aria-valuetext={`${panelHeightResize.width} 像素`} tabIndex={0} title="拖动调整高度，双击恢复默认" onPointerDown={panelHeightResize.onPointerDown} onKeyDown={panelHeightResize.onKeyDown} onDoubleClick={panelHeightResize.reset}/>
+      <div data-agent-extra={extra ? "" : undefined} data-agent-docked={docked} hidden={!open} className="agent-panel-resizer" role="separator" aria-label="调整助手宽度" aria-controls={panelId} aria-orientation="vertical" aria-valuemin={panelResize.minimum} aria-valuemax={panelResize.maximum} aria-valuenow={panelWidth} aria-valuetext={`${panelWidth} 像素`} tabIndex={0} title="拖动调整宽度，双击恢复默认" onPointerDown={panelResize.onPointerDown} onKeyDown={panelResize.onKeyDown} onDoubleClick={panelResize.reset}/>
+      <aside id={panelId} ref={panel} hidden={!open} data-agent-extra={extra ? "" : undefined} data-agent-source-visible={sourceVisible} data-agent-reading={reportReading} data-agent-docked={docked} data-hub-keyboard-scope="assistant" className="agent-investigation agent-panel" aria-label={extra ? "第二个助手面板" : "Hub 助手"} onDragOver={event=>{if(event.dataTransfer.types.includes("application/x-hub-tag")||event.dataTransfer.types.includes(libraryDragType)||event.dataTransfer.types.includes("application/x-hub-agent-source")||event.dataTransfer.types.includes("Files")){event.preventDefault();event.dataTransfer.dropEffect="copy";}}} onDrop={event=>{
         const tagData=event.dataTransfer.types?.includes("application/x-hub-tag")?event.dataTransfer.getData("application/x-hub-tag"):"";
         if(tagData){event.preventDefault();event.stopPropagation();try{const v=JSON.parse(tagData);if(typeof v.tagId!=="string"||typeof v.label!=="string"||v.tagId.length>200)throw Error("无法识别标签");setTagPreparation({...tagPreparation,references:[...tagPreparation.references.filter(t=>t.tagId!==v.tagId),v].slice(0,16)});}catch(reason){setError(String(reason));}return;}
         const libraryData=event.dataTransfer.types?.includes(libraryDragType)?event.dataTransfer.getData(libraryDragType):"";
@@ -1254,11 +1250,11 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         </div></details>
           <button type="button" title="新对话" aria-label="新对话" disabled={busy || !!active} onClick={()=>newInvestigation()}><Plus size={19} /></button>
         </div>
-        {side ? <strong className="agent-side-chat-title">侧边聊天</strong> : <AgentTaskMode activeTopic={research?.topic} onUnpinTopic={async topic=>{const scope=selectionScope.current;const saved=await call<ResearchTopic>({action:"saveResearchTopic",topic:{...topic,pinned:false}});if(alive.current&&selectionScope.current===scope&&research?.topic.id===saved.id)setResearch({...research,topic:{...research.topic,revision:saved.revision,pinned:false}});}} title={chatTitle} disabled={busy || !!active} tagMode={tagMode} goalMode={goalMode} goalDisabled={(scopeOptions.model ?? runtime.settings)?.provider === "deepseek"} onGeneral={()=>{setTagMode(false);if(scopeOptions.goalMode)void saveAssistantOptions({...scopeOptions,goalMode:false},false).catch(reason=>setError(String(reason)));}} onGoal={()=>{setTagMode(false);void saveAssistantOptions({...scopeOptions,goalMode:true},false).catch(reason=>setError(String(reason)));}} onTag={enableTagMode} selectedSkills={selectedSkills.map(token=>token.slice(1))} onTopics={()=>{setRequestedTopic(undefined);setTopicSave(false);setTopicsOpen(true);}} onTopic={topic=>{setRequestedTopic(topic.id);setTopicSave(false);setTopicsOpen(true);}} onUsage={()=>{detailsReturn.current=document.getElementById(panelId)?.querySelector<HTMLElement>(".agent-task-mode>summary")||null;setTaskStatusOnly(true);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current)workControls.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-heading button")?.focus();},0);}}/>}
+        <AgentTaskMode activeTopic={research?.topic} onUnpinTopic={async topic=>{const scope=selectionScope.current;const saved=await call<ResearchTopic>({action:"saveResearchTopic",topic:{...topic,pinned:false}});if(alive.current&&selectionScope.current===scope&&research?.topic.id===saved.id)setResearch({...research,topic:{...research.topic,revision:saved.revision,pinned:false}});}} title={chatTitle} disabled={busy || !!active} tagMode={tagMode} goalMode={goalMode} goalDisabled={(scopeOptions.model ?? runtime.settings)?.provider === "deepseek"} onGeneral={()=>{setTagMode(false);if(scopeOptions.goalMode)void saveAssistantOptions({...scopeOptions,goalMode:false},false).catch(reason=>setError(String(reason)));}} onGoal={()=>{setTagMode(false);void saveAssistantOptions({...scopeOptions,goalMode:true},false).catch(reason=>setError(String(reason)));}} onTag={enableTagMode} selectedSkills={selectedSkills.map(token=>token.slice(1))} onTopics={()=>{setRequestedTopic(undefined);setTopicSave(false);setTopicsOpen(true);}} onTopic={topic=>{setRequestedTopic(topic.id);setTopicSave(false);setTopicsOpen(true);}} onUsage={()=>{detailsReturn.current=document.getElementById(panelId)?.querySelector<HTMLElement>(".agent-task-mode>summary")||null;setTaskStatusOnly(true);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current)workControls.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-heading button")?.focus();},0);}}/>
         <div className="agent-header-end">
-          {!onDismiss && <button type="button" aria-label={docked?"切换为浮窗":"展开为侧边栏"} title={docked?"切换为浮窗":"展开为侧边栏"} onClick={()=>{setDocked(value=>!value);detailsPopover.close();}}>{docked?<PanelsTopLeft size={18}/>:<PanelRight size={18}/>}</button>}
+          {canDock && <button type="button" aria-label={docked?"切换为浮窗":"展开为侧边栏"} title={docked?"切换为浮窗":"展开为侧边栏"} onClick={()=>{setDocked(value=>!value);detailsPopover.close();}}>{docked?<PanelsTopLeft size={18}/>:<PanelRight size={18}/>}</button>}
           <button ref={detailsTrigger} type="button" title="对话详情" aria-label="对话详情" onClick={event=>{if(detailsMenu.current?.open&&!historyExpanded){detailsPopover.close();event.currentTarget.focus();return;}detailsReturn.current=event.currentTarget;setTaskStatusOnly(false);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-sections .agent-details-heading button")?.focus();},0);}}><MoreHorizontal size={18}/></button>
-          <button type="button" title={side ? "关闭侧边聊天（Esc）" : "关闭助手（Esc）"} aria-label={side ? "关闭侧边聊天" : "关闭助手"} onClick={closePanel}><X size={19} /></button>
+          <button type="button" title={extra ? "关闭第二个助手（Esc）" : "关闭助手（Esc）"} aria-label={extra ? "关闭第二个助手" : "关闭助手"} onClick={closePanel}><X size={19} /></button>
         </div>
       </header>
       <div className="agent-body">
@@ -1329,7 +1325,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
           if (reportReading) setReportReading(false);
           requestAnimationFrame(() => goalInput.current?.focus({preventScroll:true}));
           return true;
-        }} onSide={side ? undefined : openSideChat}/>}
+        }} onSide={!extra && openExtraPanel ? openSideChat : undefined}/>}
       {conversationScroll.showLatest && !reportReading && !citationOpen && <button type="button" className="agent-jump-latest" aria-label="回到最新内容" title="回到最新内容" data-working={running || undefined} onClick={conversationScroll.jumpToLatest}>
         <ArrowDown size={18} aria-hidden="true"/>
         {running && <span className="agent-jump-dots" aria-hidden="true"><span/><span/><span/></span>}
@@ -1453,9 +1449,5 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       </div>
       </div>
     </aside></>, document.body)}
-    {sideQuote && <AgentCitationContext.Provider value={null}>
-      <Investigation anchor={null} libraryName="" initialOpen startNew onDismiss={closeSideChat}
-        side={{open:open && sideOpen, firstQuote:sideQuote, style:sideStyle, controls:sideControls}}/>
-    </AgentCitationContext.Provider>}
   </>;
 }

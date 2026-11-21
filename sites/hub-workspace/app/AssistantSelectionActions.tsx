@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { PanelLeft, Quote } from "lucide-react";
 
@@ -84,27 +84,4 @@ export function AssistantSelectionActions({ scroll, selector, onAdd, onSide }: {
     <button type="button" onClick={() => apply(onAdd)}><Quote size={15} aria-hidden="true"/>添加到对话</button>
     {onSide && <button type="button" onClick={() => apply(onSide)}><PanelLeft size={15} aria-hidden="true"/>在侧边聊天中提问</button>}
   </div>, document.body);
-}
-
-export function useAssistantSidePosition(parent: RefObject<HTMLElement | null> | undefined) {
-  const [style, setStyle] = useState<CSSProperties>();
-  useLayoutEffect(() => {
-    const element = parent?.current;
-    if (!element) return;
-    const update = () => {
-      const rect = element.getBoundingClientRect();
-      const available = rect.left - 20;
-      if (available >= 340) {
-        setStyle({ left: "auto", right: window.innerWidth - rect.left + 8, top: rect.top, bottom: window.innerHeight - rect.bottom, width: Math.min(480, available) });
-      } else {
-        setStyle({ inset: "8px 8px 8px auto", width: "min(480px, calc(100vw - 16px))" });
-      }
-    };
-    update();
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
-    observer?.observe(element);
-    window.addEventListener("resize", update);
-    return () => { observer?.disconnect(); window.removeEventListener("resize", update); };
-  }, [parent]);
-  return style;
 }
