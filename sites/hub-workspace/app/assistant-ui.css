@@ -6,6 +6,14 @@
   --ha-control-height: 36px;
   --ha-ui-radius: 10px;
   --ha-overlay-radius: 16px;
+  --ha-frame-radius: 22px;
+  --ha-frame-edge: color-mix(in srgb, var(--text) 16%, transparent);
+  --ha-control-edge: color-mix(in srgb, var(--text) 11%, transparent);
+  --ha-divider: color-mix(in srgb, var(--text) 9%, transparent);
+  --ha-secondary-ink: color-mix(in srgb, var(--muted) 76%, var(--text));
+  --ha-history-surface: color-mix(in srgb, var(--surface-2) 32%, var(--surface));
+  --ha-frame-shadow: 0 2px 7px rgb(0 0 0 / .08), 0 20px 44px -16px rgb(0 0 0 / .30);
+  --ha-popover-shadow: 0 4px 9px rgb(0 0 0 / .09), 0 18px 32px -12px rgb(0 0 0 / .30);
   font-size: var(--ha-control-size);
 }
 .ha-panel :is(button, input, textarea, select) { font-family: inherit; }
@@ -13,6 +21,50 @@
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
+/* The floating shell, the input and the history menu sit at different elevations. */
+.ha-panel:not(.ha-expanded) {
+  border-color: var(--ha-frame-edge);
+  border-radius: var(--ha-frame-radius);
+  box-shadow: var(--ha-frame-shadow);
+}
+.ha-panel:not(.ha-expanded) .ha-header { border-radius: calc(var(--ha-frame-radius) - 1px) calc(var(--ha-frame-radius) - 1px) 0 0; }
+.ha-panel:not(.ha-expanded) .ha-composer-area { border-radius: 0 0 calc(var(--ha-frame-radius) - 1px) calc(var(--ha-frame-radius) - 1px); }
+.ha-panel .ha-mode-trigger {
+  min-height: 36px;
+  padding-inline: 11px;
+  border-color: var(--ha-control-edge);
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+.ha-panel .ha-mode-label { color: var(--ha-secondary-ink); font-size: .75rem; }
+.ha-panel .ha-prompts h3 { font-size: .9375rem; line-height: 1.4; }
+.ha-panel .ha-prompts button { color: var(--ha-secondary-ink); font-size: .9375rem; line-height: 1.45; }
+.ha-panel .ha-prompts button:is(:hover, :focus-visible) { color: var(--text); }
+
+.ha-panel .ha-history {
+  border-color: var(--ha-control-edge);
+  border-radius: 18px;
+  background: var(--ha-history-surface);
+  box-shadow: var(--ha-popover-shadow);
+}
+@supports (backdrop-filter: blur(1px)) {
+  @media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
+    .ha-panel .ha-history {
+      background: color-mix(in srgb, var(--ha-history-surface) 90%, transparent);
+      backdrop-filter: blur(16px);
+    }
+  }
+}
+.ha-panel .ha-history-heading { padding-inline: 10px 5px; border-block-end: 1px solid var(--ha-divider); }
+.ha-panel .ha-history-heading > strong { font-size: 1rem; font-weight: 650; line-height: 1.35; }
+.ha-panel .ha-history-heading-actions > .ha-icon:last-child { border-radius: 50%; background: var(--surface-2); }
+.ha-panel .ha-history-heading-actions > .ha-icon:last-child:hover { background: var(--surface-3); color: var(--text); }
+.ha-panel .ha-history .ha-menu-subtitle { padding-inline: 8px; font-size: .75rem; }
+.ha-panel .ha-history-title { font-size: .9375rem; }
+.ha-panel .ha-history-meta { color: var(--ha-secondary-ink); font-size: .8125rem; font-variant-numeric: tabular-nums; }
+.ha-panel .ha-history-empty small { color: var(--ha-secondary-ink); font-size: .8125rem; }
+
 .ha-panel .ha-message { margin-block-end: 28px; }
 .ha-panel .ha-user-bubble { font-size: .9375rem; line-height: 1.65; padding: 11px 14px; }
 .ha-panel .ha-reply { max-inline-size: 74ch; font-size: var(--ha-body-size); line-height: 1.75; color: var(--text); }
@@ -62,8 +114,34 @@
 .ha-panel .ha-section-citations { display: flex; align-items: center; gap: 5px; margin-top: 6px; color: var(--muted); font-size: .75rem; }
 .ha-panel .ha-section-citations .ha-inline-citation { min-width: 23px; min-height: 23px; font-size: .75rem; }
 .ha-panel .ha-unplaced-references { margin-block-start: 16px; font-size: .8125rem; }
-.ha-panel .ha-composer:focus-within { border-color: color-mix(in srgb, var(--accent) 65%, var(--line)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 10%, transparent); }
+.ha-panel .ha-composer {
+  border-color: var(--ha-control-edge);
+  border-radius: 15px;
+  box-shadow: 0 4px 14px rgb(0 0 0 / .045);
+}
+.ha-panel .ha-composer:focus-within { border-color: color-mix(in srgb, var(--text) 31%, transparent); }
+.ha-panel .ha-composer > textarea { font-size: 1rem; line-height: 1.55; }
+.ha-panel .ha-composer > textarea::placeholder { color: var(--ha-secondary-ink); opacity: 1; }
 .ha-panel .ha-composer > textarea:focus-visible { outline: none; }
+.ha-panel .ha-composer .ha-token { border: 1px solid var(--ha-divider); border-radius: 10px; }
+.ha-panel .ha-composer .ha-token-page > span { font-size: .875rem; }
+.ha-panel .ha-composer .ha-token-page > small,
+.ha-panel .ha-composer .ha-searchable-scope,
+.ha-panel .ha-composer .ha-selected-excerpts > strong { color: var(--ha-secondary-ink); font-size: .8125rem; }
+.ha-panel .ha-input-actions > .ha-attach:first-of-type { border-color: var(--ha-control-edge); }
+.ha-panel .ha-input-actions > .ha-scope-trigger {
+  padding-inline: 5px;
+  border: 1px solid var(--ha-control-edge);
+  background: var(--surface);
+  color: var(--ha-secondary-ink);
+  font-size: .8125rem;
+}
+.ha-panel .ha-input-actions > .ha-scope-trigger:is(:hover, [aria-expanded=true]) { background: var(--surface-2); color: var(--text); }
+.ha-panel .ha-model-controls { border: 1px solid var(--ha-control-edge); border-radius: 9px; }
+.ha-panel .ha-model-controls > :is(.ha-model-trigger, .ha-effort-trigger) { font-size: .8125rem; }
+@media (forced-colors: active) {
+  .ha-panel .ha-composer:focus-within { border-color: Highlight; }
+}
 
 /* Ordinary answer actions are separate from tag-assistant business actions. */
 .ha-answer-actions { display: flex; align-items: center; gap: 4px; max-inline-size: 46rem; margin-top: 10px; user-select: none; }
@@ -208,6 +286,8 @@
 .ha-panel .ha-replay-activity > p:not(.ha-process-meta) { color: var(--text); font-size: .875rem; line-height: 1.7; }
 
 @container hub-assistant (max-width: 390px) {
+  .ha-panel .ha-header { grid-template-columns: max-content minmax(0, 1fr) max-content; }
+  .ha-panel .ha-mode-trigger { max-width: 100%; padding-inline: 8px; }
   .ha-panel .ha-messages { padding-inline: 16px; }
   .ha-panel .ha-overlay-header { padding-inline: 12px; }
   .ha-panel .ha-overlay-toolbar, .ha-panel .ha-overlay-footer { padding-inline: 12px; }
