@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "f1153c1a3ca58f5fe66347165c7324ffa1248e22",
-  "published_version": 131,
-  "deployment_id": "appgdep_6b0138d8cf2481918074663fefe68c41",
+  "source_commit": "69c88d392672292e0d0ceca1bf96c8d18fd25be3",
+  "published_version": 132,
+  "deployment_id": "appgdep_6b01493683c48191904cebd9b878b957",
   "files": {
     ".gitignore": {
       "sha256": "ca0e1575efb181d784f15bf6c86e3c012fd5c7ede4daa34b924d0d8b590d4e77",
@@ -28,9 +28,9 @@
       "bytes": 31055
     },
     "app/Assistant.tsx": {
-      "sha256": "e0000a317a0fd908294ba22d39c616c667bcbadfcbd4346fc2ad2b12c3beeb1f",
+      "sha256": "513422122a635c61a4209fe2ec0753b6882c650a86993542e68d3bfe85dc0a26",
       "mode": "100644",
-      "bytes": 107496
+      "bytes": 110501
     },
     "app/AssistantChrome.tsx": {
       "sha256": "646f7d5b632c03c97792d5518948dca4aeeb51dcc67b09052110ca2e6a6291cc",
@@ -253,9 +253,9 @@
       "bytes": 1644
     },
     "app/assistant.css": {
-      "sha256": "dab8785db685d3b9c10ac6cb5e7cf3867ef3a7cfa4596c0d921e21a10d027f7e",
+      "sha256": "b2e5c202c69111eb50f412758b7153a4869fef4a87e411364dfd7d57be8e66b6",
       "mode": "100644",
-      "bytes": 68629
+      "bytes": 69299
     },
     "app/calendar-period.ts": {
       "sha256": "fb67e7bd1f4e04ccfd14ffb7ef8bb59fb448b0ed2080a698e9b331fe12b1224d",
@@ -1343,5 +1343,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-21T06:24:51.451959+00:00"
+  "imported_at": "2026-11-21T07:35:15.474831+00:00"
 }

@@ -154,11 +154,11 @@ export function AgentConversationHistory({ works, currentId, disabled, more, loa
       {archived && onArchivedChange ? <button type="button" aria-label="返回对话历史" title="返回对话历史" onClick={() => onArchivedChange(false)}><ArrowLeft size={17} /></button>
         : expanded && onBack && <button type="button" aria-label="返回对话菜单" onClick={onBack}><ArrowLeft size={17} /></button>}
       <strong>{archived ? "已归档的对话" : "对话历史"}</strong>
-      {onQueryChange && <button ref={searchButton} type="button" aria-label="搜索对话标题" title="搜索对话标题" aria-expanded={searching} onClick={() => { setSearchOpen(true); onExpand?.(); searchInput.current?.focus(); }}><Search size={17} /></button>}
+      {onQueryChange && <button ref={searchButton} type="button" aria-label="搜索对话标题和提问" title="搜索对话标题和提问" aria-expanded={searching} onClick={() => { setSearchOpen(true); onExpand?.(); searchInput.current?.focus(); }}><Search size={17} /></button>}
       <button ref={closeButton} type="button" aria-label="关闭对话历史" title="关闭对话历史" onClick={onClose}><X size={17} /></button>
     </div>
     {searching && onQueryChange && <div className="agent-history-search"><Search size={16} aria-hidden="true" />
-      <input ref={searchInput} type="search" aria-label="搜索对话标题" placeholder="搜索对话标题…" value={query} maxLength={200} onChange={event => onQueryChange(event.target.value)}
+      <input ref={searchInput} type="search" aria-label="搜索对话标题和提问" placeholder="搜索对话标题和提问…" value={query} maxLength={200} onChange={event => onQueryChange(event.target.value)}
         onKeyDown={event => {
           if (event.key === "Escape" && !event.nativeEvent.isComposing) { event.preventDefault(); event.stopPropagation(); clearSearch(); }
           if (event.key === "ArrowDown") { event.preventDefault(); history.current?.querySelector<HTMLButtonElement>(".agent-history-open:not(:disabled)")?.focus(); }
@@ -170,7 +170,7 @@ export function AgentConversationHistory({ works, currentId, disabled, more, loa
       {!loading && !error && !works.length && <div className="agent-history-empty">
         {archived ? <Archive size={25} aria-hidden="true" /> : <MessageCircle size={25} aria-hidden="true" />}
         <p>{query ? "没有找到匹配的对话" : archived ? "还没有已归档的对话" : "还没有历史对话"}</p>
-        <small>{query ? "试试其他标题关键词" : archived ? "归档的对话会保存在这里。" : "发送第一条消息后，会显示在这里。"}</small>
+        <small>{query ? "试试其他关键词" : archived ? "归档的对话会保存在这里。" : "发送第一条消息后，会显示在这里。"}</small>
       </div>}
       {groups.map(group => <section key={group.key} className="agent-history-group" aria-label={group.label}>
         <h3>{group.label}</h3>

@@ -79,8 +79,14 @@ it("does not load or enable memory until the user opens and opts in", async () =
     action: "selectScope", workId: "work-1", projectId: "", enabled: true,
   } });
 });
-it("prepares built-in memory without asking for interpreter or model paths and exposes repair", async () => {
+it("reads settings first and prepares built-in memory only after the user asks", async () => {
+  invoke.mockImplementation(async (_,{args}) => args.prepareRuntime===false ? {...empty,configured:false} : empty);
   await open();
+  expect(invoke.mock.calls.every(([, {args}])=>args.prepareRuntime===false)).toBe(true);
+  expect(host.querySelector<HTMLInputElement>('[type="checkbox"]')!.disabled).toBe(true);
+  const prepare = Array.from(host.querySelectorAll("button")).find(button => button.textContent === "准备本地记忆")!;
+  await act(async () => prepare.click());
+  expect(invoke).toHaveBeenLastCalledWith("shared_memory", { args: { action: "status", prepareRuntime: true, workId: "work-1" } });
   expect(host.textContent).toContain("本地记忆已就绪");
   expect(host.textContent).not.toMatch(/选择.*Python|连接本地记忆环境|模型缓存目录/);
   const repair = Array.from(host.querySelectorAll("button")).find(button => button.textContent === "修复本地记忆")!;
@@ -158,7 +164,7 @@ it("refreshes the selected project's proposals before a new work exists", async 
   await act(async () => { const detail = host.querySelector("details")!; detail.open = true; detail.dispatchEvent(new Event("toggle")); });
   await act(async () => { const select = host.querySelector("select")!; select.value = "p1"; select.dispatchEvent(new Event("change", {bubbles:true})); });
   expect(host.textContent).toContain("项目内待确认建议");
-  expect(invoke).toHaveBeenLastCalledWith("shared_memory", { args: { action: "status", projectId: "p1", workId: undefined } });
+  expect(invoke).toHaveBeenLastCalledWith("shared_memory", { args: { action: "status", projectId: "p1", prepareRuntime: false, workId: undefined } });
   expect(invoke.mock.calls.some(([, {args}]) => args.action === "selectScope")).toBe(false);
   await act(async () => Array.from(host.querySelectorAll("button")).find(b => b.textContent === "修改")!.click());
   await act(async () => Array.from(host.querySelectorAll("button")).find(b => b.textContent === "确认并保存记忆")!.click());

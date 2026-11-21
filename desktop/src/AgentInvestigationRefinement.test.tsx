@@ -363,8 +363,8 @@ describe("assistant refinement integration", () => {
     list = args => args.query === "项目" ? earlier.promise : args.query === "项目复盘" ? latest.promise : Promise.resolve({ works: [], nextCursor: null });
     await render(<StandaloneInvestigation initiallyOpen startFresh />);
     await openHistory();
-    await activate(select<HTMLButtonElement>('button[aria-label="搜索对话标题"]'));
-    const search = select<HTMLInputElement>('input[aria-label="搜索对话标题"]');
+    await activate(select<HTMLButtonElement>('button[aria-label="搜索对话标题和提问"]'));
+    const search = select<HTMLInputElement>('input[aria-label="搜索对话标题和提问"]');
     await type(search, "项目");
     await type(search, "项目复盘");
     expect(calls("list").slice(-2).map(request => request.query)).toEqual(["项目", "项目复盘"]);
@@ -381,13 +381,13 @@ describe("assistant refinement integration", () => {
     await render(<StandaloneInvestigation initiallyOpen startFresh />);
     await openHistory();
     const menu = select<HTMLDetailsElement>(".agent-dialogue-details");
-    const searchButton = select<HTMLButtonElement>('button[aria-label="搜索对话标题"]');
+    const searchButton = select<HTMLButtonElement>('button[aria-label="搜索对话标题和提问"]');
     await activate(searchButton);
-    await type(select<HTMLInputElement>('input[aria-label="搜索对话标题"]'), "待清除的标题");
+    await type(select<HTMLInputElement>('input[aria-label="搜索对话标题和提问"]'), "待清除的标题");
 
     await escape();
     expect(menu.open).toBe(true);
-    expect(document.querySelector('input[aria-label="搜索对话标题"]')).toBeNull();
+    expect(document.querySelector('input[aria-label="搜索对话标题和提问"]')).toBeNull();
     expect(calls("list").slice(-1)[0]?.query).toBe("");
     expect(document.activeElement).toBe(searchButton);
 

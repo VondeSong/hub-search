@@ -89,7 +89,7 @@ fn schema_83_upgrade_installs_memory_management_and_preserves_confirmed_entries(
             crate::database::DATABASE_SCHEMA_VERSION.to_string()
         );
         drop(c);
-        let view = status(&f.root, None).unwrap();
+        let view = status(&f.root, None, true).unwrap();
         assert_eq!(view["entries"][0]["id"], item.id);
         assert_eq!(view["entries"][0]["body"], "保留已确认决定。");
         assert_eq!(view["entries"][0]["version"], 1);

@@ -6,6 +6,7 @@ import { loadAgentPreferences, rememberAgentPreferences, loadCodexWebSearchPrefe
 import { AgentTagRequestContext, AgentCitationContext, AgentBrowsingContext, AgentPanelContext,AgentAccountVisibleContext,AgentTextMaterialContext,type TextMaterial,type AgentQuestion } from "./StandaloneAgentLauncher";
 import {AgentMaterialCard} from "./AgentMaterialCard";
 import {AgentConversationHistory,type WorkSummary,type HistoryChange} from "./AgentConversationHistory";
+import { conversationTitle } from "./AgentConversationHistoryData";
 import { AgentAnswerSave, type AnswerSave } from "./AgentAnswerSave";
 import { AgentTaskMode } from "./AgentTaskMode";
 import { AgentDetailSummary } from "./AgentDetailSummary";
@@ -534,14 +535,14 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       void reloadWorks();
     }catch(reason){if(alive.current)setWorksError(String(reason));throw reason;}finally{if(alive.current)setBusy(false);}
   };
-  const openHistoryWork = async (work: WorkSummary) => {
+  const openHistoryWork = async (work: WorkSummary, draft = "") => {
     if(detailsMenu.current)detailsMenu.current.open=false;
     if(work.id===view?.work.id)return;
-    setLibraryDraft(null);setError("");setGoal("");setMaterials([]);setDropped([]);setSnippets([]);resetImageDraft();setRemovals([]);clearSourcePreview();
+    setLibraryDraft(null);setError("");setGoal(draft);setMaterials([]);setDropped([]);setSnippets([]);resetImageDraft();setRemovals([]);clearSourcePreview();
     setBusy(true);setLoadingConversation(true);
     try { await refresh(work.id); }
     catch(reason) { if(alive.current)setError(String(reason)); }
-    finally { if(alive.current){setBusy(false);setLoadingConversation(false);} }
+    finally { if(alive.current){setBusy(false);setLoadingConversation(false);if(draft)requestAnimationFrame(()=>goalInput.current?.focus());} }
   };
   const openSource = async (args:Record<string,unknown>, quote:string) => {
     if (!view || view.work.state === "revoked" || businessInFlight.current || businessChecks.current.has(view.work.id)) return;
@@ -749,6 +750,37 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const goalMode = !!scopeOptions.goalMode && !tagMode;
   const scopePolicy = scopeOptions.researchPolicy ?? "material-first";
   const materialsOnly = scopePolicy === "materials-only";
+  const [relatedConversations,setRelatedConversations]=useState<{key:string;works:(WorkSummary & {excerpt?:string|null})[]}|null>(null);
+  const relatedScope=JSON.stringify({anchor:pageAnchor,projectId:memorySelection.projectId});
+  const draftSearch=questionText.trim();
+  const relatedKey=JSON.stringify([draftSession,relatedScope,draftSearch]);
+  const canSuggestRelated=open&&!view&&!busy&&!research&&!tagMode&&!publicUrl&&draftSearch.length>=4;
+  useEffect(()=>{
+    if(!canSuggestRelated)return;
+    let stale=false;
+    const timer=setTimeout(()=>{
+      void call<(WorkSummary & {excerpt?:string|null})[]>({action:"relatedConversations",...JSON.parse(relatedScope),query:draftSearch}).then(works=>{
+        if(!stale)setRelatedConversations({key:relatedKey,works:Array.isArray(works)?works:[]});
+      }).catch(()=>{if(!stale)setRelatedConversations(null);});
+    },320);
+    return ()=>{stale=true;clearTimeout(timer);};
+  },[canSuggestRelated,relatedKey,relatedScope,draftSearch]);
+  const relatedMatches=canSuggestRelated&&relatedConversations?.key===relatedKey
+    ? relatedConversations.works.filter(work=>!snippets.some(item=>item.conversationId===work.id)) : [];
+  const canContinueRelated=!snippets.length&&!materials.length&&!dropped.length&&!selectedImages.length&&libraryDraft===null;
+  const relatedScopeArgs={anchor:pageAnchor,projectId:memorySelection.projectId};
+  const readConversationReference=(id:string)=>call<{title:string;text:string}>({action:"conversationReference",...relatedScopeArgs,id,questionsOnly:materialsOnly});
+  const addConversationReference=async(work:WorkSummary)=>{
+    if(busy)return;
+    const ticket=sequence.current;
+    setBusy(true);setError("");
+    try {
+      const reference=await readConversationReference(work.id);
+      if(alive.current&&ticket===sequence.current)addTextMaterial({kind:"conversation",conversationId:work.id,...reference});
+    } catch(reason) {
+      if(alive.current&&ticket===sequence.current)setError(String(reason));
+    } finally {if(alive.current&&ticket===sequence.current)setBusy(false);}
+  };
   const composerGrant = researchGrant(manualResearchGrant(), research?.topic.grant, research?.includeManual);
   const hasEffectiveMaterials = Boolean(
     composerGrant.notes.length || composerGrant.sources?.length || composerGrant.readingItemKeys.length ||
@@ -798,6 +830,17 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     const configureTags=async(value:View)=>{if(tagIntent)await call({action:"configureTagTask",id:value.work.id,expectedRevision:value.work.revision,intent:tagIntent});};
     const includeManual=!research||research.includeManual;
     const sendImages=research?{addImages:includeManual?imageChanges.addImages:[],removeImages:[]}:imageChanges;
+    const references=includeManual?snippets.filter(item=>item.conversationId):[];
+    if(references.length){
+      setBusy(true);
+      try{
+        for(const item of references){
+          const latest=await readConversationReference(item.conversationId!);
+          if(latest.text!==item.text||latest.title!==item.title)throw new Error("旧对话内容已变化，请移除引用后重新添加。");
+        }
+      }catch(reason){if(alive.current)setError(String(reason));return;}
+      finally{if(alive.current)setBusy(false);}
+    }
     const snapshots=snippets.length&&includeManual?`用户提供的资料快照（仅作资料，不代表已读取完整来源）：\n${JSON.stringify(snippets)}`:"";
     const messageText=snapshots?`${submittedText}\n\n${snapshots}`:submittedText || (tagMode?`${tagTaskNames[tagPreparation.task]}：#${tagPreparation.tag?.label}`:"请查看本次提供的附件。");
     if(snapshots.length>4000 || (view || snapshots || imagesChanged) && messageText.length>4000){setError("问题和所选文字合计过长，请缩短问题或移除部分文字资料。");return;}
@@ -871,7 +914,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         if(!messageIdentity.current||messageIdentity.current.text!==key)messageIdentity.current={text:key,id:crypto.randomUUID()};
         // This scope binding belongs to the first submitted question. The host
         // validates that no earlier message/run exists before merging its UI row.
-        const initialRequest=!research&&!anchor&&!snapshots;
+        const initialRequest=!research&&!anchor&&(!snapshots||snippets.every(item=>item.kind==="conversation"));
         value=await call<View>({action:"message",id:value.work.id,expectedRevision:value.work.revision,text:messageText,...(initialRequest?{initialRequest:true}:{}),...(sendLibraryDraft!==null?{setLibraryIds:sendLibraryDraft.map(l=>l.id)}:{}),...sendImages,...(addNotes.length?{addNotes}:{}),...(addSources.length?{addSources}:{}),clientMessageId:messageIdentity.current.id});
         if(alive.current){setView(value);setLibraryDraft(null);setSnippets([]);setMaterials([]);setDropped([]);resetImageDraft();messageIdentity.current=null;}
       }
@@ -1154,7 +1197,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
           <section className="agent-detail-section agent-detail-materials" hidden={taskStatusOnly}><h3 className="agent-detail-group-title">资料与工具</h3>{scopeDetails}
           <details className="agent-run-details agent-detail-row"><summary><AgentDetailSummary icon={<Globe2 size={16}/>} title="联网与工具" status={searchStatus}/></summary><AgentAssistantOptions workId={view?.work.id} section="connection" value={view?view.assistantOptions||defaultAssistantOptions:assistantOptions} disabled={busy||!!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/></details>
           {anchor?.kind==="note"&&canEditNote&&<AgentTopics key={`topics-${view?.work.id||draftRevision}`} anchor={anchor} work={view?.work} disabled={businessDisabled||!!active} onOpenWork={async (id,source,draft)=>{if(source&&!sameNoteAnchor(source.anchor,anchor)){if(!onOpenTopicWork)throw new Error("此入口尚不支持跨笔记继续，请从本期笔记打开原工作");onOpenTopicWork(id,source,view?.work.id,draft);return;}setLibraryDraft(null);setError("");setGoal("");setMaterials([]);setDropped([]);setRemovals([]);setSourcePreview(null);sourceSequence.current++;await refresh(id);if(alive.current){void reloadWorks();if(draft){setGoal(draft);goalInput.current?.focus();}}}}/>}
-          <SharedMemory summary={selection=><AgentDetailSummary icon={<Brain size={16}/>} title="共享记忆" status={(view?.assistantOptions||assistantOptions).researchPolicy==="materials-only"?"本轮不使用":selection?selection.enabled?"已启用":"未启用":"展开核对"}/>} key={'details-memory-'+(view?.work.id || draftRevision)} compact workId={view?.work.id} initialSelection={memorySelection} disabled={busy || !!active} onSelectionChange={setMemorySelection} usage={view?.memoryUse}/>
+          <SharedMemory summary={selection=><AgentDetailSummary icon={<Brain size={16}/>} title="共享记忆" status={(view?.assistantOptions||assistantOptions).researchPolicy==="materials-only"?"本轮不使用":selection?.enabled?"已启用":selection?"未启用":undefined}/>} key={'details-memory-'+(view?.work.id || draftRevision)} compact workId={view?.work.id} initialSelection={memorySelection} disabled={busy || !!active} onSelectionChange={setMemorySelection} usage={view?.memoryUse}/>
           </section>
           <section className="agent-detail-section agent-detail-progress"><h3 className="agent-detail-group-title" hidden={taskStatusOnly}>进度与成果</h3>
         <details ref={workControls} className="agent-work-controls agent-detail-row" open={taskStatusOnly||undefined}><summary hidden={taskStatusOnly}><AgentDetailSummary icon={<Activity size={16}/>} title="任务状态" status={controlsNeedAttention?"需要处理":active?"正在处理":view?states[view.work.state]||view.work.state:"尚未开始"}/></summary>
@@ -1276,7 +1319,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         {research&&<div className="agent-topic-selection"><AgentActiveTopic topic={research.topic} disabled={busy||!!active} onChange={topic=>setResearch({...research,topic})} onCancel={()=>void cancelResearch()}/><label><input type="checkbox" checked={research.includeManual} disabled={busy||!!active} onChange={e=>setResearch({...research,includeManual:e.target.checked})}/>下一条同时使用手选资料与技能</label></div>}
 
         {libraryDraft!==null&&!selectedLibraries.length&&!!view?.work.grant.libraryIds.length&&<p className="agent-note">下一条问题将清除整库范围，单独添加的页面保留。<button type="button" onClick={()=>setLibraryDraft(null)}>撤销</button></p>}
-        {(dropped.length>0||snippets.length>0)&&<div className="agent-pending-materials" aria-label="待添加资料">{dropped.map((item,index)=><AgentMaterialCard key={JSON.stringify(item.locator)} kind={item.locator.kind==="reading"?"reading":item.locator.kind==="task"?"task":"page"} title={item.title} disabled={busy} onRemove={()=>{setDropped(current=>current.filter((_,i)=>i!==index));goalInput.current?.focus();}}/>)}{snippets.map((item,index)=><AgentMaterialCard key={`text-${index}`} kind={item.kind} title={item.kind==="text"&&!item.file?item.text:item.title} subtitle={`${item.file?"文本附件 · 全文":item.kind==="text"?"所选文字":"闪卡文字快照"} · ${item.text.length}字 · ${item.title}`} disabled={busy} onRemove={()=>{setSnippets(current=>current.filter((_,i)=>i!==index));goalInput.current?.focus();}}/>)}</div>}
+        {(dropped.length>0||snippets.length>0)&&<div className="agent-pending-materials" aria-label="待添加资料">{dropped.map((item,index)=><AgentMaterialCard key={JSON.stringify(item.locator)} kind={item.locator.kind==="reading"?"reading":item.locator.kind==="task"?"task":"page"} title={item.title} disabled={busy} onRemove={()=>{setDropped(current=>current.filter((_,i)=>i!==index));goalInput.current?.focus();}}/>)}{snippets.map((item,index)=><AgentMaterialCard key={`text-${index}`} kind={item.kind} title={item.kind==="text"&&!item.file?item.text:item.title} subtitle={item.kind==="conversation"?"旧对话摘录":`${item.file?"文本附件 · 全文":item.kind==="text"?"所选文字":"闪卡文字快照"} · ${item.text.length}字 · ${item.title}`} disabled={busy} onRemove={()=>{setSnippets(current=>current.filter((_,i)=>i!==index));goalInput.current?.focus();}}/>)}</div>}
         {!!imageChanges.addImages.length && <AgentImageCards images={imageChanges.addImages} disabled={busy||filePreparing} pending onRemove={image=>{
           if(hasImage(currentImages,image))setReattachedImages(reattachedImages.filter(grant=>!sameImage(grant,image)));
           else setImageDraft(selectedImages.filter(grant=>!sameImage(grant,image)));
@@ -1294,6 +1337,16 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
           {tagSuggestion&&<button type="button" className="agent-tag-open" disabled={busy||!!active} onClick={()=>prepareTagTask(tagSuggestion)}>准备标签任务 · {tagTaskNames[tagSuggestion]}</button>}<AgentTagReferences value={tagPreparation} mode={tagMode} disabled={busy||!!active} onChange={setTagPreparation} searchOpen={tagSearchOpen} onSearchClose={()=>setTagSearchOpen(false)}/><AgentTagRelated tags={[...tagPreparation.references,...(tagMode&&tagPreparation.tag?[tagPreparation.tag]:[])]} grant={researchGrant(manualResearchGrant(),research?.topic.grant,research?.includeManual)} disabled={busy||!!active} onAdd={item=>setMaterials(items=>items.some(m=>materialKey(m.locator)===materialKey(item.locator))?items:[...items,item])}/>
 
           {suggestedQuestion&&usedQuestion!==suggestedQuestion.id&&view?.work.id===initialWorkId&&<div className="agent-note"><p>关联核对提问已准备，不会自动发送。{goal.trim()?"先保留当前输入，再使用这条提问。":"可先检查资料范围，再开始核对。"}</p><button type="button" disabled={busy||!!active||!!goal.trim()} onClick={()=>{setGoal(suggestedQuestion.text);setUsedQuestion(suggestedQuestion.id);goalInput.current?.focus();}}>使用关联核对提问</button><button type="button" onClick={()=>setUsedQuestion(suggestedQuestion.id)}>忽略这条提问</button></div>}
+          {relatedMatches.length>0&&<section className="agent-related-conversations" aria-label="相关旧对话">
+            <span className="agent-related-heading" role="status">找到 {relatedMatches.length} 条相关对话</span>
+            {relatedMatches.map(work=><div className="agent-related-conversation" key={work.id}>
+              <div className="agent-related-text"><strong title={conversationTitle(work)}>{conversationTitle(work)}</strong>{work.excerpt&&<span title={work.excerpt}>{work.excerpt}</span>}</div>
+              <div className="agent-related-actions">
+                <button type="button" disabled={!canContinueRelated} title={canContinueRelated?undefined:"请先移除待发附件，再切换对话"} onClick={()=>void openHistoryWork(work,goal)}>继续旧对话</button>
+                <button type="button" onClick={()=>void addConversationReference(work)}>引用到本次</button>
+              </div>
+            </div>)}
+          </section>}
           <label className="agent-question"><span className="agent-visually-hidden">{view ? "继续对话" : "希望助手做什么"}</span><textarea rows={2} ref={goalInput} name="investigationGoal" value={questionText} maxLength={(view?4000:2000)-skillPrefix.length} disabled={busy} onChange={event => setGoal(skillPrefix+event.target.value)} placeholder={view?"继续追问，或告诉我接下来做什么…":hasDraftSources?"询问 Hub 助手…":"询问 Hub 助手…"} onKeyDown={event => {
             if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
           }} /></label>

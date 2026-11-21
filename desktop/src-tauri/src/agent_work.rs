@@ -340,6 +340,8 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
             )
         }
         "status" => status(root, &text(args, "id", 150)?),
+        "relatedConversations" => store::history::related::find(root, args),
+        "conversationReference" => store::history::related::reference(root, args),
         "setHistoryPreference" => store::history_preference(root, args),
         "historyPage" => store::conversation::page(root, args),
         "sourceScopeCoverage" => store::tool_results::coverage::read_ui(root, args),

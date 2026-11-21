@@ -47,7 +47,7 @@ fn model_suggestion_requires_user_confirmation_and_retains_exact_source() {
         1
     );
     assert!(proposals::list(&f.c(), "").unwrap().is_empty());
-    let status = status(&f.root, Some(&id)).unwrap();
+    let status = status(&f.root, Some(&id), false).unwrap();
     let source = &status["entries"][0]["source"];
     assert_eq!(source["proposedBy"], "deepseek");
     assert_eq!(source["confirmedBy"], "explicitUser");

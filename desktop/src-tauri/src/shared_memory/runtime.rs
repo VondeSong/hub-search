@@ -434,6 +434,21 @@ fn extract(archive: &Path, staging: &Path, expected: &Descriptor) -> Result<(), 
 pub(super) fn ensure(root: &Path) -> Result<RuntimeConfig, String> {
     ensure_from(root, &archive_path()?)
 }
+pub(super) fn prepared(root: &Path) -> Result<(), String> {
+    let expected = descriptor()?;
+    let target = root.join("cache/memory").join(&expected.id[..16]);
+    safe_path(&target)?;
+    if fs::read_to_string(target.join(".hub-runtime-ready"))
+        .ok()
+        .as_deref()
+        == Some(&expected.id)
+        && target.join("python/python.exe").is_file()
+    {
+        Ok(())
+    } else {
+        Err("还未准备本地记忆组件。".into())
+    }
+}
 pub(super) fn ensure_from(root: &Path, archive: &Path) -> Result<RuntimeConfig, String> {
     let canonical = fs::canonicalize(root).map_err(|_| "本地数据目录不可用")?;
     let normalized = PathBuf::from(crate::display_local_path(&canonical));

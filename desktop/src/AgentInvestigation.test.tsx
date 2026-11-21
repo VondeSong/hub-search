@@ -185,6 +185,44 @@ const fill = async (name: string, value: string) => {
   const input = document.body.querySelector<HTMLTextAreaElement>(`[name="${name}"]`)!;
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); });
 };
+it("finds related history with memory off and only attaches it on request",async()=>{
+  vi.useFakeTimers();
+  const original=invoke.getMockImplementation()!;
+  const old={id:"old-work",goal:"附件跟着消息发送",state:"completed",excerpt:"旧问题：附件为什么还在输入框"};
+  const reference={title:old.goal,text:"旧对话摘录（仅作历史参考）\n只随该条消息发送"};
+  let resolveStale:(works:unknown[])=>void=()=>{};
+  invoke.mockImplementation((command,p)=>{
+    const action=p.args.action;
+    if(action==="relatedConversations"){
+      if(p.args.query==="搜索上一个草稿")return new Promise(resolve=>{resolveStale=resolve;});
+      return Promise.resolve([old]);
+    }
+    if(action==="conversationReference")return Promise.resolve(reference);
+    return original(command,p);
+  });
+  await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
+  await fill("investigationGoal","搜索上一个草稿");
+  await act(async()=>vi.advanceTimersByTimeAsync(321));
+  const question="附件为什么重复发送";
+  await fill("investigationGoal",question);
+  await act(async()=>vi.advanceTimersByTimeAsync(321));
+  await act(async()=>resolveStale([{...old,id:"stale",goal:"过时搜索"}]));
+  expect(document.body.textContent).toContain("找到 1 条相关对话");
+  expect(document.body.textContent).not.toContain("过时搜索");
+  expect(invoke.mock.calls.filter(([,p])=>["conversationReference","respond","create"].includes(p.args.action))).toHaveLength(0);
+  await click("引用到本次");
+  expect(document.body.textContent).toContain("旧对话摘录");
+  expect(document.querySelector<HTMLTextAreaElement>("[name=investigationGoal]")!.value).toBe(question);
+  expect(invoke.mock.calls.filter(([,p])=>["respond","create"].includes(p.args.action))).toHaveLength(0);
+  const remove=document.querySelector<HTMLButtonElement>('.agent-pending-materials button[aria-label^="移除材料"]');
+  expect(remove).not.toBeNull();
+  await act(async()=>remove!.click());
+  expect(document.body.textContent).not.toContain("旧对话摘录");
+  await act(async()=>vi.advanceTimersByTimeAsync(321));
+  await click("继续旧对话");
+  expect(invoke.mock.calls.some(([,p])=>p.args.action==="status"&&p.args.id===old.id)).toBe(true);
+  expect(document.querySelector<HTMLTextAreaElement>("[name=investigationGoal]")!.value).toBe(question);
+});
 it.each(["mcp","web"])("cn07c binds a standalone %s-only choice before the first model call",async kind=>{
   const original=invoke.getMockImplementation()!;
   invoke.mockImplementation((command,p)=>p?.args?.action==="discoverMcpService"?Promise.resolve({server:"openai_docs",catalogSha256:"a".repeat(64),tools:[{name:"search_openai_docs",title:"Search OpenAI Docs"}],blockedToolCount:0}):original(command,p));
@@ -2048,11 +2086,11 @@ it("stages pasted pixels locally, retains them after a failed send and retries t
   expect(document.querySelectorAll('.agent-user-message-content .agent-sent-image')).toHaveLength(1);
   expect(document.querySelector('.agent-composer .agent-image-card')).toBeNull();
   await fill('investigationGoal','补充文字');await click('发送追问');
-  expect(invoke.mock.calls.filter(([,p])=>p?.args?.action==='message').at(-1)?.[1].args.addImages).toEqual([]);
+  expect(invoke.mock.calls.filter(([,p])=>p?.args?.action==='message').slice(-1)[0]?.[1].args.addImages).toEqual([]);
   await pasteImage();
   expect(document.querySelector('.agent-composer .agent-image-card')).not.toBeNull();
   await fill('investigationGoal','再次查看这张截图');await click('发送追问');
-  expect(invoke.mock.calls.filter(([,p])=>p?.args?.action==='message').at(-1)?.[1].args.addImages).toEqual([image]);
+  expect(invoke.mock.calls.filter(([,p])=>p?.args?.action==='message').slice(-1)[0]?.[1].args.addImages).toEqual([image]);
   expect(document.querySelector('.agent-composer .agent-image-card')).toBeNull();
  }finally{prepare.mockRestore();}
 });

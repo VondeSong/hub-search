@@ -3,6 +3,8 @@
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Value};
 
+pub(in crate::agent_work) mod related;
+
 #[cfg(test)]
 mod performance_tests {
     use super::*;
@@ -128,18 +130,18 @@ pub(super) fn list_on(
             Ok((time, id, pinned))
         })
         .transpose()?;
-    // Filter the complete stored history before keyset pagination. Search is
-    // deliberately limited to titles; withdrawn answer bodies are not read.
+    // Filter the complete stored history before keyset pagination.
     // Materialize preferences once: correlated latest-row reads otherwise scan
     // all records again for each filter, sort key and conversation.
-    let mut q = c
-        .prepare(
-            "WITH preferences AS MATERIALIZED (
+    let request_text = related::REQUEST_TEXT;
+    let request_rows = related::REQUEST_ROWS;
+    let sql = format!(
+        "WITH preferences AS MATERIALIZED (
             SELECT work_id,MAX(rowid) AS latest FROM agent_records NOT INDEXED
             WHERE kind='historyPreference' GROUP BY work_id
         ), history AS MATERIALIZED (
             SELECT w.id,w.goal,w.state,w.updated_at,w.anchor_json,
-                COALESCE(p.body_json,'{}') AS preference
+                COALESCE(p.body_json,'{{}}') AS preference
             FROM agent_works w
             LEFT JOIN preferences h ON h.work_id=w.id
             LEFT JOIN agent_records p ON p.rowid=h.latest
@@ -150,7 +152,10 @@ pub(super) fn list_on(
         ), matching AS (
             SELECT *, CASE WHEN ?5 THEN 0 ELSE pinned END AS sort_pinned
             FROM visible WHERE (?1='null' OR anchor_json=?1) AND archived=?5
-                AND (?6='' OR instr(lower(goal),lower(?6))>0)
+                AND (?6='' OR instr(lower(goal),lower(?6))>0 OR (
+                    state<>'revoked' AND EXISTS(SELECT 1 FROM agent_records r
+                        WHERE r.work_id=visible.id AND {request_rows}
+                        AND instr(lower({request_text}),lower(?6))>0)))
         ), page AS MATERIALIZED (
             SELECT * FROM matching
             WHERE (?2 IS NULL OR sort_pinned<?4 OR (sort_pinned=?4
@@ -161,9 +166,9 @@ pub(super) fn list_on(
             1+(SELECT COUNT(*) FROM agent_records r WHERE r.work_id=page.id
                AND r.kind IN ('userMessage','userDecision','steering','delivery')),
             pinned,archived
-        FROM page ORDER BY sort_pinned DESC,updated_at DESC,id",
-        )
-        .map_err(|e| e.to_string())?;
+        FROM page ORDER BY sort_pinned DESC,updated_at DESC,id"
+    );
+    let mut q = c.prepare(&sql).map_err(|e| e.to_string())?;
     let mut rows = q
         .query_map(
             params![

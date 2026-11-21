@@ -6,7 +6,7 @@ mod delivery_read;
 pub(super) mod execution_budget;
 pub(super) mod followups;
 pub(super) mod goal;
-mod history;
+pub(super) mod history;
 pub(super) mod lifecycle;
 pub(super) mod material_budget;
 pub(super) mod materials;

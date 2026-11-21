@@ -48,9 +48,9 @@ export function SharedMemory({ workId, disabled, onSelectionChange, initialSelec
   async function perform(args: Record<string, unknown>, rememberSelection = false) {
     setBusy(true); setError("");
     try {
-      let next = await call({ ...(!workId ? { projectId: draftSelection.current.projectId } : {}), ...args, workId });
+      let next = await call({ ...(!workId ? { projectId: draftSelection.current.projectId } : {}), ...(args.action==="status"?{prepareRuntime:false}:{}), ...args, workId });
       if (!workId && typeof args.projectId === "string" && args.projectId !== draftSelection.current.projectId) {
-        next = await call({ action: "status", projectId: draftSelection.current.projectId });
+        next = await call({ action: "status", projectId: draftSelection.current.projectId, prepareRuntime: false });
       }
       if (alive.current && currentWork.current === workId) {setView(workId ? next : { ...next, selection: draftSelection.current }); if(workId) onSelectionChange?.(next.selection); if(rememberSelection) rememberMemoryPreference(next.selection);}
       return true;
@@ -58,7 +58,7 @@ export function SharedMemory({ workId, disabled, onSelectionChange, initialSelec
       if (alive.current && currentWork.current === workId) {
         setError(String(reason));
         try {
-          let next = await call({ action: "status", workId });
+          let next = await call({ action: "status", workId, prepareRuntime: false });
           if (!workId && draftSelection.current.projectId && !next.projects.some(project => project.id === draftSelection.current.projectId)) {
             if (alive.current && currentWork.current === workId) {
               draftSelection.current = { projectId: "", enabled: false };
@@ -66,7 +66,7 @@ export function SharedMemory({ workId, disabled, onSelectionChange, initialSelec
               setError(""); setSelectionNotice("上次选择的记忆项目已不可用，已关闭记忆。请重新选择范围。");
             }
           } else if (!workId && draftSelection.current.projectId) {
-            next = await call({ action: "status", projectId: draftSelection.current.projectId });
+            next = await call({ action: "status", projectId: draftSelection.current.projectId, prepareRuntime: false });
           }
           if (alive.current && currentWork.current === workId) {setView(workId ? next : { ...next, selection: draftSelection.current }); if(workId) onSelectionChange?.(next.selection);}
         } catch { /* Preserve the original failure. */ }
@@ -105,13 +105,12 @@ export function SharedMemory({ workId, disabled, onSelectionChange, initialSelec
   }}>
     <summary>{summary ? summary(view?.selection ?? (workId?undefined:initialSelection)) : compact && view ? `记忆 · ${view.selection.enabled ? "已启用" : "未启用"}` : "共享记忆"}{view?.proposals?.length ? ` · ${view.proposals.length} 条待确认` : ""}</summary>
     {expanded && <>
-      <p className="agent-note">保存你确认的规则与决定，供其他调查复用。个人通用记忆适用于所有启用记忆的事项，项目记忆只在所选项目内使用。</p>
-      <p className="agent-note">新聊天会沿用你最后选择的记忆范围和开关；记忆内容仍需确认保存。</p>
+      <p className="agent-note">新对话沿用你上次选择的开关和范围。这里管理你确认过的规则和决定。查找旧聊天请用「对话历史」。</p>
       {selectionNotice && <p role="status">{selectionNotice}</p>}
-      {!view && busy && <p role="status">正在准备本地记忆，首次使用可能需要一点时间…</p>}
+      {!view && busy && <p role="status">正在读取记忆设置…</p>}
       {view && <>
         <button type="button" disabled={blocked} onClick={() => void perform({ action: "status" })}>刷新记忆</button>
-        <p>{view.configured ? "本地记忆已就绪。" : view.runtimeDetail || "本地记忆尚未准备完成。"}<button type="button" disabled={blocked} onClick={() => void perform({ action: "repair" })}>{busy ? "正在检查…" : "修复本地记忆"}</button></p>
+        <p>{view.configured ? "本地记忆已就绪。" : view.runtimeDetail || "本地记忆尚未准备完成。"} <button type="button" disabled={blocked} onClick={() => void perform(view.configured ? { action: "repair" } : { action: "status", prepareRuntime: true })}>{busy ? "请稍候…" : view.configured ? "修复本地记忆" : "准备本地记忆"}</button></p>
         <label>本事项的记忆范围<select value={view.selection.projectId} disabled={blocked} onChange={event => select({ projectId: event.target.value, enabled: view.selection.enabled })}>
           <option value="">仅个人通用</option>
           {view.projects.map(project => <option value={project.id} key={project.id}>{project.name}＋个人通用</option>)}

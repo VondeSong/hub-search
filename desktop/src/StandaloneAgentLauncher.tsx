@@ -17,7 +17,7 @@ const Existing = lazy(() => import("./AgentInvestigation").then(m => ({ default:
 export type Entry = { result:SearchResult } | { itemKey:string; title?:string } | null;
 export type AgentQuestion={id:string;text:string};
 type PanelEntry=Entry|{workId:string;question?:AgentQuestion};
-export type TextMaterial={kind:"text"|"flashcard";title:string;text:string;file?:boolean};
+export type TextMaterial={kind:"text"|"flashcard"|"conversation";title:string;text:string;file?:boolean;conversationId?:string};
 export const AgentTextMaterialContext=createContext<{selection:TextMaterial|null;clearSelection:()=>void;pending:TextMaterial|null;setPending:(value:TextMaterial|null)=>void}|null>(null);
 export type AgentTagRequest={tagId:string;label:string;task:"definition"|"missing"|"relations"};
 export const AgentTagRequestContext=createContext<{pending:AgentTagRequest|null;setPending:(v:AgentTagRequest|null)=>void}|null>(null);

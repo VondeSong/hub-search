@@ -156,7 +156,7 @@ fn body(root: &Path, item: &Item) -> Result<String, String> {
     }
     Ok(raw.to_string())
 }
-fn status(root: &Path, work: Option<&str>) -> Result<Value, String> {
+fn status(root: &Path, work: Option<&str>, prepare: bool) -> Result<Value, String> {
     let c = database(root)?;
     let mut stmt=c.prepare("SELECT id FROM memory_entries WHERE state!='forgotten' ORDER BY updated_at DESC LIMIT 200").map_err(|e|e.to_string())?;
     let ids = stmt
@@ -220,7 +220,11 @@ fn status(root: &Path, work: Option<&str>) -> Result<Value, String> {
         })
         .transpose()?
         .flatten();
-    let runtime = backend::config(root);
+    let runtime = if prepare {
+        backend::config(root).map(|_| ())
+    } else {
+        backend::preview(root)
+    };
     Ok(
         json!({"backend":"basicMemory","configured":runtime.is_ok(),"runtimeDetail":runtime.err(),"entries":entries,"proposals":proposals::list(&c,selected.as_ref().and_then(|s|s["projectId"].as_str()).unwrap_or(""))?,"projects":projects,
         "selection":selected.unwrap_or(json!({"projectId":"","enabled":false}))}),
@@ -551,7 +555,7 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
         }
         _ => return Err("未知记忆操作".into()),
     }
-    let mut current = status(root, work)?;
+    let mut current = status(root, work, args["prepareRuntime"] != false)?;
     if work.is_none() {
         if let Some(project) = args["projectId"].as_str() {
             let c = database(root)?;

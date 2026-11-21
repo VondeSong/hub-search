@@ -347,6 +347,16 @@ body.resizing-agent-panel * { cursor: col-resize !important; user-select: none !
 .agent-option-model > summary > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-composer .agent-send { margin-inline-start: 0; flex-shrink: 0; }
 .agent-pending-materials { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-block: 3px; }
+.agent-related-conversations { display: grid; gap: 6px; padding: 6px 3px 8px; border-bottom: 1px solid var(--hub-separator); }
+.agent-related-heading { color: var(--hub-text-secondary); font-size: 12px; }
+.agent-related-conversation { display: flex; align-items: center; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; }
+.agent-related-text { flex: 1 1 190px; min-width: 0; display: grid; gap: 2px; font-size: 13px; }
+.agent-related-text :is(strong,span) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-related-text span { font-size: 12px; color: var(--hub-text-secondary); }
+.agent-related-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.agent-related-actions button { min-height: 28px; padding: 2px 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--hub-text-secondary); font: inherit; font-size: 12px; cursor: pointer; }
+.agent-related-actions button:hover:not(:disabled) { color: var(--hub-text); border-color: var(--hub-separator); }
+.agent-related-actions button:disabled { opacity: .55; cursor: default; }
 .agent-composer .agent-context { position: relative; min-width: 0; max-width: 100%; }
 .agent-body .agent-context-open { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 24px; padding: 0; border: 0; background: transparent; color: var(--hub-text-primary); text-align: start; }
 .agent-body .agent-context-remove { position: absolute; inset-inline-end: -6px; top: -7px; display: grid; place-items: center; width: 24px; height: 24px; min-height: 24px; padding: 0; border: 1px solid var(--hub-separator); border-radius: 50%; color: var(--hub-text-secondary); background: var(--hub-content-surface); opacity: 0; }

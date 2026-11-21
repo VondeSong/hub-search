@@ -509,8 +509,12 @@ export default function Assistant(props: AssistantProps) {
   const currentContext = selected ? (selected.fresh ? selected.entry || null : initial.contexts[0] || null) : initial.session.messages.length ? initial.contexts[0] || null : props.context;
   return <>{props.open && storageError && <p className="ha-storage-error" role="status">{storageError}</p>}<AssistantConversation key={workKey} {...props} context={currentContext} browsingContext={props.context} workKey={workKey} initial={initial} onPersist={persist}
     topics={topics} pins={pins} onPin={togglePin} onSaveTopic={saveTopic}
-    history={history} onNewWithContext={() => setSelection({ route, id: 'chat:' + uniqueId(), fresh: true, entry: props.context })} onNew={() => setSelection({ route, id: 'chat:' + uniqueId(), fresh: true })}
-    onSelect={id => setSelection({ route, id, fresh: false })}
+    history={history} readHistory={id=>conversations.current[id]} onNewWithContext={() => setSelection({ route, id: 'chat:' + uniqueId(), fresh: true, entry: props.context })} onNew={() => setSelection({ route, id: 'chat:' + uniqueId(), fresh: true })}
+    onSelect={(id,draft) => {
+      const old=conversations.current[id];
+      if(draft && old) persist(id,{...old,input:[old.input,draft].filter(Boolean).join('\n\n').slice(0,8000),inputContext:old.inputContext||old.contexts[0]||null});
+      setSelection({ route, id, fresh: false });
+    }}
     onHistoryChange={(id, change) => { const previous = historyMeta.current[id] || { pinned: false, archived: false }; setUndo({ id, previous }); const field = change === 'pin' ? 'pinned' : change === 'delete' ? 'deleted' : 'archived'; historyMeta.current[id] = { ...previous, [field]: !previous[field] }; if (change === 'delete' && id === workKey) setSelection({ route, id: 'chat:' + uniqueId(), fresh: true }); persist(workKey, conversations.current[workKey] || initial); }} />
     {props.open && undo && <div className="ha-history-undo" role="status"><span>对话操作已保存</span><button type="button" onClick={() => { historyMeta.current[undo.id] = undo.previous; setUndo(null); persist(workKey, conversations.current[workKey] || initial); }}>撤销</button><button type="button" aria-label="关闭撤销提示" onClick={() => setUndo(null)}>×</button></div>}
   </>;
@@ -518,8 +522,8 @@ export default function Assistant(props: AssistantProps) {
 
 function AssistantConversation({
   activityDemo, onCloseActivityDemo,
-  open, expanded, context, canUseContext = allowContext, onClose, onExpand, onOpenSource, onCreateDraft, notify, workKey, initial, onPersist, history, onNew, onSelect, onHistoryChange, catalog = [], browsingContext, onNewWithContext, currentPageId, onInsertPage, topics, pins, onPin, onSaveTopic, onOpenTagQueue, tagEntry, onTagEntryHandled, tagModel,
-}: AssistantProps & { topics: ResearchTopic[]; pins: WorkPins; onPin: (kind: keyof WorkPins, id: string) => void; onSaveTopic: (config: Omit<ResearchTopic, 'id'>, updateId?: string) => boolean; workKey: string; initial: Conversation; onPersist: (key: string, conversation: Conversation) => void; browsingContext: AssistantContext | null; onNewWithContext: () => void; history: HistoryItem[]; onNew: () => void; onSelect: (id: string) => void; onHistoryChange: (id: string, change: 'pin' | 'archive' | 'delete') => void }) {
+  open, expanded, context, canUseContext = allowContext, onClose, onExpand, onOpenSource, onCreateDraft, notify, workKey, initial, onPersist, history, readHistory, onNew, onSelect, onHistoryChange, catalog = [], browsingContext, onNewWithContext, currentPageId, onInsertPage, topics, pins, onPin, onSaveTopic, onOpenTagQueue, tagEntry, onTagEntryHandled, tagModel,
+}: AssistantProps & { topics: ResearchTopic[]; pins: WorkPins; onPin: (kind: keyof WorkPins, id: string) => void; onSaveTopic: (config: Omit<ResearchTopic, 'id'>, updateId?: string) => boolean; workKey: string; initial: Conversation; onPersist: (key: string, conversation: Conversation) => void; browsingContext: AssistantContext | null; onNewWithContext: () => void; history: HistoryItem[]; readHistory: (id:string) => Conversation|undefined; onNew: () => void; onSelect: (id: string, draft?:string) => void; onHistoryChange: (id: string, change: 'pin' | 'archive' | 'delete') => void }) {
   const [session, dispatch] = useReducer(reducer, initial.session);
   const [input, setInput] = useState(initial.tagIntent ? cleanTagStarter(initial.input) : initial.input);
   const [tagMode, setTagMode] = useState(initial.tagMode);
@@ -534,6 +538,21 @@ function AssistantConversation({
   const [tagMatchAll,setTagMatchAll]=useState(false);
   const [tagPageIds,setTagPageIds]=useState<string[]>([]);
   const handledTagEntry = useRef<typeof tagEntry>(null);
+  const [historyReference,setHistoryReference]=useState<{id:string;title:string;excerpt:string}|null>(null);
+  const draftQuery=input.trim().toLowerCase();
+  const queryWords=draftQuery.match(/[a-z0-9]{4,}|[一-鿿]{4,}/g)||[];
+  const related=!session.messages.length&&!session.active&&!tagMode&&draftQuery.length>=4
+    ? history.flatMap(item=>{
+      const old=readHistory(item.id);
+      if(!old||item.id===workKey||item.blocked||item.id===historyReference?.id)return [];
+      if(context ? !old.contexts.some(candidate=>candidate.id===context.id) : old.contexts.length>0)return [];
+      const texts=[item.title,...old.session.messages.filter(msg=>msg.role==='user').map(msg=>msg.text)];
+      const candidate=texts.find(text=>text.toLowerCase().includes(draftQuery)||queryWords.some(word=>{
+        const chars=Array.from(word);
+        return chars.some((_,index)=>index+5<=chars.length&&text.toLowerCase().includes(chars.slice(index,index+5).join('')));
+      }));
+      return candidate?[{...item,excerpt:candidate===item.title?'':candidate.slice(0,110)}]:[];
+    }).slice(0,3) : [];
   const [inputContext, setInputContext] = useState<AssistantContext | null>(initial.inputContext);
   const [settings, setSettings] = useState<Settings>(() => readSettings(initial));
   const [omittedId, setOmittedId] = useState<string | null>(initial.omittedId);
@@ -824,11 +843,11 @@ function AssistantConversation({
           webSearch: effectiveWebSearch,
           mcpServices: [],
           context: requestContext, resources: { ...turnResources, url: settings.researchPolicy === 'materials-only' ? '' : publicLinkIn(value) || turnResources.url },
-          additions: [], attachmentNames: turnAttachments,
+          additions: historyReference ? [`旧对话摘录 · ${historyReference.title}\n${historyReference.excerpt}`] : [], attachmentNames: turnAttachments,
         },
       });
     }
-    setInput(''); setInputContext(null);
+    setInput(''); setInputContext(null); setHistoryReference(null);
     if (useManualSources) {
       setAttachmentNames([]);
       setResources(current => ({ ...current, pages: current.pages.filter(item => !isMediaReference(item)), url: '', images: [], dataFiles: [] }));
@@ -1151,6 +1170,20 @@ function AssistantConversation({
                 {tagError&&<p role="alert">{tagError}</p>}
               </section>}
               {inputBlocked && <div className="ha-input-blocked"><span>未发送的内容引用了不可用来源，暂时隐藏。</span><button type="button" onClick={()=>{setInput('');setInputContext(null);setAttachmentNames([]);}}>移除这份输入</button></div>}
+              {related.length>0 && <section className="ha-related" aria-label="相关旧对话">
+                <span role="status">找到 {related.length} 条相关对话</span>
+                {related.map(item=><div className="ha-related-row" key={item.id}>
+                  <div><strong title={item.title}>{item.title}</strong>{item.excerpt&&<span title={item.excerpt}>{item.excerpt}</span>}</div>
+                  <div className="ha-related-actions"><button type="button" disabled={!!attachmentNames.length||!!historyReference} onClick={()=>onSelect(item.id,input)}>继续旧对话</button>
+                  <button type="button" onClick={()=>{
+                    const old=readHistory(item.id);
+                    if(!old)return;
+                    const excerpt=old.session.messages.slice(-2).map(message=>message.text).join('\n').slice(0,900);
+                    setHistoryReference({id:item.id,title:item.title,excerpt});composer.current?.focus();
+                  }}>引用到本次</button></div>
+                </div>)}
+              </section>}
+              {historyReference && <div className="ha-attachment-list" aria-label="待发旧对话摘录"><span><FileText size={12}/><span title={historyReference.title}>{historyReference.title}</span><button type="button" className="ha-chip-remove" aria-label="移除旧对话摘录" onClick={()=>setHistoryReference(null)}><X size={12}/></button></span></div>}
               <textarea ref={composer} aria-label="给 Hub 助手的消息" value={inputBlocked || contextBlocked ? '' : input} disabled={contextBlocked || inputBlocked || activeBlocked} onChange={event => { setInput(event.target.value); setInputContext(material); }} onKeyDown={inputKey} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} placeholder={contextBlocked || inputBlocked || activeBlocked ? '请先核对来源状态…' : tagIntent ? '补充要求（可选）…' : tagMode && !session.messages.length ? '例如：查找 #线束设计 的漏标' : session.messages.length ? '继续追问，或告诉我接下来做什么…' : '询问 Hub 助手…'} maxLength={8000} rows={2} />
               {needsMaterial && !session.active && <p className="ha-link-policy-note" role="status">当前只用所选资料。<button type="button" className="ha-mode-link" onClick={() => changeMenu('materials')}>添加资料或切换策略</button></p>}
               {linkInDraft && !needsMaterial && !inputBlocked && !contextBlocked && settings.researchPolicy === 'materials-only' && <p className="ha-link-policy-note" role="status">当前策略仅依据材料，链接会保留在消息中，网页不会读取。</p>}

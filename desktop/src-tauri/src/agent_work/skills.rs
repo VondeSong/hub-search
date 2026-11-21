@@ -64,6 +64,13 @@ pub(super) fn request_presentation(request: &str) -> Value {
         }
         body = rest[end..].trim_start();
     }
+    if let Some((question, items)) = super::store::history::related::snapshots(body) {
+        let titles = items
+            .iter()
+            .filter_map(|item| item["title"].as_str())
+            .collect::<Vec<_>>();
+        return json!({"text":format!("{}\n\n引用旧对话 · {}",question,titles.join("、")),"skills":selected});
+    }
     json!({"text":body,"skills":selected})
 }
 

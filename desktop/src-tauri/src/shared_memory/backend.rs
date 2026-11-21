@@ -82,6 +82,14 @@ pub(super) fn config(root: &Path) -> Result<RuntimeConfig, String> {
     serde_json::from_slice(&bytes).map_err(|_| "记忆运行配置无效".into())
 }
 
+pub(super) fn preview(root: &Path) -> Result<(), String> {
+    if runtime::archive_path()?.is_file() || !cfg!(debug_assertions) {
+        runtime::prepared(root)
+    } else {
+        config(root).map(|_| ())
+    }
+}
+
 impl BasicMemory {
     pub(super) fn start(root: &Path, cfg: &RuntimeConfig) -> Result<Self, String> {
         Self::start_controlled(root, cfg, None)

@@ -106,6 +106,8 @@ pub(in crate::agent_work) fn message_on(
         return Err("对话已在其他位置更新，请刷新后再发送".into());
     }
     if initial_request {
+        let has_references = super::history::related::snapshots(&content)
+            .is_some_and(|(question, _)| question == work.goal);
         let has_history: bool = c.query_row(
             "SELECT EXISTS(SELECT 1 FROM agent_records WHERE work_id=?1 AND kind='userMessage') OR EXISTS(SELECT 1 FROM agent_runs WHERE work_id=?1)",
             [id], |r| r.get(0),
@@ -113,8 +115,11 @@ pub(in crate::agent_work) fn message_on(
         if has_history
             || work.anchor.is_some()
             || work.revision != 1
-            || content != work.goal
-            || (library_ids.is_none() && additions.is_empty() && add_images.is_empty())
+            || (content != work.goal && !has_references)
+            || (library_ids.is_none()
+                && additions.is_empty()
+                && add_images.is_empty()
+                && !has_references)
             || !removals.is_empty()
             || !remove_images.is_empty()
         {

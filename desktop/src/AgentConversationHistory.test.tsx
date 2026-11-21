@@ -60,7 +60,7 @@ it("requests host title search instead of filtering just the loaded page and kee
   const { host, render } = mount(), query = vi.fn(), escaped = vi.fn();
   const works = [{ id: "loaded", goal: "当前已加载的对话", state: "completed" }];
   await render({ works, query: "", onQueryChange: query }, escaped);
-  await click(host, "搜索对话标题");
+  await click(host, "搜索对话标题和提问");
   const input = host.querySelector<HTMLInputElement>('input[type="search"]')!;
   expect(document.activeElement).toBe(input);
   await type(input, "更早的标题");
@@ -72,7 +72,7 @@ it("requests host title search instead of filtering just the loaded page and kee
   expect(query).toHaveBeenLastCalledWith(""); expect(escaped).not.toHaveBeenCalled();
   await render({ works, query: "", onQueryChange: query }, escaped);
   expect(host.querySelector("input")).toBeNull();
-  expect(document.activeElement).toBe(button(host, "搜索对话标题"));
+  expect(document.activeElement).toBe(button(host, "搜索对话标题和提问"));
 });
 
 it("archives and restores through a separate durable preference while retaining pin state", async () => {
