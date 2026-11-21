@@ -17,7 +17,7 @@ const Existing = lazy(() => import("./AgentInvestigation").then(m => ({ default:
 export type Entry = { result:SearchResult } | { itemKey:string; title?:string } | null;
 export type AgentQuestion={id:string;text:string};
 type PanelEntry=Entry|{workId:string;question?:AgentQuestion};
-export type TextMaterial={kind:"text"|"flashcard"|"conversation";title:string;text:string;file?:boolean;conversationId?:string};
+export type TextMaterial={kind:"text"|"flashcard"|"conversation";title:string;text:string;file?:boolean;conversationId?:string;selectedFromChat?:true};
 export const AgentTextMaterialContext=createContext<{selection:TextMaterial|null;clearSelection:()=>void;pending:TextMaterial|null;setPending:(value:TextMaterial|null)=>void}|null>(null);
 export type AgentTagRequest={tagId:string;label:string;task:"definition"|"missing"|"relations"};
 export const AgentTagRequestContext=createContext<{pending:AgentTagRequest|null;setPending:(v:AgentTagRequest|null)=>void}|null>(null);
@@ -40,7 +40,7 @@ export function AgentPanelProvider({children}:{children:ReactNode}) {
   const capture=()=>{
    const value=window.getSelection();if(!value || value.isCollapsed)return;
    const node=value.anchorNode?.parentElement,root=node?.closest('.preview-card,.flashcards-card-modal,.flashcards-review-card');
-   if(!root || !value.focusNode || !root.contains(value.focusNode) || node?.closest('input,textarea,[contenteditable=true]'))return;
+   if(!root || !value.focusNode || !root.contains(value.focusNode) || node?.closest('.agent-panel,input,textarea,[contenteditable=true]'))return;
    const text=value.toString().trim();if(text)setSelection({kind:"text",text,title:root.querySelector('.preview-title,h1,h2')?.textContent?.trim()||"当前页面"});
   };
   document.addEventListener('selectionchange',capture);return()=>document.removeEventListener('selectionchange',capture);

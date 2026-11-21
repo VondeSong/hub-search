@@ -185,6 +185,61 @@ const fill = async (name: string, value: string) => {
   const input = document.body.querySelector<HTMLTextAreaElement>(`[name="${name}"]`)!;
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); });
 };
+it("quotes a selection without sending and keeps the main draft when closing the side chat", async () => {
+  const excerpt = "需要保留原设计";
+  current.conversation = { hasEarlier: false, messages: [{
+    id: "answer", role: "assistant", createdAt: 1,
+    report: {...report, prose: {markdown: excerpt, citations: []}},
+  }] };
+  await act(async () => root.render(<ExistingWorkInvestigation workId="work-1"/>));
+  await fill("investigationGoal", "原聊天的草稿");
+  const main = document.querySelector<HTMLElement>(".agent-panel")!;
+  const scroll = main.querySelector<HTMLElement>(".agent-conversation")!;
+  vi.spyOn(scroll, "getBoundingClientRect").mockReturnValue(new DOMRect(500, 0, 400, 500));
+  const paragraph = [...main.querySelectorAll(".agent-report p")].find(node => node.textContent === excerpt)!;
+  async function selectExcerpt() {
+    const range = document.createRange();
+    range.selectNodeContents(paragraph.firstChild!);
+    Object.defineProperty(range, "getClientRects", {value: () => [new DOMRect(540, 80, 120, 18)]});
+    await act(async () => {
+      document.getSelection()!.removeAllRanges();
+      document.getSelection()!.addRange(range);
+      expect(document.getSelection()!.toString()).toBe(excerpt);
+      document.dispatchEvent(new Event("selectionchange"));
+    });
+  }
+  await selectExcerpt();
+  await click("添加到对话");
+  expect(main.querySelector("[aria-label='待添加资料']")?.textContent).toContain(excerpt);
+  await selectExcerpt();
+  await click("在侧边聊天中提问");
+  const side = document.querySelector<HTMLElement>(".agent-side-chat")!;
+  expect(side.hidden).toBe(false);
+  expect(side.querySelector("[aria-label='待添加资料']")?.textContent).toContain(excerpt);
+  expect(side.querySelector("textarea")?.value).toBe("");
+  await click("关闭侧边聊天");
+  expect(side.hidden).toBe(true);
+  expect(main.hidden).toBe(false);
+  expect(main.querySelector("textarea")?.value).toBe("原聊天的草稿");
+  expect(invoke.mock.calls.some(([,params]) => ["create", "message", "respond"].includes(params.args.action))).toBe(false);
+
+  await selectExcerpt();
+  await click("在侧边聊天中提问");
+  const question = "这段说的是什么？";
+  await act(async () => {
+    const input = side.querySelector<HTMLTextAreaElement>("textarea")!;
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(input, question);
+    input.dispatchEvent(new Event("input", {bubbles:true}));
+  });
+  await act(async () => side.querySelector("form")!.requestSubmit());
+  const calls = invoke.mock.calls.map(([,params]) => params?.args).filter(Boolean);
+  expect(calls.find(args => args.action === "create")).toMatchObject({goal:question, anchor:null, grant:{libraryIds:[], notes:[], readingItemKeys:[]}});
+  const binding = calls.find(args => args.action === "message");
+  expect(binding?.initialRequest).toBe(true);
+  expect(binding?.text).toContain(JSON.stringify({kind:"conversation", title:"对话摘录", text:excerpt, conversationId:"work-1", selectedFromChat:true}));
+  expect(calls.some(args => args.action === "conversationReference")).toBe(false);
+  expect(main.querySelector("textarea")?.value).toBe("原聊天的草稿");
+});
 it("finds related history with memory off and only attaches it on request",async()=>{
   vi.useFakeTimers();
   const original=invoke.getMockImplementation()!;

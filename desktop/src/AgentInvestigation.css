@@ -789,3 +789,54 @@ body.agent-sidebar-open > #root { width:calc(100% - min(var(--agent-panel-width,
 .agent-source-chips a { display:inline-flex; align-items:center; gap:4px; max-width:100%; border-radius:1em; padding:2px 7px; background:var(--hub-separator); color:var(--hub-text-primary); text-decoration:none; }
 .agent-source-chips a:is(:hover,:focus-visible) { text-decoration:underline; }
 .agent-source-chips a > span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.agent-conversation :is(.agent-user-message-content, .agent-report, .agent-commentary) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+.assistant-selection-actions {
+  --selection-border: var(--hub-separator);
+  --selection-surface: var(--hub-content-surface);
+  --selection-text: var(--hub-text-primary);
+  --selection-hover: var(--hub-control-fill);
+  --selection-focus: var(--hub-accent);
+}
+.assistant-selection-actions {
+  position: fixed;
+  z-index: 260;
+  display: flex;
+  flex-wrap: wrap;
+  max-width: calc(100vw - 16px);
+  padding: 4px;
+  gap: 2px;
+  border: 1px solid var(--selection-border);
+  border-radius: 10px;
+  background: var(--selection-surface);
+  color: var(--selection-text);
+  box-shadow: 0 4px 18px rgb(0 0 0 / 16%);
+  user-select: none;
+}
+.assistant-selection-actions > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: 500 13px system-ui, sans-serif;
+  cursor: pointer;
+}
+.assistant-selection-actions > button:hover { background: var(--selection-hover); }
+.assistant-selection-actions > button:focus-visible { outline: 2px solid var(--selection-focus); outline-offset: -2px; }
+body > .agent-panel.agent-side-chat {
+  z-index: 205;
+  height: auto;
+  max-height: none;
+  border: 1px solid var(--hub-separator);
+  border-radius: 16px;
+  box-shadow: 0 12px 40px #0002;
+}
+.agent-side-chat-title { justify-self: center; min-width: 0; font-size: 14px; font-weight: 600; }
