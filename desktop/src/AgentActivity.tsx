@@ -405,14 +405,12 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
   const materialGroup=events.every(isMaterialContext);
   const choices=useContext(DisclosureContext);
   const [open,setOpen]=useActivityDisclosure(`group:${runId}:${events[0].id}`,materialGroup && choices?.get(`detail:${runId}:${events[0].id}`)===true);
-  const [summariesOpen,setSummariesOpen]=useActivityDisclosure(`summaries:${runId}:${events[0].id}`,false);
   const [visible,setVisible]=useState(8);
   const operations=events.filter(isOperation);
-  const visibleCount=live && open ? Math.max(visible,operations.length) : visible;
+  const visibleCount=live && open ? Math.max(visible,events.length) : visible;
   useEffect(()=>{
     if(visibleCount>visible)setVisible(visibleCount);
   },[visibleCount,visible]);
-  const summaries=events.filter(isCodexSummary);
   const webPhase=operations.length>0 && operations.every(event=>event.kind==="webSearch");
   const failed=operations.some(event=>operationFailed(event) && (event.kind!=="webSearch" || settled));
   const active=current?.state==="running";
@@ -441,14 +439,10 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
     else summary=latest.state==="completed" && verb ? "已"+label : label;
   }
   const steps=<div className="agent-operation-children">
-    {operations.slice(0,visibleCount).map(event=><ActivityEventView key={event.id} event={event} scope={scope} runId={runId}/>)}
-    {visibleCount<operations.length && <button type="button" className="agent-show-more" onClick={()=>setVisible(count=>count+8)}>显示更多步骤 · 另 {operations.length-visibleCount} 项</button>}
-    {!!summaries.length && (operations.length ? <details className="agent-public-summaries" open={summariesOpen} onToggle={event=>setSummariesOpen(event.currentTarget.open)}>
-      <summary>公开思考摘要 · {summaries.length} 条</summary>
-      {summariesOpen && summaries.map(event=><ActivityEventView key={event.id} event={event} scope={scope} runId={runId}/>)}
-    </details> : summaries.map(event=><ActivityEventView key={event.id} event={event} scope={scope} runId={runId}/>))}
+    {events.slice(0,visibleCount).map(event=><ActivityEventView key={event.id} event={event} scope={scope} runId={runId}/>)}
+    {visibleCount<events.length && <button type="button" className="agent-show-more" onClick={()=>setVisible(count=>count+8)}>显示更多 · 另 {events.length-visibleCount} 项</button>}
   </div>;
-  if(!segmented && !summaries.length && operations.every(event=>event.kind==="tool" && (event.operation || event.toolName)))return steps;
+  if(!segmented && operations.length===events.length && operations.every(event=>event.kind==="tool" && (event.operation || event.toolName)))return steps;
   const headingIcon = latest ?? (summaryIcon && {...summaryIcon,state:"completed",errorCount:0});
   return <details className={`agent-operation-group${active?" agent-operation-active":""}`} open={open} onToggle={event=>setOpen(event.currentTarget.open)}>
     <summary title={summary}>

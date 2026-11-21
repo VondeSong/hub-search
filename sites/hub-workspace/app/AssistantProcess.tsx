@@ -293,11 +293,13 @@ export function AssistantProcess({steps,webEnabled=false,seconds}:{steps?:string
       <details className="ha-process-group">
         <summary><Search size={16} aria-hidden="true"/><span className="ha-process-label">网页检索 · 2 步</span><span className="ha-process-sites"><img src="/agent-icons/github.svg" alt="GitHub"/><img src="/agent-icons/notion.svg" alt="Notion"/></span><small>另 2 个站点</small><ChevronDown size={12} aria-hidden="true"/></summary>
         <div className="ha-process-children">
+          <p className="ha-process-meta">核对公开进展和工具回执的事件定义</p>
           <SearchReceipt queries={['Codex App Server 事件','连接器权限与工具回执']} sources={[
             {domain:'developers.openai.com',title:'Codex App Server',query:'Codex App Server 事件'},
             {domain:'modelcontextprotocol.io',title:'工具定义',query:'连接器权限与工具回执'},
             {domain:'github.com',title:'<table id="example">'},
           ]}/>
+          <p className="ha-process-meta">确认页面历史是否有对应说明</p>
           <details className="ha-process-batch">
             <summary><Globe2 size={15} aria-hidden="true"/><span>{required ? '打开指定网页' : '在网页内查找'}</span><ChevronDown size={12} aria-hidden="true"/></summary>
             {!required && <p>查找内容：页面历史。返回 4 条来源记录。</p>}

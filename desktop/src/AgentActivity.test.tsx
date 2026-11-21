@@ -673,9 +673,10 @@ it("appends new steps to the open phase and keeps the earlier receipt open",asyn
 });
 
 
-it("keeps Codex summaries optional and keeps the native tool group when a summary arrives",async()=>{
+it("keeps Codex summaries in order with the receipts of the open native tool group",async()=>{
   const tool={id:"script",kind:"tool" as const,state:"running",operation:"analyzeFiles",label:"分析附件",createdAt:1300};
   const summary={id:"summary",kind:"reasoning" as const,state:"running",origin:"codex-app-server",label:"Preparing offline PE parsing",createdAt:1400};
+  const next={id:"web",kind:"webSearch" as const,state:"completed",action:"search",label:"搜索网页",queries:["核对分发记录"],createdAt:1500};
   const nativeRun={...run,native:true};
   const draw=(events:ActivityRun["events"])=>act(async()=>root.render(<AgentActivity value={{...nativeRun,events}}/>));
 
@@ -685,16 +686,14 @@ it("keeps Codex summaries optional and keeps the native tool group when a summar
   await draw([run.events[0],{...tool,state:"completed"},summary]);
   expect(host.querySelector(".agent-operation-group")).toBe(phase);
   expect(phase.open).toBe(true);
-  expect(host.textContent).not.toContain(summary.label);
   expect(host.querySelector(".agent-live-status")?.textContent).toBe("正在思考");
 
-  const summaryDisclosure=phase.querySelector<HTMLDetailsElement>(".agent-public-summaries")!;
-  await act(async()=>{
-    summaryDisclosure.querySelector("summary")!.click();
-    await vi.waitFor(()=>expect(summaryDisclosure.open).toBe(true));
-    await new Promise(resolve=>setTimeout(resolve,0));
-  });
-  expect(summaryDisclosure.textContent).toContain(summary.label);
+  await draw([run.events[0],{...tool,state:"completed"},{...summary,state:"completed"},next]);
+  const rows=phase.querySelector(".agent-operation-children")!.children;
+  expect(rows).toHaveLength(3);
+  expect(rows[0].textContent).toContain(tool.label);
+  expect(rows[1].textContent).toBe(summary.label);
+  expect(rows[2].querySelector("summary")?.textContent).toBe("搜索网页 · 核对分发记录");
   expect(host.querySelector(".agent-show-more")).toBeNull();
 });
 

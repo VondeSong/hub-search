@@ -762,8 +762,6 @@ body.agent-sidebar-open > #root { width:calc(100% - min(var(--agent-panel-width,
 .agent-followups textarea { box-sizing:border-box; width:100%; min-height:64px; resize:vertical; }
 
 .agent-web-details .agent-source-chips { display:flex; flex-wrap:wrap; gap:4px; padding:0; list-style:none; }
-.agent-public-summaries { color:var(--hub-text-secondary); font-size:12px; padding-block:4px; }
-.agent-public-summaries > summary { cursor:pointer; }
 .agent-source-chips li { max-width:100%; min-width:0; }
 .agent-source-chips a { display:inline-flex; align-items:center; gap:4px; max-width:100%; border-radius:1em; padding:2px 7px; background:var(--hub-separator); color:var(--hub-text-primary); text-decoration:none; }
 .agent-source-chips a:is(:hover,:focus-visible) { text-decoration:underline; }
