@@ -88,6 +88,22 @@ it("keeps internal interaction open and dismisses on outside pointer, focus, or 
   await act(async()=>{details.open=true;window.dispatchEvent(new Event('blur'));});expect(details.open).toBe(false);
  }finally{outside.remove();}
 });
+it("keeps the first assistant's menu open while using Escape in the second assistant",async()=>{
+ await act(async()=>root.render(<><aside className="agent-panel"><Menu composer={false}/></aside><aside className="agent-panel"><Menu composer={false}/></aside></>));
+ const [first,second]=[...host.querySelectorAll("details")];
+ await act(async()=>{
+  first.open=true;
+  const control=second.querySelector("summary")!;
+  control.dispatchEvent(new Event("pointerdown",{bubbles:true}));
+  control.click();
+  const button=second.querySelector("button")!;
+  button.focus();
+  button.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true,cancelable:true}));
+ });
+ expect(first.open).toBe(true);
+ expect(second.open).toBe(false);
+ expect(document.activeElement).toBe(second.querySelector("summary"));
+});
 it("does not reposition non-composer disclosures and disconnects observers on unmount", async () => {
   await act(async () => root.render(<Menu composer={false} />));
   const details = host.querySelector("details")!;

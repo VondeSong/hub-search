@@ -40,7 +40,7 @@ import { AgentScopeCoverage } from "./AgentScopeCoverage";
 import { useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { AssistantSelectionActions } from "./AgentSelectionActions";
 import { createPortal } from "react-dom";
-import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronDown, ChevronRight, WandSparkles, FileText, ListChecks, Maximize2, Menu, MessageSquare, Minimize2, PanelRight, PanelsTopLeft, MoreHorizontal, Quote, Plus, Search, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronDown, ChevronRight, WandSparkles, FileText, Image, ListChecks, Maximize2, Menu, MessageSquare, Minimize2, PanelRight, PanelsTopLeft, MoreHorizontal, Quote, Plus, Search, X } from "lucide-react";
 import type { SearchResult } from "./SearchTypes";
 import { isTaskPreviewResult } from "./TaskResultIdentity";
 import { runtimeCapabilities } from "./RuntimePlatform";
@@ -190,11 +190,19 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const [historyExpanded,setHistoryExpanded]=useState(true);
   const [taskStatusOnly,setTaskStatusOnly]=useState(false);
   const workControls=useRef<HTMLDetailsElement>(null);
-  const materialPopover=useAgentPopover();
+  const materialReturn=useRef<HTMLElement|null>(null);
+  const materialPopover=useAgentPopover({returnFocusRef:materialReturn});
   const [addMenuOpen,setAddMenuOpen]=useState(false);
-  const [addPage,setAddPage]=useState<"home"|"materials"|"scope"|"skills"|"web"|"images"|"pages">("home");
+  const [addPage,setAddPage]=useState<"home"|"materials"|"scope"|"skills"|"web"|"images"|"pages"|"files">("home");
   const addBack=useRef<HTMLButtonElement>(null);
-  useEffect(()=>{if(addMenuOpen){if(["scope","materials","skills"].includes(addPage))materialPopover.ref.current?.querySelector<HTMLButtonElement>(".agent-popover-header>button:last-child")?.focus();else if(addPage!=="home")addBack.current?.focus();else materialPopover.ref.current?.querySelector<HTMLButtonElement>(".agent-add-choices button")?.focus();}},[addPage,addMenuOpen]);
+  useEffect(()=>{
+    if(!addMenuOpen)return;
+    const panel=materialPopover.ref.current;
+    const focus=addPage==="pages" ? panel?.querySelector<HTMLInputElement>(".agent-material-search input:not(:disabled)") :
+      ["scope","materials","skills"].includes(addPage) ? panel?.querySelector<HTMLButtonElement>(".agent-popover-header>button:last-child") :
+      addPage==="home" ? panel?.querySelector<HTMLButtonElement>(".agent-add-choices button:not(:disabled)") : addBack.current;
+    (focus??addBack.current)?.focus({preventScroll:true});
+  },[addPage,addMenuOpen]);
   const panelId = useId();
   const launcher = useRef<HTMLButtonElement>(null);
   const floatingLauncher = useRef<HTMLButtonElement>(null);
@@ -248,6 +256,32 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const canEditNote=pageCanEditNote && sameNoteAnchor(anchor,pageAnchor) && (pageAttached || !!view);
   const hasDraftSources=selectedLibraries.length>0 || pageAttached || materials.length>0 || dropped.length>0 || snippets.length>0;
   const [removals, setRemovals] = useState<NoteLocator[]>([]);
+  const [materialSelection,setMaterialSelection]=useState<{
+    scope:string;
+    pageAttached:boolean;
+    materials:AgentMaterial[];
+    dropped:typeof dropped;
+    removals:NoteLocator[];
+    images:ImageGrant[]|null;
+  }|null>(null);
+  const pickerScope=selectionScope.current;
+  const selection=materialSelection?.scope===pickerScope?materialSelection:null;
+  const pickerCount=selection?selection.materials.length+selection.dropped.length+Number(!view&&selection.pageAttached&&!!pageAnchor):0;
+  function openCoreMaterials(pendingRemovals=removals) {
+    setMaterialSelection({scope:pickerScope,pageAttached,materials,dropped,removals:pendingRemovals,images:null});
+    setAddPage("pages");
+  }
+  function finishCoreMaterials() {
+    if(!selection || pickerDisabled || selection.removals.length)return;
+    setMaterials(selection.materials);
+    setDropped(selection.dropped);
+    setRemovals(selection.removals);
+    setPageAttached(selection.pageAttached);
+    if(selection.images)setImageDraft(selection.images);
+    if(!selection.pageAttached)setWholeLibrary(false);
+    setMaterialSelection(null);
+    setAddPage("scope");
+  }
   const coreMaterialCount=new Set([...(view?.work.grant.notes||[]).filter(note=>!removals.some(removed=>materialKey(removed)===materialKey(note))).map(materialKey),...materials.map(item=>materialKey(item.locator)),...dropped.map(item=>item.locator.kind==="note"?materialKey(item.locator):JSON.stringify(item.locator)),...(!view&&pageAttached&&anchor?[anchor.kind==="note"?materialKey(anchor):JSON.stringify(anchor)]:[])]).size;
 
   const [memorySelection, setMemorySelection] = useState<MemorySelection>(loadMemoryPreference);
@@ -327,11 +361,17 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const scopeIdentity = useRef<{ key: string; id: string } | null>(null);
   useEffect(()=>{
     if (!view) return;
-    setRemovals(current=>{
+    const retainedRemovals=(current:NoteLocator[])=>{
       const pending=current.filter(note=>view.work.grant.notes?.some(n=>n.libraryId===note.libraryId && n.documentId===note.documentId && n.pageId===note.pageId));
       return pending.length===current.length ? current : pending;
+    };
+    setRemovals(retainedRemovals);
+    setMaterialSelection(draft=>{
+      if (!draft||draft.scope!==pickerScope)return draft;
+      const pending=retainedRemovals(draft.removals);
+      return pending===draft.removals?draft:{...draft,removals:pending};
     });
-  },[view]);
+  },[view,pickerScope]);
   const [busy, setBusy] = useState(false);
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [filePreparing,setFilePreparing]=useState(false);
@@ -663,13 +703,14 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   };
   const currentImages=view?.work.grant.images || [];
   const selectedImages=imageDraft ?? currentImages;
+  const pickerImages=selection?.images ?? selectedImages;
   const sameImage=(a:ImageGrant,b:ImageGrant)=>JSON.stringify(a)===JSON.stringify(b);
   const hasImage=(images:ImageGrant[],image:ImageGrant)=>images.some(grant=>sameImage(grant,image));
   const imageChanges={addImages:selectedImages.filter(g=>!hasImage(currentImages,g)||hasImage(reattachedImages,g)),removeImages:currentImages.filter(g=>!hasImage(selectedImages,g))};
   const imagesChanged=!!(imageChanges.addImages.length||imageChanges.removeImages.length);
   const updateImages=async (changes:ImageChange)=>{
-    setImageDraft([...selectedImages.filter(g=>!changes.removeImages.some(r=>sameImage(r,g))),...changes.addImages]);
-    materialPopover.close(false);goalInput.current?.focus();
+    setMaterialSelection(draft=>draft&&{...draft,images:[...pickerImages.filter(g=>!changes.removeImages.some(r=>sameImage(r,g))),...changes.addImages]});
+    setAddPage("pages");
   };
   const addFiles=async(files:File[])=>{
     if(busy||importingFiles.current||businessCheck||confirmMessage||view?.work.grant.manifest||publicUrl){setError("请先完成当前操作，再添加图片或文件。");return;}
@@ -758,6 +799,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     }
   };
   const [publicUrl,setPublicUrl] = useState("");
+  const pickerDisabled=busy || filePreparing || !!businessCheck || confirmMessage || !!publicUrl;
   const resumeQueue=async(selectedMessageId?:string)=>{if(!view)return;cancelResponse.current=false;setPendingRun(true);setError("");try{const next=await call<View>({action:"resumeQueue",id:view.work.id,mode,selectedMessageId,expectedRunId:view.lifecycle?.activeRunId??null,...(view.lifecycle?lifecycleRequest(view.lifecycle,crypto.randomUUID()):{})});if(alive.current)setView(current=>acceptLifecycleSnapshot(current,next));}catch(reason){await showRunError(view.work.id,reason);}finally{if(alive.current){setPendingRun(false);void refresh(view.work.id);}}};
   const scopeOptions = view ? view.assistantOptions ?? defaultAssistantOptions : assistantOptions;
   const usesDeepSeek = (scopeOptions.model?.provider ?? runtime.settings.provider) === "deepseek";
@@ -806,6 +848,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const blockEmptyScope = needsMaterials && !active && !saveOnly && !confirmMessage;
   const scopeRecovery = "当前只用所选资料。请添加资料，或切换为普通提问。";
   const openMaterialScope = () => {
+    materialReturn.current=panel.current?.querySelector<HTMLButtonElement>(".agent-scope-trigger")??null;
     setAddPage("scope");
     setAddMenuOpen(true);
     if (materialPopover.ref.current) materialPopover.ref.current.open = true;
@@ -861,7 +904,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     const messageText=snapshots?`${submittedText}\n\n${snapshots}`:submittedText || (tagMode?`${tagTaskNames[tagPreparation.task]}：#${tagPreparation.tag?.label}`:"请查看本次提供的附件。");
     if(snapshots.length>4000 || (view || snapshots || imagesChanged) && messageText.length>4000){setError("问题和所选文字合计过长，请缩短问题或移除部分文字资料。");return;}
     if (!view && publicUrl.trim() && (pageAttached || materials.length || dropped.length || snippets.length || selectedImages.length || selectedLibraries.length)) { setError("公共链接请单独开启对话；先移除其他待发送资料。"); return; }
-    if (removals.length) { setError("请先确认撤回所选授权，再发送新的分析要求。"); return; }
+    if (removals.length || (addMenuOpen&&selection?.removals.length)) { setError("请先确认撤回所选授权，再发送新的分析要求。"); return; }
     if (view && (materials.length || dropped.length || removals.length || snippets.length || imagesChanged || libraryDraft!==null) && (confirmMessage || businessCheck)) { setError("请在本轮及结果核对结束后，以普通追问发送追加材料。"); return; }
     if(research){
       if(active){if(materials.length||dropped.length||libraryDraft!==null){setError("请在本轮结束后调整专题资料。");return;}}
@@ -1052,12 +1095,12 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       }
     }
   };
-  const withdrawMaterials = async () => {
-    if (!view || !removals.length || materials.length || active || busy || confirmMessage) return;
+  const withdrawMaterials = async (notes:NoteLocator[], pending:AgentMaterial[]) => {
+    if (!view || !notes.length || pending.length || active || busy || confirmMessage) return;
     clearSourcePreview();
-    const key=JSON.stringify([view.work.id,view.work.revision,removals]);
+    const key=JSON.stringify([view.work.id,view.work.revision,notes]);
     if (!scopeIdentity.current || scopeIdentity.current.key!==key) scopeIdentity.current={key,id:crypto.randomUUID()};
-    await businessAction({action:"message",text:"明确撤回本次选中的附加材料读取授权，保留原始目标与历史；本操作不启动模型分析。",clientMessageId:scopeIdentity.current.id,expectedRevision:view.work.revision,removeNotes:removals});
+    await businessAction({action:"message",text:"明确撤回本次选中的附加材料读取授权，保留原始目标与历史；本操作不启动模型分析。",clientMessageId:scopeIdentity.current.id,expectedRevision:view.work.revision,removeNotes:notes});
   };
   const conditionAction = async (args: Record<string, unknown>) => {
     if (!view) return;
@@ -1088,6 +1131,33 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const outcomes=(items:NonNullable<AgentActions>["items"])=>items.length ? <div className="agent-outcomes" aria-label="对话成果">{items.map(item=>item.kind==="flashcardDrafts" ? <FlashcardRecord key={item.id} item={item as FlashcardAction} disabled={businessDisabled} revoked={view?.work.state==="revoked"} onAction={businessAction}/> : item.kind==="archiveCopy" ? <ArchiveRecord key={item.id} item={item as ArchiveAction} disabled={businessDisabled} revoked={view?.work.state==="revoked"} onAction={businessAction}/> : item.kind==="pluginWrite" ? <AgentPluginWriteRecord key={item.id} item={item} disabled={businessDisabled} revoked={view?.work.state==="revoked"} onAction={businessAction}/> : item.kind==="obsidianEdit" ? <AgentObsidianEdit key={item.id} actions={{tagOptions:[],items:[item]}} recordsOnly verificationPending={!!businessCheck?.uncertain && businessCheck.actionId===item.id} disabled={businessDisabled} revoked={view?.work.state==="revoked"} onAction={businessAction}/> : null)}</div> : null;
   const visibleNote=browsing?.entry&&"result" in browsing.entry?investigationAnchor(browsing.entry.result):pageAnchor;
   const saveTarget=visibleNote?.kind==="note"?visibleNote:null;
+  const visibleEntry=browsing?.entry;
+  const currentPage=visibleEntry
+    ? "result" in visibleEntry
+      ? {locator:investigationAnchor(visibleEntry.result),title:visibleEntry.result.title}
+      : {locator:{kind:"reading" as const,itemKey:visibleEntry.itemKey},title:visibleEntry.title||"当前阅读条目"}
+    : !view && pageAnchor ? {locator:pageAnchor,title:pageTitle||currentObjectLabel} : null;
+  const currentKey=JSON.stringify(currentPage?.locator);
+  const usePageAnchor=!!currentPage?.locator && !view && currentKey===JSON.stringify(pageAnchor);
+  const selectedCurrent=!!selection && !!currentPage?.locator && (usePageAnchor && selection.pageAttached ||
+    selection.materials.some(item=>JSON.stringify(item.locator)===currentKey) ||
+    selection.dropped.some(item=>JSON.stringify(item.locator)===currentKey));
+  const authorizedCurrent=!!view && !!currentPage?.locator && (currentKey===JSON.stringify(anchor) ||
+    view.work.grant.notes?.some(item=>JSON.stringify(item)===currentKey) ||
+    view.work.grant.sources?.some(item=>JSON.stringify(item)===currentKey) ||
+    currentPage.locator.kind==="reading" && view.work.grant.readingItemKeys?.includes(currentPage.locator.itemKey));
+  function toggleCurrentPage() {
+    if (!currentPage?.locator || currentPage.locator.kind==="attachment" || authorizedCurrent || pickerDisabled) return;
+    const item={locator:currentPage.locator,title:currentPage.title.slice(0,200)};
+    setMaterialSelection(draft=>{
+      if (!draft) return null;
+      return {...draft,
+        pageAttached:usePageAnchor ? !selectedCurrent : draft.pageAttached,
+        materials:draft.materials.filter(note=>JSON.stringify(note.locator)!==currentKey),
+        dropped:usePageAnchor || selectedCurrent ? draft.dropped.filter(note=>JSON.stringify(note.locator)!==currentKey) : [...draft.dropped,item],
+      };
+    });
+  }
   const inlineOutcomes=(message:ConversationMessage)=>{
     const messages=view?.conversation?.messages || [];
     const same=messages.filter(m=>m.revision===message.revision);
@@ -1120,6 +1190,17 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   }
   useLayoutEffect(() => { if (open && extra) goalInput.current?.focus({preventScroll:true}); }, [open, !!extra]);
   useEffect(()=>{if(!extra && open && !busy && textMaterials?.pending){addTextMaterial(textMaterials.pending);textMaterials.setPending(null);}},[open,busy,active,textMaterials?.pending,!!extra]);
+  const scopeVerification=<details className="agent-material-advanced"><summary>固定清单与覆盖核对</summary><p className="agent-note">{selectedLibraries.length ? `当前库范围：${selectedLibraries.map(l=>l.name).join("、")}` : (!view && !hasDraftSources || !!view && !anchor && !view.work.grant.notes?.length) ? "未添加资料，可直接对话；可在这里添加资料" : view?.work.state==="revoked" ? "来源授权已撤回" : view?.work.grant.manifest ? `已固定授权 ${view.work.grant.manifest.members.length} 份资料` : (view ? !!view.work.grant.libraryIds.length : wholeLibrary) ? `当前范围：${view?.work.grant.libraryIds.length || 1} 个资料库` : !anchor && view ? `当前范围：${view.work.grant.notes?.length || 0} 份明确选中的文档/页面` : `当前范围：${sourceTitle || currentObjectLabel}，另有 ${view ? Math.max(0,(view.work.grant.notes?.length || 1)-1) : Math.max(0,materials.length+dropped.length-(pageAttached?0:1))} 份资料`}。这里的固定清单按已有版本核验；添加资料不会改动原文件。</p>
+            {!view && canEditNote && anchor?.kind==="note" && <AgentSourceScope key={`source-scope-${draftRevision}`} libraryId={anchor.libraryId} disabled={busy || wholeLibrary || !!selectedLibraries.length || !!materials.length} canConfirm={!!goal.trim()} onConfirm={createSourceScope}/>}
+            {view?.work.grant.manifest && view.work.revision!==undefined && view.work.authorizationVersion!==undefined && <AgentScopeCoverage key={`scope-coverage-${view.work.id}-${view.work.revision}-${view.work.authorizationVersion}-${view.recordVersion}`} workId={view.work.id} revision={view.work.revision} authorizationVersion={view.work.authorizationVersion} disabled={businessDisabled || !!active}/> }
+            {view?.work.grant.manifest?.selection && anchor?.kind==="note" && <AgentSourceScope key={`scope-refresh-${view.work.id}-${view.work.revision}`} libraryId={anchor.libraryId} initialSelection={view.work.grant.manifest.selection} disabled={businessDisabled || !!active || confirmMessage} canConfirm={view.work.revision!==undefined} confirmationLabel="确认新范围，保留本对话（不启动分析）" onConfirm={replaceSourceScope}/>}
+            {view?.work.grant.manifest && <p className="agent-note">已固定授权 {view.work.grant.manifest.members.length} 份材料。成员或版本变化后可重新确认范围，原累计预算保留；也可停止整个事项的来源授权。</p>}
+            {<div className="agent-settings">
+              <p className="agent-note">这里决定助手可以读取哪些资料。选页面和开放整个资料库分别设置，浏览其他页面不会自动授权。</p>
+              {addPage!=="pages" && !view && anchor?.kind==="note" && <label className="agent-grant"><input type="checkbox" disabled={busy} checked={composerLibraries.some(library=>library.id===anchor.libraryId)} onChange={event=>changeLibraries(event.target.checked?[...composerLibraries.filter(library=>library.id!==anchor.libraryId),{id:anchor.libraryId,name:libraryName}]:composerLibraries.filter(library=>library.id!==anchor.libraryId))}/>允许查找「{libraryName}」整个资料库的相关资料</label>}
+              {!view && anchor?.kind!=="note" && <p className="agent-note">可在上方选择资料库范围，或单独添加页面。</p>}
+            </div>}
+            </details>;
   const addExternalMaterial=(entry:{result?:SearchResult;itemKey?:string;title?:string;kind?:string;text?:string})=>{
     if((entry.kind==="text"||entry.kind==="flashcard")&&typeof entry.text==="string"){addTextMaterial({kind:entry.kind,text:entry.text,title:typeof entry.title==="string"?entry.title:"所选文字"});return;}
     if(busy || filePreparing || view?.work.grant.manifest){setError("请等待附件准备完成；固定资料范围需从范围入口调整。");return;}
@@ -1155,7 +1236,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const scopeDetails = view ? <>
         <details className="agent-run-details agent-detail-row"><summary><AgentDetailSummary icon={<Layers size={16}/>} title="资料范围" status={scopeStatus}/></summary>{(hasEffectiveMaterials || materialsOnly) && <p className="agent-note">{needsMaterials ? scopeRecovery : policyNames[scopePolicy]}</p>}
         {view.work.state!=="revoked"&&!!currentImages.length&&<AgentImageCards images={selectedImages.filter(image=>currentImages.some(grant=>sameImage(image,grant)))} disabled={busy||filePreparing||!!active} onRemove={image=>setImageDraft(selectedImages.filter(grant=>!sameImage(grant,image)))}/>}
-        {view.work.state!=="revoked"&&retainedFiles.map(locator=><AgentTextFileCard key={materialKey(locator)} locator={locator} deepseek={usesDeepSeek} disabled={businessDisabled||!!active} onRemove={()=>{setRemovals(current=>[...current,locator]);detailsPopover.close();setAddPage("pages");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}/>)}
+        {view.work.state!=="revoked"&&retainedFiles.map(locator=><AgentTextFileCard key={materialKey(locator)} locator={locator} deepseek={usesDeepSeek} disabled={businessDisabled||!!active} onRemove={()=>{detailsPopover.close();openCoreMaterials([...removals,locator]);setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}/>)}
         <p className="agent-note">{view.work.grant.manifest ? `已授权：固定清单 ${view.work.grant.manifest.members.length} 份材料` : view.work.grant.libraryIds.length ? `已授权：${view.work.grant.libraryIds.length} 个资料库` : view.work.state === "revoked" ? "已停止使用来源" : (!anchor || view.work.grant.notes && view.work.grant.notes.length>1) ? `已授权：${view.work.grant.notes?.length || 0} 份明确选中的文档/页面` : `已授权：${currentObjectLabel}`} · 下一轮{mode === "quick" ? "最多 8 分钟、8 次分析调用" : "最多 15 分钟、16 次分析调用"}，另有最多 1 次结果纠错，仍计入总时限。</p>
         {view.run?.usage.modelCalls !== undefined && <p className="agent-note">{nativeRun?`本轮 Agent 会话：${view.run.usage.agentSessions ?? "未返回"}；模型响应轮次：未返回`:"本轮已调用 "+view.run.usage.modelCalls+" 次"}，读取 {view.run.usage.entitiesRead || 0} 个来源、{view.run.usage.bodyChars || 0} 字符。</p>}
         {nativeTokens && <p className="agent-note">本轮输入 {tokenLabel(nativeTokens.inputTokens)} Token，其中缓存输入 {tokenLabel(nativeTokens.cachedInputTokens)}、未缓存输入 {tokenLabel(nativeTokens.uncachedInputTokens)}；输出 {tokenLabel(nativeTokens.outputTokens)}。恢复会话按本轮差额记录，缓存输入已包含在本轮输入中；缺少回执时显示未返回。</p>}
@@ -1219,7 +1300,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       <AgentConversationHistory query={historyQuery} archived={historyArchived} onQueryChange={query=>filterHistory(query,historyFilter.current.archived)} onArchivedChange={archived=>filterHistory(historyFilter.current.query,archived)} works={works} currentId={view?.work.id} disabled={busy||!!active} more={!!worksCursor} loading={worksLoading} error={worksError} states={states} onRetry={()=>void reloadWorks()} onClose={()=>{if(detailsMenu.current)detailsMenu.current.open=false;}} onMore={()=>void loadEarlierWorks()} onChange={changeHistory} onOpen={work=>void openHistoryWork(work)}/>
           </div>
           <div className="agent-details-sections" hidden={historyExpanded}>
-          <div className="agent-details-heading"><strong>{taskStatusOnly?"任务状态":"对话详情"}</strong><button type="button" aria-label={taskStatusOnly?"关闭任务状态":"关闭对话详情"} onClick={()=>{detailsPopover.close();detailsReturn.current?.focus();}}><X size={16}/></button></div>
+          <div className="agent-details-heading agent-popover-header"><strong>{taskStatusOnly?"任务状态":"对话详情"}</strong><button type="button" aria-label={taskStatusOnly?"关闭任务状态":"关闭对话详情"} onClick={()=>{detailsPopover.close();detailsReturn.current?.focus();}}><X size={16}/></button></div>
           <div className="agent-display-controls" hidden={taskStatusOnly}>
 
             {report && view?.work.state!=="revoked" && <button type="button" className="agent-reading-toggle" aria-pressed={reportReading} disabled={!!active} onClick={()=>{if(!reportReading)readingOrigin.current={scope:sourceScopeKey,scrollTop:conversationScroll.element.current?.scrollTop||0,focus:detailsReturn.current||goalInput.current};clearSourcePreview();setReportReading(current=>!current);detailsPopover.close();}}>{reportReading?<Minimize2 size={16}/>:<Maximize2 size={16}/>} {reportReading?"返回对话布局":"只看最新回答"}</button>}
@@ -1310,8 +1391,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
           </p>
         </div>}
         <AgentSleepDatasets workId={view.work.id} recordVersion={view.recordVersion} items={(view.sleepDatasets || []).filter(dataset => !(view.analysisArtifacts || []).some(chart => chart.content?.data.extractionDataset?.datasetId === dataset.datasetId && chart.content?.data.extractionDataset?.revision === dataset.revision))} revoked={view.work.state === "revoked"} />
-        <AgentDelivery workId={view.work.id} recordVersion={view.recordVersion} report={view.conversation ? null : report ?? null} evidence={view.evidence} progress={view.activity?.length || (view.conversation && report) ? null : view.progress} history={view.conversation ? [] : view.history} running={!!running} revoked={view.work.state === "revoked"} runId={view.run?.id} onOpenCitation={(...args)=>void openCitation(...args)}/>
-        {!view.conversation&&report&&view.run?.id&&<AgentAnswerSave workId={view.work.id} runId={view.run.id} current={saveTarget} disabled={businessDisabled||!!active||!!view.lifecycle?.requiresExplicitResume} records={view.answerSaves} onChanged={()=>void refresh(view.work.id)}/>}
+        <AgentDelivery workId={view.work.id} recordVersion={view.recordVersion} report={view.conversation ? null : report ?? null} evidence={view.evidence} progress={view.activity?.length || (view.conversation && report) ? null : view.progress} history={view.conversation ? [] : view.history} running={!!running} revoked={view.work.state === "revoked"} runId={view.run?.id} onOpenCitation={(...args)=>void openCitation(...args)} actions={!view.conversation&&report&&view.run?.id&&<AgentAnswerSave workId={view.work.id} runId={view.run.id} current={saveTarget} disabled={businessDisabled||!!active||!!view.lifecycle?.requiresExplicitResume} records={view.answerSaves} onChanged={()=>void refresh(view.work.id)}/>}/>
         {outcomes(view.actions?.items.filter(a=>a.kind!=="tagProposal" && (!view.conversation || a.baseRevision===undefined || !view.conversation.messages.some(m=>m.revision===a.baseRevision))) || [])}
         {view.draftRequest && !active && <button type="button" disabled={businessDisabled} onClick={()=>void businessAction({action:"prepareResponse",runId:view.draftRequest!.runId})}>继续准备本轮草稿</button>}
         {(!active && ["ready","interrupted","failed","expired"].includes(view.work.state) || view.work.state==="revoked") && <div className="agent-actions">
@@ -1390,21 +1470,31 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
             if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
           }} /></label>
           <div className="agent-composer-controls">
-            <details ref={materialPopover.ref} className="agent-add-menu agent-popover" name="hub-agent-preference" onToggle={event=>{if(event.target!==event.currentTarget)return;setAddMenuOpen(event.currentTarget.open);if(!event.currentTarget.open)setAddPage("home");}}>
-              <summary aria-label="添加附件" title="添加附件"><Plus size={20} aria-hidden="true"/></summary>
-              <div className={`agent-add-content${(addPage==="materials" || addPage==="scope" || addPage==="pages")?" agent-add-materials":addPage==="skills"?" agent-add-skills":""}`}>
-                <div className="agent-popover-header">{!["home","scope","materials","skills"].includes(addPage)&&<button type="button" className="agent-menu-back" ref={addBack} aria-label="返回资料范围" onClick={()=>setAddPage("scope")}><ArrowLeft size={16}/></button>}<strong>{addPage==="home"?"添加到本次对话":addPage==="skills"?"技能":addPage==="pages"?"核心材料":addPage==="images"?"资料库图片":addPage==="web"?"公共链接":"资料范围"}</strong><button type="button" aria-label="关闭添加菜单" title="关闭" onClick={()=>materialPopover.close(true)}><X size={16}/></button></div>
+            <details ref={materialPopover.ref} className="agent-add-menu agent-popover" onToggle={event=>{if(event.target!==event.currentTarget)return;setAddMenuOpen(event.currentTarget.open);if(!event.currentTarget.open){setMaterialSelection(null);setAddPage("home");}}}>
+              <summary aria-label="添加附件" title="添加附件" onClick={()=>{materialReturn.current=null;}}><Plus size={20} aria-hidden="true"/></summary>
+              <div className={`agent-add-content${["materials","scope","pages","files","images"].includes(addPage)?" agent-add-materials":addPage==="skills"?" agent-add-skills":""}`}>
+                <div className="agent-popover-header">
+                  {!["home","scope","materials","skills"].includes(addPage)&&<button type="button" className="agent-menu-back" ref={addBack} aria-label={["files","images"].includes(addPage)?"返回材料列表":"返回资料范围"} onClick={()=>{if(["files","images"].includes(addPage))setAddPage("pages");else{setMaterialSelection(null);setAddPage("scope");}}}><ArrowLeft size={16}/></button>}
+                  <strong>{addPage==="home"?"添加到本次对话":addPage==="skills"?"技能":addPage==="pages"?"选择材料":addPage==="files"?"资料库文件":addPage==="images"?"资料库图片与 PDF":addPage==="web"?"公共链接":"资料范围"}</strong>
+                  <button type="button" aria-label="关闭添加菜单" title="关闭" onClick={()=>materialPopover.close(true)}><X size={16}/></button>
+                </div>
                 {addPage==="home" && <div className="agent-add-choices">
                   <button type="button" className="agent-menu-choice" disabled={busy||filePreparing||!!businessCheck||!!view?.work.grant.manifest||!!publicUrl} onClick={()=>fileInput.current?.click()}><FileText size={18}/><span><strong>添加图片或文件</strong><small>也可以直接拖入或粘贴到输入框</small></span><ChevronRight size={15}/></button>
                   <button type="button" className="agent-menu-choice" onClick={()=>{setTagSearchOpen(true);materialPopover.close();}}><Tags size={18}/><span><strong>添加标签</strong><small>引用标签参与讨论</small></span><ChevronRight size={15}/></button>
                   <p className="agent-note">资料库里的图片和文档可直接拖入，也可通过「资料范围」查找。</p>
                 </div>}
-                {addMenuOpen && addPage==="images" && <AgentImages current={selectedImages} disabled={busy || filePreparing || !!businessCheck || !!view?.work.grant.manifest || !!publicUrl} onApply={updateImages}/>}
+                {addMenuOpen && addPage==="images" && selection && <div className="agent-scope-body"><AgentImages current={pickerImages} disabled={pickerDisabled || !!view?.work.grant.manifest} onApply={updateImages}/></div>}
+                {addMenuOpen && addPage==="files" && selection && <div className="agent-scope-body">
+                  <AgentAnalysisInputs disabled={pickerDisabled||!!view?.work.grant.manifest||pickerCount>=31} onSelect={item=>{
+                    setMaterialSelection(draft=>draft&&!draft.materials.some(note=>materialKey(note.locator)===materialKey(item.locator))?{...draft,materials:[...draft.materials,item]}:draft);
+                    setAddPage("pages");
+                  }}/>
+                </div>}
                 {addMenuOpen && addPage==="web" && <div className="agent-add-section"><label>公共网页地址<input type="url" aria-label="公共网页地址" value={publicUrl} disabled={busy} onChange={event=>setPublicUrl(event.target.value)} placeholder="https://example.org/article"/></label><p className="agent-note">发送问题即读取并保存此公开网页。仅支持 HTTPS 文本与 HTML 源码；不登录、不跟随跳转，不加载脚本和图片。每次最多 256 KiB，30 秒超时。遇到代理虚拟地址时向 Cloudflare 加密查询域名，不发送正文。</p><button type="button" onClick={()=>{materialPopover.close(true);goalInput.current?.focus();}}>返回填写问题</button></div>}
                 {addMenuOpen && addPage==="skills" && <AgentSkills pinned={pinnedSkills} onPin={toggleSkillPin} selected={selectedSkills.map(token=>token.slice(1))} onReset={()=>setGoal(questionText)} disabled={busy || (!!active && !steerable)} onSelect={name=>{setGoal(current=>new RegExp(`(^|[^a-zA-Z0-9_$\\\\-])\\$${name}(?=$|[^a-zA-Z0-9_-])`).test(current)?current:`$${name} ${current}`);materialPopover.close(false);goalInput.current?.focus();}} embedded/>}
-                {addMenuOpen && (addPage==="materials" || addPage==="scope" || addPage==="pages") && <div className="agent-add-section agent-scope-body">
-            {addPage!=="pages"&&<div className="agent-scope-overview">
-              <button type="button" onClick={()=>setAddPage("pages")}><FileText size={16}/><strong>核心材料</strong><span>{coreMaterialCount?`${coreMaterialCount} 份资料`:"添加页面"}</span><ChevronRight size={14}/></button>
+                {addMenuOpen && (addPage==="materials" || addPage==="scope") && <div className="agent-add-section agent-scope-body">
+            <div className="agent-scope-overview">
+              <button type="button" onClick={()=>openCoreMaterials()}><FileText size={16}/><strong>核心材料</strong><span>{coreMaterialCount?`${coreMaterialCount} 份资料`:"添加页面"}</span><ChevronRight size={14}/></button>
               <details><summary><Library size={16}/><strong>可检索的资料库</strong><small>{composerLibraries.length?composerLibraries.length+" 个库":"未选择"}</small><ChevronDown size={14}/></summary>{!view?.work.grant.manifest&&<AgentLibraryScope registry={libraryRegistry} selected={composerLibraries} disabled={businessDisabled||!!active||confirmMessage||view?.work.state==="revoked"} onChange={changeLibraries}/>}</details>
               {hasEffectiveMaterials && <details>
                 <summary><SlidersHorizontal size={16}/><strong>怎样使用资料</strong><small>{policyNames[scopePolicy]}</small><ChevronDown size={14}/></summary>
@@ -1414,36 +1504,55 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
                 <p className="agent-note" role="status">{scopeRecovery}</p>
                 <button type="button" disabled={busy || !!active} onClick={() => void changeMaterialPolicy("material-first")}>切换为普通提问</button>
               </div>}
+            </div>{scopeVerification}</div>}
+            {addMenuOpen && selection && ["pages","files","images"].includes(addPage) && <div className="agent-core-selection" hidden={addPage!=="pages"}>
+            {view?.work.grant.manifest ? <div className="agent-scope-body">{scopeVerification}</div> : <AgentMaterials embedded hideFooter
+              anchor={view&&anchor?.kind==="note"?anchor:undefined}
+              selected={selection.materials}
+              retained={view ? view.work.grant.notes || (anchor?.kind==="note" ? [anchor] : []) : undefined}
+              libraryIds={view?.work.grant.libraryIds} disabled={pickerDisabled}
+              onChange={notes=>setMaterialSelection(draft=>draft&&{...draft,materials:notes})}
+              removed={selection.removals}
+              onRemove={view&&!active ? notes=>setMaterialSelection(draft=>draft&&{...draft,removals:notes}) : undefined}
+              onWithdraw={view&&!active ? ()=>{setRemovals(selection.removals);void withdrawMaterials(selection.removals,selection.materials);} : undefined}
+              picker={{
+                count:pickerCount,
+                advanced:scopeVerification,
+                excluded:new Set([
+                  currentPage?.locator,
+                  !view&&selection.pageAttached?pageAnchor:null,
+                  ...selection.dropped.map(item=>item.locator),
+                ].flatMap(locator=>locator?.kind==="note"?[materialKey(locator)]:[])),
+                currentPage:currentPage?.locator&&currentPage.locator.kind!=="attachment"&&<label className="agent-material-choice agent-material-current">
+                  <input type="checkbox" aria-label="添加当前页面" checked={selectedCurrent||authorizedCurrent} disabled={pickerDisabled||authorizedCurrent||(!selectedCurrent&&pickerCount>=31)} onChange={toggleCurrentPage}/>
+                  <FileText size={16} aria-hidden="true"/><span><strong>当前页面</strong><small>{currentPage.title}</small></span>
+                </label>,
+                extraSelected:<>
+                  {!view&&selection.pageAttached&&pageAnchor&&<label className="agent-material-choice"><input type="checkbox" checked disabled={pickerDisabled} onChange={()=>setMaterialSelection(draft=>draft&&{...draft,pageAttached:false})}/><FileText size={16} aria-hidden="true"/><span><strong>{pageTitle||currentObjectLabel}</strong></span></label>}
+                  {selection.dropped.map(item=><label key={JSON.stringify(item.locator)} className="agent-material-choice"><input type="checkbox" checked disabled={pickerDisabled} onChange={()=>setMaterialSelection(draft=>draft&&{...draft,dropped:draft.dropped.filter(note=>note!==item)})}/><FileText size={16} aria-hidden="true"/><span><strong>{item.title}</strong></span></label>)}
+                </>,
+                tools:<div className="agent-scope-extra">
+                  <button type="button" disabled={pickerDisabled} onClick={()=>setAddPage("files")}><FileText size={16}/>选择资料库文件<ChevronRight size={14}/></button>
+                  <button type="button" disabled={pickerDisabled} onClick={()=>setAddPage("images")}><Image size={16}/>选择资料库图片<ChevronRight size={14}/></button>
+                  {!view&&!hasDraftSources&&assistantOptions.researchPolicy!=="materials-only"&&<button type="button" onClick={()=>setAddPage("web")}><Globe2 size={16}/>读取公共链接<ChevronRight size={14}/></button>}
+                </div>,
+              }}/>}
             </div>}
-            {addPage==="pages"&&<AgentAnalysisInputs disabled={busy||filePreparing||!!view?.work.grant.manifest||!!publicUrl||materials.length>=31} onSelect={item=>{setMaterials(current=>current.some(n=>materialKey(n.locator)===materialKey(item.locator))?current:[...current,item]);materialPopover.close(false);goalInput.current?.focus();}}/>}
-            {addPage==="pages"&&<div className="agent-scope-extra"><button type="button" disabled={!!view?.work.grant.manifest||!!publicUrl} onClick={()=>setAddPage("images")}>选择资料库图片</button>{!view&&!pageAttached&&!materials.length&&(assistantOptions.researchPolicy!=="materials-only")&&<button type="button" onClick={()=>setAddPage("web")}>读取公共链接</button>}</div>}
-            {addPage==="pages"&&<>
-
-            {(browsing?.entry || (!view && pageAnchor)) && <button type="button" className="agent-menu-choice" disabled={busy || filePreparing || !!businessCheck || !!view?.work.grant.manifest || (!browsing?.entry && pageAttached)} onClick={()=>{if(browsing?.entry)addExternalMaterial(browsing.entry);else if(pageAnchor){setPageAttached(true);setMaterials(current=>current.filter(item=>!sameNoteAnchor(item.locator,pageAnchor)));}}}><FileText size={18}/><span><strong>{!browsing?.entry && pageAttached?"当前页面已加入":"添加当前页面"}</strong><small>{(browsing?.entry && ("result" in browsing.entry ? browsing.entry.result.title : browsing.entry.title)) || pageTitle || currentObjectLabel}</small></span></button>}
-            {!view?.work.grant.manifest && <AgentMaterials embedded hideFooter onDone={()=>setAddPage("scope")} key={view?.work.id || draftRevision} anchor={anchor?.kind==="note" ? anchor : undefined} anchorIncluded={!!anchor && (!!view || pageAttached)} selected={materials} retained={view ? view.work.grant.notes || (anchor?.kind==="note" ? [anchor] : []) : undefined} libraryIds={view?.work.grant.libraryIds} disabled={busy || filePreparing || !!businessCheck || confirmMessage} onChange={setMaterials} removed={removals} onRemove={view&&!active ? setRemovals : undefined} onWithdraw={view&&!active ? ()=>void withdrawMaterials() : undefined}/>}
-            </>}
-            <details hidden={addPage!=="pages"} className="agent-material-advanced" key={addPage} ><summary>固定清单与覆盖核对</summary><p className="agent-note">{selectedLibraries.length ? `当前库范围：${selectedLibraries.map(l=>l.name).join("、")}` : (!view && !hasDraftSources || !!view && !anchor && !view.work.grant.notes?.length) ? "未添加资料，可直接对话；可在这里添加资料" : view?.work.state==="revoked" ? "来源授权已撤回" : view?.work.grant.manifest ? `已固定授权 ${view.work.grant.manifest.members.length} 份资料` : (view ? !!view.work.grant.libraryIds.length : wholeLibrary) ? `当前范围：${view?.work.grant.libraryIds.length || 1} 个资料库` : !anchor && view ? `当前范围：${view.work.grant.notes?.length || 0} 份明确选中的文档/页面` : `当前范围：${sourceTitle || currentObjectLabel}，另有 ${view ? Math.max(0,(view.work.grant.notes?.length || 1)-1) : Math.max(0,materials.length+dropped.length-(pageAttached?0:1))} 份资料`}。这里的固定清单按已有版本核验；添加资料不会改动原文件。</p>
-            {!view && canEditNote && anchor?.kind==="note" && <AgentSourceScope key={`source-scope-${draftRevision}`} libraryId={anchor.libraryId} disabled={busy || wholeLibrary || !!selectedLibraries.length || !!materials.length} canConfirm={!!goal.trim()} onConfirm={createSourceScope}/>}
-            {view?.work.grant.manifest && view.work.revision!==undefined && view.work.authorizationVersion!==undefined && <AgentScopeCoverage key={`scope-coverage-${view.work.id}-${view.work.revision}-${view.work.authorizationVersion}-${view.recordVersion}`} workId={view.work.id} revision={view.work.revision} authorizationVersion={view.work.authorizationVersion} disabled={businessDisabled || !!active}/> }
-            {view?.work.grant.manifest?.selection && anchor?.kind==="note" && <AgentSourceScope key={`scope-refresh-${view.work.id}-${view.work.revision}`} libraryId={anchor.libraryId} initialSelection={view.work.grant.manifest.selection} disabled={businessDisabled || !!active || confirmMessage} canConfirm={view.work.revision!==undefined} confirmationLabel="确认新范围，保留本对话（不启动分析）" onConfirm={replaceSourceScope}/>}
-            {view?.work.grant.manifest && <p className="agent-note">已固定授权 {view.work.grant.manifest.members.length} 份材料。成员或版本变化后可重新确认范围，原累计预算保留；也可停止整个事项的来源授权。</p>}
-            {<div className="agent-settings">
-              <p className="agent-note">这里决定助手可以读取哪些资料。浏览其他页面不会自动授权；输入框中的资料会随问题一起发送给当前模型。</p>
-              {!view && anchor?.kind==="note" && <label className="agent-grant"><input type="checkbox" disabled={busy} checked={composerLibraries.some(library=>library.id===anchor.libraryId)} onChange={event=>changeLibraries(event.target.checked?[...composerLibraries.filter(library=>library.id!==anchor.libraryId),{id:anchor.libraryId,name:libraryName}]:composerLibraries.filter(library=>library.id!==anchor.libraryId))}/>允许查找「{libraryName}」整个资料库的相关资料</label>}
-              {!view && anchor?.kind!=="note" && <p className="agent-note">可在上方选择资料库范围，或单独添加页面。</p>}
-            </div>}
-            </details></div>}
-                {addMenuOpen&&["materials","scope","pages"].includes(addPage)&&<footer className="agent-scope-footer"><p className="agent-note">{addPage==="pages"?"只添加选中的页面，不开放整个资料库。":hasEffectiveMaterials?"所选范围用于下一轮。":needsMaterials?"":"未选资料，可直接提问。"}</p><div>{addPage!=="pages"&&<button type="button" disabled={busy||!!active||!!view?.work.grant.manifest||!hasDraftSources&&!research} onClick={()=>{materialPopover.close();setRequestedTopic(undefined);setTopicSave(true);setTopicsOpen(true);}}><FolderBookmark size={14}/>保存为专题</button>}<button type="button" className="agent-scope-done" disabled={addPage==="pages"&&(busy||filePreparing||!!businessCheck||confirmMessage||!!removals.length)} onClick={()=>{if(addPage==="pages")setAddPage("scope");else{materialPopover.close();goalInput.current?.focus();}}}>{addPage==="pages"?"完成选择":"完成"}</button></div></footer>}
+            {addMenuOpen&&addPage==="pages"&&selection&&<footer className="agent-scope-footer">
+              <p className="agent-note"><strong aria-live="polite">已选 {pickerCount} 份{pickerImages.length>0&&`、${pickerImages.length} 张图片或 PDF 页面`}</strong><span>完成后放进输入框，发送前仍可移除。</span></p>
+              <div><button type="button" onClick={()=>{setMaterialSelection(null);setAddPage("scope");}}>取消</button><button type="button" className="agent-scope-done" disabled={pickerDisabled||!!selection.removals.length} onClick={finishCoreMaterials}>完成选择</button></div>
+            </footer>}
+            {addMenuOpen&&["materials","scope"].includes(addPage)&&<footer className="agent-scope-footer"><p className="agent-note">{hasEffectiveMaterials?"所选范围用于下一轮。":needsMaterials?"":"未选资料，可直接提问。"}</p><div><button type="button" disabled={busy||!!active||!!view?.work.grant.manifest||!hasDraftSources&&!research} onClick={()=>{materialPopover.close();setRequestedTopic(undefined);setTopicSave(true);setTopicsOpen(true);}}><FolderBookmark size={14}/>保存为专题</button><button type="button" className="agent-scope-done" onClick={()=>{materialPopover.close();goalInput.current?.focus();}}>完成</button></div></footer>}
 
               </div>
             </details>
             <MemoryAndSavePopover model={memory} value={scopeOptions} disabled={busy || !!active} materialsOnly={materialsOnly} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
             <AgentScopeTrigger selected={detailGrant ? detailGrant.libraryIds.map(id=>({id,name:id})) : composerLibraries} registry={libraryRegistry} fallbackLabel={detailGrant ? (detailCoreCount ? `${detailCoreCount} 份资料` : "添加资料范围") : view?.work.grant.manifest ? `固定 ${view.work.grant.manifest.members.length} 份资料` : (pageAttached ? "当前页面" : hasEffectiveMaterials ? "已添加资料" : "添加资料范围")} pending={libraryDraft!==null} disabled={busy || filePreparing || !!publicUrl} onClick={openMaterialScope}/>
-          <button type="button" className="agent-current-page agent-skill-shortcut" aria-label="添加技能" title="技能：选择本次使用的处理方法" disabled={busy || (!!active && !steerable)} onClick={()=>{setAddPage("skills");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}><WandSparkles size={18} aria-hidden="true"/></button>
+          <button type="button" className="agent-current-page agent-skill-shortcut" aria-label="添加技能" title="技能：选择本次使用的处理方法" disabled={busy || (!!active && !steerable)} onClick={event=>{materialReturn.current=event.currentTarget;setAddPage("skills");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}><WandSparkles size={18} aria-hidden="true"/></button>
           {textMaterials?.selection&&<button type="button" className="agent-current-page agent-selection-tool" aria-label="添加所选文字" title="添加所选文字（文字快照，不是区块）" disabled={busy||filePreparing||!!view?.work.grant.manifest} onMouseDown={event=>event.preventDefault()} onClick={()=>{addTextMaterial(textMaterials.selection!);textMaterials.clearSelection();}}><Quote size={18}/></button>}
             <AgentAssistantOptions value={(view ? view.assistantOptions || defaultAssistantOptions : assistantOptions)} disabled={busy || !!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
             {active && <button className="agent-send" type="button" aria-label="停止本轮" title="停止本轮" disabled={busy || stopping || !!view?.lifecycle && !view.lifecycle.activeRunId} onClick={()=>void mutate("cancel")}><Square size={13} fill="currentColor" aria-hidden="true" /></button>}
-            {(!active || !!goal.trim() || !!materials.length || !!dropped.length || !!snippets.length || !!imageChanges.addImages.length) && <button className="agent-send" type="submit" aria-label={tagMode&&!active?tagTaskNames[tagPreparation.task]:saveOnly&&!active?"保存补充":"发送"} aria-keyshortcuts="Control+Enter Meta+Enter" title="发送" disabled={busy || memory.busy || filePreparing || stopping || !!removals.length || blockEmptyScope || (!goal.trim()&&!materials.length&&!dropped.length&&!snippets.length&&!imageChanges.addImages.length&&!(tagMode&&tagPreparation.tag))}><ArrowUp size={19} /></button>}
+            {(!active || !!goal.trim() || !!materials.length || !!dropped.length || !!snippets.length || !!imageChanges.addImages.length) && <button className="agent-send" type="submit" aria-label={tagMode&&!active?tagTaskNames[tagPreparation.task]:saveOnly&&!active?"保存补充":"发送"} aria-keyshortcuts="Control+Enter Meta+Enter" title="发送" disabled={busy || memory.busy || filePreparing || stopping || !!removals.length || (addMenuOpen&&!!selection?.removals.length) || blockEmptyScope || (!goal.trim()&&!materials.length&&!dropped.length&&!snippets.length&&!imageChanges.addImages.length&&!(tagMode&&tagPreparation.tag))}><ArrowUp size={19} /></button>}
           </div>
           {blockEmptyScope && <p className="agent-composer-note" role="status">
             当前只用所选资料。<button type="button" className="agent-scope-recover-link" onClick={openMaterialScope}>添加资料或切换策略</button>

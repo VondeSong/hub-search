@@ -51,7 +51,7 @@ export function MemoryAndSavePopover({model,value,canAuto,materialsOnly,disabled
     catch(reason) { setSaveError(String(reason)); }
     finally { setSaving(false); }
   }
-  return <details ref={popover.ref} className="agent-assistant-options agent-popover agent-memory-disclosure" data-hub-keyboard-scope="memory-settings" name="hub-agent-preference" onToggle={event=>{
+  return <details ref={popover.ref} className="agent-assistant-options agent-popover agent-memory-disclosure" data-hub-keyboard-scope="memory-settings" onToggle={event=>{
     if(event.target!==event.currentTarget)return;
     const open=event.currentTarget.open;
     model.setSettingsOpen(open);
@@ -62,6 +62,7 @@ export function MemoryAndSavePopover({model,value,canAuto,materialsOnly,disabled
     </summary>
     <section className="agent-assistant-settings agent-memory-permissions" role="dialog" aria-modal="true" aria-label="记忆与保存" onKeyDown={wrapDialogTab}>
       <header className="agent-popover-header"><strong>记忆与保存</strong><button ref={closeButton} type="button" aria-label="关闭记忆与保存" onClick={()=>popover.close(true)}><X size={16}/></button></header>
+      <div className="agent-memory-permissions-body">
       <section className="agent-memory-settings-section" aria-label="记忆">
         <h3>记忆</h3>
         <label className="agent-memory-switch"><span>使用已保存记忆</span><input type="checkbox" role="switch" checked={model.selection.enabled&&!materialsOnly} disabled={!canSwitch} onChange={event=>model.select({...model.selection,enabled:event.target.checked})}/></label>
@@ -82,7 +83,8 @@ export function MemoryAndSavePopover({model,value,canAuto,materialsOnly,disabled
         </> : <><div className="agent-memory-save-status"><span>保存前确认</span><Check size={16} aria-hidden="true"/></div><p>先查看草稿，再确认保存。</p></>}
         {saveError&&<p role="alert">{saveError}</p>}
       </section>
-      <ManageLink model={model} onClick={()=>{popover.close();if(trigger.current) model.openManager(trigger.current);}}/>
+      </div>
+      <footer className="agent-memory-permissions-footer"><ManageLink model={model} onClick={()=>{popover.close();if(trigger.current) model.openManager(trigger.current);}}/></footer>
     </section>
   </details>;
 }

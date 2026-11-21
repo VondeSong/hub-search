@@ -24,7 +24,11 @@ export function useAgentPopover(options: { deferEscapeSelector?: string; trigger
     // A native picker owns focus temporarily; keep its caller mounted for the result.
     const nativeDialogOpen = () => !!element.querySelector("[data-agent-native-dialog]");
     const outside = (event: Event) => {
-      if (!nativeDialogOpen() && event.target instanceof Node && !ref.current?.contains(event.target) && !trigger?.current?.contains(event.target)) close();
+      if (nativeDialogOpen() || !(event.target instanceof Node) || element.contains(event.target) || trigger?.current?.contains(event.target)) return;
+      const owner=element.closest(".agent-panel");
+      const target=event.target instanceof Element ? event.target.closest(".agent-panel") : null;
+      if(owner&&target&&owner!==target)return;
+      close();
     };
     const escape = (event: KeyboardEvent) => {
       if (nativeDialogOpen() || event.key !== "Escape" || event.isComposing || event.defaultPrevented || !element.open) return;

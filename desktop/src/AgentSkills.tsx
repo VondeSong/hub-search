@@ -122,5 +122,5 @@ export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], o
       {!!catalog?.diagnostics.length && <details><summary>有技能未能加载</summary>{catalog.diagnostics.map((item, index) => <p className="agent-note" key={index}>{item.name}：{item.message}</p>)}</details>}
     </>}
   </div>;
-  return embedded ? <div className="agent-menu-embedded">{content}</div> : <details className="agent-skills agent-popover" name="hub-agent-preference" ref={details} onToggle={event=>{if(event.target===event.currentTarget && event.currentTarget.open)void load();}}><summary>使用技能</summary>{content}</details>;
+  return embedded ? <div className="agent-menu-embedded">{content}</div> : <details className="agent-skills agent-popover" ref={details} onToggle={event=>{if(event.target===event.currentTarget && event.currentTarget.open)void load();}}><summary>使用技能</summary>{content}</details>;
 }

@@ -94,7 +94,7 @@ export function AgentTopics({anchor,work,disabled,onOpenWork}:{anchor:Anchor;wor
  }
  const blocked=disabled||loading||uncertain;
  const saveConfig=()=>void save(creating?{action:empty?"topicCreateEmpty":"topicCreate",...(empty?{anchor,defaultQuestion:question}:{workId:work?.id,expectedWorkRevision:work?.revision}),title,period,skill,outputPreference:preference}:{action:"topicUpdate",topicId:detail?.topic.id,expectedRevision:detail?.topic.revision,title,defaultQuestion:question,period,outputPreference:preference,periodDirectory:directory,...(detail&&skill!==detail.method.content.name?{skill}:{})});
- return <details ref={popover.ref} className="agent-topics agent-popover" name="hub-agent-preference" onToggle={event=>{if(event.target===event.currentTarget){setDisclosureOpen(event.currentTarget.open);if(event.currentTarget.open)void list();}}}>
+ return <details ref={popover.ref} className="agent-topics agent-popover" onToggle={event=>{if(event.target===event.currentTarget){setDisclosureOpen(event.currentTarget.open);if(event.currentTarget.open)void list();}}}>
   <summary>专题</summary><div className="agent-topic-panel">
    <div className="agent-popover-header"><strong>当前笔记的专题</strong><button type="button" aria-label="关闭专题" onClick={()=>popover.close(true)}>关闭</button></div>
    <p className="agent-note">保存可复用设置和原工作关联，不启动分析，也不写回笔记。当前仅支持内置/已登记固定方法与 Obsidian；本期实际资料在创建前核对。</p>

@@ -45,7 +45,7 @@ export function AgentModelMenu({value,disabled,onSave}:{value:AssistantOptions;d
   const bars=(count:number)=><span className="agent-reasoning-bars" aria-hidden="true">{[0,1,2,3,4].map(index=><i key={index} data-active={index<count||undefined} style={{height:6+index*3}}/>)}</span>;
   return <div className="agent-model-controls" role="group" aria-label="模型设置">
 
-    <details ref={modelMenu.ref} className="agent-assistant-options agent-popover agent-option-model" name="hub-agent-preference" onToggle={event=>{if(event.target===event.currentTarget&&event.currentTarget.open){effortMenu.close();void load();}}}>
+    <details ref={modelMenu.ref} className="agent-assistant-options agent-popover agent-option-model" onToggle={event=>{if(event.target===event.currentTarget&&event.currentTarget.open){effortMenu.close();void load();}}}>
       <summary aria-label={`选择模型：${modelName}${fastActive?"，Fast 已开启":""}`} title={`${modelName} · ${effortName(resolvedEffort)}`}>
         {fastActive&&<Zap size={13} className="agent-model-fast-active"/>}<span className="agent-model-name">{modelName}</span>
       </summary>
@@ -60,7 +60,7 @@ export function AgentModelMenu({value,disabled,onSave}:{value:AssistantOptions;d
         {error&&<p role="alert">{error}</p>}
       </div>
     </details>
-    <details ref={effortMenu.ref} hidden={!levels.length} className="agent-assistant-options agent-popover agent-option-effort" name="hub-agent-preference" onToggle={event=>{if(event.target===event.currentTarget&&event.currentTarget.open)modelMenu.close();}}>
+    <details ref={effortMenu.ref} hidden={!levels.length} className="agent-assistant-options agent-popover agent-option-effort" onToggle={event=>{if(event.target===event.currentTarget&&event.currentTarget.open)modelMenu.close();}}>
       <summary aria-label={`调整推理强度：${effortName(resolvedEffort)}`} title={`推理深度：${effortName(resolvedEffort)}`}><span>{effortName(resolvedEffort)}</span><ChevronDown size={13}/></summary>
       <div className="agent-assistant-settings agent-effort-menu" aria-label="思考强度">
         <div className="agent-popover-header"><span>思考强度</span><button type="button" aria-label="关闭推理与速度设置" onClick={()=>effortMenu.close(true)}><X size={16}/></button></div>

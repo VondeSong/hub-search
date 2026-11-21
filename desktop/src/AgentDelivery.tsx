@@ -96,7 +96,7 @@ function ReportContent({ value, evidence, runId, onOpenCitation, actions }: { va
       <ReportCitationContext.Provider value={{ citations: prose.citations, evidence, runId, onOpenCitation }}><ReportMarkdown markdown={prose.markdown} citationCount={prose.citations.length} /></ReportCitationContext.Provider>
       <AgentWebSources sources={prose.webSources??[]}/>
       {!!value.limitations.length && <p className="agent-note">{value.limitations.join("；")}</p>}
-      <div className="agent-answer-toolbar"><AgentAnswerActions text={[prose.markdown,...value.limitations,copySources.length ? "来源：\n"+copySources.join("\n") : ""].filter(Boolean).join("\n\n")}/>{actions}</div>
+      <div className="agent-answer-toolbar"><AgentAnswerActions showLabel text={[prose.markdown,...value.limitations,copySources.length ? "来源：\n"+copySources.join("\n") : ""].filter(Boolean).join("\n\n")}/>{actions}</div>
     </div>;
   }
   const citations = (items: Citation[]) => items.map((citation, index) => {
@@ -130,13 +130,13 @@ function BoundReport({ value, report, evidence, runId, onOpenCitation, workId, r
     : <>{references}{previews}{body}</>;
 }
 
-export function AgentDelivery({ report, evidence, progress, history = [], running, revoked, runId, onOpenCitation, workId, recordVersion }: Reopening & {
+export function AgentDelivery({ report, evidence, progress, history = [], running, revoked, runId, onOpenCitation, workId, recordVersion, actions }: Reopening & {
   report: Report | null; evidence: Evidence[]; progress?: Progress | null;
-  history?: HistoricalDelivery[]; running: boolean; revoked: boolean; runId?: string; onOpenCitation?: CitationOpening;
+  history?: HistoricalDelivery[]; running: boolean; revoked: boolean; runId?: string; onOpenCitation?: CitationOpening; actions?: ReactNode;
 }) {
   if (revoked) return null;
   return <>
-    {report && <ReportContent value={report} evidence={evidence} runId={runId} onOpenCitation={onOpenCitation} />}
+    {report && <ReportContent value={report} evidence={evidence} runId={runId} onOpenCitation={onOpenCitation} actions={actions}/>}
     {!report && progress && <section className="agent-progress" aria-label="已取得的材料">
       <h3>已取得的材料</h3>
       <p className="agent-note">{running ? "调查仍在进行，以下材料已保存。" : "本轮尚未形成完整结论，已有材料可继续核对。"} 检索候选尚未证明关联成立。</p>

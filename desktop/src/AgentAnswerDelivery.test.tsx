@@ -32,7 +32,7 @@ it("CN05 unverified text cannot load images, execute HTML or activate links",asy
 it("CN05 valid long published answers preserve their tail in restored conversation",async()=>{
  const text="正常答复。".repeat(6000)+"最终句完整保留";const report:Report={status:"completed",summary:text,findings:[],nextSteps:[],questions:[],limitations:[],waitCondition:"",prose:{markdown:text,citations:[]}};
  await act(async()=>root.render(<AgentConversation conversation={{messages:[{id:"saved",role:"assistant",runId:"run",createdAt:1,report}],hasEarlier:false}} revoked={false} onOpenCitation={vi.fn()}/>));
- expect(host.querySelector(".agent-answer")!.textContent).toBe(text);expect(host.textContent).not.toContain("未发布");
+ expect(host.querySelector(".agent-answer > p")!.textContent).toBe(text);expect(host.textContent).not.toContain("未发布");
 });
 it.each(["legacy","metadata"])("CN05 %s progress clipping remains visible while collapsed without duplicating the expanded notice",async format=>{
  const value=activity("");value.events=[{id:"progress",kind:"message",state:"completed",label:format==="legacy"?"已展示的过程。\n\n（过程消息超过显示上限，后续内容未展示。）":"已展示的过程。",truncated:format==="metadata"?true:undefined,createdAt:1}];await act(async()=>root.render(<AgentActivity value={value}/>));

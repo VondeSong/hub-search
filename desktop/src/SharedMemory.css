@@ -98,6 +98,10 @@
 .agent-memory-manager > .agent-popover-header .agent-memory-actions { margin:0; }
 .agent-memory-manager > .agent-popover-header .agent-memory-actions > button { display:inline-grid; place-items:center; padding:4px; min-width:30px; }
 .agent-composer .agent-memory-disclosure .agent-memory-permissions { box-sizing:border-box; gap:0; bottom:calc(100% + 8px + var(--agent-popover-offset,0px)); max-height:min(560px,var(--agent-popover-room,480px)); }
+.agent-composer .agent-memory-disclosure[open] .agent-memory-permissions { display:flex; flex-direction:column; overflow:hidden; padding:0; }
+.agent-memory-permissions > .agent-popover-header { flex:none; padding:8px 12px; border-block-end:1px solid var(--hub-separator); }
+.agent-memory-permissions-body { min-height:0; overflow:auto; overscroll-behavior:contain; padding:2px 12px; }
+.agent-memory-permissions-footer { flex:none; padding:6px 12px; border-block-start:1px solid var(--hub-separator); }
 .agent-memory-permissions .agent-memory-switch { flex-direction:row; }
 .agent-memory-permissions .agent-memory-scope-setting { display:grid; }
 .agent-panel .agent-memory-tools { padding:10px 0; border-bottom:1px solid var(--hub-separator); }
