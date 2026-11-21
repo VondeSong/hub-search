@@ -189,10 +189,17 @@ pub(in crate::agent_work) fn message_on(
             grant.scope()?;
         }
         images::extend(root, c, &mut grant, &add_images, &remove_images)?;
-        body["scopeBefore"] = json!(work.grant);
-        body["authorizationVersion"] = json!(work.authorization_version);
-        body["scopeAfter"] = json!(grant);
-        c.execute("UPDATE agent_works SET grant_json=?2,authorization_version=authorization_version+CASE WHEN anchor_json='null' OR ?3 THEN 1 ELSE 0 END WHERE id=?1", params![id,encode(&grant)?,library_ids.is_some() || !add_images.is_empty() || !remove_images.is_empty()]).map_err(|e|e.to_string())?;
+        let image_scope_changed = grant.images != work.grant.images;
+        if image_scope_changed
+            || library_ids.is_some()
+            || !additions.is_empty()
+            || !removals.is_empty()
+        {
+            body["scopeBefore"] = json!(work.grant);
+            body["authorizationVersion"] = json!(work.authorization_version);
+            body["scopeAfter"] = json!(grant);
+            c.execute("UPDATE agent_works SET grant_json=?2,authorization_version=authorization_version+CASE WHEN anchor_json='null' OR ?3 THEN 1 ELSE 0 END WHERE id=?1", params![id,encode(&grant)?,library_ids.is_some() || image_scope_changed]).map_err(|e|e.to_string())?;
+        }
     }
     insert(c, id, None, "userMessage", &body)?;
     c.execute("UPDATE agent_works SET revision=revision+1,state=CASE WHEN state IN ('paused','cancelled') THEN state ELSE 'ready' END,active_run=NULL,report_json=NULL,updated_at=?2 WHERE id=?1", params![id,stamp()]).map_err(|e|e.to_string())?;
@@ -469,6 +476,13 @@ fn restrict_model_history(message: &mut Value) {
 }
 
 pub(in crate::agent_work) fn context(root: &Path, work: &Work) -> Result<Value, String> {
+    context_with_images(root, work).map(|(context, _)| context)
+}
+
+pub(in crate::agent_work) fn context_with_images(
+    root: &Path,
+    work: &Work,
+) -> Result<(Value, Vec<images::ImageGrant>), String> {
     super::tasks::refresh(root, &work.id)?;
     let c = read(root)?;
     c.execute_batch("BEGIN DEFERRED")
@@ -549,6 +563,10 @@ pub(in crate::agent_work) fn context(root: &Path, work: &Work) -> Result<Value, 
     let mut request_materials = latest_request
         .map(|m| m["materials"].clone())
         .unwrap_or(json!([]));
+    let request_images = latest_request
+        .map(|message| images::selection(message, "images"))
+        .transpose()?
+        .unwrap_or_default();
     let request = if super::materials::skill_only(request) {
         if request_materials
             .as_array()
@@ -564,7 +582,7 @@ pub(in crate::agent_work) fn context(root: &Path, work: &Work) -> Result<Value, 
         if request_materials
             .as_array()
             .is_none_or(|items| !items.iter().any(|item| item["available"] == true))
-            && current.grant.images.is_empty()
+            && request_images.is_empty()
         {
             format!("{request}\n本轮未附带页面或原图。若当前另有明确的任务对象（如已选择的标签），按该对象处理；否则先请用户补充本轮要处理的内容，不要重复以前不同输入的成稿。")
         } else {
@@ -575,7 +593,7 @@ pub(in crate::agent_work) fn context(root: &Path, work: &Work) -> Result<Value, 
     };
     let mut context = json!({"currentRequest":request,"currentRequestMaterials":request_materials,"goalState":super::goal::completion::context_on(root,&c,&current)?,"goalBinding":super::goal::binding_on(&c, &current)?,"messages":messages,"earlierMessagesOmitted":omitted,"historyCursor":conversation["nextCursor"],"handoffPolicy":"当前目标和最新修订以goalState为准；进度与问题见capabilities.workingState，保存以businessActionRecords为准。历史不完整时可调用conversationHistory按页或recordId补读；不得把摘要、助手旧回答或准备中的草稿当作完成事实。","policy":"普通用户消息是本轮要求，不自动成为确认事实或长期记忆；助手历史回答本身不是事实证据。Hub 笔记的精确编号引用只能选择本轮 quoteCatalog，并核验当前授权和版本，不能沿用历史编号。公开网页来源可复用同一原生会话中已实际读取且仍适用的内容，以具名 HTTPS 链接引用；总结、解释和启示类追问材料足够时直接回答，不为重复引用而联网。新增事实、时效变化、证据冲突、上下文缺失或用户要求复核时再查证。普通延伸追问不等于否定此前事实。"});
     super::report_continuation::context_on(root, &c, &current, &mut context)?;
-    Ok(context)
+    Ok((context, request_images))
 }
 
 pub(in crate::agent_work) fn source(

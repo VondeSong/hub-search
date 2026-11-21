@@ -448,6 +448,13 @@ pub(super) fn selection(value: &Value, field: &str) -> Result<Vec<ImageGrant>, S
     if images.len() > MAX_IMAGES {
         return Err("每次最多变更8张图片或PDF页面".into());
     }
+    if images
+        .iter()
+        .enumerate()
+        .any(|(i, image)| images[..i].contains(image))
+    {
+        return Err("同一条消息中的图片不能重复添加".into());
+    }
     Ok(images)
 }
 pub(super) fn extend(
@@ -472,6 +479,9 @@ pub(super) fn extend(
         grant.images.remove(n);
     }
     for image in add {
+        if grant.images.contains(image) {
+            continue;
+        }
         if grant
             .images
             .iter()

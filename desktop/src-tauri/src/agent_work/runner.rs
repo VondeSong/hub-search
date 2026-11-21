@@ -737,7 +737,7 @@ fn investigate_loop(
         control.check()?;
         let catalog = context.reader.catalog()?;
         let decisions = store::records(root, &work.id, "userDecision", 32)?;
-        let conversation = store::conversation::context(root, work)?;
+        let (conversation, request_images) = store::conversation::context_with_images(root, work)?;
         let continuation = store::review_trigger(root, run)?;
         if let Some(delta) = continuation
             .as_ref()
@@ -909,7 +909,7 @@ fn investigate_loop(
             &crate::source_evidence::open_read_database(root)?,
             &work.grant.images,
         )?;
-        if !work.grant.images.is_empty()
+        if !request_images.is_empty()
             && !session.is_some_and(|s| s.operation.is_some_and(|op| op.native_agent()))
         {
             return Err("原图仅支持Codex原生接入，请选择Codex后继续同一对话".into());
@@ -921,6 +921,7 @@ fn investigate_loop(
                 &catalog,
                 &decisions,
                 &conversation,
+                &request_images,
                 shared_memory.as_ref(),
                 action_receipts,
             );

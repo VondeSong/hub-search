@@ -162,6 +162,8 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const textMaterials=useContext(AgentTextMaterialContext);
   const [snippets,setSnippets]=useState<TextMaterial[]>([]);
   const [imageDraft,setImageDraft]=useState<ImageGrant[]|null>(null);
+  const [reattachedImages,setReattachedImages]=useState<ImageGrant[]>([]);
+  const resetImageDraft=()=>{setImageDraft(null);setReattachedImages([]);};
   const fileInput=useRef<HTMLInputElement>(null);
   const importingFiles=useRef(false);
   const [dropped,setDropped]=useState<{locator:InvestigationLocator;title:string}[]>([]);
@@ -535,7 +537,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const openHistoryWork = async (work: WorkSummary) => {
     if(detailsMenu.current)detailsMenu.current.open=false;
     if(work.id===view?.work.id)return;
-    setLibraryDraft(null);setError("");setGoal("");setMaterials([]);setDropped([]);setSnippets([]);setImageDraft(null);setRemovals([]);clearSourcePreview();
+    setLibraryDraft(null);setError("");setGoal("");setMaterials([]);setDropped([]);setSnippets([]);resetImageDraft();setRemovals([]);clearSourcePreview();
     setBusy(true);setLoadingConversation(true);
     try { await refresh(work.id); }
     catch(reason) { if(alive.current)setError(String(reason)); }
@@ -647,7 +649,8 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const currentImages=view?.work.grant.images || [];
   const selectedImages=imageDraft ?? currentImages;
   const sameImage=(a:ImageGrant,b:ImageGrant)=>JSON.stringify(a)===JSON.stringify(b);
-  const imageChanges={addImages:selectedImages.filter(g=>!currentImages.some(c=>sameImage(c,g))),removeImages:currentImages.filter(g=>!selectedImages.some(c=>sameImage(c,g)))};
+  const hasImage=(images:ImageGrant[],image:ImageGrant)=>images.some(grant=>sameImage(grant,image));
+  const imageChanges={addImages:selectedImages.filter(g=>!hasImage(currentImages,g)||hasImage(reattachedImages,g)),removeImages:currentImages.filter(g=>!hasImage(selectedImages,g))};
   const imagesChanged=!!(imageChanges.addImages.length||imageChanges.removeImages.length);
   const updateImages=async (changes:ImageChange)=>{
     setImageDraft([...selectedImages.filter(g=>!changes.removeImages.some(r=>sameImage(r,g))),...changes.addImages]);
@@ -656,17 +659,20 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const addFiles=async(files:File[])=>{
     if(busy||importingFiles.current||businessCheck||confirmMessage||view?.work.grant.manifest||publicUrl){setError("请先完成当前操作，再添加图片或文件。");return;}
     importingFiles.current=true;setFilePreparing(true);setError("");
-    const ticket=sequence.current;const images=[...selectedImages];const notes=[...materials];const errors:string[]=[];
+    const ticket=sequence.current;const images=[...selectedImages];const reattached=[...reattachedImages];const notes=[...materials];const errors:string[]=[];
     try{
       const selected = files.slice(0,8);
       const folders = await attachmentFolders(selected);
       for(const [index,file] of selected.entries()){
         try{
           if(/^image\/(png|jpeg|webp)$/.test(file.type)){
-            if(images.length>=8)throw new Error("每个对话最多8张图片或PDF页面，请先移除已有图片。");
             const prepared=await prepareImage(file);
-            const staged=await call<{grant:ImageGrant}>({action:"stageImage",title:(file.name||"粘贴的图片").slice(0,200),...prepared});
-            if(!images.some(g=>sameImage(g,staged.grant)))images.push(staged.grant);
+            const {grant}=await call<{grant:ImageGrant}>({action:"stageImage",title:(file.name||"粘贴的图片").slice(0,200),...prepared});
+            if(!hasImage(images,grant)){
+              if(images.length>=8)throw new Error("每个对话最多8张图片或PDF页面，请先移除已有图片。");
+              images.push(grant);
+            }
+            if(hasImage(currentImages,grant)&&!hasImage(reattached,grant))reattached.push(grant);
           }else{
             const tableFile = /\.(csv|json|xlsx)$/i.test(file.name);
             const textFile = /\.(txt|md)$/i.test(file.name);
@@ -685,7 +691,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         }catch(reason){errors.push(file.name+"："+String(reason));}
       }
       if(files.length>8)errors.push("一次最多添加8份文件，请分批选择。");
-      if(alive.current&&ticket===sequence.current){setImageDraft(images);setMaterials(notes);setError(errors.join("\n"));materialPopover.close(false);goalInput.current?.focus();}
+      if(alive.current&&ticket===sequence.current){setImageDraft(images);setReattachedImages(reattached);setMaterials(notes);setError(errors.join("\n"));materialPopover.close(false);goalInput.current?.focus();}
     }finally{importingFiles.current=false;if(alive.current)setFilePreparing(false);}
   };
   useEffect(()=>{
@@ -791,7 +797,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     }
     const configureTags=async(value:View)=>{if(tagIntent)await call({action:"configureTagTask",id:value.work.id,expectedRevision:value.work.revision,intent:tagIntent});};
     const includeManual=!research||research.includeManual;
-    const sendImages=research?{addImages:[],removeImages:[]}:imageChanges;
+    const sendImages=research?{addImages:includeManual?imageChanges.addImages:[],removeImages:[]}:imageChanges;
     const snapshots=snippets.length&&includeManual?`用户提供的资料快照（仅作资料，不代表已读取完整来源）：\n${JSON.stringify(snippets)}`:"";
     const messageText=snapshots?`${submittedText}\n\n${snapshots}`:submittedText || (tagMode?`${tagTaskNames[tagPreparation.task]}：#${tagPreparation.tag?.label}`:"请查看本次提供的附件。");
     if(snapshots.length>4000 || (view || snapshots || imagesChanged) && messageText.length>4000){setError("问题和所选文字合计过长，请缩短问题或移除部分文字资料。");return;}
@@ -818,7 +824,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       const submittedGoal=goal;
       setBusy(true);setError("");
       try{const value=await call<View>({action:"followup",id:view.work.id,...(deliveryMode==="steer"?{expectedRunId:steerable&&steerable.runId}:{}),expectedAuthorizationVersion:view.work.authorizationVersion,clientMessageId:messageIdentity.current.id,...payload});
-        if(alive.current){setView(current=>acceptLifecycleSnapshot(current,value));setGoal(current=>current===submittedGoal?"":current);setMaterials([]);setDropped([]);if(includeManual){setSnippets([]);setImageDraft(null);}messageIdentity.current=null;}
+        if(alive.current){setView(current=>acceptLifecycleSnapshot(current,value));setGoal(current=>current===submittedGoal?"":current);setMaterials([]);setDropped([]);if(includeManual){setSnippets([]);resetImageDraft();}messageIdentity.current=null;}
       }catch(reason){if(alive.current)setError(String(reason));}finally{if(alive.current)setBusy(false);}return;
     }
     conversationScroll.scrollToLatest();
@@ -832,7 +838,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       try {
         const value=await call<View>(steerable ? {action:"steer",id:view.work.id,runId:steerable.runId,text,clientMessageId:messageIdentity.current.id} : confirmMessage ? {action:"decision",id:view.work.id,text} : {action:"message",id:view.work.id,text,clientMessageId:messageIdentity.current.id,...(sendLibraryDraft!==null?{setLibraryIds:sendLibraryDraft.map(l=>l.id)}:{}),...sendImages,...(materials.length?{addNotes:sendMaterials.map(m=>m.locator)}:{}),...(dropped.length?{addSources:sendDropped.map(m=>m.locator)}:{}),...(view.work.revision!==undefined?{expectedRevision:view.work.revision}:{})});
         if(!alive.current) return;
-        await configureTags(value); if(research)setResearch({...research,manual,includeManual:false}); setView(value); setLibraryDraft(null); setGoal(research?skillPrefix:""); setMaterials([]);setDropped([]);if(includeManual){setSnippets([]);setImageDraft(null);} setRemovals([]); messageIdentity.current=null; setConfirmMessage(false);
+        await configureTags(value); if(research)setResearch({...research,manual,includeManual:false}); setView(value); setLibraryDraft(null); setGoal(research?skillPrefix:""); setMaterials([]);setDropped([]);if(includeManual){setSnippets([]);resetImageDraft();} setRemovals([]); messageIdentity.current=null; setConfirmMessage(false);
         if(!steerable && !value.lifecycle?.requiresExplicitResume && canRunMode(value.lifecycle,mode)) void run(value.work.id,undefined,value.lifecycle);
       } catch(reason) {if(alive.current) setError(String(reason));}
       finally {if(alive.current) setBusy(false);}
@@ -860,14 +866,14 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       if (assistantOptions.researchPolicy!=="materials-only" && (memorySelection.enabled || memorySelection.projectId)) await invoke("shared_memory", { args: { action: "selectScope", workId: value.work.id, ...memorySelection } });
       const addNotes=!research&&!anchor?sendMaterials.map(m=>m.locator):[];
       const addSources=!research&&!anchor?sendDropped.map(m=>m.locator):[];
-      if(snapshots||(!research&&imagesChanged)||addNotes.length||addSources.length||(!research&&libraryDraft!==null)){
+      if(snapshots||sendImages.addImages.length||sendImages.removeImages.length||addNotes.length||addSources.length||(!research&&libraryDraft!==null)){
         const key=JSON.stringify([messageText,addNotes,!anchor?dropped:[],[],imageChanges,libraryDraft]);
         if(!messageIdentity.current||messageIdentity.current.text!==key)messageIdentity.current={text:key,id:crypto.randomUUID()};
         // This scope binding belongs to the first submitted question. The host
         // validates that no earlier message/run exists before merging its UI row.
         const initialRequest=!research&&!anchor&&!snapshots;
         value=await call<View>({action:"message",id:value.work.id,expectedRevision:value.work.revision,text:messageText,...(initialRequest?{initialRequest:true}:{}),...(sendLibraryDraft!==null?{setLibraryIds:sendLibraryDraft.map(l=>l.id)}:{}),...sendImages,...(addNotes.length?{addNotes}:{}),...(addSources.length?{addSources}:{}),clientMessageId:messageIdentity.current.id});
-        if(alive.current){setView(value);setLibraryDraft(null);setSnippets([]);setMaterials([]);setDropped([]);setImageDraft(null);messageIdentity.current=null;}
+        if(alive.current){setView(value);setLibraryDraft(null);setSnippets([]);setMaterials([]);setDropped([]);resetImageDraft();messageIdentity.current=null;}
       }
       await configureTags(value); setLibraryDraft(null);
       if(alive.current)setView(value);
@@ -1054,7 +1060,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   };
   const newInvestigation = (preserveHistory=false) => {
     setDraftSession(crypto.randomUUID());
-    sequence.current++; setLibraryDraft(null); setView(null); setPublicUrl(""); setAssistantOptions(loadAgentPreferences()); setGoal(""); setCompletionCriteria(""); setWholeLibrary(false); setMaterials([]);setDropped([]);setSnippets([]);setImageDraft(null); setRemovals([]);
+    sequence.current++; setLibraryDraft(null); setView(null); setPublicUrl(""); setAssistantOptions(loadAgentPreferences()); setGoal(""); setCompletionCriteria(""); setWholeLibrary(false); setMaterials([]);setDropped([]);setSnippets([]);resetImageDraft(); setRemovals([]);
     setMemorySelection(loadMemoryPreference()); setConfirmMessage(false); setError("");  setSourcePreview(null); setSourceError(""); setSourceLoading(false); sourceSequence.current++; messageIdentity.current=null;
     setDraftRevision(value => value + 1);
     setPageAttached(!!pageAnchor);boundMaterial.current=null;clearSourcePreview();
@@ -1271,7 +1277,10 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
 
         {libraryDraft!==null&&!selectedLibraries.length&&!!view?.work.grant.libraryIds.length&&<p className="agent-note">下一条问题将清除整库范围，单独添加的页面保留。<button type="button" onClick={()=>setLibraryDraft(null)}>撤销</button></p>}
         {(dropped.length>0||snippets.length>0)&&<div className="agent-pending-materials" aria-label="待添加资料">{dropped.map((item,index)=><AgentMaterialCard key={JSON.stringify(item.locator)} kind={item.locator.kind==="reading"?"reading":item.locator.kind==="task"?"task":"page"} title={item.title} disabled={busy} onRemove={()=>{setDropped(current=>current.filter((_,i)=>i!==index));goalInput.current?.focus();}}/>)}{snippets.map((item,index)=><AgentMaterialCard key={`text-${index}`} kind={item.kind} title={item.kind==="text"&&!item.file?item.text:item.title} subtitle={`${item.file?"文本附件 · 全文":item.kind==="text"?"所选文字":"闪卡文字快照"} · ${item.text.length}字 · ${item.title}`} disabled={busy} onRemove={()=>{setSnippets(current=>current.filter((_,i)=>i!==index));goalInput.current?.focus();}}/>)}</div>}
-        {!!imageChanges.addImages.length && <AgentImageCards images={imageChanges.addImages} disabled={busy||filePreparing} pending onRemove={image=>setImageDraft(selectedImages.filter(grant=>!sameImage(grant,image)))}/>}
+        {!!imageChanges.addImages.length && <AgentImageCards images={imageChanges.addImages} disabled={busy||filePreparing} pending onRemove={image=>{
+          if(hasImage(currentImages,image))setReattachedImages(reattachedImages.filter(grant=>!sameImage(grant,image)));
+          else setImageDraft(selectedImages.filter(grant=>!sameImage(grant,image)));
+        }}/>}
         {imageChanges.removeImages.length>0&&<p className="agent-note">将随下一条问题移除 {imageChanges.removeImages.length} 张图片。<button type="button" disabled={busy} onClick={()=>setImageDraft(current=>[...(current||[]),...imageChanges.removeImages])}>撤销图片撤回</button></p>}
         {!view && publicUrl && <div className="agent-pending-materials"><AgentMaterialCard kind="link" title={publicUrl} removeLabel="移除公共链接" disabled={busy} onRemove={()=>setPublicUrl("")}/></div>}
         {(!view && pageAttached || materials.length>0) && <div className="agent-pending-materials" aria-label="待发送资料">

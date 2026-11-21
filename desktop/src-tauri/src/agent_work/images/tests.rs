@@ -144,12 +144,28 @@ fn sent_images_are_bound_to_their_request_and_follow_current_authorization() {
     let messages = sent["conversation"]["messages"].as_array().unwrap();
     assert_eq!(messages.len(), 1);
     assert_eq!(messages[0]["images"], json!([grant]));
+    let work = store::load(&f.c(), id).unwrap();
+    let (_, selected) = store::conversation::context_with_images(&f.root, &work).unwrap();
+    assert_eq!(selected, vec![grant.clone()]);
     let followed = ui(&f.root, &json!({"action":"message","id":id,"clientMessageId":"explicit-repeat","text":"请查看附件"})).unwrap();
     let messages = followed["conversation"]["messages"].as_array().unwrap();
     assert_eq!(messages.len(), 2);
     assert_eq!(messages[0]["images"], json!([grant]));
     assert_eq!(messages[1]["images"], json!([]));
-    ui(&f.root, &message(&f, id, &grant, true, 3)).unwrap();
+    let work = store::load(&f.c(), id).unwrap();
+    let (_, selected) = store::conversation::context_with_images(&f.root, &work).unwrap();
+    assert!(selected.is_empty());
+    assert_eq!(work.grant.images, vec![grant.clone()]);
+
+    let reattach = json!({"action":"message","id":id,"expectedRevision":3,"clientMessageId":"reattached-image","text":"重新附上这张图片","addImages":[grant]});
+    ui(&f.root, &reattach).unwrap();
+    ui(&f.root, &reattach).unwrap();
+    let updated = store::load(&f.c(), id).unwrap();
+    assert_eq!(updated.authorization_version, work.authorization_version);
+    let (_, selected) = store::conversation::context_with_images(&f.root, &updated).unwrap();
+    assert_eq!(selected, vec![grant.clone()]);
+
+    ui(&f.root, &message(&f, id, &grant, true, 4)).unwrap();
     let reopened = ui(&f.root, &json!({"action":"status","id":id})).unwrap();
     assert_eq!(reopened["conversation"]["messages"][0]["images"], json!([]));
 }

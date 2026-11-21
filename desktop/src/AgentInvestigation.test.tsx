@@ -2035,7 +2035,8 @@ it("stages pasted pixels locally, retains them after a failed send and retries t
  });
  try{
   await open();
-  await act(async()=>{const event=new Event('paste',{bubbles:true,cancelable:true});Object.defineProperty(event,'clipboardData',{value:{files:[new File(['sample'],'截图.png',{type:'image/png'})]}});document.querySelector('.agent-composer')!.dispatchEvent(event);});
+  const pasteImage=()=>act(async()=>{const event=new Event('paste',{bubbles:true,cancelable:true});Object.defineProperty(event,'clipboardData',{value:{files:[new File(['sample'],'截图.png',{type:'image/png'})]}});document.querySelector('.agent-composer')!.dispatchEvent(event);});
+  await pasteImage();
   expect(invoke.mock.calls.some(([,p])=>p?.args?.action==='stageImage')).toBe(true);
   expect(invoke.mock.calls.some(([,p])=>['message','respond'].includes(p?.args?.action))).toBe(false);
   await fill('investigationGoal','分析截图');await click('发送追问');
@@ -2045,6 +2046,13 @@ it("stages pasted pixels locally, retains them after a failed send and retries t
   expect(messages).toHaveLength(2);expect(messages[1]).toEqual(messages[0]);expect(messages[1].addImages).toEqual([image]);
   await vi.waitFor(()=>expect(document.querySelector('.agent-user-message-content .agent-sent-image')?.textContent).toBe('截图.png'));
   expect(document.querySelectorAll('.agent-user-message-content .agent-sent-image')).toHaveLength(1);
+  expect(document.querySelector('.agent-composer .agent-image-card')).toBeNull();
+  await fill('investigationGoal','补充文字');await click('发送追问');
+  expect(invoke.mock.calls.filter(([,p])=>p?.args?.action==='message').at(-1)?.[1].args.addImages).toEqual([]);
+  await pasteImage();
+  expect(document.querySelector('.agent-composer .agent-image-card')).not.toBeNull();
+  await fill('investigationGoal','再次查看这张截图');await click('发送追问');
+  expect(invoke.mock.calls.filter(([,p])=>p?.args?.action==='message').at(-1)?.[1].args.addImages).toEqual([image]);
   expect(document.querySelector('.agent-composer .agent-image-card')).toBeNull();
  }finally{prepare.mockRestore();}
 });

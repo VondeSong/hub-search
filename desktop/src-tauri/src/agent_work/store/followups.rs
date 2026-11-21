@@ -30,10 +30,6 @@ fn payload(root: &Path, c: &Connection, work: &Work, args: &Value) -> Result<Val
         .into_iter()
         .filter(|n| !work.grant.contains(n))
         .collect::<Vec<_>>();
-    let images = images
-        .into_iter()
-        .filter(|g| !work.grant.images.contains(g))
-        .collect::<Vec<_>>();
     let mut versions = Vec::new();
     if !notes.is_empty() || !images.is_empty() {
         let mut grant = materials::extend(root, c, work, &notes, &[])?;
@@ -265,10 +261,6 @@ pub(in crate::agent_work) fn admit(
                 continue;
             }
             normalize_additions(&mut data, &current)?;
-            data["addImages"] = json!(images::selection(&data, "addImages")?
-                .into_iter()
-                .filter(|g| !current.grant.images.contains(g))
-                .collect::<Vec<_>>());
             data["clientMessageId"] = item["clientMessageId"].clone();
             data["expectedRevision"] = json!(current.revision);
             if data["text"].as_str().unwrap_or("").is_empty() {
@@ -408,10 +400,6 @@ fn take_on(
         return Ok(false);
     }
     normalize_additions(&mut data, &work)?;
-    data["addImages"] = json!(images::selection(&data, "addImages")?
-        .into_iter()
-        .filter(|g| !work.grant.images.contains(g))
-        .collect::<Vec<_>>());
     data["clientMessageId"] = item["clientMessageId"].clone();
     data["expectedRevision"] = json!(work.revision);
     if data["text"].as_str().unwrap_or("").is_empty() {

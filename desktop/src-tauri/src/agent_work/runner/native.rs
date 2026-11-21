@@ -133,6 +133,7 @@ pub(super) fn investigate(
     catalog: &Value,
     decisions: &[Value],
     conversation: &Value,
+    request_images: &[images::ImageGrant],
     memory: Option<&crate::shared_memory::Context>,
     mut receipts: Value,
 ) -> Result<(), String> {
@@ -142,7 +143,7 @@ pub(super) fn investigate(
     let run = session.run;
     let control = session.control;
     let operation = session.operation.ok_or("Agent 运行入口不可用")?;
-    let (image_input, image_metadata, image_bytes) = images::prepare(root, &work.grant.images)?;
+    let (image_input, image_metadata, image_bytes) = images::prepare(root, request_images)?;
     let image_wire_bytes = if image_input.is_empty() {
         0
     } else {
@@ -807,13 +808,26 @@ pub(super) fn investigate(
             }
             let input = format!("用户在最终发布前追加了以下真实要求，请处理这些要求，重新交付；普通只读答复可绑定当前引用后直接回答，业务成果仍需 hub_finish。旧报告不能直接发布。\n{}\n本轮已读材料：{}\n本轮有效引用：{}",json!({"messages":messages}),json!(context.observations),json!(quotes::catalog(&context.excerpts)));
             material_bytes.text(&input);
-            let (resend_images, _, resend_raw) = images::prepare(root, &work.grant.images)?;
-            material_bytes.images(
-                resend_raw,
-                serde_json::to_vec(&resend_images)
+            let mut grants = Vec::new();
+            for message in &messages {
+                for grant in images::selection(message, "addImages")? {
+                    if !work.grant.images.contains(&grant) {
+                        return Err("追加图片的授权已变化".into());
+                    }
+                    if !grants.contains(&grant) {
+                        grants.push(grant);
+                    }
+                }
+            }
+            let (pending_images, metadata, raw) = images::prepare(root, &grants)?;
+            let wire = if pending_images.is_empty() {
+                0
+            } else {
+                serde_json::to_vec(&pending_images)
                     .map_err(|e| e.to_string())?
-                    .len(),
-            );
+                    .len()
+            };
+            material_bytes.images(raw, wire);
             context.usage.request_bytes = material_bytes.total();
             store::record(
                 root,
@@ -825,17 +839,25 @@ pub(super) fn investigate(
             if thread_id.is_empty() {
                 return Err("交付恢复会话身份缺失，追加要求已保存".into());
             }
+            if !pending_images.is_empty() {
+                store::record(
+                    root,
+                    run,
+                    "nativeImages",
+                    &json!({"images":metadata,"rawBytes":raw,"wireBytes":wire,"transport":"inline exact verified bytes; no source paths or remote URL"}),
+                )?;
+            }
             store::record(
                 root,
                 run,
                 "lateSteeringRecovery",
                 &json!({"sameRun":true,"threadId":thread_id,"messages":messages.iter().map(|m|&m["clientMessageId"]).collect::<Vec<_>>(),"attempt":1,"budgetReset":false}),
             )?;
-            Ok::<_, String>(Some((messages, input, thread_id.clone())))
+            Ok::<_, String>(Some((messages, input, thread_id.clone(), pending_images)))
         })();
         match continuation {
-            Ok(Some((messages, input, thread))) => {
-                next_images = images::prepare(root, &runtime_work.grant.images)?.0;
+            Ok(Some((messages, input, thread, pending_images))) => {
+                next_images = pending_images;
                 accepted = None;
                 accepted_after = None;
                 native_citations = json!([]);

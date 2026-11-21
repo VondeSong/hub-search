@@ -129,6 +129,22 @@ fn queue_survives_reopen_deduplicates_and_does_not_change_live_scope() {
     assert!(save(&f.root, &args).is_err());
 }
 #[test]
+fn queued_image_can_be_reattached_without_reauthorizing_it() {
+    let (f, id) = setup();
+    let grant = staged_image(&f);
+    conversation::message(&f.root, &id, &json!({"text":"先看图片","clientMessageId":"image-1","expectedRevision":1,"addImages":[grant]})).unwrap();
+    let (work, run) = claim(&f, &id);
+    let mut queued = request(&work, "image-2", "queue");
+    queued["addImages"] = json!([grant]);
+    save(&f.root, &queued).unwrap();
+    finish_turn(&f, &id, &run);
+    assert!(take_next(&f.root, &id).unwrap());
+    let next = load(&read(&f.root).unwrap(), &id).unwrap();
+    assert_eq!(next.authorization_version, work.authorization_version);
+    let (_, selected) = conversation::context_with_images(&f.root, &next).unwrap();
+    assert_eq!(json!(selected), queued["addImages"]);
+}
+#[test]
 fn attachment_steer_rebases_only_exact_running_turn_and_keeps_read_boundary() {
     let (f, id) = setup();
     let (work, run) = claim(&f, &id);
