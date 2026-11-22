@@ -367,24 +367,49 @@
     .paper-breadcrumbs > div > button { max-width: 100%; overflow: hidden; white-space: nowrap; }
     .paper-breadcrumbs > div > button > span:last-of-type { overflow: hidden; text-overflow: ellipsis; }
     .paper-breadcrumbs > .icon-btn { flex-shrink: 0; }
-    .agent-case-bar {
-      height: 40px; padding: 0 14px; display: flex; align-items: center;
-      justify-content: space-between; gap: 12px; flex-shrink: 0;
-      background: #F3F3F1; border-bottom: 1px solid #E7E6E2; color: #666460;
-      font: 500 11px Inter, "Microsoft YaHei", sans-serif;
-      overflow: auto;
+    .agent-demo-menu[hidden], .agent-demo-popover[hidden], .quick-assistant-panel[hidden], .agent-source[hidden] { display: none; }
+    .agent-demo-menu { position: relative; display: inline-flex; align-items: center; }
+    .agent-demo-trigger {
+      display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px;
+      border-radius: 6px; border: 0.5px solid var(--hairline); background: var(--bg-paper);
+      color: var(--ink-secondary); font: 500 11px/1 Inter, "Microsoft YaHei", sans-serif;
+      cursor: pointer; transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
     }
-    .agent-case-bar[hidden], .quick-assistant-panel[hidden], .agent-source[hidden] { display: none; }
-    .agent-cases {
-      display: inline-flex; align-items: center; padding: 2px; border-radius: 12px;
-      background: #F4F4F2; border: 1px solid #E7E6E2; white-space: nowrap;
+    .agent-demo-trigger:hover, .agent-demo-trigger[aria-expanded="true"] {
+      color: var(--ink-primary); border-color: rgba(15, 23, 42, 0.16); background: #FFFFFF;
     }
-    .agent-cases button { display: flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 8px; }
-    .agent-cases button:hover { color: #1A1918; }
-    .agent-cases button[aria-pressed="true"] { background: #FFFFFF; color: #1A1918; box-shadow: 0 1px 2px #1a19180a; }
-    .agent-case-number { display: contents; }
-    .agent-case-dot { width: 6px; height: 6px; border-radius: 50%; }
-    #quick-assistant-layout { color: #999690; white-space: nowrap; }
+    .agent-demo-caret { font-size: 9px; opacity: 0.65; transition: transform 140ms ease; }
+    .agent-demo-trigger[aria-expanded="true"] .agent-demo-caret { transform: rotate(180deg); }
+    .agent-demo-popover {
+      position: absolute; right: 0; bottom: calc(100% + 8px); width: 248px; padding: 6px;
+      border-radius: 12px; background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%);
+      border: 0.5px solid rgba(15, 23, 42, 0.12);
+      box-shadow: 0 12px 32px -4px rgba(15, 23, 42, 0.16), 0 0 0 0.5px rgba(15, 23, 42, 0.04);
+      font-family: Inter, "Microsoft YaHei", sans-serif; z-index: 60;
+    }
+    .agent-demo-heading {
+      padding: 4px 8px 6px; font-size: 10.5px; font-weight: 600; color: var(--ink-tertiary);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .agent-cases { display: flex; flex-direction: column; gap: 2px; }
+    .agent-cases button {
+      width: 100%; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+      padding: 6px 8px; border-radius: 8px; text-align: left; color: var(--ink-secondary);
+      cursor: pointer; transition: background 120ms ease, color 120ms ease;
+    }
+    .agent-cases button:hover { background: var(--bg-hover); color: var(--ink-primary); }
+    .agent-cases button[aria-pressed="true"] { background: var(--bg-subtle); color: var(--ink-primary); }
+    .agent-case-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .agent-case-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; line-height: 1.25; }
+    .agent-case-desc { font-size: 10.5px; color: var(--ink-tertiary); line-height: 1.3; }
+    .agent-case-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .agent-case-check { font-size: 11px; color: var(--accent); opacity: 0; flex-shrink: 0; margin-top: 1px; }
+    .agent-cases button[aria-pressed="true"] .agent-case-check { opacity: 1; }
+    .agent-demo-footer {
+      margin-top: 6px; padding: 6px 8px 2px; border-top: 0.5px solid var(--hairline);
+      font-size: 10.5px; color: var(--ink-tertiary); display: flex; align-items: center; justify-content: space-between;
+    }
     .quick-assistant-panel {
       width: min(510px, 100%); min-width: 0; flex-shrink: 0; z-index: 38;
       border-left: 1px solid #E7E6E2; background: #FCFCFB;
@@ -405,14 +430,9 @@
     .agent-source > button {
       align-self: flex-start; padding: 7px 14px; color: var(--accent); font-size: 12px;
     }
-    @media (max-width: 540px) { .agent-case-number { display: none; } }
     @media (max-width: 920px) {
       .quick-assistant-panel[data-layout="docked"] { position: absolute; inset: 0 0 0 auto; }
       #workspace-content:has(.agent-source:not([hidden])) { position: static; }
-    }
-    @media (max-width: 820px) {
-      #app-shell:has(.agent-case-bar:not([hidden])) #desktop-sidebar { top: 84px; }
-      #quick-assistant-layout { display: none; }
     }
 
     /* Continuous Multi-Level Tree Indentation Guides */
@@ -547,16 +567,6 @@
       </div>
     </header>
 
-    <div id="quick-assistant-controls" class="agent-case-bar" hidden>
-      <div class="agent-cases" role="group" aria-label="助手案例">
-        <button data-agent-case="diary" aria-pressed="true"><span class="agent-case-dot" style="background:#6366F1"></span><span class="agent-case-number">案例1：</span>引用与摘录</button>
-        <button data-agent-case="report" aria-pressed="false"><span class="agent-case-number">案例2：</span>流式复核</button>
-        <button data-agent-case="interrupted" aria-pressed="false"><span class="agent-case-dot" style="background:#F59E0B"></span><span class="agent-case-number">案例3：</span>中断与规则</button>
-        <button data-agent-case="workspace" aria-pressed="false">当前资料</button>
-      </div>
-      <span id="quick-assistant-layout">当前形态：右侧分屏停靠</span>
-    </div>
-
     <!-- Main Workspace Body -->
     <div class="flex flex-1 min-h-0 overflow-hidden relative">
 
@@ -635,6 +645,52 @@
       </div>
       <div class="flex items-center gap-3 shrink-0">
         <span class="hidden md:inline">Base White · 统一预览架构</span>
+        <div id="quick-assistant-controls" class="agent-demo-menu" hidden>
+          <button id="btn-agent-demo-menu" type="button" class="agent-demo-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="agent-demo-popover" title="切换助手原型示例">
+            <span id="agent-demo-dot" class="agent-case-dot" style="background:#6366F1"></span>
+            <span id="agent-demo-label">示例：引用与摘录</span>
+            <span class="agent-demo-caret" aria-hidden="true">▴</span>
+          </button>
+          <div id="agent-demo-popover" class="agent-demo-popover" role="dialog" aria-label="助手原型示例" hidden>
+            <div class="agent-demo-heading">
+              <span>助手原型示例</span>
+              <span style="font-weight:400;opacity:.75">Demo</span>
+            </div>
+            <div class="agent-cases" role="group" aria-label="助手案例">
+              <button type="button" data-agent-case="diary" aria-pressed="true">
+                <span class="agent-case-main">
+                  <span class="agent-case-title"><span class="agent-case-dot" style="background:#6366F1"></span>案例1：引用与摘录</span>
+                  <span class="agent-case-desc">日记核对、段落引用与原文跳转高亮</span>
+                </span>
+                <span class="agent-case-check" aria-hidden="true">✓</span>
+              </button>
+              <button type="button" data-agent-case="report" aria-pressed="false">
+                <span class="agent-case-main">
+                  <span class="agent-case-title"><span class="agent-case-dot" style="background:#94A3B8"></span>案例2：流式复核</span>
+                  <span class="agent-case-desc">多步工具检索与流式过程展开</span>
+                </span>
+                <span class="agent-case-check" aria-hidden="true">✓</span>
+              </button>
+              <button type="button" data-agent-case="interrupted" aria-pressed="false">
+                <span class="agent-case-main">
+                  <span class="agent-case-title"><span class="agent-case-dot" style="background:#F59E0B"></span>案例3：中断与规则</span>
+                  <span class="agent-case-desc">任务中断恢复与上下文规则提示</span>
+                </span>
+                <span class="agent-case-check" aria-hidden="true">✓</span>
+              </button>
+              <button type="button" data-agent-case="workspace" aria-pressed="false">
+                <span class="agent-case-main">
+                  <span class="agent-case-title"><span class="agent-case-dot" style="background:#10B981"></span>当前资料</span>
+                  <span class="agent-case-desc">带入主站当前阅读的单/双纸文档</span>
+                </span>
+                <span class="agent-case-check" aria-hidden="true">✓</span>
+              </button>
+            </div>
+            <div class="agent-demo-footer">
+              <span id="quick-assistant-layout">当前形态：右侧分屏停靠</span>
+            </div>
+          </div>
+        </div>
         <button id="btn-status-assistant" aria-controls="quick-assistant-panel" aria-expanded="false" class="hover:underline cursor-pointer" style="color:var(--ink-secondary)">⌘J 快捷助手</button>
       </div>
     </footer>
@@ -1524,7 +1580,29 @@
     const quickAssistantFrame = document.getElementById('quick-assistant-frame');
     const agentSource = document.getElementById('quick-assistant-source');
     const assistantCases = document.querySelectorAll('[data-agent-case]');
+    const agentDemoBtn = document.getElementById('btn-agent-demo-menu');
+    const agentDemoPopover = document.getElementById('agent-demo-popover');
+    const agentDemoLabel = document.getElementById('agent-demo-label');
+    const agentDemoDot = document.getElementById('agent-demo-dot');
+    const assistantCaseMeta = {
+      diary: { label: '引用与摘录', dot: '#6366F1' },
+      report: { label: '流式复核', dot: '#94A3B8' },
+      interrupted: { label: '中断与规则', dot: '#F59E0B' },
+      workspace: { label: '当前资料', dot: '#10B981' },
+      empty: { label: '新对话', dot: '#94A3B8' }
+    };
     const assistantLayouts = { docked: '右侧分屏停靠', floating: '悬浮浮窗', expanded: '专注展开' };
+
+    function setAgentDemoPopover(open) {
+      agentDemoPopover.hidden = !open;
+      agentDemoBtn.setAttribute('aria-expanded', String(open));
+    }
+
+    function syncAgentDemoTrigger(caseKey) {
+      const meta = assistantCaseMeta[caseKey] || assistantCaseMeta.diary;
+      agentDemoLabel.textContent = '示例：' + meta.label;
+      agentDemoDot.style.background = meta.dot;
+    }
     let quickAssistantReady = false;
     let quickAssistantRequest = null;
     let lastAssistantContext = '';
@@ -1558,6 +1636,7 @@
       lastAssistantView = state.view;
       quickAssistantPanel.hidden = !showPanel;
       document.getElementById('quick-assistant-controls').hidden = !showPanel;
+      if (!showPanel) setAgentDemoPopover(false);
       document.getElementById('workspace-content').inert = showPanel && quickAssistantPanel.dataset.layout === 'expanded' && agentSource.hidden;
       if (!showPanel) agentSource.hidden = true;
       fab.style.display = showPanel || dedicatedAgent ? 'none' : 'inline-flex';
@@ -1636,6 +1715,7 @@
         closeQuickAssistant(true);
       } else if (data.type === 'hub-assistant-case-changed') {
         assistantCases.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.agentCase === data.value)));
+        syncAgentDemoTrigger(data.value);
       } else if (data.type === 'hub-assistant-layout' && Object.hasOwn(assistantLayouts, data.value)) {
         quickAssistantPanel.dataset.layout = data.value;
         document.getElementById('quick-assistant-layout').textContent = '当前形态：' + assistantLayouts[data.value];
@@ -3016,8 +3096,19 @@
       renderQuickAssistant();
       postQuickAssistant('focus');
     });
+    agentDemoBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setAgentDemoPopover(agentDemoPopover.hidden);
+    });
+    document.addEventListener('click', (e) => {
+      if (!agentDemoPopover.hidden && !document.getElementById('quick-assistant-controls').contains(e.target)) {
+        setAgentDemoPopover(false);
+      }
+    });
     assistantCases.forEach(button => button.addEventListener('click', () => {
       agentSource.hidden = true;
+      setAgentDemoPopover(false);
+      syncAgentDemoTrigger(button.dataset.agentCase);
       openQuickAssistant({ type: 'case', value: button.dataset.agentCase });
     }));
     document.getElementById('btn-cancel-card-edit').addEventListener('click', closeCardEditModal);
@@ -3052,6 +3143,7 @@
         return;
       }
       if (e.key === 'Escape') {
+        if (!agentDemoPopover.hidden) { setAgentDemoPopover(false); return; }
         state.paletteOpen = false; state.jumpBarOpenKey = null;
         closeQuickAssistant();
         renderPalette(); renderQuickAssistant(); closeCardEditModal();
