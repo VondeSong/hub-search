@@ -1,10 +1,11 @@
 "use client";
 import {useCallback} from "react";
+import type { AssistantContext } from "./Assistant";
 import {InsightNotebook,type NotebookEntry,type NotebookBoard} from "./InsightNotebook";
 const key="hub.insights.decisions.demo.v1";
 type State={items:NotebookEntry[];operations:Record<string,{request:string;entry:NotebookEntry}>};
 function load():State {try{return JSON.parse(localStorage.getItem(key)||'{"items":[],"operations":{}}');}catch{return {items:[],operations:{}};}}
-export function InsightNotebookDemo({onAssistant}:{onAssistant:(id:string)=>void}){
+export function InsightNotebookDemo({onAssistant}:{onAssistant:(context:AssistantContext)=>void}){
  const read=useCallback(async():Promise<NotebookBoard>=>({items:load().items,drafts:[]}),[]);
  const works=useCallback(async()=>[{id:"decision-example",goal:"工具选择与小样例验证（示例）"}],[]);
  const mutate=useCallback(async(args:Record<string,unknown>)=>{
@@ -25,5 +26,13 @@ export function InsightNotebookDemo({onAssistant}:{onAssistant:(id:string)=>void
   entry={...entry,version:entry.version+1,updatedAt:Date.now()};
   s.items=[...s.items.filter(v=>v.id!==entry.id),entry];s.operations[op]={request,entry};localStorage.setItem(key,JSON.stringify(s));return {entry};
  },[]);
- return <InsightNotebook kind="decision" demo read={read} loadWorks={works} mutate={mutate} onOpenWork={onAssistant}/>;
+ return <InsightNotebook kind="decision" demo read={read} loadWorks={works} mutate={mutate} onOpenWork={(workId,entry,observationIds)=>onAssistant({
+  id:entry?.id??workId,title:entry?.title??"决定与条件回顾",workId,workTitle:entry?.workTitle,
+  excerpt:entry?[
+   entry.body,entry.choice&&"决定："+entry.choice,entry.reasons&&"理由："+entry.reasons,
+   entry.options&&"备选："+entry.options,entry.trigger&&"回顾条件："+entry.trigger,
+   ...entry.assumptions.map(item=>"假设："+item.text),
+   ...entry.observations.filter(item=>!observationIds||observationIds.includes(item.id)).map(item=>"观察："+item.text),
+  ].filter(Boolean).join("\n"):"请在原事项中回顾决定、假设及后续观察。",
+ })}/>;
 }

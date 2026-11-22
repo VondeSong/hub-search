@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "6972f1f63d853b28825de09e623bff2abdf257f4",
-  "published_version": 144,
-  "deployment_id": "appgdep_6b02564925f88191a3f96ccd61c2d283",
+  "source_commit": "ed78f9013c9b7da58c46e8182731977e226085b0",
+  "published_version": 145,
+  "deployment_id": "appgdep_6b025b3cb35c819184370a2d00377564",
   "files": {
     ".gitignore": {
       "sha256": "ca0e1575efb181d784f15bf6c86e3c012fd5c7ede4daa34b924d0d8b590d4e77",
@@ -168,24 +168,24 @@
       "bytes": 10249
     },
     "app/InsightNotebook.tsx": {
-      "sha256": "398c018993644030241cd86886ed46a3db82b0cba9751d0d769f67f09279f9d9",
+      "sha256": "8ca7e94fab405c383b15d608ff05c918370db936e04d85288b3e1604b603fce1",
       "mode": "100644",
-      "bytes": 16904
+      "bytes": 17040
     },
     "app/InsightNotebookDemo.tsx": {
-      "sha256": "98b993da745b737c89e23db6271519b9ef2e7c1041d7dc12702d5aaba6706b95",
+      "sha256": "b8b00dc9c3dd68c06a1660c22a8ba377d5be22cb0c3abb6371f7b99147ead167",
       "mode": "100644",
-      "bytes": 2932
+      "bytes": 3626
     },
     "app/InsightPanel.tsx": {
-      "sha256": "ea1c2c981dd0a859eeb0778fc0b58ea60e83f70c4c6bf7cf1374dd5faf333e0c",
+      "sha256": "d2aa3aff84aa4b4ffc80a8f2d3894ba26ae02b7f0afd2d2ce22a831f04858bea",
       "mode": "100644",
-      "bytes": 84708
+      "bytes": 84480
     },
     "app/InsightRecall.tsx": {
-      "sha256": "357d344c5e688888446a4e47a1a44cecab1cf064ab0380df4c9bec4aff21b0e6",
+      "sha256": "cbad40b7f053cf97e8b3981ec61ae6b84e526d3b6fbf79bf78794d346b88d632",
       "mode": "100644",
-      "bytes": 3595
+      "bytes": 3897
     },
     "app/Insights.tsx": {
       "sha256": "8637523ff1c13ed23ab6213852d2532df414e6b6be03a9f5871d83d932b6023f",
@@ -233,9 +233,9 @@
       "bytes": 2382
     },
     "app/StageReviewDemo.tsx": {
-      "sha256": "404f385c4bb76ee610ddb4c7d3d66675f20dcb2c77c62d1e5295a6034028091a",
+      "sha256": "c1e1d8633e41a24cddeb5849e20491ddf5970fffa54e52b54fa6b0d829910971",
       "mode": "100644",
-      "bytes": 3195
+      "bytes": 3542
     },
     "app/StageReviewForm.tsx": {
       "sha256": "ff529afc59c39906a8f41095bd112014bb0acd0092d6b4f1f86c07699c17ccf2",
@@ -258,29 +258,29 @@
       "bytes": 26798
     },
     "app/TaskAnalysis.tsx": {
-      "sha256": "ac2426b9f56904356c1386b48f8e60db4024368b4e3040c1bd645e9cff6be39e",
+      "sha256": "1ce85d818655aee51242b0d75e050db1847a4eeeea72d3b17c3c5e7f09d5b7d1",
       "mode": "100644",
-      "bytes": 11638
+      "bytes": 12845
     },
     "app/TaskWorkspace.tsx": {
-      "sha256": "aeab555b82a137f18fbb052f8afbd93360f562a417b13b7f1ceff6eef90099da",
+      "sha256": "8408dd04b759144508a78821486fb8706026e1c2bebe27e545ab03b6554728d3",
       "mode": "100644",
-      "bytes": 26428
+      "bytes": 26578
     },
     "app/agents/ReferenceAgent.jsx": {
-      "sha256": "149dca29846f6ae71b790508b24bd2d318058eb634609fda43c081701b77e6df",
+      "sha256": "d33ea91420759d7146cfa35013f77883751c832d4c5cea0891aab28aa1e74d60",
       "mode": "100644",
-      "bytes": 170325
+      "bytes": 173473
     },
     "app/agents/ReferenceSurface.tsx": {
-      "sha256": "ed1a5a9bd090f2691ecf485f5cef3fd084800ff59948d6e7d55b4f1a6598b461",
+      "sha256": "d99a77f2197bdd36b30cde26bfb9095e8adcd98cbd864cef7832314bb9d2bb52",
       "mode": "100644",
-      "bytes": 1243
+      "bytes": 1431
     },
     "app/agents/WorkspaceAgentsDialog.tsx": {
-      "sha256": "1b0635db9ed417cc09dc45c22ca3f9d7cd625f4ad7c96466ca7c40051f6eb32a",
+      "sha256": "76e86631bdb52573d309f7caef5ae7bd2bc88e21d4561cccfefa88e9e6fc090b",
       "mode": "100644",
-      "bytes": 1123
+      "bytes": 1350
     },
     "app/agents/page.tsx": {
       "sha256": "3bff72f8cbced87871568672f5604e53f74dc40d275234835636683d80149510",
@@ -291,6 +291,11 @@
       "sha256": "94e10655d7574976498a1d886dc109f3522c887218711153e8bec91275047af4",
       "mode": "100644",
       "bytes": 2389
+    },
+    "app/agents/workspace-context.ts": {
+      "sha256": "483a95d35626397755afb6cc81b9fcb364e6138b48e3f692bebd169dac2e8dfb",
+      "mode": "100644",
+      "bytes": 4463
     },
     "app/assistant-insert.ts": {
       "sha256": "d25ffd4aaf17fb7fcb2de8bd5ceca7c77c06ea17d23b7eeee0ffaa1ca110b403",
@@ -528,9 +533,9 @@
       "bytes": 12137
     },
     "app/page.tsx": {
-      "sha256": "7b06eff6767fbdd9c2ee067c9e2ae2462c9355fb1969d7ff7a6a874973901c5e",
+      "sha256": "d88b94237b919f0fa8a8fe4af452211be939cfa98427d08740b7bd5b836579ce",
       "mode": "100644",
-      "bytes": 76480
+      "bytes": 77479
     },
     "app/pdf-preview-model.ts": {
       "sha256": "e1f72df40daff0d29d0c63cd3552edbfc47d851a2a5d0bbe3184e0371f178970",
@@ -1413,5 +1418,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-22T02:43:32.667462+00:00"
+  "imported_at": "2026-11-22T03:04:03.323078+00:00"
 }

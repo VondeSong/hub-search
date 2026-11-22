@@ -22,6 +22,7 @@ import InsightPanel from "./InsightPanel";
 import { appendAssistantAnswer, pageBody, visibleAssistantSections, type PageInsertion } from './assistant-insert';
 import Assistant, { type AssistantContext } from "./Assistant";
 import WorkspaceAgentsDialog from "./agents/WorkspaceAgentsDialog";
+import { discussionContext, tagDiscussionContext, type WorkspaceAgentsContext } from "./agents/workspace-context";
 import { initialItems, sourceMeta, type HubItem, type SourceId, type ItemKind } from "./data";
 import { MIGRATED_HUB_ITEMS } from "./insight-migration";
 import { recordAssistantDraft } from "./insight-workflow";
@@ -116,13 +117,17 @@ export default function Hub() {
  const [insightScope,setInsightScope]=useState<InsightScope>("all");
  const [returnToInsights,setReturnToInsights]=useState(false);
  const insightReturn=useRef({filter:"all",review:false,mode:"current" as InsightMode,scope:"all" as InsightScope,query:""});
- const [tagEntry,setTagEntry]=useState<{tag?:string;task?:TagTask}|null>(null);
  const [tagReviewTarget,setTagReviewTarget]=useState<{id:string;time:number}|null>(null);
  const [assistantOpen,setAssistantOpen]=useState(false);
  const [agentsState,setAgentsState]=useState<"unopened" | "open" | "closed">("unopened");
- const [agentsDocumentId,setAgentsDocumentId]=useState<string|null>(null);
- const [agentsDocumentOpen,setAgentsDocumentOpen]=useState(false);
- const agentsOpen=agentsState==="open"||agentsDocumentOpen;
+ const [agentsEntry,setAgentsEntry]=useState<
+  | {kind:"document"; id:string}
+  | {kind:"task"|"insight"; context:AssistantContext}
+  | {kind:"tag"; tag?:string; task?:TagTask}
+  | null
+ >(null);
+ const [agentsContextOpen,setAgentsContextOpen]=useState(false);
+ const agentsOpen=agentsState==="open"||agentsContextOpen;
  const [sourceDemo,setSourceDemo]=useState(false);
  const [uiDemo,setUiDemo]=useState(false);
  const [activityDemo,setActivityDemo]=useState(false);
@@ -135,7 +140,6 @@ export default function Hub() {
   if(mode==="source-demo"||mode==="activity-demo"||mode==="ui-demo")setAssistantOpen(true);
  },[]);
  const [assistantExpanded,setAssistantExpanded]=useState(false);
- const [assistantContext,setAssistantContext]=useState<AssistantContext|null>(null);
  const [checkMarks,setCheckMarks]=useState<Record<string,boolean>>({});
  const searchRef=useRef<HTMLInputElement>(null);
  const articleRef=useRef<HTMLDivElement>(null);
@@ -166,7 +170,7 @@ export default function Hub() {
    if(shortcut&&event.key.toLowerCase()==="j"&&!modal){
     event.preventDefault();
     if(!event.repeat){
-     if(agentsDocumentOpen)setAgentsDocumentOpen(false);
+     if(agentsContextOpen)setAgentsContextOpen(false);
      else setAgentsState(state=>state==="open"?"closed":"open");
     }
     return;
@@ -189,7 +193,7 @@ export default function Hub() {
   };
   window.addEventListener("keydown",onKey);
   return()=>window.removeEventListener("keydown",onKey);
- },[query,modal,assistantOpen,agentsOpen,agentsDocumentOpen]);
+ },[query,modal,assistantOpen,agentsOpen,agentsContextOpen]);
  useEffect(()=>{articleRef.current?.scrollTo({top:0});},[selectedId]);
  useEffect(()=>{if(modal)setAssistantOpen(false);},[modal]);
  const availableItems=useMemo(()=>items.filter(item=>isSourceAccessible(item.id,ledger)&&(!item.originInsightId||isInsightAccessible(item.originInsightId,ledger))&&(Array.isArray(item.originSourceIds)?item.originSourceIds:[]).every(id=>isSourceAccessible(id,ledger))).map(item=>{const source=Object.values(ledger.sources).find(entry=>entry.id===item.id||entry.sourceItemId===item.id);const latest=source&&source.version>1?getSourceHubItem(source.id,source.version):null;const value=latest?{...item,excerpt:latest.excerpt,sections:latest.sections}:item;return {...value,sections:visibleAssistantSections(value.sections,id=>isSourceAccessible(id,ledger)&&isInsightAccessible(id,ledger))};}),[items,ledger]);
@@ -198,18 +202,29 @@ export default function Hub() {
   const item=availableItems.find(candidate=>candidate.id===entry.id);
   return item?[{item,openedAt:entry.openedAt}]:[];
  }),[history,availableItems]);
- const selected=availableItems.find(x=>x.id===selectedId);
- const agentsDocument=availableItems.find(item=>item.id===agentsDocumentId);
- const agentsDocumentSource=agentsDocument ? sourceMeta[agentsDocument.source].name : "";
- useEffect(()=>{
-  if(!agentsDocumentId||agentsDocument)return;
-  setAgentsDocumentId(null);
-  setAgentsDocumentOpen(false);
-  if(agentsDocumentOpen)notify("相关来源已不可用，已收起这段讨论");
- },[agentsDocumentId,agentsDocument,agentsDocumentOpen]);
- const canUseAssistantContext=(context:AssistantContext|null|undefined)=>{if(!context)return true;const state=getLedger();const allowed=(id:string)=>isLibraryReference(id)?!!assistantLibraryNode(id):isSourceAccessible(id,state);return isInsightAccessible(context.id,state)&&allowed(context.id)&&(context.evidence||[]).every(evidence=>allowed(evidence.id));};
+ const canUseAssistantContext=(context:AssistantContext|null|undefined)=>{if(!context)return true;const state=getLedger();const allowed=(id:string)=>isLibraryReference(id)?!!assistantLibraryNode(id):isSourceAccessible(id,state);return isInsightAccessible(context.id,state)&&allowed(context.id)&&(context.evidence||[]).every(evidence=>allowed(evidence.id)&&isInsightAccessible(evidence.id,state));};
  const explorationBlocked=MIGRATED_HUB_ITEMS.some(item=>!isSourceAccessible(item.id,ledger));
- useEffect(()=>{if(assistantOpen&&!canUseAssistantContext(assistantContext)){setAssistantOpen(false);notify("相关来源已不可用，已收起这段讨论");}},[ledger,assistantContext,assistantOpen]);
+ let agentsContext:WorkspaceAgentsContext|null=null;
+ if(agentsEntry?.kind==="document"){
+  const item=availableItems.find(record=>record.id===agentsEntry.id);
+  if(item){
+   const source=sourceMeta[item.source].name;
+   agentsContext={id:"workspace:"+item.id,kind:"document",name:item.title,
+    path:item.space.startsWith(source+" / ")?item.space:source+" · "+item.space,
+    text:pageBody(item.sections).trim()};
+  }
+ }else if(agentsEntry?.kind==="tag"){
+  agentsContext=tagDiscussionContext(agentsEntry.tag,agentsEntry.task,tagReview);
+ }else if(agentsEntry&&canUseAssistantContext(agentsEntry.context)){
+  agentsContext=discussionContext(agentsEntry.kind,agentsEntry.context);
+ }
+ const hasAgentsContext=!!agentsContext;
+ useEffect(()=>{
+  if(!agentsEntry||hasAgentsContext)return;
+  setAgentsEntry(null);
+  setAgentsContextOpen(false);
+  if(agentsContextOpen)notify("相关来源已不可用，已收起这段讨论");
+ },[agentsEntry,hasAgentsContext,agentsContextOpen]);
  const visibleItems=useMemo(()=>{
   let result=availableItems.filter(x=>view==="reading"?x.kind==="reading":view==="tasks"?x.kind==="task":view==="journal"?x.kind==="journal":view==="favorites"?favorites.includes(x.id):true);
   if(sources.length)result=result.filter(x=>sources.includes(x.source));
@@ -261,16 +276,47 @@ export default function Hub() {
  const openCloudSection=(target:CloudPage)=>{if(view==="settings"&&settingsReturn.current!=="cloud")cloudReturn.current=settingsReturn.current;setCloudPage(target);setModal(null);changeView("cloud");const url=new URL(window.location.href);url.searchParams.set("view","cloud");url.searchParams.delete("section");window.history.replaceState(null,"",url);};
  const openCloud=()=>{cloudReturn.current=view==="cloud"?"all":view;openCloudSection("overview");};
  const openRelatedSettings=(target:RelatedSetting)=>{if(view!=="settings")settingsReturn.current=view;setRelatedSetting(target);setModal(null);changeView("settings");const url=new URL(window.location.href);url.searchParams.set("view","settings");url.searchParams.set("section",target);window.history.replaceState(null,"",url);};
- const openTagChat=(tag?:string,task?:TagTask)=>{setTagEntry({tag,task});setAssistantOpen(true);};
- const openTagQueue=(id:string)=>{changeView("tags");setTagReviewTarget({id,time:Date.now()});setAssistantOpen(false);};
- const openAssistant=(context?:string|AssistantContext)=>{const next=context?(typeof context==="string"?{id:"prototype-progress",title:"阶段回顾",excerpt:context,workId:"work-hub-prototype",workTitle:"Hub · 原型验证"}:context):view==="libraries"?null:view==="insights"?assistantContext:selected?{id:selected.id,title:selected.title,excerpt:selected.excerpt,kind:selected.kind,libraryId:selected.source,libraryName:sourceMeta[selected.source].name}:null;if(!canUseAssistantContext(next)){notify("相关来源已不可用，请先恢复来源访问");return;}setSourceDemo(false);setAssistantContext(next);setAssistantOpen(true);};
+ const openTagChat=(tag?:string,task?:TagTask)=>{
+  setAgentsEntry({kind:"tag",tag,task});
+  setAgentsContextOpen(true);
+ };
+ const openTagQueue=(id:string)=>{
+  setAgentsContextOpen(false);
+  changeView("tags");
+  setTagReviewTarget({id,time:Date.now()});
+  setAssistantOpen(false);
+ };
+ const openDiscussion=(kind:"task"|"insight",context:AssistantContext)=>{
+  if(!canUseAssistantContext(context)){
+   notify("相关来源已不可用，请先恢复来源访问");
+   return;
+  }
+  setAgentsEntry({kind,context});
+  setAgentsContextOpen(true);
+ };
+ const openInsightDiscussion=(context:string|AssistantContext)=>openDiscussion("insight",
+  typeof context==="string"?{id:"prototype-progress",title:"阶段回顾",excerpt:context,workTitle:"Hub · 原型验证"}:context);
+ const openOriginalTaskAnalysis=(item:WorkspaceItem)=>{
+  const origin=ledger.insights.find(insight=>insight.id===item.originInsightId);
+  const finding=origin&&getVisibleFinding(ledger,origin);
+  const evidence=[...(origin&&finding?[{id:origin.id,title:finding.title,source:"关联洞察",excerpt:finding.summary}]:[]),
+   ...[...new Set(item.originSourceIds||[])].flatMap(id=>{
+    const source=availableItems.find(record=>record.id===id);
+    return source?[{id,title:source.title,source:sourceMeta[source.source].name,excerpt:source.excerpt}]:[];
+   })];
+  openDiscussion("task",{id:item.id,title:item.title,excerpt:[
+   "状态："+taskLabels[item.taskState||"todo"]+" · 计划日期："+(item.due||"未安排"),
+   pageBody(item.sections).trim()||item.excerpt,
+  ].join("\n"),
+   workId:item.workId,workTitle:origin?.workTitle,path:sourceMeta[item.source].name+" · "+item.space,evidence});
+ };
  const discussDocument=(item:HubItem)=>{
   if(!canUseAssistantContext(item)){
    notify("相关来源已不可用，请先恢复来源访问");
    return;
   }
-  setAgentsDocumentId(item.id);
-  setAgentsDocumentOpen(true);
+  setAgentsEntry({kind:"document",id:item.id});
+  setAgentsContextOpen(true);
  };
  const openSource=(id:string)=>{if(!isSourceAccessible(id)){notify("该来源当前不可用，正文与引文已隐藏");return;}const item=availableItems.find(x=>x.id===id);if(!item){notify("该示例资料暂未包含在原型中");return;}if(view==="insights")insightReturn.current={filter,review,mode:insightMode,scope:insightScope,query};setReturnToInsights(true);setView("all");setFilter("all");setSources([]);setQuery("");setFocused(false);pickItem(item);};
  const createLocalItem=(kind:ItemKind,title:string,body:string,origin?:DraftOrigin)=>{
@@ -403,7 +449,7 @@ if(!isSourceAccessible(id)){notify("该来源当前不可用，正文与引文�
     </div><div className="toolbar-right"><span className="prototype-label"><span/>交互原型</span>{view!=="insights"&&view!=="flashcards"&&<><div className="toolbar-divider"/><IconButton label="筛选资料来源" onClick={()=>setFilterOpen(v=>!v)} active={filterOpen||!!sources.length}><SlidersHorizontal size={17}/></IconButton><IconButton label={density==="compact"?"切换宽松列表":"切换紧凑列表"} onClick={()=>setDensity(d=>d==="compact"?"comfortable":"compact")}><LayoutList size={17}/></IconButton><IconButton label={preview?"隐藏阅读面板":"显示阅读面板"} active={preview} onClick={()=>{setPreview(v=>!v);setFocused(false);}}><PanelRight size={17}/></IconButton></>}</div>
    {filterOpen&&<div className="source-popover"><h3>资料来源</h3><p>选择本次浏览的范围</p>{(Object.keys(sourceMeta) as SourceId[]).map(s=><label key={s}><SourceIcon source={s} small/><span>{sourceMeta[s].name}</span><input type="checkbox" checked={sources.includes(s)} onChange={()=>setSources(prev=>prev.includes(s)?prev.filter(x=>x!==s):[...prev,s])}/></label>)}<footer><button onClick={()=>setSources([])}>全部资料库</button><button className="primary-button small-button" onClick={()=>setFilterOpen(false)}>完成</button></footer></div>}
    </header>}
-   {view==="tags"?<TagWorkspace searchRef={searchRef} review={tagReview} reviewTarget={tagReviewTarget} onOpenAssistant={openTagChat} initialTag={filter} navigationOpen={sidebar} navigationResizer={navigationResizer} onToggleNavigation={()=>setSidebar(v=>!v)} renderIcon={source=><SourceIcon source={source}/>} sources={sources} onSources={setSources} query={query} onQuery={setQuery} notify={notify}/>:view==="cloud"||view==="settings"?<CloudSyncCenter initialPage={view==="settings"?relatedSetting:cloudPage} standalone={view==="settings"} onOpenSettings={openRelatedSettings} onOpenCloud={openCloudSection} onExit={()=>changeView(view==="settings"?settingsReturn.current:cloudReturn.current)}/>:view==="libraries"?<LibraryBrowser navigationResizer={navigationResizer} initialNodeId={libraryTarget} navigationOpen={sidebar} onToggleNavigation={()=>setSidebar(value=>!value)} onExit={()=>changeView("all")} notify={notify}/>:view==="tasks"?<TaskWorkspace onOpenAnalysis={item=>openAssistant({id:item.originInsightId||item.id,title:item.title,excerpt:item.excerpt,workId:item.workId})} navigationResizer={navigationResizer} initialTaskId={taskTarget} items={availableItems} onUpdate={updateItem} onNew={()=>openNew("task")} onLocate={id=>{setLibraryTarget(id);setView("libraries");}} navigationOpen={sidebar} onToggleNavigation={()=>setSidebar(v=>!v)}/>:view==="journal"?<JournalSite onOpenSettings={()=>openRelatedSettings("journal")} onOpenCloud={openCloud} navigationResizer={navigationResizer} items={availableItems} onCreateTasks={createJournalTasks} onUpdateTask={updateItem} onTaskOpen={id=>{setTaskTarget(id);setView("tasks");}} navigationOpen={sidebar} onToggleNavigation={()=>setSidebar(v=>!v)}/>:view==="insights"?<div className={"insights-host "+(insightMode==="explore"?"legacy-insights-host":"")}>{insightMode==="current"?<InsightPanel onOpenSource={openSource} onAssistant={openAssistant} onCreateDraft={createLocalItem} onSourceVersionChange={sourceVersionChanged} onOverlayOpen={()=>setAssistantOpen(false)} onFilterChange={setFilter} items={availableItems} notify={notify} query={query} onQueryChange={setQuery} filter={filter} review={review} onReviewChange={setReview} scope={insightScope} onScopeChange={scope=>{if(["all","review","starred","knowledge","life","decision","cases"].includes(scope))setInsightScope(scope as InsightScope);}} navigationOpen={sidebar} onOpenNavigation={()=>setSidebar(true)} onExplore={()=>changeInsightSection("examples")}/>:<><div className="insight-exploration-banner"><span>{review?"阶段回顾":filter==="topics"?"关注主题":filter==="drafts"?"工作草稿":"更多发现"}<i/>探索示例</span><button onClick={()=>changeInsightSection("discoveries")}><ArrowLeft size={13}/>返回发现</button></div>{explorationBlocked?<div className="empty-state"><FileText size={28}/><h3>部分示例来源当前不可用</h3><p>相关历史演示暂时隐藏。恢复来源后，可以继续浏览。</p><button className="secondary-button" onClick={()=>changeInsightSection("discoveries")}>返回发现核对来源</button></div>:<Insights onOpenSource={openSource} onAssistant={openAssistant} onCreateDraft={createLocalItem} onSourceVersionChange={sourceVersionChanged} onOverlayOpen={()=>setAssistantOpen(false)} onFilterChange={setFilter} items={availableItems} notify={notify} query={query} filter={filter} review={review} onReviewChange={setReview}/>}</>}</div>:view==="flashcards"?<FlashcardsSite onCloud={openCloud} navigationResizer={navigationResizer} navigationWidth={sidebarWidth} navigationOpen={sidebar} onToggleNavigation={()=>setSidebar(v=>!v)} onExit={()=>changeView("all")}/>:<div className={"content-workspace "+(!preview?"no-preview ":"")+(focused?"reader-focused":"")}>
+   {view==="tags"?<TagWorkspace searchRef={searchRef} review={tagReview} reviewTarget={tagReviewTarget} onOpenAssistant={openTagChat} initialTag={filter} navigationOpen={sidebar} navigationResizer={navigationResizer} onToggleNavigation={()=>setSidebar(v=>!v)} renderIcon={source=><SourceIcon source={source}/>} sources={sources} onSources={setSources} query={query} onQuery={setQuery} notify={notify}/>:view==="cloud"||view==="settings"?<CloudSyncCenter initialPage={view==="settings"?relatedSetting:cloudPage} standalone={view==="settings"} onOpenSettings={openRelatedSettings} onOpenCloud={openCloudSection} onExit={()=>changeView(view==="settings"?settingsReturn.current:cloudReturn.current)}/>:view==="libraries"?<LibraryBrowser navigationResizer={navigationResizer} initialNodeId={libraryTarget} navigationOpen={sidebar} onToggleNavigation={()=>setSidebar(value=>!value)} onExit={()=>changeView("all")} notify={notify}/>:view==="tasks"?<TaskWorkspace onDiscussAnalysis={context=>openDiscussion("task",context)} onOpenAnalysis={openOriginalTaskAnalysis} navigationResizer={navigationResizer} initialTaskId={taskTarget} items={availableItems} onUpdate={updateItem} onNew={()=>openNew("task")} onLocate={id=>{setLibraryTarget(id);setView("libraries");}} navigationOpen={sidebar} onToggleNavigation={()=>setSidebar(v=>!v)}/>:view==="journal"?<JournalSite onOpenSettings={()=>openRelatedSettings("journal")} onOpenCloud={openCloud} navigationResizer={navigationResizer} items={availableItems} onCreateTasks={createJournalTasks} onUpdateTask={updateItem} onTaskOpen={id=>{setTaskTarget(id);setView("tasks");}} navigationOpen={sidebar} onToggleNavigation={()=>setSidebar(v=>!v)}/>:view==="insights"?<div className={"insights-host "+(insightMode==="explore"?"legacy-insights-host":"")}>{insightMode==="current"?<InsightPanel onOpenSource={openSource} onAssistant={openInsightDiscussion} onCreateDraft={createLocalItem} onSourceVersionChange={sourceVersionChanged} onOverlayOpen={()=>setAssistantOpen(false)} onFilterChange={setFilter} items={availableItems} notify={notify} query={query} onQueryChange={setQuery} filter={filter} review={review} onReviewChange={setReview} scope={insightScope} onScopeChange={scope=>{if(["all","review","starred","knowledge","life","decision","cases"].includes(scope))setInsightScope(scope as InsightScope);}} navigationOpen={sidebar} onOpenNavigation={()=>setSidebar(true)} onExplore={()=>changeInsightSection("examples")}/>:<><div className="insight-exploration-banner"><span>{review?"阶段回顾":filter==="topics"?"关注主题":filter==="drafts"?"工作草稿":"更多发现"}<i/>探索示例</span><button onClick={()=>changeInsightSection("discoveries")}><ArrowLeft size={13}/>返回发现</button></div>{explorationBlocked?<div className="empty-state"><FileText size={28}/><h3>部分示例来源当前不可用</h3><p>相关历史演示暂时隐藏。恢复来源后，可以继续浏览。</p><button className="secondary-button" onClick={()=>changeInsightSection("discoveries")}>返回发现核对来源</button></div>:<Insights onOpenSource={openSource} onAssistant={openInsightDiscussion} onCreateDraft={createLocalItem} onSourceVersionChange={sourceVersionChanged} onOverlayOpen={()=>setAssistantOpen(false)} onFilterChange={setFilter} items={availableItems} notify={notify} query={query} filter={filter} review={review} onReviewChange={setReview}/>}</>}</div>:view==="flashcards"?<FlashcardsSite onCloud={openCloud} navigationResizer={navigationResizer} navigationWidth={sidebarWidth} navigationOpen={sidebar} onToggleNavigation={()=>setSidebar(v=>!v)} onExit={()=>changeView("all")}/>:<div className={"content-workspace "+(!preview?"no-preview ":"")+(focused?"reader-focused":"")}>
     <section className="results-pane" aria-label={viewTitle+"列表"}>
      <div className="list-toolbar"><div><span className="list-caption">{query?"搜索结果":journalDate||caption}</span><span className="list-count">{visibleItems.length}</span></div><div className="list-toolbar-actions">{view==="reading"&&<><IconButton label="列表视图" active={layout==="list"} onClick={()=>setLayout("list")}><LayoutList size={15}/></IconButton><IconButton label="表格视图" active={layout==="table"} onClick={()=>setLayout("table")}><Table2 size={15}/></IconButton><IconButton label="看板视图" active={layout==="board"} onClick={()=>{setLayout("board");setPreview(false);}}><Columns3 size={15}/></IconButton>{view==="reading"&&<IconButton label="画廊视图" active={layout==="gallery"} onClick={()=>{setLayout("gallery");setPreview(false);}}><LayoutGrid size={15}/></IconButton>}</>}<IconButton label="新建记录" onClick={()=>openNew()}><Plus size={17}/></IconButton></div></div>
      {!!sources.length&&<div className="active-filters">{sources.map(s=><button key={s} onClick={()=>setSources(all=>all.filter(x=>x!==s))}><SourceIcon source={s} small/>{sourceMeta[s].name}<X size={11}/></button>)}</div>}
@@ -432,18 +478,13 @@ if(!isSourceAccessible(id)){notify("该来源当前不可用，正文与引文�
   </main>
   {!assistantOpen&&<button className="assistant-launcher" aria-haspopup="dialog" onClick={()=>setAgentsState("open")}><span className="assistant-orb"/><span>助手</span></button>}
   {agentsState!=="unopened"&&<WorkspaceAgentsDialog open={agentsState==="open"} onDismiss={()=>setAgentsState("closed")}/>}
-  {agentsDocument&&<WorkspaceAgentsDialog key={agentsDocument.id} open={agentsDocumentOpen}
-    onDismiss={()=>setAgentsDocumentOpen(false)}
-    documentContext={{
-     id:"workspace:"+agentsDocument.id,
-     name:agentsDocument.title,
-     path:agentsDocument.space.startsWith(agentsDocumentSource+" / ")
-      ? agentsDocument.space
-      : agentsDocumentSource+" · "+agentsDocument.space,
-     text:pageBody(agentsDocument.sections).trim(),
-    }}
+  {agentsContext&&<WorkspaceAgentsDialog key={agentsContext.id} open={agentsContextOpen}
+    onDismiss={()=>setAgentsContextOpen(false)}
+    workspaceContext={agentsContext}
+    tagWorkspace={agentsContext.kind==="tag"?tagReview:undefined}
+    onOpenTagQueue={openTagQueue}
   />}
-  <Assistant tagEntry={tagEntry} onTagEntryHandled={()=>setTagEntry(null)} tagModel={tagReview} sourceDemo={sourceDemo} uiDemo={uiDemo} activityDemo={activityDemo} onCloseActivityDemo={()=>setActivityDemo(false)} onOpenTagQueue={openTagQueue} currentPageId={["all","reading","journal","favorites"].includes(view)?current?.id:undefined} onInsertPage={insertAssistantAnswer} catalog={[...availableItems.map(item => ({ writable:item.kind!=="task"&&!REPORT_HUB_ITEMS.some(sample=>sample.id===item.id)&&!item.id.startsWith("tag-demo-"), id: item.id, title: item.title, excerpt: item.sections.map(section => section.text || section.items?.join("\n") || "").join("\n\n"), kind: item.kind, libraryId: item.source, libraryName: sourceMeta[item.source].name, path: item.space })),...assistantLibraryCatalog]} open={assistantOpen} expanded={assistantExpanded} context={assistantContext} canUseContext={canUseAssistantContext} onClose={()=>setAssistantOpen(false)} onExpand={()=>setAssistantExpanded(v=>!v)} onOpenSource={openAssistantSource} onCreateDraft={saveAssistantDraft} notify={notify}/>
+  <Assistant tagEntry={null} onTagEntryHandled={()=>{}} tagModel={tagReview} sourceDemo={sourceDemo} uiDemo={uiDemo} activityDemo={activityDemo} onCloseActivityDemo={()=>setActivityDemo(false)} onOpenTagQueue={openTagQueue} currentPageId={["all","reading","journal","favorites"].includes(view)?current?.id:undefined} onInsertPage={insertAssistantAnswer} catalog={[...availableItems.map(item => ({ writable:item.kind!=="task"&&!REPORT_HUB_ITEMS.some(sample=>sample.id===item.id)&&!item.id.startsWith("tag-demo-"), id: item.id, title: item.title, excerpt: item.sections.map(section => section.text || section.items?.join("\n") || "").join("\n\n"), kind: item.kind, libraryId: item.source, libraryName: sourceMeta[item.source].name, path: item.space })),...assistantLibraryCatalog]} open={assistantOpen} expanded={assistantExpanded} context={null} canUseContext={canUseAssistantContext} onClose={()=>setAssistantOpen(false)} onExpand={()=>setAssistantExpanded(v=>!v)} onOpenSource={openAssistantSource} onCreateDraft={saveAssistantDraft} notify={notify}/>
   {toast&&<div className="toast" role="status"><CheckCircle2 size={16}/>{toast}<button onClick={()=>setToast("")} aria-label="关闭提示"><X size={13}/></button></div>}
   {modal==="settings"&&<Modal title="外观与设置" onClose={()=>setModal(null)} wide><div className="settings-tabs"><button className={settingsTab==="data"?"selected":""} onClick={()=>setSettingsTab("data")}><Folder size={15}/>内容与数据</button><button onClick={openCloud}><Cloud size={15}/>云同步</button><button className={settingsTab==="appearance"?"selected":""} onClick={()=>setSettingsTab("appearance")}><Palette size={15}/>外观</button><button className={settingsTab==="layout"?"selected":""} onClick={()=>setSettingsTab("layout")}><PanelLeft size={15}/>布局</button><button className={settingsTab==="about"?"selected":""} onClick={()=>setSettingsTab("about")}><CircleHelp size={15}/>关于原型</button></div><div className="settings-content">{settingsTab==="data"?<><h3>内容与数据</h3><p>按用途管理，云同步负责设备间的内容更新。</p><div className="settings-destinations">{([['cache','数据与存储','本机缓存、空间上限与离线保留'],['journal','速记保存位置','目标资料库、日记目录与写入状态'],['sources','来源与采集','来源连接、更新频率与原内容保留'],['backup','备份与恢复','独立文件备份与原件恢复']] as const).map(([id,label,hint])=><button key={id} onClick={()=>openRelatedSettings(id)}><Folder size={17}/><span><strong>{label}</strong><small>{hint}</small></span><ChevronRight size={16}/></button>)}</div><CraftReadingExport/></>:settingsTab==="appearance"?<><h3>让工作空间，像你喜欢的样子</h3><p>强调色默认跟随背景主题，也可以单独选择。</p><label className="setting-label">背景主题</label><div className="theme-grid">{themes.map(t=><button key={t.id} className={"theme-option "+(theme===t.id?"selected":"")} onClick={()=>setTheme(t.id)} aria-pressed={theme===t.id}><span className="theme-preview" style={{background:t.color}}><span style={{background:["black","sage"].includes(t.id)?"#ffffff24":"#0000000d"}}/><span style={{background:["black","sage"].includes(t.id)?"#ffffff32":"#00000013"}}/>{theme===t.id&&<Check size={15} style={{color:["black","sage"].includes(t.id)?"white":"#333"}}/>}</span><span>{t.name}</span></button>)}</div><label className="setting-label">强调色</label><div className="accent-options"><button className="accent-follow-theme" aria-pressed={accent==="theme"} onClick={()=>setAccent("theme")}>跟随主题</button>{Object.entries(accents).map(([key,color],i)=><button key={key} style={{background:color}} title={["松绿","湖蓝","暮紫","琥珀","玫瑰","石墨"][i]} aria-label={"强调色 "+["松绿","湖蓝","暮紫","琥珀","玫瑰","石墨"][i]} aria-pressed={accent===key} onClick={()=>setAccent(key)}>{accent===key&&<Check size={17}/>}</button>)}</div><div className="appearance-sample"><SourceIcon source="craft"/><div><strong>一处安静的工作空间</strong><span>让内容回到视线中央。</span></div><span className="sample-tag">预览</span></div></>:settingsTab==="layout"?<><h3>适合你的阅读节奏</h3><p>列表和阅读面板的分隔线都可以拖动调整。</p><div className="setting-row"><div><strong>列表密度</strong><p>紧凑适合浏览，宽松适合慢慢阅读。</p></div><select value={density} onChange={e=>setDensity(e.target.value)} aria-label="列表密度"><option value="compact">紧凑</option><option value="comfortable">宽松</option></select></div><div className="setting-row"><div><strong>二级导航</strong><p>按当前模块展示集合、清单与视图。</p></div><button role="switch" aria-checked={sidebar} aria-label="显示二级导航" className={"toggle "+(sidebar?"on":"")} onClick={()=>setSidebar(v=>!v)}><span/></button></div><div className="setting-row"><div><strong>右侧阅读面板</strong><p>保留上下文，在同一处打开资料。</p></div><button role="switch" aria-checked={preview} aria-label="显示右侧阅读面板" className={"toggle "+(preview?"on":"")} onClick={()=>setPreview(v=>!v)}><span/></button></div><button className="secondary-button" onClick={()=>{resetSidebarWidths();setListWidth(43);setSidebar(true);setPreview(true);setFocused(false);notify("布局已恢复默认");}}><RotateCcw size={14}/>恢复默认布局</button></>:<><h3>Hub 浏览器交互原型</h3><p>依据当前桌面 UI、GitHub 中的模块结构，以及洞察规划制作。</p><div className="about-note">这里的资料与流程用于交互演示，公开案例附有官方出处。助手使用演示回复，交互修改保存在当前浏览器。</div><a className="repo-link" href="https://github.com/VondeSong/hub-search" target="_blank" rel="noreferrer"><FileText size={16}/>查看 Hub 源代码<ExternalLink size={14}/></a><div className="keyboard-grid"><span>搜索</span><kbd>⌘ / Ctrl K</kbd><span>快速搜索</span><kbd>/</kbd><span>关闭弹窗 / 返回</span><kbd>Esc</kbd></div><button className="secondary-button" onClick={()=>{setItems(workspaceItems);setFavorites(["ui-design","dxf-guide","read-craft"]);setHistory([{id:"codex-hub"}]);setCollections([{name:"使用 AI",term:"AI"}]);changeView("all");setSelectedId("codex-hub");notify("内容、收藏与记录已恢复示例；外观设置保留");}}>恢复示例内容</button></>}</div><footer className="modal-footer"><span>设置会自动保留</span><button className="primary-button" onClick={()=>setModal(null)}>完成</button></footer></Modal>}
   {modal==="new"&&(!editingId||availableItems.some(item=>item.id===editingId))&&<Modal title={editingId?"编辑内容":newKind==="task"?"新建任务":newKind==="journal"?"写一条日志":"新建笔记"} onClose={()=>setModal(null)}><form onSubmit={e=>{e.preventDefault();if(!newTitle.trim())return;if(editingId){const editingItem=availableItems.find(item=>item.id===editingId);if(!editingItem){notify("相关来源已不可用，无法保存这份笔记");return;}const practice=isPublicPractice(editingItem)?parsePracticeMarkdown(editingId,newBody):null;updateItem(editingId,{title:newTitle.trim(),excerpt:newBody.slice(0,160),sections:practice?practice.sections:newBody.split(/\n\s*\n/).filter(Boolean).map(text=>({type:"p",text}))});if(practice)setCheckMarks(all=>({...all,...practice.initialChecks}));notify("修改已保存在当前浏览器");}else addItem(newKind,newTitle,newBody);setModal(null);}}><div className="form-content"><label>标题<input autoFocus value={newTitle} onChange={e=>setNewTitle(e.target.value)} placeholder={newKind==="journal"?"今天，有什么值得记下？":"给这个想法起个名字"} required maxLength={160}/></label><label>{newKind==="task"?"补充说明":"内容"}<textarea value={newBody} onChange={e=>setNewBody(e.target.value)} placeholder="从一两句话开始…" rows={8}/></label><p className="form-hint">保存到当前浏览器的演示工作空间。</p></div><footer className="modal-footer"><button type="button" className="secondary-button" onClick={()=>setModal(null)}>取消</button><button className="primary-button" type="submit">保存{newKind==="task"?"任务":newKind==="journal"?"日志":"笔记"}</button></footer></form></Modal>}

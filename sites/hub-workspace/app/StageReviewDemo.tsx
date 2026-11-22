@@ -1,10 +1,11 @@
 "use client";
 import {useCallback} from "react";
+import type { AssistantContext } from "./Assistant";
 import {StageReviewForm,type ReviewInput,type ReviewPlan,type ReviewView} from "./StageReviewForm";
 import "./stage-review.css";
 const demoWork={id:"stage-review-example",goal:"回看这个月的支出与阅读（示例）"};
 let saved:ReviewView|null=null;
-export function StageReviewDemo({onAssistant}:{onAssistant:(prompt:string)=>void}){
+export function StageReviewDemo({onAssistant}:{onAssistant:(context:AssistantContext)=>void}){
  const loadWorks=useCallback(async()=>[demoWork],[]);
  const read=useCallback(async()=>saved,[]);
  const prepare=useCallback(async(plan:ReviewPlan,input:ReviewInput)=>{
@@ -17,5 +18,13 @@ export function StageReviewDemo({onAssistant}:{onAssistant:(prompt:string)=>void
   return saved;
  },[]);
  const preview=useCallback(async()=>({description:"仅用于演示，未读取真实账单",count:6,items:["本期餐饮","本期医疗","医疗退款","内部转账","重复导入","去年餐饮"].map(title=>({title,path:"示例记录"}))}),[]);
- return <StageReviewForm preview={preview} demo loadWorks={loadWorks} read={read} prepare={prepare} onOpenWork={()=>onAssistant(`阶段回顾交互演示：${saved?.config.question}。仅用示例材料说明分析方式；不声称已经读取真实记录。${saved?.config.extraDiscoveries?"如有依据可补充线索，没有则省略。":"只回答原问题。"}`)}/>;
+ return <StageReviewForm preview={preview} demo loadWorks={loadWorks} read={read} prepare={prepare} onOpenWork={workId=>onAssistant({
+  id:workId,title:"阶段回顾",workId,workTitle:demoWork.goal,revision:saved?.revision,
+  excerpt:[saved?.config.question,saved?.scope.description,saved?.answer?.markdown,
+   saved?.config.extraDiscoveries?"如有依据可补充线索。":"只回答原问题。"
+  ].filter(Boolean).join("\n\n"),
+  evidence:saved?.inputs.filter(item=>!item.withdrawn&&item.text.trim()).map((item,index)=>({
+   id:item.id??workId+"-input-"+index,title:"本次补充材料",source:"阶段回顾",excerpt:item.text,
+  })),
+ })}/>;
 }

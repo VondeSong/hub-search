@@ -3,8 +3,9 @@ import {useEffect,useState} from "react";
 import {REPORT_FIXTURES} from "./insight-reports";
 import {isSourceAccessible,type LedgerState} from "./insight-ledger";
 import {recallFixture} from "./insight-recall";
+import type { AssistantEvidence } from "./Assistant";
 
-export function InsightRecall({state,onOpenWork}:{state:LedgerState;onOpenWork:(id:string,question?:string)=>void}){
+export function InsightRecall({state,onOpenWork}:{state:LedgerState;onOpenWork:(id:string,question?:string,evidence?:AssistantEvidence[])=>void}){
  const works=[...new Map(REPORT_FIXTURES.map(r=>[r.workId,r.workTitle])).entries()];
  const [work,setWork]=useState(""),[query,setQuery]=useState(""),[searched,setSearched]=useState(false);
  const [hits,setHits]=useState<{id:string;title:string;content:string}[]>([]);
@@ -20,5 +21,5 @@ export function InsightRecall({state,onOpenWork}:{state:LedgerState;onOpenWork:(
   {mode==="keyword"?<button className="ip-button ip-primary" disabled={!work||!query.trim()} onClick={search}>在已选资料中查找</button>:<><p className="ip-form-help">{mode==="semantic"?"桌面由原助手在明确选定的资料内按含义交叉核对，保留原文、适用条件和实际覆盖。此处仅演示入口，不伪造模型已经核对的候选。":"桌面需要同时明确选择任务对象和说明笔记，区分计划、纸面验证、实际完成和未知；只提出待核对差异，不自动改任务。"}</p><button className="ip-button ip-primary" disabled={!work||!query.trim()} onClick={()=>onOpenWork(work,`${mode==="semantic"?"请按含义寻找可复用知识":"请核对明确任务与笔记的完成状态差异"}：${query}。只用本次授权，读取两侧原文、保留精确引用和不确定性，不写入来源或任务。当前是交互演示，不声称读取真实资料。`)}>在原事项准备核对</button></>}
   {searched&&<p role="status">{hits.length?`找到 ${hits.length} 份候选资料；请核对原文、适用条件和反例。`:"没有匹配资料。可以换一个关键词；无命中不等于没有相关知识。"}</p>}
   {hits.filter(h=>isSourceAccessible(h.id,state)).map(h=><article key={h.id}><strong>{h.title}</strong><details><summary>查看原文</summary><blockquote>{h.content}</blockquote></details></article>)}
- </div><footer className="ip-dialog-footer"><button className="ip-button" disabled={!work} onClick={()=>onOpenWork(work)}>在原事项核对</button></footer></>;
+ </div><footer className="ip-dialog-footer"><button className="ip-button" disabled={!work} onClick={()=>onOpenWork(work,query.trim()?`请围绕「${query.trim()}」核对原文和适用条件。关键词匹配仅表示候选。`:undefined,hits.filter(h=>isSourceAccessible(h.id,state)).map(h=>({id:h.id,title:h.title,excerpt:h.content})))}>在原事项核对</button></footer></>;
 }

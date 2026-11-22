@@ -1,18 +1,20 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
-import {ArrowLeft,ArrowUpRight,Check,RefreshCw,Sparkles,X} from 'lucide-react';
+import {ArrowLeft,ArrowUpRight,Check,MessageSquare,RefreshCw,Sparkles,X} from 'lucide-react';
+import type { AssistantContext } from './Assistant';
+import { taskStates } from './task-data';
 import {adoptionError,analysisRevision,buildTaskAdvice,type AnalysisMemory,type AnalysisRequest,type AnalysisTask,type ReadMode,type TaskAdvice,type TaskEvidence} from './task-analysis-model';
 
 const steps=['读取聚合数据','刷新来源','分析建议','选择采纳'];
 const modeTitle={today:'安排今天',project:'梳理项目',task:'推进任务'};
-type Props={request:AnalysisRequest;tasks:AnalysisTask[];evidence:Record<string,TaskEvidence[]>;memory:AnalysisMemory;day:string;onClose:()=>void;onRefresh:()=>void;onTask:(id:string)=>void;onAdopt:(advice:TaskAdvice)=>string;onSource:(id:string,text:string)=>boolean};
-export default function TaskAnalysis({request,tasks,evidence,memory,day,onClose,onRefresh,onTask,onAdopt,onSource}:Props){
+type Props={request:AnalysisRequest;tasks:AnalysisTask[];evidence:Record<string,TaskEvidence[]>;memory:AnalysisMemory;day:string;onClose:()=>void;onRefresh:()=>void;onTask:(id:string)=>void;onDiscuss:(context:AssistantContext)=>void;onAdopt:(advice:TaskAdvice)=>string;onSource:(id:string,text:string)=>boolean};
+export default function TaskAnalysis({request,tasks,evidence,memory,day,onClose,onRefresh,onTask,onDiscuss,onAdopt,onSource}:Props){
  const [phase,setPhase]=useState(-1),[readMode,setReadMode]=useState<ReadMode>('fresh'),[refreshFirst,setRefreshFirst]=useState(true),[advice,setAdvice]=useState<TaskAdvice[]>([]),[readAt,setReadAt]=useState(''),[snapshot,setSnapshot]=useState<AnalysisTask[]>([]),[error,setError]=useState(''),[preview,setPreview]=useState(''),[outcome,setOutcome]=useState('success'),[results,setResults]=useState<Record<string,string>>({});
  const latest=useRef({tasks,evidence,onRefresh,onClose});latest.current={tasks,evidence,onRefresh,onClose};
  const [runOptions,setRunOptions]=useState({refresh:true,readMode:'fresh' as ReadMode});
  const generation=useRef(0),timers=useRef<ReturnType<typeof setTimeout>[]>([]),heading=useRef<HTMLHeadingElement>(null);
  const content=useRef<HTMLDivElement>(null);
- useEffect(()=>{heading.current?.focus({preventScroll:true});const key=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();latest.current.onClose();}};window.addEventListener('keydown',key);return()=>{generation.current++;timers.current.forEach(clearTimeout);window.removeEventListener('keydown',key);};},[]);
+ useEffect(()=>{heading.current?.focus({preventScroll:true});const key=(event:KeyboardEvent)=>{if(event.key==='Escape'&&!document.querySelector('dialog[open]')){event.preventDefault();event.stopPropagation();latest.current.onClose();}};window.addEventListener('keydown',key);return()=>{generation.current++;timers.current.forEach(clearTimeout);window.removeEventListener('keydown',key);};},[]);
  const working=phase>=0&&phase<3;
  function run(){
   if(Object.values(results).some(r=>r==='unknown'||r==='failed')){setError('请先核对或处理上次模拟保存的结果，再重新分析。');return;}
@@ -36,8 +38,25 @@ export default function TaskAnalysis({request,tasks,evidence,memory,day,onClose,
   const warning=onAdopt(a);if(warning&&a.kind!=='source'){setError(warning);return;}setResults(old=>({...old,[a.id]:'adopted'}));setPreview('');if(warning)setError(warning);
  }
  const focusedTasks=tasks.filter(t=>request.taskIds.includes(t.id));
+ function discuss(){
+  const task=request.mode==='task'?focusedTasks[0]:undefined;
+  const sources=new Map(focusedTasks.flatMap(item=>(evidence[item.id]||[]).map(source=>[source.id,source] as const)));
+  onDiscuss({
+   id:task?.id??'analysis-'+request.id,
+   title:request.label,
+   path:task?task.source+' · '+task.project:modeTitle[request.mode],
+   excerpt:focusedTasks.map(item=>[
+    task?'':item.title+' · '+item.source+' / '+item.project,
+    '状态：'+taskStates[item.status]+' · 计划日期：'+(item.date||'未安排'),
+    item.description,
+   ].filter(Boolean).join('\n')).join('\n\n'),
+   evidence:[...sources.values()]
+    .filter(source=>phase!==3||effectiveMode!=='partial'||source.source!=='飞书')
+    .map(source=>({id:source.id,title:source.title,source:source.source,excerpt:source.text})),
+  });
+ }
  return <aside className="tw-analysis" aria-label="任务分析" data-ready={phase===3}><header><div><small>任务内 AI 分析</small><h2 ref={heading} tabIndex={-1}>{modeTitle[request.mode]}</h2></div><button aria-label="关闭任务分析" onClick={onClose}><X size={17}/></button></header><div ref={content} className="tw-analysis-content">
-  <section className="ta-analysis-scope"><strong>{request.label}</strong><p>{request.taskIds.length} 项原任务 · 本次范围固定，列表仍可继续浏览</p><details><summary>查看读取范围</summary><ul>{focusedTasks.map(t=><li key={t.id}><button onClick={()=>onTask(t.id)}>{t.title}<ArrowUpRight size={11}/></button><small>{t.source} / {t.project} · {t.id}</small></li>)}</ul></details></section>
+  <section className="ta-analysis-scope"><strong>{request.label}</strong><p>{request.taskIds.length} 项原任务 · 本次范围固定，列表仍可继续浏览</p><details><summary>查看读取范围</summary><ul>{focusedTasks.map(t=><li key={t.id}><button onClick={()=>onTask(t.id)}>{t.title}<ArrowUpRight size={11}/></button><small>{t.source} / {t.project} · {t.id}</small></li>)}</ul></details><button className="ta-analysis-return" aria-haspopup="dialog" disabled={working||!focusedTasks.length} onClick={discuss}><MessageSquare size={14}/>在 Agents 中讨论</button></section>
   <ol className="ta-analysis-steps" aria-label="读取到采纳的过程">{steps.map((text,index)=><li key={text} aria-current={phase===index?'step':undefined} className={phase>index?'done':''}><span>{phase>index?<Check size={12}/>:index+1}</span><div><strong>{text}</strong><small>{index===0?(phase>0?`已读取同一列表的 ${snapshot.length||focusedTasks.length} 项示例记录`:'使用现有任务身份，不重新导入'):index===1?(phase>1?(!runOptions.refresh?'已跳过，使用原缓存':runOptions.readMode==='fresh'?'示例刷新完成':runOptions.readMode==='cached'?'离线，保留旧数据':'任务刷新完成，飞书资料缺失'):'需要时核对来源变化'):index===2?(phase>2?`${advice.length} 条建议 · ${readAt}`:'只分析所选任务与关联资料'):'逐条采用，说明具体影响'}</small></div></li>)}</ol>
   <div className="ta-analysis-options"><label><input type="checkbox" checked={refreshFirst} disabled={working} onChange={e=>setRefreshFirst(e.target.checked)}/>分析前刷新示例来源</label><details><summary>体验离线或读取失败</summary><label>数据情境<select aria-label="分析数据情境" value={readMode} disabled={working} onChange={e=>setReadMode(e.target.value as ReadMode)}><option value="fresh">示例刷新成功</option><option value="cached">离线，使用旧缓存</option><option value="partial">飞书关联资料读取失败</option></select></label></details><button className="ta-analysis-primary" disabled={working||!focusedTasks.length} onClick={run}><RefreshCw size={14}/>{working?['正在读取聚合数据…','正在刷新来源…','正在分析示例任务…'][phase]:phase===3?'重新读取并分析':'读取并分析（演示）'}</button></div>
   {error&&<p className="ta-analysis-error" role="alert">{error}</p>}

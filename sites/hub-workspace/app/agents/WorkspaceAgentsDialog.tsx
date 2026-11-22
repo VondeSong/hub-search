@@ -1,16 +1,19 @@
 "use client";
 
 import { lazy, Suspense, useEffect, useRef } from "react";
-import type { AgentsDocumentContext } from "./ReferenceSurface";
+import type { TagReviewModel } from "../tag-assistant";
+import type { WorkspaceAgentsContext } from "./workspace-context";
 
 const AgentsSurface = lazy(() => import("./ReferenceSurface").then(module => ({
   default: module.ReferenceSurface,
 })));
 
-export default function WorkspaceAgentsDialog({ open, onDismiss, documentContext }: {
+export default function WorkspaceAgentsDialog({ open, onDismiss, workspaceContext, tagWorkspace, onOpenTagQueue }: {
   open: boolean;
   onDismiss: () => void;
-  documentContext?: AgentsDocumentContext;
+  workspaceContext?: WorkspaceAgentsContext;
+  tagWorkspace?: TagReviewModel;
+  onOpenTagQueue?: (id: string) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
 
@@ -32,7 +35,7 @@ export default function WorkspaceAgentsDialog({ open, onDismiss, documentContext
       }}
     >
       <Suspense fallback={<p role="status" className="workspace-agents-loading">正在打开助手…</p>}>
-        <AgentsSurface onDismiss={onDismiss} documentContext={documentContext} open={open} />
+        <AgentsSurface onDismiss={onDismiss} workspaceContext={workspaceContext} tagWorkspace={tagWorkspace} onOpenTagQueue={onOpenTagQueue} open={open} />
       </Suspense>
     </dialog>
   );

@@ -1,6 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { tagPrompt } from '../tag-assistant';
+import { runWorkspaceTagReview, tagDiscussionContext, tagWorkspaceLibraries, tagWorkspaceMaterials } from './workspace-context';
+
+const tagActions = { draft: 'definition', find: 'missing', compare: 'relation' };
+const currentLabels = { document: '当前页', task: '当前任务', insight: '当前洞察', tag: '当前标签' };
 
 // 统一线框图标组件（严格遵守 JSX Fragment 包裹多标签）
 function Icon({ name, className = 'w-4 h-4', strokeWidth = 1.75 }) {
@@ -56,11 +61,12 @@ function Icon({ name, className = 'w-4 h-4', strokeWidth = 1.75 }) {
 }
 
 // Apple 原生风格 Toggle Switch
-function Toggle({ checked, onChange }) {
+function Toggle({ checked, onChange, label }) {
   return (
     <button
       type="button"
       role="switch"
+      aria-label={label}
       aria-checked={checked}
       onClick={(e) => { e.stopPropagation(); onChange(!checked); }}
       className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${checked ? 'bg-primary' : 'bg-black/15'}`}
@@ -186,23 +192,25 @@ function ThumbArtwork({ kind, large = false }) {
   );
 }
 
-export default function ReferenceAgent({ onDismiss, documentContext, open }) {
+export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspace, onOpenTagQueue, open }) {
   // 1. 视口宽度模式：'sidebar' (480px) | 'focus' (760px) | 'full'
   const [viewportMode, setViewportMode] = useState('focus');
   // 示例场景切换：'report' (正常流式复核报告) | 'interrupted' (图2规则加载 + 图3核验中断重构案例)
-  const [activeCase, setActiveCase] = useState(documentContext ? 'new' : 'report');
+  const [activeCase, setActiveCase] = useState(workspaceContext ? 'new' : 'report');
   const [newMessages, setNewMessages] = useState([]);
 
   // 2. 顶部与模式状态
-  const [threadTitle, setThreadTitle] = useState(documentContext?.name ?? 'Hub 助手工作过程和展示方案');
+  const [threadTitle, setThreadTitle] = useState(workspaceContext?.name ?? 'Hub 助手工作过程和展示方案');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [taskMode, setTaskMode] = useState('standard'); // 'standard' | 'goal' | 'tag' | 'topic'
-  const [tagSubTab, setTagSubTab] = useState('draft'); // 'draft' | 'find' | 'compare'
-  const [targetTag, setTargetTag] = useState('');
-  const [compareTag, setCompareTag] = useState('');
+  const [taskMode, setTaskMode] = useState(tagWorkspace ? 'tag' : 'standard'); // 'standard' | 'goal' | 'tag' | 'topic'
+  const [tagSubTab, setTagSubTab] = useState(
+    Object.keys(tagActions).find(key => tagActions[key] === workspaceContext?.tagTask?.intent) || 'draft'
+  ); // 'draft' | 'find' | 'compare'
+  const [targetTag, setTargetTag] = useState(workspaceContext?.tag || '');
+  const [compareTag, setCompareTag] = useState(workspaceContext?.tagTask?.other || '');
   const [tagPickerSlot, setTagPickerSlot] = useState(null); // null | 'target' | 'compare'
   const [tagSearchQuery, setTagSearchQuery] = useState('');
-  const [goalText, setGoalText] = useState(documentContext ? '' : '核对流式状态与工作过程规范，输出 15 条桌面测试项');
+  const [goalText, setGoalText] = useState(workspaceContext ? '' : '核对流式状态与工作过程规范，输出 15 条桌面测试项');
   const [pauseOnBlocker, setPauseOnBlocker] = useState(true);
 
   // 3. 专题系统（支持置顶、搜索与自定义保存）
@@ -238,15 +246,15 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
   const [sourcesSearch, setSourcesSearch] = useState('');
   const [saveNoteModalOpen, setSaveNoteModalOpen] = useState(false);
   const [saveNoteTab, setSaveNoteTab] = useState('append'); // 'append' | 'new'
-  const [saveNoteTarget, setSaveNoteTarget] = useState(documentContext?.name ?? '2023-02-02');
-  const [saveNoteTitle, setSaveNoteTitle] = useState(documentContext?.name ?? 'Hub 桌面助手｜流式状态与工作过程证据复核');
+  const [saveNoteTarget, setSaveNoteTarget] = useState(workspaceContext?.name ?? '2023-02-02');
+  const [saveNoteTitle, setSaveNoteTitle] = useState(workspaceContext?.name ?? 'Hub 桌面助手｜流式状态与工作过程证据复核');
   const [createTaskModalOpen, setCreateTaskModalOpen] = useState(false);
-  const [taskTitle, setTaskTitle] = useState(documentContext ? `跟进：${documentContext.name}` : '验证 Hub 桌面助手流式状态与 15 项可访问性用例');
+  const [taskTitle, setTaskTitle] = useState(workspaceContext ? `跟进：${workspaceContext.name}` : '验证 Hub 桌面助手流式状态与 15 项可访问性用例');
   const [taskList, setTaskList] = useState('收件箱');
   const [taskDue, setTaskDue] = useState('明天');
   const [taskPriority, setTaskPriority] = useState('高');
   const [taskAttachReport, setTaskAttachReport] = useState(false);
-  const [taskSubItems, setTaskSubItems] = useState(documentContext ? [] : [
+  const [taskSubItems, setTaskSubItems] = useState(workspaceContext ? [] : [
     { id: 'st1', text: '将回执列表改为普通列表 + 独立 status 播报区', checked: true },
     { id: 'st2', text: '实测展开旧回执后，新内容到达不跳动视口与焦点', checked: true },
     { id: 'st3', text: '验证「回到最新」按钮在 reduced-motion 下的滚动行为', checked: true }
@@ -254,19 +262,27 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
 
   // 5. 视图与诊断偏好
   const [onlyLatestReply, setOnlyLatestReply] = useState(false);
-  const [webSearchEnabled, setWebSearchEnabled] = useState(!documentContext);
-  const [mcpEnabled, setMcpEnabled] = useState(!documentContext);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(!workspaceContext);
+  const [mcpEnabled, setMcpEnabled] = useState(!workspaceContext);
   const [diagExpanded, setDiagExpanded] = useState(false);
 
   // 6. 模型、资料范围、记忆、技能与附件状态
   const [selectedModel, setSelectedModel] = useState('DeepSeek V4.1 Flash');
   const [reasoningLevel, setReasoningLevel] = useState('high'); // 'low' | 'medium' | 'high'
   const [responseSpeed, setResponseSpeed] = useState('standard'); // 'standard' | 'fast'
-  const [retrievalStrategy, setRetrievalStrategy] = useState(documentContext ? 'only' : 'prefer'); // 'prefer' | 'only'
-  const documentId = documentContext?.id;
-  const [selectedDocs, setSelectedDocs] = useState(documentId ? [documentId] : ['d1', 'd2']);
-  const [selectedLibs, setSelectedLibs] = useState(documentContext ? [] : ['Car']);
-  const [memoryActive, setMemoryActive] = useState(!documentContext);
+  const [retrievalStrategy, setRetrievalStrategy] = useState(workspaceContext ? 'only' : 'prefer'); // 'prefer' | 'only'
+  const primaryMaterial = tagWorkspace
+    ? targetTag && { ...tagDiscussionContext(targetTag, undefined, tagWorkspace), id: workspaceContext.id }
+    : workspaceContext;
+  const documentId = primaryMaterial?.id;
+  const evidence = workspaceContext?.evidence || [];
+  const [selectedDocs, setSelectedDocs] = useState(workspaceContext
+    ? [...(documentId ? [documentId] : []), ...evidence.map(item => item.id)]
+    : ['d1', 'd2']);
+  const [selectedLibs, setSelectedLibs] = useState(workspaceContext
+    ? workspaceContext.tagTask?.libraries || []
+    : ['Car']);
+  const [memoryActive, setMemoryActive] = useState(!workspaceContext);
 
   useEffect(() => {
     if (open && documentId) {
@@ -297,13 +313,13 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
   const [editingMemoryId, setEditingMemoryId] = useState(null);
   const [editingMemoryText, setEditingMemoryText] = useState('');
 
-  const [uploadError, setUploadError] = useState(documentContext ? null : {
+  const [uploadError, setUploadError] = useState(workspaceContext ? null : {
     fileName: '会话示例录音.flac',
     size: '34.2 MB',
     limit: '10 MB'
   });
-  const [attachedSkills, setAttachedSkills] = useState(documentContext ? [] : ['阅读材料归档']);
-  const [attachedLocalFiles, setAttachedLocalFiles] = useState(documentContext ? [] : [
+  const [attachedSkills, setAttachedSkills] = useState(workspaceContext ? [] : ['阅读材料归档']);
+  const [attachedLocalFiles, setAttachedLocalFiles] = useState(workspaceContext ? [] : [
     { id: 'f1', name: '初步策略', type: 'task' },
     { id: 'f2', name: 'codex2.mp4', type: 'video' },
     { id: 'f3', name: 'style.css', type: 'code' },
@@ -311,7 +327,7 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
     { id: 'f5', name: '扭矩扳手量具操作指导书2025(1).pdf', type: 'pdf' }
   ]);
   const [expandAllFiles, setExpandAllFiles] = useState(false);
-  const [attachedImages, setAttachedImages] = useState(documentContext ? [] : [
+  const [attachedImages, setAttachedImages] = useState(workspaceContext ? [] : [
     { id: 'img1', name: 'image.png', size: '248 KB', kind: 'terminal' },
     { id: 'img2', name: 'unnamed.jpg', size: '182 KB', kind: 'sketch' }
   ]);
@@ -522,15 +538,18 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
   ];
 
   const availableDocs = [
-    ...(documentContext ? [{ ...documentContext, current: true }] : []),
-    { id: 'd1', name: '2023-02-02', path: '示例库 · Journals/2023/02/2023-02-02.md', current: !documentContext },
+    ...(primaryMaterial ? [{ ...primaryMaterial, current: currentLabels[primaryMaterial.kind] }] : []),
+    ...evidence,
+    ...(tagWorkspace ? tagWorkspaceMaterials(tagWorkspace) : [
+    { id: 'd1', name: '2023-02-02', path: '示例库 · Journals/2023/02/2023-02-02.md', current: !workspaceContext && '当前页' },
     { id: 'd2', name: '8_竞品和参考', path: 'Car · 工作台方案' },
     { id: 'd3', name: '案例', path: '示例库 · 未分类' },
     { id: 'd4', name: '2024.08.31', path: '示例库 · 未分类' },
     { id: 'd5', name: 'DXF 图纸到线表规范', path: 'Car · 工程标准' }
+    ]),
   ];
 
-  const availableLibs = [
+  const availableLibs = tagWorkspace ? tagWorkspaceLibraries(tagWorkspace, selectedLibs) : [
     { id: 'Car', name: 'Car', source: 'Craft', count: '49 篇文档', color: 'bg-amber-500' },
     { id: 'OS', name: 'OS', source: 'Obsidian', count: '2,066 篇文档', color: 'bg-purple-500' },
     { id: 'main', name: 'main', source: 'Craft', count: '155 篇文档', color: 'bg-sky-500' },
@@ -538,7 +557,11 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
     { id: '滴答清单', name: '滴答清单', source: '滴答', count: '407 条任务', color: 'bg-blue-500' }
   ];
 
-  const availableTags = [
+  const availableTags = tagWorkspace ? tagWorkspace.tags.map(tag => ({
+    value: tag,
+    name: '#' + tag,
+    count: tagWorkspace.records.filter(item => item.tags.includes(tag)).length,
+  })) : [
     { name: '#craft', count: 121 },
     { name: '#main', count: 86 },
     { name: '#结构学', count: 73 },
@@ -599,24 +622,36 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
     }
   };
 
+  const tagAction = tagWorkspace && taskMode === 'tag' ? {
+    intent: tagActions[tagSubTab], tag: targetTag, other: compareTag,
+  } : null;
+  const canSend = !!inputText.trim() || !!tagAction?.tag;
+
   const handleSendMessage = () => {
-    if (!inputText.trim()) return;
+    if (!canSend) return;
     const userMsg = {
       id: 'u_' + Date.now(),
       role: 'user',
       time: '刚刚',
-      text: inputText.trim()
+      text: inputText.trim() || tagPrompt(tagAction)
     };
-    const currentDocumentSelected = documentContext && selectedDocs.includes(documentContext.id);
-    const excerpt = currentDocumentSelected ? documentContext.text.replace(/\s+/g, ' ').slice(0, 120) : '';
-    const documentReceipt = currentDocumentSelected
-      ? `\n\n当前资料《${documentContext.name}》${excerpt ? `\n正文节选：${excerpt}` : ''}`
+    const currentMaterialSelected = primaryMaterial && selectedDocs.includes(primaryMaterial.id);
+    const excerpt = currentMaterialSelected ? primaryMaterial.text.replace(/\s+/g, ' ').slice(0, 120) : '';
+    const receiptLabel = workspaceContext?.kind === 'document' ? '当前资料' : currentLabels[workspaceContext?.kind];
+    const documentReceipt = currentMaterialSelected
+      ? `\n\n${receiptLabel}《${primaryMaterial.name}》${excerpt ? `\n正文节选：${excerpt}` : ''}`
       : '';
+    const selectedEvidence = evidence.filter(item => selectedDocs.includes(item.id));
+    const evidenceReceipt = selectedEvidence.length ? '\n关联依据：' + selectedEvidence.map(item => item.name).join('、') : '';
+    const tagResult = tagAction ? runWorkspaceTagReview(
+      tagWorkspace, tagAction.intent, tagAction.tag, tagAction.other, selectedDocs, selectedLibs
+    ) : null;
     const aiMsg = {
       id: 'a_' + (Date.now() + 1),
       role: 'assistant',
       duration: '6 秒',
-      text: `已按「${taskMode === 'topic' && activeTopic ? activeTopic.name : taskMode === 'goal' ? '目标模式' : taskMode === 'tag' ? '标签助手' : '通用助手'}」模式结合 ${selectedDocs.length} 份核心资料与 ${selectedLibs.length} 个资料库生成演示回执（模型：${currentModelObj.id} · 思考强度${reasoningLabels[reasoningLevel]}）。如需沉淀结论，可直接点击下方「存入笔记」或「创建任务」。${documentReceipt}`
+      tagReviewIds: tagResult?.ids,
+      text: tagResult ? tagResult.message + documentReceipt : `已按「${taskMode === 'topic' && activeTopic ? activeTopic.name : taskMode === 'goal' ? '目标模式' : taskMode === 'tag' ? '标签助手' : '通用助手'}」模式结合 ${selectedDocs.length} 份核心资料与 ${selectedLibs.length} 个资料库生成演示回执（模型：${currentModelObj.id} · 思考强度${reasoningLabels[reasoningLevel]}）。如需沉淀结论，可直接点击下方「存入笔记」或「创建任务」。${documentReceipt}${evidenceReceipt}`
     };
     if (activeCase === 'interrupted') {
       setInterruptedMessages(prev => [...prev, userMsg, aiMsg]);
@@ -733,7 +768,7 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
             </button>
           )}
           <span className="font-semibold text-primary">Hub 助手原型</span>
-          {!documentContext && <div className="flex items-center bg-black/5 p-0.5 rounded-xl">
+          {!workspaceContext && <div className="flex items-center bg-black/5 p-0.5 rounded-xl">
             <button
               aria-pressed={activeCase === 'report'}
               onClick={() => switchDemoCase('report')}
@@ -788,7 +823,7 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
                 setActiveCase('new');
                 setNewMessages([]);
                 setInputText('');
-                setThreadTitle(documentContext?.name ?? '新对话');
+                setThreadTitle(workspaceContext?.name ?? '新对话');
                 triggerToast('已开启新对话');
               }}
               className="p-1.5 rounded-lg text-secondary hover:text-primary hover:bg-hover transition-colors"
@@ -996,6 +1031,7 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
               ].map(tab => (
                 <button
                   key={tab.id}
+                  aria-pressed={tagSubTab === tab.id}
                   onClick={() => setTagSubTab(tab.id)}
                   className={`px-2.5 py-0.5 rounded-md font-medium transition-all ${tagSubTab === tab.id ? 'bg-surface text-emerald-800 shadow-xs' : 'text-secondary hover:text-primary'}`}
                 >
@@ -1395,6 +1431,16 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
                       <div className="text-[14.5px] leading-[1.7] text-primary whitespace-pre-line">{msg.text}</div>
                     )}
 
+                    {msg.tagReviewIds?.map(id => {
+                      const pending = tagWorkspace?.suggestions.find(item => item.id === id && item.status === 'pending');
+                      return pending && onOpenTagQueue ? (
+                        <button key={id} type="button" onClick={() => onOpenTagQueue(id)}
+                          className="text-xs font-medium text-emerald-800 underline underline-offset-4">
+                          在标签页核查{pending.kind === 'definition' ? '定义草稿' : pending.kind === 'missing' ? '漏标建议' : '关系建议'}
+                        </button>
+                      ) : null;
+                    })}
+
                     {/* C. 极简底栏操作（合并存入笔记 + 极简创建任务 + 轻量化来源胶囊） */}
                     {!msg.interruptedCard && (
                       <div className="pt-1 flex flex-wrap items-center justify-between gap-2">
@@ -1467,7 +1513,7 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
                   className={`h-[26px] px-2.5 rounded-lg border text-[11.5px] font-medium inline-flex items-center gap-1 transition-colors ${targetTag ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-surface border-dashed border-emerald-300 text-emerald-700 hover:bg-emerald-50/60'}`}
                 >
                   <Icon name="tag" className="w-3 h-3" />
-                  <span>{targetTag || '选择目标标签'}</span>
+                  <span>{targetTag ? (tagWorkspace ? '#' + targetTag : targetTag) : '选择目标标签'}</span>
                 </button>
                 {tagSubTab === 'compare' && (
                   <button
@@ -1475,7 +1521,7 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
                     className={`h-[26px] px-2.5 rounded-lg border text-[11.5px] font-medium inline-flex items-center gap-1 transition-colors ${compareTag ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-surface border-dashed border-border text-secondary hover:text-primary'}`}
                   >
                     <Icon name="tag" className="w-3 h-3" />
-                    <span>{compareTag || '选择比较标签 (可选)'}</span>
+                    <span>{compareTag ? (tagWorkspace ? '#' + compareTag : compareTag) : '选择比较标签'}</span>
                   </button>
                 )}
                 {tagSubTab === 'find' && (
@@ -1488,7 +1534,7 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
             {(selectedDocs.length > 0 || attachedSkills.length > 0 || attachedLocalFiles.length > 0 || attachedImages.length > 0) && (
               <div className="px-3 pt-2.5 pb-1.5 border-b border-border/50 space-y-2">
                 {/* 等高紧凑胶囊行 */}
-                <div className="flex flex-wrap items-center gap-1.5">
+                <div className={`flex flex-wrap items-center gap-1.5 ${workspaceContext ? 'max-h-24 overflow-y-auto' : ''}`}>
                   {selectedDocs.map(id => availableDocs.find(doc => doc.id === id)).filter(Boolean).map(doc => (
                     <span key={doc.id} className="h-[26px] pl-2 pr-1.5 rounded-lg bg-subtle border border-border/70 text-[11.5px] text-primary inline-flex items-center gap-1.5 max-w-[160px]">
                       <Icon name="fileText" className="w-3 h-3 text-secondary shrink-0" />
@@ -1599,7 +1645,7 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
                 >
                   <Icon name="database" className="w-3.5 h-3.5 text-secondary" />
                   <span className="truncate max-w-[96px]">
-                    {selectedLibs.length > 0 ? selectedLibs[0] : '未选库'} · {selectedDocs.length}篇
+                    {availableLibs.find(lib => lib.id === selectedLibs[0])?.name || '未选库'} · {selectedDocs.length}篇
                   </span>
                   <Icon name="chevronDown" className="w-3 h-3 opacity-55" />
                 </button>
@@ -1657,7 +1703,7 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
 
                 <button
                   onClick={handleSendMessage}
-                  disabled={!inputText.trim()}
+                  disabled={!canSend}
                   className="w-7 h-7 rounded-xl bg-primary text-white flex items-center justify-center disabled:opacity-25 hover:opacity-90 transition-opacity shrink-0"
                   title="发送 (Enter)"
                 >
@@ -1717,7 +1763,7 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
 
           {/* @ 资料引用快捷触发菜单 */}
           {atMenuOpen && (
-            <div className="absolute bottom-[74px] left-4 w-64 bg-surface/95 glass rounded-2xl border border-border shadow-popover p-1.5 z-40 text-xs animate-fadeIn">
+            <div className="absolute bottom-[74px] left-4 w-64 max-h-[40vh] overflow-y-auto bg-surface/95 glass rounded-2xl border border-border shadow-popover p-1.5 z-40 text-xs animate-fadeIn">
               <div className="px-2 py-1 text-[10.5px] font-semibold text-muted">引用核心资料 (@)</div>
               {availableDocs.map(doc => (
                 <button
@@ -1764,8 +1810,8 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
                     <button
                       key={t.name}
                       onClick={() => {
-                        if (tagPickerSlot === 'target') setTargetTag(t.name);
-                        else setCompareTag(t.name);
+                        if (tagPickerSlot === 'target') setTargetTag(t.value ?? t.name);
+                        else setCompareTag(t.value ?? t.name);
                         setTagPickerSlot(null);
                       }}
                       className="w-full px-2.5 py-1.5 rounded-xl hover:bg-hover flex items-center justify-between text-xs"
@@ -1962,7 +2008,7 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                {documentContext ? (
+                {workspaceContext ? (
                   <button onClick={() => setHistoryOpen(false)} className="w-full px-2.5 py-2 rounded-xl hover:bg-hover text-left text-xs font-medium text-primary truncate">
                     {threadTitle}
                   </button>
@@ -2155,7 +2201,7 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
                               <div className="min-w-0">
                                 <div className="font-medium text-primary flex items-center gap-1.5">
                                   <span className="truncate">{doc.name}</span>
-                                  {doc.current && <span className="px-1.5 py-0.2 rounded bg-primary text-white text-[9.5px]">当前页</span>}
+                                  {doc.current && <span className="px-1.5 py-0.2 rounded bg-primary text-white text-[9.5px]">{doc.current}</span>}
                                 </div>
                                 <div className="text-[10.5px] text-muted truncate mt-0.5">{doc.path}</div>
                               </div>
@@ -2183,7 +2229,7 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
                           <div className="text-[10.5px] text-muted">{lib.source} · {lib.count}</div>
                         </div>
                       </div>
-                      <Toggle checked={checked} onChange={() => setSelectedLibs(prev => checked ? prev.filter(l => l !== lib.id) : [...prev, lib.id])} />
+                      <Toggle checked={checked} label={lib.name} onChange={() => setSelectedLibs(prev => checked ? prev.filter(l => l !== lib.id) : [...prev, lib.id])} />
                     </div>
                   );
                 })}
@@ -2300,7 +2346,7 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
                   <div className="space-y-1.5">
                     <div className="text-[11px] font-medium text-secondary">目标页面</div>
                     <div className="flex flex-wrap gap-1.5">
-                      {(documentContext ? [documentContext.name] : ['2023-02-02', '8_竞品和参考', 'DXF 线表规范']).map(p => (
+                      {(workspaceContext ? [workspaceContext.name] : ['2023-02-02', '8_竞品和参考', 'DXF 线表规范']).map(p => (
                         <button
                           key={p}
                           onClick={() => setSaveNoteTarget(p)}
@@ -2324,7 +2370,7 @@ export default function ReferenceAgent({ onDismiss, documentContext, open }) {
 
                 <div className="p-3 rounded-xl bg-canvas border border-border text-[11.5px] text-secondary leading-relaxed">
                   <div className="font-semibold text-primary mb-1">{saveNoteTitle}</div>
-                  <p className="line-clamp-3">{documentContext ? currentMessagesList.findLast(msg => msg.role === 'assistant')?.text : '建议采用普通回执列表和一处 status 状态区。用户展开回执或离开列表末尾后，Hub 继续接收结果，同时保留阅读位置、展开状态和键盘焦点...'}</p>
+                  <p className="line-clamp-3">{workspaceContext ? currentMessagesList.findLast(msg => msg.role === 'assistant')?.text : '建议采用普通回执列表和一处 status 状态区。用户展开回执或离开列表末尾后，Hub 继续接收结果，同时保留阅读位置、展开状态和键盘焦点...'}</p>
                 </div>
               </div>
               <div className="px-4 py-3 border-t border-border bg-subtle/40 flex items-center justify-end gap-2">

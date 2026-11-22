@@ -6,17 +6,14 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ReferenceAgent from './ReferenceAgent';
 import referenceStyles from './reference.css?inline';
+import type { TagReviewModel } from '../tag-assistant';
+import type { WorkspaceAgentsContext } from './workspace-context';
 
-export type AgentsDocumentContext = {
-  id: string;
-  name: string;
-  path: string;
-  text: string;
-};
-
-export function ReferenceSurface({ onDismiss, documentContext, open = true }: {
+export function ReferenceSurface({ onDismiss, workspaceContext, tagWorkspace, onOpenTagQueue, open = true }: {
   onDismiss?: () => void;
-  documentContext?: AgentsDocumentContext;
+  workspaceContext?: WorkspaceAgentsContext;
+  tagWorkspace?: TagReviewModel;
+  onOpenTagQueue?: (id: string) => void;
   open?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
@@ -36,7 +33,7 @@ export function ReferenceSurface({ onDismiss, documentContext, open = true }: {
     <div ref={host}>{surface && createPortal(
       <>
         <style>{referenceStyles}</style>
-        <ReferenceAgent onDismiss={onDismiss} documentContext={documentContext} open={open} />
+        <ReferenceAgent onDismiss={onDismiss} workspaceContext={workspaceContext} tagWorkspace={tagWorkspace} onOpenTagQueue={onOpenTagQueue} open={open} />
       </>,
       surface,
     )}</div>
