@@ -19,6 +19,43 @@ it("keeps answer actions beside copy, bound to each historical answer without an
  await act(async()=>toolbars[1].querySelector<HTMLButtonElement>('.agent-answer-destinations button')!.click());
  expect(chosen).toHaveBeenCalledExactlyOnceWith('second');
 });
+it("lists each available source once while inline citations retain their own quote",async()=>{
+ const source={title:"装配说明",sourcePath:"工程/装配说明",content:"评审稿与版本记录",startChar:0,endChar:8,totalChars:8,truncated:false};
+ const report:Report={status:"completed",summary:"核对版本",findings:[],nextSteps:[],questions:[],limitations:[],waitCondition:"",
+  prose:{markdown:"依据 [1] 和 [2]。失效引用 [3]。",citations:[
+   {evidenceId:"e1",quote:"评审稿"},{evidenceId:"e1",quote:"版本记录"},{evidenceId:"e2",quote:"旧来源"}
+  ]}};
+ const open=vi.fn();
+ await act(async()=>root.render(<AgentConversation conversation={{messages:[{id:"answer",role:"assistant",runId:"run",createdAt:1,report,evidence:[source]}],hasEarlier:false}} revoked={false} onOpenCitation={open}/>));
+ const sources=host.querySelector('[aria-label="回答来源"]')!;
+ expect(sources.querySelectorAll("button")).toHaveLength(1);
+ expect(sources.textContent).toContain("装配说明");
+ await act(async()=>sources.querySelector("button")!.click());
+ await act(async()=>host.querySelectorAll<HTMLButtonElement>(".agent-inline-citation")[1].click());
+ expect(open.mock.calls).toEqual([["run",0,"评审稿"],["run",0,"版本记录"]]);
+ expect(host.querySelectorAll<HTMLButtonElement>(".agent-inline-citation")[2].disabled).toBe(true);
+});
+
+it("copies the settled public process summary without the answer or unpublished draft",async()=>{
+ const writeText=vi.fn().mockResolvedValue(undefined);
+ const clipboard=Object.getOwnPropertyDescriptor(navigator,"clipboard");
+ Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText}});
+ try {
+  const value:ActivityRun={...activity("尚未核验的草稿"),events:[
+   {id:"read",kind:"context",state:"completed",label:"已读取授权材料",createdAt:1},
+   ...activity("尚未核验的草稿").events,
+   {id:"final",kind:"answer",state:"completed",label:"正式回答",createdAt:3},
+  ]};
+  await act(async()=>root.render(<AgentActivity value={value}/>));
+  await act(async()=>host.querySelector<HTMLButtonElement>(".agent-runtime-toggle")!.click());
+  await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="复制工作过程摘要"]')!.click());
+  expect(writeText).toHaveBeenCalledExactlyOnceWith("已读取授权材料");
+ } finally {
+  if(clipboard)Object.defineProperty(navigator,"clipboard",clipboard);
+  else Reflect.deleteProperty(navigator,"clipboard");
+ }
+});
+
 async function expand(){const details=host.querySelector<HTMLDetailsElement>("details.agent-tool-result")!;await act(async()=>{details.open=true;details.dispatchEvent(new Event("toggle"));});}
 it("CN05 unverified final is findable while process is collapsed and renders only on demand",async()=>{
  const text="中🙂".repeat(17000)+"完整尾句";await act(async()=>root.render(<AgentActivity value={activity(text)}/>));

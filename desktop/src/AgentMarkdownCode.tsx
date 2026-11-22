@@ -1,7 +1,13 @@
-import { useState, type ComponentProps } from "react";
+import { useState, type ComponentProps, type ReactNode } from "react";
 import { WrapText } from "lucide-react";
 import type { ExtraProps } from "react-markdown";
 import { AgentAnswerActions } from "./AgentAnswerActions";
+
+export function AgentMarkdownTable({ children }: { children?: ReactNode }) {
+  return <div className="agent-table-scroll" role="region" aria-label="回答表格，可横向滚动" tabIndex={0}>
+    <table>{children}</table>
+  </div>;
+}
 
 const languageNames: Record<string, string> = {
   powershell: "PowerShell", pwsh: "PowerShell", ps1: "PowerShell",

@@ -11,14 +11,14 @@ afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.useRealT
 it("keeps one time disclosure above the timeline and preserves the user's collapse during streaming",async()=>{
  await act(async()=>root.render(<AgentActivity value={run}/>));
  const toggle=host.querySelector<HTMLButtonElement>('.agent-activity-toggle')!;
- expect(host.querySelector('section')?.firstElementChild).toBe(toggle);
+ expect(host.querySelector('.agent-activity-heading')?.firstElementChild).toBe(toggle);
  expect(toggle.querySelector('.agent-run-time')?.textContent).toMatch(/^已处理 /);
  expect(toggle.getAttribute('aria-expanded')).toBe('true');
  expect(host.querySelector('.agent-spinning')).toBeNull();
  await act(async()=>toggle.click());
  expect(host.querySelector('.agent-activity-events')).toBeNull();
  await act(async()=>root.render(<AgentActivity value={{...run,events:[...run.events,{id:'next',kind:'message',state:'completed',label:'第二次进展',createdAt:2000}]}}/>));
- expect(host.querySelector('section')?.firstElementChild).toBe(toggle);
+ expect(host.querySelector('.agent-activity-heading')?.firstElementChild).toBe(toggle);
  expect(toggle.getAttribute('aria-expanded')).toBe('false');
  expect(host.querySelector('.agent-live-progress')).toBeNull();
  await expandProcess();

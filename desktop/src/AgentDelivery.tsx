@@ -1,4 +1,4 @@
-import { PencilLine } from "lucide-react";
+import { FileText, PencilLine } from "lucide-react";
 import { type MaterialKind } from "./AgentMaterialCard";
 import {AgentRequestContent, requestPresentation, type MessageSkill} from "./AgentRequestContent";
 import type {InvestigationLocator} from "./AgentInvestigation";
@@ -9,7 +9,7 @@ import { createContext, Fragment, memo, useContext, type ReactNode } from "react
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Element, Root, Text } from "hast";
-import { AgentMarkdownCode } from "./AgentMarkdownCode";
+import { AgentMarkdownCode, AgentMarkdownTable } from "./AgentMarkdownCode";
 import { AgentActivity, type ActivityRun } from "./AgentActivity";
 import type { ImageGrant } from "./AgentImages";
 export type Citation = { evidenceId: string; quote: string };
@@ -46,7 +46,7 @@ const reportMarkdownComponents = {
   a: ReportLink,
   img: ({ alt }: { alt?: string }) => <span>{alt}</span>,
   pre: AgentMarkdownCode,
-  table: ({ children }: { children?: ReactNode }) => <div className="agent-table-scroll" role="region" aria-label="回答表格，可横向滚动" tabIndex={0}><table>{children}</table></div>,
+  table: AgentMarkdownTable,
 };
 const reportRemarkPlugins = [remarkGfm];
 function reportCitations(citationCount: number) {
@@ -85,6 +85,25 @@ function SourceExcerpt({ value }: { value: Evidence }) {
   return <details className="agent-citation"><summary>{value.title}</summary><blockquote>{value.content}</blockquote><small>{value.sourcePath} · 第 {value.startChar + 1}–{value.endChar} 字符{value.truncated ? "（节选）" : ""}</small></details>;
 }
 
+function AnswerSources({ citations, evidence, runId, onOpenCitation }: { citations: Citation[]; evidence: Evidence[]; runId?: string; onOpenCitation?: CitationOpening }) {
+  if (!runId || !onOpenCitation) return null;
+  const seen = new Set<number>();
+  const sources = citations.flatMap(citation => {
+    const index = Number(citation.evidenceId.slice(1)) - 1;
+    if (!evidence[index] || seen.has(index)) return [];
+    seen.add(index);
+    return [{ index, quote: citation.quote, source: evidence[index] }];
+  });
+  if (!sources.length) return null;
+  return <div className="agent-answer-sources" role="group" aria-label="回答来源">
+    <span aria-hidden="true">来源</span>
+    {sources.map(({ index, quote, source }) => <button type="button" key={index} title={source.sourcePath || source.title}
+      onClick={() => onOpenCitation(runId, index, quote)}>
+      <FileText size={13} aria-hidden="true"/><span>{source.title}</span>
+    </button>)}
+  </div>;
+}
+
 function ReportContent({ value, evidence, runId, onOpenCitation, actions }: { value: Report; evidence: Evidence[]; runId?: string; onOpenCitation?: CitationOpening; actions?:ReactNode }) {
   if (value.prose) {
     const prose=value.prose;
@@ -94,8 +113,9 @@ function ReportContent({ value, evidence, runId, onOpenCitation, actions }: { va
     });
     return <div className="agent-report agent-answer">
       <ReportCitationContext.Provider value={{ citations: prose.citations, evidence, runId, onOpenCitation }}><ReportMarkdown markdown={prose.markdown} citationCount={prose.citations.length} /></ReportCitationContext.Provider>
-      <AgentWebSources sources={prose.webSources??[]}/>
       {!!value.limitations.length && <p className="agent-note">{value.limitations.join("；")}</p>}
+      <AnswerSources citations={prose.citations} evidence={evidence} runId={runId} onOpenCitation={onOpenCitation}/>
+      <AgentWebSources sources={prose.webSources??[]}/>
       <div className="agent-answer-toolbar"><AgentAnswerActions showLabel text={[prose.markdown,...value.limitations,copySources.length ? "来源：\n"+copySources.join("\n") : ""].filter(Boolean).join("\n\n")}/>{actions}</div>
     </div>;
   }

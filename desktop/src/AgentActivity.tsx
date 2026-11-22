@@ -7,7 +7,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AgentToolResult, type ToolResultRef, type ToolResultScope } from "./AgentToolResult";
 import { AgentImagePreview } from "./AgentFileInputs";
-import { AgentMarkdownCode } from "./AgentMarkdownCode";
+import { AgentAnswerActions } from "./AgentAnswerActions";
+import { AgentMarkdownCode, AgentMarkdownTable } from "./AgentMarkdownCode";
 
 type ActivitySource = {url:string;title?:string|null;query?:string|null};
 type PatchPreview = {patch?:string|null;truncated?:boolean; added?:number|null; removed?:number|null};
@@ -51,8 +52,10 @@ function useActivityDisclosure(key:string,initial:boolean):[boolean,(value:boole
   }];
 }
 
+const publicMarkdownComponents = { img: () => null, a: ({ children }: { children?: ReactNode }) => <span>{children}</span>, pre: AgentMarkdownCode, table: AgentMarkdownTable };
+const publicMarkdownPlugins = [remarkGfm];
 const PublicText = memo(function PublicText({ text }: { text: string }) {
-  return <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={{img:()=>null,a:({children})=><span>{children}</span>,pre:AgentMarkdownCode,table:({children})=><div className="agent-table-scroll"><table>{children}</table></div>}}>{text}</ReactMarkdown>;
+  return <ReactMarkdown remarkPlugins={publicMarkdownPlugins} skipHtml components={publicMarkdownComponents}>{text}</ReactMarkdown>;
 });
 
 function UnpublishedAnswer({text,truncated}:{text:string;truncated?:boolean}) {
@@ -600,6 +603,15 @@ export function AgentActivity({ value, onRecheck, requestText }: { value: Activi
   const timeLabel=processing ? "已处理" : "用时";
   const publicSummaries=value.events.filter(event=>event.kind==="reasoning"&&event.origin==="deepseek");
   const processEvents=value.events.filter(event=>event.kind!=="answer"&&!(showRecovery&&event.kind==="unpublishedAnswer")&&!isThinkingPlaceholder(event)&&!(event.kind==="message"&&publicSummaries.some(summary=>summary.label.trim()===event.label.trim()&&summary.createdAt<=event.createdAt))).sort((a,b)=>a.sequence!=null&&b.sequence!=null?a.sequence-b.sequence:a.createdAt-b.createdAt);
+  const publicProcess = !value.validity && !value.running
+    ? processEvents.filter(event => event.kind !== "unpublishedAnswer" && event.label.trim()) : [];
+  const hasProcessOptions = !!value.capabilities || publicProcess.length > 0;
+  const processSummary = permissionsOpen
+    ? publicProcess.map(event => {
+        const label = event.kind === "webSearch" ? webLabel(event) : activityLabel(event).trim();
+        return label ? [label, eventStateLabel(event)].filter(Boolean).join(" · ") : "";
+      }).filter(Boolean).join("\n")
+    : "";
   const stopped = !value.running && ["failed","interrupted","needsDecision"].includes(value.state);
   const failure = stopped ? newest.find(event=>event.state==="failed" || event.state==="interrupted") : undefined;
   const toolIssues=processEvents.filter(event=>isOperation(event)&&event.kind!=="webSearch"&&(event.state==="failed"||event.state==="interrupted"));
@@ -624,16 +636,17 @@ export function AgentActivity({ value, onRecheck, requestText }: { value: Activi
       <span className="agent-run-time">{timeLabel} {duration}</span>{stateLabel && <span className="agent-activity-state">{stateLabel}</span>}<ChevronDown className={processOpen ? "" : "agent-collapsed"} size={13} aria-hidden="true"/>
     </button> : (!processing || value.capabilities) && <p className="agent-elapsed">{timeLabel} {duration}{stateLabel && <> · {stateLabel}</>}</p>;
   return <section className="agent-activity" data-live={processing || undefined} aria-label="本轮工作过程">
-    {value.capabilities ? <>
-      <div className="agent-activity-heading">
-        {timeControl}
-        <button type="button" className="agent-runtime-toggle" aria-label="本轮工具与权限" title="本轮工具与权限"
+    <div className="agent-activity-heading">
+      {timeControl}
+      {hasProcessOptions && <button type="button" className="agent-runtime-toggle" aria-label={value.capabilities ? "本轮工具与权限" : "过程选项"} title="过程选项"
           aria-expanded={permissionsOpen} aria-controls={permissionsId} onClick={()=>setPermissionsOpen(!permissionsOpen)}>
-          <Ellipsis size={16} aria-hidden="true"/>
-        </button>
-      </div>
-      {permissionsOpen && <div id={permissionsId}><RuntimePermissions capabilities={value.capabilities} events={processEvents}/></div>}
-    </> : timeControl}
+        <Ellipsis size={16} aria-hidden="true"/>
+      </button>}
+    </div>
+    {permissionsOpen && hasProcessOptions && <div id={permissionsId} className="agent-activity-options">
+      {value.capabilities && <RuntimePermissions capabilities={value.capabilities} events={processEvents}/>}
+      {processSummary && <AgentAnswerActions text={processSummary} label="工作过程摘要" buttonText="复制工作过程摘要" showLabel/>}
+    </div>}
     {value.validity && <div className="agent-process-failure" role="status">
       <TriangleAlert size={14} aria-hidden="true"/><span>{value.validity}</span>
       {onRecheck && <button type="button" onClick={onRecheck}>准备重新核对</button>}
