@@ -531,7 +531,7 @@
 
     @media (max-width: 820px) {
       #desktop-sidebar {
-        position: fixed; top: 44px; bottom: 26px; left: 0; z-index: 40;
+        position: fixed; top: 0; bottom: 26px; left: 0; z-index: 40;
         box-shadow: 12px 0 32px rgba(15, 23, 42, 0.12);
       }
       #desktop-sidebar.collapsed { transform: translateX(-100%); width: 236px !important; opacity: 0; pointer-events: none; }
@@ -578,74 +578,30 @@
   <!-- Full Desktop App Shell -->
   <div id="app-shell" class="flex flex-col h-screen w-screen overflow-hidden">
 
-    <!-- macOS Unified Translucent Titlebar (44px) -->
-    <header class="mac-titlebar h-11 flex items-center justify-between px-3.5 shrink-0 z-30">
-      <div class="flex items-center gap-3 min-w-0">
-        <div class="hidden sm:flex items-center gap-1.5 pr-1" aria-hidden="true">
-          <span class="traffic-dot" style="background:#FF5F57"></span>
-          <span class="traffic-dot" style="background:#FEBC2E"></span>
-          <span class="traffic-dot" style="background:#28C840"></span>
-        </div>
-
-        <button id="btn-toggle-sidebar" class="icon-btn" title="收起/展开侧栏 (⌘\)" aria-label="切换侧栏">
-          <i data-lucide="panel-left" class="w-4 h-4"></i>
-        </button>
-
-        <div class="flex items-center gap-1.5 text-[12.5px] min-w-0 truncate">
-          <span class="font-medium" style="color:var(--ink-tertiary)">Hub 工作台</span>
-          <span style="color:var(--ink-muted)">/</span>
-          <span id="titlebar-crumb" class="font-medium truncate" style="color:var(--ink-primary)">Car · Craft</span>
-          <span id="titlebar-scope-badge" class="hidden md:inline-flex items-center gap-1 ml-1.5 px-2 py-0.5 rounded-full text-[11px] font-mono-eng" style="background:var(--bg-subtle); color:var(--ink-secondary)">
-            层级目录 · 实时预览
-          </span>
-        </div>
-      </div>
-
-      <!-- Center: Spotlight Command Palette Trigger -->
-      <button id="btn-open-palette" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] transition-all cursor-pointer max-w-[320px] w-full sm:w-64 md:w-72" style="background:var(--bg-subtle); border:0.5px solid var(--hairline); color:var(--ink-tertiary)">
-        <i data-lucide="search" class="w-3.5 h-3.5 shrink-0"></i>
-        <span class="truncate flex-1 text-left">快速搜索、跳转空间或执行命令...</span>
-        <kbd class="font-mono-eng text-[10.5px] px-1.5 py-0.5 rounded" style="background:var(--bg-paper); border:0.5px solid var(--hairline); color:var(--ink-secondary)">⌘K</kbd>
-      </button>
-
-      <!-- Right: Module Mode Switch + Sync Telemetry + Serif Toggle + Settings -->
-      <div class="flex items-center gap-1.5 shrink-0">
-        <div id="pro-module-controls" class="hidden items-center gap-1 mr-1">
-          <div class="pro-pill-wrap" role="tablist" aria-label="原型版本切换">
-            <button id="btn-mode-pro" class="pro-pill-btn active" title="使用独立高保真专题原型">高保真</button>
-            <button id="btn-mode-v3" class="pro-pill-btn" title="切换回 v3 轻量内置视图对比">v3 轻量</button>
-          </div>
-          <a id="btn-popout-module" href="#" target="_blank" rel="noopener" class="icon-btn" title="在新标签页独立打开当前专题原型" aria-label="独立打开">
-            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-          </a>
-        </div>
-        <button id="btn-sync-now" class="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11.5px] font-mono-eng transition-colors cursor-pointer hover:bg-black/5" style="color:var(--ink-secondary)" title="点击立即触发增量索引同步">
-          <span class="w-1.5 h-1.5 rounded-full" style="background:var(--accent-green)"></span>
-          <span id="sync-label">SQLite · 3,223</span>
-        </button>
-
-        <button id="btn-toggle-serif" class="icon-btn" title="切换衬线/无衬线阅读字体" aria-label="切换阅读字体">
-          <i data-lucide="type" class="w-4 h-4"></i>
-        </button>
-
-        <button id="btn-open-settings" class="icon-btn" title="连接、MCP 与工作台设置" aria-label="打开设置">
-          <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
-        </button>
-      </div>
-    </header>
-
     <!-- Main Workspace Body -->
     <div class="flex flex-1 min-h-0 overflow-hidden relative">
 
       <!-- Unified macOS Frosted Left Sidebar -->
       <aside id="desktop-sidebar" class="mac-vibrancy hairline-r w-[236px] shrink-0 flex flex-col justify-between transition-all duration-150 overflow-hidden">
+        <!-- Sidebar Top: Inline Command Palette Trigger + Sidebar Collapse (Notion / Linear style) -->
+        <div class="h-11 px-2.5 shrink-0 hairline-b flex items-center gap-1.5">
+          <button id="btn-open-palette" class="flex-1 min-w-0 h-7 flex items-center gap-1.5 px-2 rounded-lg text-[11.5px] transition-all cursor-pointer hover:bg-white" style="background:rgba(255,255,255,0.72); border:0.5px solid var(--hairline); color:var(--ink-tertiary)" title="快速搜索、跳转空间或执行命令 (⌘K)">
+            <i data-lucide="search" class="w-3.5 h-3.5 shrink-0"></i>
+            <span class="truncate flex-1 text-left">搜索或跳转...</span>
+            <kbd class="font-mono-eng text-[10px] px-1 py-0.5 rounded shrink-0" style="background:var(--bg-subtle); color:var(--ink-secondary)">⌘K</kbd>
+          </button>
+          <button id="btn-toggle-sidebar" class="icon-btn shrink-0" title="收起侧栏 (⌘\)" aria-label="切换侧栏">
+            <i data-lucide="panel-left" class="w-4 h-4"></i>
+          </button>
+        </div>
+
         <div class="flex-1 overflow-y-auto px-2.5 py-3 space-y-5">
 
           <!-- Primary Workspace Nav -->
           <div>
             <div class="px-2.5 mb-1.5 flex items-center justify-between">
               <span class="text-[10.5px] font-semibold tracking-wider uppercase" style="color:var(--ink-tertiary)">工作区</span>
-              <span class="text-[10px] font-mono-eng" style="color:var(--ink-muted)">v3 · Base White</span>
+              <span class="text-[10px] font-mono-eng" style="color:var(--ink-muted)">Hub · Base White</span>
             </div>
             <nav id="sidebar-nav-list" class="space-y-0.5"></nav>
           </div>
@@ -672,18 +628,25 @@
 
         </div>
 
-        <!-- Codex Engineering Status Footer -->
-        <div class="hairline-t px-3 py-2.5 space-y-1.5" style="background: rgba(15, 23, 42, 0.015)">
-          <div class="flex items-center justify-between text-[11px]">
+        <!-- Codex Engineering Status & Quiet Settings Footer -->
+        <div class="hairline-t px-2.5 py-2 space-y-1.5" style="background: rgba(15, 23, 42, 0.015)">
+          <div class="flex items-center justify-between text-[11px] px-0.5">
             <span class="flex items-center gap-1.5 font-medium" style="color:var(--ink-secondary)">
               <span class="w-1.5 h-1.5 rounded-full" style="background:var(--accent-green)"></span>
               VPS Agent 在线
             </span>
             <span class="font-mono-eng text-[10.5px]" style="color:var(--ink-tertiary)">gpt-6.1-sol</span>
           </div>
-          <div class="flex items-center justify-between text-[10.5px] font-mono-eng" style="color:var(--ink-tertiary)">
-            <span>MCP: 3 已连接</span>
-            <span>FTS5 · 9ms</span>
+          <div class="flex items-center justify-between pt-0.5">
+            <span class="text-[10.5px] font-mono-eng px-0.5" style="color:var(--ink-tertiary)">MCP 3 · FTS5 9ms</span>
+            <div class="flex items-center gap-0.5">
+              <button id="btn-toggle-serif" class="icon-btn !w-6 !h-6" title="切换衬线/无衬线阅读字体" aria-label="切换阅读字体">
+                <i data-lucide="type" class="w-3.5 h-3.5"></i>
+              </button>
+              <button id="btn-open-settings" class="icon-btn !w-6 !h-6" title="连接、MCP 与工作台设置" aria-label="打开设置">
+                <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -703,15 +666,32 @@
     </div>
 
     <!-- Quiet macOS Bottom Status Bar (26px) -->
-    <footer id="app-statusbar" class="h-[26px] px-3.5 shrink-0 hairline-t flex items-center justify-between text-[11px] font-mono-eng z-30" style="background:var(--bg-sidebar); color:var(--ink-tertiary)">
-      <div class="flex items-center gap-3 min-w-0">
-        <span class="inline-flex items-center gap-1.5">
+    <footer id="app-statusbar" class="h-[26px] px-3 shrink-0 hairline-t flex items-center justify-between gap-3 text-[11px] font-mono-eng z-30" style="background:var(--bg-sidebar); color:var(--ink-tertiary)">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <button id="btn-status-sidebar" type="button" class="hidden items-center gap-1 px-1.5 py-0.5 rounded hover:bg-black/5 cursor-pointer shrink-0" style="color:var(--ink-secondary)" title="展开左侧导航栏 (⌘\)">
+          <i data-lucide="panel-left" class="w-3 h-3"></i>
+          <span>侧栏</span>
+        </button>
+        <button id="btn-status-palette" type="button" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-black/5 cursor-pointer shrink-0" style="color:var(--ink-secondary)" title="快速搜索、跳转空间或执行命令 (⌘K)">
+          <i data-lucide="search" class="w-3 h-3"></i>
+          <span>⌘K 跳转</span>
+        </button>
+        <button id="btn-sync-now" type="button" class="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-black/5 cursor-pointer shrink-0" style="color:var(--ink-secondary)" title="点击立即触发增量索引同步">
           <span class="w-1.5 h-1.5 rounded-full" style="background:var(--accent-green)"></span>
-          <span id="status-scope-text">Hub · 资料库层级浏览：↑↓ 实时连刷右侧预览 · ←→ 折叠展开 · ⌘+点击并排对照</span>
-        </span>
+          <span id="sync-label">SQLite · 3,223</span>
+        </button>
+        <span id="status-scope-text" class="hidden xl:inline truncate">Hub · 资料库层级浏览：↑↓ 实时连刷右侧预览 · ←→ 折叠展开 · ⌘+点击并排对照</span>
       </div>
-      <div class="flex items-center gap-3 shrink-0">
-        <span class="hidden md:inline">Base White · 统一预览架构</span>
+      <div class="flex items-center gap-2.5 shrink-0">
+        <div id="pro-module-controls" class="hidden items-center gap-1">
+          <div class="pro-pill-wrap !p-[1px]" role="tablist" aria-label="原型版本切换">
+            <button id="btn-mode-pro" class="pro-pill-btn !py-[2px] !px-1.5 !text-[10.5px] active" title="使用独立高保真专题原型">高保真</button>
+            <button id="btn-mode-v3" class="pro-pill-btn !py-[2px] !px-1.5 !text-[10.5px]" title="切换回 v3 轻量内置视图对比">v3 轻量</button>
+          </div>
+          <a id="btn-popout-module" href="#" target="_blank" rel="noopener" class="inline-flex items-center justify-center w-5 h-5 rounded hover:bg-black/5" style="color:var(--ink-secondary)" title="在新标签页独立打开当前专题原型" aria-label="独立打开">
+            <i data-lucide="external-link" class="w-3 h-3"></i>
+          </a>
+        </div>
         <div id="quick-assistant-controls" class="agent-demo-menu" hidden>
           <button id="btn-agent-demo-menu" type="button" class="agent-demo-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="agent-demo-popover" title="切换助手原型示例">
             <span id="agent-demo-dot" class="agent-case-dot" style="background:#6366F1"></span>
@@ -1509,26 +1489,6 @@
     ];
 
     function renderChrome() {
-      const crumb = document.getElementById('titlebar-crumb');
-      const badge = document.getElementById('titlebar-scope-badge');
-
-      if (state.view === 'space') {
-        const labelMap = { favorites: '跨库收藏', topic: '线束专题' };
-        crumb.textContent = labelMap[state.spaceLib] || getLib(state.spaceLib).name;
-        badge.textContent = state.spaceSurface === 'dual'
-          ? '双白纸并排对照'
-          : state.spaceBrowseMode === 'tree' ? '层级目录 · 实时预览' : '空间卡片 · 实时预览';
-      } else {
-        const activeNav = NAV_ITEMS.find(n => n.id === state.view) || NAV_ITEMS[0];
-        crumb.textContent = activeNav.label;
-        if (isEmbedActive(state.view)) {
-          badge.textContent = EMBED_MODULES[state.view].badgeText;
-        } else {
-          const count = state.selectedLibraries.size;
-          badge.textContent = count === LIBRARIES.length ? `全部 ${count} 资料库` : `已选 ${count}/${LIBRARIES.length} 库`;
-        }
-      }
-
       const proCtrl = document.getElementById('pro-module-controls');
       if (EMBED_MODULES[state.view]) {
         proCtrl.classList.remove('hidden');
@@ -1544,14 +1504,19 @@
       document.getElementById('btn-toggle-serif').classList.toggle('active', state.serifReading);
 
       const sidebar = document.getElementById('desktop-sidebar');
+      const statusSidebarBtn = document.getElementById('btn-status-sidebar');
       if (state.sidebarCollapsed) {
         sidebar.classList.add('collapsed');
         sidebar.style.width = '0px';
         sidebar.style.borderRightWidth = '0px';
+        statusSidebarBtn.classList.remove('hidden');
+        statusSidebarBtn.classList.add('inline-flex');
       } else {
         sidebar.classList.remove('collapsed');
         sidebar.style.width = '236px';
         sidebar.style.borderRightWidth = '0.5px';
+        statusSidebarBtn.classList.add('hidden');
+        statusSidebarBtn.classList.remove('inline-flex');
       }
 
       const navEl = document.getElementById('sidebar-nav-list');
@@ -3578,11 +3543,14 @@
     });
 
     document.getElementById('btn-toggle-sidebar').addEventListener('click', () => { sidebarAutoCollapsedByAssistant = false; state.sidebarCollapsed = !state.sidebarCollapsed; renderChrome(); });
+    document.getElementById('btn-status-sidebar').addEventListener('click', () => { sidebarAutoCollapsedByAssistant = false; state.sidebarCollapsed = false; renderChrome(); });
     document.getElementById('btn-toggle-libs').addEventListener('click', () => { state.libsCollapsed = !state.libsCollapsed; renderChrome(); });
     document.getElementById('btn-reset-libs').addEventListener('click', () => { state.selectedLibraries = new Set(LIBRARIES.map(l => l.id)); showToast('已恢复全部 6 个资料库'); renderAll(); });
     document.getElementById('btn-toggle-serif').addEventListener('click', () => { state.serifReading = !state.serifReading; renderAll(); });
     document.getElementById('btn-sync-now').addEventListener('click', () => { const l = document.getElementById('sync-label'); l.textContent = '同步中...'; setTimeout(() => { l.textContent = 'SQLite · 3,223'; showToast('增量同步完成 (9ms)', 'refresh-cw'); }, 400); });
-    document.getElementById('btn-open-palette').addEventListener('click', () => { state.paletteOpen = true; state.paletteQuery = ''; renderPalette(); const i = document.getElementById('palette-input'); i.value = ''; i.focus(); });
+    const openCommandPalette = () => { state.paletteOpen = true; state.paletteQuery = ''; renderPalette(); const i = document.getElementById('palette-input'); i.value = ''; i.focus(); };
+    document.getElementById('btn-open-palette').addEventListener('click', openCommandPalette);
+    document.getElementById('btn-status-palette').addEventListener('click', openCommandPalette);
     document.getElementById('modal-palette').addEventListener('click', e => { if (e.target.id === 'modal-palette') { state.paletteOpen = false; renderPalette(); } });
     document.getElementById('palette-input').addEventListener('input', e => { state.paletteQuery = e.target.value; state.paletteIndex = 0; renderPalette(); });
     document.getElementById('palette-input').addEventListener('keydown', e => {
