@@ -11,6 +11,7 @@ import type { LibrarySummary } from "./SearchTypes";
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
+vi.mock("./AgentInvestigation", () => ({ ReadingInvestigation: () => <button type="button">询问助手</button> }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(async () => null) }));
 
 const libraries: LibrarySummary[] = [
@@ -108,7 +109,7 @@ it("passes a saved-copy library filter while preserving source and revealing its
   await mount();
   await act(async () => container.querySelector<HTMLButtonElement>(".collection-chip-likes")!.click());
   await act(async () => vi.advanceTimersByTimeAsync(160));
-  await clickNavigation("已保存副本");
+  await clickNavigation("资料库副本");
   const libraryButton = [...container.querySelectorAll<HTMLButtonElement>('[aria-label="阅读导航"] button')].find(button => button.textContent?.includes("Craft") && button.textContent.includes("Main"));
   expect(libraryButton).toBeTruthy(); await act(async () => libraryButton!.click());
   await act(async () => vi.advanceTimersByTimeAsync(160));
@@ -127,6 +128,8 @@ it("saves explicit query conditions and later layout changes in the named view w
   await changeField("阅读标签筛选", "AI");
   await clickButton("新建视图"); await changeField("新视图名称", "AI 视频待读"); await clickButton("创建视图");
   await clickButton("画廊");
+  expect(container.querySelector(".collection-nav-view-changes")).toBeTruthy();
+  await clickButton("更新视图");
   expect(container.querySelector(".collection-nav-view-changes")).toBeNull();
   await clickNavigation("全部内容"); await clickNavigation("AI 视频待读");
   expect(latestQuery()).toMatchObject({ source: "all", status: "unread", media: "video", filters: { tags: ["AI"], collectedWithinDays: 7 } });
@@ -145,11 +148,11 @@ it.each(["列表", "表格", "看板", "画廊"])("offers target-specific recove
   invoke.mockImplementation(async (command: string) => command === "list_collection_items" ? { ...page, items: [{ ...item, attentionOperations: operations.filter(operation => operation.phase !== "cancelled") }] } : command === "get_collection_storage" ? storage : command === "list_libraries" ? libraries : []);
   await mount(); await clickButton(layout); await clickNavigation("需要处理");
   expect(latestQuery()).toMatchObject({ status: "needs_attention" });
-  const actions = container.querySelector(".collection-attention-actions")!;
-  expect(actions.textContent).toContain("Main：继续补齐");
-  expect(actions.textContent).toContain("滴答清单：待核对");
-  expect(actions.querySelectorAll("button")).toHaveLength(2);
-  await act(async () => [...actions.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("滴答清单"))!.click());
+  const triage = container.querySelector(".reading-triage")!;
+  expect(triage.querySelector('[aria-label="后台可恢复"]')?.textContent).toContain("Main");
+  expect(triage.querySelector('[aria-label="待你确认"]')?.textContent).toContain("滴答清单");
+  expect(triage.querySelectorAll(".collection-attention-actions button")).toHaveLength(2);
+  await clickButton("核对并关联");
   expect(container.querySelector("dialog[open]")?.textContent).toContain("实际创建的页面或任务 ID");
   expect(localCallsOnly()).toBe(true);
 });

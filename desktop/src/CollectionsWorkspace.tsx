@@ -4,7 +4,7 @@ import { userProfileStorage } from "./UserProfileStorage";
 import { CollectionSyncPanel, type CollectionSyncSource, type CollectionSyncJob } from "./CollectionSyncPanel";
 import { CollectionDestination, CollectionLibraryBadge, CollectionConversionPreview, type CollectionLibraryOperation } from "./CollectionDestination";
 import type { LibrarySummary } from "./SearchTypes";
-import { useCollectionViews, type CollectionView as View } from "./CollectionViews";
+import { collectionEntryLabels, useCollectionViews, type CollectionBuiltinEntry, type CollectionView as View } from "./CollectionViews";
 import type { CollectionItem, CollectionPage } from "./CollectionPage";
 import { CollectionColumnResize } from "./CollectionColumnResize";
 import { CollectionProperties } from "./CollectionProperties";
@@ -20,7 +20,7 @@ import { defaultCollectionCards, cardFields, type CardField } from "./Collection
 import { CollectionGalleryCover } from "./CollectionGalleryCover";
 import { CollectionSort, normalizeCollectionSorts } from "./CollectionSort";
 import { CollectionPostBody, collectionAttachments } from "./CollectionPostBody";
-import { ReadingArticleTools } from "./ReadingArticleTools";
+import { ReadingArticleTools, type ReadingArticleToolsHandle } from "./ReadingArticleTools";
 import { ReadingInvestigation } from "./AgentInvestigation";
 import "./PreviewContent.css";
 import { PreviewFrame, PreviewHeading, PreviewTitle, PreviewToolbar } from "./PreviewFrame";
@@ -28,12 +28,13 @@ import { usePreviewLinkCopy } from "./usePreviewLinkCopy";
 import { open as chooseDirectory } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useContext, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { ArrowLeft, ArrowUpRight, Bookmark, Archive, GripVertical, PanelRight, Circle, PanelLeft, RefreshCw, Search, FolderOpen, X, ListFilter, LoaderCircle } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Bookmark, Archive, GripVertical, PanelRight, Circle, PanelLeft, RefreshCw, Search, FolderOpen, X, ListFilter, LoaderCircle, LayoutList, Table2, Columns3, LayoutGrid, Paperclip, MoreHorizontal, Link2, Check, RotateCcw } from "lucide-react";
 import { WorkspaceFilterSummary } from "./WorkspaceFilterSummary";
 import { WorkspaceHeaderContext } from "./WorkspaceChrome";
 import { useVisiblePolling } from "./useVisiblePolling";
 import { SerialRefresh } from "./SerialRefresh";
 import "./CollectionsWorkspace.css";
+import "./ReadingWorkspaceReference.css";
 
 type Source = "bookmarks" | "likes" | "telegram" | "dida";
 const boardStatuses = ["unread", "in_progress", "read", "abandoned"] as const;
@@ -58,19 +59,28 @@ const PREVIEW_WIDTH_KEY = "hub.collection.preview-width-v1";
 const DEFAULT_PREVIEW_WIDTH = 520;
 const MIN_READING_PANEL = 300;
 const MAX_PREVIEW_WIDTH = 1600;
-const PREVIEW_DIVIDER_WIDTH = 8;
+const PREVIEW_DIVIDER_WIDTH = 10;
+const DEFAULT_BROWSE_WIDTH = 356;
+const READING_STAGE_PADDING = 20;
+const readingStatusShortcuts: Record<string,string> = { "1": "unread", "2": "in_progress", "3": "read" };
+const readingLayouts = [
+  { id: "list", label: "精简阅读流（双栏分屏）", icon: LayoutList },
+  { id: "table", label: "全宽属性表格", icon: Table2 },
+  { id: "board", label: "阅读进度看板", icon: Columns3 },
+  { id: "gallery", label: "视觉灵感画廊", icon: LayoutGrid },
+] as const;
 function loadPreviewWidth() {
   try {
     const value = Number(userProfileStorage.getItem(PREVIEW_WIDTH_KEY));
-    return Number.isFinite(value) && value > 0 ? Math.min(MAX_PREVIEW_WIDTH, Math.max(MIN_READING_PANEL, Math.round(value))) : DEFAULT_PREVIEW_WIDTH;
-  } catch { return DEFAULT_PREVIEW_WIDTH; }
+    return Number.isFinite(value) && value > 0 ? Math.min(MAX_PREVIEW_WIDTH, Math.max(MIN_READING_PANEL, Math.round(value))) : 0;
+  } catch { return 0; }
 }
 
 export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, onSearchTargetHandled }: { onToggleDesktopSidebar?: () => void; initialItemKey?: string; onSearchTargetHandled?: () => void }) {
   const shellHeader = useContext(WorkspaceHeaderContext);
-  const {view, updateView, activeEntry, updateSavedView, setNavigationCounts, settingsRevision, session, updateSession, pageSnapshot, dataRevision} = useCollectionViews();
+  const {view, updateView, activeEntry, isModified, selectView, updateSavedView, setNavigationCounts, settingsRevision, session, updateSession, pageSnapshot, dataRevision} = useCollectionViews();
   const [searchItemKey,setSearchItemKey]=useState<string|null>(null);
-  const changeView = (patch: Partial<View>) => {setSearchItemKey(null);updateView(patch);updateSavedView();updateSession({offset:0,scrollTop:0});};
+  const changeView = (patch: Partial<View>) => {setSearchItemKey(null);updateView(patch);updateSession({offset:0,scrollTop:0});};
   const query=view.query;
   const setQuery=(query:string)=>changeView({query});
   const offset=session.offset;
@@ -78,6 +88,9 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const selectedKey=session.selectedKey;
   const setSelectedKey=(selectedKey:string|null)=>{if(!selectedKey)setSearchItemKey(null);updateSession({selectedKey});};
   useEffect(()=>{if(initialItemKey){setSearchItemKey(initialItemKey);updateSession({selectedKey:initialItemKey,previewEnabled:true,offset:0});onSearchTargetHandled?.();}},[initialItemKey]);
+  const [openReadingKey,setOpenReadingKey]=useState<string|null>(null);
+  const [checkedKeys,setCheckedKeys]=useState<Set<string>>(()=>new Set());
+  const [articleMenu,setArticleMenu]=useState(false);
   const previewEnabled=session.previewEnabled;
   const setPreviewEnabled=(previewEnabled:boolean)=>updateSession({previewEnabled});
   const cards = {...defaultCollectionCards,...view.cards};
@@ -126,8 +139,10 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const [boardDragPreview,setBoardDragPreview]=useState<{title:string;x:number;y:number}|null>(null);
   const [filtersOpen,setFiltersOpen] = useState(false);
   const [searchOpen,setSearchOpen] = useState(false);
+  const filterAnchor=useRef<HTMLDivElement>(null);
   const [syncMenu,setSyncMenu] = useState(false);
   const databaseRef=useRef<HTMLDivElement>(null);
+  const inspectorRef=useRef<ReadingArticleToolsHandle>(null);
   const previewBackRef=useRef<HTMLButtonElement>(null);
   const bodyRef=useRef<HTMLDivElement>(null);
   const [bodyWidth,setBodyWidth]=useState(0);
@@ -135,9 +150,11 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const previewWidthRef=useRef(previewWidth);
   const resizeCleanup=useRef<(()=>void)|null>(null);
   const compactControls=runtimeCapabilities.mobile||(bodyWidth>0&&bodyWidth<700);
-  const compactPreview=runtimeCapabilities.mobile||(bodyWidth>0&&bodyWidth<MIN_READING_PANEL*2+PREVIEW_DIVIDER_WIDTH);
-  const maximumPreviewWidth=bodyWidth>0?Math.min(MAX_PREVIEW_WIDTH,Math.max(MIN_READING_PANEL,bodyWidth-MIN_READING_PANEL-PREVIEW_DIVIDER_WIDTH)):MAX_PREVIEW_WIDTH;
-  const effectivePreviewWidth=Math.min(maximumPreviewWidth,Math.max(MIN_READING_PANEL,previewWidth));
+  const compactPreview=runtimeCapabilities.mobile||(bodyWidth>0&&bodyWidth<MIN_READING_PANEL*2+PREVIEW_DIVIDER_WIDTH+READING_STAGE_PADDING);
+  const maximumPreviewWidth=bodyWidth>0?Math.min(MAX_PREVIEW_WIDTH,Math.max(MIN_READING_PANEL,bodyWidth-READING_STAGE_PADDING-MIN_READING_PANEL-PREVIEW_DIVIDER_WIDTH)):MAX_PREVIEW_WIDTH;
+  const defaultReaderWidth=bodyWidth>0?bodyWidth-READING_STAGE_PADDING-DEFAULT_BROWSE_WIDTH-PREVIEW_DIVIDER_WIDTH:DEFAULT_PREVIEW_WIDTH;
+  const effectivePreviewWidth=Math.min(maximumPreviewWidth,Math.max(MIN_READING_PANEL,previewWidth||defaultReaderWidth));
+  const useSplitReading=!compactPreview&&view.layout==="list"&&!view.attentionOnly;
   useEffect(()=>{
     const body=bodyRef.current;if(!body)return;
     const measure=()=>setBodyWidth(Math.round(body.getBoundingClientRect().width));
@@ -150,6 +167,11 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
     const width=Math.min(maximumPreviewWidth,Math.max(MIN_READING_PANEL,Math.round(value)));
     previewWidthRef.current=width;setPreviewWidth(width);
     try{userProfileStorage.setItem(PREVIEW_WIDTH_KEY,String(width));}catch{/* keep the width for this session */}
+  };
+  const resetPreviewWidth=()=>{
+    previewWidthRef.current=0;
+    setPreviewWidth(0);
+    try{userProfileStorage.removeItem(PREVIEW_WIDTH_KEY);}catch{/* retain the reset for this session */}
   };
   const resizePreview=(event:ReactPointerEvent<HTMLDivElement>)=>{
     if(event.button!==0||compactPreview)return;event.preventDefault();resizeCleanup.current?.();
@@ -167,7 +189,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
     else if(event.key==="ArrowRight")width-=event.shiftKey?40:16;
     else if(event.key==="Home")width=MIN_READING_PANEL;
     else if(event.key==="End")width=maximumPreviewWidth;
-    else if(event.key==="Enter")width=DEFAULT_PREVIEW_WIDTH;
+    else if(event.key==="Enter"){event.preventDefault();resetPreviewWidth();return;}
     else return;event.preventDefault();persistPreviewWidth(width);
   };
   const positionRestored=useRef(false);
@@ -262,8 +284,34 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const sources: SourceState[] = (["bookmarks","likes","telegram","dida"] as Source[]).map(id=>page?.sources?.find(source=>source.id===id)||{id,count:id==="bookmarks"?(page?.total||0):0,connected:id==="bookmarks"?!!page?.connected:id==="dida"?libraries.some(l=>l.provider==="dida365"&&l.connected):false,canResume:id==="bookmarks"?!!page?.canResume:false,status:id==="bookmarks"?(page?.status||""):""});
   const activeTotal=page?.sources?.length?sources.reduce((sum,source)=>sum+source.count,0):page?.total||0;
   const connection=sources.find(s=>s.id===connectionSource);
-  const selected=page?.items.find(item=>item.key===selectedKey);
-  const detailOpen=!!selected&&previewEnabled&&compactPreview;
+  const selected=page?.items.find(item=>item.key===selectedKey)||(useSplitReading&&!searchItemKey?page?.items[0]:undefined);
+  const detailOpen=!!selected&&previewEnabled&&!useSplitReading&&(runtimeCapabilities.mobile||openReadingKey===selected.key||searchItemKey===selected.key);
+  const showReading=!!selected&&previewEnabled&&(useSplitReading||detailOpen);
+  const openItem=(key:string)=>{
+    setArticleMenu(false);
+    setOpenReadingKey(key);
+    updateSession({previewEnabled:true,selectedKey:key});
+  };
+  const closeReading=()=>{
+    setArticleMenu(false);
+    setOpenReadingKey(null);
+    if(searchItemKey||runtimeCapabilities.mobile||useSplitReading)setPreviewEnabled(false);
+  };
+  const changeLayout=(layout:View["layout"])=>{
+    if(layout===view.layout)return;
+    setOpenReadingKey(null);
+    setArticleMenu(false);
+    changeView({layout});
+  };
+  const shownItems=page?.items||[];
+  const batchItems=shownItems.filter(item=>checkedKeys.has(item.key));
+  useEffect(()=>{setCheckedKeys(new Set());setArticleMenu(false);},[loadKey]);
+  useEffect(()=>{setOpenReadingKey(null);},[activeEntry.kind,activeEntry.id,view.layout]);
+  const toggleChecked=(key:string)=>setCheckedKeys(current=>{
+    const next=new Set(current);
+    if(next.has(key))next.delete(key);else next.add(key);
+    return next;
+  });
   const previewHistoryPushed=useRef(false);
   useEffect(()=>{
     if(!runtimeCapabilities.mobile)return;
@@ -296,7 +344,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
     if(detailOpen)previewBackRef.current?.focus();
     else if(databaseRef.current){
       databaseRef.current.scrollTop=session.scrollTop;
-      if(wasDetailOpen.current)databaseRef.current.querySelector<HTMLElement>(".collection-row.selected,.collection-gallery-card.selected,.collection-table-wrap tr.selected,.collection-board article.selected")?.focus({preventScroll:true});
+      if(wasDetailOpen.current)databaseRef.current.querySelector<HTMLElement>(".collection-row.selected,.collection-gallery-card.selected,.collection-table-wrap tr.selected,.collection-board article.selected button")?.focus({preventScroll:true});
     }
     wasDetailOpen.current=detailOpen;
   },[detailOpen,session.scrollTop]);
@@ -372,6 +420,29 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const readControl=(item:CollectionItem)=><button className="collection-read-control" data-status={readingStatus(item)} type="button" disabled={propertyBusy} aria-label={`${item.read?"标为待读":"标为已读"}：${title(item)}`} aria-pressed={item.read} onClick={e=>{e.stopPropagation();void toggleRead(item);}}>{statusIcon(item.lifecycle==="archived"?"archived":readingStatus(item))}</button>;
   const badge=(item:CollectionItem)=><span className={`collection-source-badge ${item.post.source||"bookmarks"}`}>{sourceName(item.post.source||"bookmarks")}</span>;
   const saveProperties=async(item:CollectionItem,status:string,tags:string[],prefix="")=>{if(propertyWrite.current)return false;propertyWrite.current=true;setPropertyBusy(true);setError("");setNotice("");try{const message=await invoke<string>("set_collection_properties",{key:item.key,status,tags,expectedStatus:readingStatus(item),expectedTags:item.tags||[]});commitProperties(item.key,status,tags);setNotice(`${prefix}${message||"状态与标签已保存"}`);await latestLoad.current();return true;}catch(e){setError(String(e));return false;}finally{propertyWrite.current=false;setPropertyBusy(false);}};
+  const applyBatch=async(action:"read"|"in_progress"|"archived")=>{
+    if(propertyWrite.current)return;
+    propertyWrite.current=true;
+    setPropertyBusy(true);
+    setError("");
+    const failed=new Set<string>();
+    try{
+      for(const item of batchItems){
+        try{
+          if(action==="archived"){await invoke("set_collection_lifecycle",{key:item.key,state:"archived"});}
+          else if(readingStatus(item)!==action){
+            await invoke("set_collection_properties",{key:item.key,status:action,tags:item.tags||[],expectedStatus:readingStatus(item),expectedTags:item.tags||[]});
+            commitProperties(item.key,action,item.tags||[]);
+          }
+        }catch{failed.add(item.key);}
+      }
+      await latestLoad.current();
+      setCheckedKeys(failed);
+      const count=batchItems.length-failed.size;
+      setNotice(count?"已处理 "+count+" 篇":"");
+      if(failed.size)setError(failed.size+" 篇处理失败，可重试。");
+    }finally{propertyWrite.current=false;setPropertyBusy(false);}
+  };
   const moveBoardCard=async(key:string,status:BoardStatus)=>{
     const item=latestPage.current?.items.find(item=>item.key===key);
     if(!item||propertyBusy||propertyWrite.current||item.lifecycle==="archived"||item.lifecycle==="deleting"||readingStatus(item)===status)return;
@@ -430,6 +501,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const confirmDelete=async()=>{if(!deleting)return;setPropertyBusy(true);try{setNotice(await invoke<string>("set_collection_lifecycle",{key:deleting.key,state:"deleting"}));setSelectedKey(null);setDeleting(null);await load();}catch(e){setError(String(e));}finally{setPropertyBusy(false);}};
   const readingStatus=(item:CollectionItem)=>item.status||(item.read?"read":"unread");
   const statusIcon=(status:string)=>status==="archived"?<Archive size={16}/>:status==="read"?<CompletedStatusIcon size={19}/>:status==="abandoned"?<CircleSlash size={19}/>:status==="in_progress"?<svg width="19" height="19" viewBox="0 0 20 20" aria-label="进行中"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="1.5"/><path d="M10 2 A8 8 0 0 1 18 10 H10 Z" fill="currentColor"/></svg>:<Circle size={19}/>;
+  const checkItem=(item:CollectionItem)=><input className="reading-item-checkbox" type="checkbox" aria-label={"选择："+title(item)} checked={checkedKeys.has(item.key)} onClick={event=>event.stopPropagation()} onChange={()=>toggleChecked(item.key)}/>;
   const downloaded=(item:CollectionItem)=>collectionAttachments(item.post).filter(asset=>item.savedMedia?.includes(asset.url)).length;
   const galleryCover = (item: CollectionItem) => {
     const original = collectionAttachments(item.post)[0];
@@ -441,6 +513,21 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   };
   const copyLibraries=(item:CollectionItem)=>libraries.filter(l=>(item.destinationIds||[item.destinationId]).includes(l.id));
   const copyBadges=(item:CollectionItem)=><>{copyLibraries(item).map(l=><CollectionLibraryBadge key={l.id} library={l}/>)}</>;
+  const attentionRows = view.attentionOnly ? shownItems.flatMap(item => {
+    const targets = issues(item).map(operation => ({
+      item, key: item.key+":"+operation.target, heading: operation.plan?.libraryName||libraries.find(library=>library.id===operation.target)?.name||"资料库副本",
+      group: operation.phase==="partial" ? "后台可恢复" : "待你确认",
+      detail: operation.error||operation.detail||"查看保存方案",
+      label: operation.phase==="unknown" ? "核对并关联" : operation.phase==="partial" ? "继续补齐" : "查看方案",
+      action: () => openReview(item.key,operation.target),
+    }));
+    const sources = (item.attentionIssues||[]).map(issue => ({
+      item, key: item.key+":"+issue.kind, heading: sourceName(item.post.source||"bookmarks"),
+      group: "需重连与会话故障", detail: issue.error, label: "查看同步记录",
+      action: () => setSyncMenu(true),
+    }));
+    return [...targets,...sources];
+  }) : [];
   const cardValue=(item:CollectionItem,field:CardField)=>field==="destination"?copyLibraries(item).map(l=>l.name).join("、"):field==="status"?(({unread:"待读",read:"已读",in_progress:"进行中",abandoned:"放弃"} as Record<string,string>)[readingStatus(item)]||"待读"):field==="source"?sourceName(item.post.source||"bookmarks"):field==="author"?(item.post.authorName||item.post.authorHandle):field==="published"?date(item.post.publishedAt):field==="collected"?date(item.collectedAt):field==="liked"?(item.post.liked||item.post.source==="likes"?"是":"否"):`${downloaded(item)}/${collectionAttachments(item.post).length} 已下载`;
   const cardStyle=(item:CollectionItem)=>{const rule=view.layout==="gallery"?cards.rules.find(rule=>{const value=cardValue(item,rule.field);return rule.operator==="equals"?value===rule.value:rule.operator==="contains"?value.includes(rule.value):rule.operator==="not_contains"?!value.includes(rule.value):rule.operator==="is_empty"?!value:!!value;}):undefined;if(rule)return {background:rule.color};const color=view.colorMode==="source"?({bookmarks:"#737b86",likes:"#c77b98",telegram:"#2198d4",dida:"#4a71f3"} as Record<string,string>)[item.post.source||"bookmarks"]:view.colorMode==="status"?({unread:"#2088e9",in_progress:"#c18a24",read:"#3a9e61",abandoned:"#89909b",archived:"#89909b"} as Record<string,string>)[readingStatus(item)]:undefined;return color?{background:`color-mix(in srgb, ${color} 12%, var(--hub-content-surface, #fff))`}:undefined;};
   const fields=(item:CollectionItem,column:Column)=>column==="destination"?copyBadges(item):column==="source"?badge(item):column==="author"?(item.post.authorName||item.post.authorHandle):column==="published"?date(item.post.publishedAt):column==="collected"?date(item.collectedAt):column==="liked"?(item.post.liked||item.post.source==="likes"?"是":"否"):`${downloaded(item)}/${collectionAttachments(item.post).length} 已下载`;
@@ -450,17 +537,65 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const widths={...tableWidths};for(const c of visibleColumns){const saved=view.widths?.[c];if(typeof saved==="number"&&Number.isFinite(saved))widths[c]=Math.min(1600,Math.max(c==="status"?44:72,saved));}
   const setWidths=(patch:Partial<Record<TableColumn,number>>)=>{updateView({widths:{...view.widths,...patch}});updateSavedView();};
   const beginResize=(column:TableColumn)=>{const measured:Partial<Record<TableColumn,number>>={};for(const header of tableRef.current?.querySelectorAll<HTMLTableCellElement>("th[data-column]")||[]){const c=header.dataset.column as TableColumn;measured[c]=Math.round(header.getBoundingClientRect().width)||widths[c];}setWidths(measured);return measured[column]||widths[column];};
-  return <section className={`collections-workspace task-workspace${compactControls?" collection-compact-layout":""}${detailOpen?" collection-detail-open":""}`} aria-label="阅读">
+  const searchButtonRef=useRef<HTMLButtonElement>(null);
+  const searchInputRef=useRef<HTMLInputElement>(null);
+  const dismissSearch=()=>{setSearchOpen(false);setQuery("");requestAnimationFrame(()=>searchButtonRef.current?.focus());};
+  useEffect(()=>{if(searchOpen)searchInputRef.current?.focus();},[searchOpen,compactControls]);
+  useEffect(()=>{
+    if(!filtersOpen)return;
+    const closeOutside=(event:PointerEvent)=>{if(!filterAnchor.current?.contains(event.target as Node))setFiltersOpen(false);};
+    document.addEventListener("pointerdown",closeOutside);
+    return()=>document.removeEventListener("pointerdown",closeOutside);
+  },[filtersOpen]);
+  const readingKeys=(event:ReactKeyboardEvent<HTMLElement>)=>{
+    if(runtimeCapabilities.mobile||event.defaultPrevented||event.altKey||event.ctrlKey||event.metaKey)return;
+    const target=event.target as HTMLElement;
+    if(target.closest("dialog,.collection-sync-popover"))return;
+    if(event.key==="Escape"){
+      if(target.closest(".collection-property-menu,.collection-destination-menu,details[open]"))return;
+      if(articleMenu)setArticleMenu(false);
+      else if(syncMenu)setSyncMenu(false);
+      else if(filtersOpen)setFiltersOpen(false);
+      else if(searchOpen)dismissSearch();
+      else if(detailOpen)closeReading();
+      else return;
+      event.preventDefault();
+      return;
+    }
+    if(target.closest("input,textarea,select,[contenteditable=true]"))return;
+    if(event.key==="/"){event.preventDefault();setSearchOpen(true);return;}
+    const key=event.key.toLowerCase();
+    if(key==="j"||key==="k"){
+      const index=shownItems.findIndex(item=>item.key===selected?.key);
+      const next=shownItems[Math.max(0,Math.min(shownItems.length-1,index+(key==="j"?1:-1)))];
+      if(next){event.preventDefault();openItem(next.key);requestAnimationFrame(()=>{
+        if(document.activeElement===previewBackRef.current)return;
+        databaseRef.current?.querySelector<HTMLElement>(".selected")?.scrollIntoView?.({block:"nearest"});
+      });}
+      return;
+    }
+    if(!selected||(!showReading&&!target.closest(".collection-database"))||propertyBusy||event.repeat)return;
+    const status=readingStatusShortcuts[key];
+    if(status&&selected.lifecycle!=="archived"){event.preventDefault();void saveProperties(selected,status,selected.tags||[]);}
+    if(key==="e"&&selected.lifecycle!=="archived"&&selected.lifecycle!=="deleting"){event.preventDefault();void lifecycle(selected,"archived");}
+  };
+  const layoutName=readingLayouts.find(layout=>layout.id===view.layout)?.label;
+  const activeTitle=activeEntry.kind==="view"?view.name:activeEntry.kind==="library"?(libraries.find(library=>library.id===activeEntry.id)?.name||"资料库副本"):collectionEntryLabels[activeEntry.id as CollectionBuiltinEntry];
+  return <section onKeyDown={readingKeys} className={`collections-workspace task-workspace${compactControls?" collection-compact-layout":""}${detailOpen?" collection-detail-open":""}`} aria-label="阅读">
     {searchItemKey&&<div role="status" className="collection-notice">从搜索打开的阅读条目<button type="button" onClick={()=>setSelectedKey(null)}>返回阅读列表</button>{page&&!page.items.length&&<span>条目已变更或移除，请重新搜索。</span>}</div>}
-    <div className="collection-browse-controls" hidden={detailOpen}>
+    <div className="collection-browse-controls" hidden={detailOpen&&(compactPreview||runtimeCapabilities.mobile)}>
     {runtimeCapabilities.mobile?<MobileReadingControls view={view} onChange={changeView} count={page?.matched} tags={page?.availableTags||[]} onSync={openCloudSyncSettings}><CollectionViewTabs onChange={changeView} compact={true} onNotice={setNotice}/><CollectionSort key={`${view.id}:${view.layout}`} rules={sorts} onChange={sorts=>changeView({sorts,sort:sorts[0]?.field||"collected",ascending:sorts[0]?.ascending||false})}/></MobileReadingControls>:<>
     <header className="task-workspace-header collection-header" onMouseDown={e=>{if(!(e.target as HTMLElement).closest("button, input, select, textarea, a, summary, details, [role=button]"))shellHeader?.onMouseDown(e);}}>
       <div className="task-source-chips" role="group" aria-label="阅读来源">
-        {!runtimeCapabilities.mobile&&!detailOpen&&onToggleDesktopSidebar&&<button className="task-icon-button" aria-label="切换侧边栏" onClick={onToggleDesktopSidebar}><PanelLeft size={18}/></button>}
+        {!runtimeCapabilities.mobile&&onToggleDesktopSidebar&&<button className="task-icon-button workspace-panel-toggle" aria-label="切换侧边栏" onClick={onToggleDesktopSidebar}><PanelLeft size={16}/></button>}
+        <strong className="reading-window-title">阅读</strong>
+        <div className="reading-source-segment">
         <button className={`task-source-chip ${view.source==="all"?"active":""}`} aria-pressed={view.source==="all"} onClick={()=>changeView({source:"all"})}><span>全部</span>{" "}<strong>{activeTotal}</strong></button>
         {sources.map(s=><button key={s.id} className={`task-source-chip collection-chip-${s.id} ${view.source===s.id?"active":""}`} aria-pressed={view.source===s.id} onClick={()=>changeView({source:s.id})}><i/><span>{sourceName(s.id)}</span><strong>{s.count}</strong></button>)}
+        </div>
       </div>
       {!runtimeCapabilities.mobile&&<div className="collection-header-tools">
+        {searchOpen&&!compactControls?<label className="task-toolbar-search"><Search size={14}/><input ref={searchInputRef} aria-label="搜索阅读内容" placeholder="搜索标题、正文或作者…" value={query} onChange={event=>setQuery(event.target.value)}/><button aria-label="关闭搜索" onClick={dismissSearch}><X size={13}/></button></label>:<button ref={searchButtonRef} aria-label="搜索阅读内容" title="阅读内搜索 (/)" aria-expanded={searchOpen} onClick={()=>setSearchOpen(!searchOpen)}><Search size={15}/></button>}
         {!runtimeCapabilities.mobile&&<div className="collection-menu-wrap"><button className={`collection-sync-trigger${syncMenu?" active":""}`} aria-label="同步与连接" title={jobRunning?"后台保存中 · 点击查看进度":jobVisible?"同步需要处理 · 点击查看":"同步与连接"} aria-expanded={syncMenu} aria-busy={jobRunning} onClick={()=>setSyncMenu(!syncMenu)}>{jobRunning?<LoaderCircle size={17} strokeWidth={1.8} className="spin"/>:<RefreshCw size={17} strokeWidth={1.8}/>} {jobVisible&&!jobRunning&&<span className="collection-sync-indicator"/>}</button>
           {syncMenu&&<CollectionSyncPanel sources={sources} operations={operations} itemTitles={Object.fromEntries((page?.items||[]).map(item=>[item.key,title(item)]))}
             autoSyncMinutes={storage.config.autoSyncMinutes} storageLabel={`${storage.config.mode==="obsidian"?"保存到 Obsidian · 本机保留索引与缓存":"保存到本地数据库"} · Telegram 大附件可通过 tdl 下载`} storageStatus={storage.status} pendingCancellations={page?.pendingCancellations||0}
@@ -471,28 +606,39 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
             <TelegramTdlSettings state={storage.tdl} paired={!!sources.find(s=>s.id==="telegram")?.paired} reload={load} onError={setError}/>
           </CollectionSyncPanel>}
         </div>}
-        {!runtimeCapabilities.mobile&&!detailOpen&&shellHeader?.actions}
-        {!runtimeCapabilities.mobile&&<button aria-label="切换预览侧栏" title="预览侧栏" aria-pressed={previewEnabled} onClick={()=>setPreviewEnabled(!previewEnabled)}><PanelRight size={18}/></button>}
+        <button aria-label="云同步设置" title="云同步状态与设置" onClick={openCloudSyncSettings}><Cloud size={15}/></button>
+        {shellHeader?.actions}
+        {!runtimeCapabilities.mobile&&<button aria-label="切换预览侧栏" title="预览侧栏" aria-pressed={previewEnabled} onClick={()=>{if(detailOpen)closeReading();else setPreviewEnabled(!previewEnabled);}}><PanelRight size={18}/></button>}
       </div>}
     </header>
-    <div className="task-view-toolbar collection-toolbar">
-      <CollectionViewTabs onChange={changeView} compact={compactControls} onNotice={setNotice}/>
-      <div className="task-secondary-actions">
-        {page&&<small className="collection-result-count">{page.matched} 条</small>}
-        
-        <button aria-label="筛选" title={filtersOpen?"隐藏筛选":"显示筛选"} className={filtersOpen||filterCount?"active":""} aria-expanded={filtersOpen} aria-pressed={filterCount>0} onClick={()=>setFiltersOpen(!filtersOpen)}><ListFilter size={18}/></button>
-        <CollectionSort key={`${view.id}:${view.layout}`} rules={sorts} onChange={sorts=>changeView({sorts,sort:sorts[0]?.field||"collected",ascending:sorts[0]?.ascending||false})}/>
-        {searchOpen&&!compactControls?<label className="task-toolbar-search"><Search size={14}/><input autoFocus aria-label="搜索阅读内容" placeholder="搜索正文或作者" value={query} onChange={e=>{setQuery(e.target.value);setOffset(0);}}/><button aria-label="关闭搜索" onClick={()=>{setSearchOpen(false);setQuery("");}}><X size={13}/></button></label>:<button aria-label="搜索阅读内容" aria-expanded={searchOpen} onClick={()=>setSearchOpen(!searchOpen)}><Search size={17}/></button>}
-        <button aria-label="云同步设置" title="云同步设置" onClick={openCloudSyncSettings}><Cloud size={17}/></button>
-      </div>
+    {compactControls&&searchOpen&&<label className="collection-mobile-search"><Search size={16}/><input ref={searchInputRef} aria-label="搜索阅读内容" placeholder="搜索标题、正文或作者…" value={query} onChange={event=>setQuery(event.target.value)}/><button aria-label="关闭搜索" onClick={dismissSearch}><X size={17}/></button></label>}
+    </>}
     </div>
-    {compactControls&&searchOpen&&<label className="collection-mobile-search"><Search size={16}/><input autoFocus aria-label="搜索阅读内容" placeholder="搜索正文或作者" value={query} onChange={event=>setQuery(event.target.value)}/><button aria-label="关闭搜索" onClick={()=>{setSearchOpen(false);setQuery("");}}><X size={17}/></button></label>}
-    {filtersOpen&&<div className="collection-query-tools">
+    {detailOpen&&compactPreview&&!runtimeCapabilities.mobile&&(onToggleDesktopSidebar||shellHeader?.actions)&&<header className="collection-detail-desktop-header" onMouseDown={event=>{if(!(event.target as HTMLElement).closest("button, input, select, textarea, a, summary, details, [role=button]"))shellHeader?.onMouseDown(event);}}>{onToggleDesktopSidebar&&<button className="workspace-panel-toggle" aria-label="切换侧边栏" onClick={onToggleDesktopSidebar}><PanelLeft size={18}/></button>}<span>阅读</span><div className="collection-header-tools">{shellHeader?.actions}</div></header>}
+    <div ref={bodyRef} className={`collection-body ${showReading?"has-preview":""} ${detailOpen?"compact-preview":""}`} style={{"--reading-preview-width":`${resizeCleanup.current?previewWidthRef.current:effectivePreviewWidth}px`} as CSSProperties}>
+      <div className="reading-browse-paper" hidden={detailOpen}>
+        {!runtimeCapabilities.mobile&&<>
+    <div className="task-view-toolbar collection-toolbar">
+      <div className="reading-view-title"><h2>{activeTitle}</h2>{page&&<span>{page.matched.toLocaleString("en-US")}</span>}
+        {isModified&&<div className="reading-view-draft"><button onClick={updateSavedView}>更新视图</button><button aria-label="还原视图" title="还原" onClick={()=>selectView(activeEntry.id)}><RotateCcw size={12}/></button></div>}
+      </div>
+      <div className="reading-view-configuration" title={layoutName}><CollectionViewTabs onChange={patch=>patch.layout?changeLayout(patch.layout):changeView(patch)} compact={true} onNotice={setNotice}/></div>
+      <div className="task-secondary-actions">
+        <div className="reading-layout-segment" role="group" aria-label="阅读布局">{readingLayouts.map(({id,label,icon:Icon})=><button type="button" key={id} aria-label={label} title={label} aria-pressed={view.layout===id} onClick={()=>changeLayout(id)}><Icon size={14}/></button>)}</div>
+        
+        <div ref={filterAnchor} className="reading-filter-anchor">
+        <button aria-label="筛选" title={filtersOpen?"隐藏筛选":"显示筛选"} className={filtersOpen||filterCount?"active":""} aria-expanded={filtersOpen} aria-pressed={filterCount>0} onClick={()=>setFiltersOpen(!filtersOpen)}><ListFilter size={18}/></button>
+    {filtersOpen&&<div className="collection-query-tools" aria-label="筛选当前列表">
       <label>状态<select aria-label="阅读状态筛选" value={view.status} onChange={e=>changeView({status:e.target.value as View["status"]})}><option value="all">全部状态</option><option value="unread">待读</option><option value="read">已读</option><option value="in_progress">进行中</option><option value="abandoned">放弃</option><option value="archived">归档</option></select></label>
       <label>内容<select aria-label="内容类型筛选" value={view.media} onChange={e=>changeView({media:e.target.value as View["media"]})}><option value="all">全部内容</option><option value="photo">有图片</option><option value="video">有视频</option><option value="links">有外链</option></select></label>
       <label>收集时间<select aria-label="收集时间筛选" value={view.dateFilter} onChange={e=>changeView({dateFilter:e.target.value as View["dateFilter"]})}><option value="any">不限</option><option value="7">最近 7 天</option><option value="30">最近 30 天</option><option value="90">最近 90 天</option></select></label>
       <label>标签<select aria-label="阅读标签筛选" value="" onChange={e=>{if(e.target.value&&!view.tags.includes(e.target.value))changeView({tags:[...view.tags,e.target.value]});}}><option value="">添加标签条件</option>{page?.availableTags?.map(tag=><option key={tag} value={tag}>{tag}</option>)}</select></label>
     </div>}
+        </div>
+        <CollectionSort key={`${view.id}:${view.layout}`} rules={sorts} onChange={sorts=>changeView({sorts,sort:sorts[0]?.field||"collected",ascending:sorts[0]?.ascending||false})}/>
+
+      </div>
+    </div>
     <WorkspaceFilterSummary filters={[
       ...(view.source!=="all"?[{label:sourceName(view.source),clear:()=>changeView({source:"all"})}]:[]),
       ...(view.status!=="all"?[{label:({read:"已读",unread:"待读",in_progress:"进行中",abandoned:"放弃",archived:"归档"}[view.status]),clear:()=>changeView({status:"all"})}]:[]),
@@ -503,34 +649,74 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
       ...(view.attentionOnly?[{label:"需要处理",clear:()=>changeView({attentionOnly:false})}]:[]),
       ...(query?[{label:`搜索：${query}`,clear:()=>setQuery("")}]:[]),
     ]} onReset={resetFilters}/>
-    </>}
-    </div>
-    {detailOpen&&!runtimeCapabilities.mobile&&(onToggleDesktopSidebar||shellHeader?.actions)&&<header className="collection-detail-desktop-header" onMouseDown={event=>{if(!(event.target as HTMLElement).closest("button, input, select, textarea, a, summary, details, [role=button]"))shellHeader?.onMouseDown(event);}}>{onToggleDesktopSidebar&&<button aria-label="切换侧边栏" onClick={onToggleDesktopSidebar}><PanelLeft size={18}/></button>}<span>阅读</span><div className="collection-header-tools">{shellHeader?.actions}</div></header>}
-    <div ref={bodyRef} className={`collection-body ${selected&&previewEnabled?"has-preview":""} ${compactPreview?"compact-preview":""}`} style={{"--reading-preview-width":`${Math.min(resizeCleanup.current?previewWidthRef.current:previewWidth,maximumPreviewWidth)}px`} as CSSProperties}>
+        </>}
       <div ref={databaseRef} className={`collection-database density-${view.density}`} aria-hidden={detailOpen||undefined} inert={detailOpen} onScroll={e=>{if(!detailOpen)updateSession({scrollTop:e.currentTarget.scrollTop});}}>
         {!page&&<div className="collections-empty">正在读取本地阅读内容…</div>}
         {page?.items.length===0&&<div className="collections-empty"><Bookmark size={28}/><h2>{page.total?"没有符合筛选条件的内容":"把值得读的内容留在这里"}</h2><p>{page.total?"调整筛选，或搜索其他作者和正文。":"在右上角管理 X、Telegram 和滴答来源，把待读内容放在一起。"}</p>{page.total>0&&<button onClick={resetFilters}>清除筛选</button>}{view.source==="telegram"&&!sources.find(s=>s.id==="telegram")?.connected&&<button onClick={()=>{setConnectionSource("telegram");setError("");setConnecting(true);}}>连接 Telegram</button>}</div>}
-        {view.layout==="list"&&page?.items.map(item=><article key={item.key} role="button" tabIndex={0} aria-label={`阅读：${title(item)}`} className={`collection-row ${selectedKey===item.key?"selected":""}`} style={cardStyle(item)} draggable onDragStart={event=>{event.dataTransfer.effectAllowed="copy";event.dataTransfer.setData("application/x-hub-agent-source",JSON.stringify({itemKey:item.key,title:title(item)}));}} onClick={()=>(setPreviewEnabled(true),setSelectedKey(item.key))} onKeyDown={e=>{if(e.target===e.currentTarget&&(e.key==="Enter"||e.key===" ")){e.preventDefault();(setPreviewEnabled(true),setSelectedKey(item.key));}}}>
-          {readControl(item)}<div className="collection-row-title"><strong>{title(item)}</strong>{view.density!=="compact"&&(view.columns.author||view.columns.media)&&<small>{view.columns.author&&<span data-reading-property="author">{item.post.authorName} {item.post.authorHandle&&`@${item.post.authorHandle}`}</span>}{view.columns.media&&collectionAttachments(item.post).length>0&&<span data-reading-property="media">{view.columns.author?" · ":""}{collectionAttachments(item.post).length} 个附件</span>}</small>}{runtimeCapabilities.mobile&&<p className="mobile-reading-excerpt">{cleanSearchSnippet(item.post.text).slice(0,160)}</p>}{renderIssues(item)}</div><div className="collection-row-meta">{view.columns.source&&badge(item)}{view.columns.destination&&copyBadges(item)}{view.columns.published&&<time data-reading-property="published">{date(item.post.publishedAt)}</time>}{view.columns.collected&&<time data-reading-property="collected" title="创建日期">{date(item.collectedAt)}</time>}{view.columns.liked&&<small data-reading-property="liked">喜欢：{fields(item,"liked")}</small>}</div>
+        {view.attentionOnly&&attentionRows.length>0&&<div className="reading-triage">
+          {["待你确认","后台可恢复","需重连与会话故障"].map(group=>{
+            const rows=attentionRows.filter(row=>row.group===group);
+            return rows.length>0&&<section key={group} aria-label={group}>
+              <header><h3>{group}</h3><span>{rows.length}</span></header>
+              {rows.map(row=><article key={row.key}>
+                <div><strong>{row.heading}</strong><p>{row.detail}</p><button className="reading-triage-title" onClick={()=>openItem(row.item.key)}>{title(row.item)}</button></div>
+                <div className="collection-attention-actions"><button onClick={row.action}>{row.label}</button></div>
+              </article>)}
+            </section>;
+          })}
+        </div>}
+        {(!view.attentionOnly||!attentionRows.length)&&<>
+        {view.layout==="list"&&page?.items.map(item=><article key={item.key} role="button" tabIndex={0} aria-label={`阅读：${title(item)}`} className={`collection-row ${selected?.key===item.key?"selected":""}`} style={cardStyle(item)} draggable onDragStart={event=>{event.dataTransfer.effectAllowed="copy";event.dataTransfer.setData("application/x-hub-agent-source",JSON.stringify({itemKey:item.key,title:title(item)}));}} onClick={()=>openItem(item.key)} onKeyDown={e=>{if(e.target===e.currentTarget&&(e.key==="Enter"||e.key===" ")){e.preventDefault();openItem(item.key);}}}>
+          {!runtimeCapabilities.mobile&&checkItem(item)}
+          {readControl(item)}<div className="collection-row-title"><strong>{title(item)}{!runtimeCapabilities.mobile&&(issues(item).length>0||Boolean(item.attentionIssues?.length))&&<i className="reading-list-warning" title="有待处理项"/>}</strong>{!runtimeCapabilities.mobile&&<p className="reading-row-excerpt">{cleanSearchSnippet(item.post.text).slice(0,200)}</p>}{view.density!=="compact"&&(view.columns.author||view.columns.media)&&<small>{view.columns.author&&<span data-reading-property="author">{item.post.authorName} {item.post.authorHandle&&`@${item.post.authorHandle}`}</span>}{view.columns.media&&collectionAttachments(item.post).length>0&&<span data-reading-property="media">{view.columns.author?" · ":""}{collectionAttachments(item.post).length} 个附件</span>}</small>}{runtimeCapabilities.mobile&&<p className="mobile-reading-excerpt">{cleanSearchSnippet(item.post.text).slice(0,160)}</p>}{renderIssues(item)}</div><div className="collection-row-meta">{view.columns.source&&badge(item)}{view.columns.destination&&copyBadges(item)}{view.columns.published&&<time data-reading-property="published">{date(item.post.publishedAt)}</time>}{view.columns.collected&&<time data-reading-property="collected" title="创建日期">{date(item.collectedAt)}</time>}{view.columns.liked&&<small data-reading-property="liked">喜欢：{fields(item,"liked")}</small>}{!runtimeCapabilities.mobile&&view.columns.media&&collectionAttachments(item.post).length>0&&<small className="reading-attachment-count" title="本机附件"><Paperclip size={11}/>{downloaded(item)}/{collectionAttachments(item.post).length}</small>}{!runtimeCapabilities.mobile&&item.tags?.[0]&&<small className="reading-list-tag">#{item.tags[0]}</small>}</div>
         </article>)}
-        {view.layout==="table"&&!!page?.items.length&&<div className="collection-table-wrap"><table ref={tableRef} className="task-database-table" style={{width:visibleColumns.reduce((sum,c)=>sum+widths[c],0),minWidth:view.widths?0:"100%"}}><colgroup>{visibleColumns.map(c=><col key={c} style={{width:widths[c]}}/>)}</colgroup><thead><tr>{visibleColumns.map(c=><th data-column={c} key={c} className={c==="status"?"task-check-column":c==="title"?"task-title-column":undefined}><span>{tableLabels[c]}</span><CollectionColumnResize name={tableLabels[c]} column={c} width={widths[c]} min={c==="status"?44:72} onStart={()=>beginResize(c)} onChange={width=>setWidths({[c]:width})}/></th>)}</tr></thead><tbody>{page.items.map(item=><tr key={item.key} className={selectedKey===item.key?"selected":""} style={cardStyle(item)} tabIndex={0} draggable onDragStart={event=>{event.dataTransfer.effectAllowed="copy";event.dataTransfer.setData("application/x-hub-agent-source",JSON.stringify({itemKey:item.key,title:title(item)}));}} onClick={()=>(setPreviewEnabled(true),setSelectedKey(item.key))} onKeyDown={e=>{if(e.target===e.currentTarget&&e.key==="Enter")(setPreviewEnabled(true),setSelectedKey(item.key));}}><td>{readControl(item)}</td><td><button className="collection-title-link" draggable onDragStart={event=>{event.dataTransfer.effectAllowed="copy";event.dataTransfer.setData("application/x-hub-agent-source",JSON.stringify({itemKey:item.key,title:title(item)}));}} onClick={()=>(setPreviewEnabled(true),setSelectedKey(item.key))}>{title(item)}</button>{renderIssues(item)}</td>{(Object.keys(labels) as Column[]).filter(c=>view.columns[c]).map(c=><td key={c}>{fields(item,c)}</td>)}</tr>)}</tbody></table></div>}
-        {view.layout==="board"&&<div className="collection-board" ref={boardRef}>{boardStatuses.map(status=><section key={status} data-reading-status={status} aria-label={`${boardLabels[status]}列`} className={boardDropStatus===status?"collection-board-drop-target":""}><header><strong>{boardLabels[status]}</strong><small>本页 {page?.items.filter(i=>readingStatus(i)===status).length||0}</small></header>{page?.items.filter(i=>readingStatus(i)===status).map(item=><article key={item.key} aria-label={`阅读卡片：${title(item)}`} className={`${selectedKey===item.key?"selected ":""}${boardDragKey===item.key?"collection-board-dragging":""}`} style={cardStyle(item)} draggable={false} onPointerDown={event=>beginBoardDrag(event,item)} onClickCapture={event=>{if(suppressBoardClick.current){event.preventDefault();event.stopPropagation();}}}>
-          <div className="collection-board-card-heading"><button className="collection-board-title" onPointerDown={event=>event.stopPropagation()} draggable onDragStart={event=>{event.dataTransfer.effectAllowed="copy";event.dataTransfer.setData("application/x-hub-agent-source",JSON.stringify({itemKey:item.key,title:title(item)}));}} onClick={()=>(setPreviewEnabled(true),setSelectedKey(item.key))}>{title(item)}</button><button className="collection-board-drag" aria-label={`移动阅读卡片：${title(item)}`} title="拖到另一列；方向键或 Home / End 更改状态" disabled={propertyBusy||item.lifecycle==="archived"||item.lifecycle==="deleting"} onKeyDown={event=>moveBoardWithKeyboard(event,item)}><GripVertical size={14}/></button></div>
+        {view.layout==="table"&&!!page?.items.length&&<div className="collection-table-wrap"><table ref={tableRef} className="task-database-table" style={{width:visibleColumns.reduce((sum,c)=>sum+widths[c],0),minWidth:view.widths?0:"100%"}}><colgroup>{visibleColumns.map(c=><col key={c} style={{width:widths[c]}}/>)}</colgroup><thead><tr>{visibleColumns.map(c=><th data-column={c} key={c} className={c==="status"?"task-check-column":c==="title"?"task-title-column":undefined}><span>{tableLabels[c]}</span><CollectionColumnResize name={tableLabels[c]} column={c} width={widths[c]} min={c==="status"?44:72} onStart={()=>beginResize(c)} onChange={width=>setWidths({[c]:width})}/></th>)}</tr></thead><tbody>{page.items.map(item=><tr key={item.key} className={selected?.key===item.key?"selected":""} style={cardStyle(item)} tabIndex={0} draggable onDragStart={event=>{event.dataTransfer.effectAllowed="copy";event.dataTransfer.setData("application/x-hub-agent-source",JSON.stringify({itemKey:item.key,title:title(item)}));}} onClick={()=>openItem(item.key)} onKeyDown={e=>{if(e.target===e.currentTarget&&e.key==="Enter")openItem(item.key);}}><td><div className="reading-table-status">{!runtimeCapabilities.mobile&&checkItem(item)}{readControl(item)}</div></td><td><button className="collection-title-link" draggable onDragStart={event=>{event.dataTransfer.effectAllowed="copy";event.dataTransfer.setData("application/x-hub-agent-source",JSON.stringify({itemKey:item.key,title:title(item)}));}} onClick={()=>openItem(item.key)}>{title(item)}</button>{renderIssues(item)}</td>{(Object.keys(labels) as Column[]).filter(c=>view.columns[c]).map(c=><td key={c}>{fields(item,c)}</td>)}</tr>)}</tbody></table></div>}
+        {view.layout==="board"&&<div className="collection-board" ref={boardRef}>{boardStatuses.map(status=><section key={status} data-reading-status={status} aria-label={`${boardLabels[status]}列`} className={boardDropStatus===status?"collection-board-drop-target":""}><header><strong>{boardLabels[status]}</strong><small>本页 {page?.items.filter(i=>readingStatus(i)===status).length||0}</small></header>{page?.items.filter(i=>readingStatus(i)===status).map(item=><article key={item.key} aria-label={`阅读卡片：${title(item)}`} className={`${selected?.key===item.key?"selected ":""}${boardDragKey===item.key?"collection-board-dragging":""}`} style={cardStyle(item)} draggable={false} onPointerDown={event=>beginBoardDrag(event,item)} onClickCapture={event=>{if(suppressBoardClick.current){event.preventDefault();event.stopPropagation();}}}>
+          <div className="collection-board-card-heading"><button className="collection-board-title" onPointerDown={event=>event.stopPropagation()} draggable onDragStart={event=>{event.dataTransfer.effectAllowed="copy";event.dataTransfer.setData("application/x-hub-agent-source",JSON.stringify({itemKey:item.key,title:title(item)}));}} onClick={()=>openItem(item.key)}>{title(item)}</button><button className="collection-board-drag" aria-label={`移动阅读卡片：${title(item)}`} title="拖到另一列；方向键或 Home / End 更改状态" disabled={propertyBusy||item.lifecycle==="archived"||item.lifecycle==="deleting"} onKeyDown={event=>moveBoardWithKeyboard(event,item)}><GripVertical size={14}/></button></div>
           {view.columns.author&&<p data-reading-property="author">{item.post.authorName}</p>}{renderIssues(item)}<footer>{readControl(item)}{view.columns.source&&badge(item)}{view.columns.destination&&copyBadges(item)}{view.columns.media&&<small data-reading-property="media">{collectionAttachments(item.post).length?`${collectionAttachments(item.post).length} 个附件`:"文字"}</small>}{view.columns.published&&<small data-reading-property="published">{date(item.post.publishedAt)}</small>}{view.columns.collected&&<small data-reading-property="collected" title="创建日期">{date(item.collectedAt)}</small>}{view.columns.liked&&<small data-reading-property="liked">喜欢：{fields(item,"liked")}</small>}</footer></article>)}</section>)}</div>}
         {boardDragPreview&&<div className="collection-board-drag-preview" aria-hidden="true" style={{left:boardDragPreview.x+14,top:boardDragPreview.y+14}}>{boardDragPreview.title}</div>}
-        {view.layout==="gallery"&&<div className={`collection-gallery card-size-${cards.size} ${cards.fullTitle?"full-title":""} ${cards.wrap?"wrap-properties":""} ${cards.compact&&!cards.names?"compact-properties":""} cover-${cards.coverMode}`}>{page?.items.map(item=><article key={item.key} style={cardStyle(item)} className={`collection-gallery-card ${selectedKey===item.key?"selected":""}`} role="button" tabIndex={0} aria-label={`阅读：${title(item)}`} draggable onDragStart={event=>{event.dataTransfer.effectAllowed="copy";event.dataTransfer.setData("application/x-hub-agent-source",JSON.stringify({itemKey:item.key,title:title(item)}));}} onClick={()=>(setPreviewEnabled(true),setSelectedKey(item.key))} onKeyDown={event=>{if(event.target===event.currentTarget&&(event.key==="Enter"||event.key===" ")){event.preventDefault();(setPreviewEnabled(true),setSelectedKey(item.key));}}}>
+        {view.layout==="gallery"&&<div className={`collection-gallery card-size-${cards.size} ${cards.fullTitle?"full-title":""} ${cards.wrap?"wrap-properties":""} ${cards.compact&&!cards.names?"compact-properties":""} cover-${cards.coverMode}`}>{page?.items.map(item=><article key={item.key} style={cardStyle(item)} className={`collection-gallery-card ${selected?.key===item.key?"selected":""}`} role="button" tabIndex={0} aria-label={`阅读：${title(item)}`} draggable onDragStart={event=>{event.dataTransfer.effectAllowed="copy";event.dataTransfer.setData("application/x-hub-agent-source",JSON.stringify({itemKey:item.key,title:title(item)}));}} onClick={()=>openItem(item.key)} onKeyDown={event=>{if(event.target===event.currentTarget&&(event.key==="Enter"||event.key===" ")){event.preventDefault();openItem(item.key);}}}>
           {cards.cover && galleryCover(item)}
           <div className="collection-gallery-copy"><strong>{title(item)}</strong>{renderIssues(item)}</div>
           <div className="collection-gallery-properties">{(Object.keys(cardFields) as CardField[]).filter(field=>!cards.hidden.includes(field)).map(field=><div key={field} data-field={field} title={cardValue(item,field)}>{cards.names&&<span className="collection-property-name">{cardFields[field]}</span>}{field==="destination"?copyBadges(item):field==="status"?readControl(item):field==="source"?badge(item):<span>{cardValue(item,field)}</span>}</div>)}</div>
         </article>)}</div>}
+        </>}
         {page&&page.matched>60&&<nav className="collections-pagination" aria-label="阅读分页"><button disabled={offset===0} onClick={()=>setOffset(Math.max(0,offset-60))}>上一页</button><span>{Math.floor(offset/60)+1} / {Math.ceil(page.matched/60)} · 每页 60 条</span><button disabled={offset+60>=page.matched} onClick={()=>setOffset(offset+60)}>下一页</button></nav>}
       </div>
-      {selected&&previewEnabled&&<><div className="reading-preview-resizer" role="separator" tabIndex={compactPreview?-1:0} aria-label="调整阅读预览宽度" aria-orientation="vertical" aria-valuemin={MIN_READING_PANEL} aria-valuemax={maximumPreviewWidth} aria-valuenow={effectivePreviewWidth} title="拖动调整预览宽度；双击恢复默认" onPointerDown={resizePreview} onKeyDown={resizePreviewWithKeyboard} onDoubleClick={()=>persistPreviewWidth(DEFAULT_PREVIEW_WIDTH)}/><PreviewFrame className="collection-detail" label="阅读详情">
+      </div>
+      {!runtimeCapabilities.mobile&&!detailOpen&&batchItems.length>=2&&<div className="reading-batch-bar" role="group" aria-label="批量阅读操作"><strong>已选 {batchItems.length} 篇</strong><button disabled={propertyBusy} onClick={()=>void applyBatch("read")}>已读</button><button disabled={propertyBusy} onClick={()=>void applyBatch("in_progress")}>进行中</button><button disabled={propertyBusy||batchItems.some(item=>item.lifecycle==="archived"||item.lifecycle==="deleting")} onClick={()=>void applyBatch("archived")}>归档</button><button aria-label="清除选择" onClick={()=>setCheckedKeys(new Set())}><X size={14}/></button></div>}
+      {selected&&showReading&&<>{useSplitReading&&<div className="reading-preview-resizer" role="separator" tabIndex={compactPreview?-1:0} aria-label="调整阅读预览宽度" aria-orientation="vertical" aria-valuemin={MIN_READING_PANEL} aria-valuemax={maximumPreviewWidth} aria-valuenow={effectivePreviewWidth} title="拖动调整预览宽度；双击恢复默认" onPointerDown={resizePreview} onKeyDown={resizePreviewWithKeyboard} onDoubleClick={resetPreviewWidth}/>}<PreviewFrame className="collection-detail" label="阅读详情">
+        {runtimeCapabilities.mobile?<>
         <PreviewHeading source={<>{badge(selected)}<span className="preview-path" title={selected.post.authorName}>{selected.post.authorName}{selected.post.authorHandle&&` / @${selected.post.authorHandle}`}</span></>} actions={<PreviewToolbar
           copied={previewLink.copiedKey===selected.key} onCopy={()=>previewLink.copy(selected.key,()=>selected.post.url)}
           openTitle="打开原文" openDisabled={!selected.post.url} hideOpen={selected.post.source==="dida"} onOpen={()=>void open(selected.post.url)}
-        >{compactPreview&&<button ref={previewBackRef} className="collection-preview-back mobile-preview-back" aria-label="返回阅读列表" title="返回阅读列表" onClick={()=>setPreviewEnabled(false)}><ArrowLeft size={20}/><span>返回</span></button>}<ReadingArticleTools key={selected.key} itemKey={selected.key} revision={JSON.stringify([selected.post,readingStatus(selected),selected.tags||[],selected.lifecycle])}/>{!runtimeCapabilities.mobile&&<button className="collection-refresh-content" aria-label="更新内容" title="更新内容" disabled={selected.post.source==="dida"?sourceConnectionRunning("dida"):jobRunning} onClick={()=>selected.post.source==="dida"?void sync("dida",false):selected.post.source==="telegram"?void sync("telegram",false):void refreshContent(selected.key)}><RefreshCw size={17}/></button>}<ReadingInvestigation itemKey={selected.key} title={fullTitle(selected)}/></PreviewToolbar>}><PreviewTitle agentSource={{itemKey:selected.key,title:fullTitle(selected)}} key={selected.key} text={fullTitle(selected)}>{title(selected)}</PreviewTitle></PreviewHeading>
-        <div className="preview-content collection-detail-content preview-document" key={selected.key}><dl><div><dt>作者</dt><dd>{selected.post.authorName}{selected.post.authorHandle&&` @${selected.post.authorHandle}`}</dd></div><CollectionProperties key={selected.key} status={readingStatus(selected)} tags={selected.tags||[]} options={page?.availableTags||[]} disabled={propertyBusy} icon={statusIcon} archived={selected.lifecycle==="archived"} allowDelete={!runtimeCapabilities.mobile} sourceActions={!runtimeCapabilities.mobile && !selected.cloudImported} onLifecycle={state=>void lifecycle(selected,state)} save={async(status,tags)=>{await saveProperties(selected,status,tags);}}/>{runtimeCapabilities.mobile?<div><dt>保存位置</dt><dd>在桌面端管理资料库副本</dd></div>:<CollectionDestination libraries={libraries} destinationId={selected.destinationId} storageLocation={selected.storageLocation} storageLocations={selected.storageLocations} defaultConfig={storage.config} operation={selected.operation} disabled={propertyBusy} onChange={id=>void move(selected,id)} onRemove={id=>void removeDestination(selected,id)} onReview={()=>openReview(selected.key,selected.operation?.target)}/>}<div><dt>发布时间</dt><dd>{date(selected.post.publishedAt)}</dd></div><div><dt>创建日期</dt><dd>{date(selected.collectedAt)}</dd></div></dl><CollectionPostBody post={selected.post} itemKey={selected.key} revision={JSON.stringify([selected.post,readingStatus(selected),selected.tags||[],selected.lifecycle])} open={open}/>
+        >{compactPreview&&<button ref={previewBackRef} className="collection-preview-back mobile-preview-back" aria-label="返回阅读列表" title="返回阅读列表" onClick={closeReading}><ArrowLeft size={20}/><span>返回</span></button>}<ReadingArticleTools key={selected.key} itemKey={selected.key} revision={JSON.stringify([selected.post,readingStatus(selected),selected.tags||[],selected.lifecycle])}/>{!runtimeCapabilities.mobile&&<button className="collection-refresh-content" aria-label="更新内容" title="更新内容" disabled={selected.post.source==="dida"?sourceConnectionRunning("dida"):jobRunning} onClick={()=>selected.post.source==="dida"?void sync("dida",false):selected.post.source==="telegram"?void sync("telegram",false):void refreshContent(selected.key)}><RefreshCw size={17}/></button>}<ReadingInvestigation itemKey={selected.key} title={fullTitle(selected)}/></PreviewToolbar>}><PreviewTitle agentSource={{itemKey:selected.key,title:fullTitle(selected)}} key={selected.key} text={fullTitle(selected)}>{title(selected)}</PreviewTitle></PreviewHeading>
+        </>:<>
+        <div className="reading-article-toolbar">
+          {detailOpen&&<button ref={previewBackRef} className="collection-preview-back" aria-label="返回阅读列表" onClick={closeReading}><ArrowLeft size={14}/>{compactPreview?"返回列表":"收起阅读"}</button>}
+          <span className="reading-article-source">{badge(selected)}{selected.post.authorHandle?" · @"+selected.post.authorHandle:""}</span>
+          <div className="preview-actions" role="group" aria-label="预览操作">
+            {selected.post.source!=="dida"&&selected.post.url&&<button type="button" className="preview-copy-action" aria-label={previewLink.copiedKey===selected.key?"已复制":"复制来源链接"} title="复制来源链接" onClick={()=>void previewLink.copy(selected.key,()=>selected.post.url)}>{previewLink.copiedKey===selected.key?<Check size={15}/>:<Link2 size={15}/>}</button>}
+            <ReadingInvestigation itemKey={selected.key} title={fullTitle(selected)}/>
+            <ReadingArticleTools key={selected.key} ref={inspectorRef} reference needsAttention={issues(selected).length>0||Boolean(selected.attentionIssues?.length)} itemKey={selected.key} revision={JSON.stringify([selected.post,readingStatus(selected),selected.tags||[],selected.lifecycle])}/>
+            <div className="reading-article-menu" onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))setArticleMenu(false);}}>
+              <button type="button" aria-label="归档或更多阅读操作" title="归档 / 永久删除" aria-expanded={articleMenu} onClick={()=>setArticleMenu(!articleMenu)}><MoreHorizontal size={17}/></button>
+              <div className="reading-article-menu-panel" hidden={!articleMenu}>
+                {selected.post.source!=="dida"&&selected.post.url&&<button aria-label="打开原文" onClick={()=>{setArticleMenu(false);void open(selected.post.url);}}>打开原文</button>}
+                <button className="collection-refresh-content" aria-label="更新内容" disabled={selected.post.source==="dida"?sourceConnectionRunning("dida"):jobRunning} onClick={()=>{setArticleMenu(false);selected.post.source==="dida"?void sync("dida",false):selected.post.source==="telegram"?void sync("telegram",false):void refreshContent(selected.key);}}>更新内容</button>
+                <button disabled={propertyBusy} onClick={()=>{setArticleMenu(false);void lifecycle(selected,selected.lifecycle==="archived"?"active":"archived");}}>{selected.lifecycle==="archived"?"恢复到阅读":"归档"}</button>
+                <button className="reading-menu-danger" disabled={propertyBusy} onClick={()=>{setArticleMenu(false);void lifecycle(selected,"deleting");}}>永久删除</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        </>}
+        <div className="preview-content collection-detail-content preview-document" key={selected.key}>{!runtimeCapabilities.mobile&&<>
+          {selected.lifecycle==="archived"&&<div className="reading-context-alert"><span>已归档 · 已保存的资料库副本保持不变</span><button disabled={propertyBusy} onClick={()=>void lifecycle(selected,"active")}>恢复到阅读</button></div>}
+          {selected.lifecycle!=="archived"&&issues(selected).length>0&&<div className="reading-context-alert warning"><span>{issues(selected)[0]?.detail||"这篇内容有待处理的资料库副本"}</span><button onClick={()=>openReview(selected.key,issues(selected)[0]?.target)}>查看处理记录</button></div>}
+          <PreviewTitle agentSource={{itemKey:selected.key,title:fullTitle(selected)}} text={fullTitle(selected)}>{title(selected)}</PreviewTitle>
+        </>}<dl><div><dt>作者</dt><dd>{selected.post.authorName}{selected.post.authorHandle&&` @${selected.post.authorHandle}`}</dd></div><CollectionProperties key={selected.key} status={readingStatus(selected)} tags={selected.tags||[]} options={page?.availableTags||[]} disabled={propertyBusy} reference={!runtimeCapabilities.mobile} icon={statusIcon} archived={selected.lifecycle==="archived"} allowDelete={!runtimeCapabilities.mobile} sourceActions={!runtimeCapabilities.mobile && !selected.cloudImported} onLifecycle={state=>void lifecycle(selected,state)} save={async(status,tags)=>{await saveProperties(selected,status,tags);}}/>{runtimeCapabilities.mobile?<div><dt>保存位置</dt><dd>在桌面端管理资料库副本</dd></div>:<CollectionDestination libraries={libraries} destinationId={selected.destinationId} storageLocation={selected.storageLocation} storageLocations={selected.storageLocations} defaultConfig={storage.config} operation={selected.operation} disabled={propertyBusy} onChange={id=>void move(selected,id)} onRemove={id=>void removeDestination(selected,id)} onReview={()=>openReview(selected.key,selected.operation?.target)}/>}<div><dt>{runtimeCapabilities.mobile?"发布时间":"收集时间"}</dt><dd title={"收集于 "+date(selected.collectedAt)}>{date(runtimeCapabilities.mobile?selected.post.publishedAt:selected.collectedAt)}</dd></div>{runtimeCapabilities.mobile&&<div><dt>创建日期</dt><dd>{date(selected.collectedAt)}</dd></div>}</dl><CollectionPostBody post={selected.post} itemKey={selected.key} revision={JSON.stringify([selected.post,readingStatus(selected),selected.tags||[],selected.lifecycle])} open={open} attachmentSummary={!runtimeCapabilities.mobile&&collectionAttachments(selected.post).length>0?
+          <div className="reading-attachments-heading"><span>原附件 · {downloaded(selected)}/{collectionAttachments(selected.post).length} 本机可用</span><button type="button" onClick={()=>inspectorRef.current?.open()}>查看云端校验</button></div>:undefined}/>
       </div></PreviewFrame></>}
     </div>
 

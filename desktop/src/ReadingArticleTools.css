@@ -22,3 +22,22 @@
   .reading-article-tools-content .reading-attachments li { flex-wrap:wrap; }
   .reading-article-tools-content .reading-attachments li>.reading-attachment-actions { flex-direction:row; flex-wrap:wrap; }
 }
+
+html:not([data-runtime-platform="android"]) .reading-reference-inspector[open] {
+  position: fixed;
+  inset: var(--reading-inspector-top, 10px) var(--reading-inspector-right, 10px) auto auto;
+  width: min(356px, calc(100vw - 20px));
+  height: var(--reading-inspector-height, calc(100dvh - 20px));
+  max-width: 100vw;
+  max-height: 100dvh;
+  margin: 0;
+  border: 1px solid #0001;
+  border-radius: 0 15px 15px 0;
+  box-shadow: -8px 0 32px -12px #0003;
+  background: #fff;
+}
+.reading-reference-inspector::backdrop { background: transparent; }
+.reading-reference-inspector > header { align-items: center; padding: 6px 11px 6px 14px; }
+.reading-reference-inspector > header h2 { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+.reading-reference-inspector > header > button { width: 28px; height: 28px; }
+.reading-reference-inspector .reading-article-tools-content { padding: 0 14px 12px; }

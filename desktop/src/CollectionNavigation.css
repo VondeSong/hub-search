@@ -42,3 +42,12 @@
 .collection-nav-secondary { border-top: 1px solid var(--hub-separator, #e5e4e0); padding-top: 12px; margin-top: 12px; }
 .collection-navigation-footer { border-top: 1px solid var(--hub-separator, #e5e4e0); margin-top: auto; padding-top: 8px; }
 .collection-navigation button:focus-visible, .collection-nav-manage input:focus-visible { outline: 2px solid var(--hub-focus-ring, #84b3ed); outline-offset: -2px; }
+
+.collection-navigation .collection-navigation-footer { position: relative; display: flex; align-items: center; gap: 4px; }
+.collection-navigation .collection-navigation-footer .collection-nav-item { flex: 1; }
+.reading-shortcuts-trigger { display: grid; place-items: center; flex: 0 0 25px; height: 25px; border: 0; border-radius: 6px; background: transparent; color: #71717a; cursor: pointer; }
+.reading-shortcuts-trigger:hover,.reading-shortcuts-trigger[aria-expanded="true"] { background: #e7e8eb; color: #18181b; }
+.reading-shortcuts-popover { position: absolute; z-index: 15; right: 0; bottom: 38px; width: 185px; margin: 0; padding: 8px; border: 1px solid #0001; border-radius: 10px; background: #fff; box-shadow: 0 7px 24px #0002; color: #52525b; font-size: 11.5px; }
+.reading-shortcuts-popover > div { display: flex; justify-content: space-between; align-items: center; gap: 7px; padding: 4px; }
+.reading-shortcuts-popover dd { margin: 0; white-space: nowrap; }
+.reading-shortcuts-popover kbd { padding: 1px 3px; border-radius: 3px; background: #f1f1f2; color: #27272a; }

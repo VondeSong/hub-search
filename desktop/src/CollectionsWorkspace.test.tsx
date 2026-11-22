@@ -10,6 +10,7 @@ import { runtimeCapabilities } from "./RuntimePlatform";
 import { WorkspaceHeaderContext } from "./WorkspaceChrome";
 const { invoke, chooseDirectory } = vi.hoisted(() => ({ invoke: vi.fn(), chooseDirectory: vi.fn(async ():Promise<string|null> => "D:/test-vault") }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
+vi.mock("./AgentInvestigation", () => ({ ReadingInvestigation: () => <button type="button">询问助手</button> }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: chooseDirectory }));
 let container: HTMLDivElement;
 let root: Root;
@@ -130,7 +131,7 @@ it.each(["bookmarks","telegram","dida"])("keeps the original open action only fo
   expect(toolbar).toBeTruthy();
   expect(toolbar!.querySelector('[aria-label="打开原文"]')!==null).toBe(source!=="dida");
   expect(toolbar!.querySelector('[aria-label="更新内容"]')).toBeTruthy();
-  expect(toolbar!.querySelector('[aria-label="复制结果链接"]')).toBeTruthy();
+  expect(!!toolbar!.querySelector('[aria-label="复制来源链接"]')).toBe(source!=="dida");
 });
 beforeEach(() => {
   chooseDirectory.mockReset().mockResolvedValue("D:/test-vault");
@@ -614,12 +615,12 @@ it("opens a reading pane without changing read status", async()=>{
   expect(invoke).not.toHaveBeenCalledWith("set_collection_read",expect.anything());
   const writeText=vi.fn(async()=>{});
   Object.defineProperty(navigator,"clipboard",{value:{writeText},configurable:true});
-  await click("复制结果链接");expect(writeText).toHaveBeenCalledWith(item.post.url);
+  await click("复制来源链接");expect(writeText).toHaveBeenCalledWith(item.post.url);
   expect(container.querySelector('.preview-copy-action')?.getAttribute("aria-label")).toBe("已复制");
   await act(async()=>vi.advanceTimersByTimeAsync(1800));
   await click("打开原文");expect(invoke).toHaveBeenCalledWith("open_external_url",{url:item.post.url});
   writeText.mockRejectedValueOnce(new Error("clipboard unavailable"));
-  await click("复制结果链接");expect(container.querySelector('[role="alert"]')?.textContent).toContain("复制链接失败");
+  await click("复制来源链接");expect(container.querySelector('[role="alert"]')?.textContent).toContain("复制链接失败");
   expect(invoke).not.toHaveBeenCalledWith("set_collection_read",expect.anything());
   await click("切换预览侧栏");expect(container.querySelector('[aria-label="阅读详情"]')).toBeNull();
   await click("切换预览侧栏");expect(container.querySelector('[aria-label="阅读详情"]')).toBeTruthy();
@@ -633,7 +634,7 @@ it("opens gallery cards without marking them read and uses task status icons", a
   const card=container.querySelector<HTMLElement>(".collection-gallery-card")!;
   expect(card).toBeTruthy(); await act(async()=>card.click());
   expect(container.querySelector('[aria-label="阅读详情"]')).toBeTruthy();
-  expect(container.querySelector('.collection-status-picker .lucide-circle')).toBeTruthy();
+  expect(container.querySelector('.collection-status-picker .reading-metadata-dot')).toBeTruthy();
   expect(container.querySelector('[aria-label="关闭详情"]')).toBeNull();
   expect(invoke).not.toHaveBeenCalledWith("set_collection_read",expect.anything());
   await click("阅读状态"); await act(async()=>container.querySelector<HTMLButtonElement>('[role="option"]:nth-of-type(2)')!.click());
@@ -749,7 +750,7 @@ it("keeps sorting independent from filters and layout while persisting the curre
  expect(container.querySelector('.collection-query-tools [aria-label="排序方式"]')).toBeNull();
  expect(container.querySelector('.collection-query-tools [aria-label="切换排序方向"]')).toBeNull();
  const filter=container.querySelector('[aria-label="筛选"]')!;
- expect(filter.nextElementSibling?.querySelector('[aria-label="排序"]')).toBeTruthy();
+ expect(filter.closest('.task-secondary-actions')?.querySelector('[aria-label="排序"]')).toBeTruthy();
  await input(container.querySelector<HTMLSelectElement>('[aria-label="阅读状态筛选"]')!,"unread");
  await click("排序");
  expect(container.querySelector('[role="dialog"][aria-label="排序设置"]')).toBeTruthy();
@@ -968,16 +969,16 @@ it("remembers a dragged reading preview width and keeps both panels within the a
   try {
     await mount(); await act(async () => container.querySelector<HTMLElement>(".collection-row")!.click());
     const divider = container.querySelector<HTMLElement>('[aria-label="调整阅读预览宽度"]')!;
-    expect(divider.getAttribute("aria-valuenow")).toBe("520");
+    expect(divider.getAttribute("aria-valuenow")).toBe("714");
     await act(async () => divider.dispatchEvent(readingPointer("pointerdown", 600)));
     await act(async () => window.dispatchEvent(readingPointer("pointermove", 500)));
-    expect(divider.getAttribute("aria-valuenow")).toBe("620");
+    expect(divider.getAttribute("aria-valuenow")).toBe("770");
     await act(async () => window.dispatchEvent(readingPointer("pointerup", 500)));
-    expect(localStorage.getItem("hub.collection.preview-width-v1")).toBe("620");
+    expect(localStorage.getItem("hub.collection.preview-width-v1")).toBe("770");
     expect(document.body.classList.contains("resizing-reading-preview")).toBe(false);
     await act(async () => root.render(null)); await mount();
     await act(async () => container.querySelector<HTMLElement>(".collection-row")!.click());
-    expect(container.querySelector('[aria-label="调整阅读预览宽度"]')?.getAttribute("aria-valuenow")).toBe("620");
+    expect(container.querySelector('[aria-label="调整阅读预览宽度"]')?.getAttribute("aria-valuenow")).toBe("770");
   } finally { measure.mockRestore(); }
 });
 it("adjusts the reading divider with the keyboard and clamps an oversized saved width", async () => {
@@ -988,13 +989,13 @@ it("adjusts the reading divider with the keyboard and clamps an oversized saved 
     await mount(); await act(async () => container.querySelector<HTMLElement>(".collection-row")!.click());
     const divider = container.querySelector<HTMLElement>('[aria-label="调整阅读预览宽度"]')!;
     const key = async (key: string, shiftKey = false) => act(async () => divider.dispatchEvent(new KeyboardEvent("keydown", { key, shiftKey, bubbles: true, cancelable: true })));
-    expect(divider.getAttribute("aria-valuenow")).toBe("692");
+    expect(divider.getAttribute("aria-valuenow")).toBe("670");
     await key("Home"); expect(divider.getAttribute("aria-valuenow")).toBe("300");
     await key("ArrowLeft"); expect(divider.getAttribute("aria-valuenow")).toBe("316");
     await key("ArrowLeft", true); expect(divider.getAttribute("aria-valuenow")).toBe("356");
-    await key("End"); expect(divider.getAttribute("aria-valuenow")).toBe("692");
-    await key("Enter"); expect(divider.getAttribute("aria-valuenow")).toBe("520");
-    expect(localStorage.getItem("hub.collection.preview-width-v1")).toBe("520");
+    await key("End"); expect(divider.getAttribute("aria-valuenow")).toBe("670");
+    await key("Enter"); expect(divider.getAttribute("aria-valuenow")).toBe("614");
+    expect(localStorage.getItem("hub.collection.preview-width-v1")).toBeNull();
   } finally { measure.mockRestore(); }
 });
 it("switches a narrow reading area to the preview and provides a way back to the list", async () => {
@@ -1006,7 +1007,7 @@ it("switches a narrow reading area to the preview and provides a way back to the
     expect(container.querySelector('[aria-label="阅读布局"]')).toBeTruthy();
     expect(container.querySelector<HTMLElement>(".collection-browse-controls")?.hidden).toBe(true);
     expect(container.querySelector('[aria-label="返回阅读列表"] .lucide-arrow-left')).toBeTruthy();
-    expect(container.querySelector('[aria-label="调整阅读预览宽度"]')?.getAttribute("tabindex")).toBe("-1");
+    expect(container.querySelector('[aria-label="调整阅读预览宽度"]')).toBeNull();
     await click("返回阅读列表");
     expect(container.querySelector('[aria-label="阅读详情"]')).toBeNull();
     expect(container.querySelector(".collection-body")?.classList.contains("has-preview")).toBe(false);
@@ -1043,7 +1044,7 @@ it("filters and refreshes Dida later reading through the connected library while
 });
 
 it("uses the available reading area consistently when a narrow window still fits two panels", async () => {
-  let available = 620;
+  let available = 650;
   const measure = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(() => ({ width: available } as DOMRect));
   const originalWidth = window.innerWidth;
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 650 });
@@ -1052,12 +1053,12 @@ it("uses the available reading area consistently when a narrow window still fits
     await mount(); await act(async () => container.querySelector<HTMLElement>(".collection-row")!.click());
     const body = container.querySelector<HTMLElement>(".collection-body")!;
     expect(body.classList.contains("compact-preview")).toBe(false);
-    expect(body.style.getPropertyValue("--reading-preview-width")).toBe("312px");
+    expect(body.style.getPropertyValue("--reading-preview-width")).toBe("300px");
     expect(container.querySelector('[aria-label="调整阅读预览宽度"]')?.getAttribute("tabindex")).toBe("0");
     available = 580; await act(async () => window.dispatchEvent(new Event("resize")));
     expect(body.classList.contains("compact-preview")).toBe(true);
     expect(container.querySelector('[aria-label="返回阅读列表"]')).toBeTruthy();
-    available = 620; await act(async () => window.dispatchEvent(new Event("resize")));
+    available = 650; await act(async () => window.dispatchEvent(new Event("resize")));
     expect(body.classList.contains("compact-preview")).toBe(false);
     expect(container.querySelector('[aria-label="返回阅读列表"]')).toBeNull();
   } finally { measure.mockRestore(); Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth }); }

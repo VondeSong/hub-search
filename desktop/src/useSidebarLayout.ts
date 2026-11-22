@@ -4,6 +4,7 @@ import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerE
 import { loadSidebarMode, type SidebarMode } from "./WorkspaceChrome";
 
 const SIDEBAR_WIDTH_KEY = "hub.sidebar.context-width-v1";
+const READING_SIDEBAR_WIDTH_KEY = "hub.reading.navigation-width-v1";
 const LIBRARY_SIDEBAR_WIDTH_KEY = "hub.library-browse.navigation-width-v1";
 const DEFAULT_SIDEBAR_WIDTH = 240;
 const MIN_SIDEBAR_WIDTH = 200;
@@ -13,8 +14,10 @@ function clampSidebarWidth(value: number) {
   return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(value)));
 }
 
+const defaultWidth = (key: string) => key === READING_SIDEBAR_WIDTH_KEY ? 206 : key === LIBRARY_SIDEBAR_WIDTH_KEY ? 248 : DEFAULT_SIDEBAR_WIDTH;
+
 function loadSidebarWidth(key: string) {
-  const fallback = key === LIBRARY_SIDEBAR_WIDTH_KEY ? 248 : DEFAULT_SIDEBAR_WIDTH;
+  const fallback = defaultWidth(key);
   try {
     const stored = Number(userProfileStorage.getItem(key));
     return Number.isFinite(stored) && stored > 0 ? clampSidebarWidth(stored) : fallback;
@@ -24,7 +27,7 @@ function loadSidebarWidth(key: string) {
 }
 
 export function useSidebarLayout(view?: string) {
-  const widthKey = view === "libraries" ? LIBRARY_SIDEBAR_WIDTH_KEY : SIDEBAR_WIDTH_KEY;
+  const widthKey = view === "collections" ? READING_SIDEBAR_WIDTH_KEY : view === "libraries" ? LIBRARY_SIDEBAR_WIDTH_KEY : SIDEBAR_WIDTH_KEY;
   const [mode, setMode] = useState(loadSidebarMode);
   const [narrow, setNarrow] = useState(() => window.matchMedia?.("(max-width: 1000px)").matches ?? false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -73,11 +76,11 @@ export function useSidebarLayout(view?: string) {
     else if (event.key === "ArrowRight") next += event.shiftKey ? 24 : 8;
     else if (event.key === "Home") next = MIN_SIDEBAR_WIDTH;
     else if (event.key === "End") next = MAX_SIDEBAR_WIDTH;
-    else if (event.key === "Enter") next = widthKey === LIBRARY_SIDEBAR_WIDTH_KEY ? 248 : DEFAULT_SIDEBAR_WIDTH;
+    else if (event.key === "Enter") next = defaultWidth(widthKey);
     else return;
     event.preventDefault();
     persistSidebarWidth(next);
-  }, [persistSidebarWidth]);
+  }, [persistSidebarWidth, widthKey]);
   const changeMode = useCallback((next: SidebarMode) => {
     setMode(next); setDrawerOpen(false);
     if (next !== "focus") expandedMode.current = next;
@@ -125,6 +128,6 @@ export function useSidebarLayout(view?: string) {
     sidebarWidthMax: MAX_SIDEBAR_WIDTH,
     resizeSidebar,
     resizeSidebarWithKeyboard,
-    resetSidebarWidth: () => persistSidebarWidth(widthKey === LIBRARY_SIDEBAR_WIDTH_KEY ? 248 : DEFAULT_SIDEBAR_WIDTH),
+    resetSidebarWidth: () => persistSidebarWidth(defaultWidth(widthKey)),
   };
 }

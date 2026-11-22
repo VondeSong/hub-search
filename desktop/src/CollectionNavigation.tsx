@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Archive, Bookmark, BookOpenCheck, Check, ChevronDown, ChevronRight, Circle, CircleAlert, CircleSlash, Columns3, Eye, EyeOff, GalleryHorizontal, LayoutList, MoreHorizontal, Pencil, PlayCircle, Plus, Settings2, Table2, Trash2, ArrowUp, ArrowDown, X } from "lucide-react";
+import { Archive, Bookmark, BookOpenCheck, Check, ChevronDown, ChevronRight, Circle, CircleAlert, CircleSlash, Columns3, Eye, EyeOff, GalleryHorizontal, Keyboard, LayoutList, MoreHorizontal, Pencil, PlayCircle, Plus, Settings2, Table2, Trash2, ArrowUp, ArrowDown, X } from "lucide-react";
 import { LibraryIcon } from "./LibraryIcon";
 import { providerName } from "./ProviderLabels";
 import type { LibrarySummary } from "./SearchTypes";
@@ -25,6 +25,7 @@ export function CollectionNavigation({ libraries = [], onOpenSettings }: { libra
   const [editor, setEditor] = useState<{ kind: "new" | "rename"; id?: string; name: string } | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [manageViews, setManageViews] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const copies = new Map(counts.savedCopies.map(copy => [copy.libraryId, copy.count]));
   const copyLibraries = libraries.filter(library => ["craft", "obsidian", "dida365"].includes(library.provider));
@@ -53,13 +54,13 @@ export function CollectionNavigation({ libraries = [], onOpenSettings }: { libra
     </button>;
   };
 
-  return <nav className="collection-navigation" aria-label="阅读导航" onKeyDown={event => { if (event.key === "Escape") { closeTransient(); setManageViews(false); } }}>
+  return <nav className="collection-navigation" aria-label="阅读导航" onKeyDown={event => { if (event.key === "Escape") { closeTransient(); setManageViews(false); setShortcutsOpen(false); } }}>
     <div className="collection-navigation-scroll">
       <section className="collection-nav-section collection-nav-primary" aria-label="阅读状态">
         {(["all", "unread", "in_progress", "read"] as const).map(builtin)}
       </section>
       <section className="collection-nav-section" aria-label="我的视图">
-        <div className="collection-nav-heading"><span>我的视图</span><div>
+        <div className="collection-nav-heading"><span>视图</span><div>
           {views.length > 0 && <button type="button" aria-label="管理我的视图" title="管理我的视图" aria-expanded={manageViews} onClick={() => { setManageViews(!manageViews); setOpenMenu(null); }}><Settings2 size={14} /></button>}
           <button type="button" aria-label="保存当前筛选为视图" title={views.length >= 30 ? "最多保存 30 个视图" : "保存当前筛选为视图"} disabled={views.length >= 30} onClick={() => { setEditor({ kind: "new", name: "" }); setOpenMenu(null); }}><Plus size={16} /></button>
         </div></div>
@@ -94,7 +95,7 @@ export function CollectionNavigation({ libraries = [], onOpenSettings }: { libra
       </section>
       <section className="collection-nav-section" aria-label="已保存副本">
         <button type="button" className="collection-nav-disclosure" aria-label={navigation.librariesCollapsed ? "展开已保存副本" : "折叠已保存副本"} aria-expanded={!navigation.librariesCollapsed} onClick={() => navigation.setLibrariesCollapsed(!navigation.librariesCollapsed)}>
-          {navigation.librariesCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}<span>已保存副本</span>
+          {navigation.librariesCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}<span>资料库副本</span>
         </button>
         {!navigation.librariesCollapsed && <div className="collection-nav-copies">
           {copyLibraries.map(library => {
@@ -110,6 +111,15 @@ export function CollectionNavigation({ libraries = [], onOpenSettings }: { libra
         {(["archived", "abandoned", "attention"] as const).map(builtin)}
       </section>
     </div>
-    <div className="collection-navigation-footer"><button type="button" aria-label="收集与保存设置" className="collection-nav-item" onClick={() => { closeTransient(); if (onOpenSettings) onOpenSettings(); else navigation.openSettings(); }}><Settings2 size={16} /><span>收集与保存设置</span></button></div>
+    <div className="collection-navigation-footer"><button type="button" aria-label="收集与保存设置" className="collection-nav-item" onClick={() => { closeTransient(); if (onOpenSettings) onOpenSettings(); else navigation.openSettings(); }}><Settings2 size={16} /><span>收集与保存</span></button>
+      <button type="button" className="reading-shortcuts-trigger" aria-label="快捷键" title="快捷键" aria-expanded={shortcutsOpen} onClick={()=>setShortcutsOpen(!shortcutsOpen)}><Keyboard size={14}/></button>
+      {shortcutsOpen&&<dl className="reading-shortcuts-popover" aria-label="阅读快捷键">
+        <div><dt>阅读内搜索</dt><dd><kbd>/</kbd></dd></div>
+        <div><dt>下一篇 / 上一篇</dt><dd><kbd>J</kbd> <kbd>K</kbd></dd></div>
+        <div><dt>待读 / 进行中 / 已读</dt><dd><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></dd></div>
+        <div><dt>归档</dt><dd><kbd>E</kbd></dd></div>
+        <div><dt>关闭当前面板</dt><dd><kbd>Esc</kbd></dd></div>
+      </dl>}
+    </div>
   </nav>;
 }

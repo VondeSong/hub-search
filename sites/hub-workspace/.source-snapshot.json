@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "87372b70b4dc9fd22fed032eaac4d1adcf275d6c",
-  "published_version": 150,
-  "deployment_id": "appgdep_6b029afbd5f08191b6adb7cb60098f0c",
+  "source_commit": "1975b6e874036e772bb290ece677157472dea165",
+  "published_version": 151,
+  "deployment_id": "appgdep_6b029d0bda2c8191b2db81cb953df957",
   "files": {
     ".gitignore": {
       "sha256": "ca0e1575efb181d784f15bf6c86e3c012fd5c7ede4daa34b924d0d8b590d4e77",
@@ -418,9 +418,9 @@
       "bytes": 50148
     },
     "app/globals.css": {
-      "sha256": "d078dc0fb01d229b36c9805cc3767b968395854e42df4916c37ce4d754a9acb9",
+      "sha256": "4dd892f1271ff8902837ad25ba32d075b4562079df28963186224f1345f164ca",
       "mode": "100644",
-      "bytes": 49944
+      "bytes": 50104
     },
     "app/insight-discovery.css": {
       "sha256": "13a4af11aaa1077229eb61319a7b844509fa2d1f26411e7337e8a549dcd50fdb",
@@ -568,9 +568,9 @@
       "bytes": 12137
     },
     "app/page.tsx": {
-      "sha256": "c71436922e47f6602513a2ea0c7b84db67d7d073d827744aa52504c19c0b7ddc",
+      "sha256": "947c74b9147dd693447f410355f628c9ee46ad9e1d4aaa5de1721f1e61478462",
       "mode": "100644",
-      "bytes": 77606
+      "bytes": 75673
     },
     "app/pdf-preview-model.ts": {
       "sha256": "e1f72df40daff0d29d0c63cd3552edbfc47d851a2a5d0bbe3184e0371f178970",
@@ -1252,6 +1252,36 @@
       "mode": "100644",
       "bytes": 133251
     },
+    "public/reading-workspace/index.html": {
+      "sha256": "02f446a66d120749f4087454a1816a7c97cf35ddf84e1afe602ea241be82aba3",
+      "mode": "100644",
+      "bytes": 15831
+    },
+    "public/reading-workspace/lucide.LICENSE": {
+      "sha256": "1e7290b35280a048667bbf0ebabac1c7fd52a75300e8b2946ac165715997f2bc",
+      "mode": "100644",
+      "bytes": 880
+    },
+    "public/reading-workspace/lucide.min.js": {
+      "sha256": "11029ba9738a92512a8e424f6dbc42e6c6ae9e655c218a1979bc1cf25d65dea2",
+      "mode": "100644",
+      "bytes": 355936
+    },
+    "public/reading-workspace/reading-utilities.css": {
+      "sha256": "fdb5e7b6442a1a43830848742b93016be5bc2c6e5ea6ad22ded2351b2a63445a",
+      "mode": "100644",
+      "bytes": 26426
+    },
+    "public/reading-workspace/reading.css": {
+      "sha256": "cd5c7b3641e8dbc8deaf42af58b2a421aa053e3ead6adca5eaccea890f2140e2",
+      "mode": "100644",
+      "bytes": 5389
+    },
+    "public/reading-workspace/reading.js": {
+      "sha256": "dfaaaa1d43de04cda924de8dc11edb30b6855cb9bca06c10e45081520ca678c6",
+      "mode": "100644",
+      "bytes": 119408
+    },
     "scripts/assistant-answer-check.mjs": {
       "sha256": "eec1ec20fffed18411309ae94f10bf04dbac503394ab0800205d82c976704797",
       "mode": "100644",
@@ -1453,5 +1483,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-22T07:35:16.099485+00:00"
+  "imported_at": "2026-11-22T07:43:49.544443+00:00"
 }

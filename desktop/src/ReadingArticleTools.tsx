@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { createPortal } from "react-dom";
-import { MoreHorizontal, X } from "lucide-react";
+import { MoreHorizontal, ShieldCheck, X } from "lucide-react";
 import { ReadingAttachments } from "./ReadingAttachments";
 import { ReadingCopies } from "./ReadingCopies";
 import { ReadingOffline } from "./ReadingOffline";
@@ -9,14 +9,15 @@ import { ReadingSourceRecovery } from "./ReadingSourceRecovery";
 import { runtimeCapabilities } from "./RuntimePlatform";
 import "./ReadingArticleTools.css";
 
-type Props = { itemKey: string; revision: string };
+export type ReadingArticleToolsHandle = { open: () => void };
+type Props = { ref?: Ref<ReadingArticleToolsHandle>; itemKey: string; revision: string; reference?: boolean; needsAttention?: boolean };
 
 // Changing articles closes the tools and releases their status polling.
 export function ReadingArticleTools(props: Props) {
   return <ArticleTools key={props.itemKey} {...props} />;
 }
 
-function ArticleTools({ itemKey, revision }: Props) {
+function ArticleTools({ ref, itemKey, revision, reference = false, needsAttention = false }: Props) {
   const [opened, setOpened] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -85,13 +86,28 @@ function ArticleTools({ itemKey, revision }: Props) {
     }
     const element = dialog.current;
     element?.showModal();
-    return () => { if (element?.open) element.close(); };
-  }, [opened]);
+    const position = () => {
+      const paper = trigger.current?.closest(".collection-detail")?.getBoundingClientRect();
+      if (!reference || !element || !paper) return;
+      element.style.setProperty("--reading-inspector-top", paper.top + "px");
+      element.style.setProperty("--reading-inspector-right", (window.innerWidth - paper.right) + "px");
+      element.style.setProperty("--reading-inspector-height", paper.height + "px");
+    };
+    position();
+    window.addEventListener("resize", position);
+    return () => {
+      window.removeEventListener("resize", position);
+      if (element?.open) element.close();
+    };
+  }, [opened, reference]);
 
+  useImperativeHandle(ref, () => ({ open }));
+
+  const label = reference ? "本文管理与核验" : "更多阅读操作";
   return <>
-    <button ref={trigger} type="button" className="reading-article-tools-trigger" aria-label="更多阅读操作" title="更多阅读操作" aria-haspopup="dialog" aria-expanded={opened} onClick={open}><MoreHorizontal size={19} /></button>
-    {opened && createPortal(<dialog ref={dialog} className="reading-article-tools-dialog" aria-labelledby={titleId} onCancel={event => { event.preventDefault(); close(); }} onClose={close} onClick={event => { if (event.target === event.currentTarget) { const bounds = event.currentTarget.getBoundingClientRect(); if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) close(); } }}>
-      <header><div><h2 id={titleId}>本文管理</h2><p>离线内容、资料库副本与云端检查</p></div><button type="button" autoFocus aria-label="关闭本文管理" onClick={close}><X size={20} /></button></header>
+    <button ref={trigger} type="button" className="reading-article-tools-trigger" aria-label={label} title={label} aria-haspopup="dialog" aria-expanded={opened} onClick={open}>{reference ? <ShieldCheck size={16} /> : <MoreHorizontal size={19} />}{reference && needsAttention && <span className="reading-inspector-warning" />}</button>
+    {opened && createPortal(<dialog ref={dialog} className={"reading-article-tools-dialog"+(reference?" reading-reference-inspector":"")} aria-labelledby={titleId} onCancel={event => { event.preventDefault(); close(); }} onClose={close} onClick={event => { if (event.target === event.currentTarget) { const bounds = event.currentTarget.getBoundingClientRect(); if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) close(); } }}>
+      <header><div><h2 id={titleId}>{reference ? <><ShieldCheck size={16}/>本文管理与核验</> : "本文管理"}</h2>{!reference && <p>离线内容、资料库副本与云端检查</p>}</div><button type="button" autoFocus aria-label="关闭本文管理" onClick={close}><X size={20} /></button></header>
       <div className="reading-article-tools-content">
         <ReadingOffline itemKey={itemKey} />
         <ReadingAttachments itemKey={itemKey} />

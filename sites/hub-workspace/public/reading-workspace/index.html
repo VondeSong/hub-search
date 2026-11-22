@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hub 阅读工作区 · 交互原型 v2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet" />
+  <script src="lucide.min.js" defer></script>
+  <link rel="stylesheet" href="reading-utilities.css">
+  <link rel="stylesheet" href="reading.css">
+</head>
+<body>
+  <div id="app" class="h-screen w-screen flex flex-col bg-[#F2F3F5] select-none">
+    <!-- Unified macOS Titlebar (46px): Single top surface for Sources + Global Utility + Unobtrusive Demo Trigger -->
+    <header id="titlebar" class="h-[46px] px-3.5 flex items-center justify-between gap-3 mac-vibrancy shrink-0 z-30">
+      <!-- Left: Sidebar Toggle + Workspace Identity -->
+      <div class="flex items-center gap-2 shrink-0">
+        <button id="btn-toggle-sidebar" class="w-7 h-7 rounded-[7px] flex items-center justify-center text-neutral-500 hover:bg-black/[0.05] hover:text-neutral-900 transition" title="展开/收起侧栏">
+          <i data-lucide="panel-left" class="w-4 h-4"></i>
+        </button>
+        <span class="text-[13.5px] font-semibold tracking-tight text-neutral-900 hidden sm:inline">阅读</span>
+      </div>
+
+      <!-- Center: Orthogonal Source Switcher (macOS Segmented Control — Zero Clutter inside Paper Sheets!) -->
+      <nav id="source-segmented" class="flex items-center gap-0.5 bg-black/[0.045] p-[3px] rounded-[9px] overflow-x-auto no-scrollbar max-w-full"></nav>
+
+      <!-- Right: Quiet Icon Controls (Search, Sync, Cloud, Demo Switcher) -->
+      <div class="flex items-center gap-1 shrink-0">
+        <div id="global-search-wrap" class="flex items-center">
+          <button id="btn-search-open" class="w-7 h-7 rounded-[7px] flex items-center justify-center text-neutral-500 hover:bg-black/[0.05] hover:text-neutral-900 transition" title="阅读内搜索 (/)">
+            <i data-lucide="search" class="w-3.5 h-3.5"></i>
+          </button>
+          <div id="search-pill" class="hidden flex items-center bg-white/90 border border-black/10 rounded-[8px] px-2 py-1 w-40 sm:w-48 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+            <i data-lucide="search" class="w-3.5 h-3.5 text-neutral-400 mr-1.5 shrink-0"></i>
+            <input id="search-input" type="text" placeholder="搜索标题、正文或作者…" class="bg-transparent text-[12.5px] text-neutral-800 placeholder-neutral-400 focus:outline-none w-full select-text" />
+            <button id="btn-search-close" class="text-neutral-400 hover:text-neutral-700 ml-1" title="关闭并清空">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+
+        <button id="btn-sync-modal" class="w-7 h-7 rounded-[7px] flex items-center justify-center text-neutral-500 hover:bg-black/[0.05] hover:text-neutral-900 transition relative" title="来源同步与连接">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span id="dot-sync-warn" class="hidden absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+        </button>
+
+        <button id="btn-cloud-modal" class="w-7 h-7 rounded-[7px] flex items-center justify-center text-neutral-500 hover:bg-black/[0.05] hover:text-neutral-900 transition relative" title="云同步状态与设置">
+          <i data-lucide="cloud" class="w-3.5 h-3.5"></i>
+          <span id="dot-cloud-state" class="absolute bottom-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-teal-600"></span>
+        </button>
+
+        <span class="w-[1px] h-3.5 bg-black/10 mx-0.5 hidden sm:inline-block"></span>
+
+        <!-- Single subtle Demo & Scenarios button (replaces entire cluttered prototype bar!) -->
+        <button id="btn-demo-menu" class="h-7 px-2.5 rounded-[7px] bg-white/80 hover:bg-white border border-black/[0.08] text-[12px] font-medium text-neutral-700 flex items-center gap-1.5 transition shadow-[0_1px_2px_rgba(0,0,0,0.03)]" title="验收场景、宽窄屏与断网模拟">
+          <span id="demo-dot" class="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+          <span class="hidden sm:inline" id="demo-btn-label">验收演示</span>
+          <i data-lucide="chevron-down" class="w-3 h-3 text-neutral-400"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Workspace Body -->
+    <div class="flex-1 flex min-h-0 overflow-hidden px-2.5 pb-2.5 gap-0 relative">
+      <!-- 1. Whisper-Quiet Translucent Sidebar (macOS HIG) -->
+      <aside id="sidebar" class="w-[206px] shrink-0 flex flex-col pr-2 pt-1 pb-1 overflow-hidden transition-all">
+        <div class="flex-1 overflow-y-auto space-y-5 pr-0.5">
+          <!-- Primary Reading Scopes -->
+          <div id="nav-scopes" class="space-y-0.5"></div>
+
+          <!-- Saved Views -->
+          <div>
+            <div class="px-2.5 mb-1 flex items-center justify-between">
+              <span class="text-[11px] font-medium text-neutral-400 tracking-wide">视图</span>
+              <div class="flex items-center gap-0.5">
+                <button id="btn-views-mgr" class="p-1 rounded text-neutral-400 hover:text-neutral-700 hover:bg-black/[0.04] transition" title="管理视图">
+                  <i data-lucide="sliders-horizontal" class="w-3 h-3"></i>
+                </button>
+                <button id="btn-view-add" class="p-1 rounded text-neutral-400 hover:text-neutral-700 hover:bg-black/[0.04] transition" title="保存当前为新视图">
+                  <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            </div>
+            <div id="nav-views" class="space-y-0.5"></div>
+          </div>
+
+          <!-- Verified Copies -->
+          <div>
+            <button id="btn-copies-fold" class="w-full px-2.5 mb-1 flex items-center justify-between text-[11px] font-medium text-neutral-400 hover:text-neutral-600 tracking-wide">
+              <span>资料库副本</span>
+              <i data-lucide="chevron-down" id="ico-copies-fold" class="w-3 h-3 transition-transform"></i>
+            </button>
+            <div id="nav-copies" class="space-y-0.5"></div>
+          </div>
+
+          <!-- Lifecycle & Triage -->
+          <div class="pt-3 hair-t">
+            <div id="nav-special" class="space-y-0.5"></div>
+          </div>
+        </div>
+
+        <!-- Quiet Footer -->
+        <div class="pt-2 hair-t flex items-center justify-between px-1">
+          <button id="btn-collect-cfg" class="px-2 py-1.5 rounded-[7px] text-[12px] text-neutral-500 hover:bg-black/[0.04] hover:text-neutral-800 flex items-center gap-1.5 transition">
+            <i data-lucide="folder-cog" class="w-3.5 h-3.5 text-neutral-400"></i>
+            <span>收集与保存</span>
+          </button>
+          <button id="btn-kbd-help" class="p-1.5 rounded-[7px] text-neutral-400 hover:bg-black/[0.04] hover:text-neutral-700 transition" title="快捷键">
+            <i data-lucide="keyboard" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Mobile Sidebar Backdrop -->
+      <div id="sidebar-backdrop" class="hidden fixed inset-0 bg-black/20 backdrop-blur-[2px] z-30"></div>
+
+      <!-- 2. Main Floating Paper Stage -->
+      <main id="stage" class="flex-1 flex min-w-0 overflow-hidden relative">
+        <!-- Floating Paper A: Editorial Stream / Full-Width Table / Board / Gallery / Triage -->
+        <section id="browse-paper" class="craft-paper flex flex-col min-w-0 overflow-hidden relative transition-all" style="width: 360px;">
+          <div id="sweep-bar" class="sweep-bar hidden"><span></span></div>
+
+          <!-- Clean 44px Sheet Header (Zero Source Clutter!) -->
+          <div class="h-11 px-3.5 hair-b flex items-center justify-between gap-2 shrink-0">
+            <div class="flex items-center gap-2 min-w-0">
+              <h2 id="sheet-title" class="text-[13.5px] font-semibold text-neutral-900 truncate">全部内容</h2>
+              <span id="sheet-count" class="text-[11.5px] font-mono-tech text-neutral-400 whitespace-nowrap"></span>
+              <div id="dirty-view-actions" class="hidden items-center gap-1"></div>
+            </div>
+
+            <div class="flex items-center gap-1 shrink-0">
+              <!-- Layout Mode Switcher (Stream / Table / Board / Gallery) -->
+              <div id="layout-bar" class="inline-flex items-center bg-black/[0.04] p-0.5 rounded-[7px]"></div>
+              <button id="btn-filter" class="w-7 h-7 rounded-[7px] flex items-center justify-center text-neutral-500 hover:bg-black/[0.05] hover:text-neutral-900 transition relative" title="筛选">
+                <i data-lucide="list-filter" class="w-3.5 h-3.5"></i>
+                <span id="dot-filter" class="hidden absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+              </button>
+              <button id="btn-sort" class="w-7 h-7 rounded-[7px] flex items-center justify-center text-neutral-500 hover:bg-black/[0.05] hover:text-neutral-900 transition" title="排序">
+                <i data-lucide="arrow-up-down" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Contextual Active Filters (Only visible when filters exist) -->
+          <div id="filter-strip" class="hidden px-3.5 py-2 hair-b bg-neutral-50/80 flex items-center justify-between gap-2 flex-wrap text-[12px] shrink-0">
+            <div id="filter-chips" class="flex items-center gap-1.5 flex-wrap"></div>
+            <button id="btn-clear-filters" class="text-[11.5px] font-medium text-blue-600 hover:text-blue-800 whitespace-nowrap">清除</button>
+          </div>
+
+          <!-- Contextual System Banner (Offline or Pending X Abandon Undo) -->
+          <div id="system-banner" class="hidden px-3.5 py-2 hair-b text-[12px] flex items-center justify-between gap-2 shrink-0"></div>
+
+          <!-- Scrollable Items Container -->
+          <div id="browse-body" class="flex-1 overflow-y-auto relative"></div>
+
+          <!-- Floating Batch Action Pill (Only when 2+ items checked) -->
+          <div id="batch-pill" class="hidden absolute bottom-3.5 left-1/2 -translate-x-1/2 mac-vibrancy border border-black/10 shadow-lg rounded-full px-3.5 py-1.5 flex items-center gap-2.5 text-[12px] z-20">
+            <span id="batch-count" class="font-semibold text-neutral-900 font-mono-tech"></span>
+            <span class="text-neutral-300">|</span>
+            <button data-batch="read" class="text-neutral-700 hover:text-neutral-950 font-medium">已读</button>
+            <button data-batch="reading" class="text-neutral-700 hover:text-neutral-950 font-medium">进行中</button>
+            <button data-batch="archive" class="text-neutral-700 hover:text-neutral-950 font-medium">归档</button>
+            <button data-batch="clear" class="text-neutral-400 hover:text-neutral-800"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+          </div>
+        </section>
+
+        <!-- Invisible-Until-Hover Gutter -->
+        <div id="paper-gutter" class="paper-gutter" title="拖动调整阅读区宽度（双击复位）"></div>
+
+        <!-- Floating Paper B: Claude Desktop + Craft Editorial Reading Canvas -->
+        <section id="reading-paper" class="claude-paper flex-1 flex flex-col min-w-0 overflow-hidden relative">
+          <!-- Whisper-Quiet Top Bar (Ghost Icons Only) -->
+          <div id="reading-topbar" class="h-11 px-5 hair-b flex items-center justify-between gap-2 shrink-0"></div>
+
+          <!-- Centered Editorial Reading Surface -->
+          <div id="reading-scroll" class="flex-1 overflow-y-auto px-7 sm:px-12 py-8 select-text"></div>
+
+          <!-- Slide-Over 1: Codex Article Inspector ("本文管理") -->
+          <div id="inspector-panel" class="hidden absolute inset-y-0 right-0 w-full sm:w-[356px] bg-white hair-l shadow-[-12px_0_32px_-8px_rgba(0,0,0,0.10)] flex flex-col z-30">
+            <div class="h-11 px-4 hair-b flex items-center justify-between shrink-0">
+              <span class="text-[13px] font-semibold text-neutral-900 flex items-center gap-1.5">
+                <i data-lucide="shield-check" class="w-4 h-4 text-neutral-600"></i>本文管理与核验
+              </span>
+              <button id="btn-close-inspector" class="w-7 h-7 rounded-[7px] flex items-center justify-center text-neutral-400 hover:bg-black/[0.05] hover:text-neutral-800">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+            <div id="inspector-body" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
+          </div>
+
+          <!-- Slide-Over 2: Integrated Hub Assistant -->
+          <div id="assistant-panel" class="hidden absolute inset-y-0 right-0 w-full sm:w-[372px] bg-white hair-l shadow-[-12px_0_32px_-8px_rgba(0,0,0,0.10)] flex flex-col z-30">
+            <div class="h-11 px-4 hair-b flex items-center justify-between shrink-0">
+              <span class="text-[13px] font-semibold text-neutral-900 flex items-center gap-1.5">
+                <i data-lucide="sparkles" class="w-4 h-4 text-blue-600"></i>Hub 助手
+              </span>
+              <div class="flex items-center gap-1">
+                <button id="btn-asst-new" class="px-2 py-1 rounded-[6px] text-[11.5px] font-medium text-neutral-600 hover:bg-black/[0.05] transition">新开对话</button>
+                <button id="btn-close-assistant" class="w-7 h-7 rounded-[7px] flex items-center justify-center text-neutral-400 hover:bg-black/[0.05] hover:text-neutral-800">
+                  <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+            <div id="asst-messages" class="flex-1 overflow-y-auto p-4 space-y-3 select-text"></div>
+            <div class="p-3 hair-t bg-[#FAFAFA] space-y-2">
+              <div id="asst-context-bar" class="px-2.5 py-1.5 rounded-[8px] bg-white border border-black/[0.07] text-[12px] text-neutral-600 flex items-center justify-between gap-2"></div>
+              <div class="flex items-end gap-2">
+                <textarea id="asst-input" rows="2" placeholder="围绕这篇文章提问（输入后按发送）…" class="flex-1 resize-none rounded-[9px] border border-black/10 bg-white px-3 py-2 text-[13px] text-neutral-800 placeholder-neutral-400 focus:outline-none focus:border-blue-500 select-text"></textarea>
+                <button id="btn-asst-send" class="h-9 px-3.5 rounded-[9px] bg-neutral-900 hover:bg-neutral-800 text-white text-[12.5px] font-medium transition shrink-0">发送</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- Popover Layer -->
+    <div id="popover-root" class="hidden fixed inset-0 z-50">
+      <div id="popover-bg" class="absolute inset-0"></div>
+      <div id="popover-card" class="absolute bg-white rounded-[12px] p-2.5 text-[13px] max-h-[78vh] overflow-y-auto" style="box-shadow: var(--shadow-popover);"></div>
+    </div>
+
+    <!-- Modal Layer -->
+    <div id="modal-root" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-[3px]">
+      <div id="modal-card" class="bg-white rounded-[14px] w-full max-w-[560px] max-h-[85vh] flex flex-col overflow-hidden" style="box-shadow: 0 24px 60px -12px rgba(0,0,0,0.24), 0 0 0 0.5px rgba(0,0,0,0.08);"></div>
+    </div>
+
+    <!-- Toast Stack -->
+    <div id="toast-root" class="fixed bottom-4 right-4 z-[60] flex flex-col gap-2 pointer-events-none"></div>
+  </div>
+
+  <script src="reading.js" defer></script>
+</body>
+</html>
