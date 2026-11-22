@@ -337,7 +337,62 @@
     .diff-add { background: rgba(30, 142, 90, 0.10); color: var(--accent-green); }
     .diff-del { background: rgba(209, 59, 52, 0.09); color: var(--accent-red); }
     mark.search-hit { background: rgba(250, 204, 21, 0.24); color: inherit; padding: 0 2px; border-radius: 3px; }
-    mark.search-hit.active { background: rgba(245, 158, 11, 0.42); box-shadow: inset 0 -1.5px 0 #D97706; }
+    mark.search-hit.active { background: rgba(245, 158, 11, 0.44); box-shadow: inset 0 -1.5px 0 #D97706; }
+
+    .search-entry .search-input-shell { background: var(--bg-subtle); border: 0.5px solid var(--hairline); }
+    .search-entry .search-icon { color: var(--ink-tertiary); }
+    .search-entry .search-recents { display: none; }
+    .search-entry:focus-within .search-input-shell { border-color: var(--accent); }
+    .search-entry:focus-within .search-icon { color: var(--accent); }
+    .search-entry:focus-within .search-recents { display: block; }
+
+    .search-reader { container-type: inline-size; }
+    @container (max-width: 440px) {
+      .search-reader-header { flex-direction: column; align-items: flex-start; }
+      .search-reader-actions { max-width: 100%; flex-wrap: wrap; }
+    }
+
+    /* macOS Frosted Filter Popover */
+    .filter-popover {
+      position: absolute;
+      top: calc(100% + 6px); right: 0;
+      width: 316px; max-width: calc(100vw - 32px);
+      z-index: 46;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      border: 0.5px solid var(--hairline-strong);
+      border-radius: 14px;
+      box-shadow: var(--modal-shadow);
+      padding: 14px;
+    }
+    .filter-dot {
+      position: absolute; top: 4px; right: 4px;
+      width: 5px; height: 5px; border-radius: 999px;
+      background: var(--accent);
+    }
+
+    /* 1.2s Subtle Amber Pulse on Target Paragraph Jump */
+    @keyframes hitPulseFade {
+      0% { background-color: rgba(245, 158, 11, 0.20); box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12); }
+      70% { background-color: rgba(245, 158, 11, 0.08); box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.04); }
+      100% { background-color: transparent; box-shadow: none; }
+    }
+    .hit-pulse { border-radius: 6px; animation: hitPulseFade 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+
+    /* Right-Edge Hit Marks Scrollbar Rail */
+    .hit-track {
+      position: absolute; top: 14px; right: 3px; bottom: 14px;
+      width: 10px; z-index: 15; pointer-events: none;
+    }
+    .hit-tick {
+      position: absolute; right: 1px; width: 6px; height: 2.5px;
+      border-radius: 999px; background: rgba(217, 119, 6, 0.55);
+      pointer-events: auto; cursor: pointer;
+      transition: transform 120ms ease, background-color 120ms ease, width 120ms ease;
+    }
+    .hit-tick:hover { width: 9px; background: #D97706; }
+    .hit-tick.active { width: 9px; height: 3.5px; background: var(--accent); box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.18); }
 
     /* Rich Document Blocks */
     .doc-toc { background: var(--bg-surface); border: 0.5px solid var(--hairline); border-radius: 10px; padding: 12px 14px; margin-bottom: 18px; }
@@ -970,13 +1025,14 @@
     const DOCUMENTS = [
       {
         id: 'doc-1', title: '1 线束 · Craft 资料', library: 'craft', spaceNodeId: 'c-doc-1',
+        docType: 'page', folderName: 'Car / 线束工程',
         path: 'Car / 线束工程 / 1 线束', updated: '今天 10:42', relTime: '18 分钟前', timeGroup: '今天', dateBucket: '7d',
         tags: ['线束', 'eds', 'craft-car'], favorite: true,
         snippet: '线束布置、过孔密封、波纹管弯曲半径与整车接口冻结的总入口文档，包含 2 篇关联子页面与线表附件。',
         toc: [
-          { id: 'sec-overview', label: '线束设计总览与适用范围' },
-          { id: 'sec-params', label: '核心布置参数对照表' },
-          { id: 'sec-attachments', label: '原始附件与关联子页面' }
+          { id: 's-c1-1', label: '线束设计总览与适用范围' },
+          { id: 's-c1-2', label: '核心布置参数对照表' },
+          { id: 's-c1-3', label: '原始附件与图纸' }
         ],
         blocks: SPACE_NODES.find(n => n.id === 'c-doc-1').blocks,
         subpages: [
@@ -986,15 +1042,39 @@
         backlinks: ['飞书 Q4 车型线束接口冻结跟踪', '试装现场记录 · 左前门线束.md']
       },
       {
+        id: 'doc-9', title: '汽车线束焊点设计要点-终稿.pdf', library: 'craft', spaceNodeId: 'c-doc-1',
+        docType: 'pdf', folderName: 'Car / 线束工程',
+        path: 'Car / 线束工程 / 汽车线束焊点设计要点-终稿.pdf', updated: '3 天前', relTime: '3 天前', timeGroup: '本周', dateBucket: '7d',
+        tags: ['线束', 'pdf', 'eds'], favorite: false,
+        snippet: '涵盖超声波焊接线径配比、双壁热缩管防水密封以及线束分支焊点距接插件最小距离规范（第 1–18 页已索引）。',
+        toc: [
+          { id: 'pdf-p1', label: 'P.02 超声波焊点线径配比规范' },
+          { id: 'pdf-p2', label: 'P.07 湿区线束焊点双壁热缩管密封' },
+          { id: 'pdf-p3', label: 'P.14 焊点距插接器与折弯区最小距离' }
+        ],
+        blocks: [
+          { type: 'callout', text: 'PDF 原文索引 · 共 18 页已建立页级全文索引，点击左侧不同命中摘录可直达对应页码段落。' },
+          { type: 'h2', id: 'pdf-p1', text: 'P.02 超声波焊点线径配比规范' },
+          { type: 'p', text: '汽车线束主干分支采用超声波焊接时，单节点最多合并 6 根导线，最大与最小截面积比值不宜超过 1:4，防止细线在线束振动中过早疲劳断裂。' },
+          { type: 'h2', id: 'pdf-p2', text: 'P.07 湿区线束焊点双壁热缩管密封' },
+          { type: 'p', text: '前舱及四门湿区线束焊点必须采用带热熔胶的双壁热缩管密封，加热后两端应可见均匀透明胶环溢出，避免水汽沿线束铜丝毛细渗入。' },
+          { type: 'h2', id: 'pdf-p3', text: 'P.14 焊点距插接器与折弯区最小距离' },
+          { type: 'p', text: '线束焊点距离插接器尾部护套应 ≥ 50mm，且严禁布置在车门过孔动态弯曲段或波纹管急弯处。' }
+        ],
+        backlinks: ['1 线束 · Craft 资料']
+      },
+      {
         id: 'doc-2', title: 'HUB_AGENTS_ARCHITECTURE v1.16 — 上下文压缩与写回撤销', library: 'obsidian', spaceNodeId: 'o-arch',
+        docType: 'page', folderName: 'OS / Projects',
         path: 'OS / Projects / HUB_AGENTS_ARCHITECTURE.md', updated: '今天 10:24', relTime: '36 分钟前', timeGroup: '今天', dateBucket: '7d',
         tags: ['hub-search', 'agent', 'sqlite'], favorite: true,
-        snippet: '定义 V3 长任务上下文预算（128k 软上限）、条件式 Obsidian 写回撤销快照，以及 Rust + SQLite 原生检索优先策略。',
+        snippet: '定义 V3 上下文压缩双阈值（128k 软上限）、条件式 Obsidian 写回撤销快照，以及 Rust + SQLite 原生检索优先策略。',
         blocks: SPACE_NODES.find(n => n.id === 'o-arch').blocks,
         backlinks: ['FSRS-v5-Workflow.md']
       },
       {
         id: 'doc-8', title: '试装现场记录 · 左前门线束.md', library: 'obsidian', spaceNodeId: 'o-field',
+        docType: 'page', folderName: 'OS / 现场记录',
         path: 'OS / 试装现场记录 · 左前门线束.md', updated: '今天 10:05', relTime: '55 分钟前', timeGroup: '今天', dateBucket: '7d',
         tags: ['线束', 'eds'], favorite: true,
         snippet: '现场本次先安装卡扣 2，再安装卡扣 1（支架暂记 V3），需与设计稿 V2 对齐版本。',
@@ -1003,6 +1083,7 @@
       },
       {
         id: 'doc-3', title: '完成 Hub 桌面端 v3 层级预览与双纸对照原型', library: 'dida', spaceNodeId: 'd-t1',
+        docType: 'task', folderName: '滴答 / Hub 开发',
         path: '滴答清单 / Hub 开发', updated: '今天 09:15', relTime: '1 小时前', timeGroup: '今天', dateBucket: '7d',
         tags: ['hub-search', 'gtd'], favorite: false,
         snippet: '落地原生无边框层级目录、共享纯白阅读纸、Jump Bar 跨库跳转与双纸对照。',
@@ -1011,6 +1092,7 @@
       },
       {
         id: 'doc-4', title: 'Apple macOS HIG 视觉精髓：毛玻璃层级、0.5px 发丝线与 Inset Grouped', library: 'x',
+        docType: 'reading', folderName: 'X 书签',
         path: 'X 书签 · @design_systems', updated: '昨天 21:10', relTime: '昨天', timeGroup: '昨天', dateBucket: '7d',
         tags: ['design', 'macos', 'hig'], favorite: true,
         snippet: '拆解 macOS 与 Craft Docs 如何用中性灰底布、纯白悬浮纸面与 0.5px 边框消除传统 SaaS 界面的割裂感。',
@@ -1019,6 +1101,7 @@
       },
       {
         id: 'doc-5', title: 'FSRS v5 参数调优笔记：4 档评分按钮与快捷键 1-4', library: 'obsidian', spaceNodeId: 'o-fsrs',
+        docType: 'flashcard', folderName: 'OS / 学习笔记',
         path: 'OS / FSRS-v5-Workflow.md', updated: '3 天前', relTime: '3 天前', timeGroup: '本周', dateBucket: '7d',
         tags: ['fsrs', 'learning'], favorite: false,
         snippet: '对比 SM-2 与 FSRS 记忆稳定度曲线，记录桌面端空格翻面 + 1/2/3/4 评分的零鼠标复习节奏。',
@@ -1027,6 +1110,7 @@
       },
       {
         id: 'doc-6', title: 'SQLite FTS5 + WAL 模式毫秒级检索优化', library: 'telegram',
+        docType: 'reading', folderName: 'Telegram 收藏',
         path: 'Telegram 收藏 · Rust & SQLite Channel', updated: '5 天前', relTime: '5 天前', timeGroup: '本周', dateBucket: '7d',
         tags: ['sqlite', 'rust'], favorite: false,
         snippet: '使用 trigram tokenizer 配合中文分词前缀索引，将桌面端实时键入搜索延迟稳定压在 12ms 以内。',
@@ -1035,12 +1119,22 @@
       },
       {
         id: 'doc-7', title: '2026 Q4 车型线束接口冻结跟踪', library: 'feishu', spaceNodeId: 'f-ecr',
+        docType: 'attachment', folderName: '飞书 / 车型项目',
         path: '飞书知识库 / 2026 Q4 车型线束接口冻结跟踪', updated: '2 周前', relTime: '2 周前', timeGroup: '上月', dateBucket: '30d',
         tags: ['线束', 'eds', 'feishu'], favorite: false,
         snippet: '汇总 14 项车身域控制器针脚变更状态、左前门支架 V2→V3 孔位微调与 ECR 冻结节点。',
         blocks: SPACE_NODES.find(n => n.id === 'f-ecr').blocks,
         backlinks: ['1 线束 · Craft 资料']
       }
+    ];
+
+    const SEARCH_TYPE_OPTIONS = [
+      { id: 'page', label: '页面' },
+      { id: 'task', label: '任务' },
+      { id: 'pdf', label: 'PDF' },
+      { id: 'attachment', label: '附件' },
+      { id: 'reading', label: '阅读' },
+      { id: 'flashcard', label: '闪卡' }
     ];
 
     const READING_ITEMS = [
@@ -1051,7 +1145,7 @@
     ];
 
     const INITIAL_TASKS = [
-      { id: 't-1', title: '体验 Hub v3 原生层级目录、共享预览与双纸对照', bucket: 'today', priority: 'high', source: '滴答清单', due: '今天 18:00', tags: ['hub-search', 'design'], done: false, notes: '测试 ↑↓ 键盘连刷右侧预览，以及把 Craft 1 线束和 Obsidian 现场记录并排摊开。' },
+      { id: 't-1', title: '体验 Hub v3 搜索筛选浮层、同页多命中跳转与双纸对照', bucket: 'today', priority: 'high', source: '滴答清单', due: '今天 18:00', tags: ['hub-search', 'design'], done: false, notes: '测试搜索“线束”展开多处命中直达右侧对应段落，以及 ⌘⇧F 毛玻璃筛选浮层。' },
       { id: 't-2', title: '核查左前门线束卡扣顺序（设计稿 V2 vs 现场记录 V3）', bucket: 'today', priority: 'high', source: '滴答清单', due: '今天 16:30', tags: ['eds', '线束'], done: false, notes: '用双纸对照模式配合助手一键比对差异。' },
       { id: 't-3', title: '优化 SQLite facet_cache 预加载逻辑', bucket: 'today', priority: 'medium', source: '本地', due: '今天', tags: ['sqlite', 'rust'], done: false, notes: '冷启动零闪烁。' },
       { id: 't-4', title: '整理本周 X 书签并提取 3 张 FSRS 闪卡', bucket: 'next7', priority: 'low', source: '滴答清单', due: '周三', tags: ['fsrs'], done: false, notes: '' },
@@ -1065,8 +1159,8 @@
         label: '今天 · 11月22日 周日',
         mood: '精修收敛',
         entries: [
-          { id: 'j-1', time: '15:10', text: '把资料库与搜索页的右侧纯白预览纸面彻底统一为同一套组件，左侧采用无横线原生层级树 + 连续垂直引导线，既能一眼看清嵌套关系，又能用 ↑↓ 零延迟连刷预览，按 ⌘+点击直接摊开双纸对照。', tags: ['hub-search', 'design'] },
-          { id: 'j-2', time: '11:15', text: '搜索页保持了高效率的双模态（未搜索时间流 ↔ 搜索高亮摘要 + 子页面折叠）与 1/N 页内命中跳转。', tags: ['search'] }
+          { id: 'j-1', time: '16:20', text: '把低频高级筛选收拢进 macOS 毛玻璃单面板 Popover（0 推挤），搜索长文档时支持点击任意命中摘录直接滚到对应章节并同步 1/N 与边缘命中刻度轨。', tags: ['hub-search', 'search'] },
+          { id: 'j-2', time: '15:10', text: '把资料库与搜索页的右侧纯白预览纸面彻底统一为同一套组件，左侧采用无横线原生层级树 + 连续垂直引导线。', tags: ['hub-search', 'design'] }
         ]
       }
     ];
@@ -1074,7 +1168,7 @@
     const INITIAL_FLASHCARDS = [
       { id: 'fc-1', deck: 'EDS 线束工程', front: '整车前舱湿区动态摆动段的波纹管与屏蔽高压线束，最小弯曲半径要求是多少？', back: '最小弯曲半径不得小于外径的 3 倍（≥ 3D），以防止波峰应力集中与振动磨穿。', sourceDocId: 'doc-1', sourceTitle: '1 线束 · Craft 资料', stability: '14.2 天', reps: 5 },
       { id: 'fc-2', deck: 'Rust & Tauri', front: 'Hub 本地知识库为何同时启用 SQLite WAL 模式与 facet_cache 表？', back: 'WAL 允许后台写入不阻塞前台 FTS5 查询（9–12ms）；facet_cache 消除冷启动计数闪烁。', sourceDocId: 'doc-6', sourceTitle: 'SQLite FTS5 + WAL 优化', stability: '9.6 天', reps: 3 },
-      { id: 'fc-3', deck: '设计系统与 HIG', front: '为何在资料库浏览中采用「原生无边框层级树 + 共享右侧阅读纸 + Jump Bar」？', back: '层级树解决文件夹嵌套查找痛点，共享阅读纸保持与搜索页一致的阅读手感，顶部 Jump Bar 在专注阅读时依然可跨库直达。', sourceDocId: 'doc-4', sourceTitle: 'Apple macOS HIG 视觉精髓', stability: '6.0 天', reps: 2 }
+      { id: 'fc-3', deck: '设计系统与 HIG', front: '为何将低频高级筛选收拢进毛玻璃 Popover，而非点击后向下挤出二层筛选条？', back: '保持日常 90% 场景下的极简单行搜索栏与零布局跳动；仅在激活非默认条件时浮出可一键清除的轻量胶囊。', sourceDocId: 'doc-4', sourceTitle: 'Apple macOS HIG 视觉精髓', stability: '6.0 天', reps: 2 }
     ];
 
     const INITIAL_THREADS = [
@@ -1115,7 +1209,7 @@
     // =========================================================================
 
     const state = {
-      view: 'space',
+      view: 'search',
       serifReading: false,
       sidebarCollapsed: false,
       libsCollapsed: false,
@@ -1141,17 +1235,22 @@
       // Search & Reading state
       searchQuery: '',
       searchTag: null,
-      searchDate: 'all',
+      searchDate: 'all', // all | 7d | 30d | 90d
+      searchField: 'all', // all | title | heading
+      searchTypes: new Set(),
+      searchFolder: 'all',
+      searchFolderQuery: '',
+      searchFilterOpen: false,
       searchDensity: 'auto',
-      searchFocused: false,
       selectedDocId: 'doc-1',
       activeSubpageId: null,
       expandedSubpages: new Set(),
+      expandedHits: new Set(),
       inDocHitIndex: 0,
       previewPinned: false,
       splitPercent: 42,
-      recentDocIds: ['doc-1', 'doc-2', 'doc-8'],
-      recentQueries: ['线束', '写回', 'FSRS', 'SQLite'],
+      recentDocIds: ['doc-1', 'doc-9', 'doc-8'],
+      recentQueries: ['线束', '写回', 'FSRS', 'title:线束'],
 
       // Quick Assistant
       quickAssistantOpen: false,
@@ -1334,13 +1433,6 @@
           return `<mark class="search-hit ${idx === state.inDocHitIndex ? 'active' : ''}" data-hit-idx="${idx}">${match}</mark>`;
         });
       }).join('');
-    }
-
-    function countQueryHitsInTarget(target, query) {
-      const q = (query || '').trim();
-      if (!q || !target) return 0;
-      const m = `${target.title || ''}\n${getDocPlainText(target)}`.match(new RegExp(escapeRegExp(q), 'gi'));
-      return m ? m.length : 0;
     }
 
     function renderDocumentBlocks(target, query, hitCounter) {
@@ -1581,6 +1673,11 @@
         } else {
           el.textContent = '资料库层级浏览 · ↑↓ 键盘连刷右侧统一预览 · ←→ 折叠展开 · ⌘. 专注阅读 · ⌘+点击并排对照';
         }
+      } else if (state.view === 'search') {
+        const count = state.selectedLibraries.size;
+        el.textContent = count === LIBRARIES.length
+          ? 'Hub · 搜索与全部：输入“线束”体验同页多命中直达，⌘⇧F 打开毛玻璃筛选浮层'
+          : `Hub · 搜索范围：已选 ${count}/${LIBRARIES.length} 个资料库`;
       } else {
         el.textContent = `Hub · 全局搜索范围：已选 ${state.selectedLibraries.size}/${LIBRARIES.length} 个资料库 · FTS5 9ms`;
       }
@@ -2492,35 +2589,173 @@
     }
 
     // =========================================================================
-    // VIEW 1: SEARCH & ALL CONTENT (Dual-Mode + Subpage Collapse + 1/N Jump)
+    // VIEW 1: SEARCH & ALL CONTENT (Popover Filter + Multi-Hit Jump + Hit Marks)
     // =========================================================================
 
+    function parseSearchQuery(raw) {
+      let rest = String(raw || '').trim();
+      let inlineField = null;
+      let inlineType = null;
+      let inlineFolder = null;
+
+      rest = rest.replace(/(?:^|\s)title:(\S+)/gi, (_, kw) => { inlineField = 'title'; return ' ' + kw; });
+      rest = rest.replace(/(?:^|\s)type:(\S+)/gi, (_, t) => { inlineType = t.toLowerCase(); return ''; });
+      rest = rest.replace(/(?:^|\s)in:(\S+)/gi, (_, f) => { inlineFolder = f.toLowerCase(); return ''; });
+
+      return { keyword: rest.trim(), inlineField, inlineType, inlineFolder };
+    }
+
+    function getActiveFilterCount() {
+      let c = 0;
+      if (state.searchField !== 'all') c++;
+      if (state.searchDate !== 'all') c++;
+      if (state.searchTypes.size > 0) c += state.searchTypes.size;
+      if (state.searchFolder !== 'all') c++;
+      return c;
+    }
+
+    function getDocHeadingsText(doc) {
+      return (doc.blocks || []).filter(b => b.type === 'h2').map(b => b.text || '').join(' ');
+    }
+
+    function extractTargetHits(target, query) {
+      const q = (query || '').trim();
+      if (!q || !target) return [];
+      const re = new RegExp(escapeRegExp(q), 'gi');
+      const hits = [];
+      let hitIdx = 0;
+
+      const scanText = (rawText, anchorLabel) => {
+        const clean = String(rawText || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1').replace(/\n+/g, ' ');
+        re.lastIndex = 0;
+        let m;
+        while ((m = re.exec(clean)) !== null) {
+          const start = Math.max(0, m.index - 22);
+          const end = Math.min(clean.length, m.index + m[0].length + 46);
+          const excerpt = (start > 0 ? '…' : '') + clean.slice(start, end) + (end < clean.length ? '…' : '');
+          hits.push({ hitIndex: hitIdx, anchorLabel, excerpt });
+          hitIdx++;
+        }
+      };
+
+      // Matches exact render order of h1 + renderDocumentBlocks()
+      scanText(target.title, '标题');
+
+      let currentHeading = '正文';
+      let tableNum = 0;
+      (target.blocks || []).forEach(block => {
+        if (block.type === 'h2') {
+          currentHeading = (block.text || '').slice(0, 14);
+          scanText(block.text, '章节');
+        } else if (block.type === 'callout') {
+          scanText(block.text, '提示');
+        } else if (block.type === 'table') {
+          tableNum++;
+          const tblLabel = `表 ${tableNum}`;
+          (block.headers || []).forEach(h => scanText(h, tblLabel));
+          (block.rows || []).forEach((row, rIdx) => {
+            row.forEach(cell => scanText(cell, `${tblLabel}·行${rIdx + 1}`));
+          });
+        } else if (block.type === 'attachments') {
+          (block.items || []).forEach(att => scanText(att.name, '附件'));
+        } else {
+          scanText(block.text || '', currentHeading);
+        }
+      });
+
+      return hits;
+    }
+
     function getFilteredDocs() {
-      const q = state.searchQuery.trim().toLowerCase();
+      const parsed = parseSearchQuery(state.searchQuery);
+      const q = parsed.keyword.toLowerCase();
+      const effectiveField = parsed.inlineField || state.searchField;
+
       return DOCUMENTS.filter(doc => {
         if (!state.selectedLibraries.has(doc.library)) return false;
         if (state.searchTag && !doc.tags.includes(state.searchTag)) return false;
         if (state.searchDate === '7d' && doc.dateBucket !== '7d') return false;
+        if (state.searchDate === '30d' && !['7d', '30d'].includes(doc.dateBucket)) return false;
+
+        if (parsed.inlineType && doc.docType !== parsed.inlineType) return false;
+        if (state.searchTypes.size > 0 && !state.searchTypes.has(doc.docType)) return false;
+
+        if (parsed.inlineFolder && !(doc.folderName || '').toLowerCase().includes(parsed.inlineFolder)) return false;
+        if (state.searchFolder !== 'all' && doc.folderName !== state.searchFolder) return false;
+
         if (!q) return true;
-        const selfMatch = doc.title.toLowerCase().includes(q) || doc.snippet.toLowerCase().includes(q) || doc.tags.some(t => t.toLowerCase().includes(q)) || getDocPlainText(doc).toLowerCase().includes(q);
+        const titleHit = doc.title.toLowerCase().includes(q);
+        if (effectiveField === 'title') return titleHit;
+        const headingHit = getDocHeadingsText(doc).toLowerCase().includes(q);
+        if (effectiveField === 'heading') return titleHit || headingHit;
+
+        const selfMatch = titleHit || doc.snippet.toLowerCase().includes(q) || doc.tags.some(t => t.toLowerCase().includes(q)) || getDocPlainText(doc).toLowerCase().includes(q);
         const subMatch = (doc.subpages || []).some(sp => sp.title.toLowerCase().includes(q) || sp.snippet.toLowerCase().includes(q) || getDocPlainText(sp).toLowerCase().includes(q));
         return selfMatch || subMatch;
       });
     }
 
-    function jumpToInDocHit(delta, totalHits) {
-      if (!totalHits) return;
-      state.inDocHitIndex = (state.inDocHitIndex + delta + totalHits) % totalHits;
-      renderMain();
-      requestAnimationFrame(() => {
-        const mark = document.querySelector(`mark.search-hit[data-hit-idx="${state.inDocHitIndex}"]`);
-        if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const searchReaderObserver = new ResizeObserver(updateHitMarksTrack);
+
+    function updateHitMarksTrack() {
+      const scroller = document.getElementById('search-reader-scroll');
+      const track = document.getElementById('reader-hit-track');
+      if (!scroller || !track) return;
+      const marks = scroller.querySelectorAll('mark.search-hit[data-hit-idx]');
+      if (!marks.length) { track.innerHTML = ''; return; }
+      const totalH = Math.max(scroller.scrollHeight, 1);
+      const scrollerRect = scroller.getBoundingClientRect();
+
+      track.innerHTML = Array.from(marks).map(m => {
+        const idx = Number(m.dataset.hitIdx);
+        const rect = m.getBoundingClientRect();
+        const absTop = rect.top - scrollerRect.top + scroller.scrollTop;
+        const pct = Math.min(98, Math.max(2, (absTop / totalH) * 100));
+        return `<button class="hit-tick ${idx === state.inDocHitIndex ? 'active' : ''}" style="top:${pct}%" data-tick-hit="${idx}" title="跳至第 ${idx + 1} 处命中"></button>`;
+      }).join('');
+
+      track.querySelectorAll('[data-tick-hit]').forEach(btn => {
+        btn.addEventListener('click', () => jumpToExactHit(Number(btn.dataset.tickHit)));
       });
     }
 
+    function scrollAndPulseHit(hitIdx) {
+      requestAnimationFrame(() => {
+        updateHitMarksTrack();
+        const mark = document.querySelector(`#search-reader-scroll mark.search-hit[data-hit-idx="${hitIdx}"]`);
+        if (!mark) return;
+        mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const container = mark.closest('p, h1, h2, tr, .doc-callout, .doc-attachment') || mark;
+        container.classList.remove('hit-pulse');
+        void container.offsetWidth;
+        container.classList.add('hit-pulse');
+      });
+    }
+
+    function jumpToExactHit(targetIdx) {
+      const input = document.getElementById('search-view-input');
+      const restoreFocus = document.activeElement === input;
+      const selection = restoreFocus ? [input.selectionStart, input.selectionEnd] : null;
+      state.inDocHitIndex = Math.max(0, targetIdx);
+      renderMain();
+      if (selection) {
+        const nextInput = document.getElementById('search-view-input');
+        nextInput.focus({ preventScroll: true });
+        nextInput.setSelectionRange(...selection);
+      }
+      scrollAndPulseHit(state.inDocHitIndex);
+    }
+
+    function jumpToInDocHit(delta, totalHits) {
+      if (!totalHits) return;
+      jumpToExactHit((state.inDocHitIndex + delta + totalHits) % totalHits);
+    }
+
     function renderSearchView(stage) {
-      const q = state.searchQuery.trim();
-      const effectiveMode = state.searchDensity === 'auto' ? (q || state.searchTag ? 'snippet' : 'compact') : state.searchDensity;
+      const parsed = parseSearchQuery(state.searchQuery);
+      const q = parsed.keyword;
+      const filterCount = getActiveFilterCount();
+      const effectiveMode = state.searchDensity === 'auto' ? (q || state.searchTag || filterCount > 0 ? 'snippet' : 'compact') : state.searchDensity;
       const filtered = getFilteredDocs();
 
       if (!state.previewPinned && filtered.length && !filtered.some(d => d.id === state.selectedDocId)) {
@@ -2533,8 +2768,12 @@
       const sub = state.activeSubpageId && activeDoc.subpages ? activeDoc.subpages.find(s => s.id === state.activeSubpageId) : null;
       const readingTarget = sub || activeDoc;
       const isSubpage = Boolean(sub);
+      const listScrollTop = stage.querySelector('#search-list-pane')?.scrollTop || 0;
+      const previousReader = stage.querySelector('#search-reader-scroll');
+      const readerScrollTop = previousReader?.dataset.targetId === readingTarget.id ? previousReader.scrollTop : 0;
       const activeLib = getLib(activeDoc.library);
-      const totalHits = q ? countQueryHitsInTarget(readingTarget, q) : 0;
+      const readingHits = q ? extractTargetHits(readingTarget, q) : [];
+      const totalHits = readingHits.length;
       if (totalHits > 0 && state.inDocHitIndex >= totalHits) state.inDocHitIndex = 0;
       const hitCounter = { count: 0 };
 
@@ -2542,45 +2781,154 @@
         .map(g => ({ label: g, items: filtered.filter(d => d.timeGroup === g) }))
         .filter(g => g.items.length > 0);
 
+      const allFolders = Array.from(new Set(DOCUMENTS.map(d => d.folderName).filter(Boolean)));
+      const fq = state.searchFolderQuery.trim().toLowerCase();
+      const visibleFolders = allFolders.filter(f => !fq || f.toLowerCase().includes(fq));
+
+      const fieldLabels = { all: '全部字段', title: '仅标题', heading: '标题与章节' };
+      const dateLabels = { all: '不限', '7d': '最近 7 天', '30d': '最近 30 天', '90d': '最近 90 天' };
+
+      const activeChips = [];
+      if (state.searchField !== 'all') activeChips.push({ key: 'field', label: fieldLabels[state.searchField] });
+      if (state.searchDate !== 'all') activeChips.push({ key: 'date', label: dateLabels[state.searchDate] });
+      state.searchTypes.forEach(t => {
+        const opt = SEARCH_TYPE_OPTIONS.find(x => x.id === t);
+        if (opt) activeChips.push({ key: `type:${t}`, label: opt.label });
+      });
+      if (state.searchFolder !== 'all') activeChips.push({ key: 'folder', label: state.searchFolder });
+      if (state.searchTag) activeChips.push({ key: 'tag', label: `#${state.searchTag}` });
+
       stage.innerHTML = `
         <div class="flex flex-col h-full animate-view">
-          <div class="px-5 py-2.5 hairline-b flex flex-wrap items-center gap-2.5 shrink-0 relative z-20" style="background:var(--bg-paper)">
-            <div class="relative flex-1 min-w-[220px]">
-              <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg" style="background:var(--bg-subtle); border:0.5px solid ${state.searchFocused ? 'var(--accent)' : 'var(--hairline)'}">
-                <i data-lucide="search" class="w-3.5 h-3.5 shrink-0" style="color:${state.searchFocused ? 'var(--accent)' : 'var(--ink-tertiary)'}"></i>
-                <input id="search-view-input" type="text" value="${escapeHtml(state.searchQuery)}" placeholder="搜索全部资料库（试试输入“线束”体验子页面折叠与 1/N 跳转）..." class="w-full bg-transparent outline-none text-[13px]" autocomplete="off" />
-                ${q ? `<button id="btn-clear-search" class="text-[11px] px-1.5 py-0.5 rounded cursor-pointer hover:bg-black/5" style="color:var(--ink-tertiary)">清除</button>` : `<kbd class="font-mono-eng text-[10px] px-1.5 py-0.5 rounded hidden sm:inline" style="background:var(--bg-paper); border:0.5px solid var(--hairline); color:var(--ink-tertiary)">⌘K</kbd>`}
-              </div>
-              ${state.searchFocused && !q ? `
-                <div class="absolute left-0 right-0 top-full mt-1.5 rounded-xl p-2.5 z-30 animate-view" style="background:var(--bg-paper); border:0.5px solid var(--hairline-strong); box-shadow:var(--modal-shadow)">
-                  <div class="mb-2">
-                    <div class="px-2 py-1 text-[10.5px] font-semibold uppercase tracking-wider" style="color:var(--ink-tertiary)">最近搜索</div>
-                    <div class="flex flex-wrap gap-1.5 px-2 pt-1">${state.recentQueries.map(rq => `<button class="pill-btn text-[11.5px]" data-recent-query="${escapeHtml(rq)}"><i data-lucide="history" class="w-3 h-3"></i> ${escapeHtml(rq)}</button>`).join('')}</div>
-                  </div>
-                  <div class="pt-2 hairline-t">
-                    <div class="px-2 py-1 text-[10.5px] font-semibold uppercase tracking-wider" style="color:var(--ink-tertiary)">最近打开</div>
-                    <div class="space-y-0.5 mt-0.5">${state.recentDocIds.map(id => { const rd = getDoc(id); return `<button class="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-[12.5px] hover:bg-black/5 cursor-pointer" data-recent-doc="${rd.id}"><span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:${getLib(rd.library).color}"></span><span class="truncate flex-1 font-medium">${escapeHtml(rd.title)}</span><span class="font-mono-eng text-[10.5px]" style="color:var(--ink-tertiary)">${getLib(rd.library).short}</span></button>`; }).join('')}</div>
-                  </div>
+          <!-- Notion Single-Row Search Bar + Floating Filter Popover -->
+          <div class="px-5 py-2.5 hairline-b shrink-0 relative z-20 space-y-2" style="background:var(--bg-paper)">
+            <div class="flex items-center gap-2">
+              <div class="search-entry relative flex-1 min-w-0">
+                <div class="search-input-shell flex items-center gap-2 px-3 py-1.5 rounded-lg">
+                  <i data-lucide="search" class="search-icon w-3.5 h-3.5 shrink-0"></i>
+                  <input id="search-view-input" type="text" aria-label="搜索全部资料库" value="${escapeHtml(state.searchQuery)}" placeholder="搜索全部资料库（试试输入“线束”体验同页多命中直达，或用 title: / type:）..." class="w-full min-w-0 bg-transparent outline-none text-[13px]" autocomplete="off" />
+                  ${state.searchQuery ? `<button id="btn-clear-search" class="shrink-0 whitespace-nowrap text-[11px] px-1.5 py-0.5 rounded cursor-pointer hover:bg-black/5" style="color:var(--ink-tertiary)">清除</button>` : `<kbd class="font-mono-eng text-[10px] px-1.5 py-0.5 rounded hidden sm:inline" style="background:var(--bg-paper); border:0.5px solid var(--hairline); color:var(--ink-tertiary)">⌘K</kbd>`}
                 </div>
-              ` : ''}
-            </div>
+                ${!state.searchQuery ? `
+                  <div class="search-recents absolute left-0 right-0 top-full mt-1.5 rounded-xl p-2.5 z-30 animate-view" style="background:var(--bg-paper); border:0.5px solid var(--hairline-strong); box-shadow:var(--modal-shadow)">
+                    <div class="mb-2">
+                      <div class="px-2 py-1 text-[10.5px] font-semibold uppercase tracking-wider" style="color:var(--ink-tertiary)">最近搜索 & 语法示例</div>
+                      <div class="flex flex-wrap gap-1.5 px-2 pt-1">${state.recentQueries.map(rq => `<button class="pill-btn text-[11.5px]" data-recent-query="${escapeHtml(rq)}"><i data-lucide="history" class="w-3 h-3"></i> ${escapeHtml(rq)}</button>`).join('')}</div>
+                    </div>
+                    <div class="pt-2 hairline-t">
+                      <div class="px-2 py-1 text-[10.5px] font-semibold uppercase tracking-wider" style="color:var(--ink-tertiary)">最近打开</div>
+                      <div class="space-y-0.5 mt-0.5">${state.recentDocIds.map(id => { const rd = getDoc(id); return `<button class="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-[12.5px] hover:bg-black/5 cursor-pointer" data-recent-doc="${rd.id}"><span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:${getLib(rd.library).color}"></span><span class="truncate flex-1 font-medium">${escapeHtml(rd.title)}</span><span class="font-mono-eng text-[10.5px]" style="color:var(--ink-tertiary)">${getLib(rd.library).short}</span></button>`; }).join('')}</div>
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
 
-            <div class="flex items-center gap-1.5 overflow-x-auto">
-              <button class="pill-btn ${state.searchDate === 'all' ? 'active' : ''}" data-date-filter="all">全部时间</button>
-              <button class="pill-btn ${state.searchDate === '7d' ? 'active' : ''}" data-date-filter="7d">近 7 天</button>
-              ${state.searchTag ? `<button id="btn-clear-tag" class="pill-btn active">#${state.searchTag} <i data-lucide="x" class="w-3 h-3"></i></button>` : ''}
-              <div class="inline-flex items-center p-0.5 rounded-full" style="background:var(--bg-subtle)">
+              <!-- Filter Popover Trigger -->
+              <div class="relative shrink-0">
+                <button id="btn-toggle-search-filter" class="icon-btn relative ${state.searchFilterOpen || filterCount > 0 ? 'active' : ''}" title="高级筛选 (⌘⇧F)">
+                  <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+                  ${filterCount > 0 ? `<span class="filter-dot"></span>` : ''}
+                </button>
+
+                ${state.searchFilterOpen ? `
+                  <div id="search-filter-popover" class="filter-popover animate-view space-y-3.5">
+                    <div class="flex items-center justify-between">
+                      <span class="text-[12.5px] font-semibold">筛选条件</span>
+                      ${filterCount > 0 ? `<button id="btn-reset-all-filters" class="text-[11.5px] cursor-pointer hover:underline" style="color:var(--accent)">重置全部</button>` : `<span class="font-mono-eng text-[10.5px]" style="color:var(--ink-tertiary)">⌘⇧F</span>`}
+                    </div>
+
+                    <div class="space-y-1.5">
+                      <div class="text-[11px] font-medium" style="color:var(--ink-tertiary)">匹配范围</div>
+                      <div class="grid grid-cols-3 p-0.5 rounded-lg" style="background:var(--bg-subtle)">
+                        ${[['all','全部'],['title','仅标题'],['heading','标题与章节']].map(([val, lbl]) => `
+                          <button class="py-1 rounded-md text-[11.5px] cursor-pointer ${state.searchField === val ? 'font-medium' : ''}" data-sf-field="${val}" style="background:${state.searchField === val ? 'var(--bg-paper)' : 'transparent'}; color:${state.searchField === val ? 'var(--ink-primary)' : 'var(--ink-secondary)'}; box-shadow:${state.searchField === val ? '0 1px 2px rgba(15,23,42,0.06)' : 'none'}">${lbl}</button>
+                        `).join('')}
+                      </div>
+                    </div>
+
+                    <div class="space-y-1.5">
+                      <div class="text-[11px] font-medium" style="color:var(--ink-tertiary)">时间范围</div>
+                      <div class="flex flex-wrap gap-1.5">
+                        ${[['all','不限'],['7d','7 天'],['30d','30 天'],['90d','90 天']].map(([val, lbl]) => `
+                          <button class="pill-btn !py-0.5 text-[11.5px] ${state.searchDate === val ? 'active' : ''}" data-date-filter="${val}">${lbl}</button>
+                        `).join('')}
+                      </div>
+                    </div>
+
+                    <div class="space-y-1.5">
+                      <div class="text-[11px] font-medium" style="color:var(--ink-tertiary)">内容类型 ${state.searchTypes.size === 0 ? '· 默认全部' : `· 已选 ${state.searchTypes.size}`}</div>
+                      <div class="flex flex-wrap gap-1.5">
+                        ${SEARCH_TYPE_OPTIONS.map(opt => {
+                          const cnt = DOCUMENTS.filter(d => d.docType === opt.id).length;
+                          const active = state.searchTypes.has(opt.id);
+                          return `<button class="pill-btn !py-0.5 text-[11.5px] ${active ? 'active' : ''}" data-sf-type="${opt.id}">${opt.label} <span class="font-mono-eng text-[10px] opacity-70">${cnt}</span></button>`;
+                        }).join('')}
+                      </div>
+                    </div>
+
+                    <div class="space-y-1.5">
+                      <div class="text-[11px] font-medium" style="color:var(--ink-tertiary)">限定文件夹</div>
+                      <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style="background:var(--bg-subtle); border:0.5px solid var(--hairline)">
+                        <i data-lucide="folder" class="w-3 h-3 shrink-0" style="color:var(--ink-tertiary)"></i>
+                        <input id="sf-folder-input" type="text" value="${escapeHtml(state.searchFolderQuery)}" placeholder="快速筛选文件夹..." class="w-full bg-transparent outline-none text-[11.5px]" />
+                      </div>
+                      <div class="max-h-28 overflow-y-auto space-y-0.5 pt-0.5">
+                        <button class="w-full flex items-center justify-between px-2 py-1 rounded-md text-[12px] cursor-pointer ${state.searchFolder === 'all' ? 'font-medium' : 'hover:bg-black/5'}" data-sf-folder="all" style="background:${state.searchFolder === 'all' ? 'var(--bg-active)' : 'transparent'}; color:${state.searchFolder === 'all' ? 'var(--accent)' : 'var(--ink-primary)'}">
+                          <span>全部文件夹</span>
+                          <span class="font-mono-eng text-[10.5px] opacity-70">${DOCUMENTS.length}</span>
+                        </button>
+                        ${visibleFolders.map(fn => {
+                          const cnt = DOCUMENTS.filter(d => d.folderName === fn).length;
+                          const isSel = state.searchFolder === fn;
+                          return `
+                            <button class="w-full flex items-center justify-between px-2 py-1 rounded-md text-[12px] cursor-pointer ${isSel ? 'font-medium' : 'hover:bg-black/5'}" data-sf-folder="${escapeHtml(fn)}" style="background:${isSel ? 'var(--bg-active)' : 'transparent'}; color:${isSel ? 'var(--accent)' : 'var(--ink-primary)'}">
+                              <span class="truncate">${escapeHtml(fn)}</span>
+                              <span class="font-mono-eng text-[10.5px] opacity-70">${cnt}</span>
+                            </button>
+                          `;
+                        }).join('')}
+                      </div>
+                    </div>
+
+                    <div class="pt-2 hairline-t flex items-center justify-between text-[11px]" style="color:var(--ink-tertiary)">
+                      <span>支持 title: / type: / in:</span>
+                      <button id="btn-close-filter-pop" class="primary-btn px-3 py-1 text-[11.5px]">完成</button>
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
+
+              <div class="inline-flex items-center p-0.5 rounded-full shrink-0" style="background:var(--bg-subtle)">
                 <button class="px-2 py-0.5 rounded-full text-[11px] cursor-pointer ${effectiveMode === 'compact' ? 'font-medium' : ''}" data-density="compact" style="background:${effectiveMode === 'compact' ? 'var(--bg-paper)' : 'transparent'}">紧凑</button>
                 <button class="px-2 py-0.5 rounded-full text-[11px] cursor-pointer ${effectiveMode === 'snippet' ? 'font-medium' : ''}" data-density="snippet" style="background:${effectiveMode === 'snippet' ? 'var(--bg-paper)' : 'transparent'}">摘要</button>
               </div>
-              <span class="font-mono-eng text-[11px] ml-1 whitespace-nowrap" style="color:var(--ink-tertiary)">${q ? `${filtered.length} 篇 · 9ms` : `${filtered.length} 篇`}</span>
+              <span class="font-mono-eng text-[11px] ml-0.5 whitespace-nowrap shrink-0" style="color:var(--ink-tertiary)">${q ? `${filtered.length} 篇 · 9ms` : `${filtered.length} 篇`}</span>
             </div>
+
+            ${activeChips.length > 0 ? `
+              <div class="flex items-center gap-1.5 flex-wrap animate-view">
+                ${activeChips.map(ch => `
+                  <button class="pill-btn active !py-0.5 text-[11px]" data-remove-chip="${escapeHtml(ch.key)}">
+                    <span>${escapeHtml(ch.label)}</span>
+                    <i data-lucide="x" class="w-3 h-3"></i>
+                  </button>
+                `).join('')}
+                <button id="btn-clear-chips-all" class="text-[11px] px-1.5 py-0.5 cursor-pointer hover:underline" style="color:var(--ink-tertiary)">清空条件</button>
+              </div>
+            ` : ''}
           </div>
 
           <div id="search-split-wrap" class="flex-1 flex min-h-0 overflow-hidden">
             <div id="search-list-pane" class="overflow-y-auto p-4 shrink-0" style="width:${state.splitPercent}%; min-width:260px; max-width:60%">
               ${filtered.length === 0 ? `
-                <div class="paper-sheet p-8 text-center space-y-2"><div class="text-[13.5px] font-medium">没有匹配的条目</div><button id="btn-expand-all-libs" class="primary-btn px-3.5 py-1.5 text-[12px]">扩大到全部资料库</button></div>
+                <div class="paper-sheet p-8 text-center space-y-2.5">
+                  <div class="text-[13.5px] font-medium">没有匹配的条目</div>
+                  <div class="text-[12px]" style="color:var(--ink-tertiary)">可以尝试清空筛选条件或扩大到全部资料库</div>
+                  <div class="flex items-center justify-center gap-2 pt-1">
+                    ${filterCount > 0 || state.searchTag ? `<button id="btn-empty-clear-filters" class="pill-btn">重置筛选条件</button>` : ''}
+                    <button id="btn-expand-all-libs" class="primary-btn px-3.5 py-1.5 text-[12px]">扩大到全部资料库</button>
+                  </div>
+                </div>
               ` : effectiveMode === 'compact' ? `
                 <div class="space-y-4">
                   ${grouped.map(grp => `
@@ -2603,15 +2951,50 @@
                     const isSel = doc.id === state.selectedDocId && !state.activeSubpageId;
                     const matchedSubs = (doc.subpages || []).filter(sp => !q || sp.title.toLowerCase().includes(q.toLowerCase()) || sp.snippet.toLowerCase().includes(q.toLowerCase()) || getDocPlainText(sp).toLowerCase().includes(q.toLowerCase()));
                     const subsExpanded = state.expandedSubpages.has(doc.id);
-                    const docHits = q ? countQueryHitsInTarget(doc, q) : 0;
+
+                    const docHitsList = q ? extractTargetHits(doc, q) : [];
+                    const bodyHits = docHitsList.filter(h => h.anchorLabel !== '标题');
+                    const displayHits = bodyHits.length > 0 ? bodyHits : docHitsList;
+                    const hitsExpanded = state.expandedHits.has(doc.id);
+                    const visibleHits = hitsExpanded ? displayHits : displayHits.slice(0, 1);
+
                     return `
                       <div class="inset-row px-3.5 py-3 cursor-pointer ${isSel ? 'selected' : ''}" data-doc-id="${doc.id}">
                         <div class="flex items-center justify-between gap-2 mb-1">
-                          <span class="inline-flex items-center gap-1.5 text-[11px] font-medium" style="color:var(--ink-secondary)"><span class="w-1.5 h-1.5 rounded-full" style="background:${lib.color}"></span>${lib.short}${docHits > 0 ? `<span class="font-mono-eng text-[10px] px-1.5 py-0.5 rounded" style="background:var(--bg-subtle); color:var(--ink-tertiary)">${docHits} 处命中</span>` : ''}</span>
-                          <span class="font-mono-eng text-[10.5px]" style="color:var(--ink-tertiary)">${doc.updated}</span>
+                          <span class="inline-flex items-center gap-1.5 text-[11px] font-medium" style="color:var(--ink-secondary)">
+                            <span class="w-1.5 h-1.5 rounded-full" style="background:${lib.color}"></span>
+                            ${lib.short}
+                            ${docHitsList.length > 0 ? `<span class="font-mono-eng text-[10px] px-1.5 py-0.5 rounded" style="background:var(--bg-subtle); color:var(--ink-tertiary)">${docHitsList.length} 处命中</span>` : ''}
+                          </span>
+                          <div class="flex items-center gap-1.5">
+                            <button class="hover-reveal icon-btn !w-5 !h-5 ${doc.favorite ? '!opacity-100 active' : ''}" data-row-fav="${doc.id}" title="收藏"><i data-lucide="star" class="w-3 h-3"></i></button>
+                            <span class="font-mono-eng text-[10.5px]" style="color:var(--ink-tertiary)">${doc.updated}</span>
+                          </div>
                         </div>
-                        <div class="text-[13.5px] font-medium leading-snug mb-1">${highlightSnippet(doc.title, q)}</div>
-                        <div class="text-[12px] line-clamp-2 leading-relaxed" style="color:var(--ink-secondary)">${highlightSnippet(doc.snippet, q)}</div>
+                        <div class="text-[13.5px] font-medium leading-snug mb-1.5">${highlightSnippet(doc.title, q)}</div>
+
+                        ${q && displayHits.length > 0 ? `
+                          <div class="space-y-1">
+                            ${visibleHits.map(hit => {
+                              const isActiveHit = isSel && state.inDocHitIndex === hit.hitIndex;
+                              return `
+                                <button class="w-full text-left px-2 py-1.5 rounded-lg flex items-start gap-2 transition-colors cursor-pointer ${isActiveHit ? '' : 'hover:bg-black/5'}" data-jump-doc-hit="${doc.id}|${hit.hitIndex}" style="background:${isActiveHit ? 'rgba(0,122,255,0.09)' : 'rgba(15,23,42,0.025)'}">
+                                  <span class="font-mono-eng text-[10px] px-1.5 py-0.5 rounded shrink-0 mt-0.5" style="background:var(--bg-paper); border:0.5px solid var(--hairline); color:${isActiveHit ? 'var(--accent)' : 'var(--ink-tertiary)'}">${escapeHtml(hit.anchorLabel)}</span>
+                                  <span class="text-[12px] leading-relaxed line-clamp-2 flex-1" style="color:var(--ink-secondary)">${highlightSnippet(hit.excerpt, q)}</span>
+                                </button>
+                              `;
+                            }).join('')}
+                            ${displayHits.length > 1 ? `
+                              <button class="inline-flex items-center gap-1 px-1 py-0.5 text-[11px] font-medium cursor-pointer hover:underline" style="color:var(--ink-tertiary)" data-toggle-hits="${doc.id}">
+                                <i data-lucide="${hitsExpanded ? 'chevron-up' : 'chevron-down'}" class="w-3 h-3"></i>
+                                <span>${hitsExpanded ? '收起命中段落' : `展开其余 ${displayHits.length - 1} 处命中`}</span>
+                              </button>
+                            ` : ''}
+                          </div>
+                        ` : `
+                          <div class="text-[12px] line-clamp-2 leading-relaxed" style="color:var(--ink-secondary)">${highlightSnippet(doc.snippet, q)}</div>
+                        `}
+
                         ${matchedSubs.length > 0 ? `
                           <div class="mt-2.5 pt-2 hairline-t">
                             <button class="inline-flex items-center gap-1 text-[11.5px] font-medium cursor-pointer hover:underline" style="color:var(--accent)" data-toggle-subs="${doc.id}"><i data-lucide="${subsExpanded ? 'chevron-down' : 'chevron-right'}" class="w-3.5 h-3.5"></i><span>${subsExpanded ? `收起 ${matchedSubs.length} 篇关联子页面` : `展开其余 ${matchedSubs.length} 项子页面`}</span></button>
@@ -2627,64 +3010,174 @@
 
             <div id="search-resizer" class="split-resizer"></div>
 
-            <div class="flex-1 min-w-0 overflow-y-auto p-5 lg:p-7 pb-16 select-text">
-              <article class="paper-sheet p-6 lg:p-9 mx-auto max-w-[780px]">
-                <div class="flex items-center justify-between gap-2 pb-3.5 mb-5 hairline-b sticky top-0 z-10 -mx-2 px-2 py-1.5 rounded-lg" style="background:rgba(255,255,255,0.92); backdrop-filter:blur(12px)">
-                  <div class="flex items-center gap-1.5 min-w-0 text-[12px]">
-                    <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:${activeLib.color}"></span>
-                    ${isSubpage ? `<button id="btn-back-parent-doc" class="hover:underline cursor-pointer truncate font-medium" style="color:var(--accent)">${escapeHtml(activeDoc.title)}</button><span style="color:var(--ink-muted)">/</span><span class="truncate font-medium">${escapeHtml(readingTarget.title)}</span>` : `<span class="font-medium truncate" style="color:var(--ink-secondary)">${escapeHtml(activeDoc.path)}</span>`}
+            <!-- Right: White Paper Reader with Hit Marks Scroll Rail -->
+            <div class="search-reader flex-1 min-w-0 relative flex flex-col overflow-hidden">
+              <div id="search-reader-scroll" data-target-id="${readingTarget.id}" class="flex-1 overflow-y-auto p-5 lg:p-7 pb-16 select-text">
+                <article class="paper-sheet p-6 lg:p-9 mx-auto max-w-[780px]">
+                  <div class="search-reader-header flex items-center justify-between gap-2 pb-3.5 mb-5 hairline-b sticky top-0 z-10 -mx-2 px-2 py-1.5 rounded-lg" style="background:rgba(255,255,255,0.92); backdrop-filter:blur(12px)">
+                    <div class="flex items-center gap-1.5 min-w-0 text-[12px]">
+                      <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:${activeLib.color}"></span>
+                      ${isSubpage ? `<button id="btn-back-parent-doc" class="hover:underline cursor-pointer truncate font-medium" style="color:var(--accent)">${escapeHtml(activeDoc.title)}</button><span style="color:var(--ink-muted)">/</span><span class="truncate font-medium">${escapeHtml(readingTarget.title)}</span>` : `<span class="font-medium truncate" style="color:var(--ink-secondary)">${escapeHtml(activeDoc.path)}</span>`}
+                    </div>
+                    <div class="search-reader-actions flex items-center gap-1 shrink-0">
+                      ${totalHits > 0 ? `<div class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg mr-1" style="background:var(--bg-subtle); border:0.5px solid var(--hairline)"><span class="font-mono-eng text-[11px] px-1" style="color:var(--ink-secondary)">${state.inDocHitIndex + 1}/${totalHits}</span><button id="btn-hit-prev" class="icon-btn !w-5 !h-5" title="上一处命中 (Shift+Enter)"><i data-lucide="chevron-up" class="w-3.5 h-3.5"></i></button><button id="btn-hit-next" class="icon-btn !w-5 !h-5" title="下一处命中 (Enter)"><i data-lucide="chevron-down" class="w-3.5 h-3.5"></i></button></div>` : ''}
+                      ${(readingTarget.spaceNodeId || activeDoc.spaceNodeId) ? `<button id="btn-open-in-space" class="pill-btn text-[11.5px]" title="在资料库层级中打开或并排对照"><i data-lucide="columns-2" class="w-3 h-3"></i> 空间/并排</button>` : ''}
+                      <button id="btn-pin-preview" class="icon-btn ${state.previewPinned ? 'active' : ''}" title="${state.previewPinned ? '取消固定阅读面板' : '固定当前文档'}"><i data-lucide="pin" class="w-3.5 h-3.5"></i></button>
+                      <button id="btn-fav-doc" class="icon-btn ${activeDoc.favorite ? 'active' : ''}" title="收藏文档"><i data-lucide="star" class="w-3.5 h-3.5"></i></button>
+                      <button id="btn-ask-quick-doc" class="pill-btn text-[11.5px]"><i data-lucide="sparkles" class="w-3 h-3" style="color:var(--accent)"></i> 问助手</button>
+                    </div>
                   </div>
-                  <div class="flex items-center gap-1 shrink-0">
-                    ${totalHits > 0 ? `<div class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg mr-1" style="background:var(--bg-subtle); border:0.5px solid var(--hairline)"><span class="font-mono-eng text-[11px] px-1" style="color:var(--ink-secondary)">${state.inDocHitIndex + 1}/${totalHits}</span><button id="btn-hit-prev" class="icon-btn !w-5 !h-5"><i data-lucide="chevron-up" class="w-3.5 h-3.5"></i></button><button id="btn-hit-next" class="icon-btn !w-5 !h-5"><i data-lucide="chevron-down" class="w-3.5 h-3.5"></i></button></div>` : ''}
-                    ${(readingTarget.spaceNodeId || activeDoc.spaceNodeId) ? `<button id="btn-open-in-space" class="pill-btn text-[11.5px]" title="在资料库层级中打开或并排对照"><i data-lucide="columns-2" class="w-3 h-3"></i> 空间/并排</button>` : ''}
-                    <button id="btn-pin-preview" class="icon-btn ${state.previewPinned ? 'active' : ''}" title="${state.previewPinned ? '取消固定阅读面板' : '固定当前文档'}">
-                      <i data-lucide="pin" class="w-3.5 h-3.5"></i>
-                    </button>
-                    <button id="btn-fav-doc" class="icon-btn ${activeDoc.favorite ? 'active' : ''}" title="收藏文档">
-                      <i data-lucide="star" class="w-3.5 h-3.5"></i>
-                    </button>
-                    <button id="btn-ask-quick-doc" class="pill-btn text-[11.5px]"><i data-lucide="sparkles" class="w-3 h-3" style="color:var(--accent)"></i> 问助手</button>
-                  </div>
-                </div>
 
-                <h1 class="text-[21px] font-semibold tracking-tight leading-snug mb-2.5 ${state.serifReading ? 'font-reading-serif' : ''}">${highlightRichText(readingTarget.title, q, hitCounter)}</h1>
-                <div class="flex flex-wrap items-center gap-2 mb-5 text-[11.5px]" style="color:var(--ink-tertiary)">
-                  <span class="font-mono-eng">更新于 ${readingTarget.updated || activeDoc.updated}</span>
-                  <span>·</span>
-                  ${(activeDoc.tags || []).map(t => `<span class="px-2 py-0.5 rounded-full font-mono-eng" style="background:var(--bg-subtle); color:var(--ink-secondary)">#${t}</span>`).join('')}
-                </div>
-
-                <div class="reading-prose text-[14.5px] ${state.serifReading ? 'font-reading-serif' : ''}">${renderDocumentBlocks(readingTarget, q, hitCounter)}</div>
-
-                <div class="mt-8 pt-5 hairline-t flex flex-wrap items-center justify-between gap-3">
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <span class="text-[11.5px] font-medium" style="color:var(--ink-tertiary)">反向链接</span>
-                    ${(activeDoc.backlinks && activeDoc.backlinks.length) ? activeDoc.backlinks.map(b => `<span class="text-[11.5px] px-2 py-0.5 rounded-md" style="background:var(--bg-subtle); color:var(--ink-secondary)">[[${escapeHtml(b)}]]</span>`).join('') : `<span class="text-[11.5px]" style="color:var(--ink-muted)">暂无反向链接</span>`}
+                  <h1 class="text-[21px] font-semibold tracking-tight leading-snug mb-2.5 ${state.serifReading ? 'font-reading-serif' : ''}">${highlightRichText(readingTarget.title, q, hitCounter)}</h1>
+                  <div class="flex flex-wrap items-center gap-2 mb-5 text-[11.5px]" style="color:var(--ink-tertiary)">
+                    <span class="font-mono-eng">更新于 ${readingTarget.updated || activeDoc.updated}</span>
+                    <span>·</span>
+                    ${(activeDoc.tags || []).map(t => `<span class="px-2 py-0.5 rounded-full font-mono-eng" style="background:var(--bg-subtle); color:var(--ink-secondary)">#${t}</span>`).join('')}
                   </div>
-                  <div class="flex items-center gap-1.5">
-                    <button id="btn-doc-to-task" class="pill-btn text-[11.5px]"><i data-lucide="list-plus" class="w-3 h-3"></i> 转为任务</button>
-                    <button id="btn-doc-to-card" class="pill-btn text-[11.5px]"><i data-lucide="layers" class="w-3 h-3"></i> 生成闪卡</button>
+
+                  ${readingTarget.toc && readingTarget.toc.length ? `
+                    <nav class="doc-toc">
+                      <div class="text-[11px] font-semibold uppercase tracking-wider mb-1.5" style="color:var(--ink-tertiary)">本页目录</div>
+                      <ul class="m-0 p-0 list-none space-y-1">${readingTarget.toc.map(i => `<li><button class="text-[12.5px] hover:underline cursor-pointer" style="color:var(--ink-secondary)" data-toc-jump="${i.id}">${escapeHtml(i.label)}</button></li>`).join('')}</ul>
+                    </nav>
+                  ` : ''}
+
+                  <div class="reading-prose text-[14.5px] ${state.serifReading ? 'font-reading-serif' : ''}">${renderDocumentBlocks(readingTarget, q, hitCounter)}</div>
+
+                  <div class="mt-8 pt-5 hairline-t flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="text-[11.5px] font-medium" style="color:var(--ink-tertiary)">反向链接</span>
+                      ${(activeDoc.backlinks && activeDoc.backlinks.length) ? activeDoc.backlinks.map(b => `<span class="text-[11.5px] px-2 py-0.5 rounded-md" style="background:var(--bg-subtle); color:var(--ink-secondary)">[[${escapeHtml(b)}]]</span>`).join('') : `<span class="text-[11.5px]" style="color:var(--ink-muted)">暂无反向链接</span>`}
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                      <button id="btn-doc-to-task" class="pill-btn text-[11.5px]"><i data-lucide="list-plus" class="w-3 h-3"></i> 转为任务</button>
+                      <button id="btn-doc-to-card" class="pill-btn text-[11.5px]"><i data-lucide="layers" class="w-3 h-3"></i> 生成闪卡</button>
+                    </div>
                   </div>
-                </div>
-              </article>
+                </article>
+              </div>
+              ${totalHits > 0 ? `<div id="reader-hit-track" class="hit-track" aria-label="文档命中位置刻度"></div>` : ''}
             </div>
           </div>
         </div>
       `;
 
+      document.getElementById('search-list-pane').scrollTop = listScrollTop;
+      document.getElementById('search-reader-scroll').scrollTop = readerScrollTop;
+      if (totalHits > 0) searchReaderObserver.observe(stage.querySelector('#search-reader-scroll article'));
+
       const searchInput = document.getElementById('search-view-input');
-      searchInput.addEventListener('focus', () => { if (!state.searchFocused) { state.searchFocused = true; renderMain(); document.getElementById('search-view-input')?.focus(); } });
-      searchInput.addEventListener('blur', () => { setTimeout(() => { if (state.searchFocused && document.activeElement?.id !== 'search-view-input') { state.searchFocused = false; renderMain(); } }, 160); });
-      searchInput.addEventListener('input', e => { state.searchQuery = e.target.value; state.inDocHitIndex = 0; const pos = searchInput.selectionStart; renderMain(); const ni = document.getElementById('search-view-input'); if (ni) { ni.focus(); ni.setSelectionRange(pos, pos); } });
-      searchInput.addEventListener('keydown', e => { if (e.key === 'Enter' && totalHits > 0) { e.preventDefault(); jumpToInDocHit(e.shiftKey ? -1 : 1, totalHits); } });
+      const updateSearch = e => {
+        if (e.isComposing || searchInput.value === state.searchQuery) return;
+        state.searchQuery = searchInput.value;
+        state.inDocHitIndex = 0;
+        const pos = searchInput.selectionStart;
+        renderMain();
+        const nextInput = document.getElementById('search-view-input');
+        nextInput.focus({ preventScroll: true });
+        nextInput.setSelectionRange(pos, pos);
+      };
+      searchInput.addEventListener('input', updateSearch);
+      searchInput.addEventListener('compositionend', updateSearch);
+      searchInput.addEventListener('keydown', e => {
+        if (!e.isComposing && e.key === 'Enter' && totalHits > 0) {
+          e.preventDefault();
+          jumpToInDocHit(e.shiftKey ? -1 : 1, totalHits);
+        }
+      });
+
+      document.getElementById('btn-toggle-search-filter')?.addEventListener('click', e => {
+        e.stopPropagation();
+        state.searchFilterOpen = !state.searchFilterOpen;
+        renderMain();
+      });
+      document.getElementById('search-filter-popover')?.addEventListener('click', e => e.stopPropagation());
+      document.getElementById('btn-close-filter-pop')?.addEventListener('click', () => { state.searchFilterOpen = false; renderMain(); });
+
+      const resetFilters = () => {
+        state.searchField = 'all';
+        state.searchDate = 'all';
+        state.searchTypes.clear();
+        state.searchFolder = 'all';
+        state.searchFolderQuery = '';
+        state.searchTag = null;
+        renderAll();
+      };
+      document.getElementById('btn-reset-all-filters')?.addEventListener('click', resetFilters);
+      document.getElementById('btn-clear-chips-all')?.addEventListener('click', resetFilters);
+      document.getElementById('btn-empty-clear-filters')?.addEventListener('click', resetFilters);
+
+      stage.querySelectorAll('[data-sf-field]').forEach(b => b.addEventListener('click', () => { state.searchField = b.dataset.sfField; renderMain(); }));
+      stage.querySelectorAll('[data-date-filter]').forEach(b => b.addEventListener('click', () => { state.searchDate = b.dataset.dateFilter; renderMain(); }));
+      stage.querySelectorAll('[data-sf-type]').forEach(b => b.addEventListener('click', () => {
+        const t = b.dataset.sfType;
+        state.searchTypes.has(t) ? state.searchTypes.delete(t) : state.searchTypes.add(t);
+        renderMain();
+      }));
+      stage.querySelectorAll('[data-sf-folder]').forEach(b => b.addEventListener('click', () => { state.searchFolder = b.dataset.sfFolder; renderMain(); }));
+      const sfFolderInput = document.getElementById('sf-folder-input');
+      if (sfFolderInput) {
+        sfFolderInput.addEventListener('input', e => {
+          state.searchFolderQuery = e.target.value;
+          const pos = sfFolderInput.selectionStart;
+          renderMain();
+          const ni = document.getElementById('sf-folder-input');
+          if (ni) { ni.focus(); ni.setSelectionRange(pos, pos); }
+        });
+      }
+
+      stage.querySelectorAll('[data-remove-chip]').forEach(b => b.addEventListener('click', () => {
+        const k = b.dataset.removeChip;
+        if (k === 'field') state.searchField = 'all';
+        else if (k === 'date') state.searchDate = 'all';
+        else if (k === 'folder') state.searchFolder = 'all';
+        else if (k === 'tag') state.searchTag = null;
+        else if (k.startsWith('type:')) state.searchTypes.delete(k.slice(5));
+        renderAll();
+      }));
+
+      stage.querySelectorAll('[data-toggle-hits]').forEach(b => b.addEventListener('click', e => {
+        e.stopPropagation();
+        const id = b.dataset.toggleHits;
+        state.expandedHits.has(id) ? state.expandedHits.delete(id) : state.expandedHits.add(id);
+        renderMain();
+      }));
+
+      stage.querySelectorAll('[data-jump-doc-hit]').forEach(b => b.addEventListener('click', e => {
+        e.stopPropagation();
+        const [docId, hitIdxStr] = b.dataset.jumpDocHit.split('|');
+        state.selectedDocId = docId;
+        state.activeSubpageId = null;
+        state.inDocHitIndex = Number(hitIdxStr) || 0;
+        renderMain();
+        scrollAndPulseHit(state.inDocHitIndex);
+      }));
+
+      stage.querySelectorAll('[data-row-fav]').forEach(b => b.addEventListener('click', e => {
+        e.stopPropagation();
+        const d = getDoc(b.dataset.rowFav);
+        d.favorite = !d.favorite;
+        showToast(d.favorite ? '已加入收藏' : '已移出收藏', 'star');
+        renderMain();
+      }));
 
       document.getElementById('btn-clear-search')?.addEventListener('click', () => { state.searchQuery = ''; state.inDocHitIndex = 0; renderMain(); });
-      document.getElementById('btn-clear-tag')?.addEventListener('click', () => { state.searchTag = null; renderAll(); });
       document.getElementById('btn-expand-all-libs')?.addEventListener('click', () => { state.selectedLibraries = new Set(LIBRARIES.map(l => l.id)); renderAll(); });
-      stage.querySelectorAll('[data-recent-query]').forEach(b => b.addEventListener('mousedown', e => { e.preventDefault(); state.searchQuery = b.dataset.recentQuery; state.searchFocused = false; renderMain(); }));
-      stage.querySelectorAll('[data-recent-doc]').forEach(b => b.addEventListener('mousedown', e => { e.preventDefault(); state.selectedDocId = b.dataset.recentDoc; state.activeSubpageId = null; state.searchFocused = false; renderMain(); }));
+      // Keep the suggestions open until a click or keyboard activation selects an item.
+      stage.querySelectorAll('[data-recent-query], [data-recent-doc]').forEach(button => {
+        button.addEventListener('mousedown', e => e.preventDefault());
+        button.addEventListener('click', () => {
+          if (button.dataset.recentQuery !== undefined) {
+            state.searchQuery = button.dataset.recentQuery;
+          } else {
+            state.selectedDocId = button.dataset.recentDoc;
+            state.activeSubpageId = null;
+          }
+          state.inDocHitIndex = 0;
+          renderMain();
+        });
+      });
       stage.querySelectorAll('[data-density]').forEach(b => b.addEventListener('click', () => { state.searchDensity = b.dataset.density; renderMain(); }));
-      stage.querySelectorAll('[data-date-filter]').forEach(b => b.addEventListener('click', () => { state.searchDate = b.dataset.dateFilter; renderMain(); }));
       stage.querySelectorAll('[data-toggle-subs]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); const id = b.dataset.toggleSubs; state.expandedSubpages.has(id) ? state.expandedSubpages.delete(id) : state.expandedSubpages.add(id); renderMain(); }));
       stage.querySelectorAll('[data-sub-id]').forEach(el => el.addEventListener('click', e => { e.stopPropagation(); state.selectedDocId = el.dataset.subParent; state.activeSubpageId = el.dataset.subId; state.inDocHitIndex = 0; renderMain(); }));
       stage.querySelectorAll('[data-doc-id]').forEach(r => r.addEventListener('click', () => { state.selectedDocId = r.dataset.docId; state.activeSubpageId = null; state.inDocHitIndex = 0; renderMain(); }));
@@ -2692,47 +3185,21 @@
       document.getElementById('btn-hit-prev')?.addEventListener('click', () => jumpToInDocHit(-1, totalHits));
       document.getElementById('btn-hit-next')?.addEventListener('click', () => jumpToInDocHit(1, totalHits));
       document.getElementById('btn-open-in-space')?.addEventListener('click', () => openPaperInSpace(readingTarget.spaceNodeId || activeDoc.spaceNodeId, false));
-      document.getElementById('btn-pin-preview')?.addEventListener('click', () => {
-        state.previewPinned = !state.previewPinned;
-        showToast(state.previewPinned ? '已固定当前阅读面板' : '已取消固定');
-        renderMain();
-      });
-      document.getElementById('btn-fav-doc')?.addEventListener('click', () => {
-        activeDoc.favorite = !activeDoc.favorite;
-        showToast(activeDoc.favorite ? '已加入收藏' : '已移出收藏', 'star');
-        renderMain();
-      });
+      document.getElementById('btn-pin-preview')?.addEventListener('click', () => { state.previewPinned = !state.previewPinned; showToast(state.previewPinned ? '已固定当前阅读面板' : '已取消固定'); renderMain(); });
+      document.getElementById('btn-fav-doc')?.addEventListener('click', () => { activeDoc.favorite = !activeDoc.favorite; showToast(activeDoc.favorite ? '已加入收藏' : '已移出收藏', 'star'); renderMain(); });
       document.getElementById('btn-doc-to-task')?.addEventListener('click', () => {
-        state.tasks.unshift({
-          id: 't-' + Date.now(),
-          title: `跟进：${readingTarget.title}`,
-          bucket: 'today',
-          priority: 'medium',
-          source: '本地',
-          due: '今天',
-          tags: (activeDoc.tags || []).slice(0, 2),
-          done: false,
-          notes: `来源文档：${activeDoc.path}`
-        });
+        state.tasks.unshift({ id: 't-' + Date.now(), title: `跟进：${readingTarget.title}`, bucket: 'today', priority: 'medium', source: '本地', due: '今天', tags: (activeDoc.tags || []).slice(0, 2), done: false, notes: `来源文档：${activeDoc.path}` });
         showToast('已创建今日任务', 'list-todo');
         renderChrome();
       });
       document.getElementById('btn-doc-to-card')?.addEventListener('click', () => {
-        state.flashcards.unshift({
-          id: 'fc-' + Date.now(),
-          deck: '知识摘录',
-          front: `《${readingTarget.title}》的核心要点是什么？`,
-          back: readingTarget.snippet || activeDoc.snippet,
-          sourceDocId: activeDoc.id,
-          sourceTitle: readingTarget.title,
-          stability: '1.0 天',
-          reps: 0
-        });
+        state.flashcards.unshift({ id: 'fc-' + Date.now(), deck: '知识摘录', front: `《${readingTarget.title}》的核心要点是什么？`, back: readingTarget.snippet || activeDoc.snippet, sourceDocId: activeDoc.id, sourceTitle: readingTarget.title, stability: '1.0 天', reps: 0 });
         state.dueCount += 1;
         showToast('已生成 1 张新闪卡并加入待复习队列', 'book-open-check');
         renderChrome();
       });
       document.getElementById('btn-ask-quick-doc')?.addEventListener('click', () => openQuickAssistant({ type: 'case', value: 'workspace', focus: true }));
+      stage.querySelectorAll('[data-toc-jump]').forEach(b => b.addEventListener('click', () => document.getElementById(b.dataset.tocJump)?.scrollIntoView({ behavior: 'smooth', block: 'start' })));
       stage.querySelectorAll('[data-open-attachment]').forEach(c => c.addEventListener('click', () => showToast(`附件预览：${c.dataset.openAttachment}`, 'file-text')));
 
       const resizer = document.getElementById('search-resizer');
@@ -2745,8 +3212,16 @@
           const pct = Math.min(60, Math.max(26, ((ev.clientX - rect.left) / rect.width) * 100));
           state.splitPercent = pct; listPane.style.width = pct + '%';
         };
-        const onUp = () => { resizer.classList.remove('dragging'); window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); };
-        window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp);
+        const endDrag = () => {
+          resizer.classList.remove('dragging');
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', endDrag);
+          window.removeEventListener('pointercancel', endDrag);
+          updateHitMarksTrack();
+        };
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', endDrag);
+        window.addEventListener('pointercancel', endDrag);
       });
     }
 
@@ -3045,6 +3520,7 @@
     // =========================================================================
 
     function renderMain() {
+      searchReaderObserver.disconnect();
       destroyCharts();
       syncHashFromView();
       const stage = document.getElementById('main-stage');
@@ -3076,8 +3552,9 @@
     function renderAll() { renderChrome(); renderMain(); renderStatusBar(); }
 
     window.addEventListener('click', () => {
-      if (state.jumpBarOpenKey) {
+      if (state.jumpBarOpenKey || state.searchFilterOpen) {
         state.jumpBarOpenKey = null;
+        state.searchFilterOpen = false;
         renderMain();
       }
     });
@@ -3130,6 +3607,7 @@
 
     // Global Keyboard Flow
     window.addEventListener('keydown', e => {
+      if (e.isComposing) return;
       const tag = (e.target && e.target.tagName) || '';
       const typing = tag === 'INPUT' || tag === 'TEXTAREA';
 
@@ -3139,6 +3617,12 @@
         return;
       }
       if ((e.metaKey || e.ctrlKey) && e.key === '\\') { e.preventDefault(); state.sidebarCollapsed = !state.sidebarCollapsed; renderChrome(); return; }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f' && state.view === 'search') {
+        e.preventDefault();
+        state.searchFilterOpen = !state.searchFilterOpen;
+        renderMain();
+        return;
+      }
       if ((e.metaKey || e.ctrlKey) && e.key === '.' && state.view === 'space' && state.spaceSurface === 'split') {
         e.preventDefault();
         state.spaceFocusReader = !state.spaceFocusReader;
@@ -3154,7 +3638,7 @@
       }
       if (e.key === 'Escape') {
         if (!agentDemoPopover.hidden) { setAgentDemoPopover(false); return; }
-        state.paletteOpen = false; state.jumpBarOpenKey = null;
+        state.paletteOpen = false; state.jumpBarOpenKey = null; state.searchFilterOpen = false;
         closeQuickAssistant();
         renderPalette(); renderQuickAssistant(); closeCardEditModal();
         document.getElementById('modal-settings').classList.add('hidden');
