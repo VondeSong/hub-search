@@ -791,9 +791,15 @@ it("allows frequency changes while protecting the active save destination",async
 
 it("keeps Telegram manual sync and tdl setup available during an X run",async()=>{
  const page={...initial,running:true,sources:[...initial.sources,{id:"telegram",count:1,connected:true,paired:true,canResume:false,status:""}]};
- const active={...storage,running:true,telegramRunning:false,tdl:{installed:true,version:"0.20.4",enabled:false,ready:false,running:false,phase:"",status:"",bytes:0,proxy:""}};
+ const active={...storage,running:true,telegramRunning:false,
+   job:{id:1,running:true,source:"bookmarks",phase:"fetching",outcome:"",processed:0,total:0,downloadedBytes:0,fileBytes:0,message:""},
+   tdl:{installed:true,version:"0.20.4",enabled:false,ready:false,running:false,phase:"",status:"",bytes:0,proxy:""}};
  invoke.mockImplementation(async(command:string)=>command==="list_collection_items"?page:command==="get_collection_storage"?active:"");
- await mount();await openSyncDetails();
+ await mount();await click("来源同步与连接");
+ expect(container.querySelector('dialog[open] article[aria-label="X 书签"]')?.textContent).toContain("同步中");
+ expect(container.querySelector('dialog[open] article[aria-label="X 喜欢"]')?.textContent).toContain("后台任务占用");
+ expect(container.querySelector<HTMLButtonElement>('dialog[open] [aria-label="立即同步Telegram + tdl 个人号"]')?.disabled).toBe(false);
+ await click("同步详情");
  const actions=[...container.querySelectorAll<HTMLButtonElement>('.collection-source-sync button[aria-label^="立即同步"]')];expect(actions[0].disabled).toBe(true);expect(actions[1].disabled).toBe(true);expect(actions[2].disabled).toBe(false);
  await act(async()=>actions[2].click());expect(invoke).toHaveBeenCalledWith("sync_x_bookmarks",{source:"telegram",restart:true});
  await click("设置");await expand("Telegram 历史与大附件");await click("登录 Telegram 账号");expect(invoke).toHaveBeenCalledWith("login_telegram_tdl",{method:"qr"});
@@ -831,10 +837,13 @@ it("resizes each table column without changing its neighbors and persists widths
 });
 
 it("applies reference filters immediately and preserves scope, layout and sort when clearing",async()=>{
+ const mockPage = { ...initial, sources: [{ ...initial.sources[0], count: 17 }, { ...initial.sources[1], count: 3 }] };
+ invoke.mockImplementation(async command => command === "list_collection_items" ? mockPage : command === "get_collection_storage" ? storage : []);
  await mount();
  await act(async () => container.querySelector<HTMLButtonElement>(".collection-chip-likes")!.click());
  await click("筛选"); await click("近 7 天");
  expect(document.querySelector('.reading-reference-popover')).toBeNull();
+ expect(container.querySelector(".reading-source-segment button strong")?.textContent).toBe("20");
  await click("筛选"); await click("有视频");
  expect(container.querySelector(".reading-reference-filter-strip")?.textContent).toContain("近 7 天含视频");
  await click("排序"); await click("发布时间");

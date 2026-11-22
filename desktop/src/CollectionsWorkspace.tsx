@@ -293,9 +293,11 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const jobRunning=Boolean(storageRunning || storage.telegramRunning || storage.didaRunning || storage.tdl?.running || launching);
   // Telegram owns a separate receiver lock; an X fetch or shared export does not block bot setup.
   const sourceConnectionRunning=(source:Source)=>source==="dida"?Boolean(storage.didaRunning || launching==="dida"):source==="telegram"?Boolean(storage.telegramRunning || launching==="telegram"):storageRunning;
+  const sourceActive=(source:Source)=>source==="dida" ? Boolean(storage.didaRunning||launching==="dida") :
+    source==="telegram" ? Boolean(storage.telegramRunning||launching==="telegram") : Boolean((job?.running&&job.source===source)||launching===source);
   const connectionRunning=sourceConnectionRunning(connectionSource);
   const sources: SourceState[] = (["bookmarks","likes","telegram","dida"] as Source[]).map(id=>pageState?.sources?.find(source=>source.id===id)||{id,count:id==="bookmarks"?(pageState?.total||0):0,connected:id==="bookmarks"?!!pageState?.connected:id==="dida"?libraries.some(l=>l.provider==="dida365"&&l.connected):false,canResume:id==="bookmarks"?!!pageState?.canResume:false,status:id==="bookmarks"?(pageState?.status||""):""});
-  const activeTotal=page?.sources?.length?sources.reduce((sum,source)=>sum+source.count,0):page?.total||0;
+  const activeTotal=pageState?.sources?.length?sources.reduce((sum,source)=>sum+source.count,0):pageState?.total||0;
   const connection=sources.find(s=>s.id===connectionSource);
   const selected=page?.items.find(item=>item.key===selectedKey)||(useSplitReading&&!searchItemKey?page?.items[0]:undefined);
   const selectedSource=selected?.post.source||"bookmarks";
@@ -607,7 +609,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
         {!runtimeCapabilities.mobile&&<div className="collection-menu-wrap"><button className={`collection-sync-trigger${syncMenu||syncOverview==="source"?" active":""}`} aria-label="来源同步与连接" title="来源同步与连接" aria-haspopup="dialog" aria-expanded={syncMenu||syncOverview==="source"} aria-busy={jobRunning} onClick={()=>{if(syncMenu)setSyncMenu(false);else setSyncOverview("source");}}>{jobRunning?<LoaderCircle size={16} strokeWidth={1.8} className="spin"/>:<RefreshCw size={16} strokeWidth={1.8}/>} {jobVisible&&!jobRunning&&<span className="collection-sync-indicator"/>}</button>
           {syncMenu&&<CollectionSyncPanel sources={sources} operations={operations} itemTitles={Object.fromEntries((page?.items||[]).map(item=>[item.key,title(item)]))}
             autoSyncMinutes={storage.config.autoSyncMinutes} storageLabel={`${storage.config.mode==="obsidian"?"保存到 Obsidian · 本机保留索引与缓存":"保存到本地数据库"} · Telegram 大附件可通过 tdl 下载`} storageStatus={storage.status} pendingCancellations={page?.pendingCancellations||0}
-            job={job} jobRunning={jobRunning} jobVisible={jobVisible} sourceBusy={sourceConnectionRunning} sourceActive={source=>source==="dida"?Boolean(storage.didaRunning||launching==="dida"):source==="telegram"?Boolean(storage.telegramRunning||launching==="telegram"):Boolean((job?.running&&job.source===source)||launching===source)}
+            job={job} jobRunning={jobRunning} jobVisible={jobVisible} sourceBusy={sourceConnectionRunning} sourceActive={sourceActive}
             onClose={()=>setSyncMenu(false)} onSettings={()=>{setDraft(storage.config);setSyncMenu(false);setError("");setSettings(true);}} onSync={(source,restart)=>void sync(source,restart)} onPause={()=>void pause()} onStore={()=>{setSyncMenu(false);void store(false);}}
             onConnect={source=>{setConnectionSource(source);setSyncMenu(false);setError("");setConnecting(true);}} onOpenUrl={url=>void open(url)} onDidaLogin={()=>invoke("open_dida_attachment_login")} onReview={openReview}
             onRetry={op=>void invoke("retry_collection_library_operation",{key:op.key,expectedTarget:op.target}).then(()=>load()).catch(e=>setError(String(e)))} onContinueCopy={op=>void invoke("move_collection_to_library",{key:op.key,destination:op.target}).then(()=>load()).catch(e=>setError(String(e)))}>
@@ -645,7 +647,8 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
       didaVerifiedAt={didaVerifiedAt} onDidaVerified={setDidaVerifiedAt}
       local={{...storage.localSources,path:storage.config.mode==="obsidian"?storage.config.vaultPath:"",running:checkingSources||storage.localSources?.running,
         error:storage.localSources?.error||(storage.vaultRelocation?.rootExists===false?"保存库目录已移动":"")}}
-      sourceBusy={sourceConnectionRunning} onSync={sync} onCheckLocal={checkLocalSources} onClose={()=>setSyncOverview(null)} onNotice={setNotice}
+      sourceBusy={sourceConnectionRunning} sourceActive={sourceActive}
+      onSync={sync} onCheckLocal={checkLocalSources} onClose={()=>setSyncOverview(null)} onNotice={setNotice}
       onDetails={()=>{setSyncOverview(null);setSyncMenu(true);}}
       onStorage={()=>{setSyncOverview(null);setDraft(storage.config);setError("");setSettings(true);}}
       onConnect={source=>{setSyncOverview(null);setError("");if(source==="dida"){if(onOpenLibrarySettings)onOpenLibrarySettings();else setSyncMenu(true);}else{setConnectionSource(source);setConnecting(true);}}}/>}

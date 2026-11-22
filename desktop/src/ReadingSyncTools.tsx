@@ -62,7 +62,7 @@ function SourceRow({ name, state, tone, description, action, disabled, onAction,
 }
 
 const openDidaLogin = () => invoke<void>("open_dida_attachment_login");
-export function ReadingSourceConnections({ sources, loading, tdlReady, didaVerifiedAt, onDidaVerified, local, sourceBusy, onSync, onCheckLocal,
+export function ReadingSourceConnections({ sources, loading, tdlReady, didaVerifiedAt, onDidaVerified, local, sourceBusy, sourceActive, onSync, onCheckLocal,
   onConnect, onStorage, onDetails, onClose, onNotice }: {
   sources: CollectionSyncSource[];
   loading: boolean;
@@ -71,6 +71,7 @@ export function ReadingSourceConnections({ sources, loading, tdlReady, didaVerif
   onDidaVerified: (checkedAt: number) => void;
   local: { path: string; running?: boolean; lastCheckedAt?: number; error?: string };
   sourceBusy: (source: CollectionSource) => boolean;
+  sourceActive: (source: CollectionSource) => boolean;
   onSync: (source: CollectionSource, restart: boolean) => Promise<string | undefined>;
   onCheckLocal: () => Promise<string | undefined>;
   onConnect: (source: CollectionSource) => void;
@@ -109,23 +110,25 @@ export function ReadingSourceConnections({ sources, loading, tdlReady, didaVerif
     <div className="reading-reference-dialog-body">
       {rows.map(({ id, name, description }) => {
         const source = sources.find(candidate => candidate.id === id);
-        const busy = pending === id || sourceBusy(id);
+        const running = pending === id || sourceActive(id);
+        const waiting = !running && sourceBusy(id);
+        const busy = running || waiting;
         const recentDidaVerification = didaVerifiedAt > 0 && didaVerifiedAt >= (source?.lastCheckedAt ?? 0);
         const didaLogin = id === "dida" && source?.connected && source.didaCleanup?.authRequired && !recentDidaVerification;
         const verifyOnSync = id === "dida" && login.currentVerified && login.feedback.status?.accountMatched === false;
         const connected = !!source?.connected;
-        const blocked = !!source?.autoBlocked;
+        const blocked = id !== "dida" && !!source?.autoBlocked;
         const tdlMissing = id === "telegram" && connected && !tdlReady;
-        const state = loading ? "正在读取" : busy ? "同步中" : didaLogin ? "附件网页会话待核验" :
+        const state = loading ? "正在读取" : running ? "同步中" : waiting ? "后台任务占用" : didaLogin ? "附件网页会话待核验" :
           blocked ? "连接待检查" : tdlMissing ? "Telegram 已连接 · tdl 未就绪" : connected ? "已连接" : "未连接";
-        const action = busy ? "同步中…" : verifyOnSync ? "同步并核验" : didaLogin ? "重连会话" :
-          id !== "dida" && blocked ? "重新连接" : !connected ? "连接" : "立即同步";
+        const action = running ? "同步中…" : waiting ? "请稍候" : verifyOnSync ? "同步并核验" : didaLogin ? "重连会话" :
+          blocked ? "重新连接" : !connected ? "连接" : "立即同步";
         return <SourceRow key={id} name={name} state={state} tone={didaLogin || blocked ? "warning" : connected && !busy ? "ok" : undefined}
           description={description + " · " + timeLabel(source?.lastSuccess)} action={action} disabled={loading || busy || (id === "dida" && login.busy)}
           onAction={() => {
             if (verifyOnSync) void run(id, () => onSync(id, false));
             else if (didaLogin) { setFailure(""); setReconnecting(true); void login.openLogin(); }
-            else if ((id !== "dida" && blocked) || !connected) onConnect(id);
+            else if (blocked || !connected) onConnect(id);
             else void run(id, () => onSync(id, !source?.canResume));
           }}>
           {id === "dida" && reconnecting && <div className="reading-reference-inline-feedback" role="status">
