@@ -186,7 +186,7 @@ function ThumbArtwork({ kind, large = false }) {
   );
 }
 
-export default function ReferenceAgent() {
+export default function ReferenceAgent({ onDismiss }) {
   // 1. 视口宽度模式：'sidebar' (480px) | 'focus' (760px) | 'full'
   const [viewportMode, setViewportMode] = useState('focus');
   // 示例场景切换：'report' (正常流式复核报告) | 'interrupted' (图2规则加载 + 图3核验中断重构案例)
@@ -707,16 +707,29 @@ export default function ReferenceAgent() {
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-2 sm:p-4 bg-[#F3F3F1]">
       {/* 顶部原型视口与示例场景控制条 */}
       <div className={`w-full ${containerWidthClass} mb-2 flex flex-wrap items-center justify-between gap-2 px-1 text-xs transition-all duration-300`}>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {onDismiss && (
+            <button
+              type="button"
+              autoFocus
+              onClick={onDismiss}
+              className="flex items-center gap-1 rounded-lg px-2 py-1 font-medium text-secondary hover:bg-hover hover:text-primary"
+            >
+              <Icon name="arrowLeft" className="w-3.5 h-3.5" />
+              返回工作台
+            </button>
+          )}
           <span className="font-semibold text-primary">Hub 助手原型</span>
           <div className="flex items-center bg-black/5 p-0.5 rounded-xl">
             <button
+              aria-pressed={activeCase === 'report'}
               onClick={() => switchDemoCase('report')}
               className={`px-2 py-0.5 rounded-lg text-[11px] font-medium transition-all ${activeCase === 'report' ? 'bg-surface text-primary shadow-sm' : 'text-secondary hover:text-primary'}`}
             >
               案例1：流式复核
             </button>
             <button
+              aria-pressed={activeCase === 'interrupted'}
               onClick={() => switchDemoCase('interrupted')}
               className={`px-2 py-0.5 rounded-lg text-[11px] font-medium transition-all flex items-center gap-1 ${activeCase === 'interrupted' ? 'bg-surface text-primary shadow-sm' : 'text-secondary hover:text-primary'}`}
             >
@@ -733,6 +746,7 @@ export default function ReferenceAgent() {
           ].map(v => (
             <button
               key={v.id}
+              aria-pressed={viewportMode === v.id}
               onClick={() => setViewportMode(v.id)}
               className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${viewportMode === v.id ? 'bg-surface text-primary shadow-sm' : 'text-secondary hover:text-primary'}`}
             >
