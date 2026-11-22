@@ -423,6 +423,8 @@
     .paper-breadcrumbs > div > button > span:last-of-type { overflow: hidden; text-overflow: ellipsis; }
     .paper-breadcrumbs > .icon-btn { flex-shrink: 0; }
     .agent-demo-menu[hidden], .agent-demo-popover[hidden], .quick-assistant-panel[hidden], .agent-source[hidden] { display: none; }
+    /* Raise the status bar so its open menu clears the assistant frame. */
+    #app-statusbar:has(.agent-demo-popover:not([hidden])) { z-index: 47; }
     .agent-demo-menu { position: relative; display: inline-flex; align-items: center; }
     .agent-demo-trigger {
       display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px;
