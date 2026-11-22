@@ -13,14 +13,28 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
+    const __hubHostMode = /[?&](panel|embed|source)=1/.test(window.location.search) || window.self !== window.top;
     tailwind.config = {
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'sans-serif'],
-            mono: ['JetBrains Mono', 'SF Mono', 'Menlo', 'monospace']
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"PingFang SC"', '"Hiragino Sans GB"', 'Inter', '"Microsoft YaHei"', 'sans-serif'],
+            mono: ['"SF Mono"', '"JetBrains Mono"', 'ui-monospace', 'Menlo', 'monospace']
           },
-          colors: {
+          colors: __hubHostMode ? {
+            canvas: '#FFFFFF',
+            frame: '#F5F6F8',
+            surface: '#FFFFFF',
+            subtle: '#F4F5F7',
+            hover: '#EEF0F4',
+            border: '#E6E8EE',
+            primary: '#18181B',
+            secondary: '#52525B',
+            muted: '#8A8F98',
+            'accent-indigo': '#007AFF',
+            'accent-amber': '#C47F17',
+            'accent-emerald': '#1E8E5A'
+          } : {
             canvas: '#FCFCFB',
             frame: '#F3F3F1',
             surface: '#FFFFFF',
@@ -34,7 +48,13 @@
             'accent-amber': '#D97706',
             'accent-emerald': '#10B981'
           },
-          boxShadow: {
+          boxShadow: __hubHostMode ? {
+            '2xs': '0 1px 2px rgba(15, 23, 42, 0.035)',
+            xs: '0 1px 3px rgba(15, 23, 42, 0.05)',
+            card: '0 2px 12px -2px rgba(15, 23, 42, 0.05), 0 0 0 0.5px rgba(15, 23, 42, 0.08)',
+            popover: '0 12px 32px -4px rgba(15, 23, 42, 0.14), 0 0 0 0.5px rgba(15, 23, 42, 0.08)',
+            float: '0 24px 64px -12px rgba(15, 23, 42, 0.20), 0 0 0 0.5px rgba(15, 23, 42, 0.10)'
+          } : {
             '2xs': '0 1px 2px rgba(26, 25, 24, 0.04)',
             xs: '0 1px 3px rgba(26, 25, 24, 0.06)',
             card: '0 4px 16px -2px rgba(26, 25, 24, 0.06), 0 0 0 1px rgba(26, 25, 24, 0.04)',
@@ -69,6 +89,19 @@
   <style>
     html.hub-embedded header { height: 40px !important; background: rgba(248, 249, 251, 0.92) !important; }
     html.hub-embedded .hub-embed-hide { display: none !important; }
+    html.hub-panel, html.hub-panel body, html.hub-panel #root {
+      background: #FFFFFF !important;
+      color: #18181B !important;
+    }
+    html.hub-panel ::-webkit-scrollbar { width: 5px; height: 5px; }
+    html.hub-panel ::-webkit-scrollbar-track { background: transparent; }
+    html.hub-panel ::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.12); border-radius: 999px; }
+    html.hub-panel ::-webkit-scrollbar-thumb:hover { background: rgba(15, 23, 42, 0.24); }
+    .hub-panel > div > section > header {
+      height: 44px !important;
+      background: rgba(255, 255, 255, 0.92) !important;
+      border-bottom: 0.5px solid rgba(15, 23, 42, 0.08) !important;
+    }
     .hub-panel .agent-composer-controls { flex-wrap: wrap; row-gap: 4px; }
     .hub-panel .agent-composer-controls > div { flex-wrap: wrap; }
   </style>
@@ -3720,6 +3753,7 @@
       const isPanel = params.get('panel') === '1' && window.self !== window.top;
       const isSource = params.get('source') === '1';
       const isEmbed = !isPanel && !isSource && (params.get('embed') === '1' || window.self !== window.top);
+      if (isPanel) document.documentElement.classList.add('hub-panel');
       if (isEmbed) document.documentElement.classList.add('hub-embedded');
       if (isEmbed || isPanel) {
         window.addEventListener('keydown', function (e) {
