@@ -521,7 +521,7 @@ details[open] > summary > .agent-detail-caret { transform:rotate(180deg); }
   width: 100%; min-height: 26px; padding: 3px 8px; margin: 0; border: 1px solid transparent;
   justify-self: center; border-radius: 8px; background: transparent; font-size: 12px;
 }
-.agent-panel button.agent-chat-title { display: block; }
+.agent-panel button.agent-chat-title { display: block; max-width: 80%; font-weight: 600; }
 .agent-panel .agent-chat-title > span { display: block; overflow: hidden; text-overflow: ellipsis; }
 .agent-panel button.agent-chat-title:hover:not(:disabled) { background: var(--agent-chat-hover); }
 .agent-panel input.agent-chat-title { border-color: color-mix(in srgb, var(--agent-chat-ink) 25%, transparent); background: var(--agent-chat-surface); }
