@@ -1,0 +1,2194 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="h-full select-none">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hub 洞察工作区 · 交互原型 v4</title>
+
+  <!-- Tailwind CSS 3.4.17 CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons 0.460.0 CDN -->
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+
+  <!-- Google Fonts: Inter, Noto Sans SC, JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans SC', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Courier New', 'monospace'],
+          },
+          colors: {
+            studio: '#ECEEF2',
+            paper: '#FFFFFF',
+            paperWell: '#F8F9FB',
+            paperWarm: '#FDFCFA',
+            ink: '#141413',
+            inkBody: '#2C2C2A',
+            inkSecondary: '#575754',
+            inkMuted: '#8A8A86',
+            hair: 'rgba(20, 20, 19, 0.07)',
+            hairStrong: 'rgba(20, 20, 19, 0.12)',
+            accent: '#2563EB',
+            ok: '#0F766E',
+            warn: '#B45309',
+            err: '#B91C1C',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      --studio-bg: #ECEEF2;
+      --glass-bar: rgba(236, 238, 242, 0.78);
+      --paper: #FFFFFF;
+      --paper-well: #F8F9FB;
+      --paper-warm: #FDFCFA;
+      --ink: #141413;
+      --ink-body: #2C2C2A;
+      --ink-secondary: #575754;
+      --ink-muted: #8A8A86;
+      --hair: rgba(20, 20, 19, 0.07);
+      --hair-strong: rgba(20, 20, 19, 0.12);
+      --accent: #2563EB;
+      --ok: #0F766E;
+      --warn: #B45309;
+      --err: #B91C1C;
+      --radius-paper: 16px;
+      --shadow-paper: 0 0.5px 1px rgba(15, 23, 42, 0.05), 0 10px 28px -14px rgba(15, 23, 42, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+      --shadow-sheet: -12px 0 36px -12px rgba(15, 23, 42, 0.14), 0 0 0 0.5px rgba(15, 23, 42, 0.07);
+      --shadow-popover: 0 16px 38px -8px rgba(15, 23, 42, 0.18), 0 0 0 0.5px rgba(15, 23, 42, 0.08);
+    }
+
+    body {
+      background-color: var(--studio-bg);
+      color: var(--ink-body);
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    .font-mono-tech {
+      font-family: 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .studio-canvas {
+      background: radial-gradient(ellipse 90% 70% at 0% 0%, #E7ECF5 0%, #ECEEF2 48%, #E9EBF0 100%);
+    }
+
+    .mac-vibrancy {
+      background: var(--glass-bar);
+      backdrop-filter: blur(22px) saturate(160%);
+      -webkit-backdrop-filter: blur(22px) saturate(160%);
+    }
+
+    .mac-groove {
+      background: rgba(20, 20, 19, 0.05);
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+      border-radius: 8px;
+      padding: 2px;
+    }
+
+    .mac-seg-active {
+      background: #FFFFFF;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0.5px 1px rgba(0, 0, 0, 0.08);
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .sb-item {
+      transition: all 0.15s ease;
+      border-radius: 8px;
+    }
+    .sb-item:hover {
+      background: rgba(20, 20, 19, 0.04);
+    }
+    .sb-item.is-active {
+      background: rgba(255, 255, 255, 0.7);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    .sb-ico {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .hub-chk {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 15px;
+      height: 15px;
+      border: 1.5px solid rgba(20, 20, 19, 0.25);
+      border-radius: 4px;
+      outline: none;
+      cursor: pointer;
+      position: relative;
+      background: #FFFFFF;
+      transition: all 0.12s ease;
+    }
+    .hub-chk:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .hub-chk:checked::after {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 1px;
+      width: 4px;
+      height: 8px;
+      border: solid white;
+      border-width: 0 1.5px 1.5px 0;
+      transform: rotate(45deg);
+    }
+
+    .craft-paper {
+      background: var(--paper);
+      box-shadow: var(--shadow-paper);
+      border-radius: var(--radius-paper);
+      border: 1px solid var(--hair);
+    }
+
+    .claude-paper {
+      background: var(--paper-warm);
+      box-shadow: var(--shadow-paper);
+      border-radius: var(--radius-paper);
+      border: 1px solid var(--hair);
+    }
+
+    .claude-prose {
+      font-size: 15.5px;
+      line-height: 1.82;
+      color: var(--ink-body);
+    }
+
+    .stream-well {
+      background: var(--paper-well);
+    }
+
+    .stream-card {
+      transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+      border: 1px solid transparent;
+    }
+    .stream-card:hover {
+      border-color: rgba(37, 99, 235, 0.18);
+      background: #FFFFFF;
+    }
+    .stream-card-active {
+      background: #FFFFFF !important;
+      box-shadow: 0 4px 16px -4px rgba(15, 23, 42, 0.08), 0 0 0 1.5px var(--accent) !important;
+    }
+
+    .inline-ghost {
+      transition: all 0.12s ease;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: 2px 6px;
+      color: var(--ink-secondary);
+      font-size: 12px;
+    }
+    .inline-ghost:hover {
+      background: rgba(20, 20, 19, 0.04);
+      border-color: var(--hair-strong);
+      color: var(--ink);
+    }
+
+    .sweep-bar {
+      height: 2px;
+      width: 100%;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      background-size: 200% 100%;
+      animation: sweep 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    @keyframes sweep {
+      0% { background-position: -150% 0; }
+      100% { background-position: 150% 0; }
+    }
+
+    .shake-x {
+      animation: shake 0.38s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    }
+    @keyframes shake {
+      10%, 90% { transform: translate3d(-1px, 0, 0); }
+      20%, 80% { transform: translate3d(2px, 0, 0); }
+      30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+      40%, 60% { transform: translate3d(4px, 0, 0); }
+    }
+
+    .paper-gutter {
+      width: 10px;
+      cursor: col-resize;
+      position: relative;
+      z-index: 10;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .paper-gutter::after {
+      content: '';
+      width: 2px;
+      height: 32px;
+      border-radius: 1px;
+      background: rgba(20, 20, 19, 0.12);
+      transition: background 0.15s ease, height 0.15s ease;
+    }
+    .paper-gutter:hover::after, .paper-gutter.is-dragging::after {
+      background: var(--accent);
+      height: 48px;
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(20, 20, 19, 0.14);
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(20, 20, 19, 0.25);
+    }
+
+    .shell-narrow {
+      max-width: 412px !important;
+      margin: 0 auto;
+      border-left: 1px solid rgba(0,0,0,0.1);
+      border-right: 1px solid rgba(0,0,0,0.1);
+      box-shadow: 0 0 40px rgba(0,0,0,0.15);
+    }
+  </style>
+
+  <style>
+    html.hub-embedded > body > header { height: 42px !important; background: rgba(248, 249, 251, 0.88) !important; }
+  </style>
+
+</head>
+<body class="studio-canvas flex flex-col antialiased">
+
+  <!-- ==================== 1. TITLEBAR (46px) ==================== -->
+  <header class="h-[46px] mac-vibrancy border-b border-[var(--hair-strong)] px-3 flex items-center justify-between shrink-0 z-30 select-none">
+
+    <!-- Left: Brand & Sidebar Toggle -->
+    <div class="flex items-center gap-2">
+      <button id="btn-toggle-sidebar" onclick="toggleSidebar()" class="p-1.5 hover:bg-black/5 rounded-md text-[var(--ink-secondary)] transition-colors" title="展开/收起侧边栏">
+        <i data-lucide="panel-left" class="w-4 h-4"></i>
+      </button>
+      <div class="flex items-center gap-1.5 font-semibold text-sm text-[var(--ink)] tracking-tight">
+        <div class="w-2 h-2 rounded-full bg-blue-600"></div>
+        <span>洞察</span>
+        <span class="text-xs text-[var(--ink-muted)] font-normal font-mono-tech ml-0.5">v4.0</span>
+      </div>
+    </div>
+
+    <!-- Center: Mac-Groove Segmented Control for Processing Status -->
+    <div class="hidden sm:flex items-center">
+      <div class="mac-groove flex items-center gap-0.5 text-xs">
+        <button onclick="setFilterStatus('ALL')" id="seg-ALL" class="mac-seg-active px-3 py-1 rounded-md transition-all flex items-center gap-1.5">
+          <span>全部</span>
+          <span id="cnt-ALL" class="font-mono-tech opacity-70">6</span>
+        </button>
+        <button onclick="setFilterStatus('PENDING')" id="seg-PENDING" class="px-3 py-1 rounded-md text-[var(--ink-secondary)] hover:text-[var(--ink)] transition-all flex items-center gap-1.5">
+          <span>待关注</span>
+          <span id="cnt-PENDING" class="font-mono-tech opacity-70">3</span>
+        </button>
+        <button onclick="setFilterStatus('LATER')" id="seg-LATER" class="px-3 py-1 rounded-md text-[var(--ink-secondary)] hover:text-[var(--ink)] transition-all flex items-center gap-1.5">
+          <span>稍后</span>
+          <span id="cnt-LATER" class="font-mono-tech opacity-70">1</span>
+        </button>
+        <button onclick="setFilterStatus('DONE')" id="seg-DONE" class="px-3 py-1 rounded-md text-[var(--ink-secondary)] hover:text-[var(--ink)] transition-all flex items-center gap-1.5">
+          <span>已处理</span>
+          <span id="cnt-DONE" class="font-mono-tech opacity-70">2</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Right: Search, Actions, Quick Demo Popover -->
+    <div class="flex items-center gap-2">
+      <!-- Search Input Pill -->
+      <div class="relative flex items-center">
+        <i data-lucide="search" class="w-3.5 h-3.5 absolute left-2.5 text-[var(--ink-muted)]"></i>
+        <input type="text" id="global-search" oninput="handleSearch(this.value)" placeholder="搜索洞察、引文或原事项... (/)"
+               class="pl-8 pr-7 py-1 text-xs w-36 sm:w-48 bg-black/5 focus:bg-white focus:ring-1 focus:ring-blue-500 rounded-md border-0 text-[var(--ink)] placeholder-[var(--ink-muted)] transition-all outline-none font-sans">
+        <span class="absolute right-2 text-[10px] text-[var(--ink-muted)] font-mono-tech">/</span>
+      </div>
+
+      <!-- Action Buttons -->
+      <button onclick="openDiscoverModal()" class="px-2.5 py-1 bg-neutral-900 hover:bg-black text-white text-xs font-medium rounded-md shadow-sm transition-all flex items-center gap-1">
+        <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+        <span>开始发现</span>
+      </button>
+
+      <button onclick="openImportModal()" class="hidden md:flex items-center gap-1 px-2.5 py-1 hover:bg-black/5 text-[var(--ink-secondary)] text-xs font-medium rounded-md border border-[var(--hair-strong)] transition-all">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+        <span>导入成果</span>
+      </button>
+
+      <!-- Quick Acceptance Demo Dropdown -->
+      <div class="relative">
+        <button onclick="toggleDemoPopover()" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-medium rounded-md border border-blue-200 transition-all flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
+          <span>验收演示</span>
+          <i data-lucide="chevron-down" class="w-3 h-3 ml-0.5"></i>
+        </button>
+
+        <!-- Popover -->
+        <div id="demo-popover" class="hidden absolute right-0 top-full mt-1.5 w-80 bg-white rounded-xl shadow-[var(--shadow-popover)] border border-[var(--hair-strong)] p-3 z-50 text-xs space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-[var(--hair)]">
+            <span class="font-semibold text-[var(--ink)]">v4 交互升级 Quick Checklist</span>
+            <span class="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-mono-tech">Desktop v4</span>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="text-[11px] text-[var(--ink-muted)] font-medium">视图与排版控制</div>
+            <div class="grid grid-cols-2 gap-1.5">
+              <button onclick="setDemoViewport('DESKTOP')" id="btn-vp-desktop" class="p-1.5 rounded border border-blue-500 bg-blue-50 text-blue-700 font-medium text-left flex items-center gap-1.5">
+                <i data-lucide="monitor" class="w-3.5 h-3.5"></i> 宽屏桌面
+              </button>
+              <button onclick="setDemoViewport('NARROW')" id="btn-vp-narrow" class="p-1.5 rounded border border-[var(--hair-strong)] hover:bg-black/5 text-[var(--ink-secondary)] font-medium text-left flex items-center gap-1.5">
+                <i data-lucide="smartphone" class="w-3.5 h-3.5"></i> 窄屏移动
+              </button>
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="text-[11px] text-[var(--ink-muted)] font-medium">六大核心测试场景（一键直达）</div>
+            <div class="space-y-1">
+              <button onclick="runScenario(1)" class="w-full text-left p-1.5 hover:bg-blue-50 hover:text-blue-600 rounded transition-colors flex items-center justify-between group">
+                <span>1. 正交态 (已处理+待复核) & Diff 对比</span>
+                <i data-lucide="arrow-right" class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+              </button>
+              <button onclick="runScenario(2)" class="w-full text-left p-1.5 hover:bg-blue-50 hover:text-blue-600 rounded transition-colors flex items-center justify-between group">
+                <span>2. 全宽属性表格 & Craft 详情滑出页</span>
+                <i data-lucide="arrow-right" class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+              </button>
+              <button onclick="runScenario(3)" class="w-full text-left p-1.5 hover:bg-blue-50 hover:text-blue-600 rounded transition-colors flex items-center justify-between group">
+                <span>3. 批量分诊胶囊 (已选 2 条+)</span>
+                <i data-lucide="arrow-right" class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+              </button>
+              <button onclick="runScenario(4)" class="w-full text-left p-1.5 hover:bg-blue-50 hover:text-blue-600 rounded transition-colors flex items-center justify-between group">
+                <span>4. 来源撤权脱敏保护 (安全遮蔽)</span>
+                <i data-lucide="arrow-right" class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+              </button>
+              <button onclick="runScenario(5)" class="w-full text-left p-1.5 hover:bg-blue-50 hover:text-blue-600 rounded transition-colors flex items-center justify-between group">
+                <span>5. 历史版本 v1 只读保护 (禁用修订)</span>
+                <i data-lucide="arrow-right" class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+              </button>
+              <button onclick="runScenario(6)" class="w-full text-left p-1.5 hover:bg-blue-50 hover:text-blue-600 rounded transition-colors flex items-center justify-between group">
+                <span>6. 模拟并发写入冲突 (rowRevision 过期)</span>
+                <i data-lucide="arrow-right" class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ==================== MAIN WORKSPACE SHELL ==================== -->
+  <div id="app-shell" class="flex-1 flex overflow-hidden">
+
+    <!-- ==================== 2. TRANSLUCENT SIDEBAR (206px) ==================== -->
+    <aside id="sidebar" class="w-[206px] mac-vibrancy border-r border-[var(--hair-strong)] flex flex-col shrink-0 transition-all duration-200 z-20">
+
+      <div class="p-2 space-y-4 flex-1 overflow-y-auto">
+        <!-- Section 1: Scopes -->
+        <div class="space-y-0.5">
+          <div class="px-2 py-1 text-[10px] font-semibold text-[var(--ink-muted)] tracking-wider uppercase">洞察集合</div>
+          <button onclick="setScope('ALL')" id="sb-scope-ALL" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between is-active">
+            <div class="flex items-center gap-2">
+              <div class="sb-ico bg-blue-100 text-blue-600"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i></div>
+              <span>全部洞察</span>
+            </div>
+            <span id="sb-cnt-all" class="font-mono-tech text-[11px] opacity-70">6</span>
+          </button>
+          <button onclick="setScope('NEED_REVIEW')" id="sb-scope-NEED_REVIEW" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <div class="sb-ico bg-amber-100 text-amber-700"><i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i></div>
+              <span>待复核</span>
+            </div>
+            <span id="sb-cnt-review" class="font-mono-tech text-[10px] px-1.5 py-0.2 bg-amber-500 text-white font-semibold rounded-full">2</span>
+          </button>
+          <button onclick="setScope('STARRED')" id="sb-scope-STARRED" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <div class="sb-ico bg-amber-50 text-amber-500"><i data-lucide="star" class="w-3.5 h-3.5"></i></div>
+              <span>星标发现</span>
+            </div>
+            <span id="sb-cnt-starred" class="font-mono-tech text-[11px] opacity-70">2</span>
+          </button>
+        </div>
+
+        <div class="h-px bg-[var(--hair)] mx-1"></div>
+
+        <!-- Section 2: Perspectives -->
+        <div class="space-y-0.5">
+          <div class="px-2 py-1 text-[10px] font-semibold text-[var(--ink-muted)] tracking-wider uppercase">发现视角</div>
+          <button onclick="setPerspective('ALL')" id="sb-pers-ALL" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <i data-lucide="layers" class="w-3.5 h-3.5 text-[var(--ink-muted)]"></i>
+              <span>全部视角</span>
+            </div>
+          </button>
+          <button onclick="setPerspective('WORK')" id="sb-pers-WORK" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <i data-lucide="briefcase" class="w-3.5 h-3.5 text-blue-600"></i>
+              <span>知识与工作</span>
+            </div>
+          </button>
+          <button onclick="setPerspective('LIFE')" id="sb-pers-LIFE" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <i data-lucide="smile" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>生活与进展</span>
+            </div>
+          </button>
+          <button onclick="setPerspective('DECISION')" id="sb-pers-DECISION" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <i data-lucide="git-commit" class="w-3.5 h-3.5 text-purple-600"></i>
+              <span>决定与变化</span>
+            </div>
+          </button>
+        </div>
+
+        <div class="h-px bg-[var(--hair)] mx-1"></div>
+
+        <!-- Section 3: Workspace Modules -->
+        <div class="space-y-0.5">
+          <div class="px-2 py-1 text-[10px] font-semibold text-[var(--ink-muted)] tracking-wider uppercase">工作区模块</div>
+          <button onclick="switchModule('CHECKING')" id="sb-mod-CHECKING" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <i data-lucide="inbox" class="w-3.5 h-3.5 text-indigo-600"></i>
+              <span>核对台</span>
+            </div>
+            <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+          </button>
+          <button onclick="switchModule('REVIEW')" id="sb-mod-REVIEW" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <i data-lucide="calendar" class="w-3.5 h-3.5 text-teal-600"></i>
+              <span>阶段回顾</span>
+            </div>
+          </button>
+          <button onclick="switchModule('TOPICS')" id="sb-mod-TOPICS" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <i data-lucide="bookmark" class="w-3.5 h-3.5 text-amber-600"></i>
+              <span>关注主题</span>
+            </div>
+          </button>
+          <button onclick="switchModule('AUDIT')" id="sb-mod-AUDIT" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <i data-lucide="history" class="w-3.5 h-3.5 text-gray-600"></i>
+              <span>处理记录</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="p-2 border-t border-[var(--hair)] space-y-1 text-xs">
+        <button onclick="triggerRecheck()" class="w-full px-2 py-1.5 hover:bg-black/5 rounded text-[var(--ink-secondary)] flex items-center justify-between transition-colors">
+          <span class="flex items-center gap-1.5"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> 重聚焦校验</span>
+          <span class="text-[10px] font-mono-tech opacity-60">F5</span>
+        </button>
+        <button onclick="openShortcutsModal()" class="w-full px-2 py-1.5 hover:bg-black/5 rounded text-[var(--ink-secondary)] flex items-center justify-between transition-colors">
+          <span class="flex items-center gap-1.5"><i data-lucide="help-circle" class="w-3.5 h-3.5"></i> 快捷键说明</span>
+          <span class="text-[10px] font-mono-tech opacity-60">?</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ==================== MAIN WORKSPACE CONTENT ==================== -->
+    <main class="flex-1 flex overflow-hidden relative p-2 sm:p-3 gap-0">
+
+      <!-- ==================== PRIMARY VIEW: BROWSE & DETAIL (STREAM OR TABLE) ==================== -->
+      <div id="module-INSIGHTS" class="flex-1 flex w-full h-full overflow-hidden relative gap-0">
+
+        <!-- PAPER A: BROWSE / LIST CONTAINER -->
+        <div id="paper-a" class="craft-paper flex flex-col shrink-0 h-full overflow-hidden transition-all duration-75 relative z-10" style="width: 360px;">
+
+          <!-- Animated Sweep Bar at top of Paper A -->
+          <div id="paper-a-sweep" class="sweep-bar hidden"></div>
+
+          <!-- Paper A Header (44px) -->
+          <div class="h-[44px] px-3 border-b border-[var(--hair)] flex items-center justify-between shrink-0 bg-white/80 backdrop-blur-sm">
+            <div class="flex items-center gap-1.5">
+              <!-- View Switcher -->
+              <div class="mac-groove flex items-center gap-0.5">
+                <button onclick="setLayoutView('STREAM')" id="btn-layout-stream" class="mac-seg-active p-1 rounded transition-all" title="精简流式分屏">
+                  <i data-lucide="align-left" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="setLayoutView('TABLE')" id="btn-layout-table" class="p-1 rounded text-[var(--ink-secondary)] hover:text-[var(--ink)] transition-all" title="全宽属性表格">
+                  <i data-lucide="table-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+
+              <!-- Scope Title Indicator -->
+              <span id="txt-current-scope" class="font-medium text-xs text-[var(--ink)] ml-1">全部洞察</span>
+            </div>
+
+            <!-- Filter & Sort Popover Buttons -->
+            <div class="flex items-center gap-1 text-xs">
+              <button onclick="toggleFilterPopover()" class="px-2 py-1 hover:bg-black/5 rounded text-[var(--ink-secondary)] flex items-center gap-1 border border-transparent hover:border-[var(--hair)] transition-all">
+                <i data-lucide="filter" class="w-3 h-3"></i>
+                <span>筛选</span>
+              </button>
+
+              <button onclick="toggleSortPopover()" class="px-2 py-1 hover:bg-black/5 rounded text-[var(--ink-secondary)] flex items-center gap-1 border border-transparent hover:border-[var(--hair)] transition-all">
+                <i data-lucide="arrow-up-down" class="w-3 h-3"></i>
+                <span id="txt-sort-label">更新时间</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Filter Bar Indicator if active -->
+          <div id="filter-indicator-bar" class="hidden px-3 py-1 bg-blue-50 border-b border-blue-100 text-[11px] text-blue-700 flex items-center justify-between">
+            <span id="filter-indicator-text">筛选: 近7天 · 已核对</span>
+            <button onclick="resetFilters()" class="hover:underline text-[10px]">清除</button>
+          </div>
+
+          <!-- STREAM VIEW CONTAINER -->
+          <div id="stream-container" class="flex-1 overflow-y-auto stream-well p-2 space-y-2">
+            <!-- Dynamic stream cards inserted here -->
+          </div>
+
+          <!-- TABLE VIEW CONTAINER (Hidden by default) -->
+          <div id="table-container" class="hidden flex-1 overflow-auto bg-white">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="sticky top-0 bg-[var(--paper-well)] border-b border-[var(--hair-strong)] text-[var(--ink-muted)] font-medium z-10">
+                <tr>
+                  <th class="w-9 p-2 text-center">
+                    <input type="checkbox" onchange="toggleSelectAll(this.checked)" class="hub-chk">
+                  </th>
+                  <th class="p-2 w-20">处理状态</th>
+                  <th class="p-2">洞察结论与主要标签</th>
+                  <th class="p-2 w-28">依据状态</th>
+                  <th class="p-2 w-24">视角</th>
+                  <th class="p-2 w-16">版本</th>
+                  <th class="p-2 w-28">原事项</th>
+                  <th class="p-2 w-24 text-right pr-3">更新时间</th>
+                </tr>
+              </thead>
+              <tbody id="table-tbody" class="divide-y divide-[var(--hair)]">
+                <!-- Dynamic table rows inserted here -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Paper A Footer: Counters & Load More -->
+          <div class="p-2 border-t border-[var(--hair)] flex items-center justify-between text-[11px] text-[var(--ink-muted)] bg-white">
+            <span id="txt-filtered-count" class="font-mono-tech">命中 6 / 总计 6 条</span>
+            <button onclick="loadMoreInsights()" id="btn-load-more" class="px-2 py-0.5 hover:bg-black/5 rounded text-blue-600 font-medium transition-colors">
+              加载更多 (当前 6 / 12)
+            </button>
+          </div>
+        </div>
+
+        <!-- SPLIT RESIZE GUTTER -->
+        <div id="split-gutter" class="paper-gutter" title="拖拽调整宽度，双击复位 360px"></div>
+
+        <!-- PAPER B: DETAIL CONTAINER (CLAUDE PAPER) -->
+        <div id="paper-b" class="claude-paper flex-1 flex flex-col h-full overflow-hidden relative">
+
+          <!-- Paper B Top Toolbar (44px) -->
+          <div class="h-[44px] px-4 border-b border-[var(--hair)] flex items-center justify-between shrink-0 bg-transparent">
+            <!-- Left: Breadcrumb / Work ID / Close Sheet (Table Mode) -->
+            <div class="flex items-center gap-2">
+              <button id="btn-close-sheet" onclick="closeSheetInTableMode()" class="hidden px-2 py-1 bg-black/5 hover:bg-black/10 rounded text-xs text-[var(--ink)] font-medium transition-colors flex items-center gap-1">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                <span>收起详情</span>
+              </button>
+              <span id="detail-work-id" class="text-xs font-mono-tech bg-black/5 px-2 py-0.5 rounded text-[var(--ink-secondary)]">Work #W-2026-1102</span>
+              <span id="detail-date" class="text-xs text-[var(--ink-muted)]">2026-11-20 14:32</span>
+            </div>
+
+            <!-- Right: Keyboard Prev/Next & 3 Mutually Exclusive Drawer Toggles -->
+            <div class="flex items-center gap-1">
+              <div class="flex items-center border-r border-[var(--hair)] pr-1.5 mr-1.5">
+                <button onclick="navigateInsight(-1)" class="p-1 hover:bg-black/5 rounded text-[var(--ink-secondary)]" title="上一条 (K)">
+                  <i data-lucide="chevron-up" class="w-4 h-4"></i>
+                </button>
+                <button onclick="navigateInsight(1)" class="p-1 hover:bg-black/5 rounded text-[var(--ink-secondary)]" title="下一条 (J)">
+                  <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                </button>
+              </div>
+
+              <!-- Drawer Toggles -->
+              <button onclick="toggleDrawer('QUOTE')" id="btn-drawer-QUOTE" class="p-1.5 hover:bg-black/5 rounded text-[var(--ink-secondary)] transition-colors relative" title="原文引文核对">
+                <i data-lucide="file-search" class="w-4 h-4"></i>
+              </button>
+
+              <button onclick="toggleDrawer('INSPECTOR')" id="btn-drawer-INSPECTOR" class="p-1.5 hover:bg-black/5 rounded text-[var(--ink-secondary)] transition-colors relative" title="版本与溯源检验 (Inspector)">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+              </button>
+
+              <button onclick="toggleDrawer('ASSISTANT')" id="btn-drawer-ASSISTANT" class="p-1.5 hover:bg-black/5 rounded text-[var(--ink-secondary)] transition-colors relative" title="原事项助手">
+                <i data-lucide="sparkles" class="w-4 h-4 text-purple-600"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- READ-ONLY HISTORY WARNING BANNER (Shows when viewing v1) -->
+          <div id="banner-readonly-history" class="hidden px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-800 text-xs flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i data-lucide="info" class="w-4 h-4 text-amber-600 shrink-0"></i>
+              <span>正在查看历史版本 <strong font-mono-tech>v1</strong> · 反馈与修订仅对当前版本 <strong font-mono-tech>v2</strong> 开放</span>
+            </div>
+            <button onclick="switchRevision('v2')" class="px-2 py-0.5 bg-amber-200 hover:bg-amber-300 rounded text-[11px] font-medium transition-colors">
+              切换至当前 v2
+            </button>
+          </div>
+
+          <!-- STRICT SECURITY MASKING BANNER (Shows for INS-05) -->
+          <div id="banner-security-masked" class="hidden px-4 py-3 bg-red-50 border-b border-red-200 text-red-700 text-xs flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-red-600 shrink-0"></i>
+              <span>原笔记权限已撤回或来源停用，受限正文、引文与历史已隐藏</span>
+            </div>
+            <button onclick="recheckPermission()" class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-medium transition-colors">
+              重新校验权限
+            </button>
+          </div>
+
+          <!-- Paper B Main Scrollable Canvas -->
+          <div class="flex-1 overflow-y-auto p-6 sm:p-10 relative">
+
+            <div class="max-w-[62ch] mx-auto space-y-6">
+
+              <!-- Title & Header Block -->
+              <div class="space-y-3">
+                <h1 id="detail-title" class="text-xl sm:text-2xl font-bold tracking-tight text-[var(--ink)] leading-snug">
+                  图纸字段在纸面已经核对，仍缺实机台架验证
+                </h1>
+
+                <!-- Notion-style Low-Noise Inline Metadata Subtraction Strip -->
+                <div class="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-[var(--ink-secondary)]">
+                  <!-- Processing Status Dropdown -->
+                  <div class="relative">
+                    <button onclick="toggleStatusPopover()" id="btn-inline-status" class="inline-ghost font-medium flex items-center gap-1">
+                      <span id="dot-inline-status" class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      <span id="txt-inline-status">已处理</span>
+                      <i data-lucide="chevron-down" class="w-3 h-3 text-[var(--ink-muted)]"></i>
+                    </button>
+                  </div>
+
+                  <span class="text-[var(--hair-strong)]">•</span>
+
+                  <!-- Perspective Dropdown -->
+                  <div class="relative">
+                    <button onclick="togglePerspectivePopover()" id="btn-inline-pers" class="inline-ghost flex items-center gap-1">
+                      <i data-lucide="briefcase" class="w-3 h-3 text-blue-600"></i>
+                      <span id="txt-inline-pers">知识与工作</span>
+                    </button>
+                  </div>
+
+                  <span class="text-[var(--hair-strong)]">•</span>
+
+                  <!-- Revision Dropdown -->
+                  <div class="relative">
+                    <button onclick="toggleRevisionPopover()" id="btn-inline-rev" class="inline-ghost font-mono-tech flex items-center gap-1">
+                      <span id="txt-inline-rev">v2 (当前)</span>
+                      <i data-lucide="history" class="w-3 h-3 text-[var(--ink-muted)]"></i>
+                    </button>
+                  </div>
+
+                  <span class="text-[var(--hair-strong)]">•</span>
+
+                  <!-- Star Toggle -->
+                  <button onclick="toggleStarCurrent()" id="btn-inline-star" class="inline-ghost hover:text-amber-500 flex items-center gap-1">
+                    <i data-lucide="star" id="ico-inline-star" class="w-3.5 h-3.5"></i>
+                    <span id="txt-inline-star">星标</span>
+                  </button>
+
+                  <!-- Follow/Bell Toggle -->
+                  <button onclick="toggleFollowCurrent()" id="btn-inline-follow" class="inline-ghost hover:text-blue-500 flex items-center gap-1">
+                    <i data-lucide="bell" id="ico-inline-follow" class="w-3.5 h-3.5"></i>
+                    <span id="txt-inline-follow">关注</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="h-px bg-[var(--hair)]"></div>
+
+              <!-- ORTHOGONAL CODEX ALERT STRIP (If Pending Review) -->
+              <div id="codex-review-strip" class="p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-xl space-y-3">
+                <div class="flex items-start justify-between">
+                  <div class="flex items-center gap-2">
+                    <div class="p-1 bg-amber-500 text-white rounded">
+                      <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                      <div class="font-semibold text-amber-900 text-xs">依据存在变动 · 待复核</div>
+                      <div class="text-[11px] text-amber-700">关联的本地笔记《实机台架202611.md》已被修改。</div>
+                    </div>
+                  </div>
+                  <button onclick="toggleDrawer('QUOTE')" class="px-2 py-1 bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 rounded text-xs font-medium transition-colors flex items-center gap-1">
+                    <i data-lucide="file-diff" class="w-3.5 h-3.5"></i> 查看 Diff 对比
+                  </button>
+                </div>
+
+                <!-- Two Branch Revision Form -->
+                <div class="pt-2 border-t border-amber-200/60 flex flex-wrap gap-2">
+                  <button onclick="resolveReview('MAINTAIN')" class="px-3 py-1.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-medium shadow-sm transition-all flex items-center gap-1">
+                    <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600"></i>
+                    <span>维持原判断并留记录</span>
+                  </button>
+
+                  <button onclick="resolveReview('UPGRADE')" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-medium shadow-sm transition-all flex items-center gap-1">
+                    <i data-lucide="git-commit" class="w-3.5 h-3.5"></i>
+                    <span>采用新修订 (升级至 v3)</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Main Insight Prose Content -->
+              <div id="detail-prose-body" class="claude-prose space-y-4">
+                <p>根据《工程交付图纸规范 v2.4》及 11 月 02 日现场盘点记录，各控制柜接线图纸中的编码规则已完成全量比对，符号与端子号符合 2026 工业桌面标准。</p>
+                <p>但需要注意的是，目前核对仅停留在<strong>纸面与静态 CAD 规则层面</strong>。对于高频震动及极端工况下的物理接线稳定性，仍缺少台架实测数据的直接印证。</p>
+              </div>
+
+              <!-- Key Quotes & Evidences Accordion Card -->
+              <div class="p-4 bg-white border border-[var(--hair-strong)] rounded-xl space-y-2 shadow-sm">
+                <div class="text-xs font-semibold text-[var(--ink-secondary)] flex items-center justify-between">
+                  <span class="flex items-center gap-1.5">
+                    <i data-lucide="quote" class="w-3.5 h-3.5 text-blue-600"></i>
+                    <span>核心依据与段落引文 (Line 42-45)</span>
+                  </span>
+                  <button onclick="toggleDrawer('QUOTE')" class="text-blue-600 hover:underline text-[11px]">在原文打开</button>
+                </div>
+                <blockquote id="detail-quote-box" class="text-xs text-[var(--ink-body)] italic bg-[var(--paper-well)] p-2.5 rounded-lg border-l-2 border-blue-500 font-sans">
+                  "图纸比对无误，已归档。台架测试预定于下个周期补充，目前无实机数据。"
+                </blockquote>
+              </div>
+
+              <!-- Feedback / Correction Form (Disabled if v1 or security masked) -->
+              <div id="section-feedback" class="pt-4 border-t border-[var(--hair)] space-y-3">
+                <div class="text-xs font-semibold text-[var(--ink)] flex items-center justify-between">
+                  <span>纠正与补充反馈</span>
+                  <span class="text-[10px] text-[var(--ink-muted)]">仅针对当前版本生效</span>
+                </div>
+                <div class="flex gap-2">
+                  <input type="text" id="ipt-feedback" placeholder="补充你的最新发现或纠正依据..."
+                         class="flex-1 px-3 py-1.5 text-xs bg-white border border-[var(--hair-strong)] rounded-lg focus:ring-1 focus:ring-blue-500 outline-none">
+                  <button onclick="submitFeedback()" class="px-3 py-1.5 bg-neutral-900 hover:bg-black text-white text-xs font-medium rounded-lg transition-colors">
+                    提交反馈
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+          <!-- THREE MUTUALLY EXCLUSIVE SLIDE-OVER DRAWERS -->
+
+          <!-- Drawer 1: 原文引文核对 (QUOTE) -->
+          <div id="drawer-QUOTE" class="hidden absolute top-[44px] right-0 bottom-0 w-full sm:w-[376px] bg-white border-l border-[var(--hair-strong)] shadow-[var(--shadow-sheet)] flex flex-col z-20">
+            <div class="h-10 px-3 border-b border-[var(--hair)] flex items-center justify-between bg-[var(--paper-well)]">
+              <div class="flex items-center gap-1.5 font-semibold text-xs text-[var(--ink)]">
+                <i data-lucide="file-search" class="w-4 h-4 text-blue-600"></i>
+                <span>原文引文核对</span>
+              </div>
+              <button onclick="closeDrawers()" class="p-1 hover:bg-black/5 rounded"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+              <div class="p-2.5 bg-blue-50 text-blue-900 rounded-lg space-y-1">
+                <div class="font-medium text-[11px] uppercase tracking-wider">关联来源笔记</div>
+                <div class="font-bold">《实机台架202611.md》</div>
+                <div class="text-[10px] text-blue-700 font-mono-tech">Craft Local Vault / Works / Hardware</div>
+              </div>
+
+              <!-- Diff Highlight Block (If Pending Review) -->
+              <div id="drawer-diff-block" class="p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-2">
+                <div class="font-semibold text-amber-900 text-[11px] flex items-center gap-1">
+                  <i data-lucide="file-diff" class="w-3.5 h-3.5"></i>
+                  <span>原文 Diff 高亮对比 (3秒判断)</span>
+                </div>
+                <div class="space-y-1 font-mono-tech text-[11px] p-2 bg-white rounded border border-amber-100">
+                  <div class="text-red-600 line-through bg-red-50 p-1 rounded">- "图纸比对无误，已归档。台架测试预定于下个周期补充，目前无实机数据。"</div>
+                  <div class="text-emerald-700 bg-emerald-50 p-1 rounded">+ "台架测试已于11-21完成首轮振动试验，发现接线端子在 40Hz 发生微幅偏移。"</div>
+                </div>
+              </div>
+
+              <!-- Full Source Note Preview -->
+              <div class="space-y-2">
+                <div class="text-[11px] font-medium text-[var(--ink-muted)]">笔记正文片段 (包含行号)</div>
+                <div class="p-3 bg-[var(--paper-well)] rounded-lg font-mono-tech text-[11px] leading-relaxed space-y-1.5 text-[var(--ink-body)] border border-[var(--hair)]">
+                  <div><span class="text-[var(--ink-muted)] mr-3">39</span># 硬件与图纸复核记录</div>
+                  <div><span class="text-[var(--ink-muted)] mr-3">40</span>- 参与人: Alex, Chen</div>
+                  <div><span class="text-[var(--ink-muted)] mr-3">41</span>- 时间: 2026-11-02</div>
+                  <div class="bg-yellow-100/80 p-1 rounded border-l-2 border-yellow-500 font-sans font-medium text-amber-950">
+                    <span class="text-[var(--ink-muted)] font-mono-tech mr-3">42</span>"图纸比对无误，已归档。台架测试预定于下个周期补充，目前无实机数据。"
+                  </div>
+                  <div><span class="text-[var(--ink-muted)] mr-3">43</span>- 关键接线端子: T-01 到 T-48 全量校验通过</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Drawer 2: 版本与溯源检验 (INSPECTOR) -->
+          <div id="drawer-INSPECTOR" class="hidden absolute top-[44px] right-0 bottom-0 w-full sm:w-[376px] bg-white border-l border-[var(--hair-strong)] shadow-[var(--shadow-sheet)] flex flex-col z-20">
+            <div class="h-10 px-3 border-b border-[var(--hair)] flex items-center justify-between bg-[var(--paper-well)]">
+              <div class="flex items-center gap-1.5 font-semibold text-xs text-[var(--ink)]">
+                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
+                <span>Codex 真实性检验 (Inspector)</span>
+              </div>
+              <button onclick="closeDrawers()" class="p-1 hover:bg-black/5 rounded"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+              <!-- 4 Hairline Truth Rows -->
+              <div class="space-y-2 border border-[var(--hair-strong)] rounded-lg p-3 bg-white">
+                <div class="flex items-center justify-between py-1 border-b border-[var(--hair)]">
+                  <span class="text-[var(--ink-muted)]">出处锁定</span>
+                  <span class="font-mono-tech text-[var(--ink)] font-medium">Work/Delivery/Pos#42</span>
+                </div>
+                <div class="flex items-center justify-between py-1 border-b border-[var(--hair)]">
+                  <span class="text-[var(--ink-muted)]">引文与方法校验</span>
+                  <span class="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-medium">100% 精确匹配</span>
+                </div>
+                <div class="flex items-center justify-between py-1 border-b border-[var(--hair)]">
+                  <span class="text-[var(--ink-muted)]">版本三元组</span>
+                  <span class="font-mono-tech text-[10px] text-gray-700">h:v2 | c:v2 | r:rev_9901</span>
+                </div>
+                <div class="flex items-center justify-between py-1">
+                  <span class="text-[var(--ink-muted)]">依赖来源状态</span>
+                  <span class="text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded font-medium">Obsidian Vault (可用)</span>
+                </div>
+              </div>
+
+              <!-- Concurrency Conflict Test Button -->
+              <div class="p-3 bg-gray-50 rounded-lg space-y-2 border border-gray-200">
+                <div class="font-semibold text-gray-800 text-[11px]">并发写入与冲突控制测试</div>
+                <p class="text-[11px] text-gray-600">点击下方可模拟后台 `rowRevision` 被他人修改时的冲突拦截。</p>
+                <button onclick="triggerConflictSimulation()" class="w-full py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded font-medium transition-colors flex items-center justify-center gap-1">
+                  <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                  <span>模拟并发写入冲突 (rowRevision)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Drawer 3: 原事项助手 (ASSISTANT) -->
+          <div id="drawer-ASSISTANT" class="hidden absolute top-[44px] right-0 bottom-0 w-full sm:w-[376px] bg-white border-l border-[var(--hair-strong)] shadow-[var(--shadow-sheet)] flex flex-col z-20">
+            <div class="h-10 px-3 border-b border-[var(--hair)] flex items-center justify-between bg-purple-50">
+              <div class="flex items-center gap-1.5 font-semibold text-xs text-purple-900">
+                <i data-lucide="sparkles" class="w-4 h-4 text-purple-600"></i>
+                <span>原事项 Copilot 助手</span>
+              </div>
+              <button onclick="closeDrawers()" class="p-1 hover:bg-black/5 rounded"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+              <div class="p-3 bg-purple-50/50 border border-purple-100 rounded-lg space-y-1">
+                <div class="text-[10px] text-purple-600 font-mono-tech">Bound to Work #W-2026-1102</div>
+                <div class="font-semibold text-purple-950">硬件图纸与实机台架核对任务</div>
+              </div>
+
+              <div class="space-y-2">
+                <div class="text-[11px] font-medium text-[var(--ink-muted)]">快捷处理指令</div>
+                <div class="flex flex-wrap gap-1.5">
+                  <button onclick="sendAssistantChip('按补充继续核对')" class="px-2 py-1 bg-gray-100 hover:bg-purple-100 hover:text-purple-700 rounded text-[11px] transition-colors">按补充继续核对</button>
+                  <button onclick="sendAssistantChip('加新资料复核')" class="px-2 py-1 bg-gray-100 hover:bg-purple-100 hover:text-purple-700 rounded text-[11px] transition-colors">加新资料复核</button>
+                  <button onclick="sendAssistantChip('导出为简报')" class="px-2 py-1 bg-gray-100 hover:bg-purple-100 hover:text-purple-700 rounded text-[11px] transition-colors">导出为简报</button>
+                </div>
+              </div>
+
+              <!-- Message Stream -->
+              <div id="assistant-chat-stream" class="space-y-3 pt-2 border-t border-[var(--hair)]">
+                <div class="p-2.5 bg-gray-50 rounded-lg text-[11px] text-gray-700 leading-relaxed">
+                  👋 我已锁定当前原事项。你可以直接提问，或要求我根据最新补充资料重新对齐图纸结论。
+                </div>
+              </div>
+            </div>
+
+            <!-- Composer -->
+            <div class="p-2 border-t border-[var(--hair)] bg-white flex gap-1.5">
+              <input type="text" id="ipt-assistant" placeholder="向 Copilot 发送指令..." class="flex-1 px-2.5 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-md outline-none focus:bg-white focus:ring-1 focus:ring-purple-500">
+              <button onclick="sendAssistantMsg()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded-md transition-colors">发送</button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- ==================== SIDEBAR MODULE PANELS (Full-Width Overlays) ==================== -->
+
+      <!-- Module 1: 核对台 (CHECKING) -->
+      <div id="module-CHECKING" class="hidden flex-1 craft-paper p-6 overflow-y-auto space-y-6 bg-white">
+        <div class="flex items-center justify-between border-b border-[var(--hair)] pb-4">
+          <div>
+            <h2 class="text-lg font-bold text-[var(--ink)] flex items-center gap-2">
+              <i data-lucide="inbox" class="w-5 h-5 text-indigo-600"></i>
+              <span>发现核对台 (Candidate Inbox)</span>
+            </h2>
+            <p class="text-xs text-[var(--ink-muted)]">模型新提炼的候选洞察，需人工确认后正式留存入库</p>
+          </div>
+          <span class="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-mono-tech font-semibold">2 待核对</span>
+        </div>
+
+        <div class="space-y-4 max-w-4xl">
+          <!-- Candidate Item 1 (Verified Ready) -->
+          <div class="p-4 border border-indigo-200 bg-indigo-50/30 rounded-xl space-y-3">
+            <div class="flex items-start justify-between">
+              <div>
+                <span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-medium">依据校验通过</span>
+                <h3 class="font-bold text-sm text-[var(--ink)] mt-1">智能终端在低电量模式下的心跳休眠间隔为 300s</h3>
+              </div>
+              <button onclick="acceptCandidate(1)" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i> 保留这条发现
+              </button>
+            </div>
+            <p class="text-xs text-[var(--ink-body)]">引文出处：《终端电源管理协议.md》Line 88。经过与硬件日志对照，此结论完全符合事实。</p>
+          </div>
+
+          <!-- Candidate Item 2 (Rejected) -->
+          <div class="p-4 border border-[var(--hair-strong)] bg-white rounded-xl space-y-3">
+            <div class="flex items-start justify-between">
+              <div>
+                <span class="text-[10px] bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-medium">引文未在原文命中</span>
+                <h3 class="font-bold text-sm text-[var(--ink)] mt-1">旧接口兼容层将在 2026Q4 彻底废弃</h3>
+              </div>
+              <button onclick="rejectCandidate(2)" class="px-3 py-1.5 bg-gray-100 hover:bg-red-50 hover:text-red-600 rounded-lg text-xs font-medium transition-colors">
+                拒绝并丢弃
+              </button>
+            </div>
+            <p class="text-xs text-[var(--ink-muted)]">未能在任何关联笔记中查找到“彻底废弃”的明确日期说明。</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Module 2: 阶段回顾 (REVIEW) -->
+      <div id="module-REVIEW" class="hidden flex-1 craft-paper p-6 overflow-y-auto space-y-6 bg-white">
+        <div class="flex items-center justify-between border-b border-[var(--hair)] pb-4">
+          <div>
+            <h2 class="text-lg font-bold text-[var(--ink)] flex items-center gap-2">
+              <i data-lucide="calendar" class="w-5 h-5 text-teal-600"></i>
+              <span>阶段回顾与统计 (Period Review)</span>
+            </h2>
+            <p class="text-xs text-[var(--ink-muted)]">严格区分「资料不足」与「确定为零」的精细核算</p>
+          </div>
+          <div class="flex gap-2">
+            <button class="px-2.5 py-1 bg-gray-100 text-xs rounded-md">直接提问</button>
+            <button class="px-2.5 py-1 bg-teal-600 text-white text-xs rounded-md font-medium">本月回顾</button>
+            <button class="px-2.5 py-1 bg-gray-100 text-xs rounded-md">对比去年同期</button>
+          </div>
+        </div>
+
+        <div class="max-w-4xl space-y-4">
+          <table class="w-full text-left text-xs border border-[var(--hair-strong)] rounded-lg overflow-hidden">
+            <thead class="bg-gray-50 border-b border-[var(--hair)] text-[var(--ink-muted)]">
+              <tr>
+                <th class="p-3">统计维度</th>
+                <th class="p-3">本期发现数</th>
+                <th class="p-3">依据完整度</th>
+                <th class="p-3">统计口径说明</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--hair)]">
+              <tr>
+                <td class="p-3 font-medium">硬件图纸与交付</td>
+                <td class="p-3 font-mono-tech">4 条</td>
+                <td class="p-3 text-emerald-700 font-medium">100% 完整</td>
+                <td class="p-3 text-[var(--ink-muted)]">确定无未归档争议</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-medium">第三方服务预算</td>
+                <td class="p-3 font-mono-tech text-amber-700">0 元 (资料不足)</td>
+                <td class="p-3 text-amber-700 font-medium">尚缺 2 份账单</td>
+                <td class="p-3 text-[var(--ink-muted)]">注意: 并非确定为零，属资料不全</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Module 3: 关注主题 (TOPICS) -->
+      <div id="module-TOPICS" class="hidden flex-1 craft-paper p-6 overflow-y-auto space-y-6 bg-white">
+        <div class="flex items-center justify-between border-b border-[var(--hair)] pb-4">
+          <div>
+            <h2 class="text-lg font-bold text-[var(--ink)] flex items-center gap-2">
+              <i data-lucide="bookmark" class="w-5 h-5 text-amber-600"></i>
+              <span>长效关注主题 (Monitored Topics)</span>
+            </h2>
+            <p class="text-xs text-[var(--ink-muted)]">后台定时轮询新笔记，发现关联证据时即刻提醒</p>
+          </div>
+          <button class="px-3 py-1.5 bg-neutral-900 text-white rounded-lg text-xs font-medium">新建主题</button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
+          <div class="p-4 border border-[var(--hair-strong)] rounded-xl space-y-2 relative bg-white">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-sm text-[var(--ink)]">SQLite FTS5 性能与内存</span>
+              <span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-mono-tech">监控中</span>
+            </div>
+            <p class="text-xs text-[var(--ink-muted)]">最多 7 天 · 剩余 2/3 轮校验</p>
+            <div class="pt-2 border-t border-[var(--hair)] flex justify-between text-xs">
+              <span class="text-[var(--ink-secondary)]">累计命中: 3 条洞察</span>
+              <button class="text-blue-600 hover:underline">暂停监控</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Module 4: 处理记录 (AUDIT LOG) -->
+      <div id="module-AUDIT" class="hidden flex-1 craft-paper p-6 overflow-y-auto space-y-6 bg-white">
+        <div class="flex items-center justify-between border-b border-[var(--hair)] pb-4">
+          <div>
+            <h2 class="text-lg font-bold text-[var(--ink)] flex items-center gap-2">
+              <i data-lucide="history" class="w-5 h-5 text-gray-600"></i>
+              <span>全量处理记录 (Audit Timeline)</span>
+            </h2>
+            <p class="text-xs text-[var(--ink-muted)]">实时记录你在工作区内完成的每次分诊、修订与状态变更</p>
+          </div>
+          <button onclick="clearAuditLogs()" class="text-xs text-[var(--ink-muted)] hover:text-red-600">清空记录</button>
+        </div>
+
+        <div id="audit-log-stream" class="space-y-3 max-w-3xl font-mono-tech text-xs">
+          <!-- Dynamic logs appended here -->
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- ==================== FLOATING BATCH TRIAGE ACTION PILL (batch-pill) ==================== -->
+  <div id="batch-pill" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 mac-vibrancy px-4 py-2 rounded-full shadow-2xl border border-[var(--hair-strong)] flex items-center gap-3 z-50 animate-bounce-short">
+    <span id="batch-pill-count" class="text-xs font-bold text-[var(--ink)]">已选 2 条</span>
+    <div class="h-3 w-px bg-black/15"></div>
+    <div class="flex items-center gap-1 text-xs">
+      <button onclick="applyBatchStatus('DONE')" class="px-2.5 py-1 bg-white hover:bg-gray-50 rounded-full border border-gray-200 text-emerald-700 font-medium transition-colors">
+        标为已处理
+      </button>
+      <button onclick="applyBatchStatus('LATER')" class="px-2.5 py-1 bg-white hover:bg-gray-50 rounded-full border border-gray-200 text-amber-700 font-medium transition-colors">
+        设稍后
+      </button>
+      <button onclick="applyBatchStatus('UNSTAR')" class="px-2.5 py-1 bg-white hover:bg-gray-50 rounded-full border border-gray-200 text-gray-700 font-medium transition-colors">
+        取消关注
+      </button>
+      <button onclick="clearSelection()" class="p-1 hover:bg-black/5 rounded-full text-[var(--ink-muted)]">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== MODALS & POPOVERS ==================== -->
+
+  <!-- Inline Status Popover -->
+  <div id="popover-status" class="hidden absolute top-12 left-10 w-44 bg-white rounded-xl shadow-[var(--shadow-popover)] border border-[var(--hair-strong)] p-1 z-50 text-xs space-y-0.5">
+    <button onclick="setInsightStatus('PENDING')" class="w-full text-left px-2.5 py-1.5 hover:bg-black/5 rounded flex items-center gap-2">
+      <span class="w-2 h-2 rounded-full bg-amber-500"></span> 待关注
+    </button>
+    <button onclick="setInsightStatus('LATER')" class="w-full text-left px-2.5 py-1.5 hover:bg-black/5 rounded flex items-center justify-between">
+      <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-blue-500"></span> 稍后</span>
+      <span class="text-[10px] text-gray-400">选择日期</span>
+    </button>
+    <button onclick="setInsightStatus('DONE')" class="w-full text-left px-2.5 py-1.5 hover:bg-black/5 rounded flex items-center gap-2">
+      <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 已处理
+    </button>
+  </div>
+
+  <!-- Inline Perspective Popover -->
+  <div id="popover-perspective" class="hidden absolute top-12 left-28 w-44 bg-white rounded-xl shadow-[var(--shadow-popover)] border border-[var(--hair-strong)] p-1 z-50 text-xs space-y-0.5">
+    <button onclick="setInsightPerspective('WORK')" class="w-full text-left px-2.5 py-1.5 hover:bg-black/5 rounded flex items-center gap-2">
+      <i data-lucide="briefcase" class="w-3.5 h-3.5 text-blue-600"></i> 知识与工作
+    </button>
+    <button onclick="setInsightPerspective('LIFE')" class="w-full text-left px-2.5 py-1.5 hover:bg-black/5 rounded flex items-center gap-2">
+      <i data-lucide="smile" class="w-3.5 h-3.5 text-emerald-600"></i> 生活与进展
+    </button>
+    <button onclick="setInsightPerspective('DECISION')" class="w-full text-left px-2.5 py-1.5 hover:bg-black/5 rounded flex items-center gap-2">
+      <i data-lucide="git-commit" class="w-3.5 h-3.5 text-purple-600"></i> 决定与变化
+    </button>
+  </div>
+
+  <!-- Inline Revision Popover -->
+  <div id="popover-revision" class="hidden absolute top-12 left-44 w-48 bg-white rounded-xl shadow-[var(--shadow-popover)] border border-[var(--hair-strong)] p-1 z-50 text-xs space-y-0.5">
+    <button onclick="switchRevision('v2')" class="w-full text-left px-2.5 py-1.5 hover:bg-black/5 rounded flex items-center justify-between font-mono-tech">
+      <span>v2 (当前 Head)</span>
+      <span class="text-[10px] bg-emerald-100 text-emerald-800 px-1 rounded">Active</span>
+    </button>
+    <button onclick="switchRevision('v1')" class="w-full text-left px-2.5 py-1.5 hover:bg-black/5 rounded flex items-center justify-between font-mono-tech">
+      <span>v1 (历史只读)</span>
+      <span class="text-[10px] bg-gray-100 text-gray-600 px-1 rounded">ReadOnly</span>
+    </button>
+  </div>
+
+  <!-- Discover Modal (+ 开始发现) -->
+  <div id="modal-discover" class="hidden fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-[var(--shadow-popover)] border border-[var(--hair-strong)] w-full max-w-lg p-5 space-y-4">
+      <div class="flex items-center justify-between border-b border-[var(--hair)] pb-3">
+        <div class="font-bold text-sm text-[var(--ink)] flex items-center gap-2">
+          <i data-lucide="sparkles" class="w-4 h-4 text-blue-600"></i>
+          <span>从本地笔记提炼新洞察</span>
+        </div>
+        <button onclick="closeModals()" class="p-1 hover:bg-black/5 rounded"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <div class="space-y-2 text-xs">
+        <div class="flex justify-between text-[var(--ink-muted)]">
+          <span>选择本地文字笔记范围 (限制 1 - 32 份)</span>
+          <span class="font-mono-tech text-blue-600 font-semibold">已选 3 份</span>
+        </div>
+        <div class="border border-[var(--hair-strong)] rounded-lg p-2 space-y-1 max-h-48 overflow-y-auto">
+          <label class="flex items-center gap-2 p-1.5 hover:bg-black/5 rounded cursor-pointer">
+            <input type="checkbox" checked class="hub-chk">
+            <span>《实机台架202611.md》</span>
+          </label>
+          <label class="flex items-center gap-2 p-1.5 hover:bg-black/5 rounded cursor-pointer">
+            <input type="checkbox" checked class="hub-chk">
+            <span>《FTS5索引优化观察.md》</span>
+          </label>
+          <label class="flex items-center gap-2 p-1.5 hover:bg-black/5 rounded cursor-pointer">
+            <input type="checkbox" checked class="hub-chk">
+            <span>《周报与认知负荷记录.md》</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="pt-2 flex justify-end gap-2 text-xs">
+        <button onclick="closeModals()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-[var(--ink-secondary)]">取消</button>
+        <button onclick="runDiscoveryProcess()" class="px-4 py-1.5 bg-neutral-900 hover:bg-black text-white rounded-lg font-medium flex items-center gap-1.5">
+          <i data-lucide="play" class="w-3.5 h-3.5"></i> 开始分析
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed top-12 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- ==================== JAVASCRIPT LOGIC ==================== -->
+  <script>
+    // INITIAL DOMAIN DATA: 6 Realistic Insights + 3 Extra Load-More Items
+    let insights = [
+      {
+        id: 'INS-01',
+        title: '图纸字段在纸面已经核对，仍缺实机台架验证',
+        status: 'DONE', // Processing status: 已处理
+        evidenceState: 'NEED_REVIEW', // Evidence state: 待复核 (Orthogonal state!)
+        perspective: 'WORK',
+        starred: true,
+        followed: false,
+        revision: 'v2',
+        hasHistory: true,
+        workId: 'Work #W-2026-1102',
+        updatedAt: '2026-11-20 14:32',
+        body: '根据《工程交付图纸规范 v2.4》及 11 月 02 日现场盘点记录，各控制柜接线图纸中的编码规则已完成全量比对，符号与端子号符合 2026 工业桌面标准。\n\n但需要注意的是，目前核对仅停留在纸面与静态 CAD 规则层面。对于高频震动及极端工况下的物理接线稳定性，仍缺少台架实测数据的直接印证。',
+        quote: '图纸比对无误，已归档。台架测试预定于下个周期补充，目前无实机数据。',
+        sourceNote: '《实机台架202611.md》',
+        sourcePath: 'Craft Local Vault / Works / Hardware',
+        diffOriginal: '图纸比对无误，已归档。台架测试预定于下个周期补充，目前无实机数据。',
+        diffUpdated: '台架测试已于11-21完成首轮振动试验，发现接线端子在 40Hz 发生微幅偏移。'
+      },
+      {
+        id: 'INS-02',
+        title: 'Craft 与 Local-first 状态解耦可在低带宽环境下维持高响应',
+        status: 'PENDING',
+        evidenceState: 'VERIFIED',
+        perspective: 'WORK',
+        starred: true,
+        followed: true,
+        revision: 'v1',
+        hasHistory: false,
+        workId: 'Work #W-2026-1099',
+        updatedAt: '2026-11-19 11:15',
+        body: '本地优先架构避免了高频 RPC 阻塞主UI。所有协同编辑状态先落本地 SQLite FTS5，后台静默补齐差异。',
+        quote: 'UI 响应延迟控制在 16ms 以内，弱网条件下无需阻断用户操作。',
+        sourceNote: '《Local-first架构设计.md》',
+        sourcePath: 'Obsidian / Architecture'
+      },
+      {
+        id: 'INS-03',
+        title: '决定采用 SQLite FTS5 替代全内存索引以控制崩溃内存峰值',
+        status: 'LATER',
+        laterDate: '11-25',
+        evidenceState: 'VERIFIED',
+        perspective: 'DECISION',
+        starred: false,
+        followed: false,
+        revision: 'v2',
+        hasHistory: true,
+        workId: 'Work #W-2026-1080',
+        updatedAt: '2026-11-18 16:40',
+        body: '经过压测发现，在大文本全量载入内存时内存占用突破 800MB；改用 FTS5 磁盘分页后内存平稳维持在 45MB 左右。',
+        quote: '决定于 11-18 完成技术选型决策，放弃全内存方案。',
+        sourceNote: '《FTS5索引优化观察.md》',
+        sourcePath: 'Craft Local / Database'
+      },
+      {
+        id: 'INS-04',
+        title: 'Prompt 预算与 Context 窗口边界需设定硬性拦截阈值',
+        status: 'PENDING',
+        evidenceState: 'NEED_REVIEW',
+        perspective: 'WORK',
+        starred: false,
+        followed: true,
+        revision: 'v1',
+        hasHistory: false,
+        workId: 'Work #W-2026-1045',
+        updatedAt: '2026-11-17 09:20',
+        body: '当长上下文突破 128k 时，模型幻觉率上升 14%。必须在前端截断阶段显式提示用户授权扩展。',
+        quote: '建议在 80% 阈值处触发 SweepBar 提示。',
+        sourceNote: '《Prompt budget.md》',
+        sourcePath: 'Obsidian / AI'
+      },
+      {
+        id: 'INS-05',
+        title: '第三方敏感服务对接授权凭证安全离线化',
+        status: 'DONE',
+        evidenceState: 'RESTRICTED', // Security Masking!
+        perspective: 'WORK',
+        starred: false,
+        followed: false,
+        revision: 'v1',
+        hasHistory: false,
+        workId: 'Work #W-2026-0999',
+        updatedAt: '2026-11-15 18:00',
+        body: '【受限内容】原笔记权限已撤回或来源停用，正文已安全隐藏。',
+        quote: '【受限引文】',
+        sourceNote: '《已撤权笔记.md》',
+        sourcePath: 'Restricted Vault'
+      },
+      {
+        id: 'INS-06',
+        title: '每周复盘节奏切换为 30 分钟精简流可降低认知负荷',
+        status: 'PENDING',
+        evidenceState: 'VERIFIED',
+        perspective: 'LIFE',
+        starred: false,
+        followed: false,
+        revision: 'v1',
+        hasHistory: false,
+        workId: 'Work #W-2026-0950',
+        updatedAt: '2026-11-14 20:10',
+        body: '缩短单次回顾时长，依靠“按需发现”替代全量扫读，注意力集中度明显提升。',
+        quote: '连续三周的满意度打分维持在 4.8 / 5.0。',
+        sourceNote: '《周报与认知负荷记录.md》',
+        sourcePath: 'Personal / Review'
+      }
+    ];
+
+    let extraLoadMoreData = [
+      {
+        id: 'INS-07',
+        title: '前端虚拟滚动列表在突破 5000 条时需开启硬件加速',
+        status: 'PENDING',
+        evidenceState: 'VERIFIED',
+        perspective: 'WORK',
+        starred: true,
+        followed: false,
+        revision: 'v1',
+        hasHistory: false,
+        workId: 'Work #W-2026-0910',
+        updatedAt: '2026-11-12 10:00',
+        body: 'DOM 节点过多会导致 Paint 时间上升。开启 translate3d 渲染后帧率稳定在 60fps。',
+        quote: '优化后滚动手感无卡顿。',
+        sourceNote: '《前端性能基准.md》',
+        sourcePath: 'Craft / Dev'
+      },
+      {
+        id: 'INS-08',
+        title: '关于建立跨事项知识重用机制的思考',
+        status: 'DONE',
+        evidenceState: 'VERIFIED',
+        perspective: 'DECISION',
+        starred: false,
+        followed: false,
+        revision: 'v1',
+        hasHistory: false,
+        workId: 'Work #W-2026-0880',
+        updatedAt: '2026-11-10 15:30',
+        body: '跨事项的知识沉淀应通过原子化洞察卡片进行建立，避免重复核对。',
+        quote: '统一原子卡片规格。',
+        sourceNote: '《知识复用指南.md》',
+        sourcePath: 'Obsidian / PKM'
+      },
+      {
+        id: 'INS-09',
+        title: '极端温度测试条件下各控制模组的降频响应曲线',
+        status: 'PENDING',
+        evidenceState: 'NEED_REVIEW',
+        perspective: 'WORK',
+        starred: false,
+        followed: false,
+        revision: 'v1',
+        hasHistory: false,
+        workId: 'Work #W-2026-0840',
+        updatedAt: '2026-11-08 17:00',
+        body: '75度环境持续运行 2 小时后自动切入保护频率。',
+        quote: '降频延迟 200ms。',
+        sourceNote: '《温控测试记录.md》',
+        sourcePath: 'Works / Test'
+      }
+    ];
+
+    // STATE MANAGEMENT
+    let selectedId = 'INS-01';
+    let currentFilterStatus = 'ALL'; // ALL, PENDING, LATER, DONE
+    let currentScope = 'ALL'; // ALL, NEED_REVIEW, STARRED
+    let currentPerspective = 'ALL'; // ALL, WORK, LIFE, DECISION
+    let layoutView = 'STREAM'; // STREAM, TABLE
+    let activeModule = 'INSIGHTS'; // INSIGHTS, CHECKING, REVIEW, TOPICS, AUDIT
+    let activeDrawer = null; // QUOTE, INSPECTOR, ASSISTANT, or null
+    let selectedItemIds = new Set();
+    let currentViewRevision = 'v2'; // v2 or v1 for detail view
+    let searchKeyword = '';
+    let isConflictSimulationActive = false;
+
+    // INITIALIZATION
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      setupSplitResizer();
+      setupKeyboardShortcuts();
+      renderAll();
+      logAudit('系统启动', 'Hub 洞察工作区 v4 初始化完成');
+    });
+
+    // RENDER ROUTINER
+    function renderAll() {
+      updateCounters();
+      renderStreamAndTable();
+      renderDetailView();
+      updateDrawerState();
+      lucide.createIcons();
+    }
+
+    // UPDATE COUNTERS IN SIDEBAR AND TITLEBAR
+    function updateCounters() {
+      const allCount = insights.length;
+      const pendingCount = insights.filter(i => i.status === 'PENDING').length;
+      const laterCount = insights.filter(i => i.status === 'LATER').length;
+      const doneCount = insights.filter(i => i.status === 'DONE').length;
+      const needReviewCount = insights.filter(i => i.evidenceState === 'NEED_REVIEW').length;
+      const starredCount = insights.filter(i => i.starred).length;
+
+      document.getElementById('cnt-ALL').innerText = allCount;
+      document.getElementById('cnt-PENDING').innerText = pendingCount;
+      document.getElementById('cnt-LATER').innerText = laterCount;
+      document.getElementById('cnt-DONE').innerText = doneCount;
+
+      document.getElementById('sb-cnt-all').innerText = allCount;
+      document.getElementById('sb-cnt-review').innerText = needReviewCount;
+      document.getElementById('sb-cnt-starred').innerText = starredCount;
+
+      const filtered = getFilteredInsights();
+      document.getElementById('txt-filtered-count').innerText = `命中 ${filtered.length} / 总计 ${insights.length} 条`;
+    }
+
+    // FILTER LOGIC
+    function getFilteredInsights() {
+      return insights.filter(item => {
+        // Filter Status
+        if (currentFilterStatus !== 'ALL' && item.status !== currentFilterStatus) return false;
+        // Scope
+        if (currentScope === 'NEED_REVIEW' && item.evidenceState !== 'NEED_REVIEW') return false;
+        if (currentScope === 'STARRED' && !item.starred) return false;
+        // Perspective
+        if (currentPerspective !== 'ALL' && item.perspective !== currentPerspective) return false;
+        // Search Keyword
+        if (searchKeyword.trim() !== '') {
+          const kw = searchKeyword.toLowerCase();
+          const matchTitle = item.title.toLowerCase().includes(kw);
+          const matchWork = item.workId.toLowerCase().includes(kw);
+          const matchBody = item.body.toLowerCase().includes(kw);
+          if (!matchTitle && !matchWork && !matchBody) return false;
+        }
+        return true;
+      });
+    }
+
+    // RENDER STREAM & TABLE
+    function renderStreamAndTable() {
+      const list = getFilteredInsights();
+      const streamContainer = document.getElementById('stream-container');
+      const tableTbody = document.getElementById('table-tbody');
+
+      // 1. Render Stream Cards
+      streamContainer.innerHTML = '';
+      if (list.length === 0) {
+        streamContainer.innerHTML = `<div class="p-8 text-center text-xs text-[var(--ink-muted)]">未找到符合条件的洞察记录</div>`;
+      } else {
+        list.forEach(item => {
+          const isSelected = item.id === selectedId;
+          const isChecked = selectedItemIds.has(item.id);
+
+          let statusBadge = '';
+          if (item.status === 'PENDING') statusBadge = `<span class="w-2 h-2 rounded-full bg-amber-500" title="待关注"></span>`;
+          else if (item.status === 'LATER') statusBadge = `<span class="text-[10px] text-blue-600 bg-blue-50 px-1 rounded font-mono-tech">稍后 ${item.laterDate || ''}</span>`;
+          else if (item.status === 'DONE') statusBadge = `<span class="w-2 h-2 rounded-full bg-emerald-500" title="已处理"></span>`;
+
+          let evidenceBadge = '';
+          if (item.evidenceState === 'NEED_REVIEW') {
+            evidenceBadge = `<span class="px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded font-semibold text-[10px] flex items-center gap-1">
+              <i data-lucide="alert-triangle" class="w-3 h-3"></i> 待复核
+            </span>`;
+          } else if (item.evidenceState === 'RESTRICTED') {
+            evidenceBadge = `<span class="px-1.5 py-0.2 bg-red-100 text-red-700 rounded text-[10px]">来源不可用</span>`;
+          }
+
+          const card = document.createElement('div');
+          card.className = `stream-card p-3 rounded-xl border border-[var(--hair)] cursor-pointer relative group ${isSelected ? 'stream-card-active' : 'bg-white/90'}`;
+          card.onclick = (e) => {
+            if (e.target.classList.contains('hub-chk')) return;
+            selectInsight(item.id);
+          };
+
+          card.innerHTML = `
+            <div class="flex items-start gap-2">
+              <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleSelectItem('${item.id}', this.checked)" class="hub-chk mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 ${isChecked ? 'opacity-100' : ''}">
+              <div class="flex-1 space-y-1.5 min-w-0">
+                <div class="flex items-center justify-between gap-1">
+                  <span class="text-[10px] font-mono-tech text-[var(--ink-muted)] truncate">${item.workId}</span>
+                  <div class="flex items-center gap-1 shrink-0">
+                    ${statusBadge}
+                    ${item.starred ? '<i data-lucide="star" class="w-3 h-3 text-amber-500 fill-amber-500"></i>' : ''}
+                  </div>
+                </div>
+                <h4 class="font-bold text-xs text-[var(--ink)] leading-snug line-clamp-2">${item.title}</h4>
+                <div class="flex items-center justify-between text-[10px] text-[var(--ink-muted)] pt-0.5">
+                  ${evidenceBadge || `<span class="text-emerald-700">依据已核对</span>`}
+                  <span class="font-mono-tech">${item.revision}</span>
+                </div>
+              </div>
+            </div>
+          `;
+          streamContainer.appendChild(card);
+        });
+      }
+
+      // 2. Render Table Rows
+      tableTbody.innerHTML = '';
+      list.forEach(item => {
+        const isSelected = item.id === selectedId;
+        const isChecked = selectedItemIds.has(item.id);
+        const tr = document.createElement('tr');
+        tr.className = `hover:bg-blue-50/50 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50/80 font-medium' : ''}`;
+        tr.onclick = (e) => {
+          if (e.target.classList.contains('hub-chk')) return;
+          selectInsight(item.id);
+          if (layoutView === 'TABLE') openSheetInTableMode();
+        };
+
+        let statusTxt = item.status === 'PENDING' ? '待关注' : (item.status === 'LATER' ? `稍后 ${item.laterDate||''}` : '已处理');
+        let statusColor = item.status === 'PENDING' ? 'text-amber-700 bg-amber-50' : (item.status === 'LATER' ? 'text-blue-700 bg-blue-50' : 'text-emerald-700 bg-emerald-50');
+
+        let evBadge = item.evidenceState === 'NEED_REVIEW'
+          ? `<span class="px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded font-bold text-[10px] flex items-center gap-1"><i data-lucide="alert-triangle" class="w-3 h-3"></i> 待复核</span>`
+          : (item.evidenceState === 'RESTRICTED' ? `<span class="px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-[10px]">来源不可用</span>` : `<span class="text-emerald-700 text-[10px]">已核对</span>`);
+
+        let persTxt = item.perspective === 'WORK' ? '知识与工作' : (item.perspective === 'LIFE' ? '生活与进展' : '决定与变化');
+
+        tr.innerHTML = `
+          <td class="p-2 text-center" onclick="event.stopPropagation()">
+            <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleSelectItem('${item.id}', this.checked)" class="hub-chk">
+          </td>
+          <td class="p-2"><span class="px-1.5 py-0.5 rounded text-[10px] ${statusColor}">${statusTxt}</span></td>
+          <td class="p-2 font-medium text-[var(--ink)]">${item.title} ${item.starred ? '<i data-lucide="star" class="w-3 h-3 inline text-amber-500 fill-amber-500 ml-1"></i>' : ''}</td>
+          <td class="p-2">${evBadge}</td>
+          <td class="p-2 text-[var(--ink-secondary)]">${persTxt}</td>
+          <td class="p-2 font-mono-tech text-[var(--ink-muted)]">${item.revision}</td>
+          <td class="p-2 font-mono-tech text-[var(--ink-muted)]">${item.workId}</td>
+          <td class="p-2 font-mono-tech text-[var(--ink-muted)] text-right pr-3">${item.updatedAt.split(' ')[0]}</td>
+        `;
+        tableTbody.appendChild(tr);
+      });
+
+      updateBatchPill();
+    }
+
+    // SELECT AN INSIGHT
+    function selectInsight(id) {
+      selectedId = id;
+      currentViewRevision = 'v2'; // Reset to head on select
+      renderAll();
+    }
+
+    // RENDER DETAIL CANVAS (PAPER B)
+    function renderDetailView() {
+      const item = insights.find(i => i.id === selectedId);
+      if (!item) return;
+
+      document.getElementById('detail-work-id').innerText = item.workId;
+      document.getElementById('detail-date').innerText = item.updatedAt;
+      document.getElementById('detail-title').innerText = item.title;
+
+      // Inline Metadata Subtraction Strip
+      const statusTxt = item.status === 'PENDING' ? '待关注' : (item.status === 'LATER' ? `稍后 · ${item.laterDate || ''}` : '已处理');
+      const statusDotColor = item.status === 'PENDING' ? 'bg-amber-500' : (item.status === 'LATER' ? 'bg-blue-500' : 'bg-emerald-500');
+      document.getElementById('txt-inline-status').innerText = statusTxt;
+      document.getElementById('dot-inline-status').className = `w-2 h-2 rounded-full ${statusDotColor}`;
+
+      const persTxt = item.perspective === 'WORK' ? '知识与工作' : (item.perspective === 'LIFE' ? '生活与进展' : '决定与变化');
+      document.getElementById('txt-inline-pers').innerText = persTxt;
+
+      document.getElementById('txt-inline-rev').innerText = `${currentViewRevision} ${currentViewRevision === 'v2' ? '(当前)' : '(历史只读)'}`;
+
+      // Star & Follow
+      const starIco = document.getElementById('ico-inline-star');
+      if (item.starred) {
+        starIco.classList.add('fill-amber-500', 'text-amber-500');
+        document.getElementById('txt-inline-star').innerText = '已星标';
+      } else {
+        starIco.classList.remove('fill-amber-500', 'text-amber-500');
+        document.getElementById('txt-inline-star').innerText = '星标';
+      }
+
+      const followIco = document.getElementById('ico-inline-follow');
+      if (item.followed) {
+        followIco.classList.add('fill-blue-500', 'text-blue-500');
+        document.getElementById('txt-inline-follow').innerText = '已关注';
+      } else {
+        followIco.classList.remove('fill-blue-500', 'text-blue-500');
+        document.getElementById('txt-inline-follow').innerText = '关注';
+      }
+
+      // Readonly Warning Banner
+      const readonlyBanner = document.getElementById('banner-readonly-history');
+      const feedbackSection = document.getElementById('section-feedback');
+      if (currentViewRevision === 'v1' && item.hasHistory) {
+        readonlyBanner.classList.remove('hidden');
+        feedbackSection.classList.add('opacity-40', 'pointer-events-none');
+      } else {
+        readonlyBanner.classList.add('hidden');
+        feedbackSection.classList.remove('opacity-40', 'pointer-events-none');
+      }
+
+      // Security Masked Banner (INS-05)
+      const securityBanner = document.getElementById('banner-security-masked');
+      const proseBody = document.getElementById('detail-prose-body');
+      const quoteBox = document.getElementById('detail-quote-box');
+      if (item.evidenceState === 'RESTRICTED') {
+        securityBanner.classList.remove('hidden');
+        proseBody.innerHTML = `<div class="p-6 bg-red-50/50 border border-red-100 rounded-xl text-center text-red-700 text-xs">正文因安全隔离已受限隐藏。</div>`;
+        quoteBox.innerText = '【受限引文】';
+      } else {
+        securityBanner.classList.add('hidden');
+        // Render normal body or v1 history body
+        if (currentViewRevision === 'v1' && item.hasHistory) {
+          proseBody.innerHTML = `<p class="text-gray-500 font-mono-tech">[v1 历史草稿] 旧版图纸比对记录：初步盘点完成，尚待现场复核。</p>`;
+        } else {
+          proseBody.innerHTML = `<p>${item.body.replace(/\n\n/g, '</p><p>')}</p>`;
+        }
+        quoteBox.innerText = `"${item.quote}"`;
+      }
+
+      // Codex Review Strip (Orthogonal NEED_REVIEW)
+      const reviewStrip = document.getElementById('codex-review-strip');
+      if (item.evidenceState === 'NEED_REVIEW' && currentViewRevision === 'v2') {
+        reviewStrip.classList.remove('hidden');
+      } else {
+        reviewStrip.classList.add('hidden');
+      }
+
+      // Update Diff drawer text if needed
+      if (item.diffOriginal && item.diffUpdated) {
+        document.getElementById('drawer-diff-block').classList.remove('hidden');
+      } else {
+        document.getElementById('drawer-diff-block').classList.add('hidden');
+      }
+    }
+
+    // RESOLVE PENDING REVIEW (TWO BRANCH REVISION)
+    function resolveReview(branch) {
+      const item = insights.find(i => i.id === selectedId);
+      if (!item) return;
+
+      if (branch === 'MAINTAIN') {
+        item.evidenceState = 'VERIFIED';
+        showToast('已完成校验：维持原判断并增加本次核对记录', 'ok');
+        logAudit('复核完成', `${item.id} 维持原判断 (v2)，校验通过`);
+      } else if (branch === 'UPGRADE') {
+        item.evidenceState = 'VERIFIED';
+        item.revision = 'v3';
+        item.title = item.title + ' (v3 已根据台架新试验数据修订)';
+        item.body = item.body + '\n\n【v3 补充修订】结合 11-21 首轮台架振动试验，发现接线端子在 40Hz 发生微幅偏移，已补齐物理约束条款。';
+        showToast('已应用新修订：卡片升级至 v3', 'ok');
+        logAudit('修订升级', `${item.id} 升级至 v3，正文与依据同步更新`);
+      }
+
+      triggerSweepBar();
+      renderAll();
+    }
+
+    // SWITCH VIEW REVISION (v2 vs v1)
+    function switchRevision(rev) {
+      currentViewRevision = rev;
+      closePopovers();
+      renderAll();
+      showToast(`已切换至版本 ${rev}`, 'info');
+    }
+
+    // DRAWERS CONTROL (3 Mutually Exclusive)
+    function toggleDrawer(drawerName) {
+      if (activeDrawer === drawerName) {
+        activeDrawer = null;
+      } else {
+        activeDrawer = drawerName;
+      }
+      updateDrawerState();
+    }
+
+    function closeDrawers() {
+      activeDrawer = null;
+      updateDrawerState();
+    }
+
+    function updateDrawerState() {
+      ['QUOTE', 'INSPECTOR', 'ASSISTANT'].forEach(d => {
+        const el = document.getElementById(`drawer-${d}`);
+        const btn = document.getElementById(`btn-drawer-${d}`);
+        if (activeDrawer === d) {
+          el.classList.remove('hidden');
+          btn.classList.add('bg-black/10', 'text-black');
+        } else {
+          el.classList.add('hidden');
+          btn.classList.remove('bg-black/10', 'text-black');
+        }
+      });
+    }
+
+    // CONCURRENCY CONFLICT SIMULATION
+    function triggerConflictSimulation() {
+      const paperB = document.getElementById('paper-b');
+      paperB.classList.add('shake-x');
+      setTimeout(() => paperB.classList.remove('shake-x'), 400);
+
+      showToast('⚠️ 写入冲突拦截: 后台 rowRevision 已改变，请刷新对照', 'err');
+      logAudit('并发冲突', '检测到 rowRevision 不一致，操作被拦截');
+    }
+
+    // LAYOUT VIEW SWITCHING (STREAM VS TABLE)
+    function setLayoutView(view) {
+      layoutView = view;
+      const paperA = document.getElementById('paper-a');
+      const paperB = document.getElementById('paper-b');
+      const gutter = document.getElementById('split-gutter');
+      const streamContainer = document.getElementById('stream-container');
+      const tableContainer = document.getElementById('table-container');
+      const btnCloseSheet = document.getElementById('btn-close-sheet');
+
+      const btnStream = document.getElementById('btn-layout-stream');
+      const btnTable = document.getElementById('btn-layout-table');
+
+      if (view === 'STREAM') {
+        btnStream.className = 'mac-seg-active p-1 rounded transition-all';
+        btnTable.className = 'p-1 rounded text-[var(--ink-secondary)] hover:text-[var(--ink)] transition-all';
+
+        paperA.style.width = '360px';
+        paperA.classList.remove('w-full');
+        paperB.classList.remove('hidden', 'absolute', 'right-0', 'top-0', 'bottom-0', 'z-30', 'w-[58%]', 'max-w-[740px]', 'shadow-[var(--shadow-sheet)]');
+        gutter.classList.remove('hidden');
+        streamContainer.classList.remove('hidden');
+        tableContainer.classList.add('hidden');
+        btnCloseSheet.classList.add('hidden');
+      } else {
+        btnTable.className = 'mac-seg-active p-1 rounded transition-all';
+        btnStream.className = 'p-1 rounded text-[var(--ink-secondary)] hover:text-[var(--ink)] transition-all';
+
+        paperA.style.width = '100%';
+        gutter.classList.add('hidden');
+        streamContainer.classList.add('hidden');
+        tableContainer.classList.remove('hidden');
+
+        // Hide detail paper B by default until a row is clicked
+        paperB.classList.add('hidden');
+      }
+
+      triggerSweepBar();
+      renderAll();
+    }
+
+    function openSheetInTableMode() {
+      if (layoutView !== 'TABLE') return;
+      const paperB = document.getElementById('paper-b');
+      const btnCloseSheet = document.getElementById('btn-close-sheet');
+
+      paperB.classList.remove('hidden');
+      paperB.classList.add('absolute', 'right-0', 'top-0', 'bottom-0', 'z-30', 'w-[58%]', 'max-w-[740px]', 'shadow-[var(--shadow-sheet)]');
+      btnCloseSheet.classList.remove('hidden');
+    }
+
+    function closeSheetInTableMode() {
+      if (layoutView !== 'TABLE') return;
+      const paperB = document.getElementById('paper-b');
+      paperB.classList.add('hidden');
+    }
+
+    // BATCH TRIAGE LOGIC
+    function toggleSelectItem(id, checked) {
+      if (checked) selectedItemIds.add(id);
+      else selectedItemIds.delete(id);
+      updateBatchPill();
+    }
+
+    function toggleSelectAll(checked) {
+      const list = getFilteredInsights();
+      if (checked) {
+        list.forEach(i => selectedItemIds.add(i.id));
+      } else {
+        selectedItemIds.clear();
+      }
+      renderStreamAndTable();
+    }
+
+    function updateBatchPill() {
+      const pill = document.getElementById('batch-pill');
+      const countLabel = document.getElementById('batch-pill-count');
+      if (selectedItemIds.size >= 2) {
+        pill.classList.remove('hidden');
+        countLabel.innerText = `已选 ${selectedItemIds.size} 条`;
+      } else {
+        pill.classList.add('hidden');
+      }
+    }
+
+    function clearSelection() {
+      selectedItemIds.clear();
+      renderStreamAndTable();
+    }
+
+    function applyBatchStatus(statusCmd) {
+      selectedItemIds.forEach(id => {
+        const item = insights.find(i => i.id === id);
+        if (item) {
+          if (statusCmd === 'DONE') item.status = 'DONE';
+          else if (statusCmd === 'LATER') { item.status = 'LATER'; item.laterDate = '11-25'; }
+          else if (statusCmd === 'UNSTAR') item.starred = false;
+        }
+      });
+      showToast(`已批量更新 ${selectedItemIds.size} 条洞察`, 'ok');
+      logAudit('批量分诊', `批量更新 ${selectedItemIds.size} 条洞察状态为 ${statusCmd}`);
+      selectedItemIds.clear();
+      renderAll();
+    }
+
+    // SIDEBAR SCOPE & PERSPECTIVE SWITCHING
+    function setFilterStatus(status) {
+      currentFilterStatus = status;
+      ['ALL', 'PENDING', 'LATER', 'DONE'].forEach(s => {
+        const btn = document.getElementById(`seg-${s}`);
+        if (s === status) btn.className = 'mac-seg-active px-3 py-1 rounded-md transition-all flex items-center gap-1.5';
+        else btn.className = 'px-3 py-1 rounded-md text-[var(--ink-secondary)] hover:text-[var(--ink)] transition-all flex items-center gap-1.5';
+      });
+      triggerSweepBar();
+      renderAll();
+    }
+
+    function setScope(scope) {
+      currentScope = scope;
+      ['ALL', 'NEED_REVIEW', 'STARRED'].forEach(s => {
+        const btn = document.getElementById(`sb-scope-${s}`);
+        if (s === scope) btn.classList.add('is-active');
+        else btn.classList.remove('is-active');
+      });
+      document.getElementById('txt-current-scope').innerText = scope === 'ALL' ? '全部洞察' : (scope === 'NEED_REVIEW' ? '待复核洞察' : '星标发现');
+      triggerSweepBar();
+      renderAll();
+    }
+
+    function setPerspective(pers) {
+      currentPerspective = pers;
+      ['ALL', 'WORK', 'LIFE', 'DECISION'].forEach(p => {
+        const btn = document.getElementById(`sb-pers-${p}`);
+        if (p === pers) btn.classList.add('is-active');
+        else btn.classList.remove('is-active');
+      });
+      triggerSweepBar();
+      renderAll();
+    }
+
+    // MODULE SWITCHING (FULL WIDTH OVERLAYS)
+    function switchModule(modName) {
+      activeModule = modName;
+      ['INSIGHTS', 'CHECKING', 'REVIEW', 'TOPICS', 'AUDIT'].forEach(m => {
+        const el = document.getElementById(`module-${m}`);
+        const sbBtn = document.getElementById(`sb-mod-${m}`);
+        if (m === modName) {
+          el.classList.remove('hidden');
+          if (sbBtn) sbBtn.classList.add('is-active');
+        } else {
+          el.classList.add('hidden');
+          if (sbBtn) sbBtn.classList.remove('is-active');
+        }
+      });
+      if (modName === 'INSIGHTS') setScope('ALL');
+    }
+
+    // SWEEP BAR ANIMATION
+    function triggerSweepBar() {
+      const sweep = document.getElementById('paper-a-sweep');
+      sweep.classList.remove('hidden');
+      setTimeout(() => sweep.classList.add('hidden'), 1200);
+    }
+
+    function triggerRecheck() {
+      triggerSweepBar();
+      showToast('已完成全库引用与依赖校验，所有项目状态均已最新', 'info');
+      logAudit('重聚焦校验', '用户触发 F5/按钮 窗口重聚焦重新校验');
+    }
+
+    // INLINE NOTION-STYLE POPOVERS
+    function toggleStatusPopover() {
+      closePopovers();
+      document.getElementById('popover-status').classList.remove('hidden');
+    }
+    function togglePerspectivePopover() {
+      closePopovers();
+      document.getElementById('popover-perspective').classList.remove('hidden');
+    }
+    function toggleRevisionPopover() {
+      closePopovers();
+      document.getElementById('popover-revision').classList.remove('hidden');
+    }
+    function toggleDemoPopover() {
+      closePopovers();
+      document.getElementById('demo-popover').classList.toggle('hidden');
+    }
+    function closePopovers() {
+      ['popover-status', 'popover-perspective', 'popover-revision', 'demo-popover'].forEach(p => {
+        document.getElementById(p).classList.add('hidden');
+      });
+    }
+
+    function setInsightStatus(st) {
+      const item = insights.find(i => i.id === selectedId);
+      if (item) {
+        item.status = st;
+        if (st === 'LATER') item.laterDate = '11-25';
+        showToast(`状态已更新为：${st}`, 'ok');
+        logAudit('状态更新', `${item.id} 更改状态为 ${st}`);
+      }
+      closePopovers();
+      renderAll();
+    }
+
+    function setInsightPerspective(pers) {
+      const item = insights.find(i => i.id === selectedId);
+      if (item) {
+        item.perspective = pers;
+        showToast(`视角已更新为：${pers}`, 'ok');
+        logAudit('视角更新', `${item.id} 视角修改为 ${pers}`);
+      }
+      closePopovers();
+      renderAll();
+    }
+
+    function toggleStarCurrent() {
+      const item = insights.find(i => i.id === selectedId);
+      if (item) {
+        item.starred = !item.starred;
+        showToast(item.starred ? '已设为星标发现' : '已取消星标', 'info');
+      }
+      renderAll();
+    }
+
+    function toggleFollowCurrent() {
+      const item = insights.find(i => i.id === selectedId);
+      if (item) {
+        item.followed = !item.followed;
+        showToast(item.followed ? '已开启关注，变动时主动提醒' : '已取消关注', 'info');
+      }
+      renderAll();
+    }
+
+    // KEYBOARD FLOW & NAVIGATION
+    function navigateInsight(direction) {
+      const list = getFilteredInsights();
+      if (list.length === 0) return;
+      const idx = list.findIndex(i => i.id === selectedId);
+      let nextIdx = idx + direction;
+      if (nextIdx < 0) nextIdx = 0;
+      if (nextIdx >= list.length) nextIdx = list.length - 1;
+      selectInsight(list[nextIdx].id);
+    }
+
+    function setupKeyboardShortcuts() {
+      window.addEventListener('keydown', (e) => {
+        if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+          if (e.key === 'Escape') document.activeElement.blur();
+          return;
+        }
+
+        if (e.key === 'j' || e.key === 'J' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          navigateInsight(1);
+        } else if (e.key === 'k' || e.key === 'K' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          navigateInsight(-1);
+        } else if (e.key === '/') {
+          e.preventDefault();
+          document.getElementById('global-search').focus();
+        } else if (e.key === '1') {
+          setInsightStatus('PENDING');
+        } else if (e.key === '2') {
+          setInsightStatus('LATER');
+        } else if (e.key === '3') {
+          setInsightStatus('DONE');
+        } else if (e.key === 's' || e.key === 'S') {
+          toggleStarCurrent();
+        } else if (e.key === 'Escape') {
+          if (activeDrawer) closeDrawers();
+          else if (layoutView === 'TABLE') closeSheetInTableMode();
+          else closePopovers();
+        }
+      });
+    }
+
+    // SEARCH & LOAD MORE
+    function handleSearch(val) {
+      searchKeyword = val;
+      renderStreamAndTable();
+    }
+
+    function loadMoreInsights() {
+      if (extraLoadMoreData.length > 0) {
+        insights.push(...extraLoadMoreData);
+        extraLoadMoreData = [];
+        showToast('已加载 3 条新洞察卡片', 'info');
+        document.getElementById('btn-load-more').innerText = `加载更多 (当前 ${insights.length} / ${insights.length})`;
+        renderAll();
+      } else {
+        showToast('已加载全部洞察数据', 'info');
+      }
+    }
+
+    // DEMO SCENARIOS & VIEWPORT SWITCHING
+    function setDemoViewport(vp) {
+      const shell = document.getElementById('app-shell');
+      if (vp === 'NARROW') {
+        shell.classList.add('shell-narrow');
+        document.getElementById('btn-vp-narrow').className = 'p-1.5 rounded border border-blue-500 bg-blue-50 text-blue-700 font-medium text-left flex items-center gap-1.5';
+        document.getElementById('btn-vp-desktop').className = 'p-1.5 rounded border border-[var(--hair-strong)] hover:bg-black/5 text-[var(--ink-secondary)] font-medium text-left flex items-center gap-1.5';
+      } else {
+        shell.classList.remove('shell-narrow');
+        document.getElementById('btn-vp-desktop').className = 'p-1.5 rounded border border-blue-500 bg-blue-50 text-blue-700 font-medium text-left flex items-center gap-1.5';
+        document.getElementById('btn-vp-narrow').className = 'p-1.5 rounded border border-[var(--hair-strong)] hover:bg-black/5 text-[var(--ink-secondary)] font-medium text-left flex items-center gap-1.5';
+      }
+      closePopovers();
+    }
+
+    function runScenario(num) {
+      closePopovers();
+      switchModule('INSIGHTS');
+      if (num === 1) {
+        setLayoutView('STREAM');
+        selectInsight('INS-01');
+        toggleDrawer('QUOTE');
+        showToast('场景 1: 正交态 (已处理+待复核) & 原文 Diff 高亮对比', 'info');
+      } else if (num === 2) {
+        setLayoutView('TABLE');
+        selectInsight('INS-01');
+        openSheetInTableMode();
+        showToast('场景 2: 全宽属性表格 & Craft 详情滑出页', 'info');
+      } else if (num === 3) {
+        setLayoutView('STREAM');
+        selectedItemIds.add('INS-01');
+        selectedItemIds.add('INS-02');
+        updateBatchPill();
+        showToast('场景 3: 多选批量分诊胶囊', 'info');
+      } else if (num === 4) {
+        setLayoutView('STREAM');
+        selectInsight('INS-05');
+        showToast('场景 4: 来源撤权脱敏保护 (安全遮蔽)', 'info');
+      } else if (num === 5) {
+        setLayoutView('STREAM');
+        selectInsight('INS-01');
+        switchRevision('v1');
+        showToast('场景 5: 历史版本 v1 只读保护', 'info');
+      } else if (num === 6) {
+        setLayoutView('STREAM');
+        selectInsight('INS-01');
+        toggleDrawer('INSPECTOR');
+        triggerConflictSimulation();
+      }
+    }
+
+    // AUDIT LOG SYSTEM
+    function logAudit(action, desc) {
+      const stream = document.getElementById('audit-log-stream');
+      const time = new Date().toTimeString().split(' ')[0];
+      const div = document.createElement('div');
+      div.className = 'p-2.5 bg-gray-50 border border-[var(--hair)] rounded-lg flex items-center justify-between';
+      div.innerHTML = `
+        <div class="flex items-center gap-2">
+          <span class="px-1.5 py-0.5 bg-gray-200 text-gray-800 rounded font-semibold text-[10px]">${action}</span>
+          <span class="text-[var(--ink-body)]">${desc}</span>
+        </div>
+        <span class="text-[10px] text-[var(--ink-muted)]">${time}</span>
+      `;
+      stream.prepend(div);
+    }
+    function clearAuditLogs() {
+      document.getElementById('audit-log-stream').innerHTML = '';
+    }
+
+    // TOAST SYSTEM
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `pointer-events-auto px-3.5 py-2 rounded-xl shadow-xl border text-xs flex items-center gap-2 transition-all duration-200 transform translate-y-2 opacity-0 bg-white`;
+
+      if (type === 'ok') toast.classList.add('border-emerald-200', 'text-emerald-900');
+      else if (type === 'err') toast.classList.add('border-red-200', 'text-red-900', 'bg-red-50');
+      else toast.classList.add('border-blue-200', 'text-blue-900');
+
+      toast.innerHTML = `<i data-lucide="${type==='ok'?'check-circle':(type==='err'?'alert-circle':'info')}" class="w-4 h-4 shrink-0"></i><span>${msg}</span>`;
+      container.appendChild(toast);
+      lucide.createIcons();
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      }, 10);
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 200);
+      }, 3000);
+    }
+
+    // SPLIT RESIZER HANDLE
+    function setupSplitResizer() {
+      const paperA = document.getElementById('paper-a');
+      const gutter = document.getElementById('split-gutter');
+      let isDragging = false;
+
+      gutter.addEventListener('mousedown', () => {
+        if (layoutView === 'TABLE') return;
+        isDragging = true;
+        gutter.classList.add('is-dragging');
+        document.body.style.cursor = 'col-resize';
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const newW = e.clientX - 210; // offset sidebar
+        if (newW >= 280 && newW <= 520) {
+          paperA.style.width = `${newW}px`;
+        }
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          gutter.classList.remove('is-dragging');
+          document.body.style.cursor = 'default';
+        }
+      });
+
+      gutter.addEventListener('dblclick', () => {
+        if (layoutView === 'STREAM') paperA.style.width = '360px';
+      });
+    }
+
+    // MODALS & SIDEBAR TOGGLE
+    function toggleSidebar() {
+      const sb = document.getElementById('sidebar');
+      sb.classList.toggle('w-[206px]');
+      sb.classList.toggle('w-0');
+      sb.classList.toggle('opacity-0');
+    }
+    function openDiscoverModal() {
+      document.getElementById('modal-discover').classList.remove('hidden');
+    }
+    function closeModals() {
+      document.getElementById('modal-discover').classList.add('hidden');
+    }
+    function runDiscoveryProcess() {
+      closeModals();
+      triggerSweepBar();
+      showToast('分析完成：新发现已进入核对台', 'ok');
+      switchModule('CHECKING');
+    }
+    function openImportModal() {
+      showToast('请选择 Hub 格式 JSON/Markdown 文件', 'info');
+    }
+    function openShortcutsModal() {
+      showToast('快捷键: J/K 移动, 1/2/3 切状态, S 星标, / 搜索, Esc 关闭', 'info');
+    }
+    function submitFeedback() {
+      const val = document.getElementById('ipt-feedback').value;
+      if (val.trim()) {
+        showToast('已提交纠正反馈并记入日志', 'ok');
+        logAudit('反馈提交', `${selectedId}: ${val}`);
+        document.getElementById('ipt-feedback').value = '';
+      }
+    }
+    function sendAssistantChip(text) {
+      document.getElementById('ipt-assistant').value = text;
+      sendAssistantMsg();
+    }
+    function sendAssistantMsg() {
+      const val = document.getElementById('ipt-assistant').value;
+      if (!val.trim()) return;
+      const stream = document.getElementById('assistant-chat-stream');
+      const msg = document.createElement('div');
+      msg.className = 'p-2 bg-purple-100/60 rounded text-[11px] text-purple-950 font-medium';
+      msg.innerText = `You: ${val}`;
+      stream.appendChild(msg);
+
+      setTimeout(() => {
+        const reply = document.createElement('div');
+        reply.className = 'p-2.5 bg-gray-50 rounded-lg text-[11px] text-gray-700 leading-relaxed';
+        reply.innerText = `Copilot: 已针对 "${val}" 对齐当前 Work #W-2026-1102 规则。`;
+        stream.appendChild(reply);
+      }, 400);
+
+      document.getElementById('ipt-assistant').value = '';
+    }
+    function acceptCandidate(id) {
+      showToast('已保留该候选洞察，自动加入全库', 'ok');
+      switchModule('INSIGHTS');
+    }
+    function rejectCandidate(id) {
+      showToast('已丢弃该候选洞察', 'info');
+    }
+    function recheckPermission() {
+      showToast('重新向 Craft Vault 发起授权请求中...', 'info');
+    }
+  </script>
+
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const isEmbed = params.get('embed') === '1' || window.self !== window.top;
+      if (isEmbed) {
+        document.documentElement.classList.add('hub-embedded');
+        window.addEventListener('keydown', function (e) {
+          const mod = e.metaKey || e.ctrlKey;
+          if (!mod) return;
+          const k = e.key.toLowerCase();
+          if (k === 'k' || k === '\\' || k === 'j' || (e.key >= '1' && e.key <= '7')) {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+              window.parent.postMessage({ type: 'hub-shortcut', key: e.key, code: e.code }, '*');
+            } catch (_) {}
+          }
+        }, true);
+      }
+    })();
+  </script>
+
+</body>
+</html>
