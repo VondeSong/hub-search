@@ -463,7 +463,7 @@ export default function Hub() {
       if(e.key==="Escape"){e.preventDefault();e.stopPropagation();searchRef.current?.focus();setSearchOpen(false);}
       if(e.key==="ArrowDown"&&e.target===searchRef.current){const first=e.currentTarget.querySelector<HTMLButtonElement>(".recent-open button");if(first){e.preventDefault();first.focus();}}
      }}>
-     <Search size={17}/><input ref={searchRef} value={query} onFocus={()=>setSearchOpen(true)} onClick={()=>setSearchOpen(true)} onChange={e=>{if(view==="flashcards")changeView("all");setQuery(e.target.value);setSearchOpen(true);setMobileDetail(false);}} placeholder={view==="insights"?"搜索发现、事项与依据…":view==="reading"?"搜索阅读资料…":view==="tasks"?"搜索项目与任务…":view==="journal"?"搜索日志…":"搜索全部资料库…"} aria-label={view==="insights"?"搜索发现、事项与依据":"搜索全部资料库"} aria-controls={showRecent?"recent-open":undefined}/>
+     <Search size={17}/><input ref={searchRef} value={query} onFocus={()=>setSearchOpen(true)} onClick={()=>setSearchOpen(true)} onChange={e=>{if(view==="flashcards")changeView("all");setQuery(e.target.value);setSearchOpen(true);setMobileDetail(false);}} placeholder={view==="insights"?"搜索发现、事项与依据…":view==="tasks"?"搜索项目与任务…":view==="journal"?"搜索日志…":"搜索全部资料库…"} aria-label={view==="insights"?"搜索发现、事项与依据":"搜索全部资料库"} aria-controls={showRecent?"recent-open":undefined}/>
      {query?<IconButton label="清除搜索" onClick={()=>{setQuery("");searchRef.current?.focus();setSearchOpen(true);}}><X size={14}/></IconButton>:<kbd>⌘ K</kbd>}
      {showRecent&&<RecentOpen entries={recentItems} recording={recordRecent}
       onOpen={item=>{changeView("all");pickItem(item);}}

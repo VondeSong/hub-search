@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ReferenceAgent from './ReferenceAgent';
+import ReferencePrototype from './ReferencePrototype';
 import AgentsDemos, { type AgentsDemosProps } from './AgentsDemos';
 import referenceStyles from './reference.css?inline';
 import type { TagReviewModel } from '../tag-assistant';
@@ -41,7 +42,8 @@ export function ReferenceSurface({ onDismiss, workspaceContext, tagWorkspace, on
       <>
         <style>{referenceStyles}</style>
         {demo && onDismiss ? <AgentsDemos {...demo} onDismiss={onDismiss} />
-          : <ReferenceAgent onDismiss={onDismiss} workspaceContext={workspaceContext} tagWorkspace={tagWorkspace} onOpenTagQueue={onOpenTagQueue} onOpenDemos={onOpenDemos} onLayoutChange={onLayoutChange} initialLayout={layout} open={open} />}
+          : workspaceContext ? <ReferenceAgent onDismiss={onDismiss} workspaceContext={workspaceContext} tagWorkspace={tagWorkspace} onOpenTagQueue={onOpenTagQueue} onOpenDemos={onOpenDemos} onLayoutChange={onLayoutChange} initialLayout={layout} open={open} />
+            : <ReferencePrototype onDismiss={onDismiss} onOpenDemos={onOpenDemos} />}
       </>,
       surface,
     )}</div>

@@ -1,8 +1,10 @@
 @import "tailwindcss" source(none);
 @source "./ReferenceAgent.jsx";
+@source "./ReferencePrototype.jsx";
 
 @theme {
   --color-canvas: #FCFCFB;
+  --color-frame: #F3F3F1;
   --color-surface: #FFFFFF;
   --color-subtle: #F4F4F2;
   --color-hover: #EFEFEA;
@@ -24,6 +26,7 @@
   --shadow-composer: 0 8px 28px -6px rgba(28, 25, 23, 0.07), 0 2px 6px -1px rgba(28, 25, 23, 0.035), 0 0 0 1px rgba(28, 25, 23, 0.06);
   --shadow-popover: 0 12px 32px -4px rgba(26, 25, 24, 0.11), 0 0 0 1px rgba(26, 25, 24, 0.06);
   --shadow-sheet: 0 20px 50px -10px rgba(26, 25, 24, 0.16), 0 0 0 1px rgba(26, 25, 24, 0.07);
+  --shadow-float: 0 20px 50px -10px rgba(26, 25, 24, 0.16), 0 0 0 1px rgba(26, 25, 24, 0.07);
 }
 
 @layer base {
@@ -60,7 +63,15 @@
   to { opacity: 1; transform: translateY(0); }
 }
 .animate-fadeIn { animation: fadeIn 0.16s ease-out both; }
+[data-reference-prototype] { font-family: var(--font-sans); }
+.reference-workspace-link { font-size: 11px; padding: 4px 6px; border-radius: 6px; white-space: nowrap; color: var(--color-secondary); }
+.reference-workspace-link:hover { background: var(--color-hover); color: var(--color-primary); }
+@media (max-width: 640px) {
+  .reference-case-bar { height: auto; min-height: 44px; flex-wrap: wrap; padding-block: 4px; }
+  .reference-case-bar > div:first-child { flex-wrap: wrap; }
+  .reference-case-picker { flex-wrap: wrap; }
+}
 @media (prefers-reduced-motion: reduce) {
   .animate-fadeIn { animation: none; }
-  [data-agents-layout] * { transition-duration: 0s !important; }
+  :is([data-agents-layout], [data-reference-prototype]) * { transition-duration: 0s !important; }
 }

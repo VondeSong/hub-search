@@ -10,7 +10,7 @@
   line-height: 1.45;
 }
 .agent-history-container > .agent-conversations.agent-history-popover {
-  width: min(288px, 88%);
+  width: min(256px, 88%);
   height: 100%;
   max-height: none;
   box-sizing: border-box;

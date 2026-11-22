@@ -368,7 +368,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const [availableSkillCount, setAvailableSkillCount] = useState<number>();
   const [titleEdit,setTitleEdit] = useState<{id:string; value:string} | null>(null);
   const [draftTitle,setDraftTitle] = useState("");
-  const panelResize = useAgentPanelResize(open, panel, "width", !!extra);
+  const panelResize = useAgentPanelResize(open, panel, "width", !!extra, docked);
   const panelHeightResize = useAgentPanelResize(open && !docked, panel, "height", !!extra);
   useEffect(() => { if (canDock) sessionStorage.setItem(dockKey, String(docked)); }, [docked, canDock, dockKey]);
   const titleQuestion=(view?.work.goal||questionText).replace(/^(?:\$[a-z0-9]+(?:-[a-z0-9]+)*(?:\s+|$))+/g, "").trim();

@@ -5,11 +5,11 @@ const VIEWPORT_GAP = 24;
 const clamp = (value: number, maximum = Number.MAX_SAFE_INTEGER, minimum = MIN_WIDTH) => Math.min(maximum, Math.max(minimum, Math.round(value)));
 
 // Both edge handles use the same drag lifecycle; resizing never starts an investigation.
-export function useAgentPanelResize(open: boolean, panel: RefObject<HTMLElement | null>, axis: "width" | "height" = "width", extra = false) {
+export function useAgentPanelResize(open: boolean, panel: RefObject<HTMLElement | null>, axis: "width" | "height" = "width", extra = false, docked = false) {
   const vertical = axis === "height";
   const defaultSize = vertical
-    ? Math.max(320, extra ? Math.round(window.innerHeight / 2) : window.innerHeight - 64)
-    : extra ? 440 : 480;
+    ? Math.max(320, extra ? Math.round(window.innerHeight / 2) : window.innerHeight - VIEWPORT_GAP)
+    : extra ? 440 : docked && window.innerWidth >= 1024 ? 510 : 460;
   const storageKey = `hub.agent.${extra ? "extra-" : ""}panel.${axis}.v1`;
   const cssProperty = `--agent-${extra ? "extra-" : ""}panel-${axis}`;
   const readSize = () => {
