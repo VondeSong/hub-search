@@ -2748,7 +2748,7 @@
     function extractTargetEvidence(target, query, effectiveField = 'all') {
       const terms = resolveSearchTerms(query);
       if (!terms.length || !target) {
-        return { titleHit: false, items: [], matchedTags: [], matchedAliases: [], capped: false };
+        return { titleHit: false, items: [], matchedTags: [], matchedAliases: [], capped: false, totalMarks: 0 };
       }
       const re = buildTermsRegex(terms);
       const items = [];
@@ -2779,7 +2779,7 @@
       hitIdx += titleScan.count;
 
       if (effectiveField === 'title') {
-        return { titleHit, items: [], matchedTags: [], matchedAliases: [], capped: false };
+        return { titleHit, items: [], matchedTags: [], matchedAliases: [], capped: false, totalMarks: titleScan.count };
       }
 
       // 2. Blocks (1 deduplicated evidence row per block / table row / attachment / OCR / PDF page)
@@ -2895,7 +2895,7 @@
         : [];
 
       const capped = items.length > 5;
-      return { titleHit, items: items.slice(0, 5), matchedTags, matchedAliases, capped };
+      return { titleHit, items: items.slice(0, 5), matchedTags, matchedAliases, capped, totalMarks: hitIdx };
     }
 
     function getFilteredDocs() {
@@ -3005,8 +3005,7 @@
       const previousReader = stage.querySelector('#search-reader-scroll');
       const readerScrollTop = previousReader?.dataset.targetId === readingTarget.id ? previousReader.scrollTop : 0;
       const activeLib = getLib(activeDoc.library);
-      const readingHits = q ? extractTargetHits(readingTarget, q) : [];
-      const totalHits = readingHits.length;
+      const totalHits = q ? extractTargetEvidence(readingTarget, q, 'all').totalMarks : 0;
       if (totalHits > 0 && state.inDocHitIndex >= totalHits) state.inDocHitIndex = 0;
       const hitCounter = { count: 0 };
 
