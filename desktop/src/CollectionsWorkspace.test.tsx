@@ -232,10 +232,78 @@ it("closes the Dida reconnect dialog only after the reading account matches", as
   expect(container.querySelector("dialog[open]")?.textContent).toContain("账号仍待同步核验");
   expect(container.querySelector("dialog[open]")?.textContent).toContain("同步并核验");
   accountMatched = true;
-  await click("我已登录，立即检查");
+  await click("重新检查");
   expect(container.querySelector("dialog[open]")).toBeNull();
   await click("来源同步与连接");
   expect(container.querySelector('dialog[open] [aria-label="立即同步滴答稍后读"]')).toBeTruthy();
+  expect(container.querySelector('dialog[open] article[aria-label="滴答稍后读"]')?.textContent).toContain("附件会话已核验");
+});
+it("retries a failed Dida session check without changing the source sync time", async () => {
+  const previousSync = 1791165600, checkedAt = 1791165700;
+  const page = { ...initial, sources: [...initial.sources, {
+    id: "dida", count: 1, connected: true, canResume: false, status: "", lastSuccess: previousSync,
+  }] };
+  let fail = true;
+  invoke.mockImplementation(async (command: string) => {
+    if (command === "list_collection_items") return page;
+    if (command === "get_collection_storage") return storage;
+    if (command === "get_dida_reading_login_status") {
+      if (fail) throw "会话检查暂不可用";
+      return { state: "verified", connected: true, accountMatched: true, checkedAt, loginWindowOpen: false, message: "账号一致" };
+    }
+    return [];
+  });
+  await mount();
+  await click("来源同步与连接");
+  const row = 'dialog[open] article[aria-label="滴答稍后读"]';
+  const previous = container.querySelector(row + " p")?.textContent?.split("检查会话")[0];
+  await click("检查会话");
+  expect(container.querySelector(row + ' [role="alert"]')?.textContent).toBe("会话检查暂不可用");
+  fail = false;
+  await click("重新检查");
+  expect(container.querySelector("dialog[open]")).toBeNull();
+  await click("来源同步与连接");
+  expect(container.querySelector(row + " p")?.textContent).toContain(previous);
+  expect(container.querySelector(row + " time")?.getAttribute("datetime")).toBe(new Date(checkedAt * 1000).toISOString());
+  expect(invoke.mock.calls.some(([command]) => command === "sync_x_bookmarks")).toBe(false);
+});
+it("keeps the cloud dialog open on failure and reads back a successful retry receipt", async () => {
+  const current = Math.floor(Date.now() / 1000);
+  let report = { completedAt: current - 600, pending: 0 };
+  let error = "";
+  let releaseStatus!: () => void;
+  const initialStatus = new Promise<void>(resolve => { releaseStatus = resolve; });
+  invoke.mockImplementation(async (command: string) => {
+    if (command === "list_collection_items") return initial;
+    if (command === "get_collection_storage") return storage;
+    if (command === "get_cloud_sync_policy") return { enabled: true, reading: true };
+    if (command === "get_reading_sync_status") {
+      await initialStatus;
+      return { supported: true, running: false, lastError: error, report };
+    }
+    if (command === "get_reading_network_policy") return { mode: "any", network: {}, allowed: true };
+    if (command === "sync_reading") {
+      if (!error) { error = "暂时无法访问云端"; throw error; }
+      error = "";
+      report = { completedAt: current, pending: 0 };
+      return report;
+    }
+    return [];
+  });
+  await mount();
+  await click("云同步状态与设置");
+  expect(container.querySelector("dialog[open]")?.textContent).toContain("正在读取同步记录…");
+  expect(container.querySelector("dialog[open]")?.textContent).not.toContain("尚未同步");
+  await act(async () => releaseStatus());
+  await click("立即同步");
+  expect(container.querySelector('dialog[open] [role="alert"]')?.textContent).toBe("暂时无法访问云端");
+  expect(container.querySelector<HTMLTimeElement>('dialog[open] time')?.dateTime).toBe(new Date((current - 600) * 1000).toISOString());
+  await click("重试同步");
+  expect(container.querySelector("dialog[open]")).toBeNull();
+  await click("云同步状态与设置");
+  expect(container.querySelector('dialog[open] time')?.textContent?.trim()).toBe("刚刚");
+  expect(container.querySelector<HTMLTimeElement>('dialog[open] time')?.dateTime).toBe(new Date(current * 1000).toISOString());
+  expect(container.querySelector('dialog[open] [role="alert"]')).toBeNull();
 });
 async function expand(label: string) {
   const summary=[...container.querySelectorAll("summary")].find(node=>node.textContent?.trim()===label)!;

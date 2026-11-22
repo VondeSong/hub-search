@@ -134,6 +134,7 @@
 .reading-reference-dialog button:disabled { opacity: .48; cursor: default; }
 .reading-reference-dialog footer { padding: 2px 16px 10px; text-align: right; }
 .reading-reference-dialog .reading-reference-link { padding: 3px 0; color: var(--reading-tools-muted); }
+.reading-reference-dialog .reading-reference-session-link { margin-inline-start: 8px; padding: 0; color: var(--reading-tools-text); text-decoration: underline; }
 .reading-reference-link:hover { text-decoration: underline; }
 .reading-reference-cloud-card { padding: 14px; background: color-mix(in srgb, var(--reading-tools-text) 2%, var(--reading-tools-paper)); border: 1px solid var(--reading-tools-line); border-radius: 10px; }
 .reading-reference-dialog .reading-reference-protection { margin: 16px 0 1px; font-size: 12.5px; }

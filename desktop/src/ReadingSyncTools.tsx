@@ -45,15 +45,21 @@ const rows = [
 const shortTime = (seconds: number) => new Date(seconds * 1000).toLocaleString("zh-CN", {
   month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
 });
+function ReceiptTime({ seconds }: { seconds: number }) {
+  const age = Date.now() - seconds * 1000;
+  return <time dateTime={new Date(seconds * 1000).toISOString()} title={shortTime(seconds)}>
+    {age >= 0 && age < 60_000 ? "刚刚" : shortTime(seconds)}
+  </time>;
+}
 const timeLabel = (seconds?: number) => seconds ? "上次 " + shortTime(seconds) : "尚未同步";
-function SourceRow({ name, state, tone, description, action, disabled, onAction, children }: {
+function SourceRow({ name, state, tone, description, action, disabled, onAction, details, children }: {
   name: string; state: string; tone?: "ok" | "warning"; description: string;
-  action: string; disabled?: boolean; onAction: () => void; children?: ReactNode;
+  action: string; disabled?: boolean; onAction: () => void; details?: ReactNode; children?: ReactNode;
 }) {
   return <article className="reading-reference-source-row" aria-label={name}>
     <div className="reading-reference-source-info">
       <div><strong>{name}</strong><span className={tone}>{state}</span></div>
-      <p>{description}</p>
+      <p>{description}{details}</p>
     </div>
     <button className="reading-reference-outline" type="button" disabled={disabled}
       aria-label={action + name} onClick={onAction}>{action}</button>
@@ -82,13 +88,13 @@ export function ReadingSourceConnections({ sources, loading, tdlReady, didaVerif
 }) {
   const [pending, setPending] = useState<CollectionSource | "obsidian" | null>(null);
   const [failure, setFailure] = useState("");
-  const [reconnecting, setReconnecting] = useState(false);
+  const [checkingDida, setCheckingDida] = useState(false);
   const active = useRef(false);
   useLayoutEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   const dida = sources.find(source => source.id === "dida");
-  const login = useDidaReadingLogin(reconnecting && !!dida?.didaCleanup?.authRequired, dida?.lastCheckedAt,
+  const login = useDidaReadingLogin(checkingDida && !!dida?.didaCleanup?.authRequired, dida?.lastCheckedAt,
     dida?.status || "", dida?.didaCleanup?.lastRun?.authenticationRequired === true, openDidaLogin);
-  const verifiedAt = reconnecting && login.currentVerified && login.feedback.status?.accountMatched && !login.latestSyncFailure
+  const verifiedAt = checkingDida && login.currentVerified && login.feedback.status?.accountMatched
     ? login.feedback.status.checkedAt : 0;
   useLayoutEffect(() => {
     if (!verifiedAt) return;
@@ -113,27 +119,40 @@ export function ReadingSourceConnections({ sources, loading, tdlReady, didaVerif
         const running = pending === id || sourceActive(id);
         const waiting = !running && sourceBusy(id);
         const busy = running || waiting;
-        const recentDidaVerification = didaVerifiedAt > 0 && didaVerifiedAt >= (source?.lastCheckedAt ?? 0);
-        const didaLogin = id === "dida" && source?.connected && source.didaCleanup?.authRequired && !recentDidaVerification;
+        const expired = id === "dida" && source?.didaCleanup?.authRequired &&
+          (!didaVerifiedAt || (source.lastCheckedAt ?? 0) > didaVerifiedAt);
+        const failedCheck = id === "dida" && checkingDida && login.feedback.phase === "failed";
+        const loginRequired = failedCheck && (login.feedback.status?.state === "authentication" || login.feedback.status?.state === "account-mismatch");
+        const didaLogin = id === "dida" && source?.connected && (expired || loginRequired);
+        const freshDida = id === "dida" && source?.connected && !didaLogin && !failedCheck && didaVerifiedAt > 0;
         const verifyOnSync = id === "dida" && login.currentVerified && login.feedback.status?.accountMatched === false;
         const connected = !!source?.connected;
         const blocked = id !== "dida" && !!source?.autoBlocked;
         const tdlMissing = id === "telegram" && connected && !tdlReady;
         const state = loading ? "正在读取" : running ? "同步中" : waiting ? "后台任务占用" : didaLogin ? "附件网页会话待核验" :
-          blocked ? "连接待检查" : tdlMissing ? "Telegram 已连接 · tdl 未就绪" : connected ? "已连接" : "未连接";
-        const action = running ? "同步中…" : waiting ? "请稍候" : verifyOnSync ? "同步并核验" : didaLogin ? "重连会话" :
+          freshDida ? "附件会话已核验" : blocked ? "连接待检查" : tdlMissing ? "Telegram 已连接 · tdl 未就绪" : connected ? "已连接" : "未连接";
+        const action = running ? "同步中…" : waiting ? "请稍候" : verifyOnSync ? "同步并核验" : didaLogin ? failedCheck ? "重试重连" : "重连会话" :
           blocked ? "重新连接" : !connected ? "连接" : "立即同步";
         return <SourceRow key={id} name={name} state={state} tone={didaLogin || blocked ? "warning" : connected && !busy ? "ok" : undefined}
           description={description + " · " + timeLabel(source?.lastSuccess)} action={action} disabled={loading || busy || (id === "dida" && login.busy)}
+          details={id === "dida" && connected && <>
+            {freshDida && <> · 最近核验 <ReceiptTime seconds={didaVerifiedAt}/></>}
+            {!didaLogin && !checkingDida && <button type="button" className="reading-reference-session-link" disabled={loading} onClick={() => {
+              setCheckingDida(true);
+              login.check();
+            }}>检查会话</button>}
+          </>}
           onAction={() => {
             if (verifyOnSync) void run(id, () => onSync(id, false));
-            else if (didaLogin) { setFailure(""); setReconnecting(true); void login.openLogin(); }
+            else if (didaLogin) { setFailure(""); setCheckingDida(true); void login.openLogin(); }
             else if (blocked || !connected) onConnect(id);
             else void run(id, () => onSync(id, !source?.canResume));
           }}>
-          {id === "dida" && reconnecting && <div className="reading-reference-inline-feedback" role="status">
-            <span>{login.feedback.message}</span>
-            <button type="button" className="reading-reference-outline" disabled={login.busy} onClick={login.check}>我已登录，立即检查</button>
+          {id === "dida" && checkingDida && <div className="reading-reference-inline-feedback">
+            <span role={failedCheck ? "alert" : "status"}>{login.feedback.message}</span>
+            <button type="button" className="reading-reference-outline" disabled={login.busy} onClick={login.check}>
+              {login.feedback.phase === "waiting" ? "我已登录，立即检查" : login.busy ? "正在检查…" : "重新检查"}
+            </button>
           </div>}
         </SourceRow>;
       })}
@@ -191,11 +210,13 @@ export function ReadingCloudOverview({ onClose, onNotice }: { onClose: () => voi
     setSyncError("");
     try {
       const report = await invoke<ReadingReport>("sync_reading");
+      if (!Number.isFinite(report?.completedAt) || report.completedAt <= 0) throw new Error("未收到有效的阅读云同步回执，请重试。");
       window.dispatchEvent(new Event("hub:reading-data-changed"));
       window.dispatchEvent(new Event("hub:cloud-data-changed"));
       if (!active.current) return;
       if (remaining(report)) {
         setSyncError("本轮同步结束，仍有内容待传输。");
+        setStatus(current => current && { ...current, running: false, lastError: "", report });
         await load();
       } else {
         onNotice("阅读云同步已完成。");
@@ -210,19 +231,23 @@ export function ReadingCloudOverview({ onClose, onNotice }: { onClose: () => voi
   };
   const networkLabel = network && ({ wifi: "仅非计费 Wi-Fi", unmetered: "仅非计费网络", any: "不限制网络" }[network.mode]);
   const running = busy || status?.running;
+  const lastError = syncError || status?.lastError;
+  const hasPending = remaining(status?.report) > 0;
+  const retry = !!lastError || hasPending || (enabled && status?.supported && network?.allowed === false);
   return <ReadingDialog title="云同步" description="已取消每轮/每日流量额度门禁，按网络与文件规则传输" kind="cloud" onClose={onClose}>
     <div className="reading-reference-dialog-body">
       <div className="reading-reference-cloud-card">
         <div><strong>阅读云同步 · {policy ? enabled ? status?.supported ? "已开启" : "未连接" : "未开启" : "正在读取"}</strong>
-          <p>{status?.report?.completedAt ? "上次同步 " + shortTime(status.report.completedAt) : "尚未同步"}{networkLabel && " · " + networkLabel}</p></div>
+          <p>{status?.report?.completedAt ? <>上次同步 <ReceiptTime seconds={status.report.completedAt}/></> :
+            status ? "尚未同步" : loadError ? "同步记录暂不可用" : "正在读取同步记录…"}{networkLabel && " · " + networkLabel}</p></div>
         <button type="button" className="reading-reference-primary" disabled={!!running || (!loadError && !policy) || (enabled && status?.supported && !network?.allowed && !loadError)}
           onClick={() => { if (loadError) void load(); else if (!enabled || !status?.supported) settings(); else void sync(); }}>
-          {running ? "同步中…" : loadError ? "重新读取" : policy && (!enabled || !status?.supported) ? "打开设置" : "立即同步"}
+          {running ? "同步中…" : loadError ? "重新读取" : policy && (!enabled || !status?.supported) ? "打开设置" : retry ? "重试同步" : "立即同步"}
         </button>
       </div>
       {network && !network.allowed && <p className="reading-reference-error" role="status">{network.reason || "当前网络不符合阅读传输策略"}</p>}
-      {(loadError || syncError || status?.lastError) && <p className="reading-reference-error" role="alert">{loadError || syncError || status?.lastError}</p>}
-      {!syncError && remaining(status?.report) > 0 && <p className="reading-reference-error" role="status">上轮同步仍有内容待传输</p>}
+      {!running && (loadError || lastError) && <p className="reading-reference-error" role="alert">{loadError || lastError}</p>}
+      {!running && !lastError && hasPending && <p className="reading-reference-error" role="status">上轮同步仍有内容待传输</p>}
       <p className="reading-reference-protection"><strong>滴答来源清理保护：</strong>云同步启用时默认关闭自动清理，需完整云恢复 + 原设备凭证 + 删除前复核全部通过。</p>
     </div>
     <footer><button type="button" className="reading-reference-link" onClick={settings}>云同步设置</button></footer>

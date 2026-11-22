@@ -322,12 +322,12 @@
       activeDemoName: '',
       browseWidthPx: 356,
       scrollTop: 0,
-      cloudSync: { enabled: true, lastSync: '15:58', network: '仅 Wi-Fi 下载大文件' },
+      cloudSync: { enabled: true, lastSync: '15:58', network: '仅 Wi-Fi 下载大文件', error: '' },
       sourceSync: {
         x_bookmark: { status: 'ok', last: '15:52' },
         x_like: { status: 'ok', last: '15:50' },
         telegram: { status: 'ok', last: '15:55', tdl: '已连接个人号（支持大附件补全）' },
-        dida: { status: 'warn', last: '15:40', note: '附件网页会话过期' },
+        dida: { status: 'warn', last: '15:40', note: '附件网页会话过期', verifiedAt: '', error: '' },
         obsidian: { status: 'ok', last: '15:30', path: 'D:\\Vaults\\Research\\Sources' }
       }
     };
@@ -1286,11 +1286,12 @@
     function openModal(html, maxW = 540, label = "") {
       const root = document.getElementById('modal-root');
       const card = document.getElementById('modal-card');
+      const wasOpen = !root.classList.contains('hidden');
       card.style.maxWidth = maxW + 'px';
       card.innerHTML = html;
       root.classList.remove('hidden');
       if (label) {
-        readingModalOpener = document.activeElement;
+        if (!wasOpen) readingModalOpener = document.activeElement;
         focusReadingControl(card, label, true);
       }
       if (window.lucide) lucide.createIcons();
@@ -1404,6 +1405,14 @@
         </div>`, 460);
     }
 
+    function syncRetryFeedback(message, kind) {
+      if (!message) return '';
+      return `<div class="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-amber-900">
+        <span role="alert">${message}</span>
+        ${state.offlineMode ? `<button data-restore-sync-network="${kind}" class="px-2 py-1 rounded-[7px] border border-black/10">恢复演示网络</button>` : ''}
+      </div>`;
+    }
+
     function openSyncModal() {
       const list = [
         { k: 'x_bookmark', n: 'X 书签', d: '采集正文、引用与附件；支持放弃回写' },
@@ -1420,13 +1429,21 @@
         <div class="p-4 divide-y divide-black/[0.05] text-[13px] overflow-y-auto">
           ${list.map(r => {
             const st = state.sourceSync[r.k];
+            const isDida = r.k === 'dida';
+            const status = st.status === 'warn' ? st.note : st.verifiedAt ? '附件会话已核验' : '已连接';
+            const action = st.error ? '重试重连' : st.status === 'warn' ? '重连会话' : '立即同步';
             return `
-              <div class="py-3 flex items-center justify-between gap-3">
-                <div>
-                  <div class="font-medium text-neutral-900 flex items-center gap-2">${r.n} <span class="text-[11px] font-normal ${st.status==='warn'?'text-amber-700':'text-teal-700'}">${st.status==='warn'?st.note:'已连接'}</span></div>
-                  <div class="text-[12px] text-neutral-400 mt-0.5">${r.d} · 上次 ${st.last}</div>
+              <div class="py-3">
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <div class="font-medium text-neutral-900 flex items-center gap-2">${r.n} <span class="text-[11px] font-normal ${st.status==='warn'?'text-amber-700':'text-teal-700'}">${status}</span></div>
+                    <div class="text-[12px] text-neutral-400 mt-0.5">${r.d} · 上次 ${st.last}${st.verifiedAt ? ' · 最近核验 ' + st.verifiedAt : ''}
+                      ${isDida && st.status !== 'warn' ? '<button data-dida-session class="ml-2 text-neutral-600 underline">检查会话</button>' : ''}
+                    </div>
+                  </div>
+                  <button data-run-sync="${r.k}" class="px-3 py-1 rounded-[7px] border border-black/10 hover:bg-neutral-50 text-[12px] text-neutral-700 font-medium whitespace-nowrap">${action}</button>
                 </div>
-                <button data-run-sync="${r.k}" class="px-3 py-1 rounded-[7px] border border-black/10 hover:bg-neutral-50 text-[12px] text-neutral-700 font-medium whitespace-nowrap">${st.status==='warn'?'重连会话':'立即同步'}</button>
+                ${isDida ? syncRetryFeedback(st.error, 'dida') : ''}
               </div>`;
           }).join('')}
         </div>`, 540, '来源同步与连接');
@@ -1441,8 +1458,9 @@
         <div class="p-5 space-y-4 text-[13px]">
           <div class="p-3.5 rounded-[10px] bg-[#FAFAFA] hair-box flex items-center justify-between">
             <div><div class="font-medium text-neutral-900">阅读云同步 · 已开启</div><div class="text-[12px] text-neutral-400 mt-0.5">上次同步 ${state.cloudSync.lastSync} · ${state.cloudSync.network}</div></div>
-            <button id="btn-cloud-now" class="px-3 py-1.5 rounded-[8px] bg-neutral-900 text-white text-[12px] font-medium">立即同步</button>
+            <button id="btn-cloud-now" class="px-3 py-1.5 rounded-[8px] bg-neutral-900 text-white text-[12px] font-medium">${state.cloudSync.error ? '重试同步' : '立即同步'}</button>
           </div>
+          ${syncRetryFeedback(state.cloudSync.error, 'cloud')}
           <div class="text-[12.5px] text-neutral-600 leading-relaxed">
             <strong class="text-neutral-900">滴答来源清理保护：</strong>云同步启用时默认关闭自动清理，需完整云恢复 + 原设备凭证 + 删除前复核全部通过。
           </div>
@@ -1845,14 +1863,50 @@
       if (t.id === 'btn-sync-modal' || t.id === 'btn-empty-sync') { openSyncModal(); return; }
       if (t.id === 'btn-empty-demo') { state.emptyMode = false; state.activeDemoName = ''; renderAll(); return; }
       if (t.id === 'btn-cloud-modal') { openCloudModal(); return; }
-      if (t.id === 'btn-cloud-now' && state.offlineMode) { toast('当前离线，联网后可重试云同步', 'warn'); return; }
-      if (t.id === 'btn-cloud-now') { state.cloudSync.lastSync = '刚刚'; closeModal(); renderAll(); toast('云同步完成', 'ok'); return; }
+      if (t.dataset.restoreSyncNetwork) {
+        state.offlineMode = false;
+        renderAll();
+        if (t.dataset.restoreSyncNetwork === 'cloud') {
+          openCloudModal();
+          document.getElementById('btn-cloud-now').focus();
+        } else {
+          openSyncModal();
+          document.querySelector('[data-run-sync="dida"]').focus();
+        }
+        return;
+      }
+      if (t.id === 'btn-cloud-now') {
+        if (state.offlineMode) {
+          state.cloudSync.error = '当前离线，联网后可重试云同步';
+          openCloudModal();
+          document.getElementById('btn-cloud-now').focus();
+          return;
+        }
+        state.cloudSync.error = '';
+        state.cloudSync.lastSync = '刚刚';
+        closeModal(); renderAll(); toast('阅读云同步已完成', 'ok'); return;
+      }
+      const dida = state.sourceSync.dida;
+      if (t.hasAttribute('data-dida-session') || (t.dataset.runSync === 'dida' && dida.status === 'warn')) {
+        if (state.offlineMode) {
+          dida.error = '当前离线，联网后可重试滴答会话核验';
+          dida.status = 'warn';
+          dida.note = '附件网页会话待核验';
+          openSyncModal();
+          document.querySelector('[data-run-sync="dida"]').focus();
+          return;
+        }
+        dida.error = '';
+        dida.status = 'ok';
+        dida.note = '';
+        dida.verifiedAt = '刚刚';
+        closeModal(); renderAll(); toast('滴答附件会话已核验', 'ok'); return;
+      }
       if (t.dataset.runSync) {
         const k = t.dataset.runSync;
         if (state.offlineMode && k !== 'obsidian') { toast('当前离线，联网后可重试来源同步', 'warn'); return; }
-        if (k === 'dida' && state.sourceSync.dida.status === 'warn') { state.sourceSync.dida.status = 'ok'; state.sourceSync.dida.note = ''; toast('滴答会话已重连', 'ok'); }
-        else toast('阶段：读来源 → 存本机 → 补附件（已完成）', 'ok');
-        state.sourceSync[k].last = '刚刚'; closeModal(); renderAll(); return;
+        state.sourceSync[k].last = '刚刚';
+        closeModal(); renderAll(); toast('阶段：读来源 → 存本机 → 补附件（已完成）', 'ok'); return;
       }
       if (t.id === 'btn-collect-cfg') {
         openModal(`
