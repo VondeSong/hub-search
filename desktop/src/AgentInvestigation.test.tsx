@@ -236,7 +236,7 @@ it("opens a quote in an independent assistant and preserves both chats when dock
   const resizeSide = document.querySelector(`.agent-panel-resizer[aria-controls="${side.id}"]`)!;
   await act(async () => resizeSide.dispatchEvent(new KeyboardEvent("keydown", {key:"ArrowLeft", bubbles:true})));
   expect(document.body.style.getPropertyValue("--agent-extra-panel-width")).toBe("450px");
-  expect(document.body.style.getPropertyValue("--agent-panel-width")).toBe("440px");
+  expect(document.body.style.getPropertyValue("--agent-panel-width")).toBe("480px");
   await click("关闭助手");
   expect(main.hidden).toBe(true);
   expect(side.hidden).toBe(false);
@@ -688,7 +688,7 @@ it("drags the floating panel height, clamps to the viewport and keeps the draft"
  const pointer=(type:string,y:number,id=1)=>{const event=resizePointer(type,0,id);Object.defineProperty(event,'clientY',{value:y});return event;};
  const initial=value();await act(async()=>edge.dispatchEvent(pointer('pointerdown',400)));
  await act(async()=>window.dispatchEvent(pointer('pointermove',320,2)));expect(value()).toBe(initial);
- await act(async()=>window.dispatchEvent(pointer('pointermove',320)));expect(value()).toBe(initial+80);
+ await act(async()=>window.dispatchEvent(pointer('pointermove',320)));expect(value()).toBe(Math.min(initial+80,window.innerHeight-24));
  await act(async()=>window.dispatchEvent(pointer('pointermove',-2000)));expect(value()).toBe(window.innerHeight-24);
  await act(async()=>window.dispatchEvent(pointer('pointermove',2000)));expect(value()).toBe(320);
  await act(async()=>window.dispatchEvent(pointer('pointercancel',2000)));expect(document.body.classList.contains('resizing-agent-panel-height')).toBe(false);
@@ -713,33 +713,34 @@ it("restores both dimensions in a newly mounted floating assistant and respects 
 });
 it("ignores invalid persisted panel dimensions without preventing the assistant from opening",async()=>{
  localStorage.setItem('hub.agent.panel.width.v1','NaN');localStorage.setItem('hub.agent.panel.height.v1','-20');
- const dock=await openResizeDock();expect(dock.width()).toBe(440);
- expect(Number.parseInt(document.body.style.getPropertyValue('--agent-panel-height'))).toBe(Math.max(320,Math.round(window.innerHeight/2)));
+ const dock=await openResizeDock();expect(dock.width()).toBe(480);
+ expect(Number.parseInt(document.body.style.getPropertyValue('--agent-panel-height'))).toBe(Math.max(320,window.innerHeight-64));
 });
 it("resizes the assistant from its divider, clamps to the viewport limits and releases the drag", async () => {
   const dock = await openResizeDock();
-  expect(dock.separator.getAttribute("aria-valuenow")).toBe("440");
+  expect(dock.separator.getAttribute("aria-valuenow")).toBe("480");
   await act(async () => dock.separator.dispatchEvent(resizePointer("pointerdown", 600)));
   await act(async () => window.dispatchEvent(resizePointer("pointermove", 400, 2)));
-  expect(dock.width()).toBe(440);
+  expect(dock.width()).toBe(480);
   await act(async () => window.dispatchEvent(resizePointer("pointermove", 400)));
-  expect(dock.width()).toBe(640);
+  expect(dock.width()).toBe(680);
   await openAddPage("更多设置");
-  expect(dock.separator.getAttribute("aria-valuenow")).toBe("640");
+  expect(dock.separator.getAttribute("aria-valuenow")).toBe("680");
   await act(async () => window.dispatchEvent(resizePointer("pointermove", 900)));
-  expect(dock.width()).toBe(140);
+  expect(dock.width()).toBe(180);
   await act(async () => window.dispatchEvent(resizePointer("pointerup", 900)));
   expect(document.body.classList.contains("resizing-agent-panel")).toBe(false);
   await act(async () => window.dispatchEvent(resizePointer("pointermove", 400)));
-  expect(dock.width()).toBe(140);
+  expect(dock.width()).toBe(180);
   await act(async () => dock.separator.dispatchEvent(new MouseEvent("dblclick", { bubbles: true })));
-  expect(dock.width()).toBe(440);
+  expect(dock.width()).toBe(480);
   expect(invoke.mock.calls.map(([, { args }]) => args.action)).toEqual(["list", "list"]);
 });
 it("keeps divider, sliders and keyboard adjustment aligned when the viewport becomes narrower", async () => {
   const dock = await openResizeDock();
+  await dock.resize(1536);
   await act(async () => dock.separator.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true })));
-  expect(dock.width()).toBe(976);
+  expect(dock.width()).toBe(1512);
   await dock.resize(720);
   expect(dock.width()).toBe(696);
   expect(dock.separator.getAttribute("aria-valuemax")).toBe("696");
@@ -752,7 +753,7 @@ it("keeps divider, sliders and keyboard adjustment aligned when the viewport bec
   await act(async () => dock.separator.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", shiftKey: true, bubbles: true })));
   expect(dock.width()).toBe(40);
   await act(async () => dock.separator.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
-  expect(dock.width()).toBe(440);
+  expect(dock.width()).toBe(480);
 });
 it("ends a cancelled or closed divider drag without losing the conversation draft", async () => {
   const dock = await openResizeDock(); await fill("investigationGoal", "保留这条未发送草稿");
@@ -760,13 +761,13 @@ it("ends a cancelled or closed divider drag without losing the conversation draf
   await act(async () => window.dispatchEvent(resizePointer("pointermove", 560)));
   await act(async () => window.dispatchEvent(resizePointer("pointercancel", 560)));
   expect(document.body.classList.contains("resizing-agent-panel")).toBe(false);
-  expect(dock.width()).toBe(480);
+  expect(dock.width()).toBe(520);
   await act(async () => dock.separator.dispatchEvent(resizePointer("pointerdown", 600)));
   await click("关闭助手");
   expect(document.body.classList.contains("resizing-agent-panel")).toBe(false);
   await act(async () => window.dispatchEvent(resizePointer("pointermove", 400)));
   await click("调查这篇笔记");
-  expect(dock.width()).toBe(480);
+  expect(dock.width()).toBe(520);
   expect(document.body.querySelector<HTMLTextAreaElement>('[name="investigationGoal"]')!.value).toBe("保留这条未发送草稿");
   expect(invoke.mock.calls.some(([, { args }]) => args.action === "respond")).toBe(false);
 });
@@ -775,10 +776,10 @@ it("mirrors divider movement for an RTL preview", async () => {
   const dock = await openResizeDock();
   await act(async () => dock.separator.dispatchEvent(resizePointer("pointerdown", 600)));
   await act(async () => window.dispatchEvent(resizePointer("pointermove", 640)));
-  expect(dock.width()).toBe(480);
+  expect(dock.width()).toBe(520);
   await act(async () => window.dispatchEvent(resizePointer("pointerup", 640)));
   await act(async () => dock.separator.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })));
-  expect(dock.width()).toBe(490);
+  expect(dock.width()).toBe(530);
 });
 it("grants only explicitly selected extra documents across libraries before the first model run",async()=>{
  const fallback=invoke.getMockImplementation()!;
@@ -1025,6 +1026,30 @@ it("loads an existing interrupted work without starting a model", async () => {
   expect(document.body.textContent).toContain("已中断，可继续");
   expect(button("继续调查")).toBeTruthy();
   expect(invoke.mock.calls.some(([, { args }]) => args.action === "respond")).toBe(false);
+});
+it("shows a historical failed turn with an unpublished draft in the recovery card", async () => {
+  const activity: ActivityRun = {
+    runId: "failed-run", revision: 1, state: "failed", running: false, startedAt: 1000, finishedAt: 39000, steps: 1,
+    events: [{ id: "draft", kind: "unpublishedAnswer", state: "unverified", label: "已留存的答复", createdAt: 39000 }],
+  };
+  current = Object.assign(makeView("failed"), {
+    activity: [activity], run: { id: activity.runId, usage: {}, error: "部分资料未核对" }, lifecycle: quotaLifecycle(true, false),
+  });
+  invoke.mockImplementation(async (_, { args }) => args.action === "list" ? { works: [{ id: "work-1", goal: current.work.goal, state: "failed" }] } : current);
+  await open();
+  const card = document.querySelector(".agent-recovery-card")!;
+  expect(card.textContent).toContain("未完成最终核验，已为你保留草稿");
+  expect(card.textContent).toContain("部分资料未核对");
+  expect(document.querySelector(".agent-activity-state")?.textContent).toBe("未完成");
+  expect(document.querySelector<HTMLElement>(".agent-status")?.hidden).toBe(true);
+  expect(document.body.textContent).not.toContain("继续调查");
+  expect(card.textContent).not.toContain("已留存的答复");
+  await click("查看草稿预览");
+  expect(card.querySelector(".agent-recovery-preview")?.textContent).toContain("已留存的答复");
+  expect(invoke.mock.calls.some(([, { args }]) => args.action === "respond" || args.action === "resume")).toBe(false);
+  await click("继续完成");
+  expect(invoke.mock.calls.filter(([, { args }]) => args.action === "respond")).toHaveLength(1);
+  expect(invoke.mock.calls.some(([, { args }]) => args.action === "resume")).toBe(false);
 });
 it.each([
   { initialState: "ready", label: "继续调查", action: "respond", kind: "continue" },
@@ -2126,22 +2151,30 @@ it("does not start a request when a dropped text snapshot exceeds the material l
  expect(document.body.textContent).toContain('每份最多2500字');expect(document.querySelector('[data-material-kind="flashcard"]')).toBeNull();
  expect(invoke.mock.calls.some(([,p])=>['message','create','respond'].includes(p?.args?.action))).toBe(false);
 });
-it("stages a dropped local text file without sending and includes it only with the question",async()=>{
- const locator={kind:'note',libraryId:'__hub_chat_text',documentId:'local-text',pageId:null};
- invoke.mockImplementation(async(_,{args})=>args.action==='list'?{works:[]}:args.action==='stageTextFile'?{locator,title:'核对.md',libraryName:'本地文本附件',path:'核对.md',totalChars:8}:current);
+it("collapses pending file chips without dropping attachments from the next question",async()=>{
+ const names=[1,2,3,4].map(index=>`核对 ${index}.md`);
+ const locator=(title:string)=>({kind:'note',libraryId:'__hub_chat_text',documentId:title,pageId:null});
+ invoke.mockImplementation(async(_,{args})=>args.action==='list'?{works:[]}:args.action==='stageTextFile'?{locator:locator(args.title),title:args.title,libraryName:'本地文本附件',path:args.title,totalChars:8}:current);
  await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
- await act(async()=>{const event=new Event('drop',{bubbles:true,cancelable:true});Object.defineProperty(event,'dataTransfer',{value:{files:[new File(['附件里的核对事项'],'核对.md',{type:'text/markdown'})]}});document.querySelector('.agent-composer')!.dispatchEvent(event);await new Promise(r=>setTimeout(r,30));});
- await vi.waitFor(async()=>{await act(async()=>{await new Promise(resolve=>setTimeout(resolve,0));});expect(document.querySelector('[data-material-kind="page"]')?.textContent).toContain('核对.md');});
+ await act(async()=>{const event=new Event('drop',{bubbles:true,cancelable:true});Object.defineProperty(event,'dataTransfer',{value:{files:names.map(name=>new File(['附件里的核对事项'],name,{type:'text/markdown'}))}});document.querySelector('.agent-composer')!.dispatchEvent(event);});
+ const chips=()=>Array.from(document.querySelectorAll('.agent-composer [data-material-kind="file"] .agent-token-title'),chip=>chip.textContent);
+ await vi.waitFor(async()=>{await act(async()=>{await new Promise(resolve=>setTimeout(resolve,0));});expect(chips()).toEqual(names.slice(0,3));});
  expect(invoke.mock.calls.some(([,p])=>['create','message','respond'].includes(p?.args?.action))).toBe(false);
+ const toggle=document.querySelector<HTMLButtonElement>('.agent-composer-more-files')!;
+ expect(toggle.textContent).toBe('+1 个文件');
+ await act(async()=>toggle.click());expect(toggle.getAttribute('aria-expanded')).toBe('true');expect(chips()).toEqual(names);
+ await act(async()=>toggle.click());expect(chips()).toEqual(names.slice(0,3));
  await fill('investigationGoal','核对附件');await click('开始调查');
  const request=invoke.mock.calls.find(([,p])=>p?.args?.action==='create')![1].args;
- expect(request.goal).toBe('核对附件');expect(request.grant.notes).toEqual([locator]);
+ expect(request.goal).toBe('核对附件');expect(request.grant.notes).toEqual(names.map(locator));
  expect(JSON.stringify(request)).not.toContain('附件里的核对事项');
 });
 it("explains when this runtime cannot open a pasted original attachment",async()=>{
  await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
  await act(async()=>{const event=new Event('paste',{bubbles:true,cancelable:true});Object.defineProperty(event,'clipboardData',{value:{files:[new File(['pdf'],'图纸.pdf',{type:'application/pdf'})]}});document.querySelector('.agent-composer')!.dispatchEvent(event);});
  expect(document.body.textContent).toContain('读取这类原件需要 Windows 桌面版的 Codex 连接');
+ expect(document.querySelector('.agent-composer-alert + .agent-composer')).not.toBeNull();
+ await click('关闭附件提示');expect(document.querySelector('.agent-composer-alert')).toBeNull();
  expect(invoke.mock.calls.some(([,p])=>['create','message','respond'].includes(p?.args?.action))).toBe(false);
 });
 it("stages pasted pixels locally, retains them after a failed send and retries the same message",async()=>{
@@ -2164,6 +2197,7 @@ it("stages pasted pixels locally, retains them after a failed send and retries t
   await open();
   const pasteImage=()=>act(async()=>{const event=new Event('paste',{bubbles:true,cancelable:true});Object.defineProperty(event,'clipboardData',{value:{files:[new File(['sample'],'截图.png',{type:'image/png'})]}});document.querySelector('.agent-composer')!.dispatchEvent(event);});
   await pasteImage();
+  expect(document.querySelector('.agent-pending-image button[aria-label="放大 截图.png"]')).not.toBeNull();
   expect(invoke.mock.calls.some(([,p])=>p?.args?.action==='stageImage')).toBe(true);
   expect(invoke.mock.calls.some(([,p])=>['message','respond'].includes(p?.args?.action))).toBe(false);
   await fill('investigationGoal','分析截图');await click('发送追问');

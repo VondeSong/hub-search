@@ -3,6 +3,7 @@ import {invoke} from "@tauri-apps/api/core";
 import type {ImageGrant} from "./AgentImages";
 import type {AgentMaterial,NoteLocator} from "./AgentMaterials";
 import {AgentMaterialCard} from "./AgentMaterialCard";
+import {X} from "lucide-react";
 
 export const isTextAttachment=(locator:{libraryId?:string})=>locator.libraryId==="__hub_chat_text";
 export function fileUseHint(item:AgentMaterial, deepseek:boolean){
@@ -42,13 +43,17 @@ export async function readTextFile(file:File):Promise<string>{
  return text;
 }
 export function AgentImageCards({images,disabled,pending,onRemove}:{images:ImageGrant[];disabled?:boolean;pending?:boolean;onRemove?:(grant:ImageGrant)=>void}){
- return <div className="agent-image-cards" aria-label={pending?"待发送图片":onRemove?"已授权图片":"已发送图片"}>{images.map(grant=><ImageCard key={JSON.stringify(grant)} grant={grant} disabled={disabled} pending={pending} onRemove={onRemove?()=>onRemove(grant):undefined}/>)}</div>;
+ return <div className={pending?"agent-image-cards agent-pending-images":"agent-image-cards"} aria-label={pending?"待发送图片":onRemove?"已授权图片":"已发送图片"}>{images.map(grant=><ImageCard key={JSON.stringify(grant)} grant={grant} disabled={disabled} pending={pending} onRemove={onRemove?()=>onRemove(grant):undefined}/>)}</div>;
 }
 function ImageCard({grant,disabled,pending,onRemove}:{grant:ImageGrant;disabled?:boolean;pending?:boolean;onRemove?:()=>void}){
  const [preview,setPreview]=useState<{title:string;url:string}|null>(null),[error,setError]=useState("");
  useEffect(()=>{let alive=true;void invoke<{title:string;url:string}>("agent_investigation",{args:{action:"imagePreview",grant}}).then(value=>{if(alive)setPreview(value);},()=>{if(alive)setError("图片预览不可用");});return()=>{alive=false;};},[JSON.stringify(grant)]);
  if(!onRemove) return preview?<AgentImagePreview image={preview} showTitle/>:<span className="agent-image-card" role="status">{error||"正在读取图片…"}</span>;
- return <div className="agent-image-card">{preview?.url&&<img src={preview.url} alt={preview.title}/>}<span><strong>{preview?.title||"图片"}</strong><small>{error||(pending?"随问题发送 · 图片分析":"已添加 · 图片分析")}</small></span><button type="button" disabled={disabled} aria-label={`移除图片 ${preview?.title||"图片"}`} onClick={onRemove}>×</button></div>;
+ if(pending) return <div className="agent-pending-image">
+  {preview ? <AgentImagePreview image={preview} showTitle/> : <span className="agent-pending-image-status" role="status">{error||"正在读取图片…"}</span>}
+  <button type="button" className="agent-pending-image-remove" disabled={disabled} aria-label={`移除图片 ${preview?.title||"图片"}`} onClick={onRemove}><X size={12} aria-hidden="true"/></button>
+ </div>;
+ return <div className="agent-image-card">{preview?.url&&<img src={preview.url} alt={preview.title}/>}<span><strong>{preview?.title||"图片"}</strong><small>{error||"已添加 · 图片分析"}</small></span><button type="button" disabled={disabled} aria-label={`移除图片 ${preview?.title||"图片"}`} onClick={onRemove}>×</button></div>;
 }
 
 export function AgentImagePreview({image,showTitle=false}:{image:{title:string;url:string};showTitle?:boolean}){

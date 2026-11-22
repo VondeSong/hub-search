@@ -2,7 +2,7 @@
 .agent-launcher:hover, .agent-launcher[aria-expanded="true"] { color: var(--hub-accent); background: var(--hub-accent-soft); }
 .agent-launcher-compact { margin: 0; }
 .agent-investigation { color: var(--hub-text-primary); background: var(--hub-content-surface); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
-.agent-panel { container: agent-assistant / inline-size; position: fixed; z-index: 200; inset: 12px 12px 12px auto; width: min(440px, calc(100vw - 24px)); display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--hub-separator); border-radius: 12px; box-shadow: 0 4px 24px var(--hub-separator); overflow: hidden; }
+.agent-panel { container: agent-assistant / inline-size; position: fixed; z-index: 200; inset: 12px 12px 12px auto; width: min(480px, calc(100vw - 24px)); display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--hub-separator); border-radius: 12px; box-shadow: 0 4px 24px var(--hub-separator); overflow: hidden; }
 .agent-panel[hidden] { display: none; }
 .preview-pane { container: agent-preview / inline-size; }
 .workspace.with-preview:has(.agent-panel:not([hidden])) { grid-template-columns: minmax(180px, 24%) 8px minmax(0, 1fr); }
@@ -111,7 +111,7 @@ body.resizing-agent-panel * { cursor: col-resize !important; user-select: none !
 .agent-user-message-content {
   min-width: 0; max-width: 100%; padding: 12px 16px;
   border: 1px solid color-mix(in srgb, var(--agent-chat-border) 60%, transparent);
-  border-radius: 16px 6px 16px 16px; background: var(--agent-chat-subtle);
+  border-radius: 16px 4px 16px 16px; background: var(--agent-chat-subtle);
   font-size: 13.5px; line-height: 1.625;
 }
 .agent-user-message-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; max-width:100%; padding-top:2px; color:var(--agent-chat-secondary); font-size:11.5px; }
@@ -515,13 +515,13 @@ body.resizing-agent-panel * { cursor: col-resize !important; user-select: none !
 .agent-body-citation { position:absolute; inset:0; z-index:40; overflow:auto; background:var(--hub-content-surface); padding:24px; }
 .agent-global-owner > .agent-launcher { display:none; }
 body {
-  --agent-main-slot: min(var(--agent-panel-width, 440px), calc(100vw - 24px));
+  --agent-main-slot: min(var(--agent-panel-width, 480px), calc(100vw - 24px));
   --agent-extra-slot: min(var(--agent-extra-panel-width, 440px), calc(100vw - 24px));
   --agent-main-dock: 0px;
   --agent-extra-dock: 0px;
 }
 body:has(> .agent-panel:not([data-agent-extra], [hidden])):has(> .agent-panel[data-agent-extra]:not([hidden])) {
-  --agent-main-slot: min(var(--agent-panel-width, 440px), calc(100vw - clamp(160px, 38vw, 360px) - 32px));
+  --agent-main-slot: min(var(--agent-panel-width, 480px), calc(100vw - clamp(160px, 38vw, 360px) - 32px));
   --agent-extra-slot: min(var(--agent-extra-panel-width, 440px), calc(100vw - var(--agent-main-slot) - 32px));
 }
 body:has(> .agent-panel[data-agent-docked=true]:not([data-agent-extra], [hidden])) {
@@ -538,7 +538,7 @@ body:has(> .agent-panel[data-agent-extra]:not([hidden])) > .agent-floating-launc
 }
 body > :is(.agent-panel, .agent-panel-resizer, .agent-panel-height-resizer) {
   --agent-slot-width: var(--agent-main-slot);
-  --agent-slot-height: var(--agent-panel-height, 50dvh);
+  --agent-slot-height: var(--agent-panel-height, calc(100dvh - 64px));
   --agent-slot-offset: 0px;
 }
 body > :is(.agent-panel, .agent-panel-resizer, .agent-panel-height-resizer)[data-agent-extra] {
@@ -660,7 +660,8 @@ body.resizing-agent-panel-height * { cursor:row-resize !important; user-select:n
 .agent-body .agent-material-card .agent-context-open { min-width:0; width:100%; gap:10px; }
 .agent-composer-materials { display:flex; flex-wrap:wrap; gap:8px; max-height:160px; overflow-y:auto; overscroll-behavior:contain; padding:7px 6px 0; margin-inline:-6px; }
 .agent-composer-materials:empty { display:none; }
-.agent-composer-materials > .agent-pending-materials { display:contents; }
+.agent-composer-tokens { display:flex; flex:1 0 100%; flex-wrap:wrap; align-items:center; gap:6px; min-width:0; }
+.agent-composer-tokens > .agent-pending-materials { display:contents; }
 .agent-message-references { display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-top:10px; }
 .agent-body .agent-reference-token.agent-material-card { position:relative; display:inline-flex; align-items:center; gap:0; min-height:30px; max-width:100%; padding:0; border:0; border-radius:7px; background:var(--hub-control-fill); color:var(--hub-text-secondary); box-shadow:none; font-size:13px; font-weight:400; }
 .agent-body .agent-token-disclosure { border:0; border-radius:0; background:transparent; padding:0; margin:0; min-width:0; }
@@ -763,7 +764,10 @@ body.resizing-agent-panel-height * { cursor:row-resize !important; user-select:n
 .agent-runtime-details :is(p,li), .agent-web-details li { overflow-wrap:anywhere; }
 .agent-operation-group > summary > svg { flex-shrink:0; }
 .agent-operation-children { overflow-wrap:anywhere; }
-.agent-operation-group > .agent-operation-children { padding-block:2px; padding-inline-start:24px; }
+.agent-operation-group > .agent-operation-children {
+  margin-block: 4px; padding-inline-start: 16px; border-inline-start: 1px solid var(--agent-chat-border);
+}
+.agent-activity .agent-context-event[data-rule] > svg { color: var(--hub-accent); }
 .agent-activity .agent-tool-activity > summary { color:var(--hub-text-secondary); }
 .agent-activity .agent-process-failure { flex-wrap:wrap; }
 .agent-activity .agent-show-more { margin-block:6px 2px; }
@@ -828,7 +832,7 @@ body.resizing-agent-panel-height * { cursor:row-resize !important; user-select:n
 .agent-activity details[open] > summary > .agent-reasoning-chevron { transform:none; }
 .agent-activity details > summary:is(:hover,:focus-visible) > .agent-reasoning-chevron { opacity:1; }
 @media (hover:hover) {
-  .agent-activity :is(.agent-operation-group,.agent-context-event > details) > summary:not(:hover,:focus-visible) > .agent-reasoning-chevron { opacity:0; }
+  .agent-activity .agent-context-event > details > summary:not(:hover,:focus-visible) > .agent-reasoning-chevron { opacity:.5; }
 }
 @media (prefers-reduced-motion:no-preference) and (forced-colors:none) {
   @supports (background-clip:text) {

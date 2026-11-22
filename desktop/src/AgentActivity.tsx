@@ -1,7 +1,7 @@
 import { publicWebHref } from "./AgentWebSources";
 import { invoke } from "@tauri-apps/api/core";
 import { createContext, memo, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, Ellipsis, Layers, Play, TriangleAlert } from "lucide-react";
+import { ChevronDown, ChevronRight, Database, Ellipsis, FileText, Layers, Play, Shield, TriangleAlert } from "lucide-react";
 import { ActivityIcon, ActivityIdentity, WebsiteIcon, activityLabel, activityOperation, activityServiceTitle, operationLabels, type ActivityOperation } from "./AgentActivityIdentity";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -23,6 +23,7 @@ const DisclosureContext=createContext<{
 const FollowConversationContext = createContext<(() => boolean) | undefined>(undefined);
 type RecoveryControls = {
   runId?: string | null;
+  retry?: boolean;
   reason: string;
   canResume: boolean;
   onResume: () => void;
@@ -74,13 +75,13 @@ export function AgentRecoveryCard({controls, draft, truncated, runId}: {
   return <section className="agent-recovery-card" aria-label="暂停后的操作">
     <div className="agent-recovery-heading">
       <span className="agent-recovery-icon"><TriangleAlert size={15} aria-hidden="true"/></span>
-      <div><strong>{draft ? "未完成最终核验，已保留草稿" : "任务已暂停"}</strong>
+      <div><strong>{draft ? "未完成最终核验，已为你保留草稿" : "任务已暂停"}</strong>
         {controls.reason && <p>{controls.reason}</p>}</div>
     </div>
     <div className="agent-recovery-actions">
       <button type="button" className="agent-recovery-resume" disabled={!controls.canResume} onClick={controls.onResume}><Play size={13} aria-hidden="true"/>继续完成</button>
-      {controls.onScope && <button type="button" onClick={event=>controls.onScope?.(event.currentTarget)}><Layers size={14} aria-hidden="true"/>核对资料范围</button>}
-      {draft && <button type="button" className="agent-recovery-preview-toggle" aria-expanded={open} aria-controls={open ? previewId : undefined} onClick={()=>setOpen(!open)}>{open ? "收起草稿" : "查看草稿预览"}<ChevronDown size={13} aria-hidden="true"/></button>}
+      {controls.onScope && <button type="button" onClick={event=>controls.onScope?.(event.currentTarget)}><Database size={14} aria-hidden="true"/>核对资料范围</button>}
+      {draft && <button type="button" className="agent-recovery-preview-toggle" aria-expanded={open} aria-controls={open ? previewId : undefined} onClick={()=>setOpen(!open)}>{open ? "收起草稿" : "查看草稿预览"}{open ? <ChevronDown size={13} aria-hidden="true"/> : <ChevronRight size={13} aria-hidden="true"/>}</button>}
     </div>
     {draft && open && <div className="agent-recovery-preview" id={previewId}>
       <div><strong>答复草稿</strong><small>{truncated ? "部分预览 · 未核验" : "仅预览 · 未核验"}</small></div>
@@ -311,7 +312,15 @@ function ActivityEventView({ event, scope, runId }: { event: ActivityEvent; scop
       {detailOpen && (scope && event.imageCount && event.sequence!=null ? <div className="agent-receipt-thumbnails">{Array.from({length:event.imageCount},(_,index)=><ReceiptImage key={index} sequence={event.sequence!} index={index} runId={runId} scope={scope}/>)}</div>
         : <p className="agent-note">这条回执没有可回读的图像引用。</p>)}
     </details></div>;
-  if (event.kind === "context") return <div className="agent-activity-step agent-context-event"><ActivityIcon event={event}/>{event.detail ? <details open={detailOpen} onToggle={change=>setDetailOpen(change.currentTarget.open)}><summary><span>{event.label}</span><ChevronDown className="agent-reasoning-chevron" size={12} aria-hidden="true"/></summary><p>{event.detail}</p></details> : <span>{event.label}</span>}</div>;
+  if (event.kind === "context") {
+    const receipt = !operationFailed(event) && isMaterialContext(event);
+    const rule = receipt && isWorkspaceRule(event);
+    const Icon = rule ? Shield : FileText;
+    return <div className="agent-activity-step agent-context-event" data-rule={rule || undefined}>
+      {receipt ? <Icon size={13} aria-hidden="true"/> : <ActivityIcon event={event}/>}
+      {event.detail ? <details open={detailOpen} onToggle={change=>setDetailOpen(change.currentTarget.open)}><summary><span>{event.label}</span><ChevronDown className="agent-reasoning-chevron" size={12} aria-hidden="true"/></summary><p>{event.detail}</p></details> : <span>{event.label}</span>}
+    </div>;
+  }
   if (event.kind === "message") return <div className="agent-commentary"><PublicText text={event.label}/></div>;
   if(event.kind==="status") {
     const label=(event.state==="failed"?"未完成：":event.state==="interrupted"?"已中断：":"")+event.label;
@@ -359,6 +368,7 @@ function elapsed(milliseconds: number) {
 
 const isOperation=(event:ActivityEvent)=>["context","tool","skill","webSearch"].includes(event.kind);
 const isMaterialContext=(event:ActivityEvent)=>event.kind==="context" && event.origin==="hub-context" && !event.operation;
+const isWorkspaceRule=(event:ActivityEvent)=>event.label==="已加载知识库工作规则";
 const isCodexSummary=(event:ActivityEvent)=>event.kind==="reasoning" && !!event.origin?.startsWith("codex");
 const operationFailed=(event:ActivityEvent)=>event.state==="failed" || event.state==="interrupted" || !!event.errorCount;
 const phaseToolLabels = new Map([
@@ -484,9 +494,9 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
   const complete=operations.every(event=>event.state==="completed"&&!event.errorCount);
   const commandBatch=operations.length>1 && labels.length===1 && labels[0]===operationLabels.command;
   const summaryOnly=operations.length===0;
-  const rules=materialGroup ? events.filter(event=>event.label==="已加载知识库工作规则").length : 0;
-  const contextLabel = rules ? ["已载入上下文", ...(events.length>rules ? [`${events.length-rules} 项材料回执`] : []), `${rules} 条规则`].join(" · ") : `资料准备 · ${operations.length} 项`;
-  const overview=summaryOnly ? reasoningPreview(events[0]) : materialGroup ? contextLabel : webOverview ? `${webTitle} · ${operations.length} 步`
+  const rules=materialGroup ? events.filter(isWorkspaceRule).length : 0;
+  const contextLabel = ["已载入上下文", ...(events.length>rules ? [`${events.length-rules} 项材料回执`] : []), ...(rules ? [`${rules} 条规则`] : [])].join(" · ");
+  const overview=materialGroup ? contextLabel : summaryOnly ? reasoningPreview(events[0]) : webOverview ? `${webTitle} · ${operations.length} 步`
     : commandBatch ? `${complete?"已运行命令":"运行命令"} · ${operations.length} 条`
     : mixed?.title ?? externalPhaseTitle(operations) ?? (complete?"已":"")+(attachmentTitle ?? labels.join("、"))+(readSpan?.title ? ` · ${readSpan.title}` : "");
   const latest=webOverview || materialGroup ? undefined : current ?? (!commandBatch && live && operations.length>1 ? operations[operations.length-1] : undefined);
@@ -499,7 +509,7 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
     else if(operationFailed(latest))summary=label+" · "+(eventStateLabel(latest)||"部分未完成");
     else summary=latest.state==="completed" && verb ? "已"+label : label;
   }
-  const firstInHeading=summaryOnly && Array.from(overview).length<=72;
+  const firstInHeading=!materialGroup && summaryOnly && Array.from(overview).length<=72;
   const steps=<div className="agent-operation-children">
     {events.slice(firstInHeading ? 1 : 0,visibleCount).map(event=><ActivityEventView key={event.id} event={event} scope={scope} runId={runId}/>)}
     {visibleCount<events.length && <button type="button" className="agent-show-more" onClick={()=>setVisible(count=>count+activityPageSize)}>显示更多 · 另 {events.length-visibleCount} 项</button>}
@@ -508,9 +518,9 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
   const headingIcon = latest ?? (summaryIcon && {...summaryIcon,state:"completed",errorCount:0});
   return <details className={`agent-operation-group${active?" agent-operation-active":""}`} open={open} onToggle={event=>setOpen(event.currentTarget.open)}>
     <summary title={summary}>
-      {headingIcon && <ActivityIcon event={headingIcon}/>}
+      {materialGroup ? <Layers size={13} aria-hidden="true"/> : headingIcon && <ActivityIcon event={headingIcon}/>}
       <span className="agent-phase-label">{summary}</span>
-      {summaryOnly && <small>另 {events.length-1} 条</small>}
+      {summaryOnly && !materialGroup && <small>另 {events.length-1} 条</small>}
       <ActivityIdentity events={operations} workId={scope?.workId} primaryIcon={headingIcon} showRemainingSites={!live || !webPhase}/>
       <ChevronDown className="agent-reasoning-chevron" size={12} aria-hidden="true"/>
       {failed&&!open&&<small className="agent-phase-warning" role="status"><TriangleAlert size={12} aria-hidden="true"/>部分未完成</small>}
@@ -620,21 +630,26 @@ export function AgentActivity({ value, onRecheck, requestText }: { value: Activi
   const hasTimeline=hasProcess || processing;
   const canDisclose=hasProcess || !!(value.native || value.capabilities);
   const processOpen=hasTimeline ? expanded : emptyOpen;
-  const stateLabel = !value.running ? (value.state==="needsDecision" ? "待确认" : showRecovery || value.state==="interrupted" ? "已暂停" : value.state==="failed" ? "未完成" : "") : "";
+  const paused = value.state==="interrupted" || (showRecovery && !recovery.retry);
+  const stateLabel = !value.running ? (value.state==="needsDecision" ? "待确认" : paused ? "已暂停" : value.state==="failed" ? "未完成" : "") : "";
   const webIssue=!value.running && !value.validity && (specifiedPageIssue(newest,requestText)
     ?? (failure?.kind==="webSearch" ? {label:[webLabel(failure),eventStateLabel(failure)].filter(Boolean).join(" · "),detail:failure.detail} : undefined));
   const clippedProgress=processEvents.filter(event=>["message","reasoning","plan"].includes(event.kind));
   const clippingInText=clippedProgress.some(event=>event.label.trimEnd().endsWith(progressClippingNotice));
   const clipped=clippingInText || clippedProgress.some(event=>event.truncated);
   const workspace = !value.validity && value.workspaceChanges?.files ? value.workspaceChanges : undefined;
+  const runTime = <>
+    <span className="agent-run-time">{timeLabel} {duration}</span>
+    {stateLabel && <span className="agent-activity-state" data-paused={paused || undefined}>{stateLabel}</span>}
+  </>;
   const timeControl = canDisclose ? <button type="button" className="agent-activity-toggle" title={processOpen ? "收起工作过程" : "展开工作过程"} aria-expanded={processOpen} aria-controls={processOpen ? detailsId : undefined} onClick={()=>{
     if (hasTimeline) {
       setReviewing(true);
       setExpanded(!processOpen);
     } else setEmptyOpen(!processOpen);
   }}>
-      <span className="agent-run-time">{timeLabel} {duration}</span>{stateLabel && <span className="agent-activity-state">{stateLabel}</span>}<ChevronDown className={processOpen ? "" : "agent-collapsed"} size={13} aria-hidden="true"/>
-    </button> : (!processing || value.capabilities) && <p className="agent-elapsed">{timeLabel} {duration}{stateLabel && <> · {stateLabel}</>}</p>;
+      {runTime}<ChevronDown className={processOpen ? "" : "agent-collapsed"} size={13} aria-hidden="true"/>
+    </button> : (!processing || value.capabilities) && <p className="agent-elapsed">{runTime}</p>;
   return <section className="agent-activity" data-live={processing || undefined} aria-label="本轮工作过程">
     <div className="agent-activity-heading">
       {timeControl}

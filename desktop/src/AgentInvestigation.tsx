@@ -40,7 +40,7 @@ import { AgentScopeCoverage } from "./AgentScopeCoverage";
 import { useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { AssistantSelectionActions } from "./AgentSelectionActions";
 import { createPortal } from "react-dom";
-import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronDown, ChevronRight, FileText, Image, ListChecks, Menu, MessageSquare, PanelRight, PanelRightOpen, PanelsTopLeft, Quote, Plus, Search, X, Zap } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronDown, ChevronRight, CircleAlert, FileText, Image, ListChecks, Menu, MessageSquare, PanelRight, PanelRightOpen, PanelsTopLeft, Quote, Plus, Search, X, Zap } from "lucide-react";
 import type { SearchResult } from "./SearchTypes";
 import { isTaskPreviewResult } from "./TaskResultIdentity";
 import { runtimeCapabilities } from "./RuntimePlatform";
@@ -392,6 +392,12 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const [busy, setBusy] = useState(false);
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [filePreparing,setFilePreparing]=useState(false);
+  const [attachmentError, setAttachmentError] = useState("");
+  const [showAllComposerFiles, setShowAllComposerFiles] = useState(false);
+  useEffect(() => {
+    setAttachmentError("");
+    setShowAllComposerFiles(false);
+  }, [titleScope]);
   const [pendingRun, setPendingRun] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const businessInFlight = useRef<object | null>(null);
@@ -740,7 +746,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const imagesChanged=!!(imageChanges.addImages.length||imageChanges.removeImages.length);
   const addFiles=async(files:File[])=>{
     if(busy||importingFiles.current||businessCheck||confirmMessage||view?.work.grant.manifest||publicUrl){setError("请先完成当前操作，再添加图片或文件。");return;}
-    importingFiles.current=true;setFilePreparing(true);setError("");
+    importingFiles.current=true;setFilePreparing(true);setError("");setAttachmentError("");
     const ticket=sequence.current;const images=[...selectedImages];const reattached=[...reattachedImages];const notes=[...materials];const errors:string[]=[];
     try{
       const selected = files.slice(0,8);
@@ -773,7 +779,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         }catch(reason){errors.push(file.name+"："+String(reason));}
       }
       if(files.length>8)errors.push("一次最多添加8份文件，请分批选择。");
-      if(alive.current&&ticket===sequence.current){setImageDraft(images);setReattachedImages(reattached);setMaterials(notes);setError(errors.join("\n"));materialPopover.close(false);goalInput.current?.focus();}
+      if(alive.current&&ticket===sequence.current){setImageDraft(images);setReattachedImages(reattached);setMaterials(notes);setAttachmentError(errors.join("\n"));materialPopover.close(false);goalInput.current?.focus();}
     }finally{importingFiles.current=false;if(alive.current)setFilePreparing(false);}
   };
   useEffect(()=>{
@@ -1281,6 +1287,8 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const detailCoreCount=detailGrant?detailGrant.notes.length+(detailGrant.sources?.length||0)+detailGrant.readingItemKeys.length:coreMaterialCount;
   const detailLibraries=detailGrant?detailGrant.libraryIds.length:composerLibraries.length;
   const retainedFiles = view?.work.grant.notes?.filter(note=>isTextAttachment(note)&&!removals.some(item=>materialKey(item)===materialKey(note))) ?? [];
+  const overflowComposerFiles = materials.filter(item => isTextAttachment(item.locator)).slice(3);
+  const visibleComposerMaterials = showAllComposerFiles ? materials : materials.filter(item => !overflowComposerFiles.includes(item));
   const scopeStatus = [detailCoreCount ? `${detailCoreCount} 份资料` : "", detailLibraries ? `${detailLibraries} 个库` : "", currentImages.length ? `${currentImages.length} 张图片` : ""].filter(Boolean).join(" · ") || (hasEffectiveMaterials ? "已选资料" : "未选资料");
   const scopeAttachments = view && view.work.state !== "revoked" && (currentImages.length > 0 || retainedFiles.length > 0) && (
     <details className="agent-material-advanced">
@@ -1300,11 +1308,17 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     {!!view.run?.usage.modelRetries && <p className="agent-note">模型超时后已重试 {view.run.usage.modelRetries} 次，计入本轮调用次数与总时限。</p>}
     {!!view.run?.usage.outputRepairs && <p className="agent-note">结果核验后已纠错 {view.run.usage.outputRepairs} 次，计入本轮调用次数与总时限。</p>}
   </details>;
-  const recovery = view && !active && view.work.state!=="revoked" && view.lifecycle?.requiresExplicitResume ? {
+  const explicitResume = view?.lifecycle?.requiresExplicitResume ? view.lifecycle : undefined;
+  const failedRunWithDraft = !explicitResume && view && !active && ["failed","interrupted"].includes(view.work.state)
+    && view.activity?.some(run => run.runId === view.run?.id && !run.running && !run.validity
+      && run.events.some(event => event.kind === "unpublishedAnswer" && event.label.trim())
+      && !run.events.some(event => event.kind === "answer" && event.label.trim()));
+  const recovery = view && !active && view.work.state!=="revoked" && (explicitResume || failedRunWithDraft) ? {
     runId: view.run?.id,
-    reason: view.lifecycle.reason,
-    canResume: !busy && !businessCheck && view.lifecycle.canResume && canRunMode(view.lifecycle,mode),
-    onResume: () => { uiTiming.begin("resume"); void run(view.work.id,view.lifecycle); },
+    retry: !!failedRunWithDraft,
+    reason: explicitResume?.reason ?? (view.run?.error || "本轮答复尚未核验。可以核对资料范围后继续，或先查看保留的草稿。"),
+    canResume: !busy && !businessCheck && (!explicitResume || explicitResume.canResume) && canRunMode(view.lifecycle,mode),
+    onResume: () => { uiTiming.begin(explicitResume ? "resume" : "continue"); void run(view.work.id,explicitResume); },
     onScope: !busy && !filePreparing && !publicUrl ? openMaterialScope : undefined,
   } : undefined;
   const recoveryInTimeline = recovery?.runId && view?.activity?.some(item=>item.runId===recovery.runId && !item.running && !item.validity);
@@ -1455,11 +1469,11 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         {hasDraftSources && <div className="agent-suggestions">{suggestions.map(({ label, icon: Icon, prompt }) => <button key={label} type="button" disabled={busy} onClick={() => { setGoal(prompt); goalInput.current?.focus(); }}><Icon size={18} aria-hidden="true" /><span>{label}</span></button>)}</div>}
       </div>}
       {!view && canEditNote && <button type="button" disabled={busy || !!active} onClick={() => void openNoteEditor()}>修改这篇 Obsidian 笔记</button>}
-      <p ref={statusElement} tabIndex={-1} role="status" className="agent-status" hidden={!!view && (view.work.state === "completed" || (view.work.state === "investigating" && !!view.activity?.length && !stopping)) && !businessCheck?.uncertain && !acting && !latestAction}>{view ? (businessCheck?.uncertain ? "结果待核对，已暂停再次提交" : stopping && active ? "正在停止，已有进展会保留" : acting ? pendingLabel : `${states[view.work.state] || view.work.state}${latestAction?.state === "prepared" ? ` · ${actionLabel}草稿已准备，待你确认` : latestAction?.state === "verified" ? ` · ${actionLabel}结果已核验` : latestAction?.state === "unknown" || latestAction?.state === "partial" ? ` · ${actionLabel}结果待核对` : ""}`) : loadingConversation ? "" : busy ? "正在发送…" : ""}</p>
+      <p ref={statusElement} tabIndex={-1} role="status" className="agent-status" hidden={!!view && (view.work.state === "completed" || !!recoveryInTimeline || (view.work.state === "investigating" && !!view.activity?.length && !stopping)) && !businessCheck?.uncertain && !acting && !latestAction}>{view ? (businessCheck?.uncertain ? "结果待核对，已暂停再次提交" : stopping && active ? "正在停止，已有进展会保留" : acting ? pendingLabel : `${states[view.work.state] || view.work.state}${latestAction?.state === "prepared" ? ` · ${actionLabel}草稿已准备，待你确认` : latestAction?.state === "verified" ? ` · ${actionLabel}结果已核验` : latestAction?.state === "unknown" || latestAction?.state === "partial" ? ` · ${actionLabel}结果待核对` : ""}`) : loadingConversation ? "" : busy ? "正在发送…" : ""}</p>
       {view && !businessCheck?.scopeChanging && <>
         {!view.conversation && <p className="agent-goal">{view.work.goal}</p>}
-        {(view.validity || view.run?.error) && <p className="agent-notice">{view.validity || view.run?.error}</p>}
-        {view.run?.error && ["failed","interrupted"].includes(view.work.state) && <section className="agent-notice" aria-label="本轮恢复说明"><p>问题与资料选择保留在本对话中。可从输入框下方的“资料”核对范围，处理失败原因后再继续；不会自动反复重试。</p>{view.activity?.some(run=>run.runId===view.run?.id && run.events.some(event=>event.kind==="unpublishedAnswer")) && <p>模型答复已保留在本轮工作过程中，但尚未完成交付核验，不能当作已保存成果。</p>}</section>}
+        {(view.validity || (!failedRunWithDraft && view.run?.error)) && <p className="agent-notice">{view.validity || view.run?.error}</p>}
+        {!failedRunWithDraft && view.run?.error && ["failed","interrupted"].includes(view.work.state) && <section className="agent-notice" aria-label="本轮恢复说明"><p>问题与资料选择保留在本对话中。可从输入框下方的“资料”核对范围，处理失败原因后再继续；不会自动反复重试。</p>{view.activity?.some(run=>run.runId===view.run?.id && run.events.some(event=>event.kind==="unpublishedAnswer")) && <p>模型答复已保留在本轮工作过程中，但尚未完成交付核验，不能当作已保存成果。</p>}</section>}
         {view.conversation && <AgentConversation workId={view.work.id} recordVersion={view.recordVersion} conversation={view.conversation} revoked={view.work.state==="revoked"} onOpenCitation={(...args)=>void openCitation(...args)} onOpenMaterial={item=>void openMaterial(item)} onEdit={!busy&&!active?editMessage:undefined} onRecheck={!businessDisabled&&!saveOnly&&!questionText.trim()&&view.work.state!=="revoked"?prepareSourceRecheck:undefined} onLoadEarlier={()=>void loadEarlier()} earlierLoading={historyLoadingScope===historyScope.current} earlierError={historyNotice?.scope===historyScope.current ? historyNotice.text : ""} renderAfter={inlineOutcomes} renderActions={message=>message.role==="assistant"&&message.report&&message.runId&&view&&<AgentAnswerSave workId={view.work.id} runId={message.runId} current={saveTarget} disabled={businessDisabled||!!active||!!view.lifecycle?.requiresExplicitResume||message.artifactState==="unavailable"} records={view.answerSaves} onChanged={()=>void refresh(view.work.id)}/>} activity={view.activity}/> }
         {view.work.state!=="revoked" && view.activity?.filter(run=>!view.conversation?.messages.some(message=>message.runId===run.runId || message.revision===run.revision)).map(run=><AgentActivity key={run.runId} value={run}/>)}
         {recovery && !recoveryInTimeline && <AgentRecoveryCard controls={recovery}/>}
@@ -1491,7 +1505,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         <AgentDelivery workId={view.work.id} recordVersion={view.recordVersion} report={view.conversation ? null : report ?? null} evidence={view.evidence} progress={view.activity?.length || (view.conversation && report) ? null : view.progress} history={view.conversation ? [] : view.history} running={!!running} revoked={view.work.state === "revoked"} runId={view.run?.id} onOpenCitation={(...args)=>void openCitation(...args)} actions={!view.conversation&&report&&view.run?.id&&<AgentAnswerSave workId={view.work.id} runId={view.run.id} current={saveTarget} disabled={businessDisabled||!!active||!!view.lifecycle?.requiresExplicitResume} records={view.answerSaves} onChanged={()=>void refresh(view.work.id)}/>}/>
         {outcomes(view.actions?.items.filter(a=>a.kind!=="tagProposal" && (!view.conversation || a.baseRevision===undefined || !view.conversation.messages.some(m=>m.revision===a.baseRevision))) || [])}
         {view.draftRequest && !active && <button type="button" disabled={businessDisabled} onClick={()=>void businessAction({action:"prepareResponse",runId:view.draftRequest!.runId})}>继续准备本轮草稿</button>}
-        {(!active && ["ready","interrupted","failed","expired"].includes(view.work.state) || view.work.state==="revoked") && <div className="agent-actions">
+        {(!active && !failedRunWithDraft && ["ready","interrupted","failed","expired"].includes(view.work.state) || view.work.state==="revoked") && <div className="agent-actions">
           {view.work.state==="revoked" ? <button type="button" disabled={busy} onClick={()=>newInvestigation()}>新建调查</button> : <button type="button" disabled={busy || !canRunMode(view.lifecycle,mode)} onClick={() => {uiTiming.begin("continue");void run(view.work.id);}}>继续调查</button>}
         </div>}
 
@@ -1533,6 +1547,10 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         setBusy(true);try{const next=await call<View>({action:"changeFollowup",id:view.work.id,clientMessageId:item.clientMessageId,editVersion:item.editVersion,operation,...payload,...(operation==="send"?{expectedRunId:view.lifecycle?.activeRunId??(steerable?steerable.runId:null)}:{})});setView(current=>acceptLifecycleSnapshot(current,next));if(operation==="send"&&!active)void resumeQueue(item.clientMessageId);}finally{setBusy(false);}
       }}/>}
       <AgentResearchTopics onBack={()=>{setTopicsOpen(false);const menu=document.getElementById(panelId)?.querySelector<HTMLDetailsElement>(".agent-task-mode");if(menu){menu.open=true;menu.querySelector("summary")?.focus();}}} onMetadata={saved=>{if(research?.topic.id===saved.id)setResearch({...research,topic:{...research.topic,revision:saved.revision,pinned:saved.pinned}});}} initialId={requestedTopic} open={topicsOpen} saveMode={topicSave} active={research?.topic} disabled={busy||!!active} config={{grant:research?researchGrant(manualResearchGrant(),research.topic.grant,research.includeManual):manualResearchGrant(),policy:(view?.assistantOptions||assistantOptions).researchPolicy||"material-first",skills:research?[...new Set([...research.topic.skills,...selectedSkills.map(s=>s.slice(1))])]:selectedSkills.map(s=>s.slice(1))}} onApply={applyResearch} onClose={()=>setTopicsOpen(false)}/>
+      {attachmentError && (!reportReading || addMenuOpen) && <div className="agent-composer-alert">
+        <div role="alert"><CircleAlert size={14} aria-hidden="true"/><span>{attachmentError}</span></div>
+        <button type="button" aria-label="关闭附件提示" onClick={()=>{setAttachmentError("");goalInput.current?.focus();}}><X size={14} aria-hidden="true"/></button>
+      </div>}
       <div className="agent-composer" hidden={reportReading&&!addMenuOpen} onPaste={event=>{const files=Array.from(event.clipboardData.files);if(files.length){event.preventDefault();void addFiles(files);}}}>
         <input ref={fileInput} type="file" aria-label="选择图片或文件" multiple hidden onChange={event=>{const files=Array.from(event.currentTarget.files||[]);event.currentTarget.value="";void addFiles(files);}}/>
         {open && globalPanel && (assistantOptions.model?.provider ?? runtime.settings.provider ?? "codex") === "codex" && <CodexAccountBadge boundScopeId={view?.codexAccountBinding?.scopeId} workId={view?.work.id} disabled={!!active||pendingRun} needsAuthorization={[error,view?.run?.error].some(value=>value?.includes("请确认账号后继续"))} onAuthorized={()=>{setError("");void refresh(view!.work.id);}}/>}
@@ -1540,18 +1558,22 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         {research&&<div className="agent-topic-selection"><AgentActiveTopic topic={research.topic} disabled={busy||!!active} onChange={topic=>setResearch({...research,topic})} onCancel={()=>void cancelResearch()}/><label><input type="checkbox" checked={research.includeManual} disabled={busy||!!active} onChange={e=>setResearch({...research,includeManual:e.target.checked})}/>下一条同时使用手选资料与技能</label></div>}
 
         {libraryDraft!==null&&!selectedLibraries.length&&!!view?.work.grant.libraryIds.length&&<p className="agent-note">下一条问题将清除整库范围，单独添加的页面保留。<button type="button" onClick={()=>setLibraryDraft(null)}>撤销</button></p>}
+        {!!(dropped.length || snippets.length || (!view && (publicUrl || pageAttached)) || materials.length || selectedSkills.length) && <div className="agent-composer-tokens">
         {(dropped.length>0||snippets.length>0)&&<div className="agent-pending-materials" aria-label="待添加资料">{dropped.map((item,index)=><AgentMaterialCard key={JSON.stringify(item.locator)} kind={item.locator.kind==="reading"?"reading":item.locator.kind==="task"?"task":"page"} title={item.title} disabled={busy} onRemove={()=>{setDropped(current=>current.filter((_,i)=>i!==index));goalInput.current?.focus();}}/>)}{snippets.map((item,index)=><AgentMaterialCard key={`text-${index}`} kind={item.kind} title={item.selectedFromChat||item.kind==="text"&&!item.file?item.text:item.title} subtitle={item.selectedFromChat?"对话摘录":item.kind==="conversation"?"旧对话摘录":`${item.file?"文本附件 · 全文":item.kind==="text"?"所选文字":"闪卡文字快照"} · ${item.text.length}字 · ${item.title}`} disabled={busy} onRemove={()=>{setSnippets(current=>current.filter((_,i)=>i!==index));goalInput.current?.focus();}}/>)}</div>}
-        {!!imageChanges.addImages.length && <AgentImageCards images={imageChanges.addImages} disabled={busy||filePreparing} pending onRemove={image=>{
-          if(hasImage(currentImages,image))setReattachedImages(reattachedImages.filter(grant=>!sameImage(grant,image)));
-          else setImageDraft(selectedImages.filter(grant=>!sameImage(grant,image)));
-        }}/>}
-        {imageChanges.removeImages.length>0&&<p className="agent-note">将随下一条问题移除 {imageChanges.removeImages.length} 张图片。<button type="button" disabled={busy} onClick={()=>setImageDraft(current=>[...(current||[]),...imageChanges.removeImages])}>撤销图片撤回</button></p>}
         {!view && publicUrl && <div className="agent-pending-materials"><AgentMaterialCard kind="link" title={publicUrl} removeLabel="移除公共链接" disabled={busy} onRemove={()=>setPublicUrl("")}/></div>}
         {(!view && pageAttached || materials.length>0) && <div className="agent-pending-materials" aria-label="待发送资料">
           {!view && pageAttached && <AgentMaterialCard kind={anchor?.kind==="reading"?"reading":anchor?.kind==="task"?"task":"page"} title={pageTitle||currentObjectLabel} subtitle={wholeLibrary?`${libraryName} · 整个资料库`:undefined} disabled={busy} openLabel="查看本次资料范围" onOpen={()=>{setAddPage("scope");if(materialPopover.ref.current)materialPopover.ref.current.open=true;}} removeLabel="移除当前页面" onRemove={()=>{setPageAttached(false);setWholeLibrary(false);goalInput.current?.focus();}}/>}
-          {materials.map(item=><AgentMaterialCard key={materialKey(item.locator)} kind="page" title={item.title} subtitle={item.fileBytes!==undefined?(fileUseHint(item,usesDeepSeek) ?? "原文件 · 待发送"):item.totalChars!==undefined?`文本附件 · 共 ${item.totalChars.toLocaleString()} 字符 · 待发送`:item.path||item.libraryName} disabled={busy||filePreparing} onRemove={()=>{setMaterials(current=>current.filter(note=>materialKey(note.locator)!==materialKey(item.locator)));goalInput.current?.focus();}}/>)}
+          {visibleComposerMaterials.map(item=><AgentMaterialCard key={materialKey(item.locator)} kind={isTextAttachment(item.locator)?"file":"page"} title={item.title} subtitle={item.fileBytes!==undefined?(fileUseHint(item,usesDeepSeek) ?? "原文件 · 待发送"):item.totalChars!==undefined?`文本附件 · 共 ${item.totalChars.toLocaleString()} 字符 · 待发送`:item.path||item.libraryName} disabled={busy||filePreparing} onRemove={()=>{setMaterials(current=>current.filter(note=>materialKey(note.locator)!==materialKey(item.locator)));goalInput.current?.focus();}}/>)}
         </div>}
           {!!selectedSkills.length && <div className="agent-selected-skills" aria-label="本次指定技能">{selectedSkills.map(token=><AgentMaterialCard key={token} kind="skill" title={skillTitle(token.slice(1))} identifier={token.slice(1)} subtitle={skillPurpose(token.slice(1))} disabled={busy} removeLabel={`移除技能 ${skillTitle(token.slice(1))}`} onRemove={()=>setGoal(selectedSkills.filter(item=>item!==token).map(item=>item+" ").join("")+questionText)}/>)}</div>}
+          {!!overflowComposerFiles.length && <button type="button" className="agent-composer-more-files" aria-expanded={showAllComposerFiles} onClick={()=>setShowAllComposerFiles(value=>!value)}>{showAllComposerFiles?"收起文件":`+${overflowComposerFiles.length} 个文件`}</button>}
+        </div>}
+        {!!imageChanges.addImages.length && <AgentImageCards images={imageChanges.addImages} disabled={busy||filePreparing} pending onRemove={image=>{
+          if(hasImage(currentImages,image))setReattachedImages(reattachedImages.filter(grant=>!sameImage(grant,image)));
+          else setImageDraft(selectedImages.filter(grant=>!sameImage(grant,image)));
+          goalInput.current?.focus();
+        }}/>}
+        {imageChanges.removeImages.length>0&&<p className="agent-note">将随下一条问题移除 {imageChanges.removeImages.length} 张图片。<button type="button" disabled={busy} onClick={()=>setImageDraft(current=>[...(current||[]),...imageChanges.removeImages])}>撤销图片撤回</button></p>}
         </div>
         {view?.work.state !== "revoked" && <form onSubmit={event=>void create(event)}>
           {goalMode && !view && !publicUrl && <label className="agent-question"><span>完成条件</span><input name="goalCompletionCriteria" value={completionCriteria} disabled={busy} maxLength={2000} onChange={event=>setCompletionCriteria(event.target.value)} placeholder="例如，交付对照表并独立复算关键数字" /></label>}
