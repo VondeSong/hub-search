@@ -1507,11 +1507,10 @@
     // =========================================================================
 
     const EMBED_MODULES = {
-      agents: { src: 'modules/agents.html?embed=1', standalone: 'modules/agents.html', tag: '高保真', badgeText: 'React 高保真 · 多形态与思维链' },
       reading: { src: 'modules/reading.html?embed=1', standalone: 'modules/reading.html', tag: 'v2', badgeText: '阅读工作区 v2 · 多视图与分屏精读' },
       insights: { src: 'modules/insights.html?embed=1', standalone: 'modules/insights.html', tag: 'v4', badgeText: '洞察工作区 v4 · 核对台与修订谱系' }
     };
-    const proModuleMode = { agents: true, reading: true, insights: true };
+    const proModuleMode = { reading: true, insights: true };
     const mountedEmbeds = {};
 
     function isEmbedActive(view) {
@@ -1533,7 +1532,7 @@
     }
 
     function syncHashFromView() {
-      const valid = ['space', 'search', 'agents', 'reading', 'tasks', 'journals', 'flashcards', 'insights'];
+      const valid = ['space', 'search', 'reading', 'tasks', 'journals', 'flashcards', 'insights'];
       if (valid.includes(state.view)) {
         const nextHash = '#' + state.view;
         if (window.location.hash !== nextHash) {
@@ -1544,12 +1543,11 @@
 
     const NAV_ITEMS = [
       { id: 'search', label: '搜索与全部', icon: 'search', shortcut: '⌘1' },
-      { id: 'agents', label: 'Agent 工作台', icon: 'sparkles', shortcut: '⌘2', badge: () => state.threads.length },
-      { id: 'reading', label: '阅读与收藏', icon: 'bookmark', shortcut: '⌘3', badge: () => READING_ITEMS.length },
-      { id: 'tasks', label: '任务', icon: 'list-todo', shortcut: '⌘4', badge: () => state.tasks.filter(t => !t.done).length },
-      { id: 'journals', label: '每日日志', icon: 'calendar-days', shortcut: '⌘5' },
-      { id: 'flashcards', label: '闪卡复习', icon: 'book-open-check', shortcut: '⌘6', badge: () => state.dueCount },
-      { id: 'insights', label: '洞察与标签', icon: 'bar-chart-3', shortcut: '⌘7', badge: () => state.tagGovernance.length || null }
+      { id: 'reading', label: '阅读与收藏', icon: 'bookmark', shortcut: '⌘2', badge: () => READING_ITEMS.length },
+      { id: 'tasks', label: '任务', icon: 'list-todo', shortcut: '⌘3', badge: () => state.tasks.filter(t => !t.done).length },
+      { id: 'journals', label: '每日日志', icon: 'calendar-days', shortcut: '⌘4' },
+      { id: 'flashcards', label: '闪卡复习', icon: 'book-open-check', shortcut: '⌘5', badge: () => state.dueCount },
+      { id: 'insights', label: '洞察与标签', icon: 'bar-chart-3', shortcut: '⌘6', badge: () => state.tagGovernance.length || null }
     ];
 
     function renderChrome() {
@@ -1787,8 +1785,7 @@
 
     function renderQuickAssistant() {
       const fab = document.getElementById('btn-quick-assistant');
-      const dedicatedAgent = state.view === 'agents' && isEmbedActive('agents');
-      const showPanel = state.quickAssistantOpen && !dedicatedAgent;
+      const showPanel = state.quickAssistantOpen;
       if (state.view !== lastAssistantView) agentSource.hidden = true;
       lastAssistantView = state.view;
       quickAssistantPanel.hidden = !showPanel;
@@ -1797,7 +1794,7 @@
       syncSidebarForAssistant(showPanel && quickAssistantPanel.dataset.layout === 'docked');
       document.getElementById('workspace-content').inert = showPanel && quickAssistantPanel.dataset.layout === 'expanded' && agentSource.hidden;
       if (!showPanel) agentSource.hidden = true;
-      fab.style.display = showPanel || dedicatedAgent ? 'none' : 'inline-flex';
+      fab.style.display = showPanel ? 'none' : 'inline-flex';
       fab.setAttribute('aria-expanded', String(showPanel));
       document.getElementById('btn-status-assistant').setAttribute('aria-expanded', String(showPanel));
 
@@ -1839,10 +1836,6 @@
     }
 
     function toggleQuickAssistant() {
-      if (state.view === 'agents' && isEmbedActive('agents')) {
-        mountedEmbeds.agents?.contentWindow.postMessage({ type: 'hub-assistant-toggle' }, '*');
-        return;
-      }
       if (state.quickAssistantOpen) closeQuickAssistant();
       else openQuickAssistant(getQuickAssistantContext().length === 2 ? { type: 'case', value: 'workspace', focus: true } : undefined);
     }
@@ -3796,10 +3789,11 @@
       }
     });
 
-    // Support URL hash deep-linking (#space, #search, #agents, #reading, #tasks, #journals, #flashcards, #insights)
+    // Support URL hash deep-linking (#space, #search, #reading, #tasks, #journals, #flashcards, #insights, #agents)
     function applyHashView() {
       const h = (window.location.hash || '').replace(/^#/, '').trim();
-      const valid = ['space', 'search', 'agents', 'reading', 'tasks', 'journals', 'flashcards', 'insights'];
+      if (h === 'agents') { state.quickAssistantOpen = true; return; }
+      const valid = ['space', 'search', 'reading', 'tasks', 'journals', 'flashcards', 'insights'];
       if (valid.includes(h)) state.view = h;
     }
     window.addEventListener('hashchange', () => { applyHashView(); renderAll(); });
