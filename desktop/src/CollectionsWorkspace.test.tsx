@@ -384,7 +384,7 @@ it("puts Telegram after X sources and filters the shared collection without star
   invoke.mockImplementation(async(command:string)=>command==="list_collection_items"?page:command==="get_collection_storage"?storage:"");
   await mount();
   const chips=[...container.querySelectorAll<HTMLButtonElement>(".task-source-chip")];
-  expect(chips.map(b=>b.textContent)).toEqual(["全部 3","X 书签2","X 喜欢0","Telegram1","滴答稍后读0"]);
+  expect(chips.map(b=>b.textContent)).toEqual(["全部3","X 书签2","X 喜欢0","Telegram1","滴答0"]);
   await act(async()=>chips[3].click());await act(async()=>vi.advanceTimersByTimeAsync(160));
   expect(invoke).toHaveBeenCalledWith("list_collection_items",expect.objectContaining({source:"telegram"}));
   expect(invoke.mock.calls.some(([c])=>c==="sync_x_bookmarks"||c==="sync_telegram")).toBe(false);
@@ -1142,4 +1142,25 @@ it("checks local originals manually without triggering network sync or attachmen
   await click("立即检查本地素材");
   expect(invoke).toHaveBeenCalledWith("check_local_reading_sources");
   expect(invoke.mock.calls.some(([command])=>["sync_x_bookmarks","save_collection_storage","export_collections_to_obsidian"].includes(command))).toBe(false);
+});
+
+it("uses the existing reading status and lifecycle commands from the article footer", async () => {
+  let item={...lifecycleItem,read:false,status:"unread",tags:["保留标签"]};
+  invoke.mockImplementation(async (command:string,args?:{status:string;state:string})=>{
+    if(command==="set_collection_properties"){item={...item,status:args!.status,read:args!.status==="read"};return "状态已保存";}
+    if(command==="set_collection_lifecycle"){item={...item,lifecycle:args!.state};return "阅读状态已更新";}
+    return command==="list_collection_items"?{...initial,items:[item],total:1,matched:1}:command==="get_collection_storage"?storage:[];
+  });
+  await mount();
+  const footer=()=>container.querySelector<HTMLElement>(".reading-end-actions")!;
+  const footerButton=(label:string)=>[...footer().querySelectorAll("button")].find(button=>button.textContent===label)!;
+  await act(async()=>footerButton("标为已读").click());
+  expect(footerButton("已读").getAttribute("aria-pressed")).toBe("true");
+  await act(async()=>footerButton("已读").click());
+  expect(footerButton("标为已读").getAttribute("aria-pressed")).toBe("false");
+  expect(invoke).toHaveBeenCalledWith("set_collection_properties",expect.objectContaining({key:item.key,status:"unread",tags:["保留标签"],expectedStatus:"read"}));
+  await act(async()=>footerButton("归档").click());
+  expect(footerButton("恢复到阅读")).toBeTruthy();
+  await act(async()=>footerButton("恢复到阅读").click());
+  expect(invoke).toHaveBeenCalledWith("set_collection_lifecycle",{key:item.key,state:"active"});
 });

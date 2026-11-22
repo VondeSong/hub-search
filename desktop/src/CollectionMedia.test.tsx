@@ -137,3 +137,22 @@ it("reports available reply counts and limits without falsely claiming every X r
  await act(async()=>root.render(<CollectionPostBody itemKey="item" open={vi.fn(async()=>{})} post={{...examplePost,replyCount:2,threadStatus:"complete"}}/>));
  expect(host.textContent).toContain("回复尚待补全");
 });
+
+it("keeps original attachments in editorial paragraph order and keeps surplus files", async () => {
+  const post = {
+    ...examplePost,
+    text: "第一段 **粗体**\n\n第二段\n\n- 一个列表",
+    media: ["a.pdf", "b.pdf", "c.pdf"].map(name => ({kind:"file", url:"https://example.com/"+name})),
+  };
+  invoke.mockImplementation(async command => command==="reading_attachment_status" ? [] : undefined);
+  await act(async () => root.render(<CollectionPostBody post={post} itemKey="inline-item" open={vi.fn(async()=>{})} inlineMedia/>));
+  const body = document.querySelector(".collection-post-text")!;
+  expect([...body.children].map(node=>node.tagName)).toEqual(["P","DIV","P","DIV","UL","DIV"]);
+  expect([...body.querySelectorAll(".reading-inline-file strong")].map(node=>node.textContent)).toEqual(["a.pdf","b.pdf","c.pdf"]);
+  expect(body.querySelector("p strong")?.textContent).toBe("粗体");
+  expect(invoke).not.toHaveBeenCalledWith("transfer_reading_attachment",expect.anything());
+  const download=body.querySelector<HTMLButtonElement>(".reading-inline-download")!;
+  await act(async()=>download.click());
+  expect(invoke).toHaveBeenCalledWith("transfer_reading_attachment",{key:"inline-item",url:"https://example.com/a.pdf",upload:false});
+  expect(body.querySelector(".reading-inline-file")?.textContent).toContain("本机可用");
+});

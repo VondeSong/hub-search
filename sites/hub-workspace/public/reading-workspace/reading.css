@@ -1,26 +1,110 @@
     :root {
-      /* Apple macOS HIG + Craft Neutral Studio Palette */
-      --studio-bg: #F2F3F5;
-      --glass-bar: rgba(242, 243, 245, 0.78);
+      /* Apple macOS HIG + Craft Layered Studio Palette */
+      --studio-bg: #ECEEF2;
+      --glass-bar: rgba(236, 238, 242, 0.72);
       --paper: #FFFFFF;
-      --paper-warm: #FCFBF9;
-      --ink: #18181B;
-      --ink-body: #27272A;
-      --ink-secondary: #52525B;
-      --ink-muted: #8E8E93;
-      --hair: rgba(0, 0, 0, 0.065);
-      --hair-hover: rgba(0, 0, 0, 0.12);
+      --paper-well: #F8F9FB;
+      --paper-warm: #FDFCFA;
+      --ink: #141413;
+      --ink-body: #2C2C2A;
+      --ink-secondary: #575754;
+      --ink-muted: #8A8A86;
+      --hair: rgba(20, 20, 19, 0.07);
+      --hair-strong: rgba(20, 20, 19, 0.12);
       --accent: #2563EB;
       --accent-ink: #1D4ED8;
       --ok: #0F766E;
       --warn: #B45309;
       --err: #B91C1C;
-      --radius-paper: 15px;
-      --radius-card: 10px;
-      --radius-pill: 7px;
-      --shadow-paper: 0 0.5px 1px rgba(0, 0, 0, 0.04), 0 6px 20px -10px rgba(0, 0, 0, 0.07);
-      --shadow-sheet: -8px 0 32px -12px rgba(0, 0, 0, 0.10), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
-      --shadow-popover: 0 12px 32px -6px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+      --radius-paper: 16px;
+      --radius-card: 11px;
+      --radius-pill: 8px;
+      --shadow-paper: 0 0.5px 1px rgba(15, 23, 42, 0.05), 0 10px 28px -14px rgba(15, 23, 42, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+      --shadow-sheet: -12px 0 36px -12px rgba(15, 23, 42, 0.14), 0 0 0 0.5px rgba(15, 23, 42, 0.07);
+      --shadow-popover: 0 16px 38px -8px rgba(15, 23, 42, 0.18), 0 0 0 0.5px rgba(15, 23, 42, 0.08);
+    }
+
+    .studio-canvas {
+      background: radial-gradient(ellipse 90% 70% at 0% 0%, #E7ECF5 0%, #ECEEF2 48%, #E9EBF0 100%);
+    }
+
+    /* Tactile macOS Sidebar Active Pill */
+    .sb-item {
+      position: relative;
+      border-radius: 9px;
+      transition: background 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
+    }
+    .sb-item:hover {
+      background: rgba(255, 255, 255, 0.52);
+    }
+    .sb-item.is-active {
+      background: rgba(255, 255, 255, 0.92);
+      color: #141413;
+      font-weight: 500;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 0 0 0.5px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 1);
+    }
+
+    /* Tinted Micro Icon Badge in Sidebar (Things 3 / Craft / Bear craft) */
+    .sb-ico {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: transform 0.14s ease;
+    }
+
+    /* Custom crisp checkbox (no raw OS checkbox) */
+    input[type="checkbox"].hub-chk {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 15px;
+      height: 15px;
+      border-radius: 4.5px;
+      border: 1.25px solid rgba(20, 20, 19, 0.24);
+      background: #FFFFFF;
+      display: inline-grid;
+      place-content: center;
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+    input[type="checkbox"].hub-chk:hover {
+      border-color: #2563EB;
+    }
+    input[type="checkbox"].hub-chk:checked {
+      background: #2563EB;
+      border-color: #2563EB;
+    }
+    input[type="checkbox"].hub-chk:checked::after {
+      content: '';
+      width: 8px;
+      height: 5px;
+      border-left: 1.7px solid #fff;
+      border-bottom: 1.7px solid #fff;
+      transform: rotate(-45deg) translate(0.5px, -0.5px);
+    }
+
+    /* Segmented inset groove */
+    .mac-groove {
+      background: rgba(15, 23, 42, 0.055);
+      box-shadow: inset 0 0.5px 1.5px rgba(15, 23, 42, 0.07);
+    }
+    .mac-seg-active {
+      background: #FFFFFF;
+      color: #141413;
+      font-weight: 500;
+      box-shadow: 0 1px 2.5px rgba(15, 23, 42, 0.09), 0 0 0 0.5px rgba(15, 23, 42, 0.04);
+    }
+
+    /* Craft Stream Card Selected Elevation */
+    .stream-well {
+      background: var(--paper-well);
+    }
+    .stream-card-active {
+      background: #FFFFFF;
+      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.07), 0 0 0 0.5px rgba(15, 23, 42, 0.08);
     }
 
     * { box-sizing: border-box; }
@@ -175,3 +259,5 @@
       background: rgba(0, 0, 0, 0.18);
       height: 52px;
     }
+
+    .stream-item:focus-within .hub-chk { opacity: 1; }

@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Archive, Bookmark, BookOpenCheck, Check, ChevronDown, ChevronRight, Circle, CircleAlert, CircleSlash, Columns3, Eye, EyeOff, GalleryHorizontal, Keyboard, LayoutList, MoreHorizontal, Pencil, PlayCircle, Plus, Settings2, Table2, Trash2, ArrowUp, ArrowDown, X } from "lucide-react";
+import { Archive, Ban, Check, CircleCheck, CircleDot, Clock3, FileText, Gem, Inbox, SquareCheck, ChevronDown, ChevronRight, CircleAlert, Columns3, Eye, EyeOff, GalleryHorizontal, Keyboard, LayoutList, MoreHorizontal, Pencil, Plus, Settings2, Table2, Trash2, ArrowUp, ArrowDown, X } from "lucide-react";
 import { LibraryIcon } from "./LibraryIcon";
 import { providerName } from "./ProviderLabels";
 import type { LibrarySummary } from "./SearchTypes";
 import { collectionEntryLabels, useCollectionViews, type CollectionBuiltinEntry, type CollectionSavedView } from "./CollectionViews";
 import "./CollectionNavigation.css";
 
-const builtinIcons = { all: Bookmark, unread: Circle, in_progress: PlayCircle, read: BookOpenCheck, archived: Archive, abandoned: CircleSlash, attention: CircleAlert };
+const builtinIcons = { all: Inbox, unread: CircleDot, in_progress: Clock3, read: CircleCheck, archived: Archive, abandoned: Ban, attention: CircleAlert };
+const copyIcons = { craft: FileText, obsidian: Gem, dida365: SquareCheck };
 const viewLayoutIcons = { list: LayoutList, table: Table2, board: Columns3, gallery: GalleryHorizontal };
 const sourceLabels = { all: "全部来源", bookmarks: "X 书签", likes: "X 喜欢", telegram: "Telegram", dida: "滴答稍后读" };
 
@@ -50,7 +51,7 @@ export function CollectionNavigation({ libraries = [], onOpenSettings }: { libra
   const builtin = (id: CollectionBuiltinEntry) => {
     const Icon = builtinIcons[id];
     return <button key={id} type="button" aria-label={collectionEntryLabels[id]} className={`collection-nav-item${activeEntry.kind === "builtin" && activeEntry.id === id ? " active" : ""}${id === "attention" && counts.needsAttention ? " attention" : ""}`} aria-pressed={activeEntry.kind === "builtin" && activeEntry.id === id} onClick={() => { closeTransient(); navigation.selectBuiltin(id); }}>
-      <Icon size={16} /><span>{collectionEntryLabels[id]}</span><small>{countFor(id)}</small>
+      <span className="reading-nav-icon" data-kind={id}><Icon size={14}/></span><span>{collectionEntryLabels[id]}</span><small>{countFor(id)}</small>
     </button>;
   };
 
@@ -73,7 +74,7 @@ export function CollectionNavigation({ libraries = [], onOpenSettings }: { libra
           const Icon = viewLayoutIcons[view.layout];
           return <div key={view.id} className={`collection-nav-view${activeEntry.kind === "view" && activeEntry.id === view.id ? " active" : ""}`}>
           <button type="button" className="collection-nav-view-open" aria-label={view.name} aria-pressed={activeEntry.kind === "view" && activeEntry.id === view.id} title={viewSummary(view)} onClick={() => { closeTransient(); navigation.selectView(view.id); }}>
-            <Icon size={15} aria-hidden="true" /><span><strong>{view.name}</strong><small>{activeEntry.kind === "view" && activeEntry.id === view.id && navigation.isModified ? "已修改" : viewSummary(view)}</small></span>
+            <span className="reading-nav-icon" data-kind="view"><Icon size={12} aria-hidden="true"/></span><span><strong>{view.name}</strong><small>{activeEntry.kind === "view" && activeEntry.id === view.id && navigation.isModified ? "已修改" : viewSummary(view)}</small></span>
           </button>
           <div className="collection-nav-menu-wrap" ref={openMenu === view.id ? menuRef : undefined}>
             <button type="button" aria-label={`视图 ${view.name} 的更多操作`} aria-haspopup="menu" aria-expanded={openMenu === view.id} onClick={() => setOpenMenu(openMenu === view.id ? null : view.id)}><MoreHorizontal size={15} /></button>
@@ -100,8 +101,9 @@ export function CollectionNavigation({ libraries = [], onOpenSettings }: { libra
         {!navigation.librariesCollapsed && <div className="collection-nav-copies">
           {copyLibraries.map(library => {
             const label = savedCopyLabel(library);
+            const Icon = copyIcons[library.provider as keyof typeof copyIcons] ?? FileText;
             return <button type="button" key={library.id} aria-label={`已保存到 ${label}`} className={`collection-nav-item collection-nav-copy${activeEntry.kind === "library" && activeEntry.id === library.id ? " active" : ""}`} aria-pressed={activeEntry.kind === "library" && activeEntry.id === library.id} title={`已保存到 ${label} 的收藏副本`} onClick={() => { closeTransient(); navigation.selectLibrary(library.id); }}>
-              <LibraryIcon provider={library.provider} name={library.name} iconSvg={library.iconSvg} defaultIconUrl={library.defaultIconUrl} title={label} compact /><span>{label}</span><small>{copies.get(library.id) || 0}</small>
+              <span className="reading-nav-icon library-icon" data-kind={library.provider} title={label}>{library.iconSvg?<LibraryIcon provider={library.provider} name={library.name} iconSvg={library.iconSvg} compact/>:<Icon size={12}/>}</span><span>{label}</span><small>{copies.get(library.id) || 0}</small>
             </button>;
           })}
           {!copyLibraries.length && <p className="collection-nav-empty">添加资料库后，可查看已保存的收藏副本。</p>}

@@ -458,11 +458,13 @@
 
     function renderTitlebar() {
       document.getElementById('app').classList.toggle('shell-narrow', state.narrowMode);
+      const srcIco = { all: 'layers', x_bookmark: 'bookmark', x_like: 'heart', telegram: 'send', dida: 'check-circle-2' };
       document.getElementById('source-segmented').innerHTML = SOURCES.map(s => {
         const active = state.source === s.id;
         const cnt = getSourceCount(s.id);
         return `
-          <button data-source="${s.id}" class="px-2.5 py-1 rounded-[7px] text-[12px] flex items-center gap-1.5 whitespace-nowrap transition ${active ? 'bg-white text-neutral-900 font-medium shadow-[0_1px_2px_rgba(0,0,0,0.06)]' : 'text-neutral-500 hover:text-neutral-800'}">
+          <button data-source="${s.id}" class="px-2.5 py-1 rounded-[7.5px] text-[12px] flex items-center gap-1.5 whitespace-nowrap transition ${active ? 'mac-seg-active' : 'text-neutral-600 hover:text-neutral-900'}">
+            <i data-lucide="${srcIco[s.id]}" class="w-3 h-3 ${active ? 'text-blue-600' : 'text-neutral-400'}"></i>
             <span>${s.label}</span>
             <span class="font-mono-tech text-[11px] ${active ? 'text-neutral-500' : 'text-neutral-400'}">${cnt.toLocaleString()}</span>
           </button>`;
@@ -482,17 +484,20 @@
 
     function renderSidebar() {
       const scopes = [
-        { id: 'all', label: '全部内容', icon: 'inbox' },
-        { id: 'unread', label: '待读', icon: 'circle-dot' },
-        { id: 'reading', label: '进行中', icon: 'clock-3' },
-        { id: 'read', label: '已读', icon: 'check-circle-2' }
+        { id: 'all', label: '全部内容', icon: 'inbox', bg: 'bg-slate-200/75 text-slate-700', abg: 'bg-blue-600 text-white' },
+        { id: 'unread', label: '待读', icon: 'circle-dot', bg: 'bg-blue-100/80 text-blue-600', abg: 'bg-blue-600 text-white' },
+        { id: 'reading', label: '进行中', icon: 'clock-3', bg: 'bg-amber-100/80 text-amber-700', abg: 'bg-amber-500 text-white' },
+        { id: 'read', label: '已读', icon: 'check-circle-2', bg: 'bg-teal-100/80 text-teal-700', abg: 'bg-teal-600 text-white' }
       ];
       document.getElementById('nav-scopes').innerHTML = scopes.map(s => {
         const active = state.scope === s.id && !state.activeViewId;
         return `
-          <button data-scope="${s.id}" class="w-full px-2.5 py-1.5 rounded-[8px] flex items-center justify-between text-[13px] transition ${active ? 'bg-black/[0.06] text-neutral-950 font-medium' : 'text-neutral-600 hover:bg-black/[0.035] hover:text-neutral-900'}">
-            <span class="flex items-center gap-2"><i data-lucide="${s.icon}" class="w-3.5 h-3.5 ${active ? 'text-neutral-900' : 'text-neutral-400'}"></i>${s.label}</span>
-            <span class="text-[11.5px] font-mono-tech text-neutral-400">${getScopeCount(s.id).toLocaleString()}</span>
+          <button data-scope="${s.id}" class="sb-item w-full px-2 py-1.5 flex items-center justify-between text-[13px] ${active ? 'is-active' : 'text-neutral-700'}">
+            <span class="flex items-center gap-2.5">
+              <span class="sb-ico ${active ? s.abg : s.bg}"><i data-lucide="${s.icon}" class="w-3.5 h-3.5"></i></span>
+              <span>${s.label}</span>
+            </span>
+            <span class="text-[11.5px] font-mono-tech ${active ? 'text-neutral-700 font-medium' : 'text-neutral-400'}">${getScopeCount(s.id).toLocaleString()}</span>
           </button>`;
       }).join('');
 
@@ -500,8 +505,11 @@
       document.getElementById('nav-views').innerHTML = state.views.filter(v => !v.hidden).map(v => {
         const active = state.activeViewId === v.id;
         return `
-          <button data-view-id="${v.id}" class="w-full px-2.5 py-1.5 rounded-[8px] flex items-center justify-between text-[13px] transition ${active ? 'bg-black/[0.06] text-neutral-950 font-medium' : 'text-neutral-600 hover:bg-black/[0.035] hover:text-neutral-900'}">
-            <span class="flex items-center gap-2 truncate"><i data-lucide="${layIcon[v.layout] || 'list'}" class="w-3.5 h-3.5 ${active ? 'text-neutral-900' : 'text-neutral-400'}"></i><span class="truncate">${v.name}</span></span>
+          <button data-view-id="${v.id}" class="sb-item w-full px-2 py-1.5 flex items-center justify-between text-[12.5px] ${active ? 'is-active' : 'text-neutral-600'}">
+            <span class="flex items-center gap-2.5 truncate">
+              <span class="sb-ico ${active ? 'bg-neutral-900 text-white' : 'bg-black/[0.04] text-neutral-500'}"><i data-lucide="${layIcon[v.layout] || 'list'}" class="w-3 h-3"></i></span>
+              <span class="truncate">${v.name}</span>
+            </span>
             ${active && isViewDirty() ? '<span class="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0"></span>' : ''}
           </button>`;
       }).join('');
@@ -509,29 +517,40 @@
       document.getElementById('ico-copies-fold').style.transform = state.copiesExpanded ? '' : 'rotate(-90deg)';
       const copiesEl = document.getElementById('nav-copies');
       copiesEl.classList.toggle('hidden', !state.copiesExpanded);
+      const brandTone = {
+        obsidian: { bg: 'bg-purple-100/80 text-purple-700', ico: 'gem' },
+        craft: { bg: 'bg-indigo-100/80 text-indigo-700', ico: 'file-text' },
+        dida: { bg: 'bg-sky-100/80 text-sky-700', ico: 'check-square' }
+      };
       copiesEl.innerHTML = DESTINATIONS.map(d => {
         const key = `copy:${d.id}`;
         const active = state.scope === key;
-        const icon = d.type === 'craft' ? 'file-text' : d.type === 'obsidian' ? 'gem' : 'check-square';
+        const bt = brandTone[d.type] || { bg: 'bg-neutral-200 text-neutral-600', ico: 'folder' };
         return `
-          <button data-scope="${key}" class="w-full px-2.5 py-1.5 rounded-[8px] flex items-center justify-between text-[12.5px] transition ${active ? 'bg-black/[0.06] text-neutral-950 font-medium' : 'text-neutral-600 hover:bg-black/[0.035] hover:text-neutral-900'}">
-            <span class="flex items-center gap-2 truncate"><i data-lucide="${icon}" class="w-3.5 h-3.5 text-neutral-400"></i><span class="truncate">${d.name}</span></span>
+          <button data-scope="${key}" class="sb-item w-full px-2 py-1.5 flex items-center justify-between text-[12.5px] ${active ? 'is-active' : 'text-neutral-600'}">
+            <span class="flex items-center gap-2.5 truncate">
+              <span class="sb-ico ${bt.bg}"><i data-lucide="${bt.ico}" class="w-3 h-3"></i></span>
+              <span class="truncate">${d.name}</span>
+            </span>
             <span class="text-[11.5px] font-mono-tech text-neutral-400">${getScopeCount(key)}</span>
           </button>`;
       }).join('');
 
       const specials = [
-        { id: 'archived', label: '归档', icon: 'archive' },
-        { id: 'abandoned', label: '放弃', icon: 'ban' },
-        { id: 'triage', label: '需要处理', icon: 'alert-circle' }
+        { id: 'archived', label: '归档', icon: 'archive', bg: 'bg-stone-200/70 text-stone-600' },
+        { id: 'abandoned', label: '放弃', icon: 'ban', bg: 'bg-neutral-200/70 text-neutral-500' },
+        { id: 'triage', label: '需要处理', icon: 'alert-circle', bg: 'bg-amber-100 text-amber-700' }
       ];
       document.getElementById('nav-special').innerHTML = specials.map(s => {
         const active = state.scope === s.id;
         const cnt = getScopeCount(s.id);
         return `
-          <button data-scope="${s.id}" class="w-full px-2.5 py-1.5 rounded-[8px] flex items-center justify-between text-[13px] transition ${active ? 'bg-black/[0.06] text-neutral-950 font-medium' : 'text-neutral-600 hover:bg-black/[0.035] hover:text-neutral-900'}">
-            <span class="flex items-center gap-2"><i data-lucide="${s.icon}" class="w-3.5 h-3.5 ${s.id === 'triage' && cnt > 0 ? 'text-amber-600' : 'text-neutral-400'}"></i>${s.label}</span>
-            <span class="text-[11.5px] font-mono-tech ${s.id === 'triage' && cnt > 0 ? 'px-1.5 rounded-full bg-amber-100 text-amber-800 font-semibold' : 'text-neutral-400'}">${cnt}</span>
+          <button data-scope="${s.id}" class="sb-item w-full px-2 py-1.5 flex items-center justify-between text-[12.5px] ${active ? 'is-active' : 'text-neutral-600'}">
+            <span class="flex items-center gap-2.5">
+              <span class="sb-ico ${s.bg}"><i data-lucide="${s.icon}" class="w-3.5 h-3.5"></i></span>
+              <span>${s.label}</span>
+            </span>
+            <span class="text-[11px] font-mono-tech ${s.id === 'triage' && cnt > 0 ? 'px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-800 font-semibold' : 'text-neutral-400'}">${cnt}</span>
           </button>`;
       }).join('');
     }
@@ -728,48 +747,47 @@
       else if (state.layout === 'gallery') renderGallery(el, items);
     }
 
-    // Default Layout: Airy Apple Mail / Craft Editorial Stream
+    // Default Layout: Tactile Craft / Apple Mail Stream Well with Elevated Selected Card
     function renderStream(el, items) {
       el.innerHTML = `
-        <div class="p-2 space-y-1">
+        <div class="min-h-full stream-well p-2.5 space-y-1.5">
           ${items.map(item => {
             const sel = state.selectedItemId === item.id;
             const checked = state.checkedIds.has(item.id);
             const unread = item.status === 'unread';
             return `
-              <div data-open-item="${item.id}" tabindex="0" class="stream-item focus-ring group relative px-3 py-3 rounded-[10px] cursor-pointer transition ${sel ? 'is-selected bg-blue-50/75' : 'hover:bg-black/[0.025]'}">
+              <div data-open-item="${item.id}" tabindex="0" class="stream-item focus-ring group relative px-3.5 py-3 rounded-[11px] cursor-pointer transition ${sel ? 'is-selected stream-card-active' : 'hover:bg-white/70'}">
                 <div class="flex items-start gap-2.5">
-                  <!-- Unread dot (quiet) or checkbox on hover/checked -->
-                  <div class="w-4 pt-1 flex items-center justify-center shrink-0">
-                    <input type="checkbox" data-check="${item.id}" ${checked ? 'checked' : ''} class="${checked ? 'opacity-100' : 'hover-reveal'} rounded border-neutral-300 text-blue-600 cursor-pointer" />
+                  <div class="w-4 pt-[5px] flex items-center justify-center shrink-0">
+                    <input type="checkbox" data-check="${item.id}" ${checked ? 'checked' : ''} class="hub-chk ${checked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}" />
                     ${!checked && unread ? '<span class="w-[6px] h-[6px] rounded-full bg-blue-600 group-hover:hidden"></span>' : ''}
                     ${!checked && item.status === 'reading' ? '<span class="w-[6px] h-[6px] rounded-full bg-amber-500 group-hover:hidden"></span>' : ''}
                   </div>
                   <div class="min-w-0 flex-1">
                     <div class="flex items-start justify-between gap-2">
-                      <h3 class="text-[13.5px] leading-[1.42] line-clamp-2 ${item.status === 'read' ? 'text-neutral-500 font-normal' : 'text-neutral-900 font-medium'}">${item.title}</h3>
+                      <h3 class="text-[13.5px] leading-[1.45] tracking-[-0.005em] line-clamp-2 ${item.status === 'read' ? 'text-neutral-500 font-normal' : 'text-[#141413] font-medium'}">${item.title}</h3>
                       ${item.triage ? '<span class="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" title="有待处理项"></span>' : ''}
                     </div>
-                    <p class="text-[12px] text-neutral-400 line-clamp-1 mt-1">${item.excerpt}</p>
+                    <p class="text-[12px] text-neutral-500/85 line-clamp-1 mt-1 leading-relaxed">${item.excerpt}</p>
                     <div class="flex items-center justify-between gap-2 mt-2 text-[11.5px] text-neutral-400">
                       <div class="flex items-center gap-1.5 truncate">
-                        <span class="text-neutral-500">${item.author}</span>
-                        <span>·</span>
+                        <span class="text-neutral-600 font-medium">${item.author}</span>
+                        <span class="text-neutral-300">·</span>
                         <span>${sourceShort(item.source)}</span>
-                        <span>·</span>
+                        <span class="text-neutral-300">·</span>
                         <span class="font-mono-tech">${item.publishedAt}</span>
                       </div>
                       <div class="flex items-center gap-1.5 shrink-0">
                         ${attBadge(item)}
-                        ${item.tags[0] ? `<span class="text-[11px] text-neutral-400">#${item.tags[0]}</span>` : ''}
+                        ${item.tags[0] ? `<span class="px-1.5 py-0.2 rounded bg-black/[0.04] text-neutral-500 text-[10.5px]">${item.tags[0]}</span>` : ''}
                       </div>
                     </div>
                   </div>
                 </div>
               </div>`;
           }).join('')}
-        </div>
-        <div class="px-4 py-3 text-[11.5px] text-neutral-400 text-center hair-t">第 1 页 · 每页 60 条（当前示例 ${items.length} 条）</div>`;
+          <div class="pt-3 pb-2 text-[11px] text-neutral-400 text-center font-mono-tech">第 1 页 · 每页 60 条（演示样本 ${items.length} 条）</div>
+        </div>`;
     }
 
     // Full-Width Table (Never Cramped!)
@@ -793,7 +811,7 @@
               const checked = state.checkedIds.has(item.id);
               return `
                 <tr data-open-item="${item.id}" class="cursor-pointer hover:bg-black/[0.02] transition ${state.selectedItemId === item.id && state.readingOverlayOpen ? 'bg-blue-50/60' : ''}">
-                  <td class="py-3 pl-4 pr-1"><input type="checkbox" data-check="${item.id}" ${checked ? 'checked' : ''} class="rounded border-neutral-300 text-blue-600 cursor-pointer" /></td>
+                  <td class="py-3 pl-4 pr-1"><input type="checkbox" data-check="${item.id}" ${checked ? 'checked' : ''} class="hub-chk" /></td>
                   <td class="py-3 px-2">
                     <button data-quick-status="${item.id}" class="inline-flex items-center gap-1.5 text-[12px] ${sm.text} hover:underline whitespace-nowrap">
                       <span class="w-2 h-2 rounded-full border ${sm.ring}"></span>${sm.label}
@@ -1026,7 +1044,12 @@
 
           ${item.forwardedFrom ? `<div class="mb-3 text-[12px] text-neutral-400 flex items-center gap-1.5"><i data-lucide="forward" class="w-3.5 h-3.5"></i>转发自 ${item.forwardedFrom}</div>` : ''}
 
-          <h1 class="font-serif-editorial text-[24px] sm:text-[26px] font-semibold text-neutral-950 leading-[1.38] tracking-[-0.015em] mb-4">${item.title}</h1>
+          <div class="mb-2.5 flex items-center gap-2 text-[11.5px] text-neutral-400 font-mono-tech">
+            <span class="uppercase tracking-wider text-neutral-500 font-sans font-medium">${sourceShort(item.source)}</span>
+            <span>·</span>
+            <span>约 ${Math.max(1, item.body.length)} 分钟阅读</span>
+          </div>
+          <h1 class="text-[23px] sm:text-[25px] font-semibold text-[#141413] leading-[1.36] tracking-[-0.02em] mb-4">${item.title}</h1>
 
           <!-- Notion Inline Subtraction: One whisper-quiet metadata line (zero clunky boxes until hovered!) -->
           <div class="flex items-center gap-x-3 gap-y-1.5 flex-wrap pb-6 mb-7 hair-b text-[12.5px] text-neutral-500">
@@ -1048,34 +1071,79 @@
             </div>
           </div>
 
-          <!-- Claude Desktop Comfortable Reading Prose -->
+          <!-- Claude Desktop Comfortable Reading Flow (Attachments Interleaved Inline in Natural Order) -->
           <div class="claude-prose">
-            ${item.body.map(p => `<p>${p}</p>`).join('')}
+            ${item.body.map((p, idx) => {
+              const att = item.attachments[idx];
+              let inlineAttHtml = '';
+              if (att) {
+                if (att.kind === 'image') {
+                  inlineAttHtml = `
+                    <figure class="my-6 rounded-[12px] overflow-hidden bg-white hair-box shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+                      <div class="h-44 px-6 flex flex-col items-center justify-center bg-gradient-to-br from-[#F6F8FC] via-[#F2F5FA] to-[#EDF1F7] relative">
+                        <div class="w-full max-w-[320px] space-y-2 opacity-80">
+                          <div class="h-2.5 w-24 rounded-full bg-blue-500/20"></div>
+                          <div class="grid grid-cols-3 gap-2">
+                            <div class="h-12 rounded-[7px] bg-white border border-black/[0.06]"></div>
+                            <div class="h-12 rounded-[7px] bg-white border border-black/[0.06]"></div>
+                            <div class="h-12 rounded-[7px] bg-white border border-black/[0.06]"></div>
+                          </div>
+                          <div class="h-2 w-40 rounded-full bg-neutral-400/20"></div>
+                        </div>
+                        ${!att.localReady ? `
+                          <div class="absolute inset-0 bg-white/75 backdrop-blur-[2px] flex flex-col items-center justify-center gap-2 p-4 text-center">
+                            <span class="text-[12.5px] font-medium text-amber-800">${att.error || (state.offlineMode ? '断网暂停下载' : '原图尚未下载到本机')}</span>
+                            <button data-dl-att="${item.id}:${att.id}" class="px-3 py-1 rounded-[7px] bg-neutral-900 hover:bg-neutral-800 text-white text-[12px] font-medium whitespace-nowrap transition">下载原图 (${att.sizeMb} MB)</button>
+                          </div>` : ''}
+                      </div>
+                      <figcaption class="px-3.5 py-2 hair-t bg-white flex items-center justify-between gap-2 text-[11.5px] text-neutral-400">
+                        <span class="truncate">${att.name}</span>
+                        <span class="font-mono-tech whitespace-nowrap shrink-0">${att.sizeMb} MB${att.localReady ? '' : ' · 未下载'}</span>
+                      </figcaption>
+                    </figure>`;
+                } else if (att.kind === 'video') {
+                  inlineAttHtml = `
+                    <figure class="my-6 rounded-[12px] overflow-hidden bg-neutral-900 text-white hair-box shadow-sm">
+                      <div class="h-48 p-5 flex flex-col items-center justify-center gap-2.5 bg-gradient-to-br from-neutral-800 to-neutral-950 relative">
+                        <div class="w-11 h-11 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center">
+                          <i data-lucide="play" class="w-5 h-5 text-white ml-0.5"></i>
+                        </div>
+                        <div class="text-[12.5px] text-white/90 font-medium">${att.localReady ? '原视频已就绪，点击播放' : '缩略图预览 · 原视频未下载'}</div>
+                        ${!att.localReady ? `<button data-dl-att="${item.id}:${att.id}" class="mt-0.5 px-3 py-1 rounded-[7px] bg-white text-neutral-900 hover:bg-neutral-100 text-[12px] font-medium whitespace-nowrap transition">下载原视频 (${att.sizeMb} MB)</button>` : ''}
+                      </div>
+                      <figcaption class="px-3.5 py-2 border-t border-white/10 flex items-center justify-between gap-2 text-[11.5px] text-white/60">
+                        <span class="truncate">${att.name}</span>
+                        <span class="font-mono-tech whitespace-nowrap shrink-0">${att.sizeMb} MB</span>
+                      </figcaption>
+                    </figure>`;
+                } else {
+                  inlineAttHtml = `
+                    <div class="my-5 px-3.5 py-2.5 rounded-[10px] bg-white hair-box flex items-center justify-between gap-3">
+                      <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-8 h-8 rounded-[7px] bg-rose-50 text-rose-600 flex items-center justify-center shrink-0"><i data-lucide="file-text" class="w-4 h-4"></i></span>
+                        <div class="min-w-0">
+                          <div class="text-[13px] font-medium text-neutral-900 truncate">${att.name}</div>
+                          <div class="text-[11.5px] font-mono-tech text-neutral-400">${att.sizeMb} MB · ${att.localReady ? '本机可用' : '未下载'}</div>
+                        </div>
+                      </div>
+                      ${!att.localReady ? `<button data-dl-att="${item.id}:${att.id}" class="px-2.5 py-1 rounded-[7px] bg-neutral-900 text-white text-[12px] font-medium whitespace-nowrap shrink-0">下载</button>` : ''}
+                    </div>`;
+                }
+              }
+              return `<p>${p}</p>${inlineAttHtml}`;
+            }).join('')}
           </div>
 
-          <!-- Attachments (Clean, Calm Cards) -->
-          ${item.attachments.length ? `
-            <div class="mt-9 pt-6 hair-t space-y-3">
-              <div class="flex items-center justify-between text-[12px] text-neutral-400">
-                <span>原附件 · ${item.attachments.filter(a => a.localReady).length}/${item.attachments.length} 本机可用</span>
-                <button id="btn-insp-from-att" class="text-neutral-600 hover:text-neutral-950 transition">查看云端校验</button>
-              </div>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                ${item.attachments.map(att => `
-                  <div class="p-3 rounded-[10px] bg-white hair-box flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-2.5 min-w-0">
-                      <div class="w-9 h-9 rounded-[8px] ${att.kind === 'video' ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-600'} flex items-center justify-center shrink-0">
-                        <i data-lucide="${att.kind === 'video' ? 'play' : att.kind === 'pdf' ? 'file-text' : 'image'}" class="w-4 h-4"></i>
-                      </div>
-                      <div class="min-w-0">
-                        <div class="text-[12.5px] font-medium text-neutral-800 truncate">${att.name}</div>
-                        <div class="text-[11px] font-mono-tech text-neutral-400">${att.sizeMb} MB · ${att.localReady ? '本机可读' : (att.error || (state.offlineMode ? '断网暂停' : '未下载'))}</div>
-                      </div>
-                    </div>
-                    ${!att.localReady ? `<button data-dl-att="${item.id}:${att.id}" class="px-2.5 py-1 rounded-[7px] bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-[11.5px] font-medium shrink-0">下载</button>` : ''}
-                  </div>`).join('')}
-              </div>
-            </div>` : ''}
+          <!-- Whisper-Quiet End-of-Reading Closure Bar (No J/K, No Line Wrapping) -->
+          <div class="mt-10 pt-5 hair-t flex items-center justify-center gap-2 text-[12.5px]">
+            <button data-quick-status="${item.id}" class="h-8 px-3.5 rounded-full whitespace-nowrap inline-flex items-center gap-1.5 transition ${item.status === 'read' ? 'bg-teal-50 text-teal-800 font-medium' : 'text-neutral-600 hover:bg-black/[0.045] hover:text-neutral-950'}">
+              <i data-lucide="check" class="w-3.5 h-3.5"></i><span>${item.status === 'read' ? '已读' : '标为已读'}</span>
+            </button>
+            <span class="text-neutral-200">·</span>
+            <button data-act-archive="${item.id}" class="h-8 px-3.5 rounded-full whitespace-nowrap inline-flex items-center gap-1.5 text-neutral-600 hover:bg-black/[0.045] hover:text-neutral-950 transition">
+              <i data-lucide="archive" class="w-3.5 h-3.5 text-neutral-400"></i><span>${item.lifecycle === 'archived' ? '恢复到阅读' : '归档'}</span>
+            </button>
+          </div>
         </article>`;
 
       // Inspector & Assistant panels
@@ -1551,7 +1619,7 @@
 
       // Reading Inline Controls
       if (t.id === 'btn-copy-url') { toast('已复制原文链接', 'ok'); return; }
-      if (t.id === 'btn-open-insp' || t.id === 'btn-insp-from-att') { state.inspectorOpen = !state.inspectorOpen; state.assistantOpen = false; renderReadingPaper(); if (window.lucide) lucide.createIcons(); return; }
+      if (t.id === 'btn-open-insp') { state.inspectorOpen = !state.inspectorOpen; state.assistantOpen = false; renderReadingPaper(); if (window.lucide) lucide.createIcons(); return; }
       if (t.id === 'btn-close-inspector') { state.inspectorOpen = false; renderReadingPaper(); return; }
       if (t.id === 'btn-open-asst') { state.assistantOpen = !state.assistantOpen; state.inspectorOpen = false; renderReadingPaper(); if (window.lucide) lucide.createIcons(); return; }
       if (t.id === 'btn-close-assistant') { state.assistantOpen = false; renderReadingPaper(); return; }
