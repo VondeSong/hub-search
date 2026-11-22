@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, Brain, Check, ChevronDown, ChevronRight, Plus, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, Brain, Check, ChevronRight, Plus, ShieldCheck, X } from "lucide-react";
 import type { AssistantOptions } from "./AgentAssistantOptions";
 import { useAgentPopover } from "./useAgentPopover";
 import { readMemoryHistory, type MemoryContent, type MemoryEntry, type MemoryKind, type MemoryProposal, type MemoryUse, type MemoryVersion, type SharedMemoryModel } from "./useSharedMemory";
@@ -161,9 +161,20 @@ export function MemoryProposalCard({model,item,editing,onEdit,onCancel,onResult}
   </section>;
 }
 
-function VersionBody({item,label}: {item:MemoryVersion;label:string}) {
-  return <div><small>{label} · 第 {item.version} 版{item.kind&&" · "+usageLabel(item.kind)}</small>{item.title&&<strong>{item.title}</strong>}
-    <p>{item.body??"此版本的正文不可核验"}</p></div>;
+function changedMemoryText(before:string,after:string) {
+  const split=(text:string)=>text.match(/[^。！？\n]+[。！？]?|[。！？\n]/g)??[];
+  const old=split(before),next=split(after);
+  let start=0,oldEnd=old.length,nextEnd=next.length;
+  while(start<oldEnd&&start<nextEnd&&old[start]===next[start])start++;
+  while(oldEnd>start&&nextEnd>start&&old[oldEnd-1]===next[nextEnd-1]){oldEnd--;nextEnd--;}
+  return {before:old.slice(start,oldEnd).join("").trim(),after:next.slice(start,nextEnd).join("").trim()};
+}
+
+function VersionBody({item,previous,includeKind=true}: {item:MemoryVersion;previous:boolean;includeKind?:boolean}) {
+  return <div data-version-side={previous?"before":"after"}>
+    <span className="agent-memory-version-sign" aria-hidden="true">{previous?"−":"+"}</span>
+    <small>{previous?"修改前":"修改后"} · 第 {item.version} 版{includeKind&&item.kind&&" · "+usageLabel(item.kind)}</small>{item.title&&<strong>{item.title}</strong>}
+    {item.body!==""&&<p>{item.body??"此版本的正文不可核验"}</p>}</div>;
 }
 
 function MemoryHistory({entry}: {entry:MemoryEntry}) {
@@ -179,12 +190,25 @@ function MemoryHistory({entry}: {entry:MemoryEntry}) {
     finally{if(alive.current)setLoading(false);}
   }
   return <details className="agent-memory-history" onToggle={event=>{if(event.target===event.currentTarget&&event.currentTarget.open&&!versions&&!loading)void load();}}>
-    <summary>修改记录 · {(entry.history?.length??1)-1}</summary>
+    <summary><ChevronRight size={14} aria-hidden="true"/><span>版本变更对比{entry.updatedAt?`（${date(entry.updatedAt)}）`:""}</span></summary>
     {loading&&<p role="status">正在读取修改记录…</p>}
     {error&&<p role="alert">{error} <button type="button" onClick={()=>void load()}>重试</button></p>}
-    {versions&&<ol>{versions.slice(0,-1).map((after,index)=><li key={after.version}><time>{date(after.source?.confirmedAt)} {after.source?.changeReason}</time>
-      <VersionBody label="修改前" item={versions[index+1]}/><VersionBody label="修改后" item={after}/>
-    </li>)}</ol>}
+    {versions&&<ol>{versions.slice(0,-1).map((after,index)=>{
+      const before=versions[index+1];
+      const verifiedBodies=before.body!==null&&after.body!==null;
+      const changes=verifiedBodies?changedMemoryText(before.body??"",after.body??""):null;
+      const titleChanged=before.title!==after.title;
+      const kindChanged=before.kind!==after.kind;
+      return <li key={after.version}><time>{date(after.source?.confirmedAt)} {after.source?.changeReason}</time>
+        {changes&&(changes.before||changes.after||titleChanged||kindChanged)?<div className="agent-memory-version-pair">
+          {(changes.before||titleChanged||kindChanged)&&<VersionBody previous includeKind={kindChanged} item={{...before,title:titleChanged?before.title:null,body:changes.before}}/>}
+          {(changes.after||titleChanged||kindChanged)&&<VersionBody previous={false} includeKind={kindChanged} item={{...after,title:titleChanged?after.title:null,body:changes.after}}/>}
+        </div>:<p className="agent-note">{verifiedBodies?"正文与标题无变化。":"部分版本正文暂不可核验。"}</p>}
+        <details className="agent-memory-versions-full"><summary>完整版本</summary><div className="agent-memory-version-pair">
+          <VersionBody previous item={before}/><VersionBody previous={false} item={after}/>
+        </div></details>
+      </li>;
+    })}</ol>}
     {versions?.length===21&&<p>显示最近 20 次修改。</p>}
   </details>;
 }
@@ -200,16 +224,26 @@ function EntryCard({model,entry,editing,onEdit,onCancel}: {
   const identity={id:entry.id,expectedVersion:entry.version};
   const cancel=()=>{onCancel();requestAnimationFrame(()=>editButton.current?.focus({preventScroll:true}));};
   useEffect(()=>{if(forgetting)cancelButton.current?.focus({preventScroll:true});},[forgetting]);
-  return <details className="agent-memory-entry" data-memory-state={entry.state}>
-    <summary><span>{entry.title}</span>{labels[entry.state]&&<small>{labels[entry.state]}</small>}<ChevronDown size={14} aria-hidden="true"/></summary>
+  return <article className="agent-memory-entry" data-memory-state={entry.state}>
+    <header className="agent-memory-entry-heading"><strong>{entry.title}</strong>
+      <span>{labels[entry.state]&&<small>{labels[entry.state]}</small>}<small className="agent-memory-version-badge">第 {entry.version} 版</small></span>
+    </header>
     <div className="agent-memory-entry-body">
       {editing ? <MemoryEditor key={entry.id} initial={{title:entry.title,body:entry.body??"",kind:entry.kind}} scope={entry.projectId} fixed projects={model.view?.projects??[]} action={action} disabled={model.blocked}
         onCancel={cancel} onSave={content=>model.save(content,{projectId:entry.projectId,topicKey:entry.topicKey,expectedVersion:entry.version},"已保存新版本")}/> : <>
         <p className="agent-memory-content">{entry.body??entry.detail??"正文暂不可用"}</p>
-        <p className="agent-memory-meta">{model.projectLabel(entry.projectId)} · {usageLabel(entry.kind)} · 第 {entry.version} 版</p>
-        <p className="agent-memory-source">{entry.source?.origin==="modelProposal"?"模型建议，经用户确认":"用户确认"} {date(entry.updatedAt)}</p>
         {(entry.history?.length??0)>1&&entry.state!=="deleting"&&<MemoryHistory key={entry.version} entry={entry}/>}
-        {entry.source?.workId&&<details className="agent-memory-origin"><summary>查看来源</summary><p>事项 {entry.source.workId}{entry.source.sourceRecordId&&" · 消息 "+entry.source.sourceRecordId}</p></details>}
+        <footer className="agent-memory-entry-footer">
+          <details className="agent-memory-origin">
+            <summary>查看来源</summary>
+            <dl>
+              <div><dt>确认</dt><dd>{entry.source?.origin==="modelProposal"?"模型建议，经用户确认":entry.source?"用户确认":"暂无来源记录"}</dd></div>
+              <div><dt>使用方式</dt><dd>{model.projectLabel(entry.projectId)} · {usageLabel(entry.kind)}</dd></div>
+              {entry.updatedAt&&<div><dt>更新时间</dt><dd>{date(entry.updatedAt)}</dd></div>}
+              {entry.source?.workId&&<div><dt>事项</dt><dd>{entry.source.workId}</dd></div>}
+              {entry.source?.sourceRecordId&&<div><dt>消息</dt><dd>{entry.source.sourceRecordId}</dd></div>}
+            </dl>
+          </details>
         {forgetting ? <div className="agent-memory-forget" onKeyDown={event=>{if(event.key==="Escape"){event.preventDefault();event.stopPropagation();setForgetting(false);requestAnimationFrame(()=>forgetButton.current?.focus());}}}>
           <p>遗忘这条记忆及其历史正文？清理后无法从这里恢复，已有备份仍保留。</p>
           <div className="agent-memory-actions"><button type="button" className="agent-memory-danger" disabled={model.blocked} onClick={()=>void model.perform({action:"forget",...identity,confirmed:true},"已遗忘这条记忆").then(()=>setForgetting(false))}>确认遗忘</button><button ref={cancelButton} type="button" onClick={()=>{setForgetting(false);requestAnimationFrame(()=>forgetButton.current?.focus());}}>取消</button></div>
@@ -217,11 +251,12 @@ function EntryCard({model,entry,editing,onEdit,onCancel}: {
           {["active","inactive","review"].includes(entry.state)&&<button ref={editButton} type="button" disabled={model.blocked} onClick={onEdit}>{action==="保存修改"?"编辑":action}</button>}
           {entry.state==="active"&&<button type="button" disabled={model.blocked} onClick={()=>void model.perform({action:"deactivate",...identity},"已停用这条记忆")}>停用</button>}
           {entry.state==="pending"&&<button type="button" disabled={model.blocked} onClick={()=>void model.perform({action:"retry",id:entry.id},"已完成索引核验")}>重试核验</button>}
-          <button ref={forgetButton} type="button" disabled={model.blocked} onClick={()=>setForgetting(true)}>{entry.state==="deleting"?"重试遗忘":"遗忘"}</button>
+          <button className="agent-memory-forget-trigger" ref={forgetButton} type="button" disabled={model.blocked} onClick={()=>setForgetting(true)}>{entry.state==="deleting"?"重试遗忘":"遗忘"}</button>
         </div>}
+        </footer>
       </>}
     </div>
-  </details>;
+  </article>;
 }
 
 function Audit({usage,model}: {usage:MemoryUse;model:SharedMemoryModel}) {
@@ -275,14 +310,14 @@ export function MemoryManager({model,materialsOnly,usage,onBack,onClose=model.cl
       <button ref={closeButton} type="button" aria-label="关闭记忆管理" disabled={switchBlocked} onClick={onClose}><X size={17}/></button>
     </div></header>
     <div className="agent-memory-manager-filters"><div className="agent-memory-manager-controls">
-      <label htmlFor={scopeId}>查看范围</label><select id={scopeId} value={model.browseScope} disabled={switchBlocked||!model.view} onChange={event=>model.browseProject(event.target.value)}>
+      <label className={centered?"agent-visually-hidden":undefined} htmlFor={scopeId}>查看范围</label><select id={scopeId} value={model.browseScope} disabled={switchBlocked||!model.view} onChange={event=>model.browseProject(event.target.value)}>
         <option value="">个人通用</option>{projects.map(project=><option key={project.id} value={project.id}>{project.name}</option>)}
       </select>
     </div>
     <div className="agent-memory-tabs" aria-label="记忆列表">
-      <button type="button" aria-pressed={tab==="saved"} disabled={switchBlocked} onClick={()=>setTab("saved")}>已保存{tab==="saved"&&!!entries.length&&<small>{entries.length}</small>}</button>
-      <button type="button" aria-pressed={tab==="pending"} disabled={switchBlocked} onClick={()=>setTab("pending")}>待确认{(model.browseProposals?.length??0)>0&&<small>{model.browseProposals?.length}</small>}</button>
-      <button className="agent-memory-more" type="button" aria-expanded={utility} disabled={switchBlocked} onClick={()=>setUtility(!utility)}>更多</button>
+      <button type="button" aria-pressed={tab==="saved"} disabled={switchBlocked} onClick={()=>setTab("saved")}>已保存{model.view&&<small>({entries.length})</small>}</button>
+      <button type="button" aria-pressed={tab==="pending"} disabled={switchBlocked} onClick={()=>setTab("pending")}>待确认{model.browseProposals&&<small>({proposals.length})</small>}</button>
+      {!centered&&<button className="agent-memory-more" type="button" aria-expanded={utility} disabled={switchBlocked} onClick={()=>setUtility(!utility)}>更多</button>}
     </div></div>
     {editing&&<p className="agent-memory-edit-notice" role="status">先保存或取消当前编辑，再切换范围或关闭。</p>}
     <div className="agent-memory-list">
@@ -307,7 +342,10 @@ export function MemoryManager({model,materialsOnly,usage,onBack,onClose=model.cl
     </div>
     <MemoryStatus model={model}/>
     <footer className="agent-memory-manager-footer">
+      <div className="agent-memory-footer-context">
       <span>{materialsOnly?"本轮不使用记忆（只用所选资料）":"本对话记忆："+(model.selection.enabled?model.projectLabel(model.selection.projectId)+(model.selection.projectId?"＋个人通用":""):"关闭")}</span>
+      {centered&&<button className="agent-memory-more" type="button" aria-expanded={utility} disabled={switchBlocked} onClick={()=>{setUtility(!utility);if(!utility)requestAnimationFrame(()=>dialog.current?.querySelector<HTMLElement>(".agent-memory-tools input")?.focus());}}>更多</button>}
+      </div>
       <small>查看其他范围不会更改本对话。</small>
       {usage&&<Audit usage={usage} model={model}/>}
       {settings}

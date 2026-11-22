@@ -17,6 +17,24 @@ const button=(text:string)=>[...host.querySelectorAll<HTMLButtonElement>("button
 const click=async(text:string)=>act(async()=>{button(text).click();await new Promise(r=>setTimeout(r,0));});
 async function render(){await act(async()=>root.render(<AgentSkillPackages onChanged={changed}/>));}
 async function inspect(){await click("管理方法包");await click("检查方法文件夹");}
+it("uses the registered package identity and real pause operation from the management card",async()=>{
+ const base=invoke.getMockImplementation()!;
+ invoke.mockImplementation((name,payload)=>payload.args.action==="skillPackagePause"
+  ?Promise.resolve({...saved,paused:true}):base(name,payload));
+ const cardSkill={...saved.skill,description:"复核点检表",packageId:src.packageId,origin:"registered" as const,version:src.methodVersion,allowImplicitInvocation:true};
+ await act(async()=>root.render(<AgentSkillPackages initiallyExpanded cardSkills={[cardSkill]} onChanged={changed}/>));
+ const row=host.querySelector(".agent-skill-manager-card")!;
+ expect(row.textContent).toContain("复核方法第 1 版Codex 通用");
+ const toggle=row.querySelector<HTMLButtonElement>('[role="switch"]')!;
+ expect(toggle.getAttribute("aria-checked")).toBe("true");
+ await act(async()=>toggle.click());
+ expect(invoke.mock.calls.find(([,request])=>request.args.action==="skillPackagePause")?.[1].args)
+  .toEqual({action:"skillPackagePause",packageId:src.packageId,expectedRevision:src.revision,paused:true});
+ expect(changed).toHaveBeenCalledTimes(1);
+ expect(host.querySelector('[aria-label="已保存方法包"]')).toBeNull();
+ await act(async()=>root.render(<AgentSkillPackages initiallyExpanded cardSkills={[{...cardSkill,available:false,unavailableReasons:["技能已停用"]}]} onChanged={changed}/>));
+ expect(toggle.getAttribute("aria-checked")).toBe("false");
+});
 it("does not inspect folders or invoke tools until requested, then shows a complete compatibility inventory",async()=>{
  await render();expect(invoke).not.toHaveBeenCalled();expect(choose).not.toHaveBeenCalled();await inspect();
  expect(choose).toHaveBeenCalledWith({directory:true,multiple:false,title:"选择包含 SKILL.md 的普通方法文件夹"});expect(host.textContent).toContain("尚未导入");expect(host.textContent).toContain("scripts/check.py");expect(host.textContent).toContain("脚本仅保存，不执行");expect(invoke.mock.calls.some(([,x])=>x.args.action==="skillPackageImport")).toBe(false);

@@ -1,9 +1,9 @@
 import ReactMarkdown from "react-markdown";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, FolderOpen, WandSparkles, Check, Pin, PinOff, Plus, Search, Settings2, RefreshCw } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, ChevronRight, WandSparkles, Check, Pin, PinOff, Plus, Search, Settings2, RefreshCw } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAgentPopover } from "./useAgentPopover";
-import {AgentSkillPackages} from "./AgentSkillPackages";
+import {AgentSkillPackages, SkillManagerCard} from "./AgentSkillPackages";
 import builtin0 from "../src-tauri/src/agent_work/skills/hub-research/SKILL.md?raw";
 import builtin1 from "../src-tauri/src/agent_work/skills/hub-flashcards/SKILL.md?raw";
 import builtin2 from "../src-tauri/src/agent_work/skills/hub-note-edit/SKILL.md?raw";
@@ -60,6 +60,7 @@ export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], o
   }
   const [managing, setManaging] = useState(manageInitially);
   const [managementTab,setManagementTab] = useState<"全部"|"本地技能"|"方法包">("全部");
+  const [packageRefresh,setPackageRefresh] = useState(0);
   const detailHeading = useRef<HTMLHeadingElement>(null);
   const listReturn = useRef<HTMLButtonElement | null>(null);
   const menuElement = useRef<HTMLDivElement>(null);
@@ -113,21 +114,26 @@ export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], o
 
     </section> : managing ? <section className="agent-skill-detail agent-skill-management" aria-label="技能管理">
       {!standaloneManagement&&<button type="button" className="agent-menu-back" onClick={back}><ChevronLeft size={15}/>返回技能</button>}
-      <div className="agent-skill-management-heading"><div><h3 ref={detailHeading} tabIndex={-1}>技能与方法包</h3><p>外部 Codex 可通过 Hub MCP 读取已提供的技能。</p></div></div>
-      <div className="agent-skill-management-group"><button type="button" className="agent-skill-management-row" aria-label="打开用户技能文件夹" disabled={loading} onClick={() => void load("openSkillDirectory")}><FolderOpen size={18}/><span><strong>用户技能文件夹</strong><small>添加或编辑自己的 SKILL.md</small></span><ChevronRight size={15}/></button></div>
+      <div className="agent-skill-interoperability" data-shared={catalog?.skills.some(skill=>skill.available&&skill.allowImplicitInvocation)||undefined}>
+        <div><h3 ref={detailHeading} tabIndex={-1}>Hub &amp; Codex 技能库互通</h3><p>外部 Codex 通过 Hub MCP 按授权读取本地 SKILL.md 技能</p></div>
+        <button type="button" aria-label="打开用户技能文件夹" disabled={loading} onClick={()=>void load("openSkillDirectory")}>打开目录<ArrowUpRight size={13} aria-hidden="true"/></button>
+      </div>
       <div className="agent-skill-manager-filters"><div role="group" aria-label="技能来源">
         {(["全部","本地技能","方法包"] as const).map(tab=><button type="button" key={tab} aria-pressed={managementTab===tab} onClick={()=>setManagementTab(tab)}>{tab}</button>)}
-      </div><button type="button" className="agent-skill-refresh" aria-label="刷新技能" title="刷新技能" disabled={loading} onClick={()=>void load()}><RefreshCw size={15}/></button></div>
+      </div><button type="button" className="agent-skill-refresh" aria-label="刷新技能" title="刷新技能" disabled={loading} onClick={()=>{setPackageRefresh(previous=>previous+1);void load();}}><RefreshCw size={14}/>刷新</button></div>
       {managementTab!=="方法包"&&<div className="agent-skill-manager-catalog">
-        {catalog?.skills.filter(skill=>skill.origin!=="registered").map(skill=><article key={skill.name}>
-          <strong>{skill.title}</strong><small title={skill.version}>{/^[a-f0-9]{12,}$/i.test(skill.version)?skill.version.slice(0,7):skill.version}</small><p>{purposes[skill.name]||skill.description}</p>
-          {!skill.available&&<span>暂不可用 · {skill.unavailableReasons.join("；")}</span>}
-        </article>)}
+        {catalog?.skills.filter(skill=>skill.origin!=="registered").map(skill=><SkillManagerCard key={skill.name} title={skill.title} version={skill.version}
+          description={purposes[skill.name]||skill.description} shared={skill.available&&skill.allowImplicitInvocation}
+          status={!skill.available?skill.unavailableReasons.join("；")||"暂不可用":undefined}
+          action={<small className="agent-skill-card-availability" data-available={skill.available}>{skill.available?"可用":"暂不可用"}</small>}/>)}
+        {catalog&&!catalog.skills.some(skill=>skill.origin!=="registered")&&managementTab==="本地技能"&&<p className="agent-note">此处暂无本地技能。</p>}
       </div>}
-      <div className="agent-skill-management-group" hidden={managementTab==="本地技能"}><h4>方法包</h4><AgentSkillPackages initiallyExpanded importTarget={importTarget} onShowImport={()=>setManagementTab("方法包")} onChanged={() => void load()}/></div>
-      <details className="agent-menu-advanced agent-skill-management-help"><summary>文件夹与使用说明</summary>
-        <p className="agent-note">用户技能与 Codex 的用户技能独立。每个技能放在独立文件夹中，包含 SKILL.md；修改后刷新。已登记方法包通过检查并发布新版本更新。外部 Codex 可通过 Hub MCP 读取 Hub 技能。</p>
-        <p className="agent-skill-directory">{catalog?.directory}</p>
+      <div hidden={managementTab==="本地技能"}><AgentSkillPackages initiallyExpanded importTarget={importTarget} onShowImport={()=>setManagementTab("方法包")}
+        cardSkills={catalog?.skills.filter(skill=>skill.origin==="registered")??[]} refreshKey={packageRefresh} onChanged={()=>void load()}/></div>
+      <details className="agent-skill-management-help"><summary>导入格式与容量规范</summary>
+        <p className="agent-note">每个方法包应包含 SKILL.md。每包最多 33 个文件、原始内容 128 KiB，文字参考和模板单份最多 32 KiB。修改本地技能后可刷新，已登记方法包可先检查变化再发布新版本。</p>
+        <p className="agent-note">Hub 的用户技能与 Codex 的用户技能独立。</p>
+        {catalog?.directory&&<p className="agent-skill-directory">{catalog.directory}</p>}
       </details>
     </section> : <>
       {compact&&<div className="agent-skill-compact-heading"><span>通用技能（Hub &amp; Codex）</span><span>点 + 快速挂载</span></div>}

@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { InlineMemoryProposals, MemoryAndSavePopover, MemoryManager } from "./SharedMemory";
 import { loadMemoryPreference, rememberMemoryPreference } from "./AgentPreferences";
-import { useSharedMemory } from "./useSharedMemory";
+import { useSharedMemory, type MemoryEntry } from "./useSharedMemory";
 
 const { invoke }=vi.hoisted(()=>({invoke:vi.fn()}));
 vi.mock("@tauri-apps/api/core",()=>({invoke}));
@@ -14,7 +14,7 @@ let host: HTMLDivElement,root:Root;
 const calls=()=>invoke.mock.calls.map(([,argument])=>argument.args);
 const button=(label:string)=>[...host.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.getAttribute("aria-label")===label||b.textContent?.trim()===label)!;
 const click=async(label:string)=>{await act(async()=>button(label).click());};
-function Assistant({workId,materialsOnly=false,active=false,canAuto=false,onSave=async()=>{}}: {workId?:string;materialsOnly?:boolean;active?:boolean;canAuto?:boolean;onSave?:(value:{autoFlashcardInbox:boolean})=>Promise<void>}) {
+function Assistant({workId,materialsOnly=false,active=false,canAuto=false,centered=false,onSave=async()=>{}}: {workId?:string;materialsOnly?:boolean;active?:boolean;canAuto?:boolean;centered?:boolean;onSave?:(value:{autoFlashcardInbox:boolean})=>Promise<void>}) {
   const [selection,setSelection]=useState(loadMemoryPreference);
   const model=useSharedMemory({workId,active,blocked:active,selection,onSelectionChange:setSelection});
   return <>
@@ -22,7 +22,7 @@ function Assistant({workId,materialsOnly=false,active=false,canAuto=false,onSave
     <MemoryAndSavePopover model={model} value={{model:null,autoFlashcardInbox:false}} disabled={active} canAuto={canAuto} materialsOnly={materialsOnly} onSave={onSave}/>
     <InlineMemoryProposals model={model} items={model.proposals}/>
     <output>{JSON.stringify(selection)}</output>
-    {model.managerOpen&&<MemoryManager model={model} materialsOnly={materialsOnly}/>}
+    {model.managerOpen&&<MemoryManager model={model} materialsOnly={materialsOnly} centered={centered}/>}
   </>;
 }
 beforeEach(()=>{
@@ -105,6 +105,33 @@ it("browses another project without changing the current scope or preference",as
   expect(host.querySelector(".agent-memory-manager [aria-label='建议记住']")?.textContent).toContain("另一项目");
   expect(calls().every(args=>args.action==="status"&&args.prepareRuntime===false)).toBe(true);
   expect(loadMemoryPreference()).toEqual({projectId:"p1",enabled:true});
+});
+
+it("shows saved memory cards directly and opens version and source details independently",async()=>{
+  const entry:MemoryEntry={id:"m1",projectId:"",topicKey:"format",title:"报告格式",body:"报告用中文。只列经过核对的数据。",kind:"rule",
+    version:2,state:"active",source:{origin:"modelProposal",workId:"work-1",sourceRecordId:"message-1"},history:[{version:2},{version:1}]};
+  invoke.mockImplementation(async(_, {args})=>args.action==="history"?{versions:[entry,{...entry,version:1,body:"报告用中文。列出采集的数据。"}]}:{...empty,entries:[entry]});
+  await act(async()=>root.render(<Assistant centered/>));
+  await click("打开管理记忆");
+  const card=host.querySelector<HTMLElement>("article.agent-memory-entry")!;
+  expect(card.querySelector(".agent-memory-content")?.textContent).toBe(entry.body);
+  expect(card.querySelector(".agent-memory-version-badge")?.textContent).toBe("第 2 版");
+  expect(calls().some(args=>args.action==="history")).toBe(false);
+  const source=card.querySelector<HTMLDetailsElement>(".agent-memory-origin")!;
+  const history=card.querySelector<HTMLDetailsElement>(".agent-memory-history")!;
+  await act(async()=>{history.open=true;history.dispatchEvent(new Event("toggle"));});
+  expect(history.querySelector('[data-version-side="before"] p')?.textContent).toBe("列出采集的数据。");
+  expect(history.querySelector('[data-version-side="after"] p')?.textContent).toBe("只列经过核对的数据。");
+  expect(history.querySelector(".agent-memory-versions-full")?.textContent).toContain("报告用中文。");
+  expect(source.open).toBe(false);
+  await act(async()=>source.querySelector("summary")!.click());
+  expect(source.open).toBe(true);
+  expect(source.textContent).toContain("message-1");
+  expect(history.open).toBe(true);
+  await click("遗忘");
+  expect(calls().some(args=>args.action==="forget")).toBe(false);
+  await click("取消");
+  expect(card.querySelector(".agent-memory-content")?.textContent).toBe(entry.body);
 });
 
 it("opens the newly created project for browsing without using it in the conversation",async()=>{
