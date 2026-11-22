@@ -515,11 +515,11 @@ details[open] > summary > .agent-detail-caret { transform:rotate(180deg); }
 }
 .agent-panel .agent-chat-title {
   min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-  color: var(--agent-chat-ink); font: 600 13px/1.5 var(--agent-chat-font); text-align: center;
+  color: var(--agent-chat-ink); font: 500 12px/1.5 var(--agent-chat-font); text-align: center;
 }
 .agent-panel :is(button,input).agent-chat-title {
   width: 100%; min-height: 26px; padding: 3px 8px; margin: 0; border: 1px solid transparent;
-  justify-self: center; border-radius: 8px; background: transparent; font-size: 13px;
+  justify-self: center; border-radius: 8px; background: transparent; font-size: 12px;
 }
 .agent-panel button.agent-chat-title { display: block; }
 .agent-panel .agent-chat-title > span { display: block; overflow: hidden; text-overflow: ellipsis; }
@@ -815,32 +815,40 @@ details[open] > summary > .agent-detail-caret { transform:rotate(180deg); }
   color:var(--hub-accent); background:color-mix(in srgb,var(--hub-accent) 9%,var(--agent-chat-surface));
 }
 .agent-panel .agent-composer .agent-skill-disclosure > .agent-add-skills {
-  width:min(288px,100%); max-width:none; padding:8px;
-  inset:auto auto calc(100% + 8px) clamp(0px,var(--agent-popover-anchor,0px),calc(100% - min(288px,100%)));
+  width:min(296px,100%); max-width:none; padding:0; border-radius:16px;
+  inset:auto auto calc(100% + 8px) clamp(0px,var(--agent-popover-anchor,0px),calc(100% - min(296px,100%)));
   background:color-mix(in srgb,var(--agent-chat-surface) 95%,transparent); backdrop-filter:blur(18px) saturate(160%);
   box-shadow:var(--agent-chat-popover-shadow);
 }
-.agent-skill-compact-heading { display:flex; justify-content:space-between; gap:8px; padding:3px 6px; font-size:11px; color:var(--agent-chat-muted); }
-.agent-panel .agent-skill-menu-compact .agent-skill-toolbar { padding:5px 5px 2px; }
-.agent-panel .agent-skill-menu-compact .agent-skill-search > input { min-height:28px; padding:3px 0; font-size:12px; }
-.agent-skill-menu-compact .agent-skill-scroll { max-height:208px; padding:0 2px; }
-.agent-panel .agent-skill-menu-compact .agent-skill-choice > button:first-child { min-height:37px; padding:4px 5px; }
-.agent-panel .agent-skill-menu-compact .agent-skill-choice:focus-within { background:var(--agent-chat-hover); }
-.agent-panel .agent-skill-menu-compact .agent-skill-copy > strong { font-size:12px; }
-.agent-panel .agent-skill-menu-compact .agent-skill-copy > span { font-size:10.5px; }
-.agent-panel .agent-skill-menu-compact .agent-skill-pin { opacity:.48; }
-.agent-panel .agent-skill-menu-compact .agent-skill-pin:is(:hover,:focus-visible,[aria-pressed=true]) { opacity:1; }
+.agent-skill-menu-compact { --agent-skill-indigo:#5c63d8; }
+.agent-skill-compact-heading { display:flex; align-items:center; flex:none; gap:6px; min-height:38px; padding:4px 12px; border-bottom:1px solid var(--agent-chat-border); }
+.agent-skill-compact-heading > strong { color:var(--agent-chat-ink); font-size:11.5px; font-weight:600; }
+.agent-skill-compact-heading > span { padding:1px 6px; border-radius:6px; background:color-mix(in srgb,var(--agent-skill-indigo) 10%,transparent); color:var(--agent-skill-indigo); font-size:9.5px; font-weight:500; }
+.agent-panel .agent-skill-compact-heading > button { display:grid; place-items:center; width:24px; min-height:24px; margin-inline-start:auto; padding:0; border:0; border-radius:6px; background:transparent; color:var(--agent-chat-muted); box-shadow:none; }
+.agent-panel .agent-skill-compact-heading > button:hover { background:var(--agent-chat-hover); color:var(--agent-chat-ink); }
+.agent-skill-menu-compact .agent-skill-scroll { max-height:224px; padding:8px; }
+.agent-panel .agent-skill-menu-compact .agent-skill-choice { gap:8px; padding-inline-end:8px; border:1px solid color-mix(in srgb,var(--agent-chat-border) 60%,transparent); border-radius:12px; background:transparent; }
+.agent-panel .agent-skill-menu-compact .agent-skill-choice + .agent-skill-choice { margin-top:4px; }
+.agent-panel .agent-skill-menu-compact .agent-skill-choice > button:first-child { min-height:46px; padding:5px 0 5px 8px; }
+.agent-panel .agent-skill-menu-compact .agent-skill-choice:is(:hover,:focus-within) { background:var(--agent-chat-hover); }
+.agent-panel .agent-skill-menu-compact .agent-skill-copy > strong { display:flex; align-items:center; gap:6px; color:var(--agent-chat-ink); font-size:12px; font-weight:600; }
+.agent-panel .agent-skill-copy > strong > span { overflow:hidden; text-overflow:ellipsis; color:inherit; font:inherit; white-space:nowrap; }
+.agent-panel .agent-skill-menu-compact .agent-skill-copy > span { overflow:hidden; color:var(--agent-chat-muted); font-size:10.5px; white-space:nowrap; text-overflow:ellipsis; }
+.agent-panel .agent-skill-copy .agent-skill-version { flex:none; padding:0 4px; border:1px solid var(--agent-chat-border); border-radius:4px; background:var(--agent-chat-subtle); font-size:9.5px; font-weight:400; }
 .agent-panel .agent-skill-menu-compact .agent-skill-quick {
-  display:grid; place-items:center; flex:0 0 24px; width:24px; height:24px; min-height:24px; padding:0; border:0;
-  border-radius:7px; background:var(--agent-chat-subtle); color:var(--agent-chat-secondary); box-shadow:none;
+  display:grid; place-items:center; flex:0 0 26px; width:26px; height:26px; min-height:26px; padding:0; border:0;
+  border-radius:8px; background:var(--agent-chat-subtle); color:var(--agent-chat-secondary); box-shadow:none;
 }
-.agent-panel .agent-skill-menu-compact .agent-skill-quick[aria-pressed=true] { color:var(--hub-accent); background:var(--hub-accent-soft); }
-.agent-skill-compact-footer { flex:none; margin-top:4px; padding-top:5px; border-top:1px solid var(--agent-chat-border); }
+.agent-panel .agent-skill-menu-compact .agent-skill-quick[aria-pressed=true] { color:#fff; background:var(--agent-skill-indigo); }
+.agent-skill-compact-footer { display:flex; flex:none; align-items:center; justify-content:space-between; gap:6px; padding:4px 12px; border-top:1px solid var(--agent-chat-border); background:color-mix(in srgb,var(--agent-chat-subtle) 40%,transparent); font-size:11px; }
+.agent-skill-compact-footer > span { display:flex; align-items:center; gap:5px; color:var(--agent-chat-muted); }
+.agent-skill-compact-footer > span::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+.agent-skill-compact-footer > span[data-shared=true]::before { background:#13a44a; }
 .agent-panel .agent-skill-compact-footer button {
-  display:flex; align-items:center; justify-content:space-between; width:100%; min-height:28px; padding:4px 6px;
-  border:0; background:transparent; box-shadow:none; color:var(--agent-chat-secondary); font-size:11.5px;
+  display:flex; align-items:center; gap:2px; min-height:24px; padding:2px 0;
+  border:0; background:transparent; box-shadow:none; color:var(--agent-chat-ink); font-size:11px; font-weight:500;
 }
-.agent-panel .agent-skill-compact-footer button:hover { background:var(--agent-chat-hover); color:var(--agent-chat-ink); }
+.agent-panel .agent-skill-compact-footer button:hover { text-decoration:underline; }
 .agent-panel .agent-add-skills .agent-skill-menu-compact .agent-skill-detail { padding:4px; }
 .agent-skill-detail-navigation { display:flex; justify-content:space-between; align-items:center; gap:6px; }
 .agent-panel .agent-skill-detail-navigation :is(.agent-menu-back,.agent-skill-source-link) { min-height:26px; padding:2px 0; border:0; background:transparent; box-shadow:none; font-size:11.5px; }

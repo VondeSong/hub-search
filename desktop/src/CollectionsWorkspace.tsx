@@ -591,13 +591,15 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   };
   const layoutName=readingLayouts.find(layout=>layout.id===view.layout)?.label;
   const activeTitle=activeEntry.kind==="view"?view.name:activeEntry.kind==="library"?(libraries.find(library=>library.id===activeEntry.id)?.name||"资料库副本"):collectionEntryLabels[activeEntry.id as CollectionBuiltinEntry];
+  const sourceCount = view.source === "all" ? activeTotal : sources.find(source => source.id === view.source)?.count ?? activeTotal;
+  const toggleReadingNavigation = shellHeader?.onToggleReadingNavigation ?? onToggleDesktopSidebar;
   return <section onKeyDown={readingKeys} className={`collections-workspace task-workspace${compactControls?" collection-compact-layout":""}${detailOpen?" collection-detail-open":""}`} aria-label="阅读">
     {searchItemKey&&<div role="status" className="collection-notice">从搜索打开的阅读条目<button type="button" onClick={()=>setSelectedKey(null)}>返回阅读列表</button>{page&&!page.items.length&&<span>条目已变更或移除，请重新搜索。</span>}</div>}
     <div className="collection-browse-controls" hidden={detailOpen&&(compactPreview||runtimeCapabilities.mobile)}>
     {runtimeCapabilities.mobile?<MobileReadingControls view={view} onChange={changeView} count={page?.matched} tags={page?.availableTags||[]} onSync={openCloudSyncSettings}><CollectionViewTabs onChange={changeView} compact={true} onNotice={setNotice}/><CollectionSort key={`${view.id}:${view.layout}`} rules={sorts} onChange={changeSorts}/></MobileReadingControls>:<>
     <header className="task-workspace-header collection-header" onMouseDown={e=>{if(!(e.target as HTMLElement).closest("button, input, select, textarea, a, summary, details, [role=button]"))shellHeader?.onMouseDown(e);}}>
       <div className="task-source-chips" role="group" aria-label="阅读来源">
-        {!runtimeCapabilities.mobile&&onToggleDesktopSidebar&&<button className="task-icon-button workspace-panel-toggle" aria-label="切换侧边栏" onClick={onToggleDesktopSidebar}><PanelLeft size={16}/></button>}
+        {!runtimeCapabilities.mobile&&toggleReadingNavigation&&<button className="task-icon-button workspace-panel-toggle" aria-label="切换侧边栏" aria-expanded={shellHeader?.readingNavigationExpanded} onClick={toggleReadingNavigation}><PanelLeft size={16}/></button>}
         <strong className="reading-window-title">阅读</strong>
         <div className="reading-source-segment">
         <button className={`task-source-chip ${view.source==="all"?"active":""}`} aria-pressed={view.source==="all"} onClick={()=>changeView({source:"all"})}><Layers size={12}/><span>全部</span><strong>{activeTotal.toLocaleString("en-US")}</strong></button>
@@ -624,12 +626,15 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
     {compactControls&&searchOpen&&<label className="collection-mobile-search"><Search size={16}/><input ref={searchInputRef} aria-label="搜索阅读内容" placeholder="搜索标题、正文或作者…" value={query} onChange={event=>setQuery(event.target.value)}/><button aria-label="关闭搜索" onClick={dismissSearch}><X size={17}/></button></label>}
     </>}
     </div>
-    {detailOpen&&compactPreview&&!runtimeCapabilities.mobile&&(onToggleDesktopSidebar||shellHeader?.actions)&&<header className="collection-detail-desktop-header" onMouseDown={event=>{if(!(event.target as HTMLElement).closest("button, input, select, textarea, a, summary, details, [role=button]"))shellHeader?.onMouseDown(event);}}>{onToggleDesktopSidebar&&<button className="workspace-panel-toggle" aria-label="切换侧边栏" onClick={onToggleDesktopSidebar}><PanelLeft size={18}/></button>}<span>阅读</span><div className="collection-header-tools">{shellHeader?.actions}</div></header>}
+    {detailOpen&&compactPreview&&!runtimeCapabilities.mobile&&(toggleReadingNavigation||shellHeader?.actions)&&<header className="collection-detail-desktop-header" onMouseDown={event=>{if(!(event.target as HTMLElement).closest("button, input, select, textarea, a, summary, details, [role=button]"))shellHeader?.onMouseDown(event);}}>{toggleReadingNavigation&&<button className="workspace-panel-toggle" aria-label="切换侧边栏" aria-expanded={shellHeader?.readingNavigationExpanded} onClick={toggleReadingNavigation}><PanelLeft size={18}/></button>}<span>阅读</span><div className="collection-header-tools">{shellHeader?.actions}</div></header>}
+    <div className="reading-workspace-body">
+    {shellHeader?.readingNavigation}
+    {shellHeader?.readingNavigation && shellHeader.navigationResizer}
     <div ref={bodyRef} className={`collection-body ${showReading?"has-preview":""} ${detailOpen?"compact-preview":""}`} style={{"--reading-preview-width":`${resizeCleanup.current?previewWidthRef.current:effectivePreviewWidth}px`} as CSSProperties}>
       <div className="reading-browse-paper" hidden={detailOpen}>
         {!runtimeCapabilities.mobile&&<>
     <div className="task-view-toolbar collection-toolbar">
-      <div className="reading-view-title"><h2>{activeTitle}</h2>{page&&<span>{page.matched.toLocaleString("en-US")}</span>}
+      <div className="reading-view-title"><h2>{activeTitle}</h2>{page&&<span>{hasQueryFilters ? `命中 ${page.matched.toLocaleString("en-US")} / ${sourceCount.toLocaleString("en-US")}` : page.matched.toLocaleString("en-US")}</span>}
         {isModified&&<div className="reading-view-draft"><button onClick={updateSavedView}>更新视图</button><button aria-label="还原视图" title="还原" onClick={()=>selectView(activeEntry.id)}><RotateCcw size={12}/></button></div>}
       </div>
       <div className="reading-view-configuration" title={layoutName}><CollectionViewTabs onChange={patch=>patch.layout?changeLayout(patch.layout):changeView(patch)} compact={true} onNotice={setNotice}
@@ -731,6 +736,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
           <button type="button" disabled={propertyBusy} onClick={()=>void lifecycle(selected,selected.lifecycle==="archived"?"active":"archived")}><Archive size={14}/>{selected.lifecycle==="archived"?"恢复到阅读":"归档"}</button>
         </footer>}
       </div></PreviewFrame></>}
+    </div>
     </div>
 
     {review&&<CollectionConversionPreview operation={review} busy={conversionBusy} error={conversionError} onApprove={()=>void approveConversion()} onCancel={()=>void cancelConversion()} onClose={()=>setReviewKey(null)} onAttachmentLogin={()=>void openAttachmentLogin()} onRegenerate={goal=>void regenerateConversion(goal)} onResolve={id=>void resolveConversion(id)} onResume={()=>void resumeReview()}/>}

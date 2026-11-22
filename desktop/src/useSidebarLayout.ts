@@ -100,7 +100,7 @@ export function useSidebarLayout(view?: string) {
   useEffect(() => setDrawerOpen(false), [view]);
   useEffect(() => {
     if (!drawerOpen || !narrow) return;
-    const selector = view === "tasks" ? ".task-module-sidebar" : view === "flashcards" ? ".flashcards-decks" : ".desktop-sidebar";
+    const selector = view === "tasks" ? ".task-module-sidebar" : view === "flashcards" ? ".flashcards-decks" : view === "collections" ? ".reading-context-navigation, .unified-shell .desktop-sidebar" : ".desktop-sidebar";
     const panel = document.querySelector<HTMLElement>(`.unified-shell ${selector}`);
     const triggers = Array.from(document.querySelectorAll<HTMLElement>(".workspace-panel-toggle"));
     const trigger = triggers.find(element => element.getClientRects().length > 0) ?? triggers[0];

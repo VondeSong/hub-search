@@ -395,7 +395,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const [skillImportTarget,setSkillImportTarget] = useState<HTMLSpanElement|null>(null);
   useEffect(()=>{if(!open){setSkillPickerOpen(false);setSkillManagerOpener(null);}},[open]);
   useEffect(()=>{
-    if(skillPickerOpen&&skillReturn.current===goalInput.current)skillPicker.ref.current?.querySelector<HTMLInputElement>(".agent-skill-search input")?.focus({preventScroll:true});
+    if(skillPickerOpen&&skillReturn.current===goalInput.current)skillPicker.ref.current?.querySelector<HTMLButtonElement>(".agent-skill-compact-heading button")?.focus({preventScroll:true});
   },[skillPickerOpen,skillPicker.ref]);
   const [availableSkillCount, setAvailableSkillCount] = useState<number>();
   const [titleEdit,setTitleEdit] = useState<{id:string; value:string} | null>(null);
@@ -1811,6 +1811,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
                 onClick={event=>{if(busy||!!active&&!steerable){event.preventDefault();return;}skillReturn.current=event.currentTarget;}}><Zap size={14} aria-hidden="true"/></summary>
               {skillPickerOpen&&<div className="agent-add-content agent-add-skills" aria-label="技能">
                 <AgentSkills embedded compact pinned={pinnedSkills} onPin={toggleSkillPin} selected={selectedSkills.map(token=>token.slice(1))}
+                  onClose={()=>skillPicker.close(true)}
                   disabled={busy||!!active&&!steerable} onManage={()=>openSkills(skillPicker.ref.current?.querySelector("summary")??null,true)}
                   onSelect={name=>{setSkillAttached(name,true);skillPicker.close();goalInput.current?.focus();}}
                   onQuickToggle={setSkillAttached}/>

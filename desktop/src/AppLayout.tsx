@@ -3,6 +3,7 @@ import type { ComponentProps, ComponentType, CSSProperties, ReactNode } from "re
 import type { AppEntryProps } from "./AppEntryTypes";
 import { DesktopAppEntry } from "./DesktopAppEntry";
 import { DesktopSidebar } from "./DesktopSidebar";
+import { CollectionNavigation } from "./CollectionNavigation";
 import { FilterBar, SearchFilterSummary } from "./FilterBar";
 import { FooterStatus } from "./FooterStatus";
 import { MobileAppEntry } from "./MobileAppEntry";
@@ -86,7 +87,8 @@ export function DesktopAppLayout(props: AppLayoutProps) {
     const insightsLayout = desktopSidebarProps.activeView === "insights";
     const journalLayout = desktopSidebarProps.activeView === "journals";
     const librariesLayout = Boolean(mainContent) && desktopSidebarProps.activeView === "libraries";
-    const integratedHeader = Boolean(mainContent) && (desktopSidebarProps.activeView === "collections" || insightsLayout || librariesLayout);
+    const readingLayout = Boolean(mainContent) && desktopSidebarProps.activeView === "collections";
+    const integratedHeader = Boolean(mainContent) && (readingLayout || insightsLayout || librariesLayout);
     return (
       <DesktopAppEntry filtersOpen={filtersOpen} previewOpen={mobilePreviewOpen} style={{ ...style, "--context-sidebar-width": `${sidebarWidth}px` } as CSSProperties} sidebarEnabled sidebarMode={sidebarMode} workspaceView={desktopSidebarProps.activeView} sidebarDrawerOpen={drawerOpen}>
         <div className="drag-strip" onMouseDown={startWindowDrag} />
@@ -109,7 +111,7 @@ export function DesktopAppLayout(props: AppLayoutProps) {
           onToggleLibrary={desktopSidebarProps.onToggleLibrary}
           onManageLibraries={() => footerStatusProps.setShowConnection(true)}
         />
-        {!insightsLayout && !librariesLayout && <><DesktopSidebar {...desktopSidebarProps} contextualTitle={sidebarMode === "standard" ? undefined : workspaceLabels[desktopSidebarProps.activeView]} onCollapse={collapsePanel} />
+        {!insightsLayout && !librariesLayout && !readingLayout && <><DesktopSidebar {...desktopSidebarProps} contextualTitle={sidebarMode === "standard" ? undefined : workspaceLabels[desktopSidebarProps.activeView]} onCollapse={collapsePanel} />
         <div
           className="context-sidebar-resizer"
           role="separator"
@@ -130,10 +132,13 @@ export function DesktopAppLayout(props: AppLayoutProps) {
           {mainContent ? <><div className="main-content-override"><WorkspaceHeaderContext.Provider value={integratedHeader ? {
             actions: librariesLayout ? null : <WorkspaceModeControl mode={sidebarMode} onModeChange={changeMode} />,
             onMouseDown: startWindowDrag,
-            navigationResizer: librariesLayout ? <div className="context-sidebar-resizer" role="separator"
-              aria-label="调整资料库导航宽度" aria-orientation="vertical" tabIndex={0}
+            readingNavigation: readingLayout && panelExpanded ? <aside className="reading-context-navigation" id="reading-context-navigation"><CollectionNavigation libraries={desktopSidebarProps.spaces} /></aside> : undefined,
+            onToggleReadingNavigation: readingLayout ? togglePanel : undefined,
+            readingNavigationExpanded: readingLayout ? panelExpanded : undefined,
+            navigationResizer: librariesLayout || (readingLayout && panelExpanded && !drawerOpen) ? <div className="context-sidebar-resizer" role="separator"
+              aria-label={readingLayout ? "调整阅读导航宽度" : "调整资料库导航宽度"} aria-orientation="vertical" tabIndex={0}
               aria-valuemin={sidebarWidthMin} aria-valuemax={sidebarWidthMax} aria-valuenow={sidebarWidth}
-              title="拖动调整资料库导航宽度；双击恢复默认"
+              title={readingLayout ? "拖动调整阅读导航宽度；双击恢复默认" : "拖动调整资料库导航宽度；双击恢复默认"}
               onPointerDown={resizeSidebar} onDoubleClick={resetSidebarWidth} onKeyDown={resizeSidebarWithKeyboard} /> : undefined,
           } : null}>{mainContent}</WorkspaceHeaderContext.Provider></div><FooterStatus {...footerStatusProps} /></> : <>
             {!journalLayout&&<SearchFilterReveal open={filtersOpen}><FilterBar {...filterBarProps} visible={filtersOpen} /></SearchFilterReveal>}

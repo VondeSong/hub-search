@@ -1,6 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowUpRight, ChevronLeft, ChevronRight, WandSparkles, Check, Pin, PinOff, Plus, Search, Settings2, RefreshCw } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, ChevronRight, WandSparkles, Check, Pin, PinOff, Plus, Search, Settings2, RefreshCw, X } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAgentPopover } from "./useAgentPopover";
 import {AgentSkillPackages, SkillManagerCard} from "./AgentSkillPackages";
@@ -21,9 +21,9 @@ export const skillTitle = (name:string) => builtinTitles[name] || name;
 const purposes: Record<string,string> = {"hub-research":"比较材料中的观点，核对原文与矛盾","hub-statistics":"统计材料中的数量、日期与覆盖范围","hub-flashcards":"根据笔记制作或检查学习卡片","hub-note-edit":"整理、改写当前可编辑的 Obsidian 笔记","hub-archive":"为阅读材料准备归档方案","hub-tool-guide":"查看标签、媒体和闪卡工具的使用约定"};
 export const skillPurpose=(name:string)=>purposes[name]||"";
 
-export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], onReset, pinned=[], onPin, manageInitially=false, compact=false, onManage, onQuickToggle, standaloneManagement=false, importTarget }: {
+export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], onReset, pinned=[], onPin, manageInitially=false, compact=false, onClose, onManage, onQuickToggle, standaloneManagement=false, importTarget }: {
   disabled: boolean; onSelect: (name: string) => void; embedded?:boolean; selected?:string[]; onReset?:()=>void; pinned?:string[];
-  onPin?:(name:string)=>void; manageInitially?:boolean; compact?:boolean; onManage?:()=>void; onQuickToggle?:(name:string)=>void; standaloneManagement?:boolean; importTarget?:HTMLElement|null;
+  onPin?:(name:string)=>void; manageInitially?:boolean; compact?:boolean; onClose?:()=>void; onManage?:()=>void; onQuickToggle?:(name:string)=>void; standaloneManagement?:boolean; importTarget?:HTMLElement|null;
 }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [query,setQuery]=useState("");
@@ -97,10 +97,12 @@ export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], o
     <button type="button" aria-label={`查看技能 ${skill.title}`} aria-pressed={selected.includes(skill.name)}
       onClick={event => { listReturn.current = event.currentTarget; setDetail(skill); }}>
       {!compact&&<span className="agent-skill-icon" aria-hidden="true"><WandSparkles size={17} strokeWidth={1.4}/></span>}
-      <span className="agent-skill-copy"><strong>{skill.title}</strong><span>{purposes[skill.name] || skill.description.split(/[。；]/)[0] || "未提供用途说明"}</span></span>
+      <span className="agent-skill-copy"><strong><span>{skill.title}</span>{compact && skill.origin === "registered" && (skill.methodVersion || skill.version) && <small className="agent-skill-version">{skill.methodVersion || skill.version}</small>}</strong>
+        <span>{purposes[skill.name] || skill.description.split(/[。；]/)[0] || "未提供用途说明"}</span>
+      </span>
       {!compact&&selected.includes(skill.name) && <Check size={16} className="agent-skill-check" aria-hidden="true"/>}
     </button>
-    {onPin && <button type="button" className="agent-skill-pin" aria-label={(pinned.includes(skill.name)?"取消置顶技能 ":"置顶技能 ")+skill.title} aria-pressed={pinned.includes(skill.name)} onClick={()=>{returnPin.current=skill.name;onPin(skill.name);}}>{pinned.includes(skill.name)?<PinOff size={15}/>:<Pin size={15}/>}</button>}
+    {!compact && onPin && <button type="button" className="agent-skill-pin" aria-label={(pinned.includes(skill.name)?"取消置顶技能 ":"置顶技能 ")+skill.title} aria-pressed={pinned.includes(skill.name)} onClick={()=>{returnPin.current=skill.name;onPin(skill.name);}}>{pinned.includes(skill.name)?<PinOff size={15}/>:<Pin size={15}/>}</button>}
     {compact&&onQuickToggle&&<button type="button" className="agent-skill-quick" aria-label={(selected.includes(skill.name)?"移除技能 ":"挂载技能 ")+skill.title} aria-pressed={selected.includes(skill.name)}
       disabled={disabled||!skill.available} onClick={()=>onQuickToggle(skill.name)}>{selected.includes(skill.name)?<Check size={14}/>:<Plus size={14}/>}</button>}
   </div>;
@@ -156,17 +158,22 @@ export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], o
         {catalog?.directory&&<p className="agent-skill-directory">{catalog.directory}</p>}
       </details>
     </section> : <>
-      {compact&&<div className="agent-skill-compact-heading"><span>通用技能（Hub &amp; Codex）</span><span>点 + 快速挂载</span></div>}
-      <div className="agent-skill-toolbar"><label className="agent-skill-search"><Search size={15}/><input type="search" aria-label="搜索技能" value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索技能"/></label>{!compact&&<button type="button" aria-label="管理技能" title="管理技能" onClick={event=>{listReturn.current=event.currentTarget;setManaging(true);}}><Settings2 size={17}/></button>}</div>
-      {(!compact||selected.length>0)&&<div className="agent-skill-intro"><p className="agent-note">{selected.length ? `已选 ${selected.length} 项，随下一条消息使用。` : "按需自动选用，也可指定本次使用的技能。"}</p>{!!selected.length&&onReset&&<button type="button" onClick={onReset} disabled={disabled}>恢复自动选择</button>}</div>}
+      {compact&&<header className="agent-skill-compact-heading"><strong>技能库</strong><span>Hub · Codex 通用</span>
+        {onClose&&<button type="button" aria-label="关闭技能库" onClick={onClose}><X size={14}/></button>}
+      </header>}
+      {!compact&&<div className="agent-skill-toolbar"><label className="agent-skill-search"><Search size={15}/><input type="search" aria-label="搜索技能" value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索技能"/></label><button type="button" aria-label="管理技能" title="管理技能" onClick={event=>{listReturn.current=event.currentTarget;setManaging(true);}}><Settings2 size={17}/></button></div>}
+      {!compact&&<div className="agent-skill-intro"><p className="agent-note">{selected.length ? `已选 ${selected.length} 项，随下一条消息使用。` : "按需自动选用，也可指定本次使用的技能。"}</p>{!!selected.length&&onReset&&<button type="button" onClick={onReset} disabled={disabled}>恢复自动选择</button>}</div>}
       <div className="agent-skill-scroll">
       {loading&&<p role="status">正在读取技能…</p>}
       {!loading&&!error&&catalog&&!catalog.skills.length&&<p className="agent-note">还没有可用技能，可直接提问或从管理技能添加。</p>}
       {!loading&&!error&&catalog&&!!catalog.skills.length&&!matches.length&&<p className="agent-note">没有找到匹配的技能。</p>}
-      {groups.filter(group=>group.items.length).map(group=><section className="agent-skill-group" aria-label={group.title} key={group.title}><h3>{group.title}<span>{group.items.length}</span></h3>{group.items.map(choice)}</section>)}
+      {compact ? groups.flatMap(group=>group.items).map(choice) : groups.filter(group=>group.items.length).map(group=><section className="agent-skill-group" aria-label={group.title} key={group.title}><h3>{group.title}<span>{group.items.length}</span></h3>{group.items.map(choice)}</section>)}
       </div>
       {!!catalog?.diagnostics.length && <details><summary>有技能未能加载</summary>{catalog.diagnostics.map((item, index) => <p className="agent-note" key={index}>{item.name}：{item.message}</p>)}</details>}
-      {compact&&onManage&&<footer className="agent-skill-compact-footer"><button type="button" aria-label="管理技能" onClick={onManage}>管理与同步技能<ChevronRight size={14}/></button></footer>}
+      {compact&&onManage&&<footer className="agent-skill-compact-footer">
+        <span data-shared={catalog?.mcpSharingEnabled}>{catalog?.mcpSharingEnabled === true ? "已与 Codex 互通" : catalog?.mcpSharingEnabled === false ? "仅本地生效" : "互通状态未确认"}</span>
+        <button type="button" onClick={onManage}>管理技能<ChevronRight size={12}/></button>
+      </footer>}
     </>}
   </div>;
   return embedded ? <div className="agent-menu-embedded">{content}</div> : <details className="agent-skills agent-popover" ref={details} onToggle={event=>{if(event.target===event.currentTarget && event.currentTarget.open)void load();}}><summary>使用技能</summary>{content}</details>;

@@ -34,6 +34,9 @@ export const WorkspaceHeaderContext = createContext<{
   actions: ReactNode;
   onMouseDown: MouseEventHandler<HTMLElement>;
   navigationResizer?: ReactNode;
+  readingNavigation?: ReactNode;
+  onToggleReadingNavigation?: () => void;
+  readingNavigationExpanded?: boolean;
 } | null>(null);
 
 export function WorkspaceModeControl({ mode, onModeChange }: {

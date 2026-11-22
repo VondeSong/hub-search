@@ -77,10 +77,10 @@ it("saves a named view and allows hiding and restoring its navigation entry", as
 it("shows each saved view's layout icon and refreshes it when layout changes are saved", async () => {
   await mount();
   const layouts = [
-    ["list", "列表视图", "lucide-layout-list"],
+    ["list", "列表视图", "lucide-text-align-start"],
     ["table", "表格视图", "lucide-table-2"],
     ["board", "看板视图", "lucide-columns-3"],
-    ["gallery", "画廊视图", "lucide-gallery-horizontal"],
+    ["gallery", "画廊视图", "lucide-layout-grid"],
   ] as const;
   for (const [layout, name] of layouts) {
     await act(async () => model.selectLayout(layout));
@@ -93,7 +93,7 @@ it("shows each saved view's layout icon and refreshes it when layout changes are
   }
   await click("列表视图");
   await act(async () => model.selectLayout("board"));
-  expect(container.querySelector('[aria-label="列表视图"] svg')?.classList.contains("lucide-layout-list")).toBe(true);
+  expect(container.querySelector('[aria-label="列表视图"] svg')?.classList.contains("lucide-text-align-start")).toBe(true);
   await click("更新视图");
   expect(container.querySelector('[aria-label="列表视图"] svg')?.classList.contains("lucide-columns-3")).toBe(true);
 });

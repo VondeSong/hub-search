@@ -123,8 +123,8 @@ export function ReadingActiveFilters({ view, onChange, onClear, onClearQuery }: 
   ];
   if (!filters.length) return null;
   return <div className="reading-reference-filter-strip" aria-label="当前筛选条件">
-    {filters.map(({ label, clear }) => <button type="button" key={label} aria-label={"移除筛选：" + label}
-      onClick={clear}>{label}<X size={11}/></button>)}
+    <div className="reading-reference-filter-chips">{filters.map(({ label, clear }) => <button type="button" key={label} aria-label={"移除筛选：" + label}
+      onClick={clear}><span>{label}</span><X size={10}/></button>)}</div>
     <button type="button" className="reading-reference-clear" onClick={onClear}>清除</button>
   </div>;
 }

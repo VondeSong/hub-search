@@ -115,9 +115,11 @@ it.each(["live", "cached", "disabled"] as const)("restores Codex search after a 
 it("keeps pinned skills in the skill library and exposes the three material scope tabs",async()=>{
   await render(<StandaloneInvestigation initiallyOpen/>);
   await activate(select<HTMLButtonElement>('.agent-skill-shortcut'));
+  await activate(select<HTMLButtonElement>('[aria-label="查看技能 资料分析与核对"]'));
   await activate(select<HTMLButtonElement>('[aria-label="置顶技能 资料分析与核对"]'));
-  expect(select<HTMLElement>('.agent-skill-group').getAttribute('aria-label')).toBe('置顶');
-  await activate(select<HTMLButtonElement>('[aria-label="关闭添加菜单"]'));
+  await activate(select<HTMLButtonElement>('.agent-skill-detail .agent-menu-back'));
+  expect(select<HTMLElement>('.agent-skill-scroll .agent-skill-choice').dataset.skillName).toBe('hub-research');
+  await activate(select<HTMLButtonElement>('[aria-label="关闭技能库"]'));
   await activate(select<HTMLElement>('.agent-task-mode>summary'));
   expect(select<HTMLElement>('.agent-mode-menu').textContent).not.toContain('置顶技能');
   await activate(select<HTMLButtonElement>('[aria-label="关闭任务模式"]'));
@@ -211,7 +213,7 @@ describe("assistant refinement integration", () => {
       await flushToggle();
     };
     await key("/");
-    expect(select(".agent-skill-disclosure .agent-skill-compact-heading").textContent).toContain("通用技能");
+    expect(select(".agent-skill-disclosure .agent-skill-compact-heading").textContent).toContain("技能库");
     await escape();
     expect(document.activeElement).toBe(input);
     await key("@");
