@@ -666,11 +666,18 @@ describe("site v71 assistant controls",()=>{
     expect(input.value).toBe("保留这段手写草稿");expect(document.querySelector('.agent-tag-workspace')).toBeNull();
     expect(calls("create")).toHaveLength(0);expect(calls("respond")).toHaveLength(0);
   });
-  it("toggles the layout directly and keeps layout choices out of conversation details",async()=>{
+  it("keeps the native docking toggle and resize controls without prototype viewport controls",async()=>{
     await render(<StandaloneInvestigation initiallyOpen startFresh/>);
     const panel=select<HTMLElement>('.agent-panel');const wasDocked=panel.dataset.agentDocked;
-    await activate(select<HTMLButtonElement>('.agent-viewport-bar button[aria-label="展开为侧边栏"]'));
+    const dock = () => select<HTMLButtonElement>('.agent-header-end button[aria-label="展开为侧边栏"],.agent-header-end button[aria-label="切换为浮窗"]');
+    const resize = select<HTMLElement>('.agent-panel-resizer');
+    const width = resize.getAttribute("aria-valuenow");
+    await activate(dock());
     expect(panel.dataset.agentDocked).not.toBe(wasDocked);
+    expect(resize.hidden).toBe(false);
+    expect(resize.getAttribute("aria-valuenow")).toBe(width);
+    expect(panel.querySelector('[aria-label="助手视图"]')).toBeNull();
+    expect(panel.textContent).not.toMatch(/侧栏 480px|专注 780px|恢复浮窗/);
     await activate(select<HTMLButtonElement>('button[aria-label="对话详情"]'));
     expect(select('.agent-inspector-drawer').textContent).not.toContain('浮窗');expect(select('.agent-inspector-drawer').textContent).not.toContain('侧边栏');
     expect(document.querySelector('.agent-provider-budget')).toBeNull();expect(document.querySelector('.agent-followup-mode')).toBeNull();

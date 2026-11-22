@@ -40,7 +40,7 @@ import { AgentScopeCoverage } from "./AgentScopeCoverage";
 import { useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { AssistantSelectionActions } from "./AgentSelectionActions";
 import { createPortal } from "react-dom";
-import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronDown, ChevronRight, FileText, Image, ListChecks, Menu, MessageSquare, PanelRight, Quote, Plus, Search, X, Zap } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronDown, ChevronRight, FileText, Image, ListChecks, Menu, MessageSquare, PanelRight, PanelRightOpen, PanelsTopLeft, Quote, Plus, Search, X, Zap } from "lucide-react";
 import type { SearchResult } from "./SearchTypes";
 import { isTaskPreviewResult } from "./TaskResultIdentity";
 import { runtimeCapabilities } from "./RuntimePlatform";
@@ -359,24 +359,10 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const dockKey = extra ? "hub-agent-extra-docked" : "hub-agent-docked";
   const canDock = !!extra || !onDismiss;
   const [docked, setDocked] = useState(() => canDock && sessionStorage.getItem(dockKey) === "true");
-  const [panelPreset, setPanelPreset] = useState<"focus" | "full" | null>(null);
-  const floatingWidth = useRef<number | null>(null);
   const [titleEdit,setTitleEdit] = useState<{id:string; value:string} | null>(null);
   const [draftTitle,setDraftTitle] = useState("");
   const panelResize = useAgentPanelResize(open, panel, "width", !!extra);
   const panelHeightResize = useAgentPanelResize(open && !docked, panel, "height", !!extra);
-  function setViewport(next: "sidebar" | "focus" | "full" | null) {
-    if(next==="sidebar" && !docked && !extra){
-      floatingWidth.current=panelResize.width;
-      panelResize.setWidth(480);
-    }else if(next!=="sidebar" && floatingWidth.current!==null){
-      panelResize.setWidth(floatingWidth.current);
-      floatingWidth.current=null;
-    }
-    setDocked(next==="sidebar");
-    setPanelPreset(next==="sidebar"?null:next);
-    detailsPopover.close();
-  }
   useEffect(() => { if (canDock) sessionStorage.setItem(dockKey, String(docked)); }, [docked, canDock, dockKey]);
   const titleQuestion=(view?.work.goal||questionText).replace(/^(?:\$[a-z0-9]+(?:-[a-z0-9]+)*(?:\s+|$))+/g, "").trim();
   const chatTitle = (view ? view.conversationTitle : draftTitle) || (titleQuestion || "新聊天").replace(/\s+/g, " ");
@@ -1353,9 +1339,9 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       if (!loaded.current) { loaded.current = true; void load(); }
     }}><span className="agent-launcher-orb" aria-hidden="true"/>助手</button>, document.body)}
     {loaded.current && createPortal(<>
-      <div data-agent-extra={extra ? "" : undefined} data-agent-docked={docked} hidden={!open || docked || !!panelPreset} className="agent-panel-height-resizer" role="separator" aria-label="调整助手高度" aria-controls={panelId} aria-orientation="horizontal" aria-valuemin={panelHeightResize.minimum} aria-valuemax={panelHeightResize.maximum} aria-valuenow={panelHeightResize.width} aria-valuetext={`${panelHeightResize.width} 像素`} tabIndex={0} title="拖动调整高度，双击恢复默认" onPointerDown={panelHeightResize.onPointerDown} onKeyDown={panelHeightResize.onKeyDown} onDoubleClick={panelHeightResize.reset}/>
-      <div data-agent-extra={extra ? "" : undefined} data-agent-docked={docked} hidden={!open || !!panelPreset} className="agent-panel-resizer" role="separator" aria-label="调整助手宽度" aria-controls={panelId} aria-orientation="vertical" aria-valuemin={panelResize.minimum} aria-valuemax={panelResize.maximum} aria-valuenow={panelWidth} aria-valuetext={`${panelWidth} 像素`} tabIndex={0} title="拖动调整宽度，双击恢复默认" onPointerDown={panelResize.onPointerDown} onKeyDown={panelResize.onKeyDown} onDoubleClick={panelResize.reset}/>
-      <aside id={panelId} ref={panel} hidden={!open} data-agent-extra={extra ? "" : undefined} data-agent-source-visible={sourceVisible} data-agent-reading={reportReading} data-agent-docked={docked} data-agent-preset={panelPreset ?? undefined} data-hub-keyboard-scope="assistant" className="agent-investigation agent-panel" aria-label={extra ? "第二个助手面板" : "Hub 助手"} onDragOver={event=>{if(event.dataTransfer.types.includes("application/x-hub-tag")||event.dataTransfer.types.includes(libraryDragType)||event.dataTransfer.types.includes("application/x-hub-agent-source")||event.dataTransfer.types.includes("Files")){event.preventDefault();event.dataTransfer.dropEffect="copy";}}} onDrop={event=>{
+      <div data-agent-extra={extra ? "" : undefined} data-agent-docked={docked} hidden={!open || docked} className="agent-panel-height-resizer" role="separator" aria-label="调整助手高度" aria-controls={panelId} aria-orientation="horizontal" aria-valuemin={panelHeightResize.minimum} aria-valuemax={panelHeightResize.maximum} aria-valuenow={panelHeightResize.width} aria-valuetext={`${panelHeightResize.width} 像素`} tabIndex={0} title="拖动调整高度，双击恢复默认" onPointerDown={panelHeightResize.onPointerDown} onKeyDown={panelHeightResize.onKeyDown} onDoubleClick={panelHeightResize.reset}/>
+      <div data-agent-extra={extra ? "" : undefined} data-agent-docked={docked} hidden={!open} className="agent-panel-resizer" role="separator" aria-label="调整助手宽度" aria-controls={panelId} aria-orientation="vertical" aria-valuemin={panelResize.minimum} aria-valuemax={panelResize.maximum} aria-valuenow={panelWidth} aria-valuetext={`${panelWidth} 像素`} tabIndex={0} title="拖动调整宽度，双击恢复默认" onPointerDown={panelResize.onPointerDown} onKeyDown={panelResize.onKeyDown} onDoubleClick={panelResize.reset}/>
+      <aside id={panelId} ref={panel} hidden={!open} data-agent-extra={extra ? "" : undefined} data-agent-source-visible={sourceVisible} data-agent-reading={reportReading} data-agent-docked={docked} data-hub-keyboard-scope="assistant" className="agent-investigation agent-panel" aria-label={extra ? "第二个助手面板" : "Hub 助手"} onDragOver={event=>{if(event.dataTransfer.types.includes("application/x-hub-tag")||event.dataTransfer.types.includes(libraryDragType)||event.dataTransfer.types.includes("application/x-hub-agent-source")||event.dataTransfer.types.includes("Files")){event.preventDefault();event.dataTransfer.dropEffect="copy";}}} onDrop={event=>{
         const tagData=event.dataTransfer.types?.includes("application/x-hub-tag")?event.dataTransfer.getData("application/x-hub-tag"):"";
         if(tagData){event.preventDefault();event.stopPropagation();try{const v=JSON.parse(tagData);if(typeof v.tagId!=="string"||typeof v.label!=="string"||v.tagId.length>200)throw Error("无法识别标签");setTagPreparation({...tagPreparation,references:[...tagPreparation.references.filter(t=>t.tagId!==v.tagId),v].slice(0,16)});}catch(reason){setError(String(reason));}return;}
         const libraryData=event.dataTransfer.types?.includes(libraryDragType)?event.dataTransfer.getData(libraryDragType):"";
@@ -1368,14 +1354,6 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         if(event.dataTransfer.files?.length){event.preventDefault();event.stopPropagation();setReportReading(false);void addFiles(Array.from(event.dataTransfer.files));return;}const data=event.dataTransfer.getData("application/x-hub-agent-source");if(!data)return;event.preventDefault();event.stopPropagation();setReportReading(false);try{if(data.length>65536)throw new Error();addExternalMaterial(JSON.parse(data));}catch{setError("无法识别拖入的资料，请重新拖入。");}}} onKeyDown={event => {
       if (event.key === "Escape" && !event.nativeEvent.isComposing && !event.defaultPrevented && !(event.target instanceof Element && event.target.closest(".agent-token-disclosure"))) { event.preventDefault(); event.stopPropagation(); const menu=((!reportReading || addMenuOpen) && event.currentTarget.querySelector<HTMLDetailsElement>(".agent-composer details[open]")) || (detailsMenu.current?.open ? detailsMenu.current : null); if(menu){menu.open=false;menu.querySelector("summary")?.focus();}else if(citationOpen){returnFromCitation();}else if(reportReading){setReportReading(false);event.currentTarget.querySelector<HTMLButtonElement>('.agent-header-end button[aria-label="对话详情"]')?.focus();}else closePanel(); }
     }}>
-      {canDock && <div className="agent-viewport-bar" role="group" aria-label="助手视图" inert={memory.managerOpen}>
-        <button type="button" aria-pressed={docked} aria-label="展开为侧边栏" onClick={()=>setViewport("sidebar")}>{extra?"侧栏":"侧栏 480px"}</button>
-        {!extra && <>
-          <button type="button" aria-pressed={panelPreset==="focus"} onClick={()=>setViewport("focus")}>专注 780px</button>
-          <button type="button" aria-pressed={panelPreset==="full"} onClick={()=>setViewport("full")}>全屏</button>
-        </>}
-        {(docked||panelPreset) && <button type="button" aria-label="切换为浮窗" onClick={()=>setViewport(null)}>恢复浮窗</button>}
-      </div>}
       <header className="agent-panel-header" inert={memory.managerOpen}>
         <div className="agent-header-start">
         <details ref={detailsMenu} data-history={historyExpanded} className="agent-dialogue-details" data-task-status={taskStatusOnly} onClickCapture={event=>{const menu=event.currentTarget;if(!menu.open&&(event.target as Element).closest("summary")===menu.firstElementChild){detailsReturn.current=menu.firstElementChild as HTMLElement;setHistoryExpanded(true);setTaskStatusOnly(false);void reloadWorks();}}} onToggle={event=>{if(event.target!==event.currentTarget)return;const menu=event.currentTarget;if(!menu.open&&detailsReturn.current?.isConnected&&(menu.contains(document.activeElement)||document.activeElement===document.body))detailsReturn.current.focus();}}><summary aria-label="对话历史" title="对话历史"><Menu size={18} aria-hidden="true"/></summary><div className="agent-details-content" role="region" aria-label={historyExpanded?"对话历史":taskStatusOnly?"任务状态":"对话详情"}>
@@ -1452,6 +1430,9 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
               onKeyDown={event=>{if(event.nativeEvent.isComposing)return;if(event.key==="Enter"){event.preventDefault();event.currentTarget.blur();}if(event.key==="Escape"){event.preventDefault();event.stopPropagation();setTitleEdit(null);}}}/>
           : <button type="button" className="agent-chat-title" title={chatTitle} aria-label="重命名对话" disabled={busy||!!active} onClick={()=>setTitleEdit({id:titleScope,value:chatTitle.slice(0,100)})}><span>{chatTitle}</span></button>}
         <div className="agent-header-end">
+          {canDock && <button type="button" aria-label={docked?"切换为浮窗":"展开为侧边栏"} title={docked?"切换为浮窗":"展开为侧边栏"} onClick={()=>{setDocked(current=>!current);detailsPopover.close();}}>
+            {docked?<PanelsTopLeft size={16} aria-hidden="true"/>:<PanelRightOpen size={16} aria-hidden="true"/>}
+          </button>}
         <AgentTaskMode activeTopic={research?.topic} onUnpinTopic={async topic=>{const scope=selectionScope.current;const saved=await call<ResearchTopic>({action:"saveResearchTopic",topic:{...topic,pinned:false}});if(alive.current&&selectionScope.current===scope&&research?.topic.id===saved.id)setResearch({...research,topic:{...research.topic,revision:saved.revision,pinned:false}});}} title={chatTitle} disabled={busy || !!active} tagMode={tagMode} goalMode={goalMode} goalDisabled={(scopeOptions.model ?? runtime.settings)?.provider === "deepseek"} onGeneral={()=>{setTagMode(false);if(scopeOptions.goalMode)void saveAssistantOptions({...scopeOptions,goalMode:false},false).catch(reason=>setError(String(reason)));}} onGoal={()=>{setTagMode(false);void saveAssistantOptions({...scopeOptions,goalMode:true},false).catch(reason=>setError(String(reason)));}} onTag={enableTagMode} selectedSkills={selectedSkills.map(token=>token.slice(1))} onTopics={()=>{setRequestedTopic(undefined);setTopicSave(false);setTopicsOpen(true);}} onTopic={topic=>{setRequestedTopic(topic.id);setTopicSave(false);setTopicsOpen(true);}} onUsage={()=>{detailsReturn.current=document.getElementById(panelId)?.querySelector<HTMLElement>(".agent-task-mode>summary")||null;setTaskStatusOnly(true);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current)workControls.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-heading button")?.focus();},0);}}/>
           <button ref={detailsTrigger} type="button" title="对话详情" aria-label="对话详情" onClick={event=>{if(detailsMenu.current?.open&&!historyExpanded){detailsPopover.close();event.currentTarget.focus();return;}detailsReturn.current=event.currentTarget;setTaskStatusOnly(false);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-sections .agent-details-heading button")?.focus();},0);}}><PanelRight size={17}/></button>
           <button type="button" title={extra ? "关闭第二个助手（Esc）" : "关闭助手（Esc）"} aria-label={extra ? "关闭第二个助手" : "关闭助手"} onClick={closePanel}><X size={19} /></button>

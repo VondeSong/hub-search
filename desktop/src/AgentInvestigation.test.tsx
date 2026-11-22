@@ -236,7 +236,7 @@ it("opens a quote in an independent assistant and preserves both chats when dock
   const resizeSide = document.querySelector(`.agent-panel-resizer[aria-controls="${side.id}"]`)!;
   await act(async () => resizeSide.dispatchEvent(new KeyboardEvent("keydown", {key:"ArrowLeft", bubbles:true})));
   expect(document.body.style.getPropertyValue("--agent-extra-panel-width")).toBe("450px");
-  expect(document.body.style.getPropertyValue("--agent-panel-width")).toBe("480px");
+  expect(document.body.style.getPropertyValue("--agent-panel-width")).toBe("440px");
   await click("关闭助手");
   expect(main.hidden).toBe(true);
   expect(side.hidden).toBe(false);
