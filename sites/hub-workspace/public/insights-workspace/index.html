@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="h-full select-none">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hub 洞察工作区 · 交互原型 v4</title>
+
+  <!-- Google Fonts: Inter, Noto Sans SC, JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+
+
+  <link rel="stylesheet" href="utilities.css">
+  <link rel="stylesheet" href="insights.css">
+  <script src="/reading-workspace/lucide.min.js" defer></script>
+  <script src="insights.js" defer></script>
+</head>
+<body class="studio-canvas flex flex-col antialiased">
+
+  <!-- ==================== 1. TITLEBAR (46px) ==================== -->
+  <header id="insights-titlebar" class="h-[46px] mac-vibrancy border-b border-[var(--hair-strong)] px-3 flex items-center justify-between shrink-0 z-30 select-none">
+
+    <!-- Left: Brand & Sidebar Toggle -->
+    <div class="flex items-center gap-2">
+      <button id="btn-toggle-sidebar" aria-controls="sidebar" aria-expanded="true" onclick="toggleSidebar()" class="p-1.5 hover:bg-black/5 rounded-md text-[var(--ink-secondary)] transition-colors" title="展开/收起侧边栏">
+        <i data-lucide="panel-left" class="w-4 h-4"></i>
+      </button>
+      <div class="flex items-center gap-1.5 font-semibold text-sm text-[var(--ink)] tracking-tight">
+        <div class="w-2 h-2 rounded-full bg-blue-600"></div>
+        <span>洞察</span>
+        <span class="text-xs text-[var(--ink-muted)] font-normal font-mono-tech ml-0.5">v4.0</span>
+      </div>
+    </div>
+
+    <!-- Center: Mac-Groove Segmented Control for Processing Status -->
+    <div id="status-segments" class="hidden sm:flex items-center">
+      <div class="mac-groove flex items-center gap-0.5 text-xs">
+        <button onclick="setFilterStatus('ALL')" id="seg-ALL" class="mac-seg-active px-3 py-1 rounded-md transition-all flex items-center gap-1.5">
+          <span>全部</span>
+          <span id="cnt-ALL" class="font-mono-tech opacity-70">6</span>
+        </button>
+        <button onclick="setFilterStatus('PENDING')" id="seg-PENDING" class="px-3 py-1 rounded-md text-[var(--ink-secondary)] hover:text-[var(--ink)] transition-all flex items-center gap-1.5">
+          <span>待关注</span>
+          <span id="cnt-PENDING" class="font-mono-tech opacity-70">3</span>
+        </button>
+        <button onclick="setFilterStatus('LATER')" id="seg-LATER" class="px-3 py-1 rounded-md text-[var(--ink-secondary)] hover:text-[var(--ink)] transition-all flex items-center gap-1.5">
+          <span>稍后</span>
+          <span id="cnt-LATER" class="font-mono-tech opacity-70">1</span>
+        </button>
+        <button onclick="setFilterStatus('DONE')" id="seg-DONE" class="px-3 py-1 rounded-md text-[var(--ink-secondary)] hover:text-[var(--ink)] transition-all flex items-center gap-1.5">
+          <span>已处理</span>
+          <span id="cnt-DONE" class="font-mono-tech opacity-70">2</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Right: Search, Actions, Quick Demo Popover -->
+    <div class="flex items-center gap-2">
+      <!-- Search Input Pill -->
+      <div class="relative flex items-center">
+        <i data-lucide="search" class="w-3.5 h-3.5 absolute left-2.5 text-[var(--ink-muted)]"></i>
+        <input type="text" id="global-search" aria-label="搜索洞察、引文或原事项" oninput="handleSearch(this.value)" placeholder="搜索洞察、引文或原事项... (/)"
+               class="pl-8 pr-7 py-1 text-xs w-36 sm:w-48 bg-black/5 focus:bg-white focus:ring-1 focus:ring-blue-500 rounded-md border-0 text-[var(--ink)] placeholder-[var(--ink-muted)] transition-all outline-none font-sans">
+        <span class="absolute right-2 text-[10px] text-[var(--ink-muted)] font-mono-tech">/</span>
+      </div>
+
+      <!-- Action Buttons -->
+      <button onclick="openDiscoverModal()" class="px-2.5 py-1 bg-neutral-900 hover:bg-black text-white text-xs font-medium rounded-md shadow-sm transition-all flex items-center gap-1">
+        <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+        <span>开始发现</span>
+      </button>
+
+      <button onclick="openImportModal()" class="hidden md:flex items-center gap-1 px-2.5 py-1 hover:bg-black/5 text-[var(--ink-secondary)] text-xs font-medium rounded-md border border-[var(--hair-strong)] transition-all">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+        <span>导入成果</span>
+      </button>
+
+      <!-- Quick Acceptance Demo Dropdown -->
+      <div class="relative">
+        <button onclick="toggleDemoPopover()" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-medium rounded-md border border-blue-200 transition-all flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
+          <span>验收演示</span>
+          <i data-lucide="chevron-down" class="w-3 h-3 ml-0.5"></i>
+        </button>
+
+        <!-- Popover -->
+        <div id="demo-popover" class="hidden absolute right-0 top-full mt-1.5 w-80 bg-white rounded-xl shadow-[var(--shadow-popover)] border border-[var(--hair-strong)] p-3 z-50 text-xs space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-[var(--hair)]">
+            <span class="font-semibold text-[var(--ink)]">v4 交互升级 Quick Checklist</span>
+            <span class="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-mono-tech">Desktop v4</span>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="text-[11px] text-[var(--ink-muted)] font-medium">视图与排版控制</div>
+            <div class="grid grid-cols-2 gap-1.5">
+              <button onclick="setDemoViewport('DESKTOP')" id="btn-vp-desktop" class="p-1.5 rounded border border-blue-500 bg-blue-50 text-blue-700 font-medium text-left flex items-center gap-1.5">
+                <i data-lucide="monitor" class="w-3.5 h-3.5"></i> 宽屏桌面
+              </button>
+              <button onclick="setDemoViewport('NARROW')" id="btn-vp-narrow" class="p-1.5 rounded border border-[var(--hair-strong)] hover:bg-black/5 text-[var(--ink-secondary)] font-medium text-left flex items-center gap-1.5">
+                <i data-lucide="smartphone" class="w-3.5 h-3.5"></i> 窄屏移动
+              </button>
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="text-[11px] text-[var(--ink-muted)] font-medium">六大核心测试场景（一键直达）</div>
+            <div class="space-y-1">
+              <button onclick="runScenario(1)" class="w-full text-left p-1.5 hover:bg-blue-50 hover:text-blue-600 rounded transition-colors flex items-center justify-between group">
+                <span>1. 正交态 (已处理+待复核) & Diff 对比</span>
+                <i data-lucide="arrow-right" class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+              </button>
+              <button onclick="runScenario(2)" class="w-full text-left p-1.5 hover:bg-blue-50 hover:text-blue-600 rounded transition-colors flex items-center justify-between group">
+                <span>2. 全宽属性表格 & Craft 详情滑出页</span>
+                <i data-lucide="arrow-right" class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+              </button>
+              <button onclick="runScenario(3)" class="w-full text-left p-1.5 hover:bg-blue-50 hover:text-blue-600 rounded transition-colors flex items-center justify-between group">
+                <span>3. 批量分诊胶囊 (已选 2 条+)</span>
+                <i data-lucide="arrow-right" class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+              </button>
+              <button onclick="runScenario(4)" class="w-full text-left p-1.5 hover:bg-blue-50 hover:text-blue-600 rounded transition-colors flex items-center justify-between group">
+                <span>4. 来源撤权脱敏保护 (安全遮蔽)</span>
+                <i data-lucide="arrow-right" class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+              </button>
+              <button onclick="runScenario(5)" class="w-full text-left p-1.5 hover:bg-blue-50 hover:text-blue-600 rounded transition-colors flex items-center justify-between group">
+                <span>5. 历史版本 v1 只读保护 (禁用修订)</span>
+                <i data-lucide="arrow-right" class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+              </button>
+              <button onclick="runScenario(6)" class="w-full text-left p-1.5 hover:bg-blue-50 hover:text-blue-600 rounded transition-colors flex items-center justify-between group">
+                <span>6. 模拟并发写入冲突 (rowRevision 过期)</span>
+                <i data-lucide="arrow-right" class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ==================== MAIN WORKSPACE SHELL ==================== -->
+  <div id="app-shell" class="relative flex-1 flex overflow-hidden">
+
+    <!-- ==================== 2. TRANSLUCENT SIDEBAR (206px) ==================== -->
+    <aside id="sidebar" class="w-[206px] mac-vibrancy border-r border-[var(--hair-strong)] flex flex-col shrink-0 transition-all duration-200 z-20">
+
+      <div class="p-2 space-y-4 flex-1 overflow-y-auto">
+        <!-- Section 1: Scopes -->
+        <div class="space-y-0.5">
+          <div class="px-2 py-1 text-[10px] font-semibold text-[var(--ink-muted)] tracking-wider uppercase">洞察集合</div>
+          <button onclick="setScope('ALL')" id="sb-scope-ALL" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between is-active">
+            <div class="flex items-center gap-2">
+              <div class="sb-ico bg-blue-100 text-blue-600"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i></div>
+              <span>全部洞察</span>
+            </div>
+            <span id="sb-cnt-all" class="font-mono-tech text-[11px] opacity-70">6</span>
+          </button>
+          <button onclick="setScope('NEED_REVIEW')" id="sb-scope-NEED_REVIEW" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <div class="sb-ico bg-amber-100 text-amber-700"><i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i></div>
+              <span>待复核</span>
+            </div>
+            <span id="sb-cnt-review" class="font-mono-tech text-[10px] px-1.5 py-0.2 bg-amber-500 text-white font-semibold rounded-full">2</span>
+          </button>
+          <button onclick="setScope('STARRED')" id="sb-scope-STARRED" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <div class="sb-ico bg-amber-50 text-amber-500"><i data-lucide="star" class="w-3.5 h-3.5"></i></div>
+              <span>星标发现</span>
+            </div>
+            <span id="sb-cnt-starred" class="font-mono-tech text-[11px] opacity-70">2</span>
+          </button>
+        </div>
+
+        <div class="h-px bg-[var(--hair)] mx-1"></div>
+
+        <!-- Section 2: Perspectives -->
+        <div class="space-y-0.5">
+          <div class="px-2 py-1 text-[10px] font-semibold text-[var(--ink-muted)] tracking-wider uppercase">发现视角</div>
+          <button onclick="setPerspective('ALL')" id="sb-pers-ALL" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <i data-lucide="layers" class="w-3.5 h-3.5 text-[var(--ink-muted)]"></i>
+              <span>全部视角</span>
+            </div>
+          </button>
+          <button onclick="setPerspective('WORK')" id="sb-pers-WORK" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <i data-lucide="briefcase" class="w-3.5 h-3.5 text-blue-600"></i>
+              <span>知识与工作</span>
+            </div>
+          </button>
+          <button onclick="setPerspective('LIFE')" id="sb-pers-LIFE" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <i data-lucide="smile" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>生活与进展</span>
+            </div>
+          </button>
+          <button onclick="setPerspective('DECISION')" id="sb-pers-DECISION" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <i data-lucide="git-commit" class="w-3.5 h-3.5 text-purple-600"></i>
+              <span>决定与变化</span>
+            </div>
+          </button>
+        </div>
+
+        <div class="h-px bg-[var(--hair)] mx-1"></div>
+
+        <!-- Section 3: Workspace Modules -->
+        <div class="space-y-0.5">
+          <div class="px-2 py-1 text-[10px] font-semibold text-[var(--ink-muted)] tracking-wider uppercase">工作区模块</div>
+          <button onclick="switchModule('CHECKING')" id="sb-mod-CHECKING" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <i data-lucide="inbox" class="w-3.5 h-3.5 text-indigo-600"></i>
+              <span>核对台</span>
+            </div>
+            <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+          </button>
+          <button onclick="switchModule('REVIEW')" id="sb-mod-REVIEW" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <i data-lucide="calendar" class="w-3.5 h-3.5 text-teal-600"></i>
+              <span>阶段回顾</span>
+            </div>
+          </button>
+          <button onclick="switchModule('TOPICS')" id="sb-mod-TOPICS" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <i data-lucide="bookmark" class="w-3.5 h-3.5 text-amber-600"></i>
+              <span>关注主题</span>
+            </div>
+          </button>
+          <button onclick="switchModule('AUDIT')" id="sb-mod-AUDIT" class="sb-item w-full px-2 py-1.5 text-xs flex items-center justify-between text-[var(--ink-secondary)]">
+            <div class="flex items-center gap-2">
+              <i data-lucide="history" class="w-3.5 h-3.5 text-gray-600"></i>
+              <span>处理记录</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="p-2 border-t border-[var(--hair)] space-y-1 text-xs">
+        <button onclick="triggerRecheck()" class="w-full px-2 py-1.5 hover:bg-black/5 rounded text-[var(--ink-secondary)] flex items-center justify-between transition-colors">
+          <span class="flex items-center gap-1.5"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> 重聚焦校验</span>
+          <span class="text-[10px] font-mono-tech opacity-60">F5</span>
+        </button>
+        <a id="open-original-workflow" href="/?view=insights&amp;section=workflow" class="w-full px-2 py-1.5 hover:bg-black/5 rounded text-[var(--ink-secondary)] flex items-center gap-1.5">
+          <i data-lucide="workflow" class="w-3.5 h-3.5"></i> 原有洞察流程
+        </a>
+        <button onclick="openShortcutsModal()" class="w-full px-2 py-1.5 hover:bg-black/5 rounded text-[var(--ink-secondary)] flex items-center justify-between transition-colors">
+          <span class="flex items-center gap-1.5"><i data-lucide="help-circle" class="w-3.5 h-3.5"></i> 快捷键说明</span>
+          <span class="text-[10px] font-mono-tech opacity-60">?</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ==================== MAIN WORKSPACE CONTENT ==================== -->
+    <main class="flex-1 flex overflow-hidden relative p-2 sm:p-3 gap-0">
+
+      <!-- ==================== PRIMARY VIEW: BROWSE & DETAIL (STREAM OR TABLE) ==================== -->
+      <div id="module-INSIGHTS" class="flex-1 flex w-full h-full overflow-hidden relative gap-0">
+
+        <!-- PAPER A: BROWSE / LIST CONTAINER -->
+        <div id="paper-a" class="craft-paper flex flex-col shrink-0 h-full overflow-hidden transition-all duration-75 relative z-10" style="width: 360px;">
+
+          <!-- Animated Sweep Bar at top of Paper A -->
+          <div id="paper-a-sweep" class="sweep-bar hidden"></div>
+
+          <!-- Paper A Header (44px) -->
+          <div class="h-[44px] px-3 border-b border-[var(--hair)] flex items-center justify-between shrink-0 bg-white/80 backdrop-blur-sm">
+            <div class="flex items-center gap-1.5">
+              <!-- View Switcher -->
+              <div class="mac-groove flex items-center gap-0.5">
+                <button onclick="setLayoutView('STREAM')" id="btn-layout-stream" aria-pressed="true" class="mac-seg-active p-1 rounded transition-all" title="精简流式分屏">
+                  <i data-lucide="align-left" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="setLayoutView('TABLE')" id="btn-layout-table" aria-pressed="false" class="p-1 rounded text-[var(--ink-secondary)] hover:text-[var(--ink)] transition-all" title="全宽属性表格">
+                  <i data-lucide="table-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+
+              <!-- Scope Title Indicator -->
+              <span id="txt-current-scope" class="font-medium text-xs text-[var(--ink)] ml-1">全部洞察</span>
+            </div>
+
+            <!-- Filter & Sort Popover Buttons -->
+            <div class="flex items-center gap-1 text-xs">
+              <button onclick="openSidebarFilters()" class="px-2 py-1 hover:bg-black/5 rounded text-[var(--ink-secondary)] flex items-center gap-1 border border-transparent hover:border-[var(--hair)] transition-all">
+                <i data-lucide="filter" class="w-3 h-3"></i>
+                <span>筛选</span>
+              </button>
+
+              <button id="btn-sort-date" aria-pressed="false" onclick="toggleSortOrder()" class="px-2 py-1 hover:bg-black/5 rounded text-[var(--ink-secondary)] flex items-center gap-1 border border-transparent hover:border-[var(--hair)] transition-all">
+                <i data-lucide="arrow-up-down" class="w-3 h-3"></i>
+                <span id="txt-sort-label">更新时间</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Filter Bar Indicator if active -->
+          <div id="filter-indicator-bar" class="hidden px-3 py-1 bg-blue-50 border-b border-blue-100 text-[11px] text-blue-700 flex items-center justify-between">
+            <span id="filter-indicator-text">筛选: 近7天 · 已核对</span>
+            <button onclick="resetFilters()" class="hover:underline text-[10px]">清除</button>
+          </div>
+
+          <!-- STREAM VIEW CONTAINER -->
+          <div id="stream-container" class="flex-1 overflow-y-auto stream-well p-2 space-y-2">
+            <!-- Dynamic stream cards inserted here -->
+          </div>
+
+          <!-- TABLE VIEW CONTAINER (Hidden by default) -->
+          <div id="table-container" class="hidden flex-1 overflow-auto bg-white">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="sticky top-0 bg-[var(--paper-well)] border-b border-[var(--hair-strong)] text-[var(--ink-muted)] font-medium z-10">
+                <tr>
+                  <th class="w-9 p-2 text-center">
+                    <input type="checkbox" onchange="toggleSelectAll(this.checked)" class="hub-chk">
+                  </th>
+                  <th class="p-2 w-20">处理状态</th>
+                  <th class="p-2">洞察结论与主要标签</th>
+                  <th class="p-2 w-28">依据状态</th>
+                  <th class="p-2 w-24">视角</th>
+                  <th class="p-2 w-16">版本</th>
+                  <th class="p-2 w-28">原事项</th>
+                  <th class="p-2 w-24 text-right pr-3">更新时间</th>
+                </tr>
+              </thead>
+              <tbody id="table-tbody" class="divide-y divide-[var(--hair)]">
+                <!-- Dynamic table rows inserted here -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Paper A Footer: Counters & Load More -->
+          <div class="p-2 border-t border-[var(--hair)] flex items-center justify-between text-[11px] text-[var(--ink-muted)] bg-white">
+            <span id="txt-filtered-count" class="font-mono-tech">命中 6 / 总计 6 条</span>
+            <button onclick="loadMoreInsights()" id="btn-load-more" class="px-2 py-0.5 hover:bg-black/5 rounded text-blue-600 font-medium transition-colors">
+              加载更多 (当前 6 / 9)
+            </button>
+          </div>
+        </div>
+
+        <!-- SPLIT RESIZE GUTTER -->
+        <div id="split-gutter" class="paper-gutter" title="拖拽调整宽度，双击复位 360px"></div>
+
+        <!-- PAPER B: DETAIL CONTAINER (CLAUDE PAPER) -->
+        <div id="paper-b" class="claude-paper flex-1 flex flex-col h-full overflow-hidden relative">
+
+          <!-- Paper B Top Toolbar (44px) -->
+          <div class="h-[44px] px-4 border-b border-[var(--hair)] flex items-center justify-between shrink-0 bg-transparent">
+            <!-- Left: Breadcrumb / Work ID / Close Sheet (Table Mode) -->
+            <div class="flex items-center gap-2">
+              <button id="btn-close-sheet" onclick="closeDetailSheet()" class="hidden px-2 py-1 bg-black/5 hover:bg-black/10 rounded text-xs text-[var(--ink)] font-medium transition-colors flex items-center gap-1">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                <span>收起详情</span>
+              </button>
+              <span id="detail-work-id" class="text-xs font-mono-tech bg-black/5 px-2 py-0.5 rounded text-[var(--ink-secondary)]">Work #W-2026-1102</span>
+              <span id="detail-date" class="text-xs text-[var(--ink-muted)]">2026-11-20 14:32</span>
+            </div>
+
+            <!-- Right: Keyboard Prev/Next & 3 Mutually Exclusive Drawer Toggles -->
+            <div class="flex items-center gap-1">
+              <div class="flex items-center border-r border-[var(--hair)] pr-1.5 mr-1.5">
+                <button onclick="navigateInsight(-1)" class="p-1 hover:bg-black/5 rounded text-[var(--ink-secondary)]" title="上一条 (K)">
+                  <i data-lucide="chevron-up" class="w-4 h-4"></i>
+                </button>
+                <button onclick="navigateInsight(1)" class="p-1 hover:bg-black/5 rounded text-[var(--ink-secondary)]" title="下一条 (J)">
+                  <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                </button>
+              </div>
+
+              <!-- Drawer Toggles -->
+              <button onclick="toggleDrawer('QUOTE')" id="btn-drawer-QUOTE" class="p-1.5 hover:bg-black/5 rounded text-[var(--ink-secondary)] transition-colors relative" title="原文引文核对">
+                <i data-lucide="file-search" class="w-4 h-4"></i>
+              </button>
+
+              <button onclick="toggleDrawer('INSPECTOR')" id="btn-drawer-INSPECTOR" class="p-1.5 hover:bg-black/5 rounded text-[var(--ink-secondary)] transition-colors relative" title="版本与溯源检验 (Inspector)">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+              </button>
+
+              <button onclick="toggleDrawer('ASSISTANT')" id="btn-drawer-ASSISTANT" class="p-1.5 hover:bg-black/5 rounded text-[var(--ink-secondary)] transition-colors relative" title="原事项助手">
+                <i data-lucide="sparkles" class="w-4 h-4 text-purple-600"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- READ-ONLY HISTORY WARNING BANNER (Shows when viewing v1) -->
+          <div id="banner-readonly-history" class="hidden px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-800 text-xs flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i data-lucide="info" class="w-4 h-4 text-amber-600 shrink-0"></i>
+              <span>正在查看历史版本 <strong id="view-version" class="font-mono-tech">v1</strong> · 反馈与修订仅对当前版本 <strong id="head-version" class="font-mono-tech">v2</strong> 开放</span>
+            </div>
+            <button onclick="switchRevision(null)" class="px-2 py-0.5 bg-amber-200 hover:bg-amber-300 rounded text-[11px] font-medium transition-colors">
+              切换至当前版本
+            </button>
+          </div>
+
+          <!-- STRICT SECURITY MASKING BANNER (Shows for INS-05) -->
+          <div id="banner-security-masked" class="hidden px-4 py-3 bg-red-50 border-b border-red-200 text-red-700 text-xs flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-red-600 shrink-0"></i>
+              <span>原笔记权限已撤回或来源停用，受限正文、引文与历史已隐藏</span>
+            </div>
+            <button onclick="recheckPermission()" class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-medium transition-colors">
+              重新校验权限
+            </button>
+          </div>
+
+          <!-- Paper B Main Scrollable Canvas -->
+          <div class="flex-1 overflow-y-auto p-6 sm:p-10 relative">
+
+            <div class="max-w-[62ch] mx-auto space-y-6">
+
+              <!-- Title & Header Block -->
+              <div class="space-y-3">
+                <h1 id="detail-title" class="text-xl sm:text-2xl font-bold tracking-tight text-[var(--ink)] leading-snug">
+                  图纸字段在纸面已经核对，仍缺实机台架验证
+                </h1>
+
+                <!-- Notion-style Low-Noise Inline Metadata Subtraction Strip -->
+                <div class="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-[var(--ink-secondary)]">
+                  <!-- Processing Status Dropdown -->
+                  <div class="relative">
+                    <button onclick="toggleStatusPopover()" id="btn-inline-status" class="inline-ghost font-medium flex items-center gap-1">
+                      <span id="dot-inline-status" class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      <span id="txt-inline-status">已处理</span>
+                      <i data-lucide="chevron-down" class="w-3 h-3 text-[var(--ink-muted)]"></i>
+                    </button>
+                  </div>
+
+                  <span class="text-[var(--hair-strong)]">•</span>
+
+                  <!-- Perspective Dropdown -->
+                  <div class="relative">
+                    <button onclick="togglePerspectivePopover()" id="btn-inline-pers" class="inline-ghost flex items-center gap-1">
+                      <i data-lucide="briefcase" class="w-3 h-3 text-blue-600"></i>
+                      <span id="txt-inline-pers">知识与工作</span>
+                    </button>
+                  </div>
+
+                  <span class="text-[var(--hair-strong)]">•</span>
+
+                  <!-- Revision Dropdown -->
+                  <div class="relative">
+                    <button onclick="toggleRevisionPopover()" id="btn-inline-rev" class="inline-ghost font-mono-tech flex items-center gap-1">
+                      <span id="txt-inline-rev">v2 (当前)</span>
+                      <i data-lucide="history" class="w-3 h-3 text-[var(--ink-muted)]"></i>
+                    </button>
+                  </div>
+
+                  <span class="text-[var(--hair-strong)]">•</span>
+
+                  <!-- Star Toggle -->
+                  <button onclick="toggleStarCurrent()" id="btn-inline-star" class="inline-ghost hover:text-amber-500 flex items-center gap-1">
+                    <i data-lucide="star" id="ico-inline-star" class="w-3.5 h-3.5"></i>
+                    <span id="txt-inline-star">星标</span>
+                  </button>
+
+                  <!-- Follow/Bell Toggle -->
+                  <button onclick="toggleFollowCurrent()" id="btn-inline-follow" class="inline-ghost hover:text-blue-500 flex items-center gap-1">
+                    <i data-lucide="bell" id="ico-inline-follow" class="w-3.5 h-3.5"></i>
+                    <span id="txt-inline-follow">关注</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="h-px bg-[var(--hair)]"></div>
+
+              <!-- ORTHOGONAL CODEX ALERT STRIP (If Pending Review) -->
+              <div id="codex-review-strip" class="p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-xl space-y-3">
+                <div class="flex items-start justify-between">
+                  <div class="flex items-center gap-2">
+                    <div class="p-1 bg-amber-500 text-white rounded">
+                      <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                      <div class="font-semibold text-amber-900 text-xs">依据存在变动 · 待复核</div>
+                      <div class="text-[11px] text-amber-700"><span id="review-source-note">关联的本地笔记《实机台架202611.md》已被修改。</span></div>
+                    </div>
+                  </div>
+                  <button onclick="toggleDrawer('QUOTE')" class="px-2 py-1 bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 rounded text-xs font-medium transition-colors flex items-center gap-1">
+                    <i data-lucide="file-diff" class="w-3.5 h-3.5"></i> 查看 Diff 对比
+                  </button>
+                </div>
+
+                <!-- Two Branch Revision Form -->
+                <div class="pt-2 border-t border-amber-200/60 flex flex-wrap gap-2">
+                  <button onclick="resolveReview('MAINTAIN')" class="px-3 py-1.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-medium shadow-sm transition-all flex items-center gap-1">
+                    <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600"></i>
+                    <span>维持原判断并留记录</span>
+                  </button>
+
+                  <button id="btn-upgrade-revision" onclick="resolveReview('UPGRADE')" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-medium shadow-sm transition-all flex items-center gap-1">
+                    <i data-lucide="git-commit" class="w-3.5 h-3.5"></i>
+                    <span>采用新修订 (升级至 v3)</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Main Insight Prose Content -->
+              <div id="detail-prose-body" class="claude-prose space-y-4">
+                <p>根据《工程交付图纸规范 v2.4》及 11 月 02 日现场盘点记录，各控制柜接线图纸中的编码规则已完成全量比对，符号与端子号符合 2026 工业桌面标准。</p>
+                <p>但需要注意的是，目前核对仅停留在<strong>纸面与静态 CAD 规则层面</strong>。对于高频震动及极端工况下的物理接线稳定性，仍缺少台架实测数据的直接印证。</p>
+              </div>
+
+              <!-- Key Quotes & Evidences Accordion Card -->
+              <div class="p-4 bg-white border border-[var(--hair-strong)] rounded-xl space-y-2 shadow-sm">
+                <div class="text-xs font-semibold text-[var(--ink-secondary)] flex items-center justify-between">
+                  <span class="flex items-center gap-1.5">
+                    <i data-lucide="quote" class="w-3.5 h-3.5 text-blue-600"></i>
+                    <span>核心依据与段落引文 (Line 42-45)</span>
+                  </span>
+                  <button id="btn-open-original" onclick="toggleDrawer('QUOTE')" class="text-blue-600 hover:underline text-[11px]">在原文打开</button>
+                </div>
+                <blockquote id="detail-quote-box" class="text-xs text-[var(--ink-body)] italic bg-[var(--paper-well)] p-2.5 rounded-lg border-l-2 border-blue-500 font-sans">
+                  "图纸比对无误，已归档。台架测试预定于下个周期补充，目前无实机数据。"
+                </blockquote>
+              </div>
+
+              <!-- Feedback / Correction Form (Disabled if v1 or security masked) -->
+              <div id="section-feedback" class="pt-4 border-t border-[var(--hair)] space-y-3">
+                <div class="text-xs font-semibold text-[var(--ink)] flex items-center justify-between">
+                  <span>纠正与补充反馈</span>
+                  <span class="text-[10px] text-[var(--ink-muted)]">仅针对当前版本生效</span>
+                </div>
+                <div class="flex gap-2">
+                  <input type="text" id="ipt-feedback" aria-label="纠正与补充反馈" placeholder="补充你的最新发现或纠正依据..."
+                         class="flex-1 px-3 py-1.5 text-xs bg-white border border-[var(--hair-strong)] rounded-lg focus:ring-1 focus:ring-blue-500 outline-none">
+                  <button onclick="submitFeedback()" class="px-3 py-1.5 bg-neutral-900 hover:bg-black text-white text-xs font-medium rounded-lg transition-colors">
+                    提交反馈
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+          <!-- THREE MUTUALLY EXCLUSIVE SLIDE-OVER DRAWERS -->
+
+          <!-- Drawer 1: 原文引文核对 (QUOTE) -->
+          <div id="drawer-QUOTE" class="hidden absolute top-[44px] right-0 bottom-0 w-full sm:w-[376px] bg-white border-l border-[var(--hair-strong)] shadow-[var(--shadow-sheet)] flex flex-col z-20">
+            <div class="h-10 px-3 border-b border-[var(--hair)] flex items-center justify-between bg-[var(--paper-well)]">
+              <div class="flex items-center gap-1.5 font-semibold text-xs text-[var(--ink)]">
+                <i data-lucide="file-search" class="w-4 h-4 text-blue-600"></i>
+                <span>原文引文核对</span>
+              </div>
+              <button onclick="closeDrawers()" class="p-1 hover:bg-black/5 rounded"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+              <div class="p-2.5 bg-blue-50 text-blue-900 rounded-lg space-y-1">
+                <div class="font-medium text-[11px] uppercase tracking-wider">关联来源笔记</div>
+                <div id="quote-note" class="font-bold">《实机台架202611.md》</div>
+                <div id="quote-path" class="text-[10px] text-blue-700 font-mono-tech">Craft Local Vault / Works / Hardware</div>
+              </div>
+
+              <!-- Diff Highlight Block (If Pending Review) -->
+              <div id="drawer-diff-block" class="p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-2">
+                <div class="font-semibold text-amber-900 text-[11px] flex items-center gap-1">
+                  <i data-lucide="file-diff" class="w-3.5 h-3.5"></i>
+                  <span>原文 Diff 高亮对比 (3秒判断)</span>
+                </div>
+                <div class="space-y-1 font-mono-tech text-[11px] p-2 bg-white rounded border border-amber-100">
+                  <div class="text-red-600 line-through bg-red-50 p-1 rounded">- "图纸比对无误，已归档。台架测试预定于下个周期补充，目前无实机数据。"</div>
+                  <div class="text-emerald-700 bg-emerald-50 p-1 rounded">+ "台架测试已于11-21完成首轮振动试验，发现接线端子在 40Hz 发生微幅偏移。"</div>
+                </div>
+              </div>
+
+              <blockquote id="quote-snippet" class="hidden p-3 bg-[var(--paper-well)] rounded-lg"></blockquote>
+              <!-- Full Source Note Preview -->
+              <div id="quote-example" class="space-y-2">
+                <div class="text-[11px] font-medium text-[var(--ink-muted)]">笔记正文片段 (包含行号)</div>
+                <div class="p-3 bg-[var(--paper-well)] rounded-lg font-mono-tech text-[11px] leading-relaxed space-y-1.5 text-[var(--ink-body)] border border-[var(--hair)]">
+                  <div><span class="text-[var(--ink-muted)] mr-3">39</span># 硬件与图纸复核记录</div>
+                  <div><span class="text-[var(--ink-muted)] mr-3">40</span>- 参与人: Alex, Chen</div>
+                  <div><span class="text-[var(--ink-muted)] mr-3">41</span>- 时间: 2026-11-02</div>
+                  <div class="bg-yellow-100/80 p-1 rounded border-l-2 border-yellow-500 font-sans font-medium text-amber-950">
+                    <span class="text-[var(--ink-muted)] font-mono-tech mr-3">42</span>"图纸比对无误，已归档。台架测试预定于下个周期补充，目前无实机数据。"
+                  </div>
+                  <div><span class="text-[var(--ink-muted)] mr-3">43</span>- 关键接线端子: T-01 到 T-48 全量校验通过</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Drawer 2: 版本与溯源检验 (INSPECTOR) -->
+          <div id="drawer-INSPECTOR" class="hidden absolute top-[44px] right-0 bottom-0 w-full sm:w-[376px] bg-white border-l border-[var(--hair-strong)] shadow-[var(--shadow-sheet)] flex flex-col z-20">
+            <div class="h-10 px-3 border-b border-[var(--hair)] flex items-center justify-between bg-[var(--paper-well)]">
+              <div class="flex items-center gap-1.5 font-semibold text-xs text-[var(--ink)]">
+                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
+                <span>Codex 真实性检验 (Inspector)</span>
+              </div>
+              <button onclick="closeDrawers()" class="p-1 hover:bg-black/5 rounded"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+              <!-- 4 Hairline Truth Rows -->
+              <div class="space-y-2 border border-[var(--hair-strong)] rounded-lg p-3 bg-white">
+                <div class="flex items-center justify-between py-1 border-b border-[var(--hair)]">
+                  <span class="text-[var(--ink-muted)]">出处锁定</span>
+                  <span class="font-mono-tech text-[var(--ink)] font-medium">Work/Delivery/Pos#42</span>
+                </div>
+                <div class="flex items-center justify-between py-1 border-b border-[var(--hair)]">
+                  <span class="text-[var(--ink-muted)]">引文与方法校验</span>
+                  <span class="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-medium">100% 精确匹配</span>
+                </div>
+                <div class="flex items-center justify-between py-1 border-b border-[var(--hair)]">
+                  <span class="text-[var(--ink-muted)]">版本三元组</span>
+                  <span class="font-mono-tech text-[10px] text-gray-700">h:v2 | c:v2 | r:rev_9901</span>
+                </div>
+                <div class="flex items-center justify-between py-1">
+                  <span class="text-[var(--ink-muted)]">依赖来源状态</span>
+                  <span class="text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded font-medium">Obsidian Vault (可用)</span>
+                </div>
+              </div>
+
+              <!-- Concurrency Conflict Test Button -->
+              <div class="p-3 bg-gray-50 rounded-lg space-y-2 border border-gray-200">
+                <div class="font-semibold text-gray-800 text-[11px]">并发写入与冲突控制测试</div>
+                <p class="text-[11px] text-gray-600">点击下方可模拟后台 `rowRevision` 被他人修改时的冲突拦截。</p>
+                <button onclick="triggerConflictSimulation()" class="w-full py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded font-medium transition-colors flex items-center justify-center gap-1">
+                  <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                  <span>模拟并发写入冲突 (rowRevision)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Drawer 3: 原事项助手 (ASSISTANT) -->
+          <div id="drawer-ASSISTANT" class="hidden absolute top-[44px] right-0 bottom-0 w-full sm:w-[376px] bg-white border-l border-[var(--hair-strong)] shadow-[var(--shadow-sheet)] flex flex-col z-20">
+            <div class="h-10 px-3 border-b border-[var(--hair)] flex items-center justify-between bg-purple-50">
+              <div class="flex items-center gap-1.5 font-semibold text-xs text-purple-900">
+                <i data-lucide="sparkles" class="w-4 h-4 text-purple-600"></i>
+                <span>原事项 Copilot 助手</span>
+              </div>
+              <button onclick="closeDrawers()" class="p-1 hover:bg-black/5 rounded"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+              <div class="p-3 bg-purple-50/50 border border-purple-100 rounded-lg space-y-1">
+                <div class="text-[10px] text-purple-600 font-mono-tech">Bound to Work #W-2026-1102</div>
+                <div class="font-semibold text-purple-950">硬件图纸与实机台架核对任务</div>
+              </div>
+
+              <div class="space-y-2">
+                <div class="text-[11px] font-medium text-[var(--ink-muted)]">快捷处理指令</div>
+                <div class="flex flex-wrap gap-1.5">
+                  <button onclick="sendAssistantChip('按补充继续核对')" class="px-2 py-1 bg-gray-100 hover:bg-purple-100 hover:text-purple-700 rounded text-[11px] transition-colors">按补充继续核对</button>
+                  <button onclick="sendAssistantChip('加新资料复核')" class="px-2 py-1 bg-gray-100 hover:bg-purple-100 hover:text-purple-700 rounded text-[11px] transition-colors">加新资料复核</button>
+                  <button onclick="sendAssistantChip('导出为简报')" class="px-2 py-1 bg-gray-100 hover:bg-purple-100 hover:text-purple-700 rounded text-[11px] transition-colors">导出为简报</button>
+                </div>
+              </div>
+
+              <!-- Message Stream -->
+              <div id="assistant-chat-stream" class="space-y-3 pt-2 border-t border-[var(--hair)]">
+                <div class="p-2.5 bg-gray-50 rounded-lg text-[11px] text-gray-700 leading-relaxed">
+                  👋 我已锁定当前原事项。你可以直接提问，或要求我根据最新补充资料重新对齐图纸结论。
+                </div>
+              </div>
+            </div>
+
+            <!-- Composer -->
+            <div class="p-2 border-t border-[var(--hair)] bg-white flex gap-1.5">
+              <input type="text" id="ipt-assistant" aria-label="输入示例助手消息" placeholder="向 Copilot 发送指令..." class="flex-1 px-2.5 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-md outline-none focus:bg-white focus:ring-1 focus:ring-purple-500">
+              <button onclick="sendAssistantMsg()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded-md transition-colors">发送</button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- ==================== SIDEBAR MODULE PANELS (Full-Width Overlays) ==================== -->
+
+      <!-- Module 1: 核对台 (CHECKING) -->
+      <div id="module-CHECKING" class="hidden flex-1 craft-paper p-6 overflow-y-auto space-y-6 bg-white">
+        <div class="flex items-center justify-between border-b border-[var(--hair)] pb-4">
+          <div>
+            <h2 class="text-lg font-bold text-[var(--ink)] flex items-center gap-2">
+              <i data-lucide="inbox" class="w-5 h-5 text-indigo-600"></i>
+              <span>发现核对台 (Candidate Inbox)</span>
+            </h2>
+            <p class="text-xs text-[var(--ink-muted)]">模型新提炼的候选洞察，需人工确认后正式留存入库</p>
+          </div>
+          <span class="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-mono-tech font-semibold">2 待核对</span>
+        </div>
+
+        <div class="space-y-4 max-w-4xl">
+          <!-- Candidate Item 1 (Verified Ready) -->
+          <div class="p-4 border border-indigo-200 bg-indigo-50/30 rounded-xl space-y-3">
+            <div class="flex items-start justify-between">
+              <div>
+                <span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-medium">依据校验通过</span>
+                <h3 class="font-bold text-sm text-[var(--ink)] mt-1">智能终端在低电量模式下的心跳休眠间隔为 300s</h3>
+              </div>
+              <button id="accept-candidate" onclick="acceptCandidate()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i> 保留这条发现
+              </button>
+            </div>
+            <p class="text-xs text-[var(--ink-body)]">引文出处：《终端电源管理协议.md》Line 88。经过与硬件日志对照，此结论完全符合事实。</p>
+          </div>
+
+          <!-- Candidate Item 2 (Rejected) -->
+          <div class="p-4 border border-[var(--hair-strong)] bg-white rounded-xl space-y-3">
+            <div class="flex items-start justify-between">
+              <div>
+                <span class="text-[10px] bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-medium">引文未在原文命中</span>
+                <h3 class="font-bold text-sm text-[var(--ink)] mt-1">旧接口兼容层将在 2026Q4 彻底废弃</h3>
+              </div>
+              <button id="reject-candidate" onclick="rejectCandidate()" class="px-3 py-1.5 bg-gray-100 hover:bg-red-50 hover:text-red-600 rounded-lg text-xs font-medium transition-colors">
+                拒绝并丢弃
+              </button>
+            </div>
+            <p class="text-xs text-[var(--ink-muted)]">未能在任何关联笔记中查找到“彻底废弃”的明确日期说明。</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Module 2: 阶段回顾 (REVIEW) -->
+      <div id="module-REVIEW" class="hidden flex-1 craft-paper p-6 overflow-y-auto space-y-6 bg-white">
+        <div class="flex items-center justify-between border-b border-[var(--hair)] pb-4">
+          <div>
+            <h2 class="text-lg font-bold text-[var(--ink)] flex items-center gap-2">
+              <i data-lucide="calendar" class="w-5 h-5 text-teal-600"></i>
+              <span>阶段回顾与统计 (Period Review)</span>
+            </h2>
+            <p class="text-xs text-[var(--ink-muted)]">严格区分「资料不足」与「确定为零」的精细核算</p>
+          </div>
+          <div class="flex gap-2">
+            <button class="px-2.5 py-1 bg-gray-100 text-xs rounded-md">直接提问</button>
+            <button class="px-2.5 py-1 bg-teal-600 text-white text-xs rounded-md font-medium">本月回顾</button>
+            <button class="px-2.5 py-1 bg-gray-100 text-xs rounded-md">对比去年同期</button>
+          </div>
+        </div>
+
+        <div class="max-w-4xl space-y-4">
+          <table class="w-full text-left text-xs border border-[var(--hair-strong)] rounded-lg overflow-hidden">
+            <thead class="bg-gray-50 border-b border-[var(--hair)] text-[var(--ink-muted)]">
+              <tr>
+                <th class="p-3">统计维度</th>
+                <th class="p-3">本期发现数</th>
+                <th class="p-3">依据完整度</th>
+                <th class="p-3">统计口径说明</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--hair)]">
+              <tr>
+                <td class="p-3 font-medium">硬件图纸与交付</td>
+                <td class="p-3 font-mono-tech">4 条</td>
+                <td class="p-3 text-emerald-700 font-medium">100% 完整</td>
+                <td class="p-3 text-[var(--ink-muted)]">确定无未归档争议</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-medium">第三方服务预算</td>
+                <td class="p-3 font-mono-tech text-amber-700">0 元 (资料不足)</td>
+                <td class="p-3 text-amber-700 font-medium">尚缺 2 份账单</td>
+                <td class="p-3 text-[var(--ink-muted)]">注意: 并非确定为零，属资料不全</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Module 3: 关注主题 (TOPICS) -->
+      <div id="module-TOPICS" class="hidden flex-1 craft-paper p-6 overflow-y-auto space-y-6 bg-white">
+        <div class="flex items-center justify-between border-b border-[var(--hair)] pb-4">
+          <div>
+            <h2 class="text-lg font-bold text-[var(--ink)] flex items-center gap-2">
+              <i data-lucide="bookmark" class="w-5 h-5 text-amber-600"></i>
+              <span>长效关注主题 (Monitored Topics)</span>
+            </h2>
+            <p class="text-xs text-[var(--ink-muted)]">后台定时轮询新笔记，发现关联证据时即刻提醒</p>
+          </div>
+          <button class="px-3 py-1.5 bg-neutral-900 text-white rounded-lg text-xs font-medium">新建主题</button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
+          <div class="p-4 border border-[var(--hair-strong)] rounded-xl space-y-2 relative bg-white">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-sm text-[var(--ink)]">SQLite FTS5 性能与内存</span>
+              <span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-mono-tech">监控中</span>
+            </div>
+            <p class="text-xs text-[var(--ink-muted)]">最多 7 天 · 剩余 2/3 轮校验</p>
+            <div class="pt-2 border-t border-[var(--hair)] flex justify-between text-xs">
+              <span class="text-[var(--ink-secondary)]">累计命中: 3 条洞察</span>
+              <button class="text-blue-600 hover:underline">暂停监控</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Module 4: 处理记录 (AUDIT LOG) -->
+      <div id="module-AUDIT" class="hidden flex-1 craft-paper p-6 overflow-y-auto space-y-6 bg-white">
+        <div class="flex items-center justify-between border-b border-[var(--hair)] pb-4">
+          <div>
+            <h2 class="text-lg font-bold text-[var(--ink)] flex items-center gap-2">
+              <i data-lucide="history" class="w-5 h-5 text-gray-600"></i>
+              <span>全量处理记录 (Audit Timeline)</span>
+            </h2>
+            <p class="text-xs text-[var(--ink-muted)]">实时记录你在工作区内完成的每次分诊、修订与状态变更</p>
+          </div>
+          <button onclick="clearAuditLogs()" class="text-xs text-[var(--ink-muted)] hover:text-red-600">清空记录</button>
+        </div>
+
+        <div id="audit-log-stream" class="space-y-3 max-w-3xl font-mono-tech text-xs">
+          <!-- Dynamic logs appended here -->
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- ==================== FLOATING BATCH TRIAGE ACTION PILL (batch-pill) ==================== -->
+  <div id="batch-pill" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 mac-vibrancy px-4 py-2 rounded-full shadow-2xl border border-[var(--hair-strong)] flex items-center gap-3 z-50 animate-bounce-short">
+    <span id="batch-pill-count" class="text-xs font-bold text-[var(--ink)]">已选 2 条</span>
+    <div class="h-3 w-px bg-black/15"></div>
+    <div class="flex items-center gap-1 text-xs">
+      <button onclick="applyBatchStatus('DONE')" class="px-2.5 py-1 bg-white hover:bg-gray-50 rounded-full border border-gray-200 text-emerald-700 font-medium transition-colors">
+        标为已处理
+      </button>
+      <button onclick="applyBatchStatus('LATER')" class="px-2.5 py-1 bg-white hover:bg-gray-50 rounded-full border border-gray-200 text-amber-700 font-medium transition-colors">
+        设稍后
+      </button>
+      <button onclick="applyBatchStatus('UNFOLLOW')" class="px-2.5 py-1 bg-white hover:bg-gray-50 rounded-full border border-gray-200 text-gray-700 font-medium transition-colors">
+        取消关注
+      </button>
+      <button onclick="clearSelection()" class="p-1 hover:bg-black/5 rounded-full text-[var(--ink-muted)]">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== MODALS & POPOVERS ==================== -->
+
+  <!-- Inline Status Popover -->
+  <div id="popover-status" class="hidden absolute top-12 left-10 w-44 bg-white rounded-xl shadow-[var(--shadow-popover)] border border-[var(--hair-strong)] p-1 z-50 text-xs space-y-0.5">
+    <button onclick="setInsightStatus('PENDING')" class="w-full text-left px-2.5 py-1.5 hover:bg-black/5 rounded flex items-center gap-2">
+      <span class="w-2 h-2 rounded-full bg-amber-500"></span> 待关注
+    </button>
+    <button onclick="setInsightStatus('LATER')" class="w-full text-left px-2.5 py-1.5 hover:bg-black/5 rounded flex items-center justify-between">
+      <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-blue-500"></span> 稍后</span>
+      <span class="text-[10px] text-gray-400">选择日期</span>
+    </button>
+    <button onclick="setInsightStatus('DONE')" class="w-full text-left px-2.5 py-1.5 hover:bg-black/5 rounded flex items-center gap-2">
+      <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 已处理
+    </button>
+  </div>
+
+  <!-- Inline Perspective Popover -->
+  <div id="popover-perspective" class="hidden absolute top-12 left-28 w-44 bg-white rounded-xl shadow-[var(--shadow-popover)] border border-[var(--hair-strong)] p-1 z-50 text-xs space-y-0.5">
+    <button onclick="setInsightPerspective('WORK')" class="w-full text-left px-2.5 py-1.5 hover:bg-black/5 rounded flex items-center gap-2">
+      <i data-lucide="briefcase" class="w-3.5 h-3.5 text-blue-600"></i> 知识与工作
+    </button>
+    <button onclick="setInsightPerspective('LIFE')" class="w-full text-left px-2.5 py-1.5 hover:bg-black/5 rounded flex items-center gap-2">
+      <i data-lucide="smile" class="w-3.5 h-3.5 text-emerald-600"></i> 生活与进展
+    </button>
+    <button onclick="setInsightPerspective('DECISION')" class="w-full text-left px-2.5 py-1.5 hover:bg-black/5 rounded flex items-center gap-2">
+      <i data-lucide="git-commit" class="w-3.5 h-3.5 text-purple-600"></i> 决定与变化
+    </button>
+  </div>
+
+  <!-- Inline Revision Popover -->
+  <div id="popover-revision" class="hidden absolute top-12 left-44 w-48 bg-white rounded-xl shadow-[var(--shadow-popover)] border border-[var(--hair-strong)] p-1 z-50 text-xs space-y-0.5">
+    <button onclick="switchRevision('v2')" class="w-full text-left px-2.5 py-1.5 hover:bg-black/5 rounded flex items-center justify-between font-mono-tech">
+      <span>v2 (当前 Head)</span>
+      <span class="text-[10px] bg-emerald-100 text-emerald-800 px-1 rounded">Active</span>
+    </button>
+    <button onclick="switchRevision('v1')" class="w-full text-left px-2.5 py-1.5 hover:bg-black/5 rounded flex items-center justify-between font-mono-tech">
+      <span>v1 (历史只读)</span>
+      <span class="text-[10px] bg-gray-100 text-gray-600 px-1 rounded">ReadOnly</span>
+    </button>
+  </div>
+
+  <!-- Discover Modal (+ 开始发现) -->
+  <div id="modal-discover" role="dialog" aria-modal="true" aria-label="开始发现" class="hidden fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-[var(--shadow-popover)] border border-[var(--hair-strong)] w-full max-w-lg p-5 space-y-4">
+      <div class="flex items-center justify-between border-b border-[var(--hair)] pb-3">
+        <div class="font-bold text-sm text-[var(--ink)] flex items-center gap-2">
+          <i data-lucide="sparkles" class="w-4 h-4 text-blue-600"></i>
+          <span>从本地笔记提炼新洞察</span>
+        </div>
+        <button onclick="closeModals()" class="p-1 hover:bg-black/5 rounded"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <div class="space-y-2 text-xs">
+        <div class="flex justify-between text-[var(--ink-muted)]">
+          <span>选择本地文字笔记范围 (限制 1 - 32 份)</span>
+          <span class="font-mono-tech text-blue-600 font-semibold">已选 3 份</span>
+        </div>
+        <div class="border border-[var(--hair-strong)] rounded-lg p-2 space-y-1 max-h-48 overflow-y-auto">
+          <label class="flex items-center gap-2 p-1.5 hover:bg-black/5 rounded cursor-pointer">
+            <input type="checkbox" checked class="hub-chk">
+            <span>《实机台架202611.md》</span>
+          </label>
+          <label class="flex items-center gap-2 p-1.5 hover:bg-black/5 rounded cursor-pointer">
+            <input type="checkbox" checked class="hub-chk">
+            <span>《FTS5索引优化观察.md》</span>
+          </label>
+          <label class="flex items-center gap-2 p-1.5 hover:bg-black/5 rounded cursor-pointer">
+            <input type="checkbox" checked class="hub-chk">
+            <span>《周报与认知负荷记录.md》</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="pt-2 flex justify-end gap-2 text-xs">
+        <button onclick="closeModals()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-[var(--ink-secondary)]">取消</button>
+        <button onclick="runDiscoveryProcess()" class="px-4 py-1.5 bg-neutral-900 hover:bg-black text-white rounded-lg font-medium flex items-center gap-1.5">
+          <i data-lucide="play" class="w-3.5 h-3.5"></i> 开始分析
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" role="status" aria-live="polite" class="fixed top-12 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- ==================== JAVASCRIPT LOGIC ==================== -->
+
+</body>
+</html>

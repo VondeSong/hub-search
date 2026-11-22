@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "756b369f21542259abd9687a9feee5becb8041ce",
-  "published_version": 155,
-  "deployment_id": "appgdep_6b02b5eef2408191adc78ee4455ec5ba",
+  "source_commit": "1b8a7ff4e744f0a6924af517dd6a607f6efdf3f9",
+  "published_version": 156,
+  "deployment_id": "appgdep_6b02baf43eb88191ac445fe571aea969",
   "files": {
     ".gitignore": {
       "sha256": "ca0e1575efb181d784f15bf6c86e3c012fd5c7ede4daa34b924d0d8b590d4e77",
@@ -423,9 +423,9 @@
       "bytes": 50148
     },
     "app/globals.css": {
-      "sha256": "4dd892f1271ff8902837ad25ba32d075b4562079df28963186224f1345f164ca",
+      "sha256": "4a22fbb697eaf7ab79701e29fbf2cc228d0e17f0b3ed89bcfe1b9c4573417ca1",
       "mode": "100644",
-      "bytes": 50104
+      "bytes": 50175
     },
     "app/insight-discovery.css": {
       "sha256": "13a4af11aaa1077229eb61319a7b844509fa2d1f26411e7337e8a549dcd50fdb",
@@ -573,9 +573,9 @@
       "bytes": 12137
     },
     "app/page.tsx": {
-      "sha256": "3f0e1aa193f93b777defed36e87b02b99e4958835c6026173a8334b27fbe7d41",
+      "sha256": "7952769241750a4c315beef2f7a349788403c58d07b3ab05a9995a011ee562a4",
       "mode": "100644",
-      "bytes": 75632
+      "bytes": 76852
     },
     "app/pdf-preview-model.ts": {
       "sha256": "e1f72df40daff0d29d0c63cd3552edbfc47d851a2a5d0bbe3184e0371f178970",
@@ -1053,9 +1053,9 @@
       "bytes": 1764
     },
     "docs/insights-discovery-prototype.md": {
-      "sha256": "32b99118787ed1a61aee1cd62dd9e8ed8daa962509312414e0f0c3f1279a6ccf",
+      "sha256": "4cca51d8a889f90306488f264492a72ada8d5c02e67f65ee36f9a69708a3537a",
       "mode": "100644",
-      "bytes": 1951
+      "bytes": 3374
     },
     "docs/journal-controls-prototype.md": {
       "sha256": "e8ee0b8d0211fc44942fb5252a4f4b9314b82db2b80648f88fd831e0991a4d63",
@@ -1257,6 +1257,26 @@
       "mode": "100644",
       "bytes": 133251
     },
+    "public/insights-workspace/index.html": {
+      "sha256": "159183448287da689d394e1271b92f8fb3cef42f1182ac85215b58f5f8e9b07d",
+      "mode": "100644",
+      "bytes": 58904
+    },
+    "public/insights-workspace/insights.css": {
+      "sha256": "d043614eccddfa9930c21b592d0b11c1fa26d8acec3e7fe81a74f8b3200bab7a",
+      "mode": "100644",
+      "bytes": 7624
+    },
+    "public/insights-workspace/insights.js": {
+      "sha256": "4a8dc6aabd16411966c881c5390913de349e6021d5c17bfc3a2a0eca47c08aa0",
+      "mode": "100644",
+      "bytes": 48227
+    },
+    "public/insights-workspace/utilities.css": {
+      "sha256": "02174ec4bb0f0e448f6a783fde1677759bf289844fb199771a09f55209431c7b",
+      "mode": "100644",
+      "bytes": 23990
+    },
     "public/reading-workspace/index.html": {
       "sha256": "170bb508b18524bf2ce8e5feecb8e688278bd0ed462ef3b1351348b08163e4a1",
       "mode": "100644",
@@ -1366,6 +1386,11 @@
       "sha256": "5e2a3742f92542de5a512b040847470d73d920fbbafbdbe3105e36d3d4cb632e",
       "mode": "100644",
       "bytes": 19836
+    },
+    "scripts/insights-workspace-tailwind.cjs": {
+      "sha256": "0b199b51c4a9fa10c03a3044cb6c787eb53742ce65aa18e3fb46c65c0005e2f3",
+      "mode": "100644",
+      "bytes": 866
     },
     "scripts/install-ci.mjs": {
       "sha256": "4a5a92d60a08d0ba54effd8373da2da06284312c55b767287c68a0bec7200da7",
@@ -1488,5 +1513,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-22T09:30:49.037512+00:00"
+  "imported_at": "2026-11-22T09:52:15.257150+00:00"
 }

@@ -111,3 +111,5 @@
 
 .hub-reading-host{min-width:0;overflow:hidden}
 .hub-reading-frame{display:block;flex:1 1 auto;width:100%;height:100%;min-height:0;border:0;background:#f2f3f5}
+
+.hub-app[data-insight-reference] .assistant-launcher { display:none }
