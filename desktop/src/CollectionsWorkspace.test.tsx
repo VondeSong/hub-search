@@ -147,9 +147,96 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 function FooterNoticeProbe(){const {operationStatus}=useOperationStatus();return operationStatus?<div className="test-footer-operation" role={operationStatus.tone==="error"?"alert":"status"}>{operationStatus.text}</div>:null;}
 async function mount() { await act(async () => root.render(<CollectionViewsProvider><CollectionNavigation /><CollectionsWorkspace /><FooterNoticeProbe/></CollectionViewsProvider>)); await act(async () => vi.advanceTimersByTimeAsync(160)); }
 async function click(label: string) {
-  const button = [...container.querySelectorAll("button")].find(b => b.textContent === label || b.getAttribute("aria-label")===label)!;
-  expect(button).toBeTruthy(); await act(async () => button.click());
+  const button = [...container.querySelectorAll("button"), ...document.querySelectorAll<HTMLButtonElement>(".reading-reference-popover button")].find(b => b.textContent === label || b.getAttribute("aria-label")===label)!;
+  expect(button, label).toBeTruthy(); await act(async () => button.click());
 }
+async function openSyncDetails() {
+  await click("来源同步与连接");
+  await click("同步详情");
+}
+async function openAdvancedSort() {
+  await act(async () => container.querySelector<HTMLElement>(".collection-database-active-tab > summary")!.click());
+  await click("高级排序");
+}
+it("opens the reference source dialog in source order and only closes after an accepted sync", async () => {
+  let fail = true;
+  invoke.mockImplementation(async (command: string) => {
+    if (command === "list_collection_items") return initial;
+    if (command === "get_collection_storage") return storage;
+    if (command === "sync_x_bookmarks") {
+      if (fail) throw "来源暂时不可用";
+      return "已开始后台保存";
+    }
+    return [];
+  });
+  await mount();
+  await click("来源同步与连接");
+  const dialog = container.querySelector<HTMLDialogElement>("dialog.reading-reference-dialog")!;
+  expect(dialog.open).toBe(true);
+  expect([...dialog.querySelectorAll("article")].map(row => row.getAttribute("aria-label"))).toEqual([
+    "X 书签", "X 喜欢", "Telegram + tdl 个人号", "滴答稍后读", "Obsidian 本地素材",
+  ]);
+  expect(invoke.mock.calls.some(([command]) => command === "sync_x_bookmarks")).toBe(false);
+  await click("立即同步X 书签");
+  expect(dialog.querySelector('[role="alert"]')?.textContent).toBe("来源暂时不可用");
+  expect(dialog.open).toBe(true);
+  fail = false;
+  await click("立即同步X 书签");
+  expect(invoke).toHaveBeenCalledWith("sync_x_bookmarks", { source: "bookmarks", restart: false });
+  expect(dialog.open).toBe(false);
+});
+it("reads the cloud policy and limits the quick action to reading sync", async () => {
+  let allowed = false;
+  invoke.mockImplementation(async (command: string) => {
+    if (command === "list_collection_items") return initial;
+    if (command === "get_collection_storage") return storage;
+    if (command === "get_cloud_sync_policy") return { enabled: true, reading: true, flashcards: true };
+    if (command === "get_reading_sync_status") return { supported: true, running: false, lastError: "", report: null };
+    if (command === "get_reading_network_policy") return { mode: "wifi", allowed, reason: "当前网络不符合策略", network: {} };
+    if (command === "sync_reading") return { completedAt: 1791165600, pending: 0 };
+    return [];
+  });
+  await mount();
+  await click("云同步状态与设置");
+  const dialog = container.querySelector<HTMLDialogElement>("dialog.reading-reference-dialog")!;
+  expect(dialog.textContent).toContain("阅读云同步 · 已开启");
+  expect(dialog.textContent).toContain("当前网络不符合策略");
+  const action = dialog.querySelector<HTMLButtonElement>(".reading-reference-primary")!;
+  expect(action.disabled).toBe(true);
+  allowed = true;
+  await act(async () => vi.advanceTimersByTimeAsync(5000));
+  expect(action.disabled).toBe(false);
+  await act(async () => action.click());
+  expect(invoke.mock.calls.filter(([command]) => command.startsWith("sync_")).map(([command]) => command)).toEqual(["sync_reading"]);
+  expect(dialog.open).toBe(false);
+});
+it("closes the Dida reconnect dialog only after the reading account matches", async () => {
+  const didaPage = { ...initial, sources: [...initial.sources, {
+    id: "dida", count: 1, connected: true, canResume: false, status: "", lastCheckedAt: 1791165600,
+    didaCleanup: { authRequired: true },
+  }] };
+  let accountMatched = false;
+  invoke.mockImplementation(async (command: string) => {
+    if (command === "list_collection_items") return didaPage;
+    if (command === "get_collection_storage") return storage;
+    if (command === "get_dida_reading_login_status") {
+      return { state: "verified", connected: true, accountMatched, checkedAt: 1791165700,
+        loginWindowOpen: true, message: accountMatched ? "账号一致" : "账号仍待同步核验" };
+    }
+    return [];
+  });
+  await mount();
+  await click("来源同步与连接");
+  await click("重连会话滴答稍后读");
+  await click("我已登录，立即检查");
+  expect(container.querySelector("dialog[open]")?.textContent).toContain("账号仍待同步核验");
+  expect(container.querySelector("dialog[open]")?.textContent).toContain("同步并核验");
+  accountMatched = true;
+  await click("我已登录，立即检查");
+  expect(container.querySelector("dialog[open]")).toBeNull();
+  await click("来源同步与连接");
+  expect(container.querySelector('dialog[open] [aria-label="立即同步滴答稍后读"]')).toBeTruthy();
+});
 async function expand(label: string) {
   const summary=[...container.querySelectorAll("summary")].find(node=>node.textContent?.trim()===label)!;
   expect(summary).toBeTruthy();await act(async()=>summary.click());
@@ -173,7 +260,7 @@ it("opens an exact search target outside the current reading page and restores t
 it("separates sync, processing records and advanced settings into visible tabs",async()=>{
  const longStatus="长同步日志 ".repeat(100);
  invoke.mockImplementation(async command=>command==="list_collection_items"?{...initial,sources:initial.sources.map(source=>({...source,status:longStatus}))}:command==="get_collection_storage"?storage:[]);
- await mount();await click("同步与连接");
+ await mount();await openSyncDetails();
  expect(container.querySelectorAll('[role="tab"]')).toHaveLength(3);
  expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("同步");
  expect(container.querySelector('[aria-label="保存位置与同步频率"]')).toBeNull();
@@ -189,7 +276,7 @@ it("separates sync, processing records and advanced settings into visible tabs",
 it("surfaces Dida authentication and preservation policy without offering an unverified cleanup",async()=>{
  const dida={id:"dida",count:40,connected:true,canResume:false,status:"32项来源保留",lastCheckedAt:1791505800,didaCleanup:{mode:"cloud-preserve",pending:32,verified:0,deleted:8,authRequired:true,reasons:[{message:"滴答网页登录未通过（401），请重新登录；原项已保留",count:32}]}};
  invoke.mockImplementation(async command=>command==="list_collection_items"?{...initial,sources:[...initial.sources,dida]}:command==="get_collection_storage"?storage:command==="get_dida_reading_login_status"?{connected:false,accountMatched:false,checkedAt:1791505801,loginWindowOpen:false,state:"authentication",message:"滴答网页登录未通过（401）；原项已保留"}:[]);
- await mount();await click("同步与连接");
+ await mount();await openSyncDetails();
  const first=container.querySelector('.collection-sync-source-card')!;
  expect(first.classList.contains("dida")).toBe(true);expect(first.textContent).toContain("滴答里的原内容：保留 32 条");
  expect(first.textContent).toContain("同步后删除：未开启");expect(first.textContent).toContain("最近检查");
@@ -201,7 +288,7 @@ it("surfaces Dida authentication and preservation policy without offering an unv
 it("pages identifiable library records and keeps cancelled history closed and non-retryable",async()=>{
  const records=Array.from({length:11},(_,index)=>({key:`record:${index}`,itemTitle:`文章 ${index}`,target:"craft-main",targetName:"Main",updatedAt:1791505800-index,action:"move",phase:index===0||index===10?"cancelled":index===8?"cleanup":index===9?"queued":"partial",error:"正文与附件尚未完成核验",parked:index>0&&index<5,plan:{status:"planned",libraryName:"Main",destinationPath:"Main / 阅读",summary:"",reason:"",title:"",markdown:"",tasks:[],attachments:[],warnings:[]}}));
  invoke.mockImplementation(async command=>command==="list_collection_items"?initial:command==="get_collection_storage"?storage:command==="collection_library_operations"?records:[]);
- await mount();await click("同步与连接");await click("处理记录");
+ await mount();await openSyncDetails();await click("处理记录");
  expect(container.querySelectorAll('.collection-sync-operations>.collection-operation-list article')).toHaveLength(5);
  const first=container.querySelector('.collection-sync-operations>.collection-operation-list article')!;
  expect(first.textContent).toContain("文章 1");expect(first.textContent).toContain("Main");expect(first.querySelector('time')?.getAttribute("datetime")).toBeTruthy();
@@ -217,7 +304,7 @@ it("pages identifiable library records and keeps cancelled history closed and no
 });
 it("shows a paused fetch as paused rather than still reading pages",async()=>{
  invoke.mockImplementation(async command=>command==="list_collection_items"?initial:command==="get_collection_storage"?{...storage,job:{id:1,running:false,phase:"fetching",source:"bookmarks",processed:0,total:0,downloadedBytes:0,fileBytes:0,message:"请求已暂停",outcome:"paused"}}:[]);
- await mount();await click("同步与连接");
+ await mount();await openSyncDetails();
  expect(container.querySelector('[aria-label="后台保存进度"]')?.textContent).toContain("读取已暂停");
  expect(container.querySelector('[aria-label="后台保存进度"]')?.textContent).not.toContain("正在分页读取");
  await click("继续同步");expect(invoke).toHaveBeenCalledWith("sync_x_bookmarks",{source:"bookmarks",restart:false});
@@ -226,7 +313,7 @@ it("does not report cancelled history as an active processing warning",async()=>
  const record={key:"cancelled:old",itemTitle:"已取消的旧文章",target:"craft-main",targetName:"Main",action:"move",phase:"cancelled",error:"方案已取消，已保存内容保留"};
  invoke.mockImplementation(async command=>command==="list_collection_items"?initial:command==="get_collection_storage"?storage:command==="collection_library_operations"?[record]:[]);
  await mount();expect(container.querySelector('.test-footer-operation')).toBeNull();
- await click("同步与连接");await click("处理记录");
+ await openSyncDetails();await click("处理记录");
  expect(container.querySelector('.collection-sync-operations')?.textContent).toContain("0 项待处理");
  expect(container.querySelector('.collection-operation-history')?.hasAttribute("open")).toBe(false);
 });
@@ -252,7 +339,7 @@ it("mobile keeps reading controls and cloud settings while hiding source and lib
   invoke.mockImplementation(async(command:string)=>command==="list_collection_items"?{...initial,items:[{...lifecycleItem,cloudImported:true}],total:1,matched:1}:command==="get_collection_storage"?storage:[]);
   HTMLDialogElement.prototype.showModal=function(){this.open=true;};HTMLDialogElement.prototype.close=function(){this.open=false;};
   await mount();await click("阅读筛选");await act(async()=>(document.querySelector('[aria-label="云同步设置"]') as HTMLElement).click());await act(async()=>vi.advanceTimersByTimeAsync(40));expect(openCloud).toHaveBeenCalledTimes(1);
-  expect(container.querySelector('[aria-label="同步与连接"]')).toBeNull();
+  expect(container.querySelector('[aria-label="来源同步与连接"]')).toBeNull();
   await act(async()=>container.querySelector<HTMLElement>(".collection-row")!.click());
   expect(container.querySelector('[aria-label="选择保存资料库"]')).toBeNull();
   expect(container.querySelector('[aria-label="更新内容"]')).toBeNull();
@@ -396,7 +483,7 @@ it("saves a bot token only through its connection command and clears it before p
     if(command==="list_collection_items")return {...initial,sources:[...initial.sources,{id:"telegram",count:0,connected,canResume:false,status:"",pairingUrl:connected?"https://t.me/test_bot?start=hub_pair":""}]};
     return command==="get_collection_storage"?storage:"";
   });
-  await mount();await click("同步与连接");await click("设置");await expand("连接管理");await click("连接 Telegram");
+  await mount();await openSyncDetails();await click("设置");await expand("连接管理");await click("连接 Telegram");
   const field=container.querySelector<HTMLInputElement>("#telegram-token")!;expect(field.type).toBe("password");
   await input(field,"7:LOCAL_TEST_TOKEN_ONLY");await click("保存连接");
   expect(invoke).toHaveBeenCalledWith("save_telegram_connection",{token:"7:LOCAL_TEST_TOKEN_ONLY"});expect(field.value).toBe("");
@@ -406,7 +493,7 @@ it("saves a bot token only through its connection command and clears it before p
 it("keeps Telegram connection and save available while X is fetching or exporting",async()=>{
   const activeStorage={...storage,running:true,telegramRunning:false,job:{id:7,running:true,phase:"saving",source:"bookmarks",processed:1,total:10,outcome:""}};
   invoke.mockImplementation(async(command:string)=>command==="list_collection_items"?{...initial,running:true}:command==="get_collection_storage"?activeStorage:"请打开机器人确认");
-  await mount();await click("同步与连接");
+  await mount();await openSyncDetails();
   await click("设置");await expand("连接管理");
   const connect=[...container.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="连接 Telegram")!;
   expect(connect.disabled).toBe(false);
@@ -420,7 +507,7 @@ it("keeps Telegram connection and save available while X is fetching or exportin
 it("shows bot validation progress, prevents duplicate saves and keeps failures retryable",async()=>{
   let rejectSave!:(reason:string)=>void;
   invoke.mockImplementation((command:string)=>command==="save_telegram_connection"?new Promise((_,reject)=>{rejectSave=reject;}):Promise.resolve(command==="list_collection_items"?initial:command==="get_collection_storage"?storage:""));
-  await mount();await click("同步与连接");await click("设置");await expand("连接管理");await click("连接 Telegram");
+  await mount();await openSyncDetails();await click("设置");await expand("连接管理");await click("连接 Telegram");
   const field=container.querySelector<HTMLInputElement>("#telegram-token")!;
   await input(field,"7:LOCAL_TEST_TOKEN_ONLY");await click("保存连接");
   const dialog=container.querySelector<HTMLDialogElement>("dialog[open]")!;
@@ -439,7 +526,7 @@ it("shows bot validation progress, prevents duplicate saves and keeps failures r
 it("explains when Telegram's own receiver temporarily blocks connection changes",async()=>{
   let receiving=false;
   invoke.mockImplementation(async(command:string)=>command==="list_collection_items"?initial:command==="get_collection_storage"?{...storage,telegramRunning:receiving}:"");
-  await mount();await click("同步与连接");await click("设置");await expand("连接管理");await click("连接 Telegram");
+  await mount();await openSyncDetails();await click("设置");await expand("连接管理");await click("连接 Telegram");
   await input(container.querySelector<HTMLInputElement>("#telegram-token")!,"7:LOCAL_TEST_TOKEN_ONLY");
   receiving=true;await act(async()=>vi.advanceTimersByTimeAsync(2000));
   const dialog=container.querySelector<HTMLDialogElement>("dialog[open]")!;
@@ -460,7 +547,7 @@ it("renders Telegram notes in the same preview and routes refresh to the inbox",
   expect(invoke.mock.calls.some(([command])=>command==="refresh_collection_content")).toBe(false);
 });
 it("keeps source restart and resume distinct and surfaces command failures", async () => {
-  await mount(); await click("同步与连接");
+  await mount(); await openSyncDetails();
   invoke.mockImplementation(async (command: string) => {
     if (command === "sync_x_bookmarks") throw "X 登录失效";
     return command === "get_collection_storage" ? storage : initial;
@@ -470,7 +557,7 @@ it("keeps source restart and resume distinct and surfaces command failures", asy
   await click("X 书签"); expect(invoke).toHaveBeenCalledWith("sync_x_bookmarks", {source:"bookmarks", restart: true });
 });
 it("opens the default browser and clears the sensitive request after saving", async () => {
-  await mount(); await click("同步与连接"); await click("设置");await expand("连接管理");await click("更新连接");
+  await mount(); await openSyncDetails(); await click("设置");await expand("连接管理");await click("更新连接");
   await click("用默认浏览器打开 X 书签");
   expect(invoke).toHaveBeenCalledWith("open_external_url", { url: "https://x.com/i/bookmarks" });
   const textarea = container.querySelector("textarea")!;
@@ -480,7 +567,7 @@ it("opens the default browser and clears the sensitive request after saving", as
   expect(textarea.value).toBe(""); expect(container.querySelector("dialog")!.open).toBe(false);
 });
 it("saves the chosen vault and custom interval, closes immediately and shows background progress", async () => {
-  await mount(); await click("同步与连接"); await click("设置");await click("保存位置与同步频率");
+  await mount(); await openSyncDetails(); await click("设置");await click("保存位置与同步频率");
   const radio = container.querySelectorAll<HTMLInputElement>('input[type="radio"]')[1];
   await act(async () => radio.click()); await click("选择文件夹");
   expect(container.querySelector<HTMLInputElement>("#collection-vault")!.value).toBe("D:/test-vault");
@@ -495,12 +582,12 @@ it("saves the chosen vault and custom interval, closes immediately and shows bac
   expect(invoke).toHaveBeenCalledWith("save_collection_storage", {config:{mode:"obsidian",vaultPath:"D:/test-vault",downloadMedia:true,autoSyncMinutes:45,localSourcesMinutes:0}});
   expect(container.querySelectorAll("dialog")[1].open).toBe(false);
   expect(container.querySelector('[aria-label="后台保存进度"]')).toBeNull();
-  await click("同步与连接");
+  await openSyncDetails();
   expect(container.querySelector('.collection-sync-popover [aria-label="后台保存进度"]')?.textContent).toContain("24 / 564 条");
   expect(container.querySelector('progress')?.value).toBe(24);
-  await click("同步与连接");
+  await click("来源同步与连接");
   await click("表格"); // View changes remain available during download.
-  await click("同步与连接");
+  await openSyncDetails();
   await click("暂停"); expect(invoke).toHaveBeenCalledWith("cancel_x_bookmark_sync");
   invoke.mockImplementation(async(command:string)=>command==="list_collection_items"?initial:{...storage,job:{id:1,running:false,phase:"saving",processed:564,total:564,downloadedBytes:2000000,fileBytes:0,message:"保存结束",outcome:"completed"}});
   await act(async()=>vi.advanceTimersByTimeAsync(2000));
@@ -511,7 +598,7 @@ it("saves the chosen vault and custom interval, closes immediately and shows bac
 const renamedVaultStorage={...storage,config:{...storage.config,mode:"obsidian",vaultPath:"D:/Obsidian/ZhiHu"},vaultRelocation:{rootExists:false,candidates:[{path:"D:/Obsidian/Sources",name:"Sources"}]}};
 async function openVaultSettings(state=renamedVaultStorage){
   invoke.mockImplementation(async(command:string)=>command==="list_collection_items"?initial:command==="get_collection_storage"?state:[]);
-  await mount();await click("同步与连接");await click("设置");await click("保存位置与同步频率");
+  await mount();await openSyncDetails();await click("设置");await click("保存位置与同步频率");
 }
 it("offers missing-vault recovery without automatically adopting a suggested folder",async()=>{
   await openVaultSettings();
@@ -570,7 +657,7 @@ it("coalesces repeated recovery clicks while native relocation is pending",async
   await act(async()=>finish({location:"D:/Obsidian/Sources",warning:null}));
 });
 it("keeps invalid settings open and permits disabling the interval", async () => {
-  await mount(); await click("同步与连接"); await click("设置");await click("保存位置与同步频率"); await input(container.querySelector<HTMLInputElement>("#collection-interval")!,"0");
+  await mount(); await openSyncDetails(); await click("设置");await click("保存位置与同步频率"); await input(container.querySelector<HTMLInputElement>("#collection-interval")!,"0");
   invoke.mockImplementation(async(command:string)=>{if(command==="save_collection_storage")throw "目录不可写";return command==="get_collection_storage"?storage:initial;});
   await click("保存设置");
   expect(invoke).toHaveBeenCalledWith("save_collection_storage",{config:{...storage.config,autoSyncMinutes:0}});
@@ -578,7 +665,7 @@ it("keeps invalid settings open and permits disabling the interval", async () =>
   expect(container.querySelector('dialog[open] [role="alert"]')?.textContent).toBe("目录不可写");
 });
 it("keeps likes connections separate from bookmarks", async () => {
-  await mount();await click("同步与连接");
+  await mount();await openSyncDetails();
   expect(container.querySelector(".collection-sync-log")?.textContent).toContain("X 喜欢");
   await click("设置");await expand("连接管理");await click("连接 X");
   expect(container.querySelector("dialog h2")?.textContent).toBe("连接 X 喜欢");
@@ -589,11 +676,9 @@ it("keeps likes connections separate from bookmarks", async () => {
 });
 it("persists custom views and applies filters and sort to backend pagination", async () => {
   await mount();
-  await click("筛选");
-  await input(container.querySelector<HTMLSelectElement>('[aria-label="阅读状态筛选"]')!,"unread");
-  await input(container.querySelector<HTMLSelectElement>('[aria-label="内容类型筛选"]')!,"video");
-  await click("排序");
-  await input(container.querySelector<HTMLSelectElement>('[aria-label="排序方式"]')!,"published");
+  await act(async () => container.querySelector('[aria-label="阅读导航"] [data-kind="unread"]')!.closest("button")!.click());
+  await click("筛选"); await click("有视频");
+  await click("排序"); await click("发布时间");
   await act(async()=>vi.advanceTimersByTimeAsync(160));
   expect(invoke).toHaveBeenCalledWith("get_collection_storage");
   expect(invoke).toHaveBeenCalledWith("list_collection_items",expect.objectContaining({status:"unread",media:"video",sort:"published",source:"all",offset:0}));
@@ -602,7 +687,7 @@ it("persists custom views and applies filters and sort to backend pagination", a
   await click("创建视图");
   await act(async()=>root.unmount());root=createRoot(container);await mount();
   expect(container.querySelector('[aria-label="阅读导航"]')?.textContent).toContain("视频待读");
-  expect(container.querySelector('[aria-label="当前筛选条件"]')?.textContent).toContain("有视频");
+  expect(container.querySelector('[aria-label="当前筛选条件"]')?.textContent).toContain("含视频");
 });
 it("opens a reading pane without changing read status", async()=>{
   const item={key:"x:1",collectedAt:1791165600000,read:false,savedMedia:[],post:{id:"1",text:"收藏标题\n正文内容 https://example.com/article",authorName:"作者",authorHandle:"reader",publishedAt:"2026-10-05",url:"https://x.com/reader/status/1",quotedText:"",contentStatus:"complete",links:[],media:[],source:"bookmarks"}};
@@ -668,7 +753,7 @@ it("persists gallery display controls and applies property visibility and condit
 it("keeps frequency in the unified menu and syncs each source independently",async()=>{
  const page={...initial,sources:[...initial.sources.map(s=>({...s,connected:true})),{id:"telegram",count:0,connected:true,paired:true,canResume:false,status:""}]};
  invoke.mockImplementation(async(command:string)=>command==="list_collection_items"?page:command==="get_collection_storage"?storage:"");
- await mount();expect(container.querySelector(".collection-auto-label")).toBeNull();await click("同步与连接");
+ await mount();expect(container.querySelector(".collection-auto-label")).toBeNull();await openSyncDetails();
  expect(container.querySelector(".collection-sync-popover .collection-auto-label")?.textContent).toContain("30");
  expect(container.querySelectorAll(".collection-sync-log").length).toBe(1);
  const actions=[...container.querySelectorAll<HTMLButtonElement>('.collection-source-sync button[aria-label^="立即同步"]')];
@@ -696,7 +781,7 @@ it("allows local status and tag edits while X is fetching and exporting",async()
 it("allows frequency changes while protecting the active save destination",async()=>{
  const active={...storage,running:true,job:{id:1,running:true,phase:"saving",source:"bookmarks",outcome:""}};
  invoke.mockImplementation(async(command:string)=>command==="list_collection_items"?{...initial,running:true}:command==="get_collection_storage"?active:"频率已保存");
- await mount();await click("同步与连接");await click("设置");await click("保存位置与同步频率");
+ await mount();await openSyncDetails();await click("设置");await click("保存位置与同步频率");
  const dialog=container.querySelector<HTMLDialogElement>("dialog[open]")!;
  expect(dialog.querySelector<HTMLInputElement>('input[type="radio"]')!.disabled).toBe(true);
  const interval=dialog.querySelector<HTMLInputElement>("#collection-interval")!;expect(interval.disabled).toBe(false);
@@ -708,7 +793,7 @@ it("keeps Telegram manual sync and tdl setup available during an X run",async()=
  const page={...initial,running:true,sources:[...initial.sources,{id:"telegram",count:1,connected:true,paired:true,canResume:false,status:""}]};
  const active={...storage,running:true,telegramRunning:false,tdl:{installed:true,version:"0.20.4",enabled:false,ready:false,running:false,phase:"",status:"",bytes:0,proxy:""}};
  invoke.mockImplementation(async(command:string)=>command==="list_collection_items"?page:command==="get_collection_storage"?active:"");
- await mount();await click("同步与连接");
+ await mount();await openSyncDetails();
  const actions=[...container.querySelectorAll<HTMLButtonElement>('.collection-source-sync button[aria-label^="立即同步"]')];expect(actions[0].disabled).toBe(true);expect(actions[1].disabled).toBe(true);expect(actions[2].disabled).toBe(false);
  await act(async()=>actions[2].click());expect(invoke).toHaveBeenCalledWith("sync_x_bookmarks",{source:"telegram",restart:true});
  await click("设置");await expand("Telegram 历史与大附件");await click("登录 Telegram 账号");expect(invoke).toHaveBeenCalledWith("login_telegram_tdl",{method:"qr"});
@@ -722,7 +807,7 @@ it("keeps storage settings in sync management and removes duplicate toolbar cont
  expect(container.querySelector('[aria-label="补写与重试附件"]')).toBeNull();
  const filter=container.querySelector('[aria-label="筛选"]')!;
  expect(filter.querySelector(".lucide-list-filter")).toBeTruthy();expect(filter.querySelector("small")).toBeNull();
- await click("同步与连接");await click("设置");expect(container.querySelector('.collection-sync-popover [aria-label="保存位置与同步频率"]')).toBeTruthy();
+ await openSyncDetails();await click("设置");expect(container.querySelector('.collection-sync-popover [aria-label="保存位置与同步频率"]')).toBeTruthy();
  await click("保存位置与同步频率");expect(container.querySelectorAll("dialog")[1].open).toBe(true);
 });
 it("resizes each table column without changing its neighbors and persists widths per view",async()=>{
@@ -745,48 +830,41 @@ it("resizes each table column without changing its neighbors and persists widths
  expect(container.querySelectorAll<HTMLTableColElement>("col")[1].style.width).toBe("524px");
 });
 
-it("keeps sorting independent from filters and layout while persisting the current view",async()=>{
- await mount();await click("筛选");
- expect(container.querySelector('.collection-query-tools [aria-label="排序方式"]')).toBeNull();
- expect(container.querySelector('.collection-query-tools [aria-label="切换排序方向"]')).toBeNull();
- const filter=container.querySelector('[aria-label="筛选"]')!;
- expect(filter.closest('.task-secondary-actions')?.querySelector('[aria-label="排序"]')).toBeTruthy();
- await input(container.querySelector<HTMLSelectElement>('[aria-label="阅读状态筛选"]')!,"unread");
- await click("排序");
- expect(container.querySelector('[role="dialog"][aria-label="排序设置"]')).toBeTruthy();
- await input(container.querySelector<HTMLSelectElement>('[aria-label="排序方式"]')!,"published");
- await input(container.querySelector<HTMLSelectElement>('[aria-label="排序方向"]')!,"asc");
+it("applies reference filters immediately and preserves scope, layout and sort when clearing",async()=>{
+ await mount();
+ await act(async () => container.querySelector<HTMLButtonElement>(".collection-chip-likes")!.click());
+ await click("筛选"); await click("近 7 天");
+ expect(document.querySelector('.reading-reference-popover')).toBeNull();
+ await click("筛选"); await click("有视频");
+ expect(container.querySelector(".reading-reference-filter-strip")?.textContent).toContain("近 7 天含视频");
+ await click("排序"); await click("发布时间");
+ await click("排序"); await click("发布时间，降序");
  await act(async()=>vi.advanceTimersByTimeAsync(160));
- expect(invoke).toHaveBeenCalledWith("list_collection_items",expect.objectContaining({sort:"published",ascending:true,status:"unread",offset:0}));
- await click("清除筛选");await act(async()=>vi.advanceTimersByTimeAsync(160));
- expect(invoke).toHaveBeenCalledWith("list_collection_items",expect.objectContaining({sort:"published",ascending:true,status:"all",offset:0}));
- await click("表格");expect(container.querySelector('[aria-label="排序设置"]')).toBeNull();
- await click("排序");expect(container.querySelector<HTMLSelectElement>('[aria-label="排序方式"]')?.value).toBe("published");
- await click("列表");await click("排序");
- expect(container.querySelector<HTMLSelectElement>('[aria-label="排序方式"]')?.value).toBe("published");
- expect(container.querySelector<HTMLSelectElement>('[aria-label="排序方向"]')?.value).toBe("asc");
+ expect(invoke).toHaveBeenCalledWith("list_collection_items",expect.objectContaining({sort:"published",ascending:true,source:"likes",media:"video",offset:0,filters:expect.objectContaining({collectedWithinDays:7})}));
+ await click("清除"); await act(async()=>vi.advanceTimersByTimeAsync(160));
+ expect(invoke).toHaveBeenCalledWith("list_collection_items",expect.objectContaining({sort:"published",ascending:true,source:"likes",media:"all",offset:0}));
+ expect(container.querySelector(".reading-reference-filter-strip")).toBeNull();
+ await click("表格"); await click("排序");
+ expect(document.querySelector('[aria-label="发布时间，升序"]')).toBeTruthy();
  await act(async()=>root.unmount());root=createRoot(container);await mount();await click("排序");
- expect(container.querySelector<HTMLSelectElement>('[aria-label="排序方式"]')?.value).toBe("published");
- expect(container.querySelector<HTMLSelectElement>('[aria-label="排序方向"]')?.value).toBe("asc");
- await click("重置排序");await act(async()=>vi.advanceTimersByTimeAsync(160));
- expect(invoke).toHaveBeenCalledWith("list_collection_items",expect.objectContaining({sort:"collected",ascending:false,status:"all"}));
+ expect(document.querySelector('[aria-label="发布时间，升序"]')).toBeTruthy();
 });
 
 it("dismisses the sort popover on escape or outside input and restores trigger focus",async()=>{
  await mount();await click("排序");
- const field=container.querySelector<HTMLSelectElement>('[aria-label="排序方式"]')!;
- expect(document.activeElement).toBe(field);
- await act(async()=>field.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true})));
- expect(container.querySelector('[aria-label="排序设置"]')).toBeNull();
+ const option=document.querySelector<HTMLButtonElement>('[aria-label="收集时间，降序"]')!;
+ expect(document.activeElement).toBe(option);
+ await act(async()=>option.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true,cancelable:true})));
+ expect(document.querySelector('[role="dialog"][aria-label="排序"]')).toBeNull();
  expect(document.activeElement).toBe(container.querySelector('[aria-label="排序"]'));
  await click("排序");
  await act(async()=>container.querySelector('[aria-label="筛选"]')!.dispatchEvent(new MouseEvent("pointerdown",{bubbles:true})));
- expect(container.querySelector('[aria-label="排序设置"]')).toBeNull();
+ expect(document.querySelector('[role="dialog"][aria-label="排序"]')).toBeNull();
  expect(container.querySelector('[aria-label="排序"]')?.getAttribute("aria-expanded")).toBe("false");
 });
 
 it("supports all fields and persists several ordered sort conditions",async()=>{
- await mount();await click("排序");
+ await mount();await openAdvancedSort();
  const field=container.querySelector<HTMLSelectElement>('[aria-label="排序方式"]')!;
  expect([...field.options].map(option=>option.textContent)).toEqual(["内容","状态","标签","来源","作者","发布时间","收藏时间","附件","喜欢","保存到"]);
  await input(field,"status");await input(container.querySelector<HTMLSelectElement>('[aria-label="排序方向"]')!,"asc");
@@ -800,7 +878,7 @@ it("supports all fields and persists several ordered sort conditions",async()=>{
  await act(async()=>container.querySelector('[aria-label="调整第 3 条排序优先级"]')!.dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowUp",bubbles:true})));
  await act(async()=>vi.advanceTimersByTimeAsync(160));
  expect(invoke).toHaveBeenCalledWith("list_collection_items",expect.objectContaining({sorts:[expected[0],expected[2],expected[1]]}));
- await act(async()=>root.unmount());root=createRoot(container);await mount();await click("排序");
+ await act(async()=>root.unmount());root=createRoot(container);await mount();await openAdvancedSort();
  expect(container.querySelector<HTMLSelectElement>('[aria-label="第 2 条排序属性"]')?.value).toBe("published");
  await click("删除第 2 条排序");await act(async()=>vi.advanceTimersByTimeAsync(160));
  expect(invoke).toHaveBeenCalledWith("list_collection_items",expect.objectContaining({sorts:[expected[0],expected[1]]}));
@@ -809,7 +887,7 @@ it("supports all fields and persists several ordered sort conditions",async()=>{
 it("keeps failed tdl installation retryable and blocks duplicate installation",async()=>{
  let rejectInstall!:(reason:string)=>void;
  invoke.mockImplementation((command:string)=>command==="install_telegram_tdl"?new Promise((_,reject)=>{rejectInstall=reject;}):Promise.resolve(command==="list_collection_items"?initial:command==="get_collection_storage"?storage:""));
- await mount();await click("同步与连接");await click("设置");await expand("Telegram 历史与大附件");await click("安装 tdl");
+ await mount();await openSyncDetails();await click("设置");await expand("Telegram 历史与大附件");await click("安装 tdl");
  const installing=[...container.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="正在处理…")!;
  expect(installing.disabled).toBe(true);await act(async()=>installing.click());
  expect(invoke.mock.calls.filter(([name])=>name==="install_telegram_tdl")).toHaveLength(1);
@@ -821,7 +899,7 @@ it("keeps failed tdl installation retryable and blocks duplicate installation",a
 it("shows tdl login handoff while allowing its separate pause action",async()=>{
  const active={...storage,tdl:{installed:true,version:"0.20.4",enabled:true,ready:false,running:true,phase:"login",status:"请完成登录",bytes:0,proxy:""}};
  invoke.mockImplementation(async(command:string)=>command==="list_collection_items"?initial:command==="get_collection_storage"?active:"");
- await mount();await click("同步与连接");
+ await mount();await openSyncDetails();
  await click("设置");await expand("Telegram 历史与大附件");
  expect(container.textContent).toContain("已打开 tdl 验证码登录窗口");
  expect(container.querySelector<HTMLSelectElement>('[aria-label="tdl 登录方式"]')?.disabled).toBe(true);
@@ -865,7 +943,7 @@ it("shows reference saving as automatic and reuses the existing attachment sessi
  const operation={key:lifecycleItem.key,action:"move",target:"tasks",phase:"ready",error:"",plan};
  invoke.mockImplementation(async(command:string)=>command==="list_collection_items"?{...initial,items:[{...lifecycleItem,operation}],total:1,matched:1}:command==="get_collection_storage"?storage:command==="collection_library_operations"?[operation]:[]);
  await mount();await act(async()=>container.querySelector<HTMLElement>(".collection-row")!.click());
- await click("同步与连接");await click("处理记录");await click("查看方案");
+ await openSyncDetails();await click("处理记录");await click("查看方案");
  const dialog=container.querySelector('dialog[open]')!;
  expect(dialog.textContent).toContain("保存为滴答笔记");expect(dialog.textContent).toContain(url);
  expect(dialog.querySelector("pre")?.textContent).toBe("原文第一段\n\n最后一条回复");
@@ -879,7 +957,7 @@ it("shows archived videos as preserved files instead of an analysis failure",asy
  const operation={key:lifecycleItem.key,action:"move",target:"car",phase:"ready",error:"",plan};
  invoke.mockImplementation(async(command:string)=>command==="list_collection_items"?{...initial,items:[{...lifecycleItem,operation}],total:1,matched:1}:command==="get_collection_storage"?storage:command==="collection_library_operations"?[operation]:[]);
  await mount();await act(async()=>container.querySelector<HTMLElement>(".collection-row")!.click());
- await click("同步与连接");await click("处理记录");await click("查看方案");
+ await openSyncDetails();await click("处理记录");await click("查看方案");
  const dialog=container.querySelector('dialog[open]')!;
  expect(dialog.textContent).toContain("Car / 日记 / 2026-10-06");
  expect(dialog.querySelectorAll("li")).toHaveLength(2);
@@ -893,7 +971,7 @@ it("shows Craft oversized files as skipped instead of upload failures",async()=>
  const operation={key:lifecycleItem.key,action:"move",target:"car",phase:"ready",error:"",plan};
  invoke.mockImplementation(async(command:string)=>command==="list_collection_items"?{...initial,items:[{...lifecycleItem,operation}],total:1,matched:1}:command==="get_collection_storage"?storage:command==="collection_library_operations"?[operation]:[]);
  await mount();await act(async()=>container.querySelector<HTMLElement>(".collection-row")!.click());
- await click("同步与连接");await click("处理记录");await click("查看方案");
+ await openSyncDetails();await click("处理记录");await click("查看方案");
  const dialog=container.querySelector('dialog[open]')!;
  expect(dialog.textContent).toContain("Car / 日记 / 2026-10-06");
  expect(dialog.querySelectorAll("li")).toHaveLength(2);
@@ -914,7 +992,7 @@ it("cancels an older failed reference save and removes its processing record",as
  expect(invoke.mock.calls.filter(([command])=>command==="cancel_collection_conversion")).toHaveLength(1);
  await act(async()=>complete());
  expect(container.querySelector("dialog[open]")).toBeNull();
- await click("同步与连接");
+ await openSyncDetails();
  expect(container.textContent).toContain("方案已取消，原内容和附件保留");
  expect(container.textContent).not.toContain("查看处理记录");
  expect(invoke).not.toHaveBeenCalledWith("approve_collection_conversion",expect.anything());
@@ -1032,7 +1110,7 @@ it("filters and refreshes Dida later reading through the connected library while
   await mount(); await act(async () => container.querySelector<HTMLButtonElement>(".collection-chip-dida")!.click());
   await act(async () => vi.advanceTimersByTimeAsync(160));
   expect(invoke).toHaveBeenCalledWith("list_collection_items", expect.objectContaining({ source: "dida" }));
-  await click("同步与连接");
+  await openSyncDetails();
   const sync = [...container.querySelectorAll<HTMLButtonElement>('.collection-source-sync button[aria-label^="立即同步"]')].find(button => button.textContent === "滴答稍后读")!;
   expect(sync.disabled).toBe(false); await act(async () => sync.click());
   expect(invoke).toHaveBeenCalledWith("sync_x_bookmarks", { source: "dida", restart: true });
@@ -1125,7 +1203,7 @@ it("applies saved condition colors in all four layouts while retaining the exist
 it("defaults local intake to manual and saves its interval separately from remote sync",async()=>{
   const localStorage={...storage,config:{...storage.config,mode:"obsidian",vaultPath:"D:/Sources"}};
   invoke.mockImplementation(async(command:string)=>command==="list_collection_items"?initial:command==="get_collection_storage"?localStorage:"同步频率已保存");
-  await mount();await click("同步与连接");await click("设置");await click("保存位置与同步频率");
+  await mount();await openSyncDetails();await click("设置");await click("保存位置与同步频率");
   const input=container.querySelector<HTMLInputElement>("#local-sources-interval")!;
   expect(input.value).toBe("0");
   await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(input,"120");input.dispatchEvent(new Event("input",{bubbles:true}));});
@@ -1138,7 +1216,7 @@ it("defaults local intake to manual and saves its interval separately from remot
 it("checks local originals manually without triggering network sync or attachment exports",async()=>{
   const localStorage={...storage,config:{...storage.config,mode:"obsidian",vaultPath:"D:/Sources",localSourcesMinutes:0}};
   invoke.mockImplementation(async(command:string)=>command==="list_collection_items"?initial:command==="get_collection_storage"?localStorage:command==="check_local_reading_sources"?{files:8,changed:2,errors:0}:[]);
-  await mount();await click("同步与连接");await click("设置");await click("保存位置与同步频率");
+  await mount();await openSyncDetails();await click("设置");await click("保存位置与同步频率");
   await click("立即检查本地素材");
   expect(invoke).toHaveBeenCalledWith("check_local_reading_sources");
   expect(invoke.mock.calls.some(([command])=>["sync_x_bookmarks","save_collection_storage","export_collections_to_obsidian"].includes(command))).toBe(false);

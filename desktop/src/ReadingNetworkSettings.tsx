@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useVisiblePolling } from "./useVisiblePolling";
 type Mode = "any" | "unmetered" | "wifi";
-type NetworkState = { mode: Mode; network: { supported: boolean; connected: boolean | null; kind: string; metered: boolean | null; restricted: boolean }; allowed: boolean; reason: string };
+export type ReadingNetworkState = { mode: Mode; network: { supported: boolean; connected: boolean | null; kind: string; metered: boolean | null; restricted: boolean }; allowed: boolean; reason: string };
 const kind: Record<string, string> = { wifi: "Wi-Fi", cellular: "移动网络", ethernet: "有线网络", other: "其他网络", vpn: "VPN", unknown: "暂无法确认" };
 export function ReadingNetworkSettings({ active = true }: { active?: boolean } = {}) {
-  const [state, setState] = useState<NetworkState | null>(null), [draft, setDraft] = useState<Mode>("any");
+  const [state, setState] = useState<ReadingNetworkState | null>(null), [draft, setDraft] = useState<Mode>("any");
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const [reload, setReload] = useState(0);
   const version = useRef(0);
@@ -13,7 +13,7 @@ export function ReadingNetworkSettings({ active = true }: { active?: boolean } =
     let active = true;
     const load = (initial: boolean) => {
       const observed = version.current;
-      void invoke<NetworkState>("get_reading_network_policy").then(next => {
+      void invoke<ReadingNetworkState>("get_reading_network_policy").then(next => {
         if (!active || observed !== version.current || !next?.network) return;
         setState(next); if (initial) { setDraft(next.mode); setError(""); }
       }).catch(e => { if (active && observed === version.current && initial) setError(String(e)); });
@@ -23,12 +23,12 @@ export function ReadingNetworkSettings({ active = true }: { active?: boolean } =
   }, [reload]);
   useVisiblePolling(async () => {
     const observed = version.current;
-    const next = await invoke<NetworkState>("get_reading_network_policy");
+    const next = await invoke<ReadingNetworkState>("get_reading_network_policy");
     if (observed === version.current && next?.network) setState(next);
   }, active && Boolean(state), 5000, { initialDelayMs: 5000 });
   const save = async () => {
     if (busy) return; setBusy(true); setError(""); setNotice("");
-    try { const next = await invoke<NetworkState>("update_reading_network_policy", { mode: draft }); version.current++; setState(next); setDraft(next.mode); setNotice("阅读网络策略已保存"); }
+    try { const next = await invoke<ReadingNetworkState>("update_reading_network_policy", { mode: draft }); version.current++; setState(next); setDraft(next.mode); setNotice("阅读网络策略已保存"); }
     catch (e) { setError(String(e)); } finally { setBusy(false); }
   };
   return <section className="cloud-sync-card" aria-label="阅读网络策略"><h3>阅读网络</h3>

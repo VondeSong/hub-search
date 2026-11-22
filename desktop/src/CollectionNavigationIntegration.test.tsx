@@ -62,7 +62,7 @@ async function mount(sidebarProps?: ComponentProps<typeof DesktopSidebar>) {
   await act(async () => vi.advanceTimersByTimeAsync(160));
 }
 async function clickButton(label: string) {
-  const button = [...container.querySelectorAll<HTMLButtonElement>("button")].find(element => element.getAttribute("aria-label") === label || element.textContent?.trim() === label);
+  const button = [...container.querySelectorAll<HTMLButtonElement>("button"), ...document.querySelectorAll<HTMLButtonElement>(".reading-reference-popover button")].find(element => element.getAttribute("aria-label") === label || element.textContent?.trim() === label);
   expect(button, label).toBeTruthy(); await act(async () => button!.click());
 }
 async function clickNavigation(label: string) {
@@ -114,25 +114,25 @@ it("passes a saved-copy library filter while preserving source and revealing its
   expect(libraryButton).toBeTruthy(); await act(async () => libraryButton!.click());
   await act(async () => vi.advanceTimersByTimeAsync(160));
   expect(latestQuery()).toMatchObject({ source: "likes", status: "all", filters: { libraryId: "craft-main" } });
-  expect(container.querySelector('[aria-label="当前筛选条件"]')?.textContent).toContain("已保存副本：Main");
+  expect(container.querySelector(".reading-view-title h2")?.textContent).toBe("Main");
   expect(localCallsOnly()).toBe(true);
 });
 
 it("saves explicit query conditions and later layout changes in the named view without writing content", async () => {
   await mount(); await clickNavigation("待读"); await clickButton("筛选");
-  await changeField("内容类型筛选", "video"); await changeField("收集时间筛选", "7");
+  await clickButton("有视频"); await clickButton("筛选"); await clickButton("近 7 天");
   // Changing scope refreshes the page and its available tags before a real
   // user can select an option from the new query's tag picker.
   await act(async () => vi.advanceTimersByTimeAsync(160));
-  expect([...container.querySelectorAll<HTMLOptionElement>('[aria-label="阅读标签筛选"] option')].some(option => option.value === "AI")).toBe(true);
-  await changeField("阅读标签筛选", "AI");
+  await clickButton("筛选"); await clickButton("#AI");
+  await clickButton("筛选"); await clickButton("#阅读");
   await clickButton("新建视图"); await changeField("新视图名称", "AI 视频待读"); await clickButton("创建视图");
   await clickButton("画廊");
   expect(container.querySelector(".collection-nav-view-changes")).toBeTruthy();
   await clickButton("更新视图");
   expect(container.querySelector(".collection-nav-view-changes")).toBeNull();
   await clickNavigation("全部内容"); await clickNavigation("AI 视频待读");
-  expect(latestQuery()).toMatchObject({ source: "all", status: "unread", media: "video", filters: { tags: ["AI"], collectedWithinDays: 7 } });
+  expect(latestQuery()).toMatchObject({ source: "all", status: "unread", media: "video", filters: { tags: ["AI", "阅读"], collectedWithinDays: 7 } });
   expect(container.querySelector('.task-view-switch button[aria-pressed="true"]')?.textContent).toBe("画廊");
   expect(container.querySelector(".collection-view-modified")).toBeNull();
   expect(localCallsOnly()).toBe(true);

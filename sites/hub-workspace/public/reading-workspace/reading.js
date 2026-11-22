@@ -674,7 +674,7 @@
       document.getElementById('filter-chips').innerHTML = chips.map(c => `
         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-black/[0.08] text-neutral-700 text-[11.5px]">
           ${escapeHtml(c.l)}
-          <button data-rm-filter="${c.k}" class="text-neutral-400 hover:text-neutral-800"><i data-lucide="x" class="w-2.5 h-2.5"></i></button>
+          <button data-rm-filter="${c.k}" aria-label="移除此筛选" class="text-neutral-400 hover:text-neutral-800"><i data-lucide="x" class="w-2.5 h-2.5"></i></button>
         </span>`).join('');
     }
 
@@ -1239,6 +1239,17 @@
     // =========================================================================
     // 4. POPOVERS & MODALS
     // =========================================================================
+    let popoverOpener = null;
+    let readingModalOpener = null;
+
+    function focusReadingControl(card, label, modal) {
+      card.setAttribute('role', 'dialog');
+      card.setAttribute('aria-label', label);
+      card.setAttribute('tabindex', '-1');
+      if (modal) card.setAttribute('aria-modal', 'true');
+      card.focus({preventScroll: true});
+    }
+
     function openPopover(anchor, html, width = 260) {
       const root = document.getElementById('popover-root');
       const card = document.getElementById('popover-card');
@@ -1252,19 +1263,47 @@
       if (top + 340 > window.innerHeight) top = Math.max(12, r.top - 300);
       card.style.left = left + 'px';
       card.style.top = top + 'px';
+      if (anchor.id === 'btn-filter' || anchor.id === 'btn-sort') {
+        popoverOpener = anchor;
+        anchor.setAttribute('aria-expanded', 'true');
+        focusReadingControl(card, anchor.title, false);
+      }
       if (window.lucide) lucide.createIcons();
     }
-    function closePopover() { document.getElementById('popover-root').classList.add('hidden'); }
+    function closePopover() {
+      document.getElementById('popover-root').classList.add('hidden');
+      const card = document.getElementById('popover-card');
+      card.removeAttribute('role');
+      card.removeAttribute('aria-label');
+      card.removeAttribute('tabindex');
+      if (popoverOpener) {
+        popoverOpener.setAttribute('aria-expanded', 'false');
+        popoverOpener.focus({preventScroll: true});
+        popoverOpener = null;
+      }
+    }
 
-    function openModal(html, maxW = 540) {
+    function openModal(html, maxW = 540, label = "") {
       const root = document.getElementById('modal-root');
       const card = document.getElementById('modal-card');
       card.style.maxWidth = maxW + 'px';
       card.innerHTML = html;
       root.classList.remove('hidden');
+      if (label) {
+        readingModalOpener = document.activeElement;
+        focusReadingControl(card, label, true);
+      }
       if (window.lucide) lucide.createIcons();
     }
-    function closeModal() { document.getElementById('modal-root').classList.add('hidden'); }
+    function closeModal() {
+      document.getElementById('modal-root').classList.add('hidden');
+      const card = document.getElementById('modal-card');
+      ['role','aria-label','aria-modal','tabindex'].forEach(name => card.removeAttribute(name));
+      if (readingModalOpener) {
+        readingModalOpener.focus({preventScroll: true});
+        readingModalOpener = null;
+      }
+    }
 
     const SCENARIOS = [
       { id: 1, title: '1. 空库首次进入 vs 1,248 条高密度态', run: () => { state.emptyMode = true; state.activeDemoName = '场景 1 · 空库'; renderAll(); } },
@@ -1376,7 +1415,7 @@
       openModal(`
         <div class="px-5 py-4 hair-b flex items-center justify-between">
           <div><div class="text-[14px] font-semibold text-neutral-900">来源同步与连接</div><div class="text-[12px] text-neutral-400">独立于跨设备云同步</div></div>
-          <button data-close-modal class="p-1 text-neutral-400"><i data-lucide="x" class="w-4 h-4"></i></button>
+          <button data-close-modal aria-label="关闭" class="p-1 text-neutral-400"><i data-lucide="x" class="w-4 h-4"></i></button>
         </div>
         <div class="p-4 divide-y divide-black/[0.05] text-[13px] overflow-y-auto">
           ${list.map(r => {
@@ -1390,14 +1429,14 @@
                 <button data-run-sync="${r.k}" class="px-3 py-1 rounded-[7px] border border-black/10 hover:bg-neutral-50 text-[12px] text-neutral-700 font-medium whitespace-nowrap">${st.status==='warn'?'重连会话':'立即同步'}</button>
               </div>`;
           }).join('')}
-        </div>`);
+        </div>`, 540, '来源同步与连接');
     }
 
     function openCloudModal() {
       openModal(`
         <div class="px-5 py-4 hair-b flex items-center justify-between">
           <div><div class="text-[14px] font-semibold text-neutral-900">云同步</div><div class="text-[12px] text-neutral-400">已取消每轮/每日流量额度门禁，按网络与文件规则传输</div></div>
-          <button data-close-modal class="p-1 text-neutral-400"><i data-lucide="x" class="w-4 h-4"></i></button>
+          <button data-close-modal aria-label="关闭" class="p-1 text-neutral-400"><i data-lucide="x" class="w-4 h-4"></i></button>
         </div>
         <div class="p-5 space-y-4 text-[13px]">
           <div class="p-3.5 rounded-[10px] bg-[#FAFAFA] hair-box flex items-center justify-between">
@@ -1407,7 +1446,7 @@
           <div class="text-[12.5px] text-neutral-600 leading-relaxed">
             <strong class="text-neutral-900">滴答来源清理保护：</strong>云同步启用时默认关闭自动清理，需完整云恢复 + 原设备凭证 + 删除前复核全部通过。
           </div>
-        </div>`, 480);
+        </div>`, 480, '云同步');
     }
 
     function openViewsMgr() {
@@ -1806,10 +1845,12 @@
       if (t.id === 'btn-sync-modal' || t.id === 'btn-empty-sync') { openSyncModal(); return; }
       if (t.id === 'btn-empty-demo') { state.emptyMode = false; state.activeDemoName = ''; renderAll(); return; }
       if (t.id === 'btn-cloud-modal') { openCloudModal(); return; }
+      if (t.id === 'btn-cloud-now' && state.offlineMode) { toast('当前离线，联网后可重试云同步', 'warn'); return; }
       if (t.id === 'btn-cloud-now') { state.cloudSync.lastSync = '刚刚'; closeModal(); renderAll(); toast('云同步完成', 'ok'); return; }
       if (t.dataset.runSync) {
         const k = t.dataset.runSync;
-        if (k === 'dida') { state.sourceSync.dida.status = 'ok'; state.sourceSync.dida.note = ''; toast('滴答会话已重连', 'ok'); }
+        if (state.offlineMode && k !== 'obsidian') { toast('当前离线，联网后可重试来源同步', 'warn'); return; }
+        if (k === 'dida' && state.sourceSync.dida.status === 'warn') { state.sourceSync.dida.status = 'ok'; state.sourceSync.dida.note = ''; toast('滴答会话已重连', 'ok'); }
         else toast('阶段：读来源 → 存本机 → 补附件（已完成）', 'ok');
         state.sourceSync[k].last = '刚刚'; closeModal(); renderAll(); return;
       }
@@ -1900,7 +1941,17 @@
 
     // Keyboard Shortcuts
     document.addEventListener('keydown', (e) => {
-      if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+      if (e.key === 'Tab' && readingModalOpener) {
+        const card = document.getElementById('modal-card');
+        const buttons = Array.from(card.querySelectorAll('button:not(:disabled)'));
+        const first = buttons[0], last = buttons.at(-1);
+        if (first && ((e.shiftKey && (document.activeElement === first || document.activeElement === card)) || (!e.shiftKey && document.activeElement === last))) {
+          e.preventDefault();
+          (e.shiftKey ? last : first).focus();
+        }
+        return;
+      }
+      if (e.key !== 'Escape' && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
       if (e.key === 'Escape') {
         if (!document.getElementById('modal-root').classList.contains('hidden')) { closeModal(); return; }
         if (!document.getElementById('popover-root').classList.contains('hidden')) { closePopover(); return; }

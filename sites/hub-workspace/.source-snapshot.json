@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "cee6dd09f67fdb85d78810646d8023aa5a909e54",
-  "published_version": 154,
-  "deployment_id": "appgdep_6b02b37c0afc819183d4486730c6ace5",
+  "source_commit": "756b369f21542259abd9687a9feee5becb8041ce",
+  "published_version": 155,
+  "deployment_id": "appgdep_6b02b5eef2408191adc78ee4455ec5ba",
   "files": {
     ".gitignore": {
       "sha256": "ca0e1575efb181d784f15bf6c86e3c012fd5c7ede4daa34b924d0d8b590d4e77",
@@ -1258,9 +1258,9 @@
       "bytes": 133251
     },
     "public/reading-workspace/index.html": {
-      "sha256": "68a33c9866d43223bccb51f3f559d51a1c61e35feffc0753cd5ef27a64f2347a",
+      "sha256": "170bb508b18524bf2ce8e5feecb8e688278bd0ed462ef3b1351348b08163e4a1",
       "mode": "100644",
-      "bytes": 15828
+      "bytes": 15964
     },
     "public/reading-workspace/lucide.LICENSE": {
       "sha256": "1e7290b35280a048667bbf0ebabac1c7fd52a75300e8b2946ac165715997f2bc",
@@ -1283,9 +1283,9 @@
       "bytes": 7955
     },
     "public/reading-workspace/reading.js": {
-      "sha256": "f44d1a0c61e8b963cf0b84e6cb86fbf551850423fa6e4b5f94523a66010a07e8",
+      "sha256": "b5fc9e3a01e56b6479c547c4888f80e628767bf344490c7a6f5014f51a1763c1",
       "mode": "100644",
-      "bytes": 124590
+      "bytes": 126932
     },
     "scripts/assistant-answer-check.mjs": {
       "sha256": "eec1ec20fffed18411309ae94f10bf04dbac503394ab0800205d82c976704797",
@@ -1488,5 +1488,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-22T09:20:51.918782+00:00"
+  "imported_at": "2026-11-22T09:30:49.037512+00:00"
 }

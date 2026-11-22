@@ -15,7 +15,7 @@ export function normalizeCollectionSorts(value:unknown,field:CollectionSortField
     return {id,field:rule.field,ascending:rule.ascending===true};
   });
 }
-export function CollectionSort({rules,onChange}:{rules:CollectionSortRule[];onChange:(rules:CollectionSortRule[])=>void}) {
+export function CollectionSort({rules,onChange,embedded=false}:{rules:CollectionSortRule[];onChange:(rules:CollectionSortRule[])=>void;embedded?:boolean}) {
   const [open,setOpen]=useState(false);
   const root=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null);
   useEffect(()=>{
@@ -27,8 +27,9 @@ export function CollectionSort({rules,onChange}:{rules:CollectionSortRule[];onCh
   const update=(id:string,patch:Partial<CollectionSortRule>)=>onChange(rules.map(rule=>rule.id===id?{...rule,...patch}:rule));
   const move=(from:number,to:number)=>{if(to<0||to>=rules.length||from===to)return;const next=[...rules];next.splice(to,0,next.splice(from,1)[0]);onChange(next);};
   const add=()=>{const field=(Object.keys(collectionSortFields) as CollectionSortField[]).find(field=>!rules.some(rule=>rule.field===field));if(field)onChange([...rules,{id:crypto.randomUUID(),field,ascending:true}]);};
-  return <div ref={root} className="task-tool-popover-wrap collection-sort-wrap" onKeyDown={event=>{if(open&&event.key==="Escape"){event.preventDefault();event.stopPropagation();close();}}}>
-    <button ref={trigger} aria-label="排序" title="排序" aria-haspopup="dialog" aria-expanded={open} className={open||rules.length?"active":""} onClick={()=>setOpen(!open)}><ArrowUpDown size={18}/></button>
+  const label=embedded?"高级排序":"排序";
+  return <div ref={root} className={"task-tool-popover-wrap collection-sort-wrap"+(embedded?" reading-advanced-sort":"")} onKeyDown={event=>{if(open&&event.key==="Escape"){event.preventDefault();event.stopPropagation();close();}}}>
+    <button ref={trigger} aria-label={label} title={label} aria-haspopup="dialog" aria-expanded={open} className={open||rules.length?"active":""} onClick={()=>setOpen(!open)}><ArrowUpDown size={embedded?14:18}/>{embedded&&label}</button>
     {open&&<section className="collection-sort-popover" role="dialog" aria-label="排序设置">
       <header><strong>排序</strong><button aria-label="关闭排序" onClick={close}><X size={15}/></button></header>
       <div className="collection-sort-rules">{rules.map((rule,index)=><div className="collection-sort-rule" key={rule.id} onDragOver={event=>event.preventDefault()} onDrop={event=>{event.preventDefault();const from=rules.findIndex(rule=>rule.id===event.dataTransfer.getData("application/hub-collection-sort"));if(from>=0)move(from,index);}}>

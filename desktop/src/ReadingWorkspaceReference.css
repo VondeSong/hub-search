@@ -105,7 +105,6 @@ html:not([data-runtime-platform="android"]) .collections-workspace .task-workspa
 .collections-workspace .reading-view-configuration .collection-database-active-tab summary span,
 .collections-workspace .reading-view-configuration .collection-database-active-tab summary svg:last-child { display: none; }
 .collections-workspace .reading-view-configuration .collection-database-tabs > button { display: none; }
-.collections-workspace .collection-query-tools { padding: 8px 12px; gap: 8px; }
 .collections-workspace .reading-preview-resizer { flex-basis: 10px; width: 10px; }
 .collections-workspace .reading-preview-resizer::after { background: transparent; }
 .collections-workspace .reading-preview-resizer:hover::after,
@@ -296,31 +295,6 @@ html:not([data-runtime-platform="android"]) .collection-navigation .collection-n
 html[data-runtime-platform="android"] .collections-workspace .collection-body { padding: 0; }
 html[data-runtime-platform="android"] .collections-workspace :is(.reading-browse-paper,.collection-detail .preview-card) { border: 0; border-radius: 0; box-shadow: none; }
 
-.reading-filter-anchor { position: relative; }
-.collections-workspace .reading-filter-anchor > button { width: 27px; height: 27px; padding: 0; }
-.collections-workspace .reading-filter-anchor .collection-query-tools {
-  position: fixed;
-  z-index: 32;
-  position-anchor: --reading-filter-trigger;
-  top: anchor(bottom);
-  left: max(10px,calc(anchor(right) - 240px));
-  display: grid;
-  width: 240px;
-  gap: 9px;
-  padding: 12px;
-  border: 1px solid #0001;
-  border-radius: 11px;
-  background: #fff;
-  color: #52525b;
-  box-shadow: 0 8px 26px #0002;
-}
-.reading-filter-anchor > button { anchor-name: --reading-filter-trigger; }
-.collections-workspace .reading-filter-anchor .collection-query-tools label { display: grid; gap: 3px; }
-.collections-workspace .reading-filter-anchor .collection-query-tools select { width: 100%; }
-@supports not (position-anchor: --reading-filter-trigger) {
-  .collections-workspace .reading-filter-anchor .collection-query-tools { position: absolute; top: 100%; right: 0; left: auto; }
-  .collections-workspace .reading-browse-paper { overflow: visible; }
-}
 .reading-article-source .collection-source-badge { padding: 0; background: transparent; color: inherit; font-size: inherit; }
 html:not([data-runtime-platform="android"]) .collections-workspace .collection-detail-content > dl .collection-properties { display: contents; }
 html:not([data-runtime-platform="android"]) .collections-workspace .collection-detail-content > dl > div:first-child { order: 0; font-weight: 500; color: #27272a; }

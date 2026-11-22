@@ -32,7 +32,7 @@ export type CloudSyncPolicy = {
   flashcards: boolean;
   reading: boolean;
 };
-type ReadingReport = {
+export type ReadingReport = {
   uploaded: number;
   downloaded: number;
   pending: number;
@@ -45,7 +45,7 @@ type ReadingReport = {
   };
   copies?: { uploaded: number; downloaded: number; pending: number };
 };
-type ReadingSyncState = {
+export type ReadingSyncState = {
   supported: boolean;
   running: boolean;
   lastError: string;

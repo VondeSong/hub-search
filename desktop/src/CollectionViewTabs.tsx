@@ -10,7 +10,7 @@ const layoutIcons = { list: LayoutList, table: Table2, board: Columns3, gallery:
 const columns: Record<CollectionColumn, string> = { source: "来源", author: "作者", published: "发布时间", collected: "创建日期", media: "附件", liked: "喜欢", destination: "保存到" };
 const layouts = ["list", "table", "board", "gallery"] as const;
 
-export function CollectionViewTabs({ onChange, compact = false, onNotice }: { onChange: (patch: Partial<CollectionView>) => void; compact?: boolean; onNotice?: (notice: string) => void }) {
+export function CollectionViewTabs({ onChange, compact = false, onNotice, advancedSort }: { onChange: (patch: Partial<CollectionView>) => void; compact?: boolean; onNotice?: (notice: string) => void; advancedSort?: React.ReactNode }) {
   const navigation = useCollectionViews();
   const { view, views, activeEntry } = navigation;
   const visibleViews = views.filter(candidate => !candidate.hidden);
@@ -124,6 +124,7 @@ export function CollectionViewTabs({ onChange, compact = false, onNotice }: { on
       <strong className="collection-database-setting-heading">条件颜色</strong>
       <label className="collection-database-setting-select"><span>突出显示</span><select aria-label="阅读条件颜色" value={view.colorMode || "none"} onChange={event => onChange({ colorMode: event.target.value as CollectionView["colorMode"] })}><option value="none">关闭</option><option value="source">按来源</option><option value="status">按阅读状态</option></select></label>
       {view.layout === "gallery" && <div className="collection-view-gallery-settings"><strong className="collection-database-setting-heading">画廊设置</strong><CardSizeControl value={cards.size} onChange={size => onChange({ cards: { ...cards, size } })}/><CollectionCardConfig key={view.id} name={tabName} value={cards} showLabel onChange={patch => onChange({ cards: { ...cards, ...patch } })}/></div>}
+      {advancedSort}
       <div className="collection-database-view-actions"><button type="button" disabled={views.length >= 30} onClick={duplicate}><Copy size={14}/>复制视图</button><button type="button" className="danger" disabled={!saved} onClick={remove}><Trash2 size={14}/>删除视图</button></div>
     </div>
   </details>;

@@ -41,12 +41,12 @@
           </div>
         </div>
 
-        <button id="btn-sync-modal" class="w-7 h-7 rounded-[7px] flex items-center justify-center text-neutral-500 hover:bg-black/[0.05] hover:text-neutral-900 transition relative" title="来源同步与连接">
+        <button id="btn-sync-modal" aria-haspopup="dialog" class="w-7 h-7 rounded-[7px] flex items-center justify-center text-neutral-500 hover:bg-black/[0.05] hover:text-neutral-900 transition relative" title="来源同步与连接">
           <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
           <span id="dot-sync-warn" class="hidden absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-500"></span>
         </button>
 
-        <button id="btn-cloud-modal" class="w-7 h-7 rounded-[7px] flex items-center justify-center text-neutral-500 hover:bg-black/[0.05] hover:text-neutral-900 transition relative" title="云同步状态与设置">
+        <button id="btn-cloud-modal" aria-haspopup="dialog" class="w-7 h-7 rounded-[7px] flex items-center justify-center text-neutral-500 hover:bg-black/[0.05] hover:text-neutral-900 transition relative" title="云同步状态与设置">
           <i data-lucide="cloud" class="w-3.5 h-3.5"></i>
           <span id="dot-cloud-state" class="absolute bottom-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-teal-600"></span>
         </button>
@@ -133,11 +133,11 @@
             <div class="flex items-center gap-1 shrink-0">
               <!-- Layout Mode Switcher (Stream / Table / Board / Gallery) -->
               <div id="layout-bar" class="inline-flex items-center bg-black/[0.04] p-0.5 rounded-[7px]"></div>
-              <button id="btn-filter" class="w-7 h-7 rounded-[7px] flex items-center justify-center text-neutral-500 hover:bg-black/[0.05] hover:text-neutral-900 transition relative" title="筛选">
+              <button id="btn-filter" aria-haspopup="dialog" aria-expanded="false" class="w-7 h-7 rounded-[7px] flex items-center justify-center text-neutral-500 hover:bg-black/[0.05] hover:text-neutral-900 transition relative" title="筛选">
                 <i data-lucide="list-filter" class="w-3.5 h-3.5"></i>
                 <span id="dot-filter" class="hidden absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-blue-600"></span>
               </button>
-              <button id="btn-sort" class="w-7 h-7 rounded-[7px] flex items-center justify-center text-neutral-500 hover:bg-black/[0.05] hover:text-neutral-900 transition" title="排序">
+              <button id="btn-sort" aria-haspopup="dialog" aria-expanded="false" class="w-7 h-7 rounded-[7px] flex items-center justify-center text-neutral-500 hover:bg-black/[0.05] hover:text-neutral-900 transition" title="排序">
                 <i data-lucide="arrow-up-down" class="w-3.5 h-3.5"></i>
               </button>
             </div>

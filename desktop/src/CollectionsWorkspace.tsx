@@ -18,7 +18,9 @@ import { CompletedStatusIcon } from "./CompletedStatusIcon";
 import { CollectionViewTabs } from "./CollectionViewTabs";
 import { defaultCollectionCards, cardFields, type CardField } from "./CollectionCardConfig";
 import { CollectionGalleryCover } from "./CollectionGalleryCover";
-import { CollectionSort, normalizeCollectionSorts } from "./CollectionSort";
+import { CollectionSort, normalizeCollectionSorts, type CollectionSortRule } from "./CollectionSort";
+import { ReadingActiveFilters, ReadingFilterTools, ReadingSortTools } from "./ReadingQueryTools";
+import { ReadingCloudOverview, ReadingSourceConnections } from "./ReadingSyncTools";
 import { CollectionPostBody, collectionAttachments } from "./CollectionPostBody";
 import { ReadingArticleTools, type ReadingArticleToolsHandle } from "./ReadingArticleTools";
 import { ReadingInvestigation } from "./AgentInvestigation";
@@ -28,8 +30,7 @@ import { usePreviewLinkCopy } from "./usePreviewLinkCopy";
 import { open as chooseDirectory } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useContext, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { ArrowLeft, ArrowUpRight, Bookmark, Archive, GripVertical, PanelRight, Circle, PanelLeft, RefreshCw, Search, FolderOpen, X, ListFilter, LoaderCircle, LayoutList, Table2, Columns3, LayoutGrid, Paperclip, MoreHorizontal, Link2, Check, RotateCcw, Layers, Heart, Send, CircleCheck } from "lucide-react";
-import { WorkspaceFilterSummary } from "./WorkspaceFilterSummary";
+import { ArrowLeft, ArrowUpRight, Bookmark, Archive, GripVertical, PanelRight, Circle, PanelLeft, RefreshCw, Search, FolderOpen, X, LoaderCircle, LayoutList, Table2, Columns3, LayoutGrid, Paperclip, MoreHorizontal, Link2, Check, RotateCcw, Layers, Heart, Send, CircleCheck } from "lucide-react";
 import { WorkspaceHeaderContext } from "./WorkspaceChrome";
 import { useVisiblePolling } from "./useVisiblePolling";
 import { SerialRefresh } from "./SerialRefresh";
@@ -87,7 +88,7 @@ function loadPreviewWidth() {
   } catch { return 0; }
 }
 
-export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, onSearchTargetHandled }: { onToggleDesktopSidebar?: () => void; initialItemKey?: string; onSearchTargetHandled?: () => void }) {
+export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, onSearchTargetHandled, onOpenLibrarySettings }: { onToggleDesktopSidebar?: () => void; initialItemKey?: string; onSearchTargetHandled?: () => void; onOpenLibrarySettings?: () => void }) {
   const shellHeader = useContext(WorkspaceHeaderContext);
   const {view, updateView, activeEntry, isModified, selectView, updateSavedView, setNavigationCounts, settingsRevision, session, updateSession, pageSnapshot, dataRevision} = useCollectionViews();
   const [searchItemKey,setSearchItemKey]=useState<string|null>(null);
@@ -106,6 +107,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const setPreviewEnabled=(previewEnabled:boolean)=>updateSession({previewEnabled});
   const cards = {...defaultCollectionCards,...view.cards};
   const sorts = normalizeCollectionSorts(view.sorts,view.sort,view.ascending);
+  const changeSorts = (rules: CollectionSortRule[]) => changeView({sorts:rules,sort:rules[0]?.field||"collected",ascending:rules[0]?.ascending||false});
   const sortingKey = JSON.stringify(sorts.map(({field,ascending})=>({field,ascending})));
   const tagsKey=JSON.stringify(view.tags);
   const includeAbandoned = view.layout === "board" && view.status === "all" && !view.attentionOnly;
@@ -148,10 +150,10 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const [boardDragKey,setBoardDragKey]=useState("");
   const [boardDropStatus,setBoardDropStatus]=useState<BoardStatus|null>(null);
   const [boardDragPreview,setBoardDragPreview]=useState<{title:string;x:number;y:number}|null>(null);
-  const [filtersOpen,setFiltersOpen] = useState(false);
   const [searchOpen,setSearchOpen] = useState(false);
-  const filterAnchor=useRef<HTMLDivElement>(null);
   const [syncMenu,setSyncMenu] = useState(false);
+  const [syncOverview,setSyncOverview] = useState<"source"|"cloud"|null>(null);
+  const [didaVerifiedAt,setDidaVerifiedAt] = useState(0);
   const databaseRef=useRef<HTMLDivElement>(null);
   const inspectorRef=useRef<ReadingArticleToolsHandle>(null);
   const previewBackRef=useRef<HTMLButtonElement>(null);
@@ -292,7 +294,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   // Telegram owns a separate receiver lock; an X fetch or shared export does not block bot setup.
   const sourceConnectionRunning=(source:Source)=>source==="dida"?Boolean(storage.didaRunning || launching==="dida"):source==="telegram"?Boolean(storage.telegramRunning || launching==="telegram"):storageRunning;
   const connectionRunning=sourceConnectionRunning(connectionSource);
-  const sources: SourceState[] = (["bookmarks","likes","telegram","dida"] as Source[]).map(id=>page?.sources?.find(source=>source.id===id)||{id,count:id==="bookmarks"?(page?.total||0):0,connected:id==="bookmarks"?!!page?.connected:id==="dida"?libraries.some(l=>l.provider==="dida365"&&l.connected):false,canResume:id==="bookmarks"?!!page?.canResume:false,status:id==="bookmarks"?(page?.status||""):""});
+  const sources: SourceState[] = (["bookmarks","likes","telegram","dida"] as Source[]).map(id=>pageState?.sources?.find(source=>source.id===id)||{id,count:id==="bookmarks"?(pageState?.total||0):0,connected:id==="bookmarks"?!!pageState?.connected:id==="dida"?libraries.some(l=>l.provider==="dida365"&&l.connected):false,canResume:id==="bookmarks"?!!pageState?.canResume:false,status:id==="bookmarks"?(pageState?.status||""):""});
   const activeTotal=page?.sources?.length?sources.reduce((sum,source)=>sum+source.count,0):page?.total||0;
   const connection=sources.find(s=>s.id===connectionSource);
   const selected=page?.items.find(item=>item.key===selectedKey)||(useSplitReading&&!searchItemKey?page?.items[0]:undefined);
@@ -371,13 +373,14 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
     } catch(e){setError(String(e));} finally{setSavingStorage(false);}
   };
   const checkLocalSources = async () => {
-    if(checkingSources || storage.localSources?.running) return;
+    if(checkingSources || storage.localSources?.running) return "本地素材正在检查。";
     setCheckingSources(true);setError("");setNotice("");
     try {
       const result=await invoke<{files:number;changed:number;errors:number}>("check_local_reading_sources");
       setNotice(`本地素材检查完成：已检查 ${result.files} 个文件，新增或更新 ${result.changed} 条${result.errors?`，${result.errors} 个文件待重试`:""}`);
       await load();
-    } catch(e) {setError(String(e));} finally {setCheckingSources(false);}
+      return result.errors ? "部分本地素材检查未通过，请重试或查看同步详情。" : undefined;
+    } catch(e) {setError(String(e));return String(e);} finally {setCheckingSources(false);}
   };
   const selectVault=async()=>{try {const path=await chooseDirectory({directory:true,multiple:false,title:"选择新内容的默认保存库",...(draft.vaultPath&&!(storage.vaultRelocation?.rootExists===false&&draft.vaultPath===storage.config.vaultPath)?{defaultPath:draft.vaultPath}:{})});if(mounted.current&&typeof path==="string")setDraft(d=>({...d,vaultPath:path}));}catch(e){if(mounted.current)setError(String(e));}};
   const relocatingVault = useRef(false);
@@ -402,7 +405,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const sync=async(source:Source|"all",restart:boolean)=>{
     setLaunching(source);setError("");setNotice("");
     try {setNotice(await invoke<string>("sync_x_bookmarks",{source,restart}));await load();}
-    catch(e){setError(String(e));}finally{setLaunching(null);}
+    catch(e){setError(String(e));return String(e);}finally{setLaunching(null);}
   };
   const save=async()=>{
     if(busy||connectionRunning||!request.trim())return;
@@ -425,7 +428,8 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   };
   const toggleRead=async(item:CollectionItem)=>{if(propertyWrite.current)return;propertyWrite.current=true;setPropertyBusy(true);setError("");try {await invoke("set_collection_read",{key:item.key,read:!item.read});commitProperties(item.key,item.read?"unread":"read",latestPage.current?.items.find(value=>value.key===item.key)?.tags||[]);await latestLoad.current();}catch(e){setError(String(e));}finally{propertyWrite.current=false;setPropertyBusy(false);}};
   const pause=async()=>{try {await invoke("cancel_x_bookmark_sync");setNotice("正在暂停，已完成的内容会保留。");await load();}catch(e){setError(String(e));}};
-  const resetFilters=()=>{changeView({source:"all",status:"all",media:"all",query:"",tags:[],dateFilter:"any",destinationId:"",attentionOnly:false});};
+  const resetFilters=()=>{setSearchOpen(false);changeView({media:"all",query:"",tags:[],dateFilter:"any"});};
+  const hasQueryFilters=!!query||view.media!=="all"||view.dateFilter!=="any"||view.tags.length>0;
   const needsAttention=(operation:CollectionLibraryOperation)=>!operation.parked&&operation.phase!=="cancelled"&&(!!operation.error||["failed","partial","unknown","needs_review"].includes(operation.phase));
   const issues=(item:CollectionItem)=>item.attentionOperations||operations.filter(o=>o.key===item.key&&needsAttention(o));
   const renderIssues=(item:CollectionItem)=>view.attentionOnly&&<div className="collection-attention-actions">{issues(item).map(o=><button key={o.target} onClick={e=>{e.stopPropagation();openReview(item.key,o.target);}}><span>{libraries.find(l=>l.id===o.target)?.name||o.plan?.libraryName||"资料库"}</span>：{o.phase==="unknown"?"待核对":o.phase==="needs_review"?"需要补充":o.phase==="partial"?"继续补齐":"查看失败记录"}</button>)}{item.attentionIssues?.map(issue=><button key={issue.kind} onClick={e=>{e.stopPropagation();setSyncMenu(true);}}>{issue.kind==="sourceCancellation"?"来源取消失败":"内容更新失败"}：查看同步记录</button>)}{issues(item).length===0&&!item.attentionIssues?.length&&<span>来源或附件处理需要检查，可查看同步与连接记录。</span>}</div>;
@@ -544,7 +548,6 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const cardStyle=(item:CollectionItem)=>{const rule=view.layout==="gallery"?cards.rules.find(rule=>{const value=cardValue(item,rule.field);return rule.operator==="equals"?value===rule.value:rule.operator==="contains"?value.includes(rule.value):rule.operator==="not_contains"?!value.includes(rule.value):rule.operator==="is_empty"?!value:!!value;}):undefined;if(rule)return {background:rule.color};const color=view.colorMode==="source"?({bookmarks:"#737b86",likes:"#c77b98",telegram:"#2198d4",dida:"#4a71f3"} as Record<string,string>)[item.post.source||"bookmarks"]:view.colorMode==="status"?({unread:"#2088e9",in_progress:"#c18a24",read:"#3a9e61",abandoned:"#89909b",archived:"#89909b"} as Record<string,string>)[readingStatus(item)]:undefined;return color?{background:`color-mix(in srgb, ${color} 12%, var(--hub-content-surface, #fff))`}:undefined;};
   const fields=(item:CollectionItem,column:Column)=>column==="destination"?copyBadges(item):column==="source"?badge(item):column==="author"?(item.post.authorName||item.post.authorHandle):column==="published"?date(item.post.publishedAt):column==="collected"?date(item.collectedAt):column==="liked"?(item.post.liked||item.post.source==="likes"?"是":"否"):`${downloaded(item)}/${collectionAttachments(item.post).length} 已下载`;
   const jobVisible=Boolean(job?.id && (job.running || job.outcome==="paused" || job.outcome==="failed"));
-  const filterCount=[view.source!=="all",view.status!=="all",view.media!=="all",view.tags.length>0,view.dateFilter!=="any",!!view.destinationId,view.attentionOnly].filter(Boolean).length;
   const visibleColumns:TableColumn[]=["status","title",...(Object.keys(labels) as Column[]).filter(c=>view.columns[c])];
   const widths={...tableWidths};for(const c of visibleColumns){const saved=view.widths?.[c];if(typeof saved==="number"&&Number.isFinite(saved))widths[c]=Math.min(1600,Math.max(c==="status"?44:72,saved));}
   const setWidths=(patch:Partial<Record<TableColumn,number>>)=>{updateView({widths:{...view.widths,...patch}});updateSavedView();};
@@ -553,12 +556,6 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const searchInputRef=useRef<HTMLInputElement>(null);
   const dismissSearch=()=>{setSearchOpen(false);setQuery("");requestAnimationFrame(()=>searchButtonRef.current?.focus());};
   useEffect(()=>{if(searchOpen)searchInputRef.current?.focus();},[searchOpen,compactControls]);
-  useEffect(()=>{
-    if(!filtersOpen)return;
-    const closeOutside=(event:PointerEvent)=>{if(!filterAnchor.current?.contains(event.target as Node))setFiltersOpen(false);};
-    document.addEventListener("pointerdown",closeOutside);
-    return()=>document.removeEventListener("pointerdown",closeOutside);
-  },[filtersOpen]);
   const readingKeys=(event:ReactKeyboardEvent<HTMLElement>)=>{
     if(runtimeCapabilities.mobile||event.defaultPrevented||event.altKey||event.ctrlKey||event.metaKey)return;
     const target=event.target as HTMLElement;
@@ -567,7 +564,6 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
       if(target.closest(".collection-property-menu,.collection-destination-menu,details[open]"))return;
       if(articleMenu)setArticleMenu(false);
       else if(syncMenu)setSyncMenu(false);
-      else if(filtersOpen)setFiltersOpen(false);
       else if(searchOpen)dismissSearch();
       else if(detailOpen)closeReading();
       else return;
@@ -596,7 +592,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   return <section onKeyDown={readingKeys} className={`collections-workspace task-workspace${compactControls?" collection-compact-layout":""}${detailOpen?" collection-detail-open":""}`} aria-label="阅读">
     {searchItemKey&&<div role="status" className="collection-notice">从搜索打开的阅读条目<button type="button" onClick={()=>setSelectedKey(null)}>返回阅读列表</button>{page&&!page.items.length&&<span>条目已变更或移除，请重新搜索。</span>}</div>}
     <div className="collection-browse-controls" hidden={detailOpen&&(compactPreview||runtimeCapabilities.mobile)}>
-    {runtimeCapabilities.mobile?<MobileReadingControls view={view} onChange={changeView} count={page?.matched} tags={page?.availableTags||[]} onSync={openCloudSyncSettings}><CollectionViewTabs onChange={changeView} compact={true} onNotice={setNotice}/><CollectionSort key={`${view.id}:${view.layout}`} rules={sorts} onChange={sorts=>changeView({sorts,sort:sorts[0]?.field||"collected",ascending:sorts[0]?.ascending||false})}/></MobileReadingControls>:<>
+    {runtimeCapabilities.mobile?<MobileReadingControls view={view} onChange={changeView} count={page?.matched} tags={page?.availableTags||[]} onSync={openCloudSyncSettings}><CollectionViewTabs onChange={changeView} compact={true} onNotice={setNotice}/><CollectionSort key={`${view.id}:${view.layout}`} rules={sorts} onChange={changeSorts}/></MobileReadingControls>:<>
     <header className="task-workspace-header collection-header" onMouseDown={e=>{if(!(e.target as HTMLElement).closest("button, input, select, textarea, a, summary, details, [role=button]"))shellHeader?.onMouseDown(e);}}>
       <div className="task-source-chips" role="group" aria-label="阅读来源">
         {!runtimeCapabilities.mobile&&onToggleDesktopSidebar&&<button className="task-icon-button workspace-panel-toggle" aria-label="切换侧边栏" onClick={onToggleDesktopSidebar}><PanelLeft size={16}/></button>}
@@ -608,7 +604,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
       </div>
       {!runtimeCapabilities.mobile&&<div className="collection-header-tools">
         {searchOpen&&!compactControls?<label className="task-toolbar-search"><Search size={14}/><input ref={searchInputRef} aria-label="搜索阅读内容" placeholder="搜索标题、正文或作者…" value={query} onChange={event=>setQuery(event.target.value)}/><button aria-label="关闭搜索" onClick={dismissSearch}><X size={13}/></button></label>:<button ref={searchButtonRef} aria-label="搜索阅读内容" title="阅读内搜索 (/)" aria-expanded={searchOpen} onClick={()=>setSearchOpen(!searchOpen)}><Search size={15}/></button>}
-        {!runtimeCapabilities.mobile&&<div className="collection-menu-wrap"><button className={`collection-sync-trigger${syncMenu?" active":""}`} aria-label="同步与连接" title={jobRunning?"后台保存中 · 点击查看进度":jobVisible?"同步需要处理 · 点击查看":"同步与连接"} aria-expanded={syncMenu} aria-busy={jobRunning} onClick={()=>setSyncMenu(!syncMenu)}>{jobRunning?<LoaderCircle size={17} strokeWidth={1.8} className="spin"/>:<RefreshCw size={17} strokeWidth={1.8}/>} {jobVisible&&!jobRunning&&<span className="collection-sync-indicator"/>}</button>
+        {!runtimeCapabilities.mobile&&<div className="collection-menu-wrap"><button className={`collection-sync-trigger${syncMenu||syncOverview==="source"?" active":""}`} aria-label="来源同步与连接" title="来源同步与连接" aria-haspopup="dialog" aria-expanded={syncMenu||syncOverview==="source"} aria-busy={jobRunning} onClick={()=>{if(syncMenu)setSyncMenu(false);else setSyncOverview("source");}}>{jobRunning?<LoaderCircle size={16} strokeWidth={1.8} className="spin"/>:<RefreshCw size={16} strokeWidth={1.8}/>} {jobVisible&&!jobRunning&&<span className="collection-sync-indicator"/>}</button>
           {syncMenu&&<CollectionSyncPanel sources={sources} operations={operations} itemTitles={Object.fromEntries((page?.items||[]).map(item=>[item.key,title(item)]))}
             autoSyncMinutes={storage.config.autoSyncMinutes} storageLabel={`${storage.config.mode==="obsidian"?"保存到 Obsidian · 本机保留索引与缓存":"保存到本地数据库"} · Telegram 大附件可通过 tdl 下载`} storageStatus={storage.status} pendingCancellations={page?.pendingCancellations||0}
             job={job} jobRunning={jobRunning} jobVisible={jobVisible} sourceBusy={sourceConnectionRunning} sourceActive={source=>source==="dida"?Boolean(storage.didaRunning||launching==="dida"):source==="telegram"?Boolean(storage.telegramRunning||launching==="telegram"):Boolean((job?.running&&job.source===source)||launching===source)}
@@ -618,7 +614,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
             <TelegramTdlSettings state={storage.tdl} paired={!!sources.find(s=>s.id==="telegram")?.paired} reload={load} onError={setError}/>
           </CollectionSyncPanel>}
         </div>}
-        <button aria-label="云同步设置" title="云同步状态与设置" onClick={openCloudSyncSettings}><Cloud size={15}/></button>
+        <button aria-label="云同步状态与设置" title="云同步状态与设置" aria-haspopup="dialog" aria-expanded={syncOverview==="cloud"} onClick={()=>{setSyncMenu(false);setSyncOverview("cloud");}}><Cloud size={15}/></button>
         {shellHeader?.actions}
         {!runtimeCapabilities.mobile&&<button aria-label="切换预览侧栏" title="预览侧栏" aria-pressed={previewEnabled} onClick={()=>{if(detailOpen)closeReading();else setPreviewEnabled(!previewEnabled);}}><PanelRight size={18}/></button>}
       </div>}
@@ -634,37 +630,30 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
       <div className="reading-view-title"><h2>{activeTitle}</h2>{page&&<span>{page.matched.toLocaleString("en-US")}</span>}
         {isModified&&<div className="reading-view-draft"><button onClick={updateSavedView}>更新视图</button><button aria-label="还原视图" title="还原" onClick={()=>selectView(activeEntry.id)}><RotateCcw size={12}/></button></div>}
       </div>
-      <div className="reading-view-configuration" title={layoutName}><CollectionViewTabs onChange={patch=>patch.layout?changeLayout(patch.layout):changeView(patch)} compact={true} onNotice={setNotice}/></div>
+      <div className="reading-view-configuration" title={layoutName}><CollectionViewTabs onChange={patch=>patch.layout?changeLayout(patch.layout):changeView(patch)} compact={true} onNotice={setNotice}
+        advancedSort={<CollectionSort key={`${view.id}:${view.layout}`} rules={sorts} onChange={changeSorts} embedded/>}/></div>
       <div className="task-secondary-actions">
         <div className="reading-layout-segment" role="group" aria-label="阅读布局">{readingLayouts.map(({id,label,icon:Icon})=><button type="button" key={id} aria-label={label} title={label} aria-pressed={view.layout===id} onClick={()=>changeLayout(id)}><Icon size={14}/></button>)}</div>
         
-        <div ref={filterAnchor} className="reading-filter-anchor">
-        <button aria-label="筛选" title={filtersOpen?"隐藏筛选":"显示筛选"} className={filtersOpen||filterCount?"active":""} aria-expanded={filtersOpen} aria-pressed={filterCount>0} onClick={()=>setFiltersOpen(!filtersOpen)}><ListFilter size={18}/></button>
-    {filtersOpen&&<div className="collection-query-tools" aria-label="筛选当前列表">
-      <label>状态<select aria-label="阅读状态筛选" value={view.status} onChange={e=>changeView({status:e.target.value as View["status"]})}><option value="all">全部状态</option><option value="unread">待读</option><option value="read">已读</option><option value="in_progress">进行中</option><option value="abandoned">放弃</option><option value="archived">归档</option></select></label>
-      <label>内容<select aria-label="内容类型筛选" value={view.media} onChange={e=>changeView({media:e.target.value as View["media"]})}><option value="all">全部内容</option><option value="photo">有图片</option><option value="video">有视频</option><option value="links">有外链</option></select></label>
-      <label>收集时间<select aria-label="收集时间筛选" value={view.dateFilter} onChange={e=>changeView({dateFilter:e.target.value as View["dateFilter"]})}><option value="any">不限</option><option value="7">最近 7 天</option><option value="30">最近 30 天</option><option value="90">最近 90 天</option></select></label>
-      <label>标签<select aria-label="阅读标签筛选" value="" onChange={e=>{if(e.target.value&&!view.tags.includes(e.target.value))changeView({tags:[...view.tags,e.target.value]});}}><option value="">添加标签条件</option>{page?.availableTags?.map(tag=><option key={tag} value={tag}>{tag}</option>)}</select></label>
-    </div>}
-        </div>
-        <CollectionSort key={`${view.id}:${view.layout}`} rules={sorts} onChange={sorts=>changeView({sorts,sort:sorts[0]?.field||"collected",ascending:sorts[0]?.ascending||false})}/>
+        <ReadingFilterTools view={view} tags={pageState?.availableTags||[]} onChange={changeView}/>
+        <ReadingSortTools rule={sorts[0]} onChange={changeSorts}/>
 
       </div>
     </div>
-    <WorkspaceFilterSummary filters={[
-      ...(view.source!=="all"?[{label:sourceName(view.source),clear:()=>changeView({source:"all"})}]:[]),
-      ...(view.status!=="all"?[{label:({read:"已读",unread:"待读",in_progress:"进行中",abandoned:"放弃",archived:"归档"}[view.status]),clear:()=>changeView({status:"all"})}]:[]),
-      ...(view.media!=="all"?[{label:view.media==="photo"?"有图片":view.media==="video"?"有视频":"有外链",clear:()=>changeView({media:"all"})}]:[]),
-      ...view.tags.map(tag=>({label:`标签：${tag}`,clear:()=>changeView({tags:view.tags.filter(value=>value!==tag)})})),
-      ...(view.dateFilter!=="any"?[{label:`最近 ${view.dateFilter} 天收集`,clear:()=>changeView({dateFilter:"any"})}]:[]),
-      ...(view.destinationId?[{label:`已保存副本：${libraries.find(l=>l.id===view.destinationId)?.name||"资料库"}`,clear:()=>changeView({destinationId:""})}]:[]),
-      ...(view.attentionOnly?[{label:"需要处理",clear:()=>changeView({attentionOnly:false})}]:[]),
-      ...(query?[{label:`搜索：${query}`,clear:()=>setQuery("")}]:[]),
-    ]} onReset={resetFilters}/>
+    <ReadingActiveFilters view={view} onChange={changeView} onClear={resetFilters} onClearQuery={dismissSearch}/>
+    {syncOverview==="source"&&<ReadingSourceConnections sources={sources} loading={!pageState} tdlReady={!!storage.tdl?.ready}
+      didaVerifiedAt={didaVerifiedAt} onDidaVerified={setDidaVerifiedAt}
+      local={{...storage.localSources,path:storage.config.mode==="obsidian"?storage.config.vaultPath:"",running:checkingSources||storage.localSources?.running,
+        error:storage.localSources?.error||(storage.vaultRelocation?.rootExists===false?"保存库目录已移动":"")}}
+      sourceBusy={sourceConnectionRunning} onSync={sync} onCheckLocal={checkLocalSources} onClose={()=>setSyncOverview(null)} onNotice={setNotice}
+      onDetails={()=>{setSyncOverview(null);setSyncMenu(true);}}
+      onStorage={()=>{setSyncOverview(null);setDraft(storage.config);setError("");setSettings(true);}}
+      onConnect={source=>{setSyncOverview(null);setError("");if(source==="dida"){if(onOpenLibrarySettings)onOpenLibrarySettings();else setSyncMenu(true);}else{setConnectionSource(source);setConnecting(true);}}}/>}
+    {syncOverview==="cloud"&&<ReadingCloudOverview onClose={()=>setSyncOverview(null)} onNotice={setNotice}/>}
         </>}
       <div ref={databaseRef} data-reading-layout={view.layout} className={`collection-database density-${view.density}`} aria-hidden={detailOpen||undefined} inert={detailOpen} onScroll={e=>{if(!detailOpen)updateSession({scrollTop:e.currentTarget.scrollTop});}}>
         {!page&&<div className="collections-empty">正在读取本地阅读内容…</div>}
-        {page?.items.length===0&&<div className="collections-empty"><Bookmark size={28}/><h2>{page.total?"没有符合筛选条件的内容":"把值得读的内容留在这里"}</h2><p>{page.total?"调整筛选，或搜索其他作者和正文。":"在右上角管理 X、Telegram 和滴答来源，把待读内容放在一起。"}</p>{page.total>0&&<button onClick={resetFilters}>清除筛选</button>}{view.source==="telegram"&&!sources.find(s=>s.id==="telegram")?.connected&&<button onClick={()=>{setConnectionSource("telegram");setError("");setConnecting(true);}}>连接 Telegram</button>}</div>}
+        {page?.items.length===0&&<div className="collections-empty"><Bookmark size={28}/><h2>{page.total?"没有符合筛选条件的内容":"把值得读的内容留在这里"}</h2><p>{page.total?"调整筛选，或搜索其他作者和正文。":"在右上角管理 X、Telegram 和滴答来源，把待读内容放在一起。"}</p>{page.total>0&&hasQueryFilters&&<button onClick={resetFilters}>清除筛选</button>}{view.source==="telegram"&&!sources.find(s=>s.id==="telegram")?.connected&&<button onClick={()=>{setConnectionSource("telegram");setError("");setConnecting(true);}}>连接 Telegram</button>}</div>}
         {view.attentionOnly&&attentionRows.length>0&&<div className="reading-triage">
           {["待你确认","后台可恢复","需重连与会话故障"].map(group=>{
             const rows=attentionRows.filter(row=>row.group===group);
