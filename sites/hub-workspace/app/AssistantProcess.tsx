@@ -107,7 +107,7 @@ function MixedToolExample() {
   </div>;
 }
 
-function WorkspaceReceiptsExample() {
+function WorkspaceReceiptsExample({previewImage}: {previewImage: string}) {
   const dialog = useRef<HTMLDialogElement>(null);
   const thumbnail = useRef<HTMLButtonElement>(null);
   return <div className="ha-replay-body">
@@ -127,7 +127,7 @@ function WorkspaceReceiptsExample() {
         </details>
         <details className="ha-process-batch ha-image-receipt">
           <summary><Images size={15} aria-hidden="true"/>已查看 1 张图像<ChevronDown size={12} aria-hidden="true"/></summary>
-          <button ref={thumbnail} type="button" className="ha-receipt-thumbnail" onClick={() => dialog.current?.showModal()} aria-label="放大工作台预览"><img src="/hub-workspace-preview.jpg" alt="工作台预览"/></button>
+          <button ref={thumbnail} type="button" className="ha-receipt-thumbnail" onClick={() => dialog.current?.showModal()} aria-label="放大工作台预览"><img src={previewImage} alt="工作台预览"/></button>
         </details>
       </ProcessGroup>
       <p className="ha-process-meta">核对预览中的布局</p>
@@ -136,7 +136,7 @@ function WorkspaceReceiptsExample() {
     <p>配置文件已更新，并已核对预览。</p>
     <details className="ha-process-permissions"><summary>本轮文件变更 · 1 个文件 · +1 −1</summary><p>config/settings.yml</p></details>
     <dialog ref={dialog} className="ha-receipt-dialog" aria-label="工作台预览" onClose={() => thumbnail.current?.focus()}>
-      <form method="dialog"><button type="submit">关闭图片</button></form><img src="/hub-workspace-preview.jpg" alt="工作台预览"/>
+      <form method="dialog"><button type="submit">关闭图片</button></form><img src={previewImage} alt="工作台预览"/>
     </dialog>
   </div>;
 }
@@ -205,7 +205,11 @@ function AttachmentReplay({onWorkingChange}: {onWorkingChange: (working: boolean
     </div>
   </>;
 }
-export function AssistantProcessDemo({onClose, onWorkingChange}: {onClose: () => void; onWorkingChange: (working: boolean) => void}) {
+export type ProcessDemoAssets = { previewImage: string; githubIcon: string; notionIcon: string };
+
+const defaultAssets: ProcessDemoAssets = { previewImage: "/hub-workspace-preview.jpg", githubIcon: "/agent-icons/github.svg", notionIcon: "/agent-icons/notion.svg" };
+
+export function AssistantProcessDemo({onClose, onWorkingChange, assets = defaultAssets}: {onClose: () => void; onWorkingChange: (working: boolean) => void; assets?: ProcessDemoAssets}) {
   const [scenario,setScenario] = useState<(typeof examples)[number][0]>('timeline');
   const [readAgain,setReadAgain] = useState(false);
   const [visibleBatches,setVisibleBatches] = useState(5);
@@ -227,9 +231,9 @@ export function AssistantProcessDemo({onClose, onWorkingChange}: {onClose: () =>
         </ProcessGroup>
         <p role="status">{readAgain ? '当前版本已读取，可以继续核对。' : '正在等待重新核对这份资料。'}</p>
       </>}
-      {scenario === 'web' && <AssistantProcess webEnabled seconds={36}/>}
+      {scenario === 'web' && <AssistantProcess webEnabled seconds={36} assets={assets}/>}
       {scenario === 'tools' && <MixedToolExample/>}
-      {scenario === 'receipts' && <WorkspaceReceiptsExample/>}
+      {scenario === 'receipts' && <WorkspaceReceiptsExample previewImage={assets.previewImage}/>}
       {scenario === 'script' && <>
         <p className="ha-process-commentary">先读取附件的文件头，确认格式和架构。</p>
         <ProcessGroup title="已使用 Python 检查附件格式和架构" icon={Terminal}>
@@ -275,7 +279,7 @@ export function AssistantProcessDemo({onClose, onWorkingChange}: {onClose: () =>
   </section>;
 }
 
-export function AssistantProcess({steps,webEnabled=false,seconds}:{steps?:string[];webEnabled?:boolean;seconds?:number}) {
+export function AssistantProcess({steps,webEnabled=false,seconds,assets=defaultAssets}:{steps?:string[];webEnabled?:boolean;seconds?:number;assets?:ProcessDemoAssets}) {
   const [required,setRequired]=useState(false);
   return <details className="ha-activity ha-process-demo">
     <summary><Terminal size={16} aria-hidden="true"/><span>{webEnabled ? '已核对资料、检索网页并运行命令' : '已核对资料并运行工作区命令'}</span>{seconds && <small>{seconds} 秒</small>}<ChevronDown size={13} aria-hidden="true"/></summary>
@@ -292,7 +296,7 @@ export function AssistantProcess({steps,webEnabled=false,seconds}:{steps?:string
     </div></details>
     {webEnabled && <>
       <details className="ha-process-group">
-        <summary><Search size={16} aria-hidden="true"/><span className="ha-process-label">网页检索 · 2 步</span><span className="ha-process-sites"><img src="/agent-icons/github.svg" alt="GitHub"/><img src="/agent-icons/notion.svg" alt="Notion"/></span><small>另 2 个站点</small><ChevronDown size={12} aria-hidden="true"/></summary>
+        <summary><Search size={16} aria-hidden="true"/><span className="ha-process-label">网页检索 · 2 步</span><span className="ha-process-sites"><img src={assets.githubIcon} alt="GitHub"/><img src={assets.notionIcon} alt="Notion"/></span><small>另 2 个站点</small><ChevronDown size={12} aria-hidden="true"/></summary>
         <div className="ha-process-children">
           <p className="ha-process-meta">核对公开进展和工具回执的事件定义</p>
           <SearchReceipt queries={['Codex App Server 事件','连接器权限与工具回执']} sources={[

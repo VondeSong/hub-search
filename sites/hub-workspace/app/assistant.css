@@ -1,3 +1,5 @@
+@import "./agents/demo-process.css";
+
 .ha-panel { container: hub-assistant / size; position: fixed; z-index: 200; right: 12px; bottom: 12px; width: min(var(--ha-width, 480px), calc(100vw - 24px)); height: min(var(--ha-height, clamp(460px, 80dvh, 704px)), calc(100dvh - 24px)); display: flex; flex-direction: column; min-width: 0; min-height: 0; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--text); box-shadow: 0 12px 24px -8px rgb(0 0 0 / .06), 0 16px 40px -6px rgb(0 0 0 / .22); font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; font-size: 13px; text-align: left; }
 .ha-panel *, .ha-draft-backdrop * { box-sizing: border-box; }
 .ha-panel button, .ha-panel select, .ha-panel textarea, .ha-draft-dialog button, .ha-draft-dialog input, .ha-draft-dialog textarea { font: inherit; }
@@ -586,138 +588,11 @@
 .ha-selected-excerpts > strong { display: block; font-weight: 550; }
 .ha-selected-excerpts .ha-attachment-list { margin-top: 3px; }
 
-/* #56: reference-aligned activity identities; every prototype event is labelled. */
-.ha-process-demo{color:var(--text)}
-.ha-process-demo>summary,.ha-process-group>summary{display:flex;align-items:center;gap:8px;list-style:none;min-height:24px;cursor:pointer}
-.ha-process-demo summary:focus-visible,.ha-answer-table:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
-.ha-answer-table{max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;margin-block:12px}
-.ha-answer-table table{width:100%;border-collapse:collapse;font-size:12px;line-height:1.6}
-.ha-answer-table :is(th,td){min-width:8em;padding:8px 10px;text-align:start;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
-.ha-answer-table caption{text-align:start;color:var(--subtle,var(--text));padding-block:0 8px}
-.ha-process-demo summary::-webkit-details-marker{display:none}
-.ha-process-demo svg,.ha-process-demo img{flex-shrink:0}
-.ha-process-demo :is(.ha-process-group,.ha-process-batch)>summary{color:var(--subtle)}
-.ha-process-demo :is(.ha-process-group,.ha-process-batch)>summary:is(:hover,:focus-visible){color:var(--text)}
-.ha-process-demo summary>svg:last-child{margin-inline-start:0;transition:transform .15s}
-.ha-process-demo details:not([open])>summary>svg:last-child,.ha-activity.ha-process-demo:not([open])>summary>svg:last-child{transform:rotate(-90deg)}
-@media (hover:hover){
-  .ha-process-demo .ha-process-group>summary:not(:hover,:focus-visible)>svg:last-child{opacity:0}
-}
-.ha-process-commentary{margin-block:12px;color:var(--text);line-height:1.6;font-size:14px}
-.ha-process-row{display:flex;align-items:flex-start;gap:8px;margin-block:8px;line-height:1.6}
-.ha-process-children>.ha-process-row{color:var(--subtle);margin-block:3px}
-.ha-process-group{margin-block:12px}
-.ha-process-group>div{padding-block:4px;padding-inline-start:24px}
-.ha-process-group>.ha-process-children{padding-block:2px;padding-inline-start:24px;overflow-wrap:anywhere}
-.ha-process-children>p{margin:4px 0 8px}
-.ha-process-meta{color:var(--subtle);font-size:13px}
-.ha-process-review{padding:12px 4px;min-width:0}
-.ha-process-review>header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.ha-process-review h2{font-size:18px;font-weight:600;margin:0}
-.ha-process-examples{display:flex;flex-wrap:wrap;gap:6px;margin-block:12px}
-.ha-process-review button{padding:5px 9px;border-radius:7px;background:transparent;color:inherit}
-.ha-process-review button:hover,.ha-process-review button[aria-pressed=true]{background:var(--surface-2)}
-.ha-process-review button:focus-visible,.ha-process-review a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.ha-process-example{border-top:1px solid var(--line);padding-top:12px;font-size:14px}
-.ha-process-batch>summary{display:flex;gap:8px;align-items:center;overflow-wrap:anywhere;min-height:30px;cursor:pointer}
-.ha-image-receipt>summary{color:var(--subtle)}
-.ha-image-receipt>summary:is(:hover,:focus-visible){color:var(--text)}
-.ha-image-receipt:not([open])>summary>svg:last-child{transform:rotate(-90deg)}
-@media (hover:hover){
-  .ha-image-receipt>summary:not(:hover,:focus-visible)>svg:last-child{opacity:0}
-}
-.ha-process-script>summary{color:var(--subtle)}
-.ha-process-script>summary:is(:hover,:focus-visible),.ha-process-script[open]>summary{color:var(--text)}
-.ha-process-script>summary>small{font-variant-numeric:tabular-nums;color:var(--subtle)}
-.ha-process-script>summary>svg:last-child{margin-inline-start:0}
-.ha-process-script:not([open])>summary>svg:last-child{transform:rotate(-90deg)}
-.ha-script-result{
-  margin:4px 0 10px 7px;
-  padding-inline-start:15px;
-  border-inline-start:1px solid var(--line);
-  min-width:0;
-}
-.ha-script-region{
-  margin-block-end:6px;
-  padding:10px 12px;
-  border:1px solid var(--line);
-  border-radius:8px;
-  background:var(--surface);
-}
-.ha-script-region+.ha-script-region{background:var(--surface-2)}
-.ha-script-region>p,.ha-script-status{font-size:12px;color:var(--subtle)}
-.ha-script-region>pre{
-  margin:6px 0 0;
-  max-height:10rem;
-  overflow:auto;
-  white-space:pre;
-  font:12px/1.55 ui-monospace,Consolas,monospace;
-  color:var(--text);
-}
-.ha-script-region code{font:inherit}
-.ha-script-status{display:flex;align-items:center;gap:5px;padding:8px 0}
-.ha-process-technical{margin-top:8px;color:var(--subtle)}
-.ha-process-technical>summary{cursor:pointer}
-.ha-process-technical>pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:160px;overflow:auto}
-.ha-process-group>summary{gap:6px;min-height:30px}
-.ha-process-group>summary>small{flex-shrink:0;font-size:11px;color:inherit}
-.ha-process-label{min-width:0;overflow-wrap:anywhere}
-.ha-search-sources{display:flex;flex-wrap:wrap;gap:5px;list-style:none;padding:0;margin:5px 0 9px}
-.ha-search-sources li{max-width:100%;min-width:0}
-.ha-search-sources a{display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:12px;background:var(--surface-2);overflow-wrap:anywhere}
-.ha-process-time{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
-.ha-process-time summary{cursor:pointer;color:var(--subtle)}
-.ha-process-permissions{margin-block:4px}
-@container hub-assistant (max-width:360px){.ha-process-group>summary{flex-wrap:wrap}}
-.ha-process-sites{display:inline-flex;gap:4px;flex-shrink:0}
-.ha-process-sites img{width:16px;height:16px;object-fit:contain}
-.ha-process-demo>.ha-process-row:last-of-type>svg{color:#68a5dd}
-@media(prefers-color-scheme:dark){.ha-process-sites img{filter:invert(1)}}
-@media(prefers-reduced-motion:reduce){.ha-process-demo summary>svg:last-child{transition:none}}
-
 .ha-native-connections{min-width:0;border:0;padding:10px 0 0;margin:8px 0 0;border-top:1px solid var(--line);font-size:12px;overflow-wrap:anywhere}
 .ha-native-connections legend{padding:0;font-weight:500}
 .ha-native-site{display:grid;gap:6px;margin:10px 0}
 .ha-native-site input{box-sizing:border-box;min-width:0;width:100%;border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--surface);color:var(--text);font:inherit}
 .ha-native-connections>button{border:1px solid var(--line);border-radius:6px;padding:5px 8px;background:var(--surface);color:var(--text);font:inherit}
-
-.ha-current-action { margin: 10px 0 16px; color: var(--subtle); font-size: 14px; line-height: 1.6; }
-@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
-  @supports (background-clip: text) {
-    .ha-active-ink {
-      background: linear-gradient(90deg,var(--subtle) 36%,white 50%,var(--subtle) 64%) 100% center / 240% 100%;
-      background-clip: text;
-      color: transparent;
-      animation: ha-running-ink 1.8s linear infinite;
-    }
-  }
-}
-@keyframes ha-running-ink { from { background-position: 100% center; } 75%,to { background-position: 0% center; } }
-.ha-replay-toolbar,.ha-replay-sites { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.ha-replay-toolbar { color: var(--subtle); font-size: 12px; }
-.ha-replay-toolbar span { margin-inline-end: auto; }
-.ha-replay-body > p { margin-block: 6px 8px; }
-.ha-replay-process { margin-block-start: 8px; }
-.ha-replay-process > summary { display: flex; align-items: center; gap: 5px; width: fit-content; min-height: 28px; margin-inline-start: -5px; padding-inline: 5px; border-radius: 6px; color: var(--subtle); font-size: 13px; cursor: pointer; }
-.ha-replay-process > summary:is(:hover,:focus-visible) { color: var(--text); }
-.ha-replay-process > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.ha-process-brand { flex: 0 0 16px; width: 16px; height: 16px; background: currentColor; mask: url('/agent-icons/github.svg') center / contain no-repeat; }
-.ha-replay-activity > p { margin-block: 10px 8px; }
-.ha-replay-activity > p.ha-process-meta { margin-block: 2px 4px; }
-.ha-replay-activity > :is(.ha-process-group,.ha-process-batch) { margin-block: 2px 4px; }
-.ha-replay-activity > :is(.ha-process-group,.ha-process-batch) > summary { min-height: 26px; }
-.ha-replay-sites span { display: inline-flex; align-items: center; gap: 4px; border-radius: 12px; background: var(--surface-2); padding: 2px 7px; }
-.ha-replay-table { width: 100%; border-collapse: collapse; }
-.ha-replay-table :is(th,td) { padding: 6px; border-bottom: 1px solid var(--line); text-align: start; overflow-wrap: anywhere; }
-.ha-receipt-diff { margin: 6px 0; min-width: 0; }
-.ha-receipt-diff > summary { overflow-wrap: anywhere; cursor: pointer; }
-.ha-receipt-diff > pre { max-height: 14rem; overflow: auto; padding: 8px; background: var(--surface-2); }
-.ha-diff-added { color: light-dark(#176343,#8ad6aa); }
-.ha-diff-deleted { color: light-dark(#a1272c,#ffa9ae); }
-.ha-receipt-thumbnail img { display: block; max-width: 100%; width: 150px; border-radius: 6px; }
-.ha-receipt-dialog { max-width: min(92vw,900px); max-height: 86dvh; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); }
-.ha-receipt-dialog::backdrop { background: rgb(0 0 0 / .64); }
-.ha-receipt-dialog > img { display: block; max-width: 100%; max-height: 72dvh; margin-top: 10px; object-fit: contain; }
 
 .ha-related { display:grid; gap:6px; padding:6px 3px 8px; border-bottom:1px solid var(--ha-line, var(--border)); font-size:12px; }
 .ha-related-row { display:flex; align-items:center; justify-content:space-between; gap:6px 12px; flex-wrap:wrap; }

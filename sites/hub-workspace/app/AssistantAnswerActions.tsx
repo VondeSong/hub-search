@@ -31,10 +31,10 @@ export function AssistantAnswerActions({ copied, onCopy, onInsert, onNote, onTas
     const id = requestAnimationFrame(() => menu.current?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true }));
     const scroll = (event: Event) => { if (!(event.target instanceof Node) || !menu.current?.contains(event.target)) close(false); };
     const outside = (event: PointerEvent) => {
-      if (!(event.target instanceof Element)) return;
-      const owner = event.target.closest('.ha-panel');
+      const path = event.composedPath();
+      const owner = path.find(node => node instanceof Element && node.classList.contains('ha-panel'));
       if (owner && owner !== host) return;
-      if (!menu.current?.contains(event.target) && !trigger.current?.contains(event.target)) close(false);
+      if (!path.includes(menu.current!) && !path.includes(trigger.current!)) close(false);
     };
     host.addEventListener('scroll', scroll, true);
     document.addEventListener('pointerdown', outside);
@@ -55,7 +55,9 @@ export function AssistantAnswerActions({ copied, onCopy, onInsert, onNote, onTas
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
     const choices = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') || []);
-    const index = choices.indexOf(document.activeElement as HTMLButtonElement);
+    const root = menu.current?.getRootNode();
+    const active = root instanceof ShadowRoot ? root.activeElement : document.activeElement;
+    const index = choices.indexOf(active as HTMLButtonElement);
     choices[event.key === 'Home' ? 0 : event.key === 'End' ? choices.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + choices.length) % choices.length]?.focus();
   }
 

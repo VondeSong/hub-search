@@ -23,6 +23,7 @@ import { AssistantHeader, AssistantTools, clampPanelSize, type AssistantMenu, ty
 import { AssistantSelectionActions } from './AssistantSelectionActions';
 import AssistantAnswerContent from './AssistantAnswerContent';
 import { AssistantAnswerActions } from './AssistantAnswerActions';
+import { formattingDemoMessages, sourceDemoIds, sourceDemoQuestion, sourceDemoAnswer, sourceDemoSections } from './agents/demo-data';
 import { AssistantMemoryManager, MemoryFeedback, useAssistantMemory, type AssistantMemoryModel } from './AssistantMemory';
 import { loadMemoryPreference, rememberMemoryPreference } from './assistant-memory';
 
@@ -492,47 +493,25 @@ export default function Assistant(props: AssistantProps) {
   const workKey = selected?.id || route;
   let initial = conversations.current[workKey];
   if (!initial && workKey === 'demo:source-preview') {
-    const pages = ['migrated-assembly-craft', 'migrated-assembly-obsidian'].flatMap(id => props.catalog?.find(page => page.id === id) || []);
+    const pages = sourceDemoIds.flatMap(id => props.catalog?.find(page => page.id === id) || []);
     if (pages.length === 2 && pages.every(props.canUseContext || allowContext)) {
       const [design, field] = pages;
       initial = readConversation({
         title: '示例 · 卡扣试装核对',
         resources: { pages },
         session: { messages: [
-          { id: 'source-demo-question', role: 'user', text: '评审稿和现场的卡扣安装顺序相反，是现场装错了吗？' },
+          { id: 'source-demo-question', role: 'user', text: sourceDemoQuestion },
           { id: 'source-demo-answer', role: 'assistant',
-            text: '目前不能判定现场装错。两份记录的安装顺序确实相反，但采用的零件条件可能不同。',
+            text: sourceDemoAnswer,
             context: { ...design, evidence: [design, field] },
-            sections: [
-              { heading: '设计评审稿', body: '建议先装卡扣 1，再装卡扣 2；对应支架 V2 和饰板方案 A。', sourceIds: [design.id] },
-              { heading: '现场试装记录', body: '实际先装卡扣 2，再装卡扣 1；支架暂记为 V3，饰板方案未记录。', sourceIds: [field.id] },
-              { heading: '下一步', body: '打开两份资料，核对版本、卡扣编号和照片视角。确认是同一套零件条件后，再比较安装顺序。' },
-            ],
+            sections: sourceDemoSections,
           },
         ] },
       });
     }
   }
   if (!initial && workKey === 'demo:ui-foundation-v1') {
-    initial = readConversation({ title: '排版示例 · 不调用模型', session: { messages: [
-      { id: 'ui-demo-question-short', role: 'user', text: '哪些分数通过了筛选？' },
-      { id: 'ui-demo-answer-short', role: 'assistant', text: '通过筛选的是 **72、91、60**，共 **3 / 5** 个分数。' },
-      { id: 'ui-demo-question-long', role: 'user', text: '用代码、步骤和表格说明为什么是 3 / 5。' },
-      { id: 'ui-demo-answer-long', role: 'assistant', text: [
-        '# 把筛选结果解释清楚',
-        '这里有 **5 个原始分数**。条件 `$_ -ge 60` 保留大于或等于 60 的值，所以恰好 60 分也通过。',
-        '## 先看这段代码',
-        '```powershell\n$scores = 58, 72, 91, 60, 45\n$passingScores = $scores | Where-Object { $_ -ge 60 }\n"及格人数: $($passingScores.Count) / $($scores.Count)"\n```',
-        '### 逐步核对',
-        '1. `$scores` 保存原来的 5 个分数。\n2. `Where-Object` 逐个检查，只保留满足条件的分数。\n3. 用 `.Count` 分别读取及格数与总数，得到 **3 / 5**。',
-        '## 用表格复核',
-        '| 分数 | 是否达到 60 | 处理结果 |\n| ---: | :---: | --- |\n| 58 | 否 | 排除 |\n| 72 | 是 | 保留 |\n| 91 | 是 | 保留 |\n| 60 | 是 | 保留，等于阈值也通过 |\n| 45 | 否 | 排除 |',
-        '> 阈值包含等号。把 `-ge` 改成 `-gt` 后，60 分就不会保留。',
-        '## 还可以检查什么',
-        '- 先确认及格线是否包含等号。\n- 复制代码时保留变量名、引号和缩进。\n- 如需查语法，可打开 [PowerShell 官方 Where-Object 文档](https://learn.microsoft.com/powershell/module/microsoft.powershell.core/where-object)。',
-      ].join('\n\n'),
-      },
-    ] } });
+    initial = readConversation({ title: '排版示例 · 不调用模型', session: { messages: formattingDemoMessages } });
   }
   initial ??= readConversation(loadMemoryPreference());
   const history: HistoryItem[] = Object.entries(conversations.current).filter(([id, value]) => !historyMeta.current[id]?.deleted && (value.session.messages.length || value.session.active)).map(([id, value]) => ({ id, updatedAt: value.updatedAt, title: value.title, pinned: historyMeta.current[id]?.pinned || false, archived: historyMeta.current[id]?.archived || false, blocked: value.contexts.some(context => !(props.canUseContext || allowContext)(context)) || value.session.messages.some(message => !(props.canUseContext || allowContext)(message.context)) || value.resources.pages.some(context => !(props.canUseContext || allowContext)(context)) })).reverse();

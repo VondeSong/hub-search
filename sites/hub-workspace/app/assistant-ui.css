@@ -1,3 +1,5 @@
+@import "./agents/demo-answer.css";
+
 /* Agents UI foundation. Business state and process timing remain in their owners. */
 .ha-panel {
   --ha-body-size: 1rem;
@@ -72,52 +74,6 @@
 .ha-panel .ha-message { margin-block-end: 28px; }
 .ha-panel .ha-user-bubble { font-size: .9375rem; line-height: 1.65; padding: 11px 14px; }
 .ha-panel .ha-reply { max-inline-size: 74ch; font-size: var(--ha-body-size); line-height: 1.75; color: var(--text); }
-.ha-panel .ha-reply-section { margin-block-start: 22px; }
-.ha-panel .ha-reply-section > h3 { margin: 0 0 8px; color: var(--text); font-size: 1.0625rem; line-height: 1.5; font-weight: 650; }
-.ha-panel .ha-answer-content { min-width: 0; overflow-wrap: anywhere; color: var(--text); }
-.ha-answer-content > :first-child { margin-block-start: 0; }
-.ha-answer-content > :last-child { margin-block-end: 0; }
-.ha-panel .ha-answer-content p { margin: 0 0 14px; white-space: pre-wrap; color: var(--text); }
-.ha-answer-content :is(h1, h2, h3) { color: var(--text); font-weight: 650; line-height: 1.45; letter-spacing: -.01em; }
-.ha-answer-content h1 { font-size: 1.25rem; margin: 26px 0 12px; }
-.ha-answer-content h2 { font-size: 1.125rem; margin: 24px 0 10px; }
-.ha-answer-content h3 { font-size: 1rem; margin: 20px 0 8px; }
-.ha-answer-content strong { font-weight: 650; }
-.ha-answer-content :is(ul, ol) { padding-inline-start: 1.4em; margin-block: 0 16px; }
-.ha-answer-content ol { list-style: decimal outside; }
-.ha-answer-content ul { list-style: disc outside; }
-.ha-answer-content ul ul { list-style-type: circle; }
-.ha-answer-content ul ul ul { list-style-type: square; }
-.ha-answer-content ol ol { list-style-type: lower-alpha; }
-.ha-answer-content li { padding-inline-start: .1em; margin-block: 6px; }
-.ha-answer-content li > p { margin-block-end: 5px; }
-.ha-answer-content li > :last-child { margin-block-end: 0; }
-.ha-answer-content li :is(ul, ol) { margin-block: 6px; }
-.ha-answer-content blockquote { margin: 18px 0; padding: 3px 0 3px 14px; border-inline-start: 3px solid var(--line); }
-.ha-answer-content blockquote > :last-child { margin-block-end: 0; }
-.ha-answer-content a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
-.ha-answer-content a:hover { text-decoration-thickness: 2px; }
-.ha-answer-content :not(pre) > code { padding: .08em .28em; border-radius: 4px; background: var(--surface-2); color: var(--text); font: .91em/1.6 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; box-decoration-break: clone; }
-.ha-answer-code { margin: 18px 0; min-width: 0; border: 1px solid var(--line); border-radius: var(--ha-ui-radius); overflow: hidden; background: var(--surface-2); }
-.ha-answer-code-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 10px; border-block-end: 1px solid var(--line); color: var(--muted); font-size: .75rem; user-select: none; }
-.ha-answer-code-language { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.ha-answer-code-actions { display: flex; gap: 4px; flex: none; }
-.ha-panel .ha-answer-code-actions button { display: inline-flex; gap: 5px; align-items: center; min-height: 28px; padding: 3px 6px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: .75rem; }
-.ha-answer-code-actions button:hover, .ha-answer-code-actions button[aria-pressed=true] { background: var(--surface); color: var(--text); }
-.ha-answer-code pre { margin: 0; padding: 13px 14px; max-height: 28rem; overflow: auto; white-space: pre; tab-size: 2; color: var(--text); font: .8125rem/1.7 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
-.ha-answer-code pre.is-wrapped { white-space: pre-wrap; overflow-wrap: anywhere; }
-.ha-answer-code pre code { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; }
-.ha-answer-code-feedback { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.ha-answer-code-feedback.is-error { position: static; display: block; width: auto; height: auto; padding: 8px 12px; clip-path: none; font-size: .8125rem; color: var(--text); }
-.ha-answer-table-wrap { max-width: 100%; overflow-x: auto; margin: 18px 0; border: 1px solid var(--line); border-radius: var(--ha-ui-radius); scrollbar-width: thin; }
-.ha-answer-content table { width: 100%; min-width: 340px; border-collapse: collapse; font-size: .875rem; line-height: 1.6; }
-.ha-answer-content :is(th, td) { padding: 10px 12px; border-block-end: 1px solid var(--line); text-align: start; vertical-align: top; }
-.ha-answer-content th { color: var(--text); background: var(--surface-2); font-weight: 600; }
-.ha-answer-content tr:last-child td { border-block-end: 0; }
-.ha-answer-content :is(th, td) + :is(th, td) { border-inline-start: 1px solid var(--line); }
-.ha-panel .ha-section-citations { display: flex; align-items: center; gap: 5px; margin-top: 6px; color: var(--muted); font-size: .75rem; }
-.ha-panel .ha-section-citations .ha-inline-citation { min-width: 23px; min-height: 23px; font-size: .75rem; }
-.ha-panel .ha-unplaced-references { margin-block-start: 16px; font-size: .8125rem; }
 .ha-panel .ha-composer {
   border-color: var(--ha-control-edge);
   border-radius: 16px;
@@ -150,15 +106,6 @@
   .ha-panel .ha-composer:focus-within { border-color: Highlight; }
 }
 
-/* Ordinary answer actions are separate from tag-assistant business actions. */
-.ha-answer-actions { display: flex; align-items: center; gap: 4px; max-inline-size: 46rem; margin-top: 10px; user-select: none; }
-.ha-panel .ha-answer-actions > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 5px 8px; border: 0; border-radius: 7px; color: var(--muted); background: transparent; font-size: .75rem; }
-.ha-answer-actions > button:hover, .ha-answer-actions > button[aria-expanded=true] { color: var(--text); background: var(--surface-2); }
-.ha-panel .ha-answer-menu { position: absolute; z-index: 35; display: flex; flex-direction: column; gap: 2px; padding: 5px; overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 12%, transparent); background: var(--surface); font-size: .875rem; }
-.ha-answer-menu > button { display: flex; align-items: center; gap: 10px; flex: none; width: 100%; min-height: 54px; padding: 8px 10px; border: 0; border-radius: 8px; text-align: start; color: var(--text); background: transparent; }
-.ha-answer-menu > button:hover, .ha-answer-menu > button:focus-visible { background: var(--surface-2); }
-.ha-answer-menu > button > svg { color: var(--muted); flex: none; }
-.ha-answer-menu small { display: block; margin-top: 2px; color: var(--muted); font-size: .75rem; line-height: 1.45; }
 .ha-ui-demo-note { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; margin: 0 0 24px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); color: var(--muted); font-size: .75rem; line-height: 1.55; }
 .ha-ui-demo-note strong { color: var(--text); font-weight: 550; font-size: .8125rem; }
 .ha-ui-demo-note a { color: var(--accent); text-underline-offset: 3px; }

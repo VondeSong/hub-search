@@ -5,15 +5,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ReferenceAgent from './ReferenceAgent';
+import AgentsDemos, { type AgentsDemosProps } from './AgentsDemos';
 import referenceStyles from './reference.css?inline';
 import type { TagReviewModel } from '../tag-assistant';
 import type { WorkspaceAgentsContext } from './workspace-context';
 
-export function ReferenceSurface({ onDismiss, workspaceContext, tagWorkspace, onOpenTagQueue, open = true }: {
+export function ReferenceSurface({ onDismiss, workspaceContext, tagWorkspace, onOpenTagQueue, demo, onOpenDemos, open = true }: {
   onDismiss?: () => void;
   workspaceContext?: WorkspaceAgentsContext;
   tagWorkspace?: TagReviewModel;
   onOpenTagQueue?: (id: string) => void;
+  demo?: Omit<AgentsDemosProps, 'onDismiss'>;
+  onOpenDemos?: () => void;
   open?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
@@ -30,10 +33,11 @@ export function ReferenceSurface({ onDismiss, workspaceContext, tagWorkspace, on
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
       precedence="default"
     />
-    <div ref={host}>{surface && createPortal(
+    <div ref={host} style={demo ? { height: "100%" } : undefined}>{surface && createPortal(
       <>
         <style>{referenceStyles}</style>
-        <ReferenceAgent onDismiss={onDismiss} workspaceContext={workspaceContext} tagWorkspace={tagWorkspace} onOpenTagQueue={onOpenTagQueue} open={open} />
+        {demo && onDismiss ? <AgentsDemos {...demo} onDismiss={onDismiss} />
+          : <ReferenceAgent onDismiss={onDismiss} workspaceContext={workspaceContext} tagWorkspace={tagWorkspace} onOpenTagQueue={onOpenTagQueue} onOpenDemos={onOpenDemos} open={open} />}
       </>,
       surface,
     )}</div>

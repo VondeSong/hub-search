@@ -7,6 +7,7 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [react()],
+  resolve: { dedupe: ["react", "react-dom", "lucide-react"] },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
@@ -31,6 +32,17 @@ export default defineConfig(async () => ({
   },
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
+    // The desktop development-only launcher consumes the workbench's shared demo source.
+    fs: { allow: [
+      ".",
+      "../sites/hub-workspace/app/agents",
+      "../sites/hub-workspace/app/AssistantAnswerActions.tsx",
+      "../sites/hub-workspace/app/AssistantAnswerContent.tsx",
+      "../sites/hub-workspace/app/AssistantProcess.tsx",
+      "../sites/hub-workspace/app/insight-migration.ts",
+      "../sites/hub-workspace/public/agent-icons",
+      "../sites/hub-workspace/public/hub-workspace-preview.jpg",
+    ] },
     port: 1420,
     strictPort: true,
     host: host || false,

@@ -2,6 +2,7 @@ import {libraryDragType} from "./AgentLibraryScope";
 import { LibraryStatusIcon } from "./LibraryStatusIcon";
 import { StandaloneAgentLauncher } from "./StandaloneAgentLauncher";
 import { CloudAgentsLauncher } from "./CloudAgentsLauncher";
+import { lazy, Suspense } from "react";
 import { providerUnavailableHint } from "./ProviderLabels";
 import {
   BookOpenCheck,
@@ -49,6 +50,8 @@ function providerLabel(provider: LibrarySummary["provider"]): string {
   if (provider === "feishu") return "飞书";
   return "滴答清单";
 }
+
+const DevAgentsDemos = import.meta.env.DEV ? lazy(() => import("./DesktopAgentsDemos")) : null;
 
 export function WorkspaceRail({
   onTogglePanel,
@@ -101,6 +104,7 @@ export function WorkspaceRail({
       <div className="workspace-rail-navigation" aria-label="浏览视图">
         <StandaloneAgentLauncher />
         <CloudAgentsLauncher />
+        {DevAgentsDemos && <Suspense fallback={null}><DevAgentsDemos /></Suspense>}
         {navigation.map((item) => (
           <button
             key={item.view}

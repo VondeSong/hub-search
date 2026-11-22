@@ -3,17 +3,20 @@
 import { lazy, Suspense, useEffect, useRef } from "react";
 import type { TagReviewModel } from "../tag-assistant";
 import type { WorkspaceAgentsContext } from "./workspace-context";
+import type { AgentsDemosProps } from "./AgentsDemos";
 
 const AgentsSurface = lazy(() => import("./ReferenceSurface").then(module => ({
   default: module.ReferenceSurface,
 })));
 
-export default function WorkspaceAgentsDialog({ open, onDismiss, workspaceContext, tagWorkspace, onOpenTagQueue }: {
+export default function WorkspaceAgentsDialog({ open, onDismiss, workspaceContext, tagWorkspace, onOpenTagQueue, demo, onOpenDemos }: {
   open: boolean;
   onDismiss: () => void;
   workspaceContext?: WorkspaceAgentsContext;
   tagWorkspace?: TagReviewModel;
   onOpenTagQueue?: (id: string) => void;
+  demo?: Omit<AgentsDemosProps, "onDismiss">;
+  onOpenDemos?: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
 
@@ -30,12 +33,13 @@ export default function WorkspaceAgentsDialog({ open, onDismiss, workspaceContex
       className="workspace-agents-dialog"
       aria-label="Hub 助手"
       onCancel={event => {
+        if (event.target !== event.currentTarget) return;
         event.preventDefault();
         onDismiss();
       }}
     >
       <Suspense fallback={<p role="status" className="workspace-agents-loading">正在打开助手…</p>}>
-        <AgentsSurface onDismiss={onDismiss} workspaceContext={workspaceContext} tagWorkspace={tagWorkspace} onOpenTagQueue={onOpenTagQueue} open={open} />
+        <AgentsSurface onDismiss={onDismiss} workspaceContext={workspaceContext} tagWorkspace={tagWorkspace} onOpenTagQueue={onOpenTagQueue} demo={demo} onOpenDemos={onOpenDemos} open={open} />
       </Suspense>
     </dialog>
   );

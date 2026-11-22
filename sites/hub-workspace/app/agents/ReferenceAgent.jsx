@@ -192,7 +192,7 @@ function ThumbArtwork({ kind, large = false }) {
   );
 }
 
-export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspace, onOpenTagQueue, open }) {
+export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspace, onOpenTagQueue, onOpenDemos, open }) {
   // 1. 视口宽度模式：'sidebar' (480px) | 'focus' (760px) | 'full'
   const [viewportMode, setViewportMode] = useState('focus');
   // 示例场景切换：'report' (正常流式复核报告) | 'interrupted' (图2规则加载 + 图3核验中断重构案例)
@@ -784,6 +784,9 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
               <span>案例2：中断与规则</span>
             </button>
+            {onOpenDemos ? <button type="button" onClick={onOpenDemos}
+              className="px-2 py-0.5 rounded-lg text-[11px] font-medium text-secondary hover:text-primary">更多演示</button>
+              : <a href="/?assistant=ui-demo" className="px-2 py-0.5 rounded-lg text-[11px] font-medium text-secondary hover:text-primary">更多演示</a>}
           </div>}
         </div>
         <div className="flex items-center bg-black/5 p-0.5 rounded-xl">
