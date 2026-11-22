@@ -97,3 +97,14 @@
   margin: 24px;
   color: #6b6965;
 }
+
+.workspace-agents-dialog:is([data-window-mode="docked"], [data-window-mode="floating"]) {
+  background: transparent;
+  pointer-events: none;
+  z-index: 80;
+}
+@media (min-width: 1000px) {
+  .hub-app:has(> .workspace-agents-dialog[open][data-window-mode="docked"]) {
+    padding-inline-end: 496px;
+  }
+}

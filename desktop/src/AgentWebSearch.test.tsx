@@ -43,18 +43,36 @@ it("CN04 failed saves remain visible",async()=>{
 it("CN04 restored web sources have safe clickable links and explicit provenance",async()=>{
  const report:Report={status:"completed",summary:"文章",findings:[],nextSteps:[],questions:[],limitations:[],waitCondition:"",prose:{markdown:"参考[官方文章](https://example.org/a)",citations:[],webSources:[{url:"https://example.org/a",title:"官方文章",provenance:"providerAccess"},{url:"https://example.org/b",title:"候选资料",provenance:"modelReference"}]}};
  await act(async()=>root.render(<AgentConversation conversation={{messages:[{id:"saved",role:"assistant",runId:"run",createdAt:1,report}],hasEarlier:false}} revoked={false} onOpenCitation={vi.fn()}/>));
- expect(host.textContent).toContain("网页来源 · 2");expect(host.textContent).toContain("Codex 有网页访问记录");expect(host.textContent).toContain("引用链接（无可匹配的联网记录）");expect(host.textContent).toContain("尚未保存 Hub 原文快照");expect(host.querySelectorAll('a[href="https://example.org/a"]')).toHaveLength(2);expect(host.querySelector("img")).toBeNull();
+ expect(host.textContent).toContain("2 个来源");
+ const opener=host.querySelector<HTMLButtonElement>(".agent-web-sources-trigger")!;
+ await act(async()=>{opener.focus();opener.click();});
+ const sources=document.body.querySelector('[role="dialog"][aria-label="网页追溯来源 (2)"]')!;
+ expect(sources.textContent).toContain("Codex 有网页访问记录");
+ expect(sources.textContent).toContain("引用链接（无可匹配的联网记录）");
+ expect(sources.textContent).toContain("尚未保存 Hub 原文快照");
+ expect(document.body.querySelectorAll('a[href="https://example.org/a"]')).toHaveLength(2);
+ expect(sources.querySelector("img")).toBeNull();
+ const field=sources.querySelector<HTMLInputElement>("input")!;
+ await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(field,"example.org/b");field.dispatchEvent(new Event("input",{bubbles:true}));});
+ expect(sources.querySelectorAll("li")).toHaveLength(1);
+ expect(sources.querySelector('a[href="https://example.org/b"]')).not.toBeNull();
+ await act(async()=>field.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true})));
+ expect(document.body.querySelector(".agent-reference-overlay")).toBeNull();
+ expect(document.activeElement).toBe(opener);
 });
 it("CN04 unsafe restored links are never activated",async()=>{
  for(const url of ["javascript:alert(1)","https://u:p@example.org/a","https://127.0.0.1","https://x.local","https://[::1]","https://example.org:444"," https://example.org"])expect(publicWebHref(url)).toBeUndefined();
- await act(async()=>root.render(<AgentWebSources sources={[{url:"javascript:alert(1)",title:"<img src=x>",provenance:"modelReference"}]}/>));expect(host.querySelector("a")).toBeNull();expect(host.querySelector("img")).toBeNull();expect(host.textContent).toContain("链接不可用");
+ await act(async()=>root.render(<AgentWebSources sources={[{url:"javascript:alert(1)",title:"<img src=x>",provenance:"modelReference"}]}/>));
+ await act(async()=>host.querySelector("button")!.click());
+ const sources=document.body.querySelector(".agent-reference-modal")!;
+ expect(sources.querySelector("a")).toBeNull();expect(sources.querySelector("img")).toBeNull();expect(sources.textContent).toContain("链接不可用");
 });
 it("CN04 native web activity remains visible without claiming full-text reading",async()=>{
  const value:ActivityRun={runId:"run",revision:1,state:"completed",running:false,startedAt:1,finishedAt:1001,steps:0,events:[{id:"w",kind:"webSearch",state:"completed",label:"Codex 访问网页",url:"https://example.org/a",createdAt:1}]};
  value.events.push({id:"empty",kind:"webSearch",state:"completed",label:"Codex 搜索网页： ",createdAt:2},{id:"failed",kind:"webSearch",state:"failed",label:"Codex 搜索网页：新闻",createdAt:3});
  await act(async()=>root.render(<AgentActivity value={value}/>));await act(async()=>host.querySelector<HTMLButtonElement>("button")!.click());
  expect(host.textContent).not.toContain("调用已结束");expect(host.textContent).not.toContain("搜索网页： ·");
- expect(host.querySelector(".agent-phase-warning")?.textContent).toBe("部分未完成");
+ expect(host.querySelector(".agent-phase-warning")).toBeNull();
  expect(host.querySelector('.agent-web-activity > summary[title="搜索网页 · 未完成"] small')?.textContent).toBe("未完成");
  expect(host.querySelector(".agent-web-provenance")).toBeNull();
  expect(host.textContent).not.toContain("已读全文");
@@ -110,10 +128,11 @@ it("distinguishes returned sources from legacy access and unmatched links",async
   {url:"https://example.org/legacy",title:"Legacy",provenance:"providerAccess"},
   {url:"https://example.org/unmatched",title:"Unmatched",provenance:"modelReference"}
  ]}/>));
- const rows=Array.from(host.querySelectorAll('li')).map(li=>li.textContent);
- expect(rows).toEqual(['Returned · 联网工具返回的来源','Legacy · Codex 有网页访问记录','Unmatched · 引用链接（无可匹配的联网记录）']);
- expect(host.textContent).toContain('不代表已完整读取');
- expect(host.textContent).toContain('无匹配记录也不代表未访问');
+ await act(async()=>host.querySelector("button")!.click());
+ const sources=document.body.querySelector(".agent-reference-modal")!;
+ const rows=Array.from(sources.querySelectorAll('li small')).map(li=>li.textContent);
+ expect(rows).toEqual(['联网工具返回的来源','Codex 有网页访问记录','引用链接（无可匹配的联网记录）']);
+ expect(sources.textContent).toContain('可能是搜索命中或页面片段');
 });
 
 it("keeps old empty web records readable without claiming a search or successful fetch",async()=>{

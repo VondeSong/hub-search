@@ -58,7 +58,7 @@ export function MemoryAndSavePopover({model,value,canAuto,materialsOnly,disabled
     if(open){setAuto(value.autoFlashcardInbox);setSaveError("");closeButton.current?.focus({preventScroll:true});}
   }}>
     <summary ref={trigger} className="agent-memory-trigger" data-memory-enabled={model.selection.enabled&&!materialsOnly} aria-label="记忆与保存" title="记忆与保存">
-      <ShieldCheck size={18} aria-hidden="true"/><span className="agent-memory-trigger-full">记忆与保存</span><span className="agent-memory-trigger-short">记忆</span>
+      <ShieldCheck size={18} aria-hidden="true"/><span className="agent-memory-trigger-full">{model.selection.enabled&&!materialsOnly ? model.projectLabel(activeProject) : "记忆与保存"}</span><span className="agent-memory-trigger-short">记忆</span>
     </summary>
     <section className="agent-assistant-settings agent-memory-permissions" role="dialog" aria-modal="true" aria-label="记忆与保存" onKeyDown={wrapDialogTab}>
       <header className="agent-popover-header"><strong>记忆与保存</strong><button ref={closeButton} type="button" aria-label="关闭记忆与保存" onClick={()=>popover.close(true)}><X size={16}/></button></header>

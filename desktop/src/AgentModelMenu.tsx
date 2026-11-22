@@ -12,7 +12,7 @@ const supportsFast=(provider:ModelProvider,model?:CodexModel)=>provider==="codex
 const descriptions:Record<string,string>={none:"直接回答，不启用推理模式",low:"较少推理投入，适合简单问题",medium:"适合日常讨论与资料整理",high:"增加推理投入，适合复杂问题",xhigh:"更充分地推理与检查，等待可能更久",max:"使用该模型最高的推理投入",ultra:"使用该模型支持的更高推理投入"};
 const modelLabel=(name:string)=>name.replace(/^(GPT-\d+(?:\.\d+)?)-(Sol|Terra|Astra|Luna)$/i,"$1 $2");
 const providers:ModelProvider[]=["deepseek","codex"];
-export function AgentModelMenu({value,disabled,onSave}:{value:AssistantOptions;disabled:boolean;onSave:(value:AssistantOptions)=>Promise<void>}){
+export function AgentModelMenu({value,disabled,onSave,onOpenAccounts}:{value:AssistantOptions;disabled:boolean;onSave:(value:AssistantOptions)=>Promise<void>;onOpenAccounts?:()=>void}){
   const runtime=useCodexSuite(),effective=value.model??(runtime.loaded?runtime.settings:null),activeProvider=effective?.provider??"codex";
   const [catalogs,setCatalogs]=useState<Record<ModelProvider,CodexModel[]>>(()=>({codex:cachedCodexSuiteModels("codex")||[],deepseek:cachedCodexSuiteModels("deepseek")||[]}));
   const [loading,setLoading]=useState(false),[saving,setSaving]=useState(false),[error,setError]=useState("");
@@ -57,6 +57,7 @@ export function AgentModelMenu({value,disabled,onSave}:{value:AssistantOptions;d
         {fastAvailable&&<section className="agent-speed-setting" aria-label="响应速度"><strong>响应速度</strong><div className="agent-speed-segments">{[false,true].map(fast=><button type="button" key={String(fast)} disabled={blocked||!effective} aria-label={fast?"快速模式":"标准速度"} aria-pressed={fastActive===fast} onClick={()=>{if(effective)void save({...value,model:{...effective,fast}});}}>{fast?<Zap size={18}/>:<Circle size={18}/>}<span>{fast?"加速":"标准"}</span>{fastActive===fast&&<Check size={16}/>}</button>)}</div><p>加速增加用量消耗，不改变思考强度。</p></section>}
         <div className="agent-model-footer"><span>思考强度：{effortName(resolvedEffort)}</span><span>从下一次发送生效</span><button type="button" className="agent-menu-refresh" aria-label="刷新可用模型" disabled={loading||saving} onClick={()=>void load(true)}><RefreshCw size={15}/></button></div>
         <button type="button" className="agent-menu-choice agent-model-default" disabled={blocked} aria-pressed={!value.model} onClick={()=>void save({...value,model:null},true)}><span>跟随全局模型设置</span>{!value.model&&<Check size={16}/>}</button>
+        {onOpenAccounts&&<button type="button" className="agent-menu-choice agent-model-default" disabled={blocked} onClick={event=>{const menu=event.currentTarget.closest("details");if(menu)menu.open=false;onOpenAccounts();}}>Codex 账号管理</button>}
         {error&&<p role="alert">{error}</p>}
       </div>
     </details>

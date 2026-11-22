@@ -5,6 +5,7 @@ import {AgentFollowups,type Followup} from "./AgentFollowups";
 import { loadAgentPreferences, rememberAgentPreferences, loadCodexWebSearchPreference, loadMemoryPreference, rememberMemoryPreference } from "./AgentPreferences";
 import { AgentTagRequestContext, AgentCitationContext, AgentBrowsingContext, AgentPanelContext,AgentAccountVisibleContext,AgentTextMaterialContext,AgentExtraPanelContext,type ExtraAgentEntry,type TextMaterial,type AgentQuestion } from "./StandaloneAgentLauncher";
 import {AgentMaterialCard} from "./AgentMaterialCard";
+import {formatFileSize} from "./FileFormatting";
 import {AgentConversationHistory,type WorkSummary,type HistoryChange} from "./AgentConversationHistory";
 import { conversationTitle } from "./AgentConversationHistoryData";
 import { AgentAnswerSave, type AnswerSave } from "./AgentAnswerSave";
@@ -23,7 +24,7 @@ import { AgentTopics, type TopicWorkSource } from "./AgentTopics";
 import { useAgentPopover } from "./useAgentPopover";
 import { useAgentPanelResize } from "./useAgentPanelResize";
 import {useInsightWork} from "./useInsights";
-import { CodexAccountBadge } from "./CodexAccountsSettings";
+import { CodexAccountBadge, CodexAccountContext, CodexAccountDialog } from "./CodexAccountsSettings";
 import { authorizeCodexConversation, getCodexAccountSnapshot, refreshCodexAccounts } from "./CodexAccounts";
 import { isInsideKeyboardDialog } from "./AppKeyboardScope";
 import { AgentActiveTopic, AgentResearchPolicy, AgentResearchTopics, researchGrant, useResearchSelection, type ResearchGrant, type ResearchTopic } from "./AgentResearch";
@@ -40,7 +41,7 @@ import { AgentScopeCoverage } from "./AgentScopeCoverage";
 import { useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { AssistantSelectionActions } from "./AgentSelectionActions";
 import { createPortal } from "react-dom";
-import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronDown, ChevronRight, CircleAlert, FileText, Image, ListChecks, Menu, MessageSquare, PanelRight, PanelRightOpen, PanelsTopLeft, Quote, Plus, Search, X, Zap } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronRight, CircleAlert, FileText, Image, ListChecks, Menu, MessageSquare, Maximize, PanelRightOpen, PanelsTopLeft, SlidersHorizontal, Quote, Plus, Search, X, Zap } from "lucide-react";
 import type { SearchResult } from "./SearchTypes";
 import { isTaskPreviewResult } from "./TaskResultIdentity";
 import { runtimeCapabilities } from "./RuntimePlatform";
@@ -359,6 +360,12 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const dockKey = extra ? "hub-agent-extra-docked" : "hub-agent-docked";
   const canDock = !!extra || !onDismiss;
   const [docked, setDocked] = useState(() => canDock && sessionStorage.getItem(dockKey) === "true");
+  const [expandedLayout, setExpandedLayout] = useState(false);
+  const windowLayout = useAgentPopover();
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [manageSkills, setManageSkills] = useState(false);
+  const [availableSkillCount, setAvailableSkillCount] = useState<number>();
   const [titleEdit,setTitleEdit] = useState<{id:string; value:string} | null>(null);
   const [draftTitle,setDraftTitle] = useState("");
   const panelResize = useAgentPanelResize(open, panel, "width", !!extra);
@@ -471,14 +478,14 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     }
     if (!reportReading) {
       const origin=readingOrigin.current;readingOrigin.current=null;
-      if(origin?.scope===sourceScopeKey){conversationScroll.holdPosition();element.scrollTop=origin.scrollTop;origin.focus?.isConnected&&origin.focus.focus({preventScroll:true});}
+      if(origin?.scope===sourceScopeKey){conversationScroll.holdPosition();element.scrollTop=origin.scrollTop;if(!detailsMenu.current?.open&&origin.focus?.isConnected)origin.focus.focus({preventScroll:true});}
       return;
     }
     conversationScroll.holdPosition();
     const answers=element.querySelectorAll<HTMLElement>(".agent-message-assistant");
     const latest=answers[answers.length-1] || element.querySelector<HTMLElement>(".agent-report");
     if(latest)element.scrollTop+=latest.getBoundingClientRect().top-element.getBoundingClientRect().top;
-    element.focus();
+    if(!detailsMenu.current?.open)element.focus();
   },[reportReading,citationOpen]);
   useLayoutEffect(() => { if(sourcePreview || sourceError || sourceLoading) sourcePreviewElement.current?.querySelector<HTMLButtonElement>("button")?.focus({preventScroll:true}); },[sourcePreview,sourceError,sourceLoading]);
   useEffect(() => { if (!open && loaded.current && accountVisible) floatingLauncher.current?.focus(); }, [open, accountVisible]);
@@ -886,7 +893,8 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     setAddMenuOpen(true);
     if (materialPopover.ref.current) materialPopover.ref.current.open = true;
   };
-  function openSkills(returnTo: HTMLElement | null) {
+  function openSkills(returnTo: HTMLElement | null, manage = false) {
+    setManageSkills(manage);
     materialReturn.current=returnTo;
     setAddPage("skills");
     setAddMenuOpen(true);
@@ -1226,6 +1234,12 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const report = view?.work.report;
   const nativeRun = view?.activity?.find(run=>run.runId===view.run?.id && run.native);
   const nativeTokens = nativeRun?.measurement?.turnTokens;
+  const modelTokenReports = view?.modelExecutions?.filter(item => item.totalTokens != null) ?? [];
+  const measuredTokens = nativeTokens?.inputTokens != null && nativeTokens.outputTokens != null
+    ? nativeTokens.inputTokens + nativeTokens.outputTokens
+    : modelTokenReports.length > 0 && modelTokenReports.length === view?.modelExecutions?.length
+      ? modelTokenReports.reduce((total,item)=>total+(item.totalTokens ?? 0),0) : null;
+  const diagnosticModel = view ? view.modelSelection?.model : scopeOptions.model?.model || runtime.settings.model;
   const tokenLabel = (value:number|null|undefined) => value == null ? "未返回" : value.toLocaleString();
   const addTextMaterial=(entry:TextMaterial)=>{
     if(snippets.some(item=>item.text===entry.text&&item.kind===entry.kind))return true;
@@ -1353,9 +1367,9 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       if (!loaded.current) { loaded.current = true; void load(); }
     }}><span className="agent-launcher-orb" aria-hidden="true"/>助手</button>, document.body)}
     {loaded.current && createPortal(<>
-      <div data-agent-extra={extra ? "" : undefined} data-agent-docked={docked} hidden={!open || docked} className="agent-panel-height-resizer" role="separator" aria-label="调整助手高度" aria-controls={panelId} aria-orientation="horizontal" aria-valuemin={panelHeightResize.minimum} aria-valuemax={panelHeightResize.maximum} aria-valuenow={panelHeightResize.width} aria-valuetext={`${panelHeightResize.width} 像素`} tabIndex={0} title="拖动调整高度，双击恢复默认" onPointerDown={panelHeightResize.onPointerDown} onKeyDown={panelHeightResize.onKeyDown} onDoubleClick={panelHeightResize.reset}/>
-      <div data-agent-extra={extra ? "" : undefined} data-agent-docked={docked} hidden={!open} className="agent-panel-resizer" role="separator" aria-label="调整助手宽度" aria-controls={panelId} aria-orientation="vertical" aria-valuemin={panelResize.minimum} aria-valuemax={panelResize.maximum} aria-valuenow={panelWidth} aria-valuetext={`${panelWidth} 像素`} tabIndex={0} title="拖动调整宽度，双击恢复默认" onPointerDown={panelResize.onPointerDown} onKeyDown={panelResize.onKeyDown} onDoubleClick={panelResize.reset}/>
-      <aside id={panelId} ref={panel} hidden={!open} data-agent-extra={extra ? "" : undefined} data-agent-source-visible={sourceVisible} data-agent-reading={reportReading} data-agent-docked={docked} data-hub-keyboard-scope="assistant" className="agent-investigation agent-panel" aria-label={extra ? "第二个助手面板" : "Hub 助手"} onDragOver={event=>{if(event.dataTransfer.types.includes("application/x-hub-tag")||event.dataTransfer.types.includes(libraryDragType)||event.dataTransfer.types.includes("application/x-hub-agent-source")||event.dataTransfer.types.includes("Files")){event.preventDefault();event.dataTransfer.dropEffect="copy";}}} onDrop={event=>{
+      <div data-agent-extra={extra ? "" : undefined} data-agent-docked={docked} hidden={!open || docked || expandedLayout} className="agent-panel-height-resizer" role="separator" aria-label="调整助手高度" aria-controls={panelId} aria-orientation="horizontal" aria-valuemin={panelHeightResize.minimum} aria-valuemax={panelHeightResize.maximum} aria-valuenow={panelHeightResize.width} aria-valuetext={`${panelHeightResize.width} 像素`} tabIndex={0} title="拖动调整高度，双击恢复默认" onPointerDown={panelHeightResize.onPointerDown} onKeyDown={panelHeightResize.onKeyDown} onDoubleClick={panelHeightResize.reset}/>
+      <div data-agent-extra={extra ? "" : undefined} data-agent-docked={docked} hidden={!open || expandedLayout} className="agent-panel-resizer" role="separator" aria-label="调整助手宽度" aria-controls={panelId} aria-orientation="vertical" aria-valuemin={panelResize.minimum} aria-valuemax={panelResize.maximum} aria-valuenow={panelWidth} aria-valuetext={`${panelWidth} 像素`} tabIndex={0} title="拖动调整宽度，双击恢复默认" onPointerDown={panelResize.onPointerDown} onKeyDown={panelResize.onKeyDown} onDoubleClick={panelResize.reset}/>
+      <aside id={panelId} ref={panel} hidden={!open} data-agent-extra={extra ? "" : undefined} data-agent-source-visible={sourceVisible} data-agent-reading={reportReading} data-agent-expanded={expandedLayout || undefined} data-agent-docked={docked} data-hub-keyboard-scope="assistant" className="agent-investigation agent-panel" aria-label={extra ? "第二个助手面板" : "Hub 助手"} onDragOver={event=>{if(event.dataTransfer.types.includes("application/x-hub-tag")||event.dataTransfer.types.includes(libraryDragType)||event.dataTransfer.types.includes("application/x-hub-agent-source")||event.dataTransfer.types.includes("Files")){event.preventDefault();event.dataTransfer.dropEffect="copy";}}} onDrop={event=>{
         const tagData=event.dataTransfer.types?.includes("application/x-hub-tag")?event.dataTransfer.getData("application/x-hub-tag"):"";
         if(tagData){event.preventDefault();event.stopPropagation();try{const v=JSON.parse(tagData);if(typeof v.tagId!=="string"||typeof v.label!=="string"||v.tagId.length>200)throw Error("无法识别标签");setTagPreparation({...tagPreparation,references:[...tagPreparation.references.filter(t=>t.tagId!==v.tagId),v].slice(0,16)});}catch(reason){setError(String(reason));}return;}
         const libraryData=event.dataTransfer.types?.includes(libraryDragType)?event.dataTransfer.getData(libraryDragType):"";
@@ -1370,8 +1384,9 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     }}>
       <header className="agent-panel-header" inert={memory.managerOpen}>
         <div className="agent-header-start">
-        <details ref={detailsMenu} data-history={historyExpanded} className="agent-dialogue-details" data-task-status={taskStatusOnly} onClickCapture={event=>{const menu=event.currentTarget;if(!menu.open&&(event.target as Element).closest("summary")===menu.firstElementChild){detailsReturn.current=menu.firstElementChild as HTMLElement;setHistoryExpanded(true);setTaskStatusOnly(false);void reloadWorks();}}} onToggle={event=>{if(event.target!==event.currentTarget)return;const menu=event.currentTarget;if(!menu.open&&detailsReturn.current?.isConnected&&(menu.contains(document.activeElement)||document.activeElement===document.body))detailsReturn.current.focus();}}><summary aria-label="对话历史" title="对话历史"><Menu size={18} aria-hidden="true"/></summary><div className="agent-details-content" role="region" aria-label={historyExpanded?"对话历史":taskStatusOnly?"任务状态":"对话详情"}>
+        <details ref={detailsMenu} data-history={historyExpanded} className="agent-dialogue-details" data-task-status={taskStatusOnly} onClickCapture={event=>{const menu=event.currentTarget;if(!menu.open&&(event.target as Element).closest("summary")===menu.firstElementChild){detailsReturn.current=menu.firstElementChild as HTMLElement;setHistoryExpanded(true);setTaskStatusOnly(false);void reloadWorks();}}} onToggle={event=>{if(event.target!==event.currentTarget)return;const menu=event.currentTarget;setDetailsOpen(menu.open);if(!menu.open&&detailsReturn.current?.isConnected&&(menu.contains(document.activeElement)||document.activeElement===document.body))detailsReturn.current.focus();}}><summary aria-label="对话历史" title="对话历史"><Menu size={18} aria-hidden="true"/></summary><div className="agent-details-content" role="region" aria-label={historyExpanded?"对话历史":taskStatusOnly?"任务状态":"对话详情"}>
           <div hidden={!historyExpanded} className="agent-history-container">
+      <div className="agent-history-backdrop" aria-hidden="true" onClick={()=>detailsPopover.close(true)}/>
       <AgentConversationHistory query={historyQuery} archived={historyArchived} onQueryChange={query=>filterHistory(query,historyFilter.current.archived)} onArchivedChange={archived=>filterHistory(historyFilter.current.query,archived)} works={works} currentId={view?.work.id} disabled={busy||!!active} more={!!worksCursor} loading={worksLoading} error={worksError} states={states} onRetry={()=>void reloadWorks()} onClose={()=>{if(detailsMenu.current)detailsMenu.current.open=false;}} onMore={()=>void loadEarlierWorks()} onChange={changeHistory} onOpen={work=>void openHistoryWork(work)}/>
           </div>
           <div className="agent-details-sections" hidden={historyExpanded}>
@@ -1389,10 +1404,11 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
           <div className="agent-inspector-body">
           <section className="agent-inspector-card" hidden={taskStatusOnly}>
             <h3>视图与工具</h3>
-            <button type="button" className="agent-inspector-switch" aria-pressed={reportReading} disabled={!report||!!active||view?.work.state==="revoked"} onClick={()=>{if(!reportReading)readingOrigin.current={scope:sourceScopeKey,scrollTop:conversationScroll.element.current?.scrollTop||0,focus:detailsReturn.current||goalInput.current};clearSourcePreview();setReportReading(current=>!current);detailsPopover.close();}}><span>{reportReading?"返回对话布局":"只看最新回答"}</span><span aria-hidden="true"/></button>
+            <button type="button" className="agent-inspector-switch" role="switch" aria-checked={reportReading} disabled={!report||view?.work.state==="revoked"} onClick={()=>{if(!reportReading)readingOrigin.current={scope:sourceScopeKey,scrollTop:conversationScroll.element.current?.scrollTop||0,focus:detailsReturn.current||goalInput.current};clearSourcePreview();setReportReading(current=>!current);}}><span>只看最新回复</span><span aria-hidden="true"/></button>
             <AgentAssistantOptions workId={view?.work.id} section="connection" inspector value={view?view.assistantOptions||defaultAssistantOptions:assistantOptions} disabled={busy||!!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
           </section>
           <section className="agent-inspector-card agent-detail-materials" hidden={taskStatusOnly}><h3>当前上下文</h3>
+          {accountVisible&&detailsOpen&&!historyExpanded&&!taskStatusOnly&&<CodexAccountContext onOpen={()=>{detailsPopover.close();setAccountOpen(true);}}/>}
           <button type="button" className="agent-detail-link agent-detail-scope-link" aria-haspopup="dialog" disabled={busy||filePreparing||!!publicUrl}
             onClick={()=>{detailsPopover.close();openMaterialScope(detailsTrigger.current);}}>
             <AgentDetailSummary icon={<Layers size={16}/>} title="资料范围" status={scopeStatus} link/>
@@ -1403,16 +1419,22 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
             detailsPopover.close();
             memory.openManager(detailsTrigger.current ?? event.currentTarget);
           }}>
-            <AgentDetailSummary icon={<Brain size={16}/>} title="管理记忆" status={memory.proposals.length ? `${memory.proposals.length} 条待确认` : undefined} link/>
+            <AgentDetailSummary icon={<Brain size={16}/>} title="管理版本记忆" status={memory.selection.enabled ? memory.projectLabel(memory.selection.projectId) : "已关闭"} link/>
           </button>
           <button type="button" className="agent-detail-link agent-inspector-skills" aria-haspopup="dialog" disabled={busy||!!active&&!steerable} onClick={()=>{
             detailsPopover.close();
-            openSkills(detailsTrigger.current);
-          }}><AgentDetailSummary icon={<Zap size={14}/>} title="技能" status={selectedSkills.length ? `${selectedSkills.length} 个已选` : "未选择"} link/></button>
+            openSkills(detailsTrigger.current, true);
+          }}><AgentDetailSummary icon={<Zap size={14}/>} title="管理通用技能" status={availableSkillCount===undefined ? undefined : `${availableSkillCount} 个可用`} link/></button>
           {onTopicBack&&<button type="button" className="agent-detail-link" disabled={busy||!!active} onClick={onTopicBack}><ArrowLeft size={16}/>返回专题所在工作</button>}
           </section>
           <section className="agent-inspector-card agent-inspector-diagnostics">
-        <details ref={workControls} className="agent-work-controls agent-inspector-disclosure" open={taskStatusOnly||undefined}><summary hidden={taskStatusOnly}><span>运行诊断与用量</span><small>{controlsNeedAttention?"需要处理":active?"正在处理":view?states[view.work.state]||view.work.state:"尚未开始"}</small><ChevronDown size={14}/></summary>
+        <details ref={workControls} className="agent-work-controls agent-inspector-disclosure" open={taskStatusOnly||undefined}><summary hidden={taskStatusOnly}><span>运行诊断与用量</span><ChevronRight size={14} aria-hidden="true"/></summary>
+        <div className="agent-run-diagnostic-summary">
+          <div>模型：{diagnosticModel || (view?.run ? "未返回" : "尚未运行")}</div>
+          <div>本轮回传：{measuredTokens===null ? (view?.run ? "未返回" : "尚未运行") : measuredTokens.toLocaleString()+" tokens"}</div>
+          <div>检索上限：{view?.materialBudget ? formatFileSize(view.materialBudget.limitBytes) : "未报告"}</div>
+        </div>
+        <details className="agent-diagnostic-advanced" open={taskStatusOnly||undefined}><summary>查看详细诊断</summary>
         <dl className="agent-task-facts"><div><dt>任务进展</dt><dd>{active?"正在处理":view?states[view.work.state]||view.work.state:"尚未开始"}</dd></div><div><dt>对话消息</dt><dd>{view?.conversation?.messages.length||0} 条</dd></div><div><dt>上下文占用</dt><dd>{view?.nativeContext?.usedPercent==null?"尚未报告":view.nativeContext.usedPercent+"%"}</dd></div></dl>
         {materialUsage}
         {view&&<label className="agent-confirm-message"><input type="checkbox" checked={confirmMessage} disabled={busy||!!active} onChange={event=>setConfirmMessage(event.target.checked)}/>这条内容是我确认的决定</label>}
@@ -1429,9 +1451,10 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         <AgentContextCompaction value={view.contextCompaction} disabled={busy || !!active} onRequest={()=>void changeCompaction()} onCancel={()=>void changeCompaction(true)}/>
         {view.lifecycle && <AgentLifecycle value={view.lifecycle} mode={mode} disabled={busy || !!active} onResume={()=>{uiTiming.begin("resume");void run(view.work.id,view.lifecycle);}} onCancel={()=>void mutate("cancelGoal")}/> }
         </> : <p className="agent-note">{view?"来源授权已撤回，保留历史记录供查看。":"尚未开始任务，发送消息后可查看实际用量和任务控制。"}</p>}
+        {!taskStatusOnly&&<div className="agent-detail-outcomes">{conversationDetails}</div>}
+        </details>
         </details>
           </section>
-          <div className="agent-inspector-card agent-detail-outcomes" hidden={taskStatusOnly}>{conversationDetails}</div>
           </div>
           </section>
         </div>
@@ -1444,11 +1467,27 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
               onKeyDown={event=>{if(event.nativeEvent.isComposing)return;if(event.key==="Enter"){event.preventDefault();event.currentTarget.blur();}if(event.key==="Escape"){event.preventDefault();event.stopPropagation();setTitleEdit(null);}}}/>
           : <button type="button" className="agent-chat-title" title={chatTitle} aria-label="重命名对话" disabled={busy||!!active} onClick={()=>setTitleEdit({id:titleScope,value:chatTitle.slice(0,100)})}><span>{chatTitle}</span></button>}
         <div className="agent-header-end">
-          {canDock && <button type="button" aria-label={docked?"切换为浮窗":"展开为侧边栏"} title={docked?"切换为浮窗":"展开为侧边栏"} onClick={()=>{setDocked(current=>!current);detailsPopover.close();}}>
-            {docked?<PanelsTopLeft size={16} aria-hidden="true"/>:<PanelRightOpen size={16} aria-hidden="true"/>}
-          </button>}
         <AgentTaskMode activeTopic={research?.topic} onUnpinTopic={async topic=>{const scope=selectionScope.current;const saved=await call<ResearchTopic>({action:"saveResearchTopic",topic:{...topic,pinned:false}});if(alive.current&&selectionScope.current===scope&&research?.topic.id===saved.id)setResearch({...research,topic:{...research.topic,revision:saved.revision,pinned:false}});}} title={chatTitle} disabled={busy || !!active} tagMode={tagMode} goalMode={goalMode} goalDisabled={(scopeOptions.model ?? runtime.settings)?.provider === "deepseek"} onGeneral={()=>{setTagMode(false);if(scopeOptions.goalMode)void saveAssistantOptions({...scopeOptions,goalMode:false},false).catch(reason=>setError(String(reason)));}} onGoal={()=>{setTagMode(false);void saveAssistantOptions({...scopeOptions,goalMode:true},false).catch(reason=>setError(String(reason)));}} onTag={enableTagMode} selectedSkills={selectedSkills.map(token=>token.slice(1))} onTopics={()=>{setRequestedTopic(undefined);setTopicSave(false);setTopicsOpen(true);}} onTopic={topic=>{setRequestedTopic(topic.id);setTopicSave(false);setTopicsOpen(true);}} onUsage={()=>{detailsReturn.current=document.getElementById(panelId)?.querySelector<HTMLElement>(".agent-task-mode>summary")||null;setTaskStatusOnly(true);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current)workControls.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-heading button")?.focus();},0);}}/>
-          <button ref={detailsTrigger} type="button" title="对话详情" aria-label="对话详情" onClick={event=>{if(detailsMenu.current?.open&&!historyExpanded){detailsPopover.close();event.currentTarget.focus();return;}detailsReturn.current=event.currentTarget;setTaskStatusOnly(false);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-sections .agent-details-heading button")?.focus();},0);}}><PanelRight size={17}/></button>
+          <button ref={detailsTrigger} type="button" title="对话详情" aria-label="对话详情" onClick={event=>{if(detailsMenu.current?.open&&!historyExpanded){detailsPopover.close();event.currentTarget.focus();return;}detailsReturn.current=event.currentTarget;setTaskStatusOnly(false);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;
+            void call<{skills?:{available:boolean}[]}>({action:"skills"}).then(value=>{
+              if(alive.current&&Array.isArray(value.skills))setAvailableSkillCount(value.skills.filter(skill=>skill.available).length);
+            },()=>{});
+            setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-sections .agent-details-heading button")?.focus();},0);}}><SlidersHorizontal size={17}/></button>
+          {canDock&&<>
+            <span className="agent-window-separator" aria-hidden="true"/>
+            <details ref={windowLayout.ref} className="agent-window-layout" onKeyDown={event=>{if(event.key==="Escape"){event.preventDefault();event.stopPropagation();windowLayout.close(true);}}}>
+              <summary aria-label="切换窗口形态" title="切换窗口形态">{expandedLayout?<Maximize size={16}/>:docked?<PanelsTopLeft size={16}/>:<PanelRightOpen size={16}/>}</summary>
+              <div className="agent-window-menu" aria-label="助手显示形态">
+                {[
+                  {id:"docked",label:"右侧分屏停靠",Icon:PanelsTopLeft},
+                  {id:"floating",label:"悬浮浮窗",Icon:PanelRightOpen},
+                  {id:"expanded",label:"专注展开",Icon:Maximize},
+                ].map(({id,label,Icon})=><button type="button" key={id} aria-pressed={id===(expandedLayout?"expanded":docked?"docked":"floating")} onClick={()=>{
+                  setDocked(id==="docked");setExpandedLayout(id==="expanded");detailsPopover.close();windowLayout.close(true);
+                }}><Icon size={15} aria-hidden="true"/>{label}</button>)}
+              </div>
+            </details>
+          </>}
           <button type="button" title={extra ? "关闭第二个助手（Esc）" : "关闭助手（Esc）"} aria-label={extra ? "关闭第二个助手" : "关闭助手"} onClick={closePanel}><X size={19} /></button>
         </div>
       </header>
@@ -1547,11 +1586,11 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         setBusy(true);try{const next=await call<View>({action:"changeFollowup",id:view.work.id,clientMessageId:item.clientMessageId,editVersion:item.editVersion,operation,...payload,...(operation==="send"?{expectedRunId:view.lifecycle?.activeRunId??(steerable?steerable.runId:null)}:{})});setView(current=>acceptLifecycleSnapshot(current,next));if(operation==="send"&&!active)void resumeQueue(item.clientMessageId);}finally{setBusy(false);}
       }}/>}
       <AgentResearchTopics onBack={()=>{setTopicsOpen(false);const menu=document.getElementById(panelId)?.querySelector<HTMLDetailsElement>(".agent-task-mode");if(menu){menu.open=true;menu.querySelector("summary")?.focus();}}} onMetadata={saved=>{if(research?.topic.id===saved.id)setResearch({...research,topic:{...research.topic,revision:saved.revision,pinned:saved.pinned}});}} initialId={requestedTopic} open={topicsOpen} saveMode={topicSave} active={research?.topic} disabled={busy||!!active} config={{grant:research?researchGrant(manualResearchGrant(),research.topic.grant,research.includeManual):manualResearchGrant(),policy:(view?.assistantOptions||assistantOptions).researchPolicy||"material-first",skills:research?[...new Set([...research.topic.skills,...selectedSkills.map(s=>s.slice(1))])]:selectedSkills.map(s=>s.slice(1))}} onApply={applyResearch} onClose={()=>setTopicsOpen(false)}/>
-      {attachmentError && (!reportReading || addMenuOpen) && <div className="agent-composer-alert">
+      {attachmentError && <div className="agent-composer-alert">
         <div role="alert"><CircleAlert size={14} aria-hidden="true"/><span>{attachmentError}</span></div>
         <button type="button" aria-label="关闭附件提示" onClick={()=>{setAttachmentError("");goalInput.current?.focus();}}><X size={14} aria-hidden="true"/></button>
       </div>}
-      <div className="agent-composer" hidden={reportReading&&!addMenuOpen} onPaste={event=>{const files=Array.from(event.clipboardData.files);if(files.length){event.preventDefault();void addFiles(files);}}}>
+      <div className="agent-composer" onPaste={event=>{const files=Array.from(event.clipboardData.files);if(files.length){event.preventDefault();void addFiles(files);}}}>
         <input ref={fileInput} type="file" aria-label="选择图片或文件" multiple hidden onChange={event=>{const files=Array.from(event.currentTarget.files||[]);event.currentTarget.value="";void addFiles(files);}}/>
         {open && globalPanel && (assistantOptions.model?.provider ?? runtime.settings.provider ?? "codex") === "codex" && <CodexAccountBadge boundScopeId={view?.codexAccountBinding?.scopeId} workId={view?.work.id} disabled={!!active||pendingRun} needsAuthorization={[error,view?.run?.error].some(value=>value?.includes("请确认账号后继续"))} onAuthorized={()=>{setError("");void refresh(view!.work.id);}}/>}
         <div className="agent-composer-materials">
@@ -1634,7 +1673,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
                   }}/>
                 </div>}
                 {addMenuOpen && addPage==="web" && <div className="agent-add-section"><label>公共网页地址<input type="url" aria-label="公共网页地址" value={publicUrl} disabled={busy} onChange={event=>setPublicUrl(event.target.value)} placeholder="https://example.org/article"/></label><p className="agent-note">发送问题即读取并保存此公开网页。仅支持 HTTPS 文本与 HTML 源码；不登录、不跟随跳转，不加载脚本和图片。每次最多 256 KiB，30 秒超时。遇到代理虚拟地址时向 Cloudflare 加密查询域名，不发送正文。</p><button type="button" onClick={()=>{materialPopover.close(true);goalInput.current?.focus();}}>返回填写问题</button></div>}
-                {addMenuOpen && addPage==="skills" && <AgentSkills pinned={pinnedSkills} onPin={toggleSkillPin} selected={selectedSkills.map(token=>token.slice(1))} onReset={()=>setGoal(questionText)} disabled={busy || (!!active && !steerable)} onSelect={name=>{setGoal(current=>new RegExp(`(^|[^a-zA-Z0-9_$\\\\-])\\$${name}(?=$|[^a-zA-Z0-9_-])`).test(current)?current:`$${name} ${current}`);materialPopover.close(false);goalInput.current?.focus();}} embedded/>}
+                {addMenuOpen && addPage==="skills" && <AgentSkills key={manageSkills?"manage":"pick"} manageInitially={manageSkills} pinned={pinnedSkills} onPin={toggleSkillPin} selected={selectedSkills.map(token=>token.slice(1))} onReset={()=>setGoal(questionText)} disabled={busy || (!!active && !steerable)} onSelect={name=>{setGoal(current=>new RegExp(`(^|[^a-zA-Z0-9_$\\\\-])\\$${name}(?=$|[^a-zA-Z0-9_-])`).test(current)?current:`$${name} ${current}`);materialPopover.close(false);goalInput.current?.focus();}} embedded/>}
                 {addMenuOpen && (addPage==="materials" || addPage==="scope") && <div className="agent-add-section agent-scope-body">
             <div className="agent-scope-tabs" role="group" aria-label="资料范围分区">
               <button type="button" aria-pressed={scopeTab==="docs"} onClick={()=>setScopeTab("docs")}>核心材料 ({coreMaterialCount})</button>
@@ -1707,7 +1746,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
           <button type="button" className="agent-current-page agent-skill-shortcut" aria-label="添加技能" title="技能：选择本次使用的处理方法" data-selected={selectedSkills.length>0} disabled={busy || (!!active && !steerable)} onClick={event=>openSkills(event.currentTarget)}><Zap size={14} aria-hidden="true"/></button>
             <MemoryAndSavePopover model={memory} value={scopeOptions} disabled={busy || !!active} materialsOnly={materialsOnly} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
           {textMaterials?.selection&&<button type="button" className="agent-current-page agent-selection-tool" aria-label="添加所选文字" title="添加所选文字（文字快照，不是区块）" disabled={busy||filePreparing||!!view?.work.grant.manifest} onMouseDown={event=>event.preventDefault()} onClick={()=>{addTextMaterial(textMaterials.selection!);textMaterials.clearSelection();}}><Quote size={18}/></button>}
-            <AgentAssistantOptions value={(view ? view.assistantOptions || defaultAssistantOptions : assistantOptions)} disabled={busy || !!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
+            <AgentAssistantOptions onOpenAccounts={accountVisible?()=>setAccountOpen(true):undefined} value={(view ? view.assistantOptions || defaultAssistantOptions : assistantOptions)} disabled={busy || !!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
             {active && <button className="agent-send" type="button" aria-label="停止本轮" title="停止本轮" disabled={busy || stopping || !!view?.lifecycle && !view.lifecycle.activeRunId} onClick={()=>void mutate("cancel")}><Square size={13} fill="currentColor" aria-hidden="true" /></button>}
             {(!active || !!goal.trim() || !!materials.length || !!dropped.length || !!snippets.length || !!imageChanges.addImages.length) && <button className="agent-send" type="submit" aria-label={tagMode&&!active?tagTaskNames[tagPreparation.task]:saveOnly&&!active?"保存补充":"发送"} aria-keyshortcuts="Control+Enter Meta+Enter" title="发送" disabled={busy || memory.busy || filePreparing || stopping || !!removals.length || (addMenuOpen&&!!selection?.removals.length) || blockEmptyScope || (!goal.trim()&&!materials.length&&!dropped.length&&!snippets.length&&!imageChanges.addImages.length&&!(tagMode&&tagPreparation.tag))}><ArrowUp size={14} strokeWidth={2.2} aria-hidden="true" /></button>}
           </div>
@@ -1718,6 +1757,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         </form>}
       </div>
       </div>
+      {open && accountOpen && <CodexAccountDialog onClose={()=>setAccountOpen(false)}/>}
       {open && memory.managerOpen && <MemoryManager key={view?.work.id || draftRevision} model={memory} materialsOnly={materialsOnly} usage={view?.memoryUse}
         onBack={detailsMemoryOpener ? () => closeDetailsMemory(true) : undefined}
         onClose={detailsMemoryOpener ? () => closeDetailsMemory() : undefined}/>}

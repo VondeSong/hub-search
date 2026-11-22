@@ -10,6 +10,12 @@ const currentLabels = { document: '当前页', task: '当前任务', insight: '�
 // 统一线框图标组件（严格遵守 JSX Fragment 包裹多标签）
 function Icon({ name, className = 'w-4 h-4', strokeWidth = 1.75 }) {
   const icons = {
+    sliders: <><line x1="4" y1="7" x2="20" y2="7" /><circle cx="9" cy="7" r="2" fill="currentColor" /><line x1="4" y1="17" x2="20" y2="17" /><circle cx="15" cy="17" r="2" fill="currentColor" /></>,
+    dockRight: <><rect x="3" y="4" width="18" height="16" rx="2.5" /><line x1="14" y1="4" x2="14" y2="20" /></>,
+    floatWindow: <><rect x="3" y="4" width="18" height="16" rx="2.5" opacity="0.35" /><rect x="11" y="7" width="8" height="10" rx="1.5" /></>,
+    maximize: <><polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" /><line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" /></>,
+    user: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>,
+    lock: <><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>,
     menu: <><line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="14" y2="17" /></>,
     plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
     x: <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
@@ -192,9 +198,11 @@ function ThumbArtwork({ kind, large = false }) {
   );
 }
 
-export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspace, onOpenTagQueue, onOpenDemos, open }) {
+export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspace, onOpenTagQueue, onOpenDemos, onLayoutChange, open }) {
   // 1. 视口宽度模式：'sidebar' (480px) | 'focus' (760px) | 'full'
   const [viewportMode, setViewportMode] = useState('focus');
+  const [layout, setLayout] = useState('expanded');
+  const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
   // 示例场景切换：'report' (正常流式复核报告) | 'interrupted' (图2规则加载 + 图3核验中断重构案例)
   const [activeCase, setActiveCase] = useState(workspaceContext ? 'new' : 'report');
   const [newMessages, setNewMessages] = useState([]);
@@ -265,6 +273,20 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
   const [webSearchEnabled, setWebSearchEnabled] = useState(!workspaceContext);
   const [mcpEnabled, setMcpEnabled] = useState(!workspaceContext);
   const [diagExpanded, setDiagExpanded] = useState(false);
+
+  const [codexAccounts, setCodexAccounts] = useState([
+    { id: 'follow', type: 'follow', label: '跟随 Codex 桌面登录', email: 'p***@example.test', plan: 'Plus', workspace: '个人', status: 'active' },
+    { id: 'acc_work', type: 'account', label: 'w***@example.test', email: 'w***@example.test', plan: 'Pro', workspace: '工作空间', status: 'active' },
+    { id: 'acc_expired', type: 'account', label: 'dev***@example.test', email: 'dev***@example.test', plan: 'Team', workspace: '外包协作', status: 'expired' }
+  ]);
+  const [activeAccountId, setActiveAccountId] = useState('follow');
+  const [accountSheetOpen, setAccountSheetOpen] = useState(false);
+  const [pendingSwitchId, setPendingSwitchId] = useState(null);
+  const [switchStrategy, setSwitchStrategy] = useState('continue'); // 'continue' | 'new'
+  const [accountSwitchedBanner, setAccountSwitchedBanner] = useState(null);
+  const [chatAuthNeeded, setChatAuthNeeded] = useState(false);
+  const [oauthFlow, setOauthFlow] = useState('idle'); // 'idle' | 'pending' | 'ready'
+  const [newlyAddedAccId, setNewlyAddedAccId] = useState(null);
 
   // 6. 模型、资料范围、记忆、技能与附件状态
   const [selectedModel, setSelectedModel] = useState('DeepSeek V4.1 Flash');
@@ -374,7 +396,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
       id: 'm2',
       role: 'assistant',
       duration: '4 分 7 秒',
-      sourcesCount: 14,
+      hasWebSources: true,
       timeline: [
         {
           type: 'contextPrep',
@@ -531,7 +553,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
   ]);
 
   const availableModels = [
-    { id: 'GPT-6.2 Sol', shortName: '6.2 Sol', vendor: 'OpenAI', web: true, reasoning: true, desc: '旗舰综合推理与长上下文' },
+    { id: 'GPT-6.2 Sol', shortName: '6.2 Sol', vendor: 'OpenAI', web: true, reasoning: true, supportsFastMode: true, desc: '旗舰综合推理与长上下文' },
     { id: 'GPT-6.1 Terra', shortName: '6.1 Terra', vendor: 'OpenAI', web: true, reasoning: true, desc: '均衡稳定，适合工程资料整理' },
     { id: 'DeepSeek V4.1 Flash', shortName: 'V4.1 Flash', vendor: 'DeepSeek', web: false, reasoning: true, desc: '极速响应，本地资料检索优选' },
     { id: 'DeepSeek V4 Pro', shortName: 'V4 Pro', vendor: 'DeepSeek', web: true, reasoning: true, desc: '深度逻辑分析与代码核对' }
@@ -571,18 +593,78 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
   ];
 
   const webSourcesList = [
-    { title: 'WCAG 4.1.3 Status Messages', host: 'w3.org', badge: 'W3C' },
-    { title: 'WAI-ARIA 1.2 · status & log role', host: 'w3.org', badge: 'W3C' },
-    { title: 'MDN · ARIA: log role & live regions', host: 'developer.mozilla.org', badge: 'MDN' },
-    { title: 'WHATWG HTML · The details & summary element', host: 'html.spec.whatwg.org', badge: 'WHATWG' },
-    { title: 'CSS Scroll Anchoring Module Level 1', host: 'drafts.csswg.org', badge: 'W3C' },
-    { title: 'MDN · prefers-reduced-motion media feature', host: 'developer.mozilla.org', badge: 'MDN' },
-    { title: 'WAI · Keyboard Focus Management Practices', host: 'w3.org/WAI', badge: 'WAI' }
+    { title: 'WCAG 4.1.3 Status Messages', host: 'w3.org/WAI/WCAG21/Understanding/status-messages', badge: 'W3C' },
+    { title: 'WAI-ARIA 1.2 Role Definitions (log & status)', host: 'w3.org/TR/wai-aria-1.2/#status', badge: 'WAI' },
+    { title: 'MDN ARIA: status role', host: 'developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Roles/status_role', badge: 'MDN' },
+    { title: 'WHATWG HTML Living Standard: details & summary', host: 'html.spec.whatwg.org/multipage/interactive-elements.html', badge: 'WHATWG' },
+    { title: 'CSS Scroll Anchoring Module Level 1', host: 'drafts.csswg.org/css-scroll-anchoring', badge: 'W3C' },
+    { title: 'MDN prefers-reduced-motion', host: 'developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion', badge: 'MDN' }
   ];
+  const sourcesQuery = sourcesSearch.trim().toLowerCase();
+  const visibleWebSources = webSourcesList.filter(source =>
+    source.title.toLowerCase().includes(sourcesQuery) || source.host.toLowerCase().includes(sourcesQuery));
 
+  const reasoningTiersByVendor = {
+    OpenAI: [
+      { id: 'low', label: '低', desc: '较少推理投入，适合简单问题' },
+      { id: 'medium', label: '中', desc: '适合日常讨论与资料整理' },
+      { id: 'high', label: '高', desc: '增加推理投入，适合复杂问题' },
+      { id: 'very_high', label: '极高', desc: '更充分地推理与检查，等待可能更久' },
+      { id: 'max', label: '最大', desc: '使用该模型最高的推理投入' },
+      { id: 'extreme', label: '极限', desc: '使用该模型支持的更高推理投入' }
+    ],
+    DeepSeek: [
+      { id: 'off', label: '关闭', desc: '跳过深度思考，直接快速作答' },
+      { id: 'medium', label: '中', desc: '标准深度思考，兼顾速度与准确度' },
+      { id: 'high', label: '高', desc: '充分链式推理，适合复杂核对与分析' }
+    ]
+  };
   const currentModelObj = availableModels.find(m => m.id === selectedModel) || availableModels[0];
-  const reasoningLabels = { low: '低', medium: '中', high: '高' };
+  const currentReasoningTiers = reasoningTiersByVendor[currentModelObj.vendor];
+  const currentReasoning = currentReasoningTiers.find(tier => tier.id === reasoningLevel);
+  const reasoningLabels = { off: '关闭', low: '低', medium: '中', high: '高', very_high: '极高', max: '最大', extreme: '极限' };
   const activeTopic = topics.find(t => t.id === activeTopicId);
+  const currentAccountObj = codexAccounts.find(a => a.id === activeAccountId) || codexAccounts[0];
+  const closeAccountSheet = () => {
+    setAccountSheetOpen(false);
+    setPendingSwitchId(null);
+    setOauthFlow('idle');
+  };
+
+  const confirmSwitchAccount = (targetId, strategy = switchStrategy) => {
+    const target = codexAccounts.find(a => a.id === targetId);
+    if (!target || target.status !== 'active') return;
+    setActiveAccountId(targetId);
+    setPendingSwitchId(null);
+    setAccountSheetOpen(false);
+    setChatAuthNeeded(false);
+    setAccountSwitchedBanner({
+      email: target.email,
+      workspace: target.workspace,
+      plan: target.plan,
+      isFollow: target.type === 'follow'
+    });
+    if (strategy === 'new') {
+      setActiveCase('new');
+      setNewMessages([]);
+      setInputText('');
+      setThreadTitle('新对话');
+      triggerToast(`已切换至 ${target.email} 并开启新对话`);
+    } else {
+      triggerToast(`已切换至 ${target.email}，下条消息将共享必要历史`);
+    }
+  };
+
+  const handleSelectModel = (model) => {
+    setSelectedModel(model.id);
+    const tiers = reasoningTiersByVendor[model.vendor] || reasoningTiersByVendor.OpenAI;
+    if (!tiers.some(t => t.id === reasoningLevel)) {
+      setReasoningLevel('high');
+    }
+    if (!model.supportsFastMode) {
+      setResponseSpeed('standard');
+    }
+  };
 
   const triggerToast = (msg) => {
     setToastMsg(msg);
@@ -591,6 +673,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
 
   const closeAllPopovers = () => {
     setModePopoverOpen(false);
+    setLayoutMenuOpen(false);
     setSkillsPopoverOpen(false);
     setModelPopoverOpen(false);
     setPlusMenuOpen(false);
@@ -625,7 +708,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
   const tagAction = tagWorkspace && taskMode === 'tag' ? {
     intent: tagActions[tagSubTab], tag: targetTag, other: compareTag,
   } : null;
-  const canSend = !!inputText.trim() || !!tagAction?.tag;
+  const canSend = !chatAuthNeeded && (!!inputText.trim() || !!tagAction?.tag);
 
   const handleSendMessage = () => {
     if (!canSend) return;
@@ -752,9 +835,9 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
   const hiddenFilesCount = attachedLocalFiles.length > 3 ? attachedLocalFiles.length - 3 : 0;
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center p-2 sm:p-4 bg-[#F3F3F1]">
+    <div data-agents-layout={layout} className="h-screen w-full flex flex-col items-center justify-center p-2 sm:p-4">
       {/* 顶部原型视口与示例场景控制条 */}
-      <div className={`w-full ${containerWidthClass} mb-2 flex flex-wrap items-center justify-between gap-2 px-1 text-xs transition-all duration-300`}>
+      <div className={`w-full ${containerWidthClass} ${layout !== 'expanded' ? 'self-end' : ''} pointer-events-auto shrink-0 mb-2 flex flex-wrap items-center justify-between gap-2 px-1 text-xs transition-all duration-300`}>
         <div className="flex flex-wrap items-center gap-2">
           {onDismiss && (
             <button
@@ -798,7 +881,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
             <button
               key={v.id}
               aria-pressed={viewportMode === v.id}
-              onClick={() => setViewportMode(v.id)}
+              onClick={() => { setViewportMode(v.id); if (v.id !== 'sidebar' && layout !== 'expanded') { setLayout('expanded'); onLayoutChange?.('expanded'); } }}
               className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${viewportMode === v.id ? 'bg-surface text-primary shadow-sm' : 'text-secondary hover:text-primary'}`}
             >
               {v.label}
@@ -808,7 +891,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
       </div>
 
       {/* 主窗口外壳 */}
-      <div className={`relative w-full ${containerWidthClass} h-[calc(100vh-64px)] min-h-[620px] bg-canvas rounded-[22px] border border-border shadow-sheet flex flex-col overflow-hidden transition-all duration-300`}>
+      <div className={`relative w-full ${containerWidthClass} ${layout === 'docked' ? 'self-end rounded-l-none rounded-r-lg' : layout === 'floating' ? 'self-end rounded-[20px]' : 'rounded-[22px]'} pointer-events-auto flex-1 min-h-0 bg-canvas border border-border shadow-sheet flex flex-col overflow-hidden transition-all duration-300`}>
 
         {/* 1. 顶部导航栏（彻底解耦：左抽屉/新建，中可编辑标题，右模式/检查器） */}
         <header className="h-12 px-3 border-b border-border/80 bg-canvas/85 glass flex items-center justify-between gap-2 shrink-0 z-20">
@@ -876,10 +959,28 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
             <button
               onClick={() => { closeAllPopovers(); setInspectorOpen(v => !v); }}
               className={`p-1.5 rounded-lg transition-colors ${inspectorOpen ? 'bg-subtle text-primary' : 'text-secondary hover:text-primary hover:bg-hover'}`}
-              title="对话详情与检查器"
+              title="对话详情与设置"
             >
-              <Icon name="panelRight" className="w-4 h-4" />
+              <Icon name="sliders" className="w-4 h-4" />
             </button>
+
+            <span className="h-3.5 w-px bg-border mx-0.5" aria-hidden="true" />
+            <button type="button" title="切换窗口形态" aria-label="切换窗口形态" aria-expanded={layoutMenuOpen}
+              className="p-1.5 rounded-lg text-secondary hover:bg-hover"
+              onClick={() => { const next = !layoutMenuOpen; closeAllPopovers(); setLayoutMenuOpen(next); }}>
+              <Icon name={layout === 'docked' ? 'dockRight' : layout === 'floating' ? 'floatWindow' : 'maximize'} />
+            </button>
+            {onDismiss && <button type="button" title="收起助手" aria-label="收起助手" onClick={onDismiss} className="p-1.5 rounded-lg text-secondary hover:bg-hover"><Icon name="x" /></button>}
+            {layoutMenuOpen && <div className="absolute right-0 top-10 w-56 rounded-2xl border border-border bg-surface p-1.5 shadow-popover z-50" aria-label="助手显示形态">
+              {[
+                { id: 'docked', icon: 'dockRight', label: '右侧分屏停靠', viewport: 'sidebar' },
+                { id: 'floating', icon: 'floatWindow', label: '悬浮浮窗', viewport: 'sidebar' },
+                { id: 'expanded', icon: 'maximize', label: '专注展开', viewport: 'focus' }
+              ].map(option => <button key={option.id} type="button" aria-pressed={layout === option.id} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs hover:bg-hover"
+                onClick={() => { setViewportMode(option.viewport); setLayout(option.id); onLayoutChange?.(option.id); setLayoutMenuOpen(false); }}>
+                <Icon name={option.icon} className="w-3.5 h-3.5" />{option.label}{layout === option.id && <Icon name="check" className="ml-auto w-3.5 h-3.5" />}
+              </button>)}
+            </div>}
 
             {/* 任务模式与专题统一浮层（单层无嵌套弹窗） */}
             {modePopoverOpen && (
@@ -1373,7 +1474,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
                                   <td className="py-2.5 px-3 text-secondary align-top">
                                     {row.evidence}
                                     <button
-                                      onClick={() => setSourcesModalOpen(true)}
+                                      onClick={(event) => { event.stopPropagation(); setSourcesSearch(''); setSourcesModalOpen(true); }}
                                       className="ml-1.5 inline-flex items-center px-1.5 py-0.2 rounded-md bg-subtle border border-border text-[10.5px] text-secondary hover:text-primary hover:border-primary/30 transition-colors"
                                     >
                                       {row.cite}
@@ -1394,7 +1495,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
                                 <strong className="font-semibold text-primary">{b.title}：</strong>
                                 <span className="text-primary/85">{b.body}</span>
                                 <button
-                                  onClick={() => setSourcesModalOpen(true)}
+                                  onClick={(event) => { event.stopPropagation(); setSourcesSearch(''); setSourcesModalOpen(true); }}
                                   className="ml-1.5 inline-flex items-center px-1.5 py-0.2 rounded-md bg-subtle border border-border text-[10.5px] text-secondary hover:text-primary"
                                 >
                                   {b.cite}
@@ -1471,13 +1572,13 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
                           </button>
                         </div>
 
-                        {msg.sourcesCount && (
+                        {msg.hasWebSources && webSourcesList.length > 0 && (
                           <button
-                            onClick={() => setSourcesModalOpen(true)}
+                            onClick={(event) => { event.stopPropagation(); setSourcesSearch(''); setSourcesModalOpen(true); }}
                             className="px-2.5 py-1 rounded-full bg-surface border border-border hover:border-primary/25 text-[11px] font-medium text-secondary hover:text-primary flex items-center gap-1.5 shadow-2xs transition-all"
                           >
                             <Icon name="globe" className="w-3 h-3 text-secondary" />
-                            <span>{msg.sourcesCount} 个来源</span>
+                            <span>{webSourcesList.length} 个来源</span>
                           </button>
                         )}
                       </div>
@@ -1503,6 +1604,60 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
               <button onClick={() => setUploadError(null)} className="text-rose-500 hover:text-rose-800 shrink-0 p-0.5">
                 <Icon name="x" className="w-3.5 h-3.5" />
               </button>
+            </div>
+          )}
+
+          {/* 旧对话未授权给新账号：单行极简磨砂授权条（取代原版双重堆叠大框） */}
+          {chatAuthNeeded && (
+            <div className="mb-2 px-3 py-2 rounded-xl bg-amber-50/95 border border-amber-200/90 text-amber-900 text-[11.5px] flex flex-wrap items-center justify-between gap-2 animate-fadeIn">
+              <div className="flex items-center gap-2 min-w-0">
+                <Icon name="lock" className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span className="truncate">
+                  此旧对话尚未授权给 <strong className="font-semibold">{currentAccountObj.email}</strong>（{currentAccountObj.workspace}）
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                <button
+                  onClick={() => { setChatAuthNeeded(false); triggerToast(`已允许 ${currentAccountObj.email} 读取本对话历史`); }}
+                  className="px-2.5 py-1 rounded-lg bg-primary text-white text-[11px] font-medium hover:opacity-90"
+                >
+                  允许读取
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveAccountId('follow');
+                    setChatAuthNeeded(false);
+                    setAccountSwitchedBanner(null);
+                    triggerToast('已切回原账号（跟随 Codex 桌面）');
+                  }}
+                  className="px-2 py-1 rounded-lg bg-surface border border-amber-200 text-amber-900 hover:bg-amber-100/60 text-[11px] font-medium"
+                >
+                  换回原账号
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 账号已切换轻胶囊提示（移出输入框内部，不挤压打字区） */}
+          {accountSwitchedBanner && !chatAuthNeeded && (
+            <div className="mb-2 px-3 py-1.5 rounded-xl bg-surface/90 border border-border text-[11.5px] text-secondary flex items-center justify-between gap-2 shadow-2xs animate-fadeIn">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent-green shrink-0"></span>
+                <span className="truncate">
+                  当前使用 <strong className="font-medium text-primary">{accountSwitchedBanner.email}</strong> · {accountSwitchedBanner.workspace}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => { closeAllPopovers(); setAccountSheetOpen(true); }}
+                  className="text-primary font-medium hover:underline text-[11px]"
+                >
+                  管理账号
+                </button>
+                <button onClick={() => setAccountSwitchedBanner(null)} className="text-muted hover:text-primary p-0.5" title="隐藏提示">
+                  <Icon name="x" className="w-3 h-3" />
+                </button>
+              </div>
             </div>
           )}
 
@@ -1842,7 +1997,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
                   return (
                     <button
                       key={m.id}
-                      onClick={() => setSelectedModel(m.id)}
+                      onClick={() => handleSelectModel(m)}
                       className={`w-full p-2 rounded-xl text-left flex items-center justify-between gap-2 transition-all ${active ? 'bg-subtle border border-primary/20' : 'hover:bg-hover border border-transparent'}`}
                     >
                       <div className="flex items-start gap-2 min-w-0">
@@ -1866,8 +2021,8 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
               <div className="pt-2 border-t border-border/70 space-y-2">
                 <div className="space-y-1.5">
                   <div className="text-[11px] font-medium text-secondary px-1">思考强度</div>
-                  <div className="grid grid-cols-3 bg-subtle p-0.5 rounded-xl border border-border text-xs">
-                    {['low', 'medium', 'high'].map(lv => (
+                  <div className="grid bg-subtle p-0.5 rounded-xl border border-border text-xs" style={{ gridTemplateColumns: "repeat(" + currentReasoningTiers.length + ", minmax(0, 1fr))" }}>
+                    {currentReasoningTiers.map(({ id: lv }) => (
                       <button
                         key={lv}
                         onClick={() => setReasoningLevel(lv)}
@@ -1878,6 +2033,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
                     ))}
                   </div>
                 </div>
+                {currentReasoning && <p className="px-1 text-[10px] text-muted">{currentReasoning.desc}</p>}
                 <div className="flex items-center justify-between px-1 pt-0.5">
                   <span className="text-[11px] font-medium text-secondary">响应速度</span>
                   <div className="flex bg-subtle p-0.5 rounded-lg border border-border text-[11px]">
@@ -1888,12 +2044,32 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
                       标准
                     </button>
                     <button
-                      onClick={() => setResponseSpeed('fast')}
+                      disabled={!currentModelObj.supportsFastMode} onClick={() => setResponseSpeed('fast')}
                       className={`px-2 py-0.5 rounded-md font-medium transition-all ${responseSpeed === 'fast' ? 'bg-surface text-primary shadow-xs' : 'text-secondary'}`}
                     >
                       加速
                     </button>
                   </div>
+                </div>
+                {/* Codex 账号高频快捷入口（无需再钻三级系统设置） */}
+                <div className="pt-2 border-t border-border/60">
+                  <button
+                    onClick={() => { setModelPopoverOpen(false); setAccountSheetOpen(true); }}
+                    className="w-full px-2 py-1.5 rounded-xl bg-subtle/70 hover:bg-hover border border-border/60 flex items-center justify-between gap-2 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${currentAccountObj.status === 'active' ? 'bg-accent-green' : 'bg-rose-500'}`}></span>
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-medium text-primary truncate">
+                          {currentAccountObj.email} · {currentAccountObj.workspace}
+                        </div>
+                        <div className="text-[9.5px] text-muted truncate">
+                          {currentAccountObj.type === 'follow' ? '跟随 Codex 桌面登录' : `固定账号 · ${currentAccountObj.plan}`}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-[10.5px] font-medium text-secondary shrink-0">切换 ›</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -2064,7 +2240,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
             <div className="w-[332px] max-w-[88%] bg-canvas/95 glass h-full border-l border-border shadow-sheet flex flex-col animate-fadeIn">
               <div className="h-12 px-4 border-b border-border flex items-center justify-between">
                 <span className="text-xs font-semibold text-primary">对话详情</span>
-                <button onClick={() => setInspectorOpen(false)} className="p-1 text-muted hover:text-primary rounded-lg">
+                <button aria-label="关闭对话详情" onClick={() => setInspectorOpen(false)} className="p-1 text-muted hover:text-primary rounded-lg">
                   <Icon name="x" className="w-4 h-4" />
                 </button>
               </div>
@@ -2074,21 +2250,31 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
                   <div className="text-[10.5px] font-semibold text-muted uppercase tracking-wider">视图与工具</div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-primary">只看最新回复</span>
-                    <Toggle checked={onlyLatestReply} onChange={setOnlyLatestReply} />
+                    <Toggle label="只看最新回复" checked={onlyLatestReply} onChange={setOnlyLatestReply} />
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-primary">联网搜索</span>
-                    <Toggle checked={webSearchEnabled} onChange={setWebSearchEnabled} />
+                    <Toggle label="联网搜索" checked={webSearchEnabled} onChange={setWebSearchEnabled} />
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-primary">MCP 外部工具</span>
-                    <Toggle checked={mcpEnabled} onChange={setMcpEnabled} />
+                    <Toggle label="MCP 外部工具" checked={mcpEnabled} onChange={setMcpEnabled} />
                   </div>
                 </div>
 
                 {/* 卡片 2：当前上下文入口 */}
                 <div className="bg-surface rounded-2xl p-3.5 border border-border shadow-card space-y-2.5">
                   <div className="text-[10.5px] font-semibold text-muted uppercase tracking-wider">当前上下文</div>
+                  <button
+                    onClick={() => { setInspectorOpen(false); setAccountSheetOpen(true); }}
+                    className="w-full flex items-center justify-between gap-3 py-0.5 text-left text-secondary hover:text-primary"
+                  >
+                    <span className="shrink-0">Codex 账号</span>
+                    <span className="text-primary font-medium truncate flex items-center gap-1.5">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${currentAccountObj.status === 'active' ? 'bg-accent-green' : 'bg-rose-500'}`}></span>
+                      <span className="truncate">{currentAccountObj.workspace} · {currentAccountObj.plan} ›</span>
+                    </span>
+                  </button>
                   <button
                     onClick={() => { setInspectorOpen(false); setScopeModalOpen(true); }}
                     className="w-full flex items-center justify-between gap-3 py-0.5 text-left text-secondary hover:text-primary"
@@ -2126,6 +2312,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
                       <div>模型：{currentModelObj.id}</div>
                       <div>本轮回传：26,633 tokens</div>
                       <div>检索上限：15 块 / 16 次调用</div>
+                      <div aria-label="用量示例">示例数据</div>
                     </div>
                   )}
                 </div>
@@ -2478,13 +2665,16 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
           </div>
         )}
 
-        {/* 轻量化「网页来源」Modal */}
+        {/* 网页来源 */}
         {sourcesModalOpen && (
-          <div className="absolute inset-0 z-50 bg-black/25 glass flex items-center justify-center p-4 animate-fadeIn">
-            <div className="w-full max-w-md bg-surface rounded-2xl border border-border shadow-sheet overflow-hidden flex flex-col max-h-[80%]">
+          <div className="absolute inset-0 z-50 bg-black/25 glass flex items-center justify-center p-4 animate-fadeIn" onClick={event => { if (event.target === event.currentTarget) setSourcesModalOpen(false); }} onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setSourcesModalOpen(false); } }}>
+            <div className="w-full max-w-md bg-surface rounded-2xl border border-border shadow-sheet overflow-hidden flex flex-col max-h-[80%]" role="dialog" aria-modal="true" aria-labelledby="reference-web-sources">
               <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                <span className="text-xs font-semibold text-primary">本轮网页追溯来源 (14)</span>
-                <button onClick={() => setSourcesModalOpen(false)} className="text-muted hover:text-primary">
+                <div className="flex items-center gap-2 text-xs font-semibold text-primary">
+                  <Icon name="globe" className="w-3.5 h-3.5 text-secondary" />
+                  <span id="reference-web-sources">网页追溯来源 ({webSourcesList.length})</span>
+                </div>
+                <button type="button" aria-label="关闭网页追溯来源" onClick={() => setSourcesModalOpen(false)} className="text-muted hover:text-primary p-1 rounded-lg">
                   <Icon name="x" className="w-4 h-4" />
                 </button>
               </div>
@@ -2492,31 +2682,269 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
                 <div className="relative">
                   <Icon name="search" className="w-3.5 h-3.5 text-muted absolute left-2.5 top-2" />
                   <input
-                    value={sourcesSearch}
+                    autoFocus aria-label="筛选引用来源" value={sourcesSearch}
                     onChange={(e) => setSourcesSearch(e.target.value)}
-                    placeholder="筛选来源标题或域名..."
-                    className="w-full pl-8 pr-2.5 py-1.5 rounded-xl bg-subtle border border-border text-xs focus:outline-none"
+                    placeholder="筛选引用来源..."
+                    className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-subtle border border-border text-xs focus:outline-none"
                   />
                 </div>
               </div>
-              <div className="p-2 overflow-y-auto space-y-1 text-xs">
-                {webSourcesList
-                  .filter(s => s.title.toLowerCase().includes(sourcesSearch.toLowerCase()) || s.host.toLowerCase().includes(sourcesSearch.toLowerCase()))
-                  .map((src, i) => (
-                    <button
-                      key={i}
-                      onClick={() => triggerToast(`打开原文：https://${src.host}`)}
-                      className="w-full p-2.5 rounded-xl hover:bg-hover flex items-center justify-between gap-2 text-left transition-colors"
+              <div className="p-3 flex-1 overflow-y-auto space-y-1.5 text-xs">
+                {visibleWebSources.map(src => (
+                    <a
+                      key={src.host}
+                      href={"https://" + src.host} target="_blank" rel="noreferrer"
+                      className="w-full p-2.5 rounded-xl border border-border/70 hover:bg-hover flex items-center justify-between gap-2.5 text-left transition-colors"
                     >
-                      <div className="min-w-0">
-                        <div className="font-medium text-primary truncate">{src.title}</div>
-                        <div className="text-[10.5px] text-muted font-mono mt-0.5">{src.host}</div>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <SiteFavicon site={src.badge} />
+                        <div className="min-w-0">
+                          <div className="font-medium text-primary truncate">{src.title}</div>
+                          <div className="text-[10.5px] font-mono text-muted truncate mt-0.5">{src.host}</div>
+                        </div>
                       </div>
-                      <span className="px-1.5 py-0.5 rounded bg-subtle border border-border text-[10px] font-mono text-secondary shrink-0">
-                        {src.badge}
-                      </span>
-                    </button>
+                      <Icon name="externalLink" className="w-3.5 h-3.5 text-muted shrink-0" />
+                    </a>
                   ))}
+                {!visibleWebSources.length && <p role="status" className="px-2 py-2 text-secondary">未找到匹配来源。</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 重构后的「Codex 账号管理与切换」居中 Sheet（支持完整增删改查） */}
+        {accountSheetOpen && (
+          <div className="absolute inset-0 z-50 bg-black/25 glass flex items-center justify-center p-4 animate-fadeIn"
+            onClick={event => { if (event.target === event.currentTarget) closeAccountSheet(); }}
+            onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeAccountSheet(); } }}>
+            <div className="w-full max-w-md bg-surface rounded-2xl border border-border shadow-sheet overflow-hidden flex flex-col max-h-[86%]" role="dialog" aria-modal="true" aria-label="Codex 账号管理">
+              <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Icon name="user" className="w-4 h-4 text-primary" />
+                  <span className="text-xs font-semibold text-primary">Codex 账号管理</span><span className="text-[10.5px] text-muted">示例</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => triggerToast('已刷新全部账号登录状态')}
+                    className="p-1.5 rounded-lg text-muted hover:text-primary hover:bg-hover"
+                    title="刷新账号状态"
+                  >
+                    <Icon name="refresh" className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    autoFocus type="button" aria-label="关闭 Codex 账号管理" onClick={closeAccountSheet}
+                    className="p-1.5 rounded-lg text-muted hover:text-primary hover:bg-hover"
+                  >
+                    <Icon name="x" className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 flex-1 overflow-y-auto space-y-2.5 text-xs">
+                {/* 账号列表卡片（查 / 改 / 删） */}
+                {codexAccounts.map(acc => {
+                  const isCurrent = activeAccountId === acc.id;
+                  const isPending = pendingSwitchId === acc.id;
+                  const isExpired = acc.status === 'expired';
+                  return (
+                    <div
+                      key={acc.id}
+                      onClick={() => {
+                        if (isCurrent || isExpired) return;
+                        setPendingSwitchId(isPending ? null : acc.id);
+                      }}
+                      className={`rounded-2xl border p-3 transition-all ${
+                        isCurrent
+                          ? 'bg-subtle/80 border-primary/25 shadow-2xs'
+                          : isPending
+                          ? 'bg-surface border-primary/40 shadow-card'
+                          : isExpired
+                          ? 'bg-rose-50/35 border-rose-200/70'
+                          : 'bg-surface border-border hover:bg-hover/60 cursor-pointer'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-semibold shrink-0 border ${
+                            isCurrent ? 'bg-primary text-white border-primary' : 'bg-subtle text-primary border-border'
+                          }`}>
+                            {acc.type === 'follow' ? <Icon name="link" className="w-3.5 h-3.5" /> : acc.workspace.slice(0, 1)}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold text-primary truncate">{acc.label}</span>
+                              <span className="px-1.5 py-0.2 rounded bg-subtle border border-border text-[9.5px] font-medium text-secondary shrink-0">
+                                {acc.plan}
+                              </span>
+                            </div>
+                            <div className="text-[10.5px] text-muted mt-0.5 flex items-center gap-1.5 truncate">
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isExpired ? 'bg-rose-500' : 'bg-accent-green'}`}></span>
+                              <span className="truncate">
+                                {acc.type === 'follow' ? `当前识别：${acc.email} · ${acc.workspace}` : `${acc.workspace} · ${isExpired ? '登录已失效' : '正常可用'}`}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          {isCurrent && (
+                            <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10.5px] font-medium">使用中</span>
+                          )}
+                          {isExpired && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCodexAccounts(prev => prev.map(item => item.id === acc.id ? { ...item, status: 'active' } : item));
+                                triggerToast(`已重新登录并恢复 ${acc.email}`);
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-rose-600 text-white text-[10.5px] font-medium hover:opacity-90"
+                            >
+                              重新登录
+                            </button>
+                          )}
+                          {acc.type !== 'follow' && !isCurrent && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCodexAccounts(prev => prev.filter(item => item.id !== acc.id));
+                                if (pendingSwitchId === acc.id) setPendingSwitchId(null);
+                                triggerToast(`已移除账号 ${acc.email}`);
+                              }}
+                              className="p-1.5 rounded-lg text-muted hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                              title="移除此账号"
+                            >
+                              <Icon name="trash" className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 选中另一账号时原地平滑展开策略选择与确认（告别传统下拉表单） */}
+                      {isPending && (
+                        <div className="mt-3 pt-3 border-t border-border/70 space-y-2.5 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+                          <div className="grid grid-cols-2 bg-subtle p-0.5 rounded-xl border border-border text-[11px]">
+                            <button
+                              onClick={() => setSwitchStrategy('continue')}
+                              className={`py-1.5 rounded-lg font-medium transition-all ${switchStrategy === 'continue' ? 'bg-surface text-primary shadow-xs' : 'text-secondary'}`}
+                            >
+                              继续当前对话
+                            </button>
+                            <button
+                              onClick={() => setSwitchStrategy('new')}
+                              className={`py-1.5 rounded-lg font-medium transition-all ${switchStrategy === 'new' ? 'bg-surface text-primary shadow-xs' : 'text-secondary'}`}
+                            >
+                              新建独立对话
+                            </button>
+                          </div>
+                          <div className="text-[10.5px] text-muted leading-relaxed px-0.5">
+                            {switchStrategy === 'continue'
+                              ? '保留当前画面，发送下一条消息时会将续聊所需的必要历史提供给新账号。'
+                              : '开启空白新对话，原对话与草稿保留在历史记录中，不向新账号共享旧内容。'}
+                          </div>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => setPendingSwitchId(null)}
+                              className="px-3 py-1.5 rounded-xl text-xs text-secondary hover:bg-hover"
+                            >
+                              取消
+                            </button>
+                            <button
+                              onClick={() => confirmSwitchAccount(acc.id, switchStrategy)}
+                              className="px-3.5 py-1.5 rounded-xl bg-primary text-white text-xs font-medium hover:opacity-90"
+                            >
+                              确认切换
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* 模拟浏览器 OAuth 添加账号流程（消除添加后再手动选一遍的断层） */}
+                {oauthFlow === 'pending' && (
+                  <div className="rounded-2xl border border-accent-indigo/30 bg-accent-indigo/5 p-3.5 space-y-2.5 animate-fadeIn">
+                    <div className="text-xs font-semibold text-primary">等待完成示例授权…</div>
+                    <p className="text-[11px] text-secondary leading-relaxed">
+                      请在刚打开的浏览器页面中选择要添加的账号并同意授权，完成后将自动同步回 Hub。
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const newAcc = {
+                            id: 'acc_' + Date.now(),
+                            type: 'account',
+                            label: 'team***@corp.ai',
+                            email: 'team***@corp.ai',
+                            plan: 'Pro',
+                            workspace: '研发团队',
+                            status: 'active'
+                          };
+                          setCodexAccounts(prev => [...prev, newAcc]);
+                          setNewlyAddedAccId(newAcc.id);
+                          setOauthFlow('ready');
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-primary text-white text-[11px] font-medium hover:opacity-90"
+                      >
+                        模拟授权完成
+                      </button>
+                      <button
+                        onClick={() => triggerToast('已重新打开浏览器授权页')}
+                        className="px-2.5 py-1.5 rounded-xl bg-surface border border-border text-[11px] text-primary hover:bg-hover"
+                      >
+                        重新打开登录页
+                      </button>
+                      <button
+                        onClick={() => setOauthFlow('idle')}
+                        className="px-2 py-1.5 rounded-xl text-[11px] text-muted hover:text-primary ml-auto"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {oauthFlow === 'ready' && newlyAddedAccId && (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 flex items-center justify-between gap-2 animate-fadeIn">
+                    <div className="text-[11.5px] text-emerald-900 font-medium">
+                      已添加新账号，是否立即切换？
+                    </div>
+                    <button
+                      onClick={() => {
+                        const targetId = newlyAddedAccId;
+                        setOauthFlow('idle');
+                        setNewlyAddedAccId(null);
+                        confirmSwitchAccount(targetId, 'continue');
+                      }}
+                      className="px-3 py-1 rounded-xl bg-emerald-700 text-white text-[11px] font-medium hover:opacity-90 shrink-0"
+                    >
+                      立即切换
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* 底栏：添加账号 + 模拟旧对话未授权测试入口 */}
+              <div className="px-4 py-3 border-t border-border bg-subtle/40 flex items-center justify-between gap-2">
+                <button
+                  onClick={() => setOauthFlow('pending')}
+                  disabled={oauthFlow === 'pending'}
+                  className="px-3 py-1.5 rounded-xl bg-surface border border-border hover:bg-hover text-xs font-medium text-primary flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <Icon name="plus" className="w-3.5 h-3.5" />
+                  <span>添加 Codex 账号</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveAccountId(codexAccounts.find(account => account.type === 'account' && account.status === 'active')?.id || 'follow');
+                    setAccountSheetOpen(false);
+                    setChatAuthNeeded(true);
+                  }}
+                  className="text-[11px] text-secondary hover:text-primary hover:underline"
+                  title="演示切换账号后打开旧对话触发的单行授权条"
+                >
+                  预览旧对话授权条 ›
+                </button>
               </div>
             </div>
           </div>

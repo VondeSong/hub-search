@@ -180,7 +180,6 @@ export function AgentConversationHistory({ works, currentId, disabled, more, loa
             <button type="button" className="agent-history-open" data-work-id={work.id} aria-label={`打开对话 ${title}`} aria-current={currentId === work.id ? "true" : undefined}
               title={`${title}\n${date} · ${states[work.state] || work.state}${work.messageCount === undefined ? "" : ` · ${work.messageCount} 条消息`}`}
               disabled={disabled || changing} onClick={() => onOpen(work)}>
-              <MessageCircle size={18} aria-hidden="true" />
               <span className="agent-history-title">{title}</span>
               {currentId === work.id && <Check size={13} className="agent-history-current" aria-hidden="true" />}
               <time title={date} dateTime={work.updatedAt && Number.isFinite(new Date(work.updatedAt).getTime()) ? new Date(work.updatedAt).toISOString() : undefined}>{conversationTime(work.updatedAt, now)}</time>

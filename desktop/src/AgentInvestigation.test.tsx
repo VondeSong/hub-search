@@ -152,7 +152,7 @@ afterEach(async () => { await act(async () => root.unmount()); resetCodexAccount
 const button = (label: string) => {
  if(label==="添加资料")return document.body.querySelector<HTMLButtonElement>(".agent-scope-trigger")!;
  if(["开始调查","发送追问","追加要求","排队发送","发送"].includes(label))return document.body.querySelector<HTMLButtonElement>('.agent-send[type="submit"]')!;
- const text=label==="专注阅读报告"?"只看最新回答":label;
+ const text=["专注阅读报告","返回对话布局","只看最新回答"].includes(label)?"只看最新回复":label;
  const buttons=Array.from(document.body.querySelectorAll<HTMLButtonElement>("button"));
  return (buttons.find(item=>item.getAttribute("aria-label")===text||item.textContent?.trim()===text||item.querySelector("strong")?.textContent===text)||buttons.find(item=>(item.getAttribute("aria-label")||item.textContent)?.includes(text)))!;
 };
@@ -183,7 +183,21 @@ async function revealButton(text:string) {
   }
   return target;
 }
-const click = async (text: string) => { const target=await revealButton(text);await act(async () => target.click()); };
+const click = async (text: string) => {
+  const layout = text==="展开为侧边栏" ? "右侧分屏停靠" : text==="切换为浮窗" ? "悬浮浮窗" : "";
+  if(layout) {
+    const menu=document.querySelector<HTMLDetailsElement>(".agent-window-layout")!;
+    await act(async()=>menu.querySelector("summary")!.click());
+    await act(async()=>button(layout).click());
+    return;
+  }
+  const target=await revealButton(text);
+  await act(async () => target.click());
+  if(text==="专注阅读报告"){
+    await act(async()=>button("关闭对话详情").click());
+    document.querySelector<HTMLElement>(".agent-conversation")?.focus();
+  }
+};
 const fill = async (name: string, value: string) => {
   const input = document.body.querySelector<HTMLTextAreaElement>(`[name="${name}"]`)!;
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); });
@@ -221,8 +235,10 @@ it("opens a quote in an independent assistant and preserves both chats when dock
   expect(side.querySelector("[aria-label='待添加资料']")?.textContent).toContain(excerpt);
   expect(side.querySelector("textarea")?.value).toBe("");
   const dock = async (panel: HTMLElement) => {
-    const label = panel.dataset.agentDocked === "true" ? "切换为浮窗" : "展开为侧边栏";
-    await act(async () => panel.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!.click());
+    const label = panel.dataset.agentDocked === "true" ? "悬浮浮窗" : "右侧分屏停靠";
+    await act(async () => panel.querySelector<HTMLElement>('.agent-window-layout > summary')!.click());
+    const choice=[...panel.querySelectorAll<HTMLButtonElement>(".agent-window-menu button")].find(item=>item.textContent===label)!;
+    await act(async () => choice.click());
   };
   await dock(side);
   expect(side.dataset.agentDocked).toBe("true");
@@ -449,12 +465,12 @@ it("keeps a failed conversation recoverable without starting another model autom
  expect(document.body.textContent).toContain("继续调查");
  expect(invoke.mock.calls.filter(([,v])=>v?.args?.action==="respond")).toHaveLength(0);
 });
-it("reads a saved report with a hidden composer and returns by Escape without closing the Work or starting a model",async()=>{
+it("filters to the saved report with the composer available and returns by Escape without closing the Work or starting a model",async()=>{
  invoke.mockImplementation(async(_,{args})=>args.action==="list"?{works:[{id:current.work.id,goal:current.work.goal,state:current.work.state}]}:current);
  await open();await fill("investigationGoal","保留这个追问草稿");await click("专注阅读报告");
  const panel=document.body.querySelector<HTMLElement>('.agent-panel')!;
  expect(panel.dataset.agentReading).toBe("true");
- expect(document.body.querySelector<HTMLElement>('.agent-composer')?.hidden).toBe(true);
+ expect(document.body.querySelector<HTMLElement>('.agent-composer')?.hidden).toBe(false);
  expect(document.activeElement?.getAttribute('aria-label')).toBe('对话与报告');
  expect(panel.textContent).toContain('历史记录要求保持 M6');
  await act(async()=>panel.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
@@ -734,7 +750,7 @@ it("resizes the assistant from its divider, clamps to the viewport limits and re
   expect(dock.width()).toBe(180);
   await act(async () => dock.separator.dispatchEvent(new MouseEvent("dblclick", { bubbles: true })));
   expect(dock.width()).toBe(480);
-  expect(invoke.mock.calls.map(([, { args }]) => args.action)).toEqual(["list", "list"]);
+  expect(invoke.mock.calls.map(([, { args }]) => args.action).filter(action=>action!=="skills")).toEqual(["list", "list"]);
 });
 it("keeps divider, sliders and keyboard adjustment aligned when the viewport becomes narrower", async () => {
   const dock = await openResizeDock();
@@ -840,14 +856,14 @@ it("opens a separate assistant, fills suggestions without sending, and restores 
   await click("概括主要内容");
   const input = panel.querySelector<HTMLTextAreaElement>('[name="investigationGoal"]')!;
   expect(input.value).toContain("概括当前材料");
-  expect(invoke.mock.calls.map(([, { args }]) => args.action)).toEqual(["list", "list"]);
+  expect(invoke.mock.calls.map(([, { args }]) => args.action).filter(action=>action!=="skills")).toEqual(["list", "list"]);
   await act(async () => input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
   expect(panel.hidden).toBe(true);
   expect(document.activeElement).toBe(document.body.querySelector(".agent-floating-launcher"));
   await click("调查这篇笔记");
   expect(panel.hidden).toBe(false);
   expect(input.value).toContain("概括当前材料");
-  expect(invoke.mock.calls.map(([, { args }]) => args.action)).toEqual(["list", "list"]);
+  expect(invoke.mock.calls.map(([, { args }]) => args.action).filter(action=>action!=="skills")).toEqual(["list", "list"]);
 });
 it("keeps settings collapsed until requested and preserves the explicit library choice while reopening", async () => {
   libraryInventory.value=[noteLibrary];
@@ -990,7 +1006,7 @@ it("does not analyze automatically and defaults to an exact note grant", async (
   await act(async () => root.render(<AgentInvestigation result={result} />));
   expect(invoke).not.toHaveBeenCalled();
   await click("调查这篇笔记");
-  expect(invoke.mock.calls.map(([, { args }]) => args.action)).toEqual(["list", "list"]);
+  expect(invoke.mock.calls.map(([, { args }]) => args.action).filter(action=>action!=="skills")).toEqual(["list", "list"]);
   await openAddPage("资料范围");
   expect(document.body.querySelector<HTMLInputElement>('[aria-label="允许查找 工作笔记"]')!.checked).toBe(false);
   expect(document.body.querySelector<HTMLInputElement>('.agent-settings [type="checkbox"]')!.checked).toBe(false);
@@ -2030,7 +2046,7 @@ it("keeps sidebar mode across global new-chat remounts",async()=>{
  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,30));});
  await click("展开为侧边栏");await click("新对话");
  expect(document.body.classList.contains("agent-sidebar-open")).toBe(true);
- expect(button("切换为浮窗")).toBeTruthy();
+ expect(button("悬浮浮窗")).toBeTruthy();
 });
 it("drops mixed explicit sources into a new conversation without granting a library",async()=>{
  await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));

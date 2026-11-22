@@ -9,18 +9,30 @@
   font-size: 13px;
   line-height: 1.45;
 }
+.agent-history-container > .agent-conversations.agent-history-popover {
+  width: min(288px, 88%);
+  height: 100%;
+  max-height: none;
+  box-sizing: border-box;
+  border-inline-end: 1px solid var(--agent-chat-border);
+  background: var(--agent-chat-surface);
+  box-shadow: 0 12px 38px #1c191717;
+  color: var(--agent-chat-ink);
+  font-family: var(--agent-chat-font);
+}
 .agent-conversations.agent-history-popover .agent-history-heading.agent-history-toolbar {
   flex: 0 0 auto;
   gap: 4px;
-  padding: 2px 0 8px;
-  border: 0;
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 0 10px 0 14px;
+  border-block-end: 1px solid var(--agent-chat-border);
 }
 .agent-conversations.agent-history-popover .agent-history-toolbar > strong {
   flex: 1;
-  padding-inline: 8px;
-  font-size: 13px;
-  font-weight: 550;
-  color: var(--hub-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--agent-chat-ink);
 }
 .agent-conversations.agent-history-popover .agent-history-heading.agent-history-toolbar > button {
   display: inline-flex;
@@ -42,7 +54,7 @@
   align-items: center;
   flex: 0 0 auto;
   gap: 8px;
-  margin: 0 5px 7px;
+  margin: 8px 8px 0;
   padding: 6px 8px;
   border: 1px solid var(--hub-separator);
   border-radius: 9px;
@@ -87,12 +99,12 @@
   overflow-x: hidden;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  padding: 0 0 6px;
+  padding: 8px;
 }
 .agent-conversations.agent-history-popover .agent-history-group > h3 {
   margin: 12px 9px 5px;
   color: var(--hub-text-secondary);
-  font-size: 12px;
+  font-size: 10.5px;
   line-height: 1.5;
   font-weight: 400;
 }
@@ -114,15 +126,17 @@
   background: color-mix(in srgb, var(--hub-text-primary) 4%, transparent);
 }
 .agent-conversations.agent-history-popover .agent-history-row .agent-history-open {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  grid-template-rows: auto auto;
   align-items: center;
   flex: 1;
   min-width: 0;
   width: auto;
   height: auto;
   min-height: 40px;
-  gap: 9px;
-  padding: 8px 5px 8px 9px;
+  gap: 2px 8px;
+  padding: 8px 5px 8px 10px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -139,21 +153,21 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   -webkit-line-clamp: unset;
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 1.5;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
 }
 .agent-conversations.agent-history-popover .agent-history-open time {
-  flex: 0 0 auto;
+  grid-area: 2 / 1;
   max-width: 7.5em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--hub-text-secondary);
-  font-size: 11px;
+  font-size: 10.5px;
   font-variant-numeric: tabular-nums;
 }
-.agent-conversations.agent-history-popover .agent-history-open .agent-history-current { color: var(--hub-accent); }
+.agent-conversations.agent-history-popover .agent-history-open .agent-history-current { grid-area: 1 / 2 / span 2; color: var(--hub-accent); }
 .agent-conversations.agent-history-popover .agent-history-actions {
   display: flex;
   flex: 0 0 26px;
@@ -196,8 +210,7 @@
 .agent-conversations.agent-history-popover button.agent-history-more::before { display: none; }
 .agent-conversations.agent-history-popover .agent-history-footer {
   flex: 0 0 auto;
-  margin-top: 3px;
-  padding: 5px 0 0;
+  padding: 5px 8px;
   border-top: 1px solid var(--hub-separator);
 }
 .agent-conversations.agent-history-popover .agent-history-footer > button {

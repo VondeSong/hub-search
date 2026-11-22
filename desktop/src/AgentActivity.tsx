@@ -521,9 +521,9 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
       {materialGroup ? <Layers size={13} aria-hidden="true"/> : headingIcon && <ActivityIcon event={headingIcon}/>}
       <span className="agent-phase-label">{summary}</span>
       {summaryOnly && !materialGroup && <small>另 {events.length-1} 条</small>}
-      <ActivityIdentity events={operations} workId={scope?.workId} primaryIcon={headingIcon} showRemainingSites={!live || !webPhase}/>
+      <ActivityIdentity events={operations} workId={scope?.workId} primaryIcon={headingIcon} showRemainingSites={!webPhase}/>
       <ChevronDown className="agent-reasoning-chevron" size={12} aria-hidden="true"/>
-      {failed&&!open&&<small className="agent-phase-warning" role="status"><TriangleAlert size={12} aria-hidden="true"/>部分未完成</small>}
+      {failed&&!open&&!webPhase&&<small className="agent-phase-warning" role="status"><TriangleAlert size={12} aria-hidden="true"/>部分未完成</small>}
     </summary>
     {steps}
   </details>;

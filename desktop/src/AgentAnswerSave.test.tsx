@@ -8,9 +8,9 @@ vi.mock("@tauri-apps/api/core",()=>({invoke}));
 let host:HTMLDivElement,root:Root;
 const changed=vi.fn();
 const preview:AnswerSave={saveId:"save",runId:"historical-run",title:"edited title",text:"edited body",mode:"note",targetName:"笔记库",state:"prepared",confirmationToken:"bound-token"};
-it("returns focus to More for the answer that opened the dialog",async()=>{
+it("returns focus to the note action for the answer that opened the dialog",async()=>{
  await act(async()=>root.render(<AgentAnswerSave workId="work" runId="historical-run" disabled={false} records={[]} onChanged={changed}/>));
- const opener=button("更多");
+ const opener=button("存入笔记");
  await openSave("新建笔记");
  await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label="关闭保存回答"]')!.click());
  expect(document.activeElement).toBe(opener);
@@ -20,9 +20,9 @@ beforeEach(()=>{Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});host=d
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();});
 const button=(text:string)=>[...document.body.querySelectorAll("button")].find(b=>b.textContent===text)!;
 async function openSave(label:string) {
- const opener=button("更多");
- await act(async()=>opener.click());
- await act(async()=>host.querySelector<HTMLButtonElement>(`[role="menuitem"][aria-label="${label}"]`)!.click());
+ const opener=button(label==="创建任务"?"创建任务":"存入笔记");
+ await act(async()=>{opener.focus();opener.click();});
+ if(label==="新建笔记")await act(async()=>button("新建独立笔记").click());
 }
 async function field(label:string,value:string){const element=document.body.querySelector<HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement>(`[aria-label="${label}"]`)!;const prototype=element instanceof HTMLSelectElement?HTMLSelectElement.prototype:element instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;await act(async()=>{Object.getOwnPropertyDescriptor(prototype,"value")!.set!.call(element,value);element.dispatchEvent(new Event(element instanceof HTMLSelectElement?"change":"input",{bubbles:true}));});}
 it("saves the specifically selected historical answer only after an editable preview and explicit confirmation",async()=>{
@@ -60,6 +60,16 @@ it("does not prepare or write when the original answer source is no longer valid
  await openSave("新建笔记");
  expect(document.body.textContent).toContain("来源授权已撤回");expect(button("预览保存").disabled).toBe(true);
  expect(invoke.mock.calls.some(([,v])=>v.args.action==="submitAnswerSave"||v.args.action==="prepareAnswerSave")).toBe(false);
+});
+it("preserves edited note text when switching between saving as a note and appending",async()=>{
+ await act(async()=>root.render(<AgentAnswerSave workId="work" runId="historical-run" disabled={false} onChanged={changed}/>));
+ await openSave("插入页面");
+ await field("保存标题","我的标题");
+ await field("保存正文","修改后的正文");
+ await act(async()=>button("新建独立笔记").click());
+ expect(document.querySelector<HTMLInputElement>('[aria-label="保存标题"]')!.value).toBe("我的标题");
+ expect(document.querySelector<HTMLTextAreaElement>('[aria-label="保存正文"]')!.value).toBe("修改后的正文");
+ expect(invoke.mock.calls.some(([,v])=>["prepareAnswerSave","submitAnswerSave"].includes(v.args.action))).toBe(false);
 });
 it("keeps a searched insertion target when returning from preview instead of switching to the current page",async()=>{
  const original=invoke.getMockImplementation()!;

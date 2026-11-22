@@ -21,7 +21,7 @@ export const skillTitle = (name:string) => builtinTitles[name] || name;
 const purposes: Record<string,string> = {"hub-research":"比较材料中的观点，核对原文与矛盾","hub-statistics":"统计材料中的数量、日期与覆盖范围","hub-flashcards":"根据笔记制作或检查学习卡片","hub-note-edit":"整理、改写当前可编辑的 Obsidian 笔记","hub-archive":"为阅读材料准备归档方案","hub-tool-guide":"查看标签、媒体和闪卡工具的使用约定"};
 export const skillPurpose=(name:string)=>purposes[name]||"";
 
-export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], onReset, pinned=[], onPin }: { disabled: boolean; onSelect: (name: string) => void; embedded?: boolean; selected?:string[]; onReset?:()=>void; pinned?:string[]; onPin?:(name:string)=>void }) {
+export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], onReset, pinned=[], onPin, manageInitially=false }: { disabled: boolean; onSelect: (name: string) => void; embedded?: boolean; selected?:string[]; onReset?:()=>void; pinned?:string[]; onPin?:(name:string)=>void; manageInitially?:boolean }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [query,setQuery]=useState("");
   const returnPin=useRef<string|null>(null);
@@ -55,7 +55,7 @@ export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], o
     try{await invoke("agent_investigation",{args:{action:"skillSourceFile",name:detail.name,reveal:true}});setSourceError("");}
     catch(reason){setSourceError(String(reason));}
   }
-  const [managing, setManaging] = useState(false);
+  const [managing, setManaging] = useState(manageInitially);
   const detailHeading = useRef<HTMLHeadingElement>(null);
   const listReturn = useRef<HTMLButtonElement | null>(null);
   const menuElement = useRef<HTMLDivElement>(null);

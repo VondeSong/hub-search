@@ -1,8 +1,29 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { ChevronRight, X } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { authorizeCodexConversation, cancelCodexLogin, dismissCodexAccountNotice, refreshCodexAccounts, removeCodexAccount, selectCodexAccount, startCodexLogin, useCodexAccounts } from "./CodexAccounts";
 import { openCodexSuiteSettings } from "./CodexSuite";
+import { useModalFocus } from "./useModalFocus";
 import "./CodexAccountsSettings.css";
+
+export function CodexAccountContext({onOpen}:{onOpen:()=>void}) {
+  const {current,loading}=useCodexAccounts();
+  const status=current ? [current.workspaceLabel || current.label, current.plan].filter(Boolean).join(" · ") : loading ? "正在读取" : "未连接";
+  return <button type="button" className="agent-detail-link agent-inspector-account" aria-haspopup="dialog" onClick={onOpen}>
+    <span className="agent-detail-title">Codex 账号</span><small><i data-connected={!!current} aria-hidden="true"/>{status}</small><ChevronRight size={12} aria-hidden="true"/>
+  </button>;
+}
+
+export function CodexAccountDialog({onClose}:{onClose:()=>void}) {
+  const panel=useRef<HTMLElement>(null);
+  useModalFocus({active:true,containerRef:panel,onDismiss:onClose});
+  return <div className="agent-reference-overlay" onClick={event=>{if(event.target===event.currentTarget)onClose();}}>
+    <section ref={panel} className="agent-reference-modal" role="dialog" aria-modal="true" aria-label="Codex 账号管理" tabIndex={-1}>
+      <header><strong>Codex 账号管理</strong><button type="button" aria-label="关闭 Codex 账号管理" onClick={onClose}><X size={16}/></button></header>
+      <div className="agent-reference-modal-body"><CodexAccountsSettings/></div>
+    </section>
+  </div>;
+}
 
 export function CodexAccountBadge({workId,boundScopeId,needsAuthorization=false,disabled=false,onAuthorized}:{workId?:string;boundScopeId?:string;needsAuthorization?:boolean;disabled?:boolean;onAuthorized?:()=>void}) {
   const value = useCodexAccounts();

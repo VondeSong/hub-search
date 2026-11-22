@@ -220,7 +220,7 @@ it("keeps the live web summary steady across successive queries and publishes th
  expect(queries).toEqual(['搜索网页 · 第一批查询','搜索网页 · 第二批查询']);
  await draw([search,{...next,action:'search',state:'completed',queries:['第二批查询'],sourceRefs:sources(5)}],false);
  expect(label.textContent).toBe('网页检索 · 2 步');
- expect(summary.textContent).toContain('另 5 个站点');
+ expect(summary.textContent).not.toContain('个站点');
  expect(phase.open).toBe(true);
 });
 it("updates a phase title and preserves its disclosure when tools and summaries arrive",async()=>{
@@ -771,6 +771,11 @@ it("keeps a failed search in its phase after the streamed answer is replaced by 
   await act(async()=>root.render(<AgentConversation conversation={conversation} activity={[activity]} revoked={false} onOpenCitation={()=>{}}/>));
   expect(host.querySelector(".agent-activity-toggle")?.textContent).toMatch(/^用时 [^·]+$/);
   await expandProcess();
-  expect(host.querySelector(".agent-phase-warning")?.textContent).toBe("部分未完成");
+  expect(host.querySelector(".agent-phase-warning")).toBeNull();
+  const group=host.querySelector<HTMLDetailsElement>(".agent-operation-group")!;
+  await act(async()=>group.querySelector("summary")!.click());
+  const receipt=group.querySelector<HTMLDetailsElement>(".agent-web-activity")!;
+  if(!receipt.open)await act(async()=>receipt.querySelector("summary")!.click());
+  expect(receipt.querySelector(".agent-process-failure")?.textContent).toContain("本批 1 项未能获取。");
   expect(host.querySelector('[aria-label="助手回答"]')?.textContent).toContain("已核对可访问的来源");
 });

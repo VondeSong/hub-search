@@ -666,13 +666,15 @@ describe("site v71 assistant controls",()=>{
     expect(input.value).toBe("保留这段手写草稿");expect(document.querySelector('.agent-tag-workspace')).toBeNull();
     expect(calls("create")).toHaveLength(0);expect(calls("respond")).toHaveLength(0);
   });
-  it("keeps the native docking toggle and resize controls without prototype viewport controls",async()=>{
+  it("switches the existing dock and preview through the window layout menu",async()=>{
     await render(<StandaloneInvestigation initiallyOpen startFresh/>);
     const panel=select<HTMLElement>('.agent-panel');const wasDocked=panel.dataset.agentDocked;
-    const dock = () => select<HTMLButtonElement>('.agent-header-end button[aria-label="展开为侧边栏"],.agent-header-end button[aria-label="切换为浮窗"]');
+    const dock = () => select<HTMLElement>('.agent-window-layout > summary');
     const resize = select<HTMLElement>('.agent-panel-resizer');
     const width = resize.getAttribute("aria-valuenow");
     await activate(dock());
+    const options = Array.from(panel.querySelectorAll<HTMLButtonElement>(".agent-window-menu > button"));
+    await activate(options.find(item=>item.textContent===(wasDocked==="true"?"悬浮浮窗":"右侧分屏停靠"))!);
     expect(panel.dataset.agentDocked).not.toBe(wasDocked);
     expect(resize.hidden).toBe(false);
     expect(resize.getAttribute("aria-valuenow")).toBe(width);

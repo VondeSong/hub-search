@@ -115,8 +115,7 @@ function ReportContent({ value, evidence, runId, onOpenCitation, actions }: { va
       <ReportCitationContext.Provider value={{ citations: prose.citations, evidence, runId, onOpenCitation }}><ReportMarkdown markdown={prose.markdown} citationCount={prose.citations.length} /></ReportCitationContext.Provider>
       {!!value.limitations.length && <p className="agent-note">{value.limitations.join("；")}</p>}
       <AnswerSources citations={prose.citations} evidence={evidence} runId={runId} onOpenCitation={onOpenCitation}/>
-      <AgentWebSources sources={prose.webSources??[]}/>
-      <div className="agent-answer-toolbar"><AgentAnswerActions showLabel text={[prose.markdown,...value.limitations,copySources.length ? "来源：\n"+copySources.join("\n") : ""].filter(Boolean).join("\n\n")}/>{actions}</div>
+      <div className="agent-answer-toolbar"><AgentAnswerActions showLabel text={[prose.markdown,...value.limitations,copySources.length ? "来源：\n"+copySources.join("\n") : ""].filter(Boolean).join("\n\n")}/>{actions}<AgentWebSources sources={prose.webSources??[]}/></div>
     </div>;
   }
   const citations = (items: Citation[]) => items.map((citation, index) => {
