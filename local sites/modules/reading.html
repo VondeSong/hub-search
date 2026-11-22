@@ -274,7 +274,15 @@
   </style>
 
   <style>
-    html.hub-embedded #titlebar { height: 42px !important; background: rgba(248, 249, 251, 0.88) !important; border-bottom: 1px solid rgba(20, 20, 19, 0.08); }
+    html.hub-embedded {
+      --studio-bg: #F5F6F8;
+      --glass-bar: rgba(248, 249, 251, 0.90);
+      --accent: #007AFF;
+      --accent-ink: #0062CC;
+      --radius-paper: 14px;
+    }
+    html.hub-embedded .studio-canvas { background: #F5F6F8 !important; }
+    html.hub-embedded #titlebar { height: 42px !important; background: rgba(248, 249, 251, 0.90) !important; border-bottom: 0.5px solid rgba(15, 23, 42, 0.08); }
   </style>
 
 </head>
@@ -282,12 +290,13 @@
   <div id="app" class="h-screen w-screen flex flex-col studio-canvas select-none">
     <!-- Unified macOS Titlebar (46px): Single top surface for Sources + Global Utility + Unobtrusive Demo Trigger -->
     <header id="titlebar" class="h-[46px] px-3.5 flex items-center justify-between gap-3 mac-vibrancy shrink-0 z-30">
-      <!-- Left: Sidebar Toggle + Workspace Identity -->
+      <!-- Left: Sidebar Toggle + Workspace Identity / Compact Inline Scopes -->
       <div class="flex items-center gap-2 shrink-0">
-        <button id="btn-toggle-sidebar" class="w-7 h-7 rounded-[7px] flex items-center justify-center text-neutral-500 hover:bg-black/[0.05] hover:text-neutral-900 transition" title="展开/收起侧栏">
+        <button id="btn-toggle-sidebar" class="w-7 h-7 rounded-[7px] flex items-center justify-center text-neutral-500 hover:bg-black/[0.05] hover:text-neutral-900 transition" title="展开/收起阅读侧栏">
           <i data-lucide="panel-left" class="w-4 h-4"></i>
         </button>
-        <span class="text-[13.5px] font-semibold tracking-tight text-neutral-900 hidden sm:inline">阅读</span>
+        <span id="titlebar-brand" class="text-[13.5px] font-semibold tracking-tight text-neutral-900 hidden sm:inline">阅读</span>
+        <div id="inline-scope-pills" class="hidden items-center gap-0.5 mac-groove p-[3px] rounded-[9px]"></div>
       </div>
 
       <!-- Center: Orthogonal Source Switcher (macOS Segmented Control — Zero Clutter inside Paper Sheets!) -->
@@ -808,7 +817,7 @@
       sortDir: 'desc',
       selectedItemId: 'item-101',
       readingOverlayOpen: false, // Used when clicking an item inside full-width Table / Board / Gallery / Triage / Narrow
-      sidebarOpen: true,
+      sidebarOpen: !(new URLSearchParams(window.location.search).get('embed') === '1' || window.self !== window.top),
       mobileSidebarOpen: false,
       copiesExpanded: true,
       inspectorOpen: false,
@@ -1078,6 +1087,27 @@
       // Desktop Wide Mode
       bd.classList.add('hidden');
       sb.className = state.sidebarOpen ? 'w-[206px] shrink-0 flex flex-col pr-2 pt-1 pb-1 overflow-hidden' : 'hidden';
+
+      const inlineScopes = document.getElementById('inline-scope-pills');
+      const brandEl = document.getElementById('titlebar-brand');
+      if (inlineScopes && brandEl) {
+        const showInline = !state.sidebarOpen;
+        brandEl.classList.toggle('hidden', showInline);
+        brandEl.classList.toggle('sm:inline', !showInline);
+        inlineScopes.className = showInline ? 'hidden md:flex items-center gap-0.5 mac-groove p-[3px] rounded-[9px]' : 'hidden';
+        if (showInline) {
+          const quickScopes = [
+            { id: 'all', label: '全部' },
+            { id: 'unread', label: '待读' },
+            { id: 'reading', label: '进行中' },
+            { id: 'read', label: '已读' }
+          ];
+          inlineScopes.innerHTML = quickScopes.map(s => {
+            const active = state.scope === s.id && !state.activeViewId;
+            return `<button data-scope="${s.id}" class="px-2 py-1 rounded-[7px] text-[11.5px] transition whitespace-nowrap ${active ? 'mac-seg-active' : 'text-neutral-600 hover:text-neutral-900'}">${s.label}</button>`;
+          }).join('');
+        }
+      }
 
       if (isSplitReadingActive()) {
         // Default Calm Split: Stream (left) + Spacious Claude Reading Paper (right)
@@ -2427,6 +2457,19 @@
       const isEmbed = params.get('embed') === '1' || window.self !== window.top;
       if (isEmbed) {
         document.documentElement.classList.add('hub-embedded');
+        let readingSidebarAutoCollapsed = false;
+        window.addEventListener('message', function (ev) {
+          if (ev.source !== window.parent || !ev.data || ev.data.type !== 'hub-host-assistant-docked') return;
+          if (ev.data.active && state.sidebarOpen) {
+            state.sidebarOpen = false;
+            readingSidebarAutoCollapsed = true;
+            renderStageLayout();
+          } else if (!ev.data.active && readingSidebarAutoCollapsed) {
+            state.sidebarOpen = true;
+            readingSidebarAutoCollapsed = false;
+            renderStageLayout();
+          }
+        });
         window.addEventListener('keydown', function (e) {
           const mod = e.metaKey || e.ctrlKey;
           if (!mod) return;

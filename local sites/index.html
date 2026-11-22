@@ -1715,6 +1715,25 @@
     let lastAssistantContext = '';
     let lastAssistantTrigger = null;
     let lastAssistantView = null;
+    let sidebarAutoCollapsedByAssistant = false;
+
+    function syncSidebarForAssistant(dockedActive) {
+      const multiColumnView = (state.view === 'space' && state.spaceSurface !== 'grid')
+        || ['tasks', 'search', 'reading', 'insights'].includes(state.view);
+      const shouldCollapse = dockedActive && (multiColumnView || window.innerWidth < 1440);
+      if (shouldCollapse && !state.sidebarCollapsed) {
+        state.sidebarCollapsed = true;
+        sidebarAutoCollapsedByAssistant = true;
+        renderChrome();
+      } else if (!dockedActive && sidebarAutoCollapsedByAssistant) {
+        state.sidebarCollapsed = false;
+        sidebarAutoCollapsedByAssistant = false;
+        renderChrome();
+      }
+      Object.values(mountedEmbeds).forEach(frame => {
+        try { frame.contentWindow?.postMessage({ type: 'hub-host-assistant-docked', active: dockedActive }, '*'); } catch (_) {}
+      });
+    }
 
     function getQuickAssistantContext() {
       const toPaper = (doc, library) => ({ id: doc.id, title: doc.title, snippet: doc.snippet || '', library: getLib(library).short });
@@ -1744,6 +1763,7 @@
       quickAssistantPanel.hidden = !showPanel;
       document.getElementById('quick-assistant-controls').hidden = !showPanel;
       if (!showPanel) setAgentDemoPopover(false);
+      syncSidebarForAssistant(showPanel && quickAssistantPanel.dataset.layout === 'docked');
       document.getElementById('workspace-content').inert = showPanel && quickAssistantPanel.dataset.layout === 'expanded' && agentSource.hidden;
       if (!showPanel) agentSource.hidden = true;
       fab.style.display = showPanel || dedicatedAgent ? 'none' : 'inline-flex';
@@ -1771,10 +1791,6 @@
 
     function openQuickAssistant(request = { type: 'focus' }) {
       if (!state.quickAssistantOpen) lastAssistantTrigger = document.activeElement;
-      if (matchMedia('(max-width: 820px)').matches && !state.sidebarCollapsed) {
-        state.sidebarCollapsed = true;
-        renderChrome();
-      }
       quickAssistantRequest = request;
       state.quickAssistantOpen = true;
       renderQuickAssistant();
@@ -3343,7 +3359,7 @@
             </div>
             <div class="flex-1 overflow-y-auto p-6"><div class="inset-group max-w-3xl">${visible.map(t => `<div class="inset-row px-4 py-3 flex items-center gap-3 cursor-pointer ${selected?.id === t.id ? 'selected' : ''}" data-select-task="${t.id}"><button class="w-4 h-4 rounded-full flex items-center justify-center shrink-0 cursor-pointer" data-toggle-task="${t.id}" style="border:1.5px solid ${t.done ? 'var(--accent-green)' : prioColor(t.priority)}; background:${t.done ? 'var(--accent-green)' : 'transparent'}">${t.done ? '<i data-lucide="check" class="w-2.5 h-2.5 text-white"></i>' : ''}</button><div class="flex-1 min-w-0"><div class="text-[13.5px] ${t.done ? 'line-through opacity-55' : 'font-medium'} truncate">${escapeHtml(t.title)}</div><div class="text-[11px] font-mono-eng" style="color:var(--ink-tertiary)">${t.source} · ${t.due}</div></div></div>`).join('')}</div></div>
           </div>
-          ${selected ? `<aside class="hidden lg:flex flex-col w-[300px] shrink-0 hairline-l p-5 space-y-4 select-text" style="background:var(--bg-paper)"><div class="text-[11px] font-semibold uppercase tracking-wider" style="color:var(--ink-tertiary)">任务详情</div><h3 class="text-[16px] font-semibold leading-snug">${escapeHtml(selected.title)}</h3><textarea id="task-notes-input" rows="5" class="w-full p-3 rounded-xl text-[13px] outline-none resize-none" style="background:var(--bg-surface); border:0.5px solid var(--hairline)">${escapeHtml(selected.notes)}</textarea></aside>` : ''}
+          ${selected ? `<div class="hidden lg:flex w-[324px] shrink-0 p-2.5 pl-0"><aside class="paper-sheet flex flex-col w-full p-5 space-y-4 select-text overflow-y-auto"><div class="text-[11px] font-semibold uppercase tracking-wider" style="color:var(--ink-tertiary)">任务详情</div><h3 class="text-[16px] font-semibold leading-snug">${escapeHtml(selected.title)}</h3><textarea id="task-notes-input" rows="5" class="w-full p-3 rounded-xl text-[13px] outline-none resize-none" style="background:var(--bg-surface); border:0.5px solid var(--hairline)">${escapeHtml(selected.notes)}</textarea></aside></div>` : ''}
         </div>
       `;
       stage.querySelectorAll('[data-task-bucket]').forEach(b => b.addEventListener('click', () => { state.taskBucket = b.dataset.taskBucket; renderMain(); }));
@@ -3559,7 +3575,7 @@
       }
     });
 
-    document.getElementById('btn-toggle-sidebar').addEventListener('click', () => { state.sidebarCollapsed = !state.sidebarCollapsed; renderChrome(); });
+    document.getElementById('btn-toggle-sidebar').addEventListener('click', () => { sidebarAutoCollapsedByAssistant = false; state.sidebarCollapsed = !state.sidebarCollapsed; renderChrome(); });
     document.getElementById('btn-toggle-libs').addEventListener('click', () => { state.libsCollapsed = !state.libsCollapsed; renderChrome(); });
     document.getElementById('btn-reset-libs').addEventListener('click', () => { state.selectedLibraries = new Set(LIBRARIES.map(l => l.id)); showToast('已恢复全部 6 个资料库'); renderAll(); });
     document.getElementById('btn-toggle-serif').addEventListener('click', () => { state.serifReading = !state.serifReading; renderAll(); });
@@ -3616,7 +3632,7 @@
         if (state.paletteOpen) { const i = document.getElementById('palette-input'); i.value = ''; i.focus(); }
         return;
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === '\\') { e.preventDefault(); state.sidebarCollapsed = !state.sidebarCollapsed; renderChrome(); return; }
+      if ((e.metaKey || e.ctrlKey) && e.key === '\\') { e.preventDefault(); sidebarAutoCollapsedByAssistant = false; state.sidebarCollapsed = !state.sidebarCollapsed; renderChrome(); return; }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f' && state.view === 'search') {
         e.preventDefault();
         state.searchFilterOpen = !state.searchFilterOpen;
@@ -3735,6 +3751,7 @@
         renderPalette();
         if (state.paletteOpen) { const i = document.getElementById('palette-input'); i.value = ''; i.focus(); }
       } else if (k === '\\') {
+        sidebarAutoCollapsedByAssistant = false;
         state.sidebarCollapsed = !state.sidebarCollapsed;
         renderChrome();
       } else if (k === 'j') {
