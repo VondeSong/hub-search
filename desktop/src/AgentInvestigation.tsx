@@ -11,7 +11,7 @@ import { conversationTitle } from "./AgentConversationHistoryData";
 import { AgentAnswerSave, type AnswerSave } from "./AgentAnswerSave";
 import { AgentTaskMode } from "./AgentTaskMode";
 import { AgentDetailSummary } from "./AgentDetailSummary";
-import { Brain, Globe2, FolderBookmark, Layers, NotebookPen, Tags } from "lucide-react";
+import { Brain, Globe2, FolderBookmark, Layers, Tags } from "lucide-react";
 import { AgentScopeTrigger } from "./AgentScopeTrigger";
 import { useAgentLibraryRegistry, resolveAgentLibraries } from "./useAgentLibraryRegistry";
 import { AgentCitationPreview, type CitationLocation } from "./AgentCitationPreview";
@@ -1087,7 +1087,13 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     try {
       const grant = { libraryIds: composerLibraries.map(library=>library.id), notes: [anchor], readingItemKeys: [] };
       const value = await call<View>({ action: "create", goal: "修改当前 Obsidian 笔记", successCriteria: "查看具体修改，明确确认后保存；发现外部变化时保留草稿并停止覆盖。", anchor, grant });
-      if (alive.current) { setView(value); void reloadWorks(); setHistoryExpanded(false); if(detailsMenu.current) detailsMenu.current.open=true; }
+      if (alive.current) {
+        setView(value);
+        void reloadWorks();
+        setTaskStatusOnly(false);
+        setHistoryExpanded(false);
+        if (detailsMenu.current) detailsMenu.current.open = true;
+      }
     } catch (reason) { if (alive.current) setError(String(reason)); }
     finally { if (alive.current) setBusy(false); }
   };
@@ -1336,9 +1342,9 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     onScope: !busy && !filePreparing && !publicUrl ? openMaterialScope : undefined,
   } : undefined;
   const recoveryInTimeline = recovery?.runId && view?.activity?.some(item=>item.runId===recovery.runId && !item.running && !item.validity);
-  const conversationDetails = view ? <>
+  const openDiagnostics = taskStatusOnly || (canEditNote && view?.work.goal === "修改当前 Obsidian 笔记");
+  const conversationActions = view && !taskStatusOnly && <>
         {!!view.decisions.length && <details><summary>你确认的决定（{view.decisions.length}）</summary><ul>{[...view.decisions].reverse().map((item, index) => <li key={index}>{item.text}</li>)}</ul></details>}
-        <details className="agent-more-tools agent-detail-row" open={canEditNote && (view.work.goal === "修改当前 Obsidian 笔记" || !!view.actions?.items.some(item => item.kind === "obsidianEdit"))}><summary><AgentDetailSummary icon={<NotebookPen size={16}/>} title="成果与保存"/></summary><p className="agent-note">从回答下方插入页面、创建笔记或任务。保存前可查看并修改草稿。</p>
         {view.work.anchor === null && view.work.state !== "revoked" && <AgentObsidianTarget key={`target-${view.work.id}-${view.work.authorizationVersion}-${view.work.actionTargetIdentity}`} targets={view.actions?.obsidianTargets || []} current={view.work.actionTarget} disabled={businessDisabled || !!view.lifecycle?.requiresExplicitResume} onAction={businessAction}/>}
         {anchor?.kind === "note" && <AgentTagAction key={view.work.id} actions={view.actions} revoked={view.work.state === "revoked"} disabled={businessDisabled || !!view.lifecycle?.requiresExplicitResume} onAction={businessAction} />}
         {view.actions?.standaloneModelDrafts?.allowed===false && <p className="agent-note" role="status">{view.actions.standaloneModelDrafts.reason}</p>}
@@ -1346,13 +1352,10 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         <AgentObsidianEdit formsOnly key={`obsidian-edit-${view.work.id}`} actions={view.actions} revoked={view.work.state === "revoked"} disabled={businessDisabled || !!view.lifecycle?.requiresExplicitResume || view.actions?.standaloneModelDrafts?.allowed===false} onAction={businessAction} />
         {anchor && <AgentBusinessActions formsOnly key={`business-${view.work.id}`} actions={view.actions} sourceKind={anchor.kind} initialGoal={view.work.goal} revoked={view.work.state === "revoked"} disabled={businessDisabled || !!view.lifecycle?.requiresExplicitResume || view.actions?.standaloneModelDrafts?.allowed===false} onAction={businessAction} />}
         {view.work.state !== "revoked" && (report || view.watch) && <AgentConditions key={`conditions-${view.work.id}`} value={view.watch} disabled={busy} active={!!active} libraryCount={view.work.grant.manifest ? 0 : view.work.grant.libraryIds.length} onAction={conditionAction} />}
-        </details>
         <div className="agent-actions">
           {view.work.state !== "revoked" && <button type="button" disabled={busy} onClick={() => void mutate("revoke")}>撤回来源授权</button>}
           {!active && view.work.state !== "revoked" && <button type="button" disabled={busy} onClick={() => { setError(""); void revalidate(view.work.id).catch(reason => setError(String(reason))); }}>核对来源</button>}
         </div>
-  </> : <>
-    <details className="agent-more-tools agent-detail-row"><summary><AgentDetailSummary icon={<NotebookPen size={16}/>} title="成果与保存"/></summary><p className="agent-note">从回答下方插入页面、创建笔记或任务。保存前可查看并修改草稿。</p><p className="agent-note">发送消息后，可查看结果保存与后续操作；现在可从输入框下方选择记忆。</p></details>
   </>;
   return <>
     {!extra && <button ref={launcher} type="button" className={`agent-launcher${compact ? " agent-launcher-compact" : ""}`} title="打开 Hub 助手" aria-label={entryLabel} aria-expanded={open} aria-controls={panelId} onClick={() => {
@@ -1428,13 +1431,13 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
           {onTopicBack&&<button type="button" className="agent-detail-link" disabled={busy||!!active} onClick={onTopicBack}><ArrowLeft size={16}/>返回专题所在工作</button>}
           </section>
           <section className="agent-inspector-card agent-inspector-diagnostics">
-        <details ref={workControls} className="agent-work-controls agent-inspector-disclosure" open={taskStatusOnly||undefined}><summary hidden={taskStatusOnly}><span>运行诊断与用量</span><ChevronRight size={14} aria-hidden="true"/></summary>
+        <details ref={workControls} className="agent-work-controls agent-inspector-disclosure" open={openDiagnostics||undefined}><summary hidden={taskStatusOnly}><span>运行诊断与用量</span><ChevronRight size={14} aria-hidden="true"/></summary>
         <div className="agent-run-diagnostic-summary">
           <div>模型：{diagnosticModel || (view?.run ? "未返回" : "尚未运行")}</div>
           <div>本轮回传：{measuredTokens===null ? (view?.run ? "未返回" : "尚未运行") : measuredTokens.toLocaleString()+" tokens"}</div>
           <div>检索上限：{view?.materialBudget ? formatFileSize(view.materialBudget.limitBytes) : "未报告"}</div>
         </div>
-        <details className="agent-diagnostic-advanced" open={taskStatusOnly||undefined}><summary>查看详细诊断</summary>
+        <details className="agent-diagnostic-advanced" open={openDiagnostics||undefined}><summary>查看详细诊断</summary>
         <dl className="agent-task-facts"><div><dt>任务进展</dt><dd>{active?"正在处理":view?states[view.work.state]||view.work.state:"尚未开始"}</dd></div><div><dt>对话消息</dt><dd>{view?.conversation?.messages.length||0} 条</dd></div><div><dt>上下文占用</dt><dd>{view?.nativeContext?.usedPercent==null?"尚未报告":view.nativeContext.usedPercent+"%"}</dd></div></dl>
         {materialUsage}
         {view&&<label className="agent-confirm-message"><input type="checkbox" checked={confirmMessage} disabled={busy||!!active} onChange={event=>setConfirmMessage(event.target.checked)}/>这条内容是我确认的决定</label>}
@@ -1451,7 +1454,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         <AgentContextCompaction value={view.contextCompaction} disabled={busy || !!active} onRequest={()=>void changeCompaction()} onCancel={()=>void changeCompaction(true)}/>
         {view.lifecycle && <AgentLifecycle value={view.lifecycle} mode={mode} disabled={busy || !!active} onResume={()=>{uiTiming.begin("resume");void run(view.work.id,view.lifecycle);}} onCancel={()=>void mutate("cancelGoal")}/> }
         </> : <p className="agent-note">{view?"来源授权已撤回，保留历史记录供查看。":"尚未开始任务，发送消息后可查看实际用量和任务控制。"}</p>}
-        {!taskStatusOnly&&<div className="agent-detail-outcomes">{conversationDetails}</div>}
+        {conversationActions}
         </details>
         </details>
           </section>

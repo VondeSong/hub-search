@@ -834,6 +834,13 @@ it("sends an additional user instruction into the active native turn without sta
   await act(async()=>finish(makeView()));
 });
 it("opens the original-note editor without starting an investigation or a model call", async () => {
+  const original = invoke.getMockImplementation()!;
+  invoke.mockImplementation(async (command, payload) => {
+    const value = await original(command, payload);
+    return payload.args.action === "create"
+      ? { ...value, actions: { items: [], tagOptions: [], obsidianEditAvailable: true } }
+      : value;
+  });
   await open();
   await click("修改这篇 Obsidian 笔记");
   const actions = invoke.mock.calls.filter(([command]) => command === "agent_investigation").map(([, { args }]) => args.action);
@@ -842,10 +849,11 @@ it("opens the original-note editor without starting an investigation or a model 
   expect(create.anchor).toEqual({ kind: "note", libraryId: "notes", documentId: "doc", pageId: null });
   expect(create.grant.libraryIds).toEqual([]);
   expect(actions).not.toContain("respond");
-  expect(document.body.querySelector<HTMLDetailsElement>(".agent-more-tools")?.open).toBe(true);
   expect(document.body.querySelector<HTMLDetailsElement>(".agent-dialogue-details")?.open).toBe(true);
   expect(document.body.querySelector<HTMLElement>(".agent-details-sections")?.hidden).toBe(false);
-  expect(document.body.querySelector(".agent-more-tools")?.closest("[hidden]")).toBeNull();
+  const editor = document.body.querySelector('[name="obsidianEditInstruction"]')!;
+  expect(editor.closest("details:not([open]), [hidden]")).toBeNull();
+  expect(editor.closest(".agent-diagnostic-advanced")).not.toBeNull();
 });
 it("opens a separate assistant, fills suggestions without sending, and restores focus and draft after Escape", async () => {
   await open();
@@ -1486,7 +1494,7 @@ it("shows the drafts returned by the same agent run beside that answer without a
  });
  await open();await fill("investigationGoal","把当前材料做成闪卡");await click("开始调查");
  expect(document.body.querySelector('.agent-message-assistant .agent-outcomes')?.textContent).toContain("自然对话制卡问题");
- expect(document.body.querySelector('.agent-more-tools')?.textContent).not.toContain("自然对话制卡问题");
+ expect(document.body.querySelector('.agent-diagnostic-advanced')?.textContent).not.toContain("自然对话制卡问题");
  expect(invoke.mock.calls.some(([,v])=>v?.args?.action==="submitFlashcards" || v?.args?.action==="prepareResponse")).toBe(false);
  await click("关闭助手");await click("调查这篇笔记");
  expect(invoke.mock.calls.filter(([,v])=>v?.args?.action==="respond")).toHaveLength(1);
@@ -2360,7 +2368,7 @@ it("keeps global history in a fresh page chat without resuming an unrelated work
  await openDialogueDetails();
  expect(document.querySelector('.agent-dialogue-details')?.textContent).toContain('尚未开始任务');
  expect(document.querySelector('.agent-dialogue-details')?.textContent).toContain('资料范围');
- expect(document.querySelector('.agent-dialogue-details')?.textContent).toContain('成果与保存');
+ expect(document.querySelector('.agent-dialogue-details')?.textContent).not.toContain('成果与保存');
  expect(invoke.mock.calls.some(([,p])=>['create','respond','resume','message'].includes(p?.args?.action))).toBe(false);
 });
 it("shows history read errors and retries only the history without replacing the draft",async()=>{
@@ -2378,7 +2386,7 @@ it("keeps history and menu sections visible when there are no saved conversation
  invoke.mockImplementation(async(_,{args})=>args.action==='list'?{works:[]}:current);
  await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
  const menu=document.querySelector('.agent-details-content')!;
- expect(menu.textContent).toContain('还没有历史对话');expect(menu.textContent).toContain('资料范围');expect(menu.textContent).toContain('成果与保存');expect(menu.textContent).toContain('运行诊断与用量');
+ expect(menu.textContent).toContain('还没有历史对话');expect(menu.textContent).toContain('资料范围');expect(menu.textContent).not.toContain('成果与保存');expect(menu.textContent).toContain('运行诊断与用量');
  expect(menu.querySelector('.agent-provider-budget')).toBeNull();expect(button('停止此任务')).toBeUndefined();
 });
 

@@ -20,7 +20,7 @@ it("sends the explicit finite delegation separately from any business action", a
   await act(async () => host.querySelector<HTMLInputElement>('[name="agentWatchChanges"]')!.click());
   await act(async () => host.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
   expect(onAction).toHaveBeenCalledExactlyOnceWith({ action: "configureWatch", confirmed: true, onChange: true, dueAt: null, notify: false });
-  expect(host.textContent).toContain("最多自动复查 3 轮"); expect(host.textContent).toContain("不自动执行标签、归档或闪卡动作");
+  expect(host.textContent).toContain("最多自动复查 3 轮"); expect(host.textContent).toContain("生成只读报告");
   expect(document.activeElement).toBe(host.querySelector('[role="status"]'));
 });
 it("keeps pause available during a background run", async () => {

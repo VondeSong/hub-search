@@ -161,7 +161,6 @@ body.resizing-agent-panel * { cursor: col-resize !important; user-select: none !
 .agent-error { margin-block: 8px; padding: 8px 10px; border-inline-start: 2px solid var(--hub-accent); max-height: 100px; overflow: auto; }
 .agent-status:empty { display: none; }
 .agent-goal { padding: 12px; background: var(--hub-control-fill); border-radius: 12px; }
-.agent-more-tools { margin-block: 16px; }
 @media (max-width: 480px) {
   .agent-panel { inset: 0; width: 100%; border-radius: 0; }
   .agent-body { padding-inline: 12px; }
@@ -185,7 +184,7 @@ body.resizing-agent-panel * { cursor: col-resize !important; user-select: none !
 .agent-details-content select { max-width: 100%; width: 100%; color: inherit; background: var(--hub-content-surface); }
 .agent-details-content button { font: inherit; color: inherit; min-height: 30px; width: auto; height: auto; border: 1px solid var(--hub-separator); padding: 5px 8px; }
 .agent-details-content h3 { margin: 10px 0; font-size: 13px; }
-.agent-details-content > details, .agent-details-content .agent-more-tools { margin-block: 12px; }
+.agent-details-content > details { margin-block: 12px; }
 .agent-body .agent-composer { display: flex; flex-direction: column; padding: 10px 12px; border-radius: 14px; }
 .agent-composer-preferences { position: relative; margin: 0; font-size: 11px; }
 .agent-composer-controls .agent-composer-preferences > details[open] { position: static; padding: 0; background: none; overflow: visible; }
