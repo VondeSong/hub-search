@@ -7,7 +7,18 @@ import { createPortal } from 'react-dom';
 import ReferenceAgent from './ReferenceAgent';
 import referenceStyles from './reference.css?inline';
 
-export function ReferenceSurface({ onDismiss }: { onDismiss?: () => void }) {
+export type AgentsDocumentContext = {
+  id: string;
+  name: string;
+  path: string;
+  text: string;
+};
+
+export function ReferenceSurface({ onDismiss, documentContext, open = true }: {
+  onDismiss?: () => void;
+  documentContext?: AgentsDocumentContext;
+  open?: boolean;
+}) {
   const host = useRef<HTMLDivElement>(null);
   const [surface, setSurface] = useState<ShadowRoot | null>(null);
 
@@ -25,7 +36,7 @@ export function ReferenceSurface({ onDismiss }: { onDismiss?: () => void }) {
     <div ref={host}>{surface && createPortal(
       <>
         <style>{referenceStyles}</style>
-        <ReferenceAgent onDismiss={onDismiss} />
+        <ReferenceAgent onDismiss={onDismiss} documentContext={documentContext} open={open} />
       </>,
       surface,
     )}</div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 // 统一线框图标组件（严格遵守 JSX Fragment 包裹多标签）
 function Icon({ name, className = 'w-4 h-4', strokeWidth = 1.75 }) {
@@ -186,15 +186,15 @@ function ThumbArtwork({ kind, large = false }) {
   );
 }
 
-export default function ReferenceAgent({ onDismiss }) {
+export default function ReferenceAgent({ onDismiss, documentContext, open }) {
   // 1. 视口宽度模式：'sidebar' (480px) | 'focus' (760px) | 'full'
   const [viewportMode, setViewportMode] = useState('focus');
   // 示例场景切换：'report' (正常流式复核报告) | 'interrupted' (图2规则加载 + 图3核验中断重构案例)
-  const [activeCase, setActiveCase] = useState('report');
+  const [activeCase, setActiveCase] = useState(documentContext ? 'new' : 'report');
   const [newMessages, setNewMessages] = useState([]);
 
   // 2. 顶部与模式状态
-  const [threadTitle, setThreadTitle] = useState('Hub 助手工作过程和展示方案');
+  const [threadTitle, setThreadTitle] = useState(documentContext?.name ?? 'Hub 助手工作过程和展示方案');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [taskMode, setTaskMode] = useState('standard'); // 'standard' | 'goal' | 'tag' | 'topic'
   const [tagSubTab, setTagSubTab] = useState('draft'); // 'draft' | 'find' | 'compare'
@@ -202,14 +202,14 @@ export default function ReferenceAgent({ onDismiss }) {
   const [compareTag, setCompareTag] = useState('');
   const [tagPickerSlot, setTagPickerSlot] = useState(null); // null | 'target' | 'compare'
   const [tagSearchQuery, setTagSearchQuery] = useState('');
-  const [goalText, setGoalText] = useState('核对流式状态与工作过程规范，输出 15 条桌面测试项');
+  const [goalText, setGoalText] = useState(documentContext ? '' : '核对流式状态与工作过程规范，输出 15 条桌面测试项');
   const [pauseOnBlocker, setPauseOnBlocker] = useState(true);
 
   // 3. 专题系统（支持置顶、搜索与自定义保存）
   const [topics, setTopics] = useState([
-    { id: 't1', name: 'OS 标签与原文核对', strategy: 'only', docs: ['2023-02-02', '案例'], libs: ['OS'], pinned: true },
-    { id: 't2', name: '折腾记录单页核对', strategy: 'only', docs: ['2023-02-02'], libs: [], pinned: true },
-    { id: 't3', name: 'DXF 线表与工程资料', strategy: 'prefer', docs: ['8_竞品和参考'], libs: ['Car', 'OS'], pinned: false }
+    { id: 't1', name: 'OS 标签与原文核对', strategy: 'only', docs: ['d1', 'd3'], libs: ['OS'], pinned: true },
+    { id: 't2', name: '折腾记录单页核对', strategy: 'only', docs: ['d1'], libs: [], pinned: true },
+    { id: 't3', name: 'DXF 线表与工程资料', strategy: 'prefer', docs: ['d2'], libs: ['Car', 'OS'], pinned: false }
   ]);
   const [activeTopicId, setActiveTopicId] = useState(null);
   const [modePopoverOpen, setModePopoverOpen] = useState(false);
@@ -238,15 +238,15 @@ export default function ReferenceAgent({ onDismiss }) {
   const [sourcesSearch, setSourcesSearch] = useState('');
   const [saveNoteModalOpen, setSaveNoteModalOpen] = useState(false);
   const [saveNoteTab, setSaveNoteTab] = useState('append'); // 'append' | 'new'
-  const [saveNoteTarget, setSaveNoteTarget] = useState('2023-02-02');
-  const [saveNoteTitle, setSaveNoteTitle] = useState('Hub 桌面助手｜流式状态与工作过程证据复核');
+  const [saveNoteTarget, setSaveNoteTarget] = useState(documentContext?.name ?? '2023-02-02');
+  const [saveNoteTitle, setSaveNoteTitle] = useState(documentContext?.name ?? 'Hub 桌面助手｜流式状态与工作过程证据复核');
   const [createTaskModalOpen, setCreateTaskModalOpen] = useState(false);
-  const [taskTitle, setTaskTitle] = useState('验证 Hub 桌面助手流式状态与 15 项可访问性用例');
+  const [taskTitle, setTaskTitle] = useState(documentContext ? `跟进：${documentContext.name}` : '验证 Hub 桌面助手流式状态与 15 项可访问性用例');
   const [taskList, setTaskList] = useState('收件箱');
   const [taskDue, setTaskDue] = useState('明天');
   const [taskPriority, setTaskPriority] = useState('高');
   const [taskAttachReport, setTaskAttachReport] = useState(false);
-  const [taskSubItems, setTaskSubItems] = useState([
+  const [taskSubItems, setTaskSubItems] = useState(documentContext ? [] : [
     { id: 'st1', text: '将回执列表改为普通列表 + 独立 status 播报区', checked: true },
     { id: 'st2', text: '实测展开旧回执后，新内容到达不跳动视口与焦点', checked: true },
     { id: 'st3', text: '验证「回到最新」按钮在 reduced-motion 下的滚动行为', checked: true }
@@ -254,18 +254,25 @@ export default function ReferenceAgent({ onDismiss }) {
 
   // 5. 视图与诊断偏好
   const [onlyLatestReply, setOnlyLatestReply] = useState(false);
-  const [webSearchEnabled, setWebSearchEnabled] = useState(true);
-  const [mcpEnabled, setMcpEnabled] = useState(true);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(!documentContext);
+  const [mcpEnabled, setMcpEnabled] = useState(!documentContext);
   const [diagExpanded, setDiagExpanded] = useState(false);
 
   // 6. 模型、资料范围、记忆、技能与附件状态
   const [selectedModel, setSelectedModel] = useState('DeepSeek V4.1 Flash');
   const [reasoningLevel, setReasoningLevel] = useState('high'); // 'low' | 'medium' | 'high'
   const [responseSpeed, setResponseSpeed] = useState('standard'); // 'standard' | 'fast'
-  const [retrievalStrategy, setRetrievalStrategy] = useState('prefer'); // 'prefer' | 'only'
-  const [selectedDocs, setSelectedDocs] = useState(['2023-02-02', '8_竞品和参考']);
-  const [selectedLibs, setSelectedLibs] = useState(['Car']);
-  const [memoryActive, setMemoryActive] = useState(true);
+  const [retrievalStrategy, setRetrievalStrategy] = useState(documentContext ? 'only' : 'prefer'); // 'prefer' | 'only'
+  const documentId = documentContext?.id;
+  const [selectedDocs, setSelectedDocs] = useState(documentId ? [documentId] : ['d1', 'd2']);
+  const [selectedLibs, setSelectedLibs] = useState(documentContext ? [] : ['Car']);
+  const [memoryActive, setMemoryActive] = useState(!documentContext);
+
+  useEffect(() => {
+    if (open && documentId) {
+      setSelectedDocs(docs => docs.includes(documentId) ? docs : [documentId, ...docs]);
+    }
+  }, [open, documentId]);
   const [memoryScope, setMemoryScope] = useState('工程资料整理');
   const [memoryTab, setMemoryTab] = useState('saved'); // 'saved' | 'pending'
   const [memoryDiffExpanded, setMemoryDiffExpanded] = useState(true);
@@ -290,13 +297,13 @@ export default function ReferenceAgent({ onDismiss }) {
   const [editingMemoryId, setEditingMemoryId] = useState(null);
   const [editingMemoryText, setEditingMemoryText] = useState('');
 
-  const [uploadError, setUploadError] = useState({
+  const [uploadError, setUploadError] = useState(documentContext ? null : {
     fileName: '会话示例录音.flac',
     size: '34.2 MB',
     limit: '10 MB'
   });
-  const [attachedSkills, setAttachedSkills] = useState(['阅读材料归档']);
-  const [attachedLocalFiles, setAttachedLocalFiles] = useState([
+  const [attachedSkills, setAttachedSkills] = useState(documentContext ? [] : ['阅读材料归档']);
+  const [attachedLocalFiles, setAttachedLocalFiles] = useState(documentContext ? [] : [
     { id: 'f1', name: '初步策略', type: 'task' },
     { id: 'f2', name: 'codex2.mp4', type: 'video' },
     { id: 'f3', name: 'style.css', type: 'code' },
@@ -304,7 +311,7 @@ export default function ReferenceAgent({ onDismiss }) {
     { id: 'f5', name: '扭矩扳手量具操作指导书2025(1).pdf', type: 'pdf' }
   ]);
   const [expandAllFiles, setExpandAllFiles] = useState(false);
-  const [attachedImages, setAttachedImages] = useState([
+  const [attachedImages, setAttachedImages] = useState(documentContext ? [] : [
     { id: 'img1', name: 'image.png', size: '248 KB', kind: 'terminal' },
     { id: 'img2', name: 'unnamed.jpg', size: '182 KB', kind: 'sketch' }
   ]);
@@ -515,7 +522,8 @@ export default function ReferenceAgent({ onDismiss }) {
   ];
 
   const availableDocs = [
-    { id: 'd1', name: '2023-02-02', path: '示例库 · Journals/2023/02/2023-02-02.md', current: true },
+    ...(documentContext ? [{ ...documentContext, current: true }] : []),
+    { id: 'd1', name: '2023-02-02', path: '示例库 · Journals/2023/02/2023-02-02.md', current: !documentContext },
     { id: 'd2', name: '8_竞品和参考', path: 'Car · 工作台方案' },
     { id: 'd3', name: '案例', path: '示例库 · 未分类' },
     { id: 'd4', name: '2024.08.31', path: '示例库 · 未分类' },
@@ -599,11 +607,16 @@ export default function ReferenceAgent({ onDismiss }) {
       time: '刚刚',
       text: inputText.trim()
     };
+    const currentDocumentSelected = documentContext && selectedDocs.includes(documentContext.id);
+    const excerpt = currentDocumentSelected ? documentContext.text.replace(/\s+/g, ' ').slice(0, 120) : '';
+    const documentReceipt = currentDocumentSelected
+      ? `\n\n当前资料《${documentContext.name}》${excerpt ? `\n正文节选：${excerpt}` : ''}`
+      : '';
     const aiMsg = {
       id: 'a_' + (Date.now() + 1),
       role: 'assistant',
       duration: '6 秒',
-      text: `已按「${taskMode === 'topic' && activeTopic ? activeTopic.name : taskMode === 'goal' ? '目标模式' : taskMode === 'tag' ? '标签助手' : '通用助手'}」模式结合 ${selectedDocs.length} 份核心资料与 ${selectedLibs.length} 个资料库生成演示回执（模型：${currentModelObj.id} · 思考强度${reasoningLabels[reasoningLevel]}）。如需沉淀结论，可直接点击下方「存入笔记」或「创建任务」。`
+      text: `已按「${taskMode === 'topic' && activeTopic ? activeTopic.name : taskMode === 'goal' ? '目标模式' : taskMode === 'tag' ? '标签助手' : '通用助手'}」模式结合 ${selectedDocs.length} 份核心资料与 ${selectedLibs.length} 个资料库生成演示回执（模型：${currentModelObj.id} · 思考强度${reasoningLabels[reasoningLevel]}）。如需沉淀结论，可直接点击下方「存入笔记」或「创建任务」。${documentReceipt}`
     };
     if (activeCase === 'interrupted') {
       setInterruptedMessages(prev => [...prev, userMsg, aiMsg]);
@@ -720,7 +733,7 @@ export default function ReferenceAgent({ onDismiss }) {
             </button>
           )}
           <span className="font-semibold text-primary">Hub 助手原型</span>
-          <div className="flex items-center bg-black/5 p-0.5 rounded-xl">
+          {!documentContext && <div className="flex items-center bg-black/5 p-0.5 rounded-xl">
             <button
               aria-pressed={activeCase === 'report'}
               onClick={() => switchDemoCase('report')}
@@ -736,7 +749,7 @@ export default function ReferenceAgent({ onDismiss }) {
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
               <span>案例2：中断与规则</span>
             </button>
-          </div>
+          </div>}
         </div>
         <div className="flex items-center bg-black/5 p-0.5 rounded-xl">
           {[
@@ -775,7 +788,7 @@ export default function ReferenceAgent({ onDismiss }) {
                 setActiveCase('new');
                 setNewMessages([]);
                 setInputText('');
-                setThreadTitle('新对话');
+                setThreadTitle(documentContext?.name ?? '新对话');
                 triggerToast('已开启新对话');
               }}
               className="p-1.5 rounded-lg text-secondary hover:text-primary hover:bg-hover transition-colors"
@@ -1476,11 +1489,11 @@ export default function ReferenceAgent({ onDismiss }) {
               <div className="px-3 pt-2.5 pb-1.5 border-b border-border/50 space-y-2">
                 {/* 等高紧凑胶囊行 */}
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {selectedDocs.map(doc => (
-                    <span key={doc} className="h-[26px] pl-2 pr-1.5 rounded-lg bg-subtle border border-border/70 text-[11.5px] text-primary inline-flex items-center gap-1.5 max-w-[160px]">
+                  {selectedDocs.map(id => availableDocs.find(doc => doc.id === id)).filter(Boolean).map(doc => (
+                    <span key={doc.id} className="h-[26px] pl-2 pr-1.5 rounded-lg bg-subtle border border-border/70 text-[11.5px] text-primary inline-flex items-center gap-1.5 max-w-[160px]">
                       <Icon name="fileText" className="w-3 h-3 text-secondary shrink-0" />
-                      <span className="truncate">{doc}</span>
-                      <button onClick={() => setSelectedDocs(prev => prev.filter(d => d !== doc))} className="text-muted hover:text-primary">
+                      <span className="truncate" title={doc.name}>{doc.name}</span>
+                      <button aria-label={`移除资料 ${doc.name}`} onClick={() => setSelectedDocs(prev => prev.filter(id => id !== doc.id))} className="text-muted hover:text-primary">
                         <Icon name="x" className="w-3 h-3" />
                       </button>
                     </span>
@@ -1710,7 +1723,7 @@ export default function ReferenceAgent({ onDismiss }) {
                 <button
                   key={doc.id}
                   onClick={() => {
-                    if (!selectedDocs.includes(doc.name)) setSelectedDocs(prev => [...prev, doc.name]);
+                    if (!selectedDocs.includes(doc.id)) setSelectedDocs(prev => [...prev, doc.id]);
                     setInputText(prev => prev.replace(/@$/, ''));
                     setAtMenuOpen(false);
                   }}
@@ -1949,7 +1962,11 @@ export default function ReferenceAgent({ onDismiss }) {
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                {historyList.map(item => (
+                {documentContext ? (
+                  <button onClick={() => setHistoryOpen(false)} className="w-full px-2.5 py-2 rounded-xl hover:bg-hover text-left text-xs font-medium text-primary truncate">
+                    {threadTitle}
+                  </button>
+                ) : historyList.map(item => (
                   <div
                     key={item.id}
                     onClick={() => {
@@ -2128,11 +2145,11 @@ export default function ReferenceAgent({ onDismiss }) {
                     <div className="space-y-1.5">
                       {availableDocs
                         .filter(doc =>
-                          (docFilterMode === 'all' || selectedDocs.includes(doc.name)) &&
+                          (docFilterMode === 'all' || selectedDocs.includes(doc.id)) &&
                           (doc.name.toLowerCase().includes(docSearchQuery.toLowerCase()) || doc.path.toLowerCase().includes(docSearchQuery.toLowerCase()))
                         )
                         .map(doc => {
-                          const checked = selectedDocs.includes(doc.name);
+                          const checked = selectedDocs.includes(doc.id);
                           return (
                             <label key={doc.id} className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-colors ${checked ? 'bg-subtle border-primary/20' : 'border-border hover:bg-hover'}`}>
                               <div className="min-w-0">
@@ -2145,7 +2162,7 @@ export default function ReferenceAgent({ onDismiss }) {
                               <input
                                 type="checkbox"
                                 checked={checked}
-                                onChange={() => setSelectedDocs(prev => checked ? prev.filter(d => d !== doc.name) : [...prev, doc.name])}
+                                onChange={() => setSelectedDocs(prev => checked ? prev.filter(id => id !== doc.id) : [...prev, doc.id])}
                                 className="accent-primary w-4 h-4 rounded"
                               />
                             </label>
@@ -2283,7 +2300,7 @@ export default function ReferenceAgent({ onDismiss }) {
                   <div className="space-y-1.5">
                     <div className="text-[11px] font-medium text-secondary">目标页面</div>
                     <div className="flex flex-wrap gap-1.5">
-                      {['2023-02-02', '8_竞品和参考', 'DXF 线表规范'].map(p => (
+                      {(documentContext ? [documentContext.name] : ['2023-02-02', '8_竞品和参考', 'DXF 线表规范']).map(p => (
                         <button
                           key={p}
                           onClick={() => setSaveNoteTarget(p)}
@@ -2307,7 +2324,7 @@ export default function ReferenceAgent({ onDismiss }) {
 
                 <div className="p-3 rounded-xl bg-canvas border border-border text-[11.5px] text-secondary leading-relaxed">
                   <div className="font-semibold text-primary mb-1">{saveNoteTitle}</div>
-                  <p className="line-clamp-3">建议采用普通回执列表和一处 status 状态区。用户展开回执或离开列表末尾后，Hub 继续接收结果，同时保留阅读位置、展开状态和键盘焦点...</p>
+                  <p className="line-clamp-3">{documentContext ? currentMessagesList.findLast(msg => msg.role === 'assistant')?.text : '建议采用普通回执列表和一处 status 状态区。用户展开回执或离开列表末尾后，Hub 继续接收结果，同时保留阅读位置、展开状态和键盘焦点...'}</p>
                 </div>
               </div>
               <div className="px-4 py-3 border-t border-border bg-subtle/40 flex items-center justify-end gap-2">

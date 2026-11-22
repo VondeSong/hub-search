@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "39f23a90979c1c0ddb97ddde377879b2bfddb484",
-  "published_version": 143,
-  "deployment_id": "appgdep_6b02533916608191bf2dbc1ce49bae2b",
+  "source_commit": "6972f1f63d853b28825de09e623bff2abdf257f4",
+  "published_version": 144,
+  "deployment_id": "appgdep_6b02564925f88191a3f96ccd61c2d283",
   "files": {
     ".gitignore": {
       "sha256": "ca0e1575efb181d784f15bf6c86e3c012fd5c7ede4daa34b924d0d8b590d4e77",
@@ -268,19 +268,19 @@
       "bytes": 26428
     },
     "app/agents/ReferenceAgent.jsx": {
-      "sha256": "447e72cc3b5c5b9c56ec7422fc3ecd6e058d910574b443603ef2cbd1e52caf25",
+      "sha256": "149dca29846f6ae71b790508b24bd2d318058eb634609fda43c081701b77e6df",
       "mode": "100644",
-      "bytes": 168661
+      "bytes": 170325
     },
     "app/agents/ReferenceSurface.tsx": {
-      "sha256": "4460dd17e26398c1e60cf6083e8c1f846a7fe6f0801ed2ce05a995e400a363dc",
+      "sha256": "ed1a5a9bd090f2691ecf485f5cef3fd084800ff59948d6e7d55b4f1a6598b461",
       "mode": "100644",
-      "bytes": 999
+      "bytes": 1243
     },
     "app/agents/WorkspaceAgentsDialog.tsx": {
-      "sha256": "788631a4f88f384fc7829369a400489d75649c8106f1eb271a494fa677bf5e31",
+      "sha256": "1b0635db9ed417cc09dc45c22ca3f9d7cd625f4ad7c96466ca7c40051f6eb32a",
       "mode": "100644",
-      "bytes": 952
+      "bytes": 1123
     },
     "app/agents/page.tsx": {
       "sha256": "3bff72f8cbced87871568672f5604e53f74dc40d275234835636683d80149510",
@@ -528,9 +528,9 @@
       "bytes": 12137
     },
     "app/page.tsx": {
-      "sha256": "8c40dc82b26bc33df8efc4c8eb3a25bd35e0611a8ab92b822f637aba69803c45",
+      "sha256": "7b06eff6767fbdd9c2ee067c9e2ae2462c9355fb1969d7ff7a6a874973901c5e",
       "mode": "100644",
-      "bytes": 75064
+      "bytes": 76480
     },
     "app/pdf-preview-model.ts": {
       "sha256": "e1f72df40daff0d29d0c63cd3552edbfc47d851a2a5d0bbe3184e0371f178970",
@@ -1413,5 +1413,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-22T02:29:40.379679+00:00"
+  "imported_at": "2026-11-22T02:43:32.667462+00:00"
 }
