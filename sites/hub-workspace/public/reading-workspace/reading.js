@@ -327,7 +327,7 @@
         x_bookmark: { status: 'ok', last: '15:52' },
         x_like: { status: 'ok', last: '15:50' },
         telegram: { status: 'ok', last: '15:55', tdl: '已连接个人号（支持大附件补全）' },
-        dida: { status: 'warn', last: '15:40', note: '附件网页会话过期', verifiedAt: '', error: '' },
+        dida: { status: 'warn', last: '15:40', note: '附件网页会话过期', verifiedAt: '', error: '', waitingForLogin: false },
         obsidian: { status: 'ok', last: '15:30', path: 'D:\\Vaults\\Research\\Sources' }
       }
     };
@@ -1317,7 +1317,9 @@
       { id: 8, title: '8. 同时保存到两库（1 成功 + 1 待确认方案）', run: () => { state.emptyMode = false; state.scope = 'triage'; state.selectedItemId = 'item-103'; state.activeDemoName = '场景 8 · 多库方案'; renderAll(); openSavePlanModal('item-103'); } },
       { id: 9, title: '9. Craft 写入结果不明核对与关联', run: () => { state.emptyMode = false; state.scope = 'triage'; state.selectedItemId = 'item-104'; state.activeDemoName = '场景 9 · Craft 核对'; renderAll(); openCraftReconcileModal('item-104'); } },
       { id: 10, title: '10. 断网可读 & 附件下载中断恢复', run: () => { state.emptyMode = false; state.offlineMode = true; state.scope = 'all'; state.layout = 'stream'; state.selectedItemId = 'item-106'; state.activeDemoName = '场景 10 · 断网可读'; renderAll(); } },
-      { id: 11, title: '11. 滴答正文已导入但附件会话过期', run: () => { state.emptyMode = false; state.offlineMode = false; state.scope = 'all'; state.source = 'all'; state.layout = 'stream'; state.selectedItemId = 'item-105'; state.inspectorOpen = true; state.activeDemoName = '场景 11 · 滴答保留'; renderAll(); } },
+      { id: 11, title: '11. 滴答正文已导入但附件会话过期', run: () => { state.emptyMode = false; state.offlineMode = false; state.scope = 'all'; state.source = 'all'; state.layout = 'stream'; state.selectedItemId = 'item-105'; state.inspectorOpen = true;
+        Object.assign(state.sourceSync.dida, { status: 'warn', note: '附件网页会话过期', verifiedAt: '', error: '', waitingForLogin: false });
+        state.activeDemoName = '场景 11 · 滴答保留'; renderAll(); } },
       { id: 12, title: '12. 云端恢复检查（正文通过 + 部分附件）', run: () => { state.emptyMode = false; state.layout = 'stream'; state.selectedItemId = 'item-106'; state.inspectorOpen = true; state.assistantOpen = false; state.activeDemoName = '场景 12 · 部分恢复'; renderAll(); } },
       { id: 13, title: '13. 用 Hub 助手讨论当前文章', run: () => { state.emptyMode = false; state.layout = 'stream'; state.selectedItemId = 'item-101'; state.inspectorOpen = false; state.assistantOpen = true; state.activeDemoName = '场景 13 · 助手绑定'; renderAll(); } },
       { id: 14, title: '14. 窄屏移动端单栏钻取与焦点返回', run: () => { state.emptyMode = false; state.narrowMode = true; state.readingOverlayOpen = true; state.selectedItemId = 'item-102'; state.inspectorOpen = false; state.activeDemoName = '场景 14 · 窄屏态'; renderAll(); } }
@@ -1407,8 +1409,10 @@
 
     function syncRetryFeedback(message, kind) {
       if (!message) return '';
+      const feedback = state.offlineMode ? message : kind === 'cloud'
+        ? '网络已恢复，可以重试同步。' : '网络已恢复，可以继续核验滴答会话。';
       return `<div class="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-amber-900">
-        <span role="alert">${message}</span>
+        <span role="${state.offlineMode ? 'alert' : 'status'}">${feedback}</span>
         ${state.offlineMode ? `<button data-restore-sync-network="${kind}" class="px-2 py-1 rounded-[7px] border border-black/10">恢复演示网络</button>` : ''}
       </div>`;
     }
@@ -1431,7 +1435,7 @@
             const st = state.sourceSync[r.k];
             const isDida = r.k === 'dida';
             const status = st.status === 'warn' ? st.note : st.verifiedAt ? '附件会话已核验' : '已连接';
-            const action = st.error ? '重试重连' : st.status === 'warn' ? '重连会话' : '立即同步';
+            const action = st.status !== 'warn' ? '立即同步' : st.error && !st.waitingForLogin ? '重试重连' : '重连会话';
             return `
               <div class="py-3">
                 <div class="flex items-center justify-between gap-3">
@@ -1444,6 +1448,10 @@
                   <button data-run-sync="${r.k}" class="px-3 py-1 rounded-[7px] border border-black/10 hover:bg-neutral-50 text-[12px] text-neutral-700 font-medium whitespace-nowrap">${action}</button>
                 </div>
                 ${isDida ? syncRetryFeedback(st.error, 'dida') : ''}
+                ${isDida && st.waitingForLogin ? `<div class="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-neutral-600">
+                  <span role="status">演示：在滴答窗口完成登录后，回到这里核验。</span>
+                  <button data-dida-verify class="px-2 py-1 rounded-[7px] border border-black/10">我已登录，立即检查</button>
+                </div>` : ''}
               </div>`;
           }).join('')}
         </div>`, 540, '来源同步与连接');
@@ -1871,7 +1879,7 @@
           document.getElementById('btn-cloud-now').focus();
         } else {
           openSyncModal();
-          document.querySelector('[data-run-sync="dida"]').focus();
+          (document.querySelector('[data-dida-verify], [data-dida-session]') || document.querySelector('[data-run-sync="dida"]')).focus();
         }
         return;
       }
@@ -1887,16 +1895,22 @@
         closeModal(); renderAll(); toast('阅读云同步已完成', 'ok'); return;
       }
       const dida = state.sourceSync.dida;
-      if (t.hasAttribute('data-dida-session') || (t.dataset.runSync === 'dida' && dida.status === 'warn')) {
+      const reconnectDida = t.dataset.runSync === 'dida' && dida.status === 'warn';
+      if (reconnectDida || t.hasAttribute('data-dida-session') || t.hasAttribute('data-dida-verify')) {
         if (state.offlineMode) {
           dida.error = '当前离线，联网后可重试滴答会话核验';
-          dida.status = 'warn';
-          dida.note = '附件网页会话待核验';
           openSyncModal();
-          document.querySelector('[data-run-sync="dida"]').focus();
+          (document.querySelector('[data-dida-verify], [data-dida-session]') || document.querySelector('[data-run-sync="dida"]')).focus();
           return;
         }
         dida.error = '';
+        if (reconnectDida) {
+          dida.waitingForLogin = true;
+          openSyncModal();
+          document.querySelector('[data-dida-verify]').focus();
+          return;
+        }
+        dida.waitingForLogin = false;
         dida.status = 'ok';
         dida.note = '';
         dida.verifiedAt = '刚刚';

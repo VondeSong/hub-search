@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { X } from "lucide-react";
-import { useCallback, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { CloudSyncPolicy, ReadingReport, ReadingSyncState } from "./CloudSyncSettingsSection";
 import type { CollectionSource, CollectionSyncSource } from "./CollectionSyncPanel";
 import type { ReadingNetworkState } from "./ReadingNetworkSettings";
@@ -67,14 +67,19 @@ function SourceRow({ name, state, tone, description, action, disabled, onAction,
   </article>;
 }
 
+export type ReadingDidaSession = {
+  checkedAt: number;
+  state: "verified" | "authentication" | "account-mismatch";
+};
+
 const openDidaLogin = () => invoke<void>("open_dida_attachment_login");
-export function ReadingSourceConnections({ sources, loading, tdlReady, didaVerifiedAt, onDidaVerified, local, sourceBusy, sourceActive, onSync, onCheckLocal,
+export function ReadingSourceConnections({ sources, loading, tdlReady, didaSession, onDidaSession, local, sourceBusy, sourceActive, onSync, onCheckLocal,
   onConnect, onStorage, onDetails, onClose, onNotice }: {
   sources: CollectionSyncSource[];
   loading: boolean;
   tdlReady: boolean;
-  didaVerifiedAt: number;
-  onDidaVerified: (checkedAt: number) => void;
+  didaSession: ReadingDidaSession | null;
+  onDidaSession: (session: ReadingDidaSession) => void;
   local: { path: string; running?: boolean; lastCheckedAt?: number; error?: string };
   sourceBusy: (source: CollectionSource) => boolean;
   sourceActive: (source: CollectionSource) => boolean;
@@ -96,12 +101,18 @@ export function ReadingSourceConnections({ sources, loading, tdlReady, didaVerif
     dida?.status || "", dida?.didaCleanup?.lastRun?.authenticationRequired === true, openDidaLogin);
   const verifiedAt = checkingDida && login.currentVerified && login.feedback.status?.accountMatched
     ? login.feedback.status.checkedAt : 0;
+  const reportedSession = login.feedback.status;
+  const rejected = checkingDida && (login.feedback.phase === "failed" || login.feedback.phase === "waiting");
+  useEffect(() => {
+    if (!rejected || (reportedSession?.state !== "authentication" && reportedSession?.state !== "account-mismatch")) return;
+    onDidaSession({ checkedAt: reportedSession.checkedAt, state: reportedSession.state });
+  }, [rejected, reportedSession, onDidaSession]);
   useLayoutEffect(() => {
     if (!verifiedAt) return;
-    onDidaVerified(verifiedAt);
+    onDidaSession({ checkedAt: verifiedAt, state: "verified" });
     onNotice("滴答附件会话已核验，可以继续同步。");
     onClose();
-  }, [verifiedAt, onDidaVerified, onClose, onNotice]);
+  }, [verifiedAt, onDidaSession, onClose, onNotice]);
   const run = async (source: CollectionSource | "obsidian", operation: () => Promise<string | undefined>) => {
     if (pending) return;
     setFailure("");
@@ -119,11 +130,13 @@ export function ReadingSourceConnections({ sources, loading, tdlReady, didaVerif
         const running = pending === id || sourceActive(id);
         const waiting = !running && sourceBusy(id);
         const busy = running || waiting;
+        const didaVerifiedAt = didaSession?.state === "verified" ? didaSession.checkedAt : 0;
+        const rejectedDida = id === "dida" && didaSession !== null && didaSession.state !== "verified";
         const expired = id === "dida" && source?.didaCleanup?.authRequired &&
           (!didaVerifiedAt || (source.lastCheckedAt ?? 0) > didaVerifiedAt);
         const failedCheck = id === "dida" && checkingDida && login.feedback.phase === "failed";
         const loginRequired = failedCheck && (login.feedback.status?.state === "authentication" || login.feedback.status?.state === "account-mismatch");
-        const didaLogin = id === "dida" && source?.connected && (expired || loginRequired);
+        const didaLogin = id === "dida" && source?.connected && (expired || loginRequired || rejectedDida);
         const freshDida = id === "dida" && source?.connected && !didaLogin && !failedCheck && didaVerifiedAt > 0;
         const verifyOnSync = id === "dida" && login.currentVerified && login.feedback.status?.accountMatched === false;
         const connected = !!source?.connected;
@@ -131,7 +144,7 @@ export function ReadingSourceConnections({ sources, loading, tdlReady, didaVerif
         const tdlMissing = id === "telegram" && connected && !tdlReady;
         const state = loading ? "正在读取" : running ? "同步中" : waiting ? "后台任务占用" : didaLogin ? "附件网页会话待核验" :
           freshDida ? "附件会话已核验" : blocked ? "连接待检查" : tdlMissing ? "Telegram 已连接 · tdl 未就绪" : connected ? "已连接" : "未连接";
-        const action = running ? "同步中…" : waiting ? "请稍候" : verifyOnSync ? "同步并核验" : didaLogin ? failedCheck ? "重试重连" : "重连会话" :
+        const action = running ? "同步中…" : waiting ? "请稍候" : verifyOnSync ? "同步并核验" : didaLogin ? failedCheck || (rejectedDida && !checkingDida) ? "重试重连" : "重连会话" :
           blocked ? "重新连接" : !connected ? "连接" : "立即同步";
         return <SourceRow key={id} name={name} state={state} tone={didaLogin || blocked ? "warning" : connected && !busy ? "ok" : undefined}
           description={description + " · " + timeLabel(source?.lastSuccess)} action={action} disabled={loading || busy || (id === "dida" && login.busy)}
@@ -175,6 +188,8 @@ export function ReadingCloudOverview({ onClose, onNotice }: { onClose: () => voi
   const [network, setNetwork] = useState<ReadingNetworkState | null>(null);
   const [loadError, setLoadError] = useState("");
   const [syncError, setSyncError] = useState("");
+  const [wasOffline, setWasOffline] = useState(false);
+  const [networkRevision, setNetworkRevision] = useState(0);
   const active = useRef(false);
   const syncing = useRef(false);
   const [busy, setBusy] = useState(false);
@@ -190,6 +205,7 @@ export function ReadingCloudOverview({ onClose, onNotice }: { onClose: () => voi
       setPolicy(nextPolicy);
       setStatus(nextStatus);
       setNetwork(nextNetwork);
+      if (nextPolicy.enabled && nextPolicy.reading && nextStatus.supported && nextNetwork.network.connected === false) setWasOffline(true);
       setLoadError("");
     } catch (error) {
       if (active.current) setLoadError(String(error));
@@ -199,7 +215,16 @@ export function ReadingCloudOverview({ onClose, onNotice }: { onClose: () => voi
     active.current = true;
     return () => { active.current = false; };
   }, []);
-  useVisiblePolling(load, true, 5000);
+  useEffect(() => {
+    const refresh = () => setNetworkRevision(revision => revision + 1);
+    window.addEventListener("online", refresh);
+    window.addEventListener("offline", refresh);
+    return () => {
+      window.removeEventListener("online", refresh);
+      window.removeEventListener("offline", refresh);
+    };
+  }, []);
+  useVisiblePolling(load, true, 5000, { refreshKey: networkRevision });
   const settings = () => { onClose(); openCloudSyncSettings(); };
   const enabled = !!policy?.enabled && policy.reading === true;
   const allowed = status?.supported && enabled && network?.allowed;
@@ -233,7 +258,7 @@ export function ReadingCloudOverview({ onClose, onNotice }: { onClose: () => voi
   const running = busy || status?.running;
   const lastError = syncError || status?.lastError;
   const hasPending = remaining(status?.report) > 0;
-  const retry = !!lastError || hasPending || (enabled && status?.supported && network?.allowed === false);
+  const retry = !!lastError || hasPending || wasOffline || (enabled && status?.supported && network?.allowed === false);
   return <ReadingDialog title="云同步" description="已取消每轮/每日流量额度门禁，按网络与文件规则传输" kind="cloud" onClose={onClose}>
     <div className="reading-reference-dialog-body">
       <div className="reading-reference-cloud-card">
@@ -248,6 +273,7 @@ export function ReadingCloudOverview({ onClose, onNotice }: { onClose: () => voi
       {network && !network.allowed && <p className="reading-reference-error" role="status">{network.reason || "当前网络不符合阅读传输策略"}</p>}
       {!running && (loadError || lastError) && <p className="reading-reference-error" role="alert">{loadError || lastError}</p>}
       {!running && !lastError && hasPending && <p className="reading-reference-error" role="status">上轮同步仍有内容待传输</p>}
+      {!running && !loadError && !lastError && !hasPending && wasOffline && allowed && <p role="status">网络已恢复，可以重试同步。</p>}
       <p className="reading-reference-protection"><strong>滴答来源清理保护：</strong>云同步启用时默认关闭自动清理，需完整云恢复 + 原设备凭证 + 删除前复核全部通过。</p>
     </div>
     <footer><button type="button" className="reading-reference-link" onClick={settings}>云同步设置</button></footer>

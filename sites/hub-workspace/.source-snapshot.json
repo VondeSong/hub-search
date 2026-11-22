@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "cf36c67b65645ed07a31d7fae15482ebbed6cc70",
-  "published_version": 157,
-  "deployment_id": "appgdep_6b02bcb7f4f88191b80b14f3585f1467",
+  "source_commit": "ad84e9f3b0e82379f645ca6462c5b6e884535813",
+  "published_version": 158,
+  "deployment_id": "appgdep_6b02c4a7662481919d3e552633c2fffd",
   "files": {
     ".gitignore": {
       "sha256": "ca0e1575efb181d784f15bf6c86e3c012fd5c7ede4daa34b924d0d8b590d4e77",
@@ -1303,9 +1303,9 @@
       "bytes": 7955
     },
     "public/reading-workspace/reading.js": {
-      "sha256": "f78c2385191c39599c5bcba31944d343b3f9d4237f3d64e6afa75edfeae847cf",
+      "sha256": "3ebed24ac59a7fc4e7d39616634035931c37e01221324f09ee7feef3c8d8b9cc",
       "mode": "100644",
-      "bytes": 129162
+      "bytes": 130351
     },
     "scripts/assistant-answer-check.mjs": {
       "sha256": "eec1ec20fffed18411309ae94f10bf04dbac503394ab0800205d82c976704797",
@@ -1513,5 +1513,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-22T09:59:38.445647+00:00"
+  "imported_at": "2026-11-22T10:33:05.459150+00:00"
 }

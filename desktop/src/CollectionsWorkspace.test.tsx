@@ -192,7 +192,7 @@ it("reads the cloud policy and limits the quick action to reading sync", async (
     if (command === "get_collection_storage") return storage;
     if (command === "get_cloud_sync_policy") return { enabled: true, reading: true, flashcards: true };
     if (command === "get_reading_sync_status") return { supported: true, running: false, lastError: "", report: null };
-    if (command === "get_reading_network_policy") return { mode: "wifi", allowed, reason: "当前网络不符合策略", network: {} };
+    if (command === "get_reading_network_policy") return { mode: "wifi", allowed, reason: "当前网络不符合策略", network: { connected: allowed } };
     if (command === "sync_reading") return { completedAt: 1791165600, pending: 0 };
     return [];
   });
@@ -203,9 +203,12 @@ it("reads the cloud policy and limits the quick action to reading sync", async (
   expect(dialog.textContent).toContain("当前网络不符合策略");
   const action = dialog.querySelector<HTMLButtonElement>(".reading-reference-primary")!;
   expect(action.disabled).toBe(true);
+  expect(action.textContent).toContain("重试同步");
   allowed = true;
-  await act(async () => vi.advanceTimersByTimeAsync(5000));
+  await act(async () => window.dispatchEvent(new Event("online")));
   expect(action.disabled).toBe(false);
+  expect(action.textContent).toContain("重试同步");
+  expect(dialog.textContent).toContain("网络已恢复，可以重试同步。");
   await act(async () => action.click());
   expect(invoke.mock.calls.filter(([command]) => command.startsWith("sync_")).map(([command]) => command)).toEqual(["sync_reading"]);
   expect(dialog.open).toBe(false);
@@ -266,6 +269,48 @@ it("retries a failed Dida session check without changing the source sync time", 
   expect(container.querySelector(row + " p")?.textContent).toContain(previous);
   expect(container.querySelector(row + " time")?.getAttribute("datetime")).toBe(new Date(checkedAt * 1000).toISOString());
   expect(invoke.mock.calls.some(([command]) => command === "sync_x_bookmarks")).toBe(false);
+});
+it("keeps an expired Dida login visible after reopening and replaces it with a fresh verification", async () => {
+  const previousSync = 1791165600;
+  let checkedAt = 1791165700;
+  let connected = true;
+  const page = { ...initial, sources: [...initial.sources, {
+    id: "dida", count: 1, connected: true, canResume: false, status: "", lastSuccess: previousSync,
+  }] };
+  invoke.mockImplementation(async (command: string) => {
+    if (command === "list_collection_items") return page;
+    if (command === "get_collection_storage") return storage;
+    if (command === "get_dida_reading_login_status") {
+      return { state: connected ? "verified" : "authentication", connected, accountMatched: connected, checkedAt,
+        loginWindowOpen: false, message: connected ? "账号一致" : "滴答网页登录会话已失效" };
+    }
+    return [];
+  });
+  await mount();
+  await click("来源同步与连接");
+  const row = 'dialog[open] article[aria-label="滴答稍后读"]';
+  const previous = container.querySelector(row + " p")?.textContent?.split("检查会话")[0];
+  await click("检查会话");
+  await click("来源同步与连接");
+  expect(container.querySelector(row)?.textContent).toContain("附件会话已核验");
+  connected = false;
+  checkedAt++;
+  await click("检查会话");
+  expect(container.querySelector(row + ' [role="alert"]')?.textContent).toContain("会话已失效");
+  await click("关闭来源同步与连接");
+  await click("来源同步与连接");
+  expect(container.querySelector(row)?.textContent).toContain("附件网页会话待核验");
+  expect(container.querySelector(row + " time")).toBeNull();
+  await click("重试重连滴答稍后读");
+  expect(invoke).toHaveBeenCalledWith("open_dida_attachment_login");
+  connected = true;
+  checkedAt++;
+  await click("我已登录，立即检查");
+  expect(container.querySelector("dialog[open]")).toBeNull();
+  await click("来源同步与连接");
+  expect(container.querySelector(row)?.textContent).toContain("附件会话已核验");
+  expect(container.querySelector(row + " p")?.textContent).toContain(previous);
+  expect(container.querySelector(row + " time")?.getAttribute("datetime")).toBe(new Date(checkedAt * 1000).toISOString());
 });
 it("keeps the cloud dialog open on failure and reads back a successful retry receipt", async () => {
   const current = Math.floor(Date.now() / 1000);

@@ -20,7 +20,7 @@ import { defaultCollectionCards, cardFields, type CardField } from "./Collection
 import { CollectionGalleryCover } from "./CollectionGalleryCover";
 import { CollectionSort, normalizeCollectionSorts, type CollectionSortRule } from "./CollectionSort";
 import { ReadingActiveFilters, ReadingFilterTools, ReadingSortTools } from "./ReadingQueryTools";
-import { ReadingCloudOverview, ReadingSourceConnections } from "./ReadingSyncTools";
+import { ReadingCloudOverview, ReadingSourceConnections, type ReadingDidaSession } from "./ReadingSyncTools";
 import { CollectionPostBody, collectionAttachments } from "./CollectionPostBody";
 import { ReadingArticleTools, type ReadingArticleToolsHandle } from "./ReadingArticleTools";
 import { ReadingInvestigation } from "./AgentInvestigation";
@@ -153,7 +153,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const [searchOpen,setSearchOpen] = useState(false);
   const [syncMenu,setSyncMenu] = useState(false);
   const [syncOverview,setSyncOverview] = useState<"source"|"cloud"|null>(null);
-  const [didaVerifiedAt,setDidaVerifiedAt] = useState(0);
+  const [didaSession,setDidaSession] = useState<ReadingDidaSession|null>(null);
   const databaseRef=useRef<HTMLDivElement>(null);
   const inspectorRef=useRef<ReadingArticleToolsHandle>(null);
   const previewBackRef=useRef<HTMLButtonElement>(null);
@@ -644,7 +644,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
     </div>
     <ReadingActiveFilters view={view} onChange={changeView} onClear={resetFilters} onClearQuery={dismissSearch}/>
     {syncOverview==="source"&&<ReadingSourceConnections sources={sources} loading={!pageState} tdlReady={!!storage.tdl?.ready}
-      didaVerifiedAt={didaVerifiedAt} onDidaVerified={setDidaVerifiedAt}
+      didaSession={didaSession} onDidaSession={setDidaSession}
       local={{...storage.localSources,path:storage.config.mode==="obsidian"?storage.config.vaultPath:"",running:checkingSources||storage.localSources?.running,
         error:storage.localSources?.error||(storage.vaultRelocation?.rootExists===false?"保存库目录已移动":"")}}
       sourceBusy={sourceConnectionRunning} sourceActive={sourceActive}
