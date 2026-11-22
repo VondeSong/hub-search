@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "4d77ab5cb85fd3918199e47ba41d12125141c02e",
-  "published_version": 149,
-  "deployment_id": "appgdep_6b028dcde30c8191a49ae9463dd42247",
+  "source_commit": "87372b70b4dc9fd22fed032eaac4d1adcf275d6c",
+  "published_version": 150,
+  "deployment_id": "appgdep_6b029afbd5f08191b6adb7cb60098f0c",
   "files": {
     ".gitignore": {
       "sha256": "ca0e1575efb181d784f15bf6c86e3c012fd5c7ede4daa34b924d0d8b590d4e77",
@@ -278,19 +278,24 @@
       "bytes": 9941
     },
     "app/agents/ReferenceAgent.jsx": {
-      "sha256": "623dc24eb3481d88b11fdfe04ff409eda704f72119d87c546cc32981ac6a0cbf",
+      "sha256": "a1bc41aab54fc427bf47bd6cdbb5099d4803d8716f3a65f95580c732211b20ce",
       "mode": "100644",
-      "bytes": 201476
+      "bytes": 209806
     },
     "app/agents/ReferenceSurface.tsx": {
-      "sha256": "be945efa7b5ad6e2d1c2c6b89d85ce45b0234260520b71b214e5076db6b05588",
+      "sha256": "35455a908441edce532671eeeac6763f514a5067ce933d5a4a92f88000317bd7",
       "mode": "100644",
-      "bytes": 2021
+      "bytes": 2044
     },
     "app/agents/WorkspaceAgentsDialog.tsx": {
-      "sha256": "c1034243a01e4663140f2df2e18576d6c80ddae881031d6553fc1af7ef9692df",
+      "sha256": "b633b5277e08afca41ff314bdb6d29ccc44882b49cbde1c092976467bab00dd4",
       "mode": "100644",
-      "bytes": 1965
+      "bytes": 2074
+    },
+    "app/agents/citation-case.js": {
+      "sha256": "40c440e2e309d25cda1daa2fdba2f6dd5eaca7b61d6d8b6432f6da1b796caad4",
+      "mode": "100644",
+      "bytes": 2982
     },
     "app/agents/demo-answer.css": {
       "sha256": "638d3382659b98e0e2be9a15fb0ef9637d88f1c063d32c7be03536c48ad17f7c",
@@ -318,9 +323,9 @@
       "bytes": 333
     },
     "app/agents/reference.css": {
-      "sha256": "94e10655d7574976498a1d886dc109f3522c887218711153e8bec91275047af4",
+      "sha256": "ccc39ef893e2ea609463b292e28d996b895ac7465b72577b9b1e4528653cc34d",
       "mode": "100644",
-      "bytes": 2389
+      "bytes": 2428
     },
     "app/agents/workspace-context.ts": {
       "sha256": "483a95d35626397755afb6cc81b9fcb364e6138b48e3f692bebd169dac2e8dfb",
@@ -413,7 +418,7 @@
       "bytes": 50148
     },
     "app/globals.css": {
-      "sha256": "7e691901329e552bd0ff3923e305497c781a530b3967558588bec2a380a5a81c",
+      "sha256": "d078dc0fb01d229b36c9805cc3767b968395854e42df4916c37ce4d754a9acb9",
       "mode": "100644",
       "bytes": 49944
     },
@@ -1448,5 +1453,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-22T06:39:16.149222+00:00"
+  "imported_at": "2026-11-22T07:35:16.099485+00:00"
 }

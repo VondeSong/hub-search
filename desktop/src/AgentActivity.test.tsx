@@ -707,7 +707,7 @@ it("restores the displayed source-list state when an open web receipt was refine
 });
 
 
-it("keeps Codex summaries in order with the receipts of the open native tool group",async()=>{
+it("keeps an open local receipt and its Codex summary when a separate web phase arrives",async()=>{
   const tool={id:"script",kind:"tool" as const,state:"running",operation:"analyzeFiles",label:"分析附件",createdAt:1300};
   const summary={id:"summary",kind:"reasoning" as const,state:"running",origin:"codex-app-server",label:"Preparing offline PE parsing",createdAt:1400};
   const next={id:"web",kind:"webSearch" as const,state:"completed",action:"search",label:"搜索网页",queries:["核对分发记录"],createdAt:1500};
@@ -724,10 +724,15 @@ it("keeps Codex summaries in order with the receipts of the open native tool gro
 
   await draw([run.events[0],{...tool,state:"completed"},{...summary,state:"completed"},next]);
   const rows=phase.querySelector(".agent-operation-children")!.children;
-  expect(rows).toHaveLength(3);
+  expect(rows).toHaveLength(2);
   expect(rows[0].textContent).toContain(tool.label);
   expect(rows[1].textContent).toBe(summary.label);
-  expect(rows[2].querySelector("summary")?.textContent).toBe("搜索网页 · 核对分发记录");
+  const webPhase=phase.nextElementSibling as HTMLDetailsElement;
+  expect(webPhase.querySelector(".agent-phase-label")?.textContent).toBe("网页检索 · 1 步");
+  expect(webPhase.open).toBe(false);
+  await act(async()=>webPhase.querySelector("summary")!.click());
+  expect(webPhase.querySelector(".agent-web-activity > summary")?.textContent).toBe("搜索网页 · 核对分发记录");
+  expect(phase.open).toBe(true);
   expect(host.querySelector(".agent-show-more")).toBeNull();
 });
 

@@ -362,7 +362,11 @@ body.resizing-agent-panel * { cursor: col-resize !important; user-select: none !
 .agent-json-key { color:var(--hub-warning-text,#98621c); }
 .agent-json-string { color:var(--hub-success-text,#288052); }
 .agent-json-value { color:var(--hub-accent); }
-.agent-run-time { white-space:nowrap; font-variant-numeric:tabular-nums; }
+.agent-run-time { white-space:nowrap; font-family:var(--agent-chat-mono,monospace); font-variant-numeric:tabular-nums; }
+.agent-run-outcome { width:6px; height:6px; flex:0 0 6px; border-radius:50%; background:#10b981; }
+.agent-run-outcome[data-outcome="attention"] { background:#d97706; }
+.agent-source-excerpt { min-width:0; padding:10px; border:1px solid var(--hub-separator); border-radius:10px; background:var(--agent-chat-surface); }
+.agent-source-excerpt-text { white-space:pre-wrap; overflow-wrap:anywhere; max-block-size:12rem; overflow:auto; }
 .agent-script-status { color:var(--hub-text-secondary); }
 
 .agent-topic-panel{display:grid;gap:10px;min-width:0;max-height:min(70vh,720px);overflow:auto;padding:12px}.agent-topic-panel nav{display:flex;flex-wrap:wrap;gap:6px}.agent-topic-panel h3,.agent-topic-panel p{margin:0}.agent-topic-settings{display:grid;gap:10px}.agent-topic-settings label{display:grid;gap:4px;min-width:0}.agent-topic-settings input,.agent-topic-settings textarea,.agent-topic-settings select{width:100%;min-width:0;box-sizing:border-box}.agent-topic-method{white-space:pre-wrap;overflow-wrap:anywhere;max-height:18rem;overflow:auto;font-size:12px}.agent-topic-panel button[aria-pressed=true]{font-weight:600;text-decoration:underline}

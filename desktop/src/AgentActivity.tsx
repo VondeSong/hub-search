@@ -483,7 +483,7 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
   const failed=operations.some(event=>operationFailed(event) && (event.kind!=="webSearch" || settled));
   const active=current?.state==="running";
   const labels = [...new Set(operations.map(event => operationLabels[activityOperation(event)]))];
-  const webOverview = webPhase && (operations.length>1 || live && labels.includes(operationLabels.webSearch));
+  const webOverview = webPhase && (operations.length>1 || labels.includes(operationLabels.webSearch));
   const webTitle = labels.every(label=>label===operationLabels.webUnknown) ? "网页操作" : "网页检索";
   const mixed = mixedPhaseOverview(operations);
   const summaryIcon=mixed?.icon ?? (labels.length>1 && !webPhase
@@ -531,10 +531,20 @@ function OperationPhase({events,scope,current,live,segmented,settled,runId}:{eve
 function ActivityTimeline({events,scope,running,segmented,settled,runId}:{events:ActivityEvent[];scope:ToolResultScope|null;running:boolean;segmented:boolean;settled:boolean;runId:string}) {
   const groups:ActivityEvent[][]=[];
   const boundary=(event:ActivityEvent)=>event.operation==="imageInput" || event.operation==="viewImage" || !isOperation(event) && !isCodexSummary(event);
+  let previousOperation: ActivityEvent | undefined;
   for(const event of events){
     const previous=groups[groups.length-1];
-    if(!boundary(event)&&previous&&!boundary(previous[0])&&isMaterialContext(event)===isMaterialContext(previous[0]))previous.push(event);
-    else groups.push([event]);
+    const operation = isOperation(event);
+    const changesToolFamily = operation && previousOperation &&
+      (event.kind==="webSearch") !== (previousOperation.kind==="webSearch");
+    if(!boundary(event) && previous && !boundary(previous[0]) &&
+      isMaterialContext(event)===isMaterialContext(previous[0]) && !changesToolFamily) {
+      previous.push(event);
+    } else {
+      groups.push([event]);
+      previousOperation=undefined;
+    }
+    if(operation) previousOperation=event;
   }
   const latest=groups[groups.length-1] ?? [];
   const current=running ? [...latest].reverse().find(event=>isOperation(event) && event.state==="running")
@@ -638,7 +648,9 @@ export function AgentActivity({ value, onRecheck, requestText }: { value: Activi
   const clippingInText=clippedProgress.some(event=>event.label.trimEnd().endsWith(progressClippingNotice));
   const clipped=clippingInText || clippedProgress.some(event=>event.truncated);
   const workspace = !value.validity && value.workspaceChanges?.files ? value.workspaceChanges : undefined;
+  const outcome = stopped || value.validity ? "attention" : !value.running && value.state==="completed" ? "completed" : undefined;
   const runTime = <>
+    {outcome && <span className="agent-run-outcome" data-outcome={outcome} aria-hidden="true"/>}
     <span className="agent-run-time">{timeLabel} {duration}</span>
     {stateLabel && <span className="agent-activity-state" data-paused={paused || undefined}>{stateLabel}</span>}
   </>;

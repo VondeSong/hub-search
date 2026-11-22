@@ -107,7 +107,11 @@ export function AgentToolResult({ value, scope, scriptState, embedded=false, dis
           </details>}
         </div>
       </div>}
-      {page?.sourcePreview && <div aria-label="读取的原文片段"><strong>{page.sourcePreview.title || "原文片段"}</strong><p style={{whiteSpace:"pre-wrap"}}>{page.sourcePreview.content}</p><p className="agent-note">本次读取片段 {page.sourcePreview.totalChars} 字符{page.sourcePreview.truncated ? "，预览前 4000 字符；完整记录见技术详情" : ""}</p></div>}
+      {page?.sourcePreview && <section className="agent-source-excerpt" aria-label="读取的原文片段">
+        <strong>{page.sourcePreview.title || "原文片段"}</strong>
+        <p className="agent-source-excerpt-text" tabIndex={0}>{page.sourcePreview.content}</p>
+        <p className="agent-note">本次读取片段 {page.sourcePreview.totalChars} 字符{page.sourcePreview.truncated ? "，预览前 4000 字符。完整记录见技术记录。" : ""}</p>
+      </section>}
       {page?.methodPreview && <div aria-label="读取的技能说明"><strong>{page.methodPreview.title || "技能说明"}</strong><p className="agent-note">本次读取的方法说明，不是资料来源，也不代表已核对事实。</p><ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={{img:()=>null,a:({children})=><span>{children}</span>}}>{page.methodPreview.content}</ReactMarkdown>{page.methodPreview.truncated && <p className="agent-note">预览前 4000 字符；完整说明见技术详情。</p>}</div>}
       {(page || technical && busy) && <details className="agent-technical-record" open={technical} onToggle={event=>setTechnical(event.currentTarget.open)}>
         <summary>技术记录</summary>{technical && record}

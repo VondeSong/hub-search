@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { tagPrompt } from '../tag-assistant';
 import { runWorkspaceTagReview, tagDiscussionContext, tagWorkspaceLibraries, tagWorkspaceMaterials } from './workspace-context';
+import { citationCaseMessages, citationCaseSources, citationCaseTitle } from './citation-case';
 
 const tagActions = { draft: 'definition', find: 'missing', compare: 'relation' };
 const currentLabels = { document: '当前页', task: '当前任务', insight: '当前洞察', tag: '当前标签' };
@@ -198,17 +199,24 @@ function ThumbArtwork({ kind, large = false }) {
   );
 }
 
-export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspace, onOpenTagQueue, onOpenDemos, onLayoutChange, open }) {
-  // 1. 视口宽度模式：'sidebar' (480px) | 'focus' (760px) | 'full'
-  const [viewportMode, setViewportMode] = useState('focus');
-  const [layout, setLayout] = useState('expanded');
+export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspace, onOpenTagQueue, onOpenDemos, onLayoutChange, initialLayout, open }) {
+  const [layout, setLayout] = useState(initialLayout);
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
   // 示例场景切换：'report' (正常流式复核报告) | 'interrupted' (图2规则加载 + 图3核验中断重构案例)
-  const [activeCase, setActiveCase] = useState(workspaceContext ? 'new' : 'report');
+  const [activeCase, setActiveCase] = useState(workspaceContext ? 'new' : 'citation');
   const [newMessages, setNewMessages] = useState([]);
+  const [citationMessages, setCitationMessages] = useState(citationCaseMessages);
+  const [activeCitation, setActiveCitation] = useState(null);
+  const citationDialog = useRef(null);
+  const citationOpener = useRef(null);
+  const messageList = useRef(null);
+  useEffect(() => { if (messageList.current) messageList.current.scrollTop = 0; }, [activeCase]);
+  useEffect(() => {
+    if (activeCitation && !citationDialog.current.open) citationDialog.current.showModal();
+  }, [activeCitation]);
 
   // 2. 顶部与模式状态
-  const [threadTitle, setThreadTitle] = useState(workspaceContext?.name ?? 'Hub 助手工作过程和展示方案');
+  const [threadTitle, setThreadTitle] = useState(workspaceContext?.name ?? citationCaseTitle);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [taskMode, setTaskMode] = useState(tagWorkspace ? 'tag' : 'standard'); // 'standard' | 'goal' | 'tag' | 'topic'
   const [tagSubTab, setTagSubTab] = useState(
@@ -361,14 +369,18 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
   const [toastMsg, setToastMsg] = useState('');
 
   // 7. 思维链折叠状态、技术记录与草稿预览展开
-  const [timelineOpenMap, setTimelineOpenMap] = useState({ m2: true, c2_m2: true });
-  const [toolGroupOpenMap, setToolGroupOpenMap] = useState({ 'm2-ctx': false, 'm2-g1': true, 'm2-g2': false, 'm2-g3': false, 'c2-ctx': true, 'c2-g1': true });
+  const [timelineOpenMap, setTimelineOpenMap] = useState({ 'citation-answer': true, m2: true, c2_m2: true });
+  const [toolGroupOpenMap, setToolGroupOpenMap] = useState({
+    'citation-read': true, 'citation-web': true, 'm2-g1': true, 'c2-ctx': true, 'c2-g1': true,
+  });
+  const [receiptOpenMap, setReceiptOpenMap] = useState({ 'citation-excerpt': true, 'citation-pages': true, 'review-web-pages': true });
   const [techLogOpenMap, setTechLogOpenMap] = useState({ 'c2-step-err': false });
   const [draftPreviewOpenMap, setDraftPreviewOpenMap] = useState({ c2_m2: false });
   const [checklistExpanded, setChecklistExpanded] = useState(false);
 
   // 8. 历史会话
   const [historyList, setHistoryList] = useState([
+    { id: 'citation-history', caseKey: 'citation', title: citationCaseTitle, time: '刚刚', pinned: true },
     { id: 'h1', caseKey: 'report', title: 'Hub 助手工作过程和展示方案', time: '3 小时前', pinned: true },
     { id: 'h2', caseKey: 'interrupted', title: '找一下我最近的任务，帮我安排一下', time: '刚刚', pinned: true },
     { id: 'h3', caseKey: 'report', title: '根据摘要，哪三个 PowerShell 分数最高', time: '5 小时前', pinned: false },
@@ -414,11 +426,15 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
         {
           type: 'toolGroup',
           id: 'm2-g1',
-          title: '网页检索 · 5 步',
+          title: '网页检索',
           badges: ['W3C', 'MDN', 'WAI'],
           steps: [
             { icon: 'search', label: '搜索网页', detail: 'site:w3.org WAI ARIA Recommendation log status implicit aria-live polite aria-atomic', extra: '另 2 条查询' },
-            { icon: 'globe', label: '网页操作', detail: '打开 WAI-ARIA 1.2 Role Definitions' },
+            { id: 'review-web-pages', icon: 'globe', label: '已浏览 3 个页面', pages: [
+              { title: 'Disclosure (Show/Hide) Pattern', host: 'w3.org/WAI/ARIA/apg/patterns/disclosure/', badge: 'WAI' },
+              { title: 'Button Pattern · APG', host: 'w3.org/WAI/ARIA/apg/patterns/button/', badge: 'WAI' },
+              { title: 'WCAG Focus Visible', host: 'w3.org/WAI/WCAG22/Understanding/focus-visible.html', badge: 'W3C' },
+            ] },
             { icon: 'fileSearch', label: '在网页内查找', detail: 'new information is added in meaningful order' },
             { icon: 'globe', label: '网页操作', detail: '对照 MDN ARIA: status role 说明' },
             { type: 'status', text: 'Preparing atomic reference check' },
@@ -432,7 +448,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
         {
           type: 'toolGroup',
           id: 'm2-g2',
-          title: '网页检索 · 4 步',
+          title: '网页检索',
           badges: ['WHATWG', 'MDN'],
           steps: [
             { icon: 'search', label: '搜索网页', detail: 'CSS Scroll Anchoring overflow-anchor details summary focus preservation', extra: '另 1 条查询' },
@@ -448,7 +464,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
         {
           type: 'toolGroup',
           id: 'm2-g3',
-          title: '网页检索 · 6 步',
+          title: '网页检索',
           badges: ['W3C', 'MDN'],
           steps: [
             { icon: 'search', label: '搜索网页', detail: 'prefers-reduced-motion scroll-behavior smooth vs auto accessibility', extra: '另 3 条查询' },
@@ -506,9 +522,8 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
         {
           type: 'contextPrep',
           id: 'c2-ctx',
-          summary: '已载入上下文 · 1 份材料 · 1 条规则',
+          summary: '已载入上下文 · 1 条规则 · 未限定资料库',
           items: [
-            { kind: 'doc', name: '仪表线束评审待查清单', meta: '当前打开材料' },
             { kind: 'rule', name: 'OS 知识库工作规则', file: 'AGENTS.md', hash: '示例版', fullPath: '示例库 / AGENTS.md' }
           ]
         },
@@ -520,7 +535,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
           type: 'toolGroup',
           id: 'c2-g1',
           icon: 'wrench',
-          title: '检索 Hub 任务 · 10 次调用',
+          title: '调用工具、搜索资料',
           badges: ['Hub'],
           warnBadge: '1 项参数异常',
           steps: [
@@ -529,7 +544,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
               id: 'c2-step-err',
               icon: 'alertTriangle',
               label: '搜索相关任务',
-              detail: '首次查询词为空，已自动调整后重试',
+              detail: '参数异常，检索结果未完整返回',
               isWarning: true,
               countBadge: '× 8 次',
               techJson: '{\n  "error": "取证查询需要 1-200 个字符",\n  "origin": "host"\n}'
@@ -592,14 +607,16 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
     { name: '#teleplay', count: 41 }
   ];
 
-  const webSourcesList = [
+  const reportSources = [
     { title: 'WCAG 4.1.3 Status Messages', host: 'w3.org/WAI/WCAG21/Understanding/status-messages', badge: 'W3C' },
     { title: 'WAI-ARIA 1.2 Role Definitions (log & status)', host: 'w3.org/TR/wai-aria-1.2/#status', badge: 'WAI' },
     { title: 'MDN ARIA: status role', host: 'developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Roles/status_role', badge: 'MDN' },
     { title: 'WHATWG HTML Living Standard: details & summary', host: 'html.spec.whatwg.org/multipage/interactive-elements.html', badge: 'WHATWG' },
     { title: 'CSS Scroll Anchoring Module Level 1', host: 'drafts.csswg.org/css-scroll-anchoring', badge: 'W3C' },
-    { title: 'MDN prefers-reduced-motion', host: 'developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion', badge: 'MDN' }
+    { title: 'MDN prefers-reduced-motion', host: 'developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion', badge: 'MDN' },
+    ...messages[1].timeline.find(node => node.id === 'm2-g1').steps.find(step => step.id === 'review-web-pages').pages,
   ];
+  const webSourcesList = activeCase === 'citation' ? citationCaseSources : reportSources;
   const sourcesQuery = sourcesSearch.trim().toLowerCase();
   const visibleWebSources = webSourcesList.filter(source =>
     source.title.toLowerCase().includes(sourcesQuery) || source.host.toLowerCase().includes(sourcesQuery));
@@ -738,6 +755,8 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
     };
     if (activeCase === 'interrupted') {
       setInterruptedMessages(prev => [...prev, userMsg, aiMsg]);
+    } else if (activeCase === 'citation') {
+      setCitationMessages(prev => [...prev, userMsg, aiMsg]);
     } else if (activeCase === 'new') {
       setNewMessages(prev => [...prev, userMsg, aiMsg]);
     } else {
@@ -749,7 +768,14 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
 
   const switchDemoCase = (caseKey) => {
     setActiveCase(caseKey);
-    setThreadTitle(caseKey === 'interrupted' ? '找一下我最近的任务，帮我安排一下' : 'Hub 助手工作过程和展示方案');
+    setThreadTitle(caseKey === 'citation' ? citationCaseTitle :
+      caseKey === 'interrupted' ? '找一下我最近的任务，帮我安排一下' : 'Hub 助手工作过程和展示方案');
+    setSourcesModalOpen(false);
+  };
+
+  const openCitation = (paragraph, opener) => {
+    citationOpener.current = opener;
+    setActiveCitation(paragraph);
   };
 
   const handleContinueInterrupted = (msgId) => {
@@ -825,19 +851,19 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
     taskMode === 'tag' ? 'bg-emerald-500' :
     taskMode === 'topic' ? 'bg-accent-indigo' : null;
 
-  const containerWidthClass =
-    viewportMode === 'sidebar' ? 'max-w-[480px]' :
-    viewportMode === 'focus' ? 'max-w-[780px]' : 'max-w-full';
+  const containerWidthClass = layout === 'expanded' ? 'max-w-[820px]'
+    : layout === 'floating' ? 'max-w-[460px]' : 'max-w-[510px]';
 
-  const currentMessagesList = activeCase === 'interrupted' ? interruptedMessages : activeCase === 'new' ? newMessages : messages;
+  const currentMessagesList = activeCase === 'citation' ? citationMessages
+    : activeCase === 'interrupted' ? interruptedMessages : activeCase === 'new' ? newMessages : messages;
   const visibleMessages = onlyLatestReply && currentMessagesList.length > 0 ? [currentMessagesList[currentMessagesList.length - 1]] : currentMessagesList;
   const visibleLocalFiles = expandAllFiles ? attachedLocalFiles : attachedLocalFiles.slice(0, 3);
   const hiddenFilesCount = attachedLocalFiles.length > 3 ? attachedLocalFiles.length - 3 : 0;
 
   return (
-    <div data-agents-layout={layout} className="h-screen w-full flex flex-col items-center justify-center p-2 sm:p-4">
+    <div data-agents-layout={layout} className={`h-dvh w-full flex flex-col items-center justify-center ${layout === 'docked' ? 'py-1' : 'p-2 sm:p-4'}`}>
       {/* 顶部原型视口与示例场景控制条 */}
-      <div className={`w-full ${containerWidthClass} ${layout !== 'expanded' ? 'self-end' : ''} pointer-events-auto shrink-0 mb-2 flex flex-wrap items-center justify-between gap-2 px-1 text-xs transition-all duration-300`}>
+      <div className={`w-full ${containerWidthClass} ${layout !== 'expanded' ? 'self-end' : ''} pointer-events-auto shrink-0 mb-2 flex flex-wrap items-center justify-between gap-2 px-1 text-xs`}>
         <div className="flex flex-wrap items-center gap-2">
           {onDismiss && (
             <button
@@ -850,14 +876,22 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
               返回工作台
             </button>
           )}
-          <span className="font-semibold text-primary">Hub 助手原型</span>
-          {!workspaceContext && <div className="flex items-center bg-black/5 p-0.5 rounded-xl">
+          <span className="font-semibold text-primary">Hub 助手 · 交互原型</span>
+          {!workspaceContext && <div className="flex flex-wrap items-center bg-subtle border border-border p-0.5 rounded-xl">
+            <button
+              aria-pressed={activeCase === 'citation'}
+              onClick={() => switchDemoCase('citation')}
+              className={`px-2 py-0.5 rounded-lg text-[11px] font-medium flex items-center gap-1 ${activeCase === 'citation' ? 'bg-surface text-primary shadow-2xs' : 'text-secondary hover:text-primary'}`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-accent-indigo" aria-hidden="true"></span>
+              引用与摘录
+            </button>
             <button
               aria-pressed={activeCase === 'report'}
               onClick={() => switchDemoCase('report')}
               className={`px-2 py-0.5 rounded-lg text-[11px] font-medium transition-all ${activeCase === 'report' ? 'bg-surface text-primary shadow-sm' : 'text-secondary hover:text-primary'}`}
             >
-              案例1：流式复核
+              流式复核
             </button>
             <button
               aria-pressed={activeCase === 'interrupted'}
@@ -865,28 +899,12 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
               className={`px-2 py-0.5 rounded-lg text-[11px] font-medium transition-all flex items-center gap-1 ${activeCase === 'interrupted' ? 'bg-surface text-primary shadow-sm' : 'text-secondary hover:text-primary'}`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-              <span>案例2：中断与规则</span>
+              <span>中断与规则</span>
             </button>
             {onOpenDemos ? <button type="button" onClick={onOpenDemos}
               className="px-2 py-0.5 rounded-lg text-[11px] font-medium text-secondary hover:text-primary">更多演示</button>
               : <a href="/?assistant=ui-demo" className="px-2 py-0.5 rounded-lg text-[11px] font-medium text-secondary hover:text-primary">更多演示</a>}
           </div>}
-        </div>
-        <div className="flex items-center bg-black/5 p-0.5 rounded-xl">
-          {[
-            { id: 'sidebar', label: '侧栏 480px' },
-            { id: 'focus', label: '专注 780px' },
-            { id: 'full', label: '全屏' }
-          ].map(v => (
-            <button
-              key={v.id}
-              aria-pressed={viewportMode === v.id}
-              onClick={() => { setViewportMode(v.id); if (v.id !== 'sidebar' && layout !== 'expanded') { setLayout('expanded'); onLayoutChange?.('expanded'); } }}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${viewportMode === v.id ? 'bg-surface text-primary shadow-sm' : 'text-secondary hover:text-primary'}`}
-            >
-              {v.label}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -977,7 +995,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
                 { id: 'floating', icon: 'floatWindow', label: '悬浮浮窗', viewport: 'sidebar' },
                 { id: 'expanded', icon: 'maximize', label: '专注展开', viewport: 'focus' }
               ].map(option => <button key={option.id} type="button" aria-pressed={layout === option.id} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs hover:bg-hover"
-                onClick={() => { setViewportMode(option.viewport); setLayout(option.id); onLayoutChange?.(option.id); setLayoutMenuOpen(false); }}>
+                onClick={() => { setLayout(option.id); onLayoutChange?.(option.id); setLayoutMenuOpen(false); }}>
                 <Icon name={option.icon} className="w-3.5 h-3.5" />{option.label}{layout === option.id && <Icon name="check" className="ml-auto w-3.5 h-3.5" />}
               </button>)}
             </div>}
@@ -1180,7 +1198,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
         )}
 
         {/* 3. 主内容消息流 / 居中呼吸感空状态 */}
-        <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-6" onClick={closeAllPopovers}>
+        <main ref={messageList} className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-6" onClick={closeAllPopovers}>
           {visibleMessages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center max-w-md mx-auto text-center pb-10 animate-fadeIn">
               <div className="w-11 h-11 rounded-2xl bg-surface border border-border shadow-card flex items-center justify-center mb-4">
@@ -1221,10 +1239,13 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <button
+                            aria-label={timelineOpenMap[msg.id] ? '收起工作过程' : '展开工作过程'}
+                            aria-expanded={!!timelineOpenMap[msg.id]}
                             onClick={() => setTimelineOpenMap(prev => ({ ...prev, [msg.id]: !prev[msg.id] }))}
-                            className="inline-flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-lg hover:bg-hover text-xs font-medium text-secondary hover:text-primary transition-colors"
+                            className="inline-flex min-h-6 items-center gap-1.5 px-2 py-0.5 -ml-2 rounded-lg hover:bg-hover text-xs font-medium text-secondary hover:text-primary transition-colors"
                           >
-                            <span className="font-mono text-[11.5px]">用时 {msg.duration}</span>
+                            <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${msg.statusBadge ? 'bg-amber-500' : 'bg-accent-emerald'}`} aria-hidden="true"></span>
+                            <span className="font-mono tabular-nums">用时 {msg.duration}</span>
                             {msg.statusBadge && (
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-md bg-amber-50 text-amber-800 border border-amber-200/80 text-[10.5px] font-sans font-medium">
                                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
@@ -1234,7 +1255,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
                             <Icon name={timelineOpenMap[msg.id] ? 'chevronDown' : 'chevronRight'} className="w-3.5 h-3.5 opacity-70" />
                           </button>
                           <button
-                            onClick={() => triggerToast('已复制完整思维链过程摘要')}
+                            onClick={() => handleCopyText(msg.timeline.map(node => node.summary ?? node.text ?? node.title).join('\n'))}
                             className="p-1 rounded-md text-muted hover:text-primary hover:bg-hover"
                             title="过程选项"
                           >
@@ -1243,13 +1264,14 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
                         </div>
 
                         {timelineOpenMap[msg.id] && (
-                          <div className="pl-3.5 border-l border-border space-y-3 text-[12.5px] leading-relaxed text-secondary animate-fadeIn">
+                          <div className="pl-3 border-l border-border space-y-2.5 text-[12.5px] leading-relaxed text-secondary">
                             {msg.timeline.map((node, idx) => {
                               if (node.type === 'contextPrep') {
                                 const isCtxOpen = !!toolGroupOpenMap[node.id];
                                 return (
                                   <div key={node.id} className="space-y-1.5">
                                     <button
+                                      aria-expanded={isCtxOpen}
                                       onClick={() => setToolGroupOpenMap(prev => ({ ...prev, [node.id]: !prev[node.id] }))}
                                       className="inline-flex items-center gap-2 py-0.5 rounded-md hover:text-primary transition-colors text-left"
                                     >
@@ -1295,7 +1317,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
                               }
                               if (node.type === 'thought') {
                                 return (
-                                  <p key={idx} className="text-secondary">
+                                  <p key={node.id ?? idx} className="text-primary/80">
                                     <InlineCodeText text={node.text} />
                                   </p>
                                 );
@@ -1312,11 +1334,12 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
                                 return (
                                   <div key={node.id} className="space-y-1.5">
                                     <button
+                                      aria-expanded={isGroupOpen}
                                       onClick={() => setToolGroupOpenMap(prev => ({ ...prev, [node.id]: !prev[node.id] }))}
-                                      className="inline-flex items-center gap-2 py-0.5 rounded-md hover:text-primary transition-colors text-left"
+                                      className="inline-flex min-h-6 flex-wrap items-center gap-x-2 gap-y-0.5 py-0.5 rounded-md hover:text-primary transition-colors text-left"
                                     >
                                       <Icon name={node.icon || 'search'} className="w-3.5 h-3.5 text-muted shrink-0" />
-                                      <span className="font-medium text-primary/85">{node.title}</span>
+                                      <span className="font-medium text-primary/85">{node.title}{node.title === '网页检索' && ` · ${node.steps.filter(step => step.type !== 'status').length} 步`}</span>
                                       {/* 叠放微缩站点图标（替代笨重文字框） */}
                                       {node.badges && node.badges.length > 0 && (
                                         <div className="flex items-center -space-x-1 ml-0.5">
@@ -1340,9 +1363,49 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
                                             <div key={si} className="text-[11px] font-mono text-muted py-0.5">
                                               {st.text}
                                             </div>
+                                          ) : st.excerpt || st.pages ? (
+                                            <div key={st.id} className="space-y-1.5">
+                                              <button
+                                                type="button"
+                                                aria-expanded={!!receiptOpenMap[st.id]}
+                                                onClick={() => setReceiptOpenMap(prev => ({ ...prev, [st.id]: !prev[st.id] }))}
+                                                className="flex min-h-6 items-center gap-1.5 text-left hover:text-primary"
+                                              >
+                                                <Icon name={st.icon} className="w-3.5 h-3.5 shrink-0 text-muted" />
+                                                <span className="font-medium text-primary/85">{st.label}</span>
+                                                {st.detail && <span className="text-[11px] text-secondary">· {st.detail}</span>}
+                                                <Icon name={receiptOpenMap[st.id] ? 'chevronDown' : 'chevronRight'} className="w-3 h-3 shrink-0 text-muted" />
+                                              </button>
+                                              {receiptOpenMap[st.id] && (st.pages ? (
+                                                <ul className="pl-5 flex flex-wrap gap-1.5" aria-label="本批浏览的网页">
+                                                  {st.pages.map(page => (
+                                                    <li key={page.host} className="min-w-0 max-w-full">
+                                                      <a href={`https://${page.host}`} target="_blank" rel="noreferrer" title={page.host}
+                                                        className="inline-flex min-h-6 max-w-full items-center gap-1.5 rounded-lg border border-border bg-surface hover:bg-hover px-1.5 text-[11px] text-primary/90">
+                                                        <SiteFavicon site={page.badge} />
+                                                        <span className="truncate">{page.title}</span>
+                                                      </a>
+                                                    </li>
+                                                  ))}
+                                                </ul>
+                                              ) : (
+                                                <div className="ml-5 rounded-xl border border-border bg-surface p-2.5 space-y-2 text-[11.5px] shadow-2xs">
+                                                  <p className="leading-relaxed">{st.excerpt.map(paragraph => paragraph.text).join(' ')}</p>
+                                                  <div className="flex flex-wrap items-center gap-2">
+                                                    <button type="button" onClick={event => openCitation(st.excerpt[0], event.currentTarget)}
+                                                      className="font-medium text-accent-indigo hover:underline">跳到原文</button>
+                                                    <button type="button" aria-expanded={!!techLogOpenMap[st.id]}
+                                                      onClick={() => setTechLogOpenMap(prev => ({ ...prev, [st.id]: !prev[st.id] }))}
+                                                      className="hover:text-primary">技术记录</button>
+                                                  </div>
+                                                  {techLogOpenMap[st.id] && <pre tabIndex={0} aria-label="笔记读取技术记录" className="overflow-x-auto rounded-lg bg-subtle p-2 font-mono">{st.techJson}</pre>}
+                                                </div>
+                                              ))}
+                                            </div>
                                           ) : (
                                             <div key={si} className="space-y-1.5">
                                               <button
+                                                aria-expanded={st.techJson ? !!techLogOpenMap[st.id] : undefined}
                                                 onClick={() => {
                                                   if (st.techJson) {
                                                     setTechLogOpenMap(prev => ({ ...prev, [st.id]: !prev[st.id] }));
@@ -1446,6 +1509,23 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
                           </div>
                         )}
                       </div>
+                    ) : msg.citations ? (
+                      <article className="space-y-3 text-[14.5px] leading-[1.7] text-primary">
+                        <h2 className="text-[17px] font-bold">周记里还有三项待验证</h2>
+                        <ol className="list-decimal space-y-2 pl-5 text-[13.5px]">
+                          {msg.citations.map(paragraph => (
+                            <li key={paragraph.number}>
+                              <strong>{paragraph.title}。</strong>{paragraph.text}{' '}
+                              <button type="button" onClick={event => openCitation(paragraph, event.currentTarget)}
+                                className="inline-flex min-h-6 items-center gap-1 rounded-lg border border-border bg-surface px-1.5 text-[11px] text-secondary hover:bg-hover">
+                                <Icon name="fileText" className="w-3 h-3" />第 {paragraph.number} 段
+                              </button>
+                            </li>
+                          ))}
+                        </ol>
+                        <h2 className="text-[15px] font-semibold">公开资料核对</h2>
+                        <p>展开控件负责切换显隐。滚动锚定可在布局变化时补偿偏移，首段回答出现时仍需验证用户当前读到的位置。</p>
+                      </article>
                     ) : msg.report ? (
                       <article className="space-y-4 text-[14.5px] leading-[1.7] text-primary">
                         <h1 className="text-[17px] font-bold tracking-tight text-primary">
@@ -1781,7 +1861,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
             </div>
 
             {/* 第 3 层：极简操作底栏 */}
-            <div className="px-2.5 pb-2 pt-1 flex items-center justify-between gap-2">
+            <div className="px-2.5 pb-2 pt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
               {/* 左侧控制组 */}
               <div className="flex items-center gap-1 min-w-0">
                 <button
@@ -1842,7 +1922,7 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
               </div>
 
               {/* 右侧：厂商图标 + 型号短名 + 思考强度 + 发送 */}
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="ml-auto flex items-center gap-1.5 shrink-0">
                 <button
                   onClick={() => {
                     const next = !modelPopoverOpen;
@@ -2664,6 +2744,22 @@ export default function ReferenceAgent({ onDismiss, workspaceContext, tagWorkspa
             </div>
           </div>
         )}
+
+        {activeCitation && <dialog ref={citationDialog} aria-label="原文段落" className="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-border bg-surface p-4 text-primary shadow-sheet backdrop:bg-black/25"
+          onClose={() => {
+            setActiveCitation(null);
+            citationOpener.current?.focus();
+          }}>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold">助手项目周记（示例）</h2>
+            <button type="button" autoFocus onClick={() => citationDialog.current.close()} aria-label="关闭原文段落"
+              className="rounded-lg p-1.5 text-secondary hover:bg-hover"><Icon name="x" /></button>
+          </div>
+          <p className="mt-3 rounded-xl border border-border bg-subtle p-3 text-[13px] leading-relaxed">
+            <strong className="block">第 {activeCitation.number} 段 · {activeCitation.title}</strong>
+            {activeCitation.text}
+          </p>
+        </dialog>}
 
         {/* 网页来源 */}
         {sourcesModalOpen && (

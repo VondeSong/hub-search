@@ -89,7 +89,7 @@ it("keeps the search and page-opening summaries distinct and the runtime details
  await act(async()=>root.render(<AgentActivity value={value}/>));
  await act(async()=>host.querySelector<HTMLButtonElement>(".agent-activity-toggle")!.click());
  const groups=[...host.querySelectorAll(".agent-operation-group > summary")];
- expect(groups.map(row=>row.textContent)).toEqual(["已搜索网页","已打开网页"]);
+ expect(groups.map(row=>row.textContent)).toEqual(["网页检索 · 1 步","已打开网页"]);
  expect(groups.map(row=>row.querySelector("[data-activity-icon]")?.getAttribute("data-activity-icon"))).toEqual(["webSearch","webOpen"]);
  expect(host.textContent).toContain("本批返回 38 项搜索结果");
  const permissions=host.querySelector<HTMLButtonElement>('.agent-runtime-toggle')!;

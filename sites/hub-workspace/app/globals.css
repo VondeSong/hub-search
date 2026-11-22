@@ -105,6 +105,6 @@
 }
 @media (min-width: 1000px) {
   .hub-app:has(> .workspace-agents-dialog[open][data-window-mode="docked"]) {
-    padding-inline-end: 496px;
+    padding-inline-end: 510px;
   }
 }

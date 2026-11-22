@@ -20,7 +20,8 @@ export default function WorkspaceAgentsDialog({ open, onDismiss, workspaceContex
   onOpenDemos?: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [layout, setLayout] = useState<AgentsWindowMode>("expanded");
+  const [layout, setLayout] = useState<AgentsWindowMode>(() =>
+    workspaceContext || demo || typeof window === "undefined" || window.innerWidth < 1000 ? "expanded" : "docked");
 
   useEffect(() => {
     const element = dialog.current;

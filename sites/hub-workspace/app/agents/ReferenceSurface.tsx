@@ -41,7 +41,7 @@ export function ReferenceSurface({ onDismiss, workspaceContext, tagWorkspace, on
       <>
         <style>{referenceStyles}</style>
         {demo && onDismiss ? <AgentsDemos {...demo} onDismiss={onDismiss} />
-          : <ReferenceAgent onDismiss={onDismiss} workspaceContext={workspaceContext} tagWorkspace={tagWorkspace} onOpenTagQueue={onOpenTagQueue} onOpenDemos={onOpenDemos} onLayoutChange={onLayoutChange} open={open} />}
+          : <ReferenceAgent onDismiss={onDismiss} workspaceContext={workspaceContext} tagWorkspace={tagWorkspace} onOpenTagQueue={onOpenTagQueue} onOpenDemos={onOpenDemos} onLayoutChange={onLayoutChange} initialLayout={layout} open={open} />}
       </>,
       surface,
     )}</div>
