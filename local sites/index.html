@@ -1100,14 +1100,39 @@
         ],
         blocks: [
           { type: 'callout', text: 'PDF 原文索引 · 共 18 页已建立页级全文索引，点击左侧不同命中摘录可直达对应页码段落。' },
-          { type: 'h2', id: 'pdf-p1', text: 'P.02 超声波焊点线径配比规范' },
-          { type: 'p', text: '汽车线束主干分支采用超声波焊接时，单节点最多合并 6 根导线，最大与最小截面积比值不宜超过 1:4，防止细线在线束振动中过早疲劳断裂。' },
-          { type: 'h2', id: 'pdf-p2', text: 'P.07 湿区线束焊点双壁热缩管密封' },
-          { type: 'p', text: '前舱及四门湿区线束焊点必须采用带热熔胶的双壁热缩管密封，加热后两端应可见均匀透明胶环溢出，避免水汽沿线束铜丝毛细渗入。' },
-          { type: 'h2', id: 'pdf-p3', text: 'P.14 焊点距插接器与折弯区最小距离' },
-          { type: 'p', text: '线束焊点距离插接器尾部护套应 ≥ 50mm，且严禁布置在车门过孔动态弯曲段或波纹管急弯处。' }
+          { type: 'h2', id: 'pdf-p1', text: 'P.02 超声波焊点线径配比规范', pageNumber: 2 },
+          { type: 'p', pageNumber: 2, text: '汽车线束主干分支采用超声波焊接时，单节点最多合并 6 根导线，最大与最小截面积比值不宜超过 1:4，防止细线在线束振动中过早疲劳断裂。' },
+          { type: 'h2', id: 'pdf-p2', text: 'P.07 湿区线束焊点双壁热缩管密封', pageNumber: 7 },
+          { type: 'p', pageNumber: 7, text: '前舱及四门湿区线束焊点必须采用带热熔胶的双壁热缩管密封，加热后两端应可见均匀透明胶环溢出，避免水汽沿线束铜丝毛细渗入。' },
+          { type: 'h2', id: 'pdf-p3', text: 'P.14 焊点距插接器与折弯区最小距离', pageNumber: 14 },
+          { type: 'p', pageNumber: 14, text: '线束焊点距离插接器尾部护套应 ≥ 50mm，且严禁布置在车门过孔动态弯曲段或波纹管急弯处。' }
         ],
         backlinks: ['1 线束 · Craft 资料']
+      },
+      {
+        id: 'doc-10', title: '前舱铭牌与实物照片归档.md', library: 'obsidian',
+        docType: 'attachment', folderName: 'OS / 现场记录',
+        path: 'OS / 现场记录 / 前舱铭牌与实物照片归档.md', updated: '昨天 16:40', relTime: '昨天', timeGroup: '昨天', dateBucket: '7d',
+        tags: ['eds', 'ocr'], favorite: false,
+        snippet: '收录前舱总成实物铭牌照片与 OCR 自动识别文字，用于核对物料号与试装批次。',
+        blocks: [
+          { type: 'p', text: '以下为 11 月试装车前舱实物铭牌拍照归档，已自动完成图片文字识别并写入本地检索索引。' },
+          { type: 'ocr', sourceTitle: 'IMG_20261118_前舱线束标签.jpg', text: '前舱主线束总成 P/N: 4012-8891-V3 · 湿区双壁波纹管保护 · 试装批次 2026-11 · 检验员 07' },
+          { type: 'attachments', items: [{ name: 'IMG_20261118_前舱线束标签.jpg', meta: 'JPG · 1.8 MB · OCR 已索引', icon: 'image' }] }
+        ],
+        backlinks: ['试装现场记录 · 左前门线束.md']
+      },
+      {
+        id: 'doc-11', title: 'EDS 车身电气架构命名规范', library: 'feishu',
+        docType: 'page', folderName: '飞书 / 车型项目',
+        path: '飞书知识库 / EDS 车身电气架构命名规范', updated: '4 天前', relTime: '4 天前', timeGroup: '本周', dateBucket: '7d',
+        tags: ['线束', 'eds'], aliases: ['整车线束命名'], favorite: false,
+        snippet: '统一车身域控制器接口编号、回路代号前缀与跨部门 ECR 评审文档命名格式。',
+        blocks: [
+          { type: 'p', text: '本规范用于统一车身域控制器接口编号、回路代号前缀（如 GUA / DMS / BDC）及 ECR 变更评审命名格式。' },
+          { type: 'p', text: '所有新增分支代号须在架构冻结前由电气组统一分配，严禁在图纸中混用旧代号。' }
+        ],
+        backlinks: ['2026 Q4 车型线束接口冻结跟踪']
       },
       {
         id: 'doc-2', title: 'HUB_AGENTS_ARCHITECTURE v1.16 — 上下文压缩与写回撤销', library: 'obsidian', spaceNodeId: 'o-arch',
@@ -1449,19 +1474,59 @@
 
     function destroyCharts() { activeCharts.forEach(c => { try { c.destroy(); } catch (e) {} }); activeCharts = []; }
 
+    const PINYIN_DEMO_MAP = {
+      xianshu: '线束',
+      handian: '焊点',
+      fangshuishuan: '防水栓',
+      mingpai: '铭牌',
+      kakou: '卡扣'
+    };
+
+    function resolveSearchTerms(query) {
+      const raw = String(query || '').trim();
+      if (!raw) return [];
+      const tokens = raw.split(/\s+/).filter(Boolean);
+      const out = [];
+      tokens.forEach(tok => {
+        const mapped = PINYIN_DEMO_MAP[tok.toLowerCase()];
+        const val = mapped || tok;
+        if (!out.some(x => x.toLowerCase() === val.toLowerCase())) out.push(val);
+      });
+      return out;
+    }
+
+    function buildTermsRegex(terms) {
+      if (!terms.length) return null;
+      const sorted = [...terms].sort((a, b) => b.length - a.length).map(escapeRegExp);
+      return new RegExp(`(${sorted.join('|')})`, 'gi');
+    }
+
+    function textMatchesAllTerms(text, terms) {
+      if (!terms.length) return true;
+      const lower = String(text || '').toLowerCase();
+      return terms.every(t => lower.includes(t.toLowerCase()));
+    }
+
+    function textMatchesAnyTerm(text, terms) {
+      if (!terms.length) return false;
+      const lower = String(text || '').toLowerCase();
+      return terms.some(t => lower.includes(t.toLowerCase()));
+    }
+
     function getDocPlainText(obj) {
       if (!obj) return '';
       return (obj.blocks || []).map(b => {
         if (b.type === 'table') return [b.headers.join(' '), ...b.rows.map(r => r.join(' '))].join(' ');
         if (b.type === 'attachments') return b.items.map(i => i.name + ' ' + i.meta).join(' ');
+        if (b.type === 'ocr') return (b.sourceTitle || '') + ' ' + (b.text || '');
         return b.text || '';
       }).join('\n');
     }
 
     function highlightSnippet(text, query) {
       const safe = escapeHtml(text || '');
-      const q = (query || '').trim();
-      return !q ? safe : safe.replace(new RegExp(`(${escapeRegExp(q)})`, 'gi'), '<mark class="search-hit">$1</mark>');
+      const re = buildTermsRegex(resolveSearchTerms(query));
+      return !re ? safe : safe.replace(re, '<mark class="search-hit">$1</mark>');
     }
 
     function highlightRichText(text, query, hitCounter) {
@@ -1469,9 +1534,8 @@
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/`([^`]+)`/g, '<code class="font-mono-eng text-[12.5px] px-1.5 py-0.5 rounded" style="background:var(--bg-code)">$1</code>')
         .replace(/\n/g, '<br>');
-      const q = (query || '').trim();
-      if (!q || !hitCounter) return safe;
-      const re = new RegExp(`(${escapeRegExp(q)})`, 'gi');
+      const re = buildTermsRegex(resolveSearchTerms(query));
+      if (!re || !hitCounter) return safe;
       return safe.split(/(<[^>]+>)/g).map(part => {
         if (part.startsWith('<')) return part;
         return part.replace(re, match => {
@@ -1485,6 +1549,9 @@
       return (target.blocks || []).map(block => {
         if (block.type === 'h2') return `<h2 id="${block.id || ''}" class="scroll-mt-16">${highlightRichText(block.text, query, hitCounter)}</h2>`;
         if (block.type === 'callout') return `<div class="doc-callout">${highlightRichText(block.text, query, hitCounter)}</div>`;
+        if (block.type === 'ocr') {
+          return `<div class="my-3 p-3.5 rounded-xl" style="background:#FAF8FF; border:0.5px solid rgba(109,40,217,0.16)"><div class="flex items-center gap-2 mb-1.5 text-[11px] font-medium" style="color:#6D28D9"><span class="px-1.5 py-0.5 rounded" style="background:#EDE9FE">图片识别文字</span><span class="font-mono-eng truncate" style="color:var(--ink-secondary)">${escapeHtml(block.sourceTitle || '图片附件')}</span></div><div class="text-[13px] leading-relaxed" style="color:var(--ink-primary)">${highlightRichText(block.text || '', query, hitCounter)}</div></div>`;
+        }
         if (block.type === 'table') {
           return `<div class="doc-table-wrap"><table class="doc-table"><thead><tr>${block.headers.map(h => `<th>${highlightRichText(h, query, hitCounter)}</th>`).join('')}</tr></thead><tbody>${block.rows.map(row => `<tr>${row.map(c => `<td>${highlightRichText(c, query, hitCounter)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
         }
@@ -2658,57 +2725,182 @@
       return (doc.blocks || []).filter(b => b.type === 'h2').map(b => b.text || '').join(' ');
     }
 
-    function extractTargetHits(target, query) {
-      const q = (query || '').trim();
-      if (!q || !target) return [];
-      const re = new RegExp(escapeRegExp(q), 'gi');
-      const hits = [];
+    const SEARCH_DEMO_PRESETS = [
+      { query: '线束', label: '线束', hint: '综合：正文/PDF/OCR/标签/子页' },
+      { query: 'title:线束', label: 'title:线束', hint: '仅标题范围约束' },
+      { query: '线束 焊点', label: '线束 焊点', hint: '多词联合高亮' },
+      { query: 'xianshu', label: 'xianshu', hint: '拼音匹配示意' },
+      { query: '4012', label: '4012', hint: '图片 OCR 命中' },
+      { query: '防水栓', label: '防水栓', hint: '仅关联子页命中' }
+    ];
+
+    const EVIDENCE_BADGE_STYLES = {
+      pdf: 'background:#EFF6FF; color:#1D4ED8;',
+      ocr: 'background:#F5F3FF; color:#6D28D9;',
+      attachment: 'background:#F1F5F9; color:#475569;',
+      tag: 'background:#ECFEFF; color:#0E7490;',
+      alias: 'background:#F0FDF4; color:#15803D;',
+      table: 'background:var(--bg-subtle); color:var(--ink-secondary);',
+      callout: 'background:#FFFBEB; color:#B45309;',
+      heading: 'background:var(--bg-subtle); color:var(--ink-secondary);'
+    };
+
+    function extractTargetEvidence(target, query, effectiveField = 'all') {
+      const terms = resolveSearchTerms(query);
+      if (!terms.length || !target) {
+        return { titleHit: false, items: [], matchedTags: [], matchedAliases: [], capped: false };
+      }
+      const re = buildTermsRegex(terms);
+      const items = [];
       let hitIdx = 0;
 
-      const scanText = (rawText, anchorLabel) => {
+      const countAndFirstMatch = (rawText) => {
         const clean = String(rawText || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1').replace(/\n+/g, ' ');
         re.lastIndex = 0;
+        let first = null;
+        let count = 0;
         let m;
         while ((m = re.exec(clean)) !== null) {
-          const start = Math.max(0, m.index - 22);
-          const end = Math.min(clean.length, m.index + m[0].length + 46);
-          const excerpt = (start > 0 ? '…' : '') + clean.slice(start, end) + (end < clean.length ? '…' : '');
-          hits.push({ hitIndex: hitIdx, anchorLabel, excerpt });
-          hitIdx++;
+          if (!first) first = { index: m.index, len: m[0].length };
+          count++;
         }
+        return { clean, first, count };
       };
 
-      // Matches exact render order of h1 + renderDocumentBlocks()
-      scanText(target.title, '标题');
+      const buildExcerpt = (clean, first) => {
+        const start = Math.max(0, first.index - 26);
+        const end = Math.min(clean.length, first.index + first.len + 74);
+        return (start > 0 ? '…' : '') + clean.slice(start, end) + (end < clean.length ? '…' : '');
+      };
 
-      let currentHeading = '正文';
+      // 1. Title (always advance hitIdx to stay aligned with right-hand reader h1)
+      const titleScan = countAndFirstMatch(target.title);
+      const titleHit = titleScan.count > 0;
+      hitIdx += titleScan.count;
+
+      if (effectiveField === 'title') {
+        return { titleHit, items: [], matchedTags: [], matchedAliases: [], capped: false };
+      }
+
+      // 2. Blocks (1 deduplicated evidence row per block / table row / attachment / OCR / PDF page)
+      let currentHeading = '';
       let tableNum = 0;
       (target.blocks || []).forEach(block => {
         if (block.type === 'h2') {
-          currentHeading = (block.text || '').slice(0, 14);
-          scanText(block.text, '章节');
-        } else if (block.type === 'callout') {
-          scanText(block.text, '提示');
+          currentHeading = String(block.text || '').trim();
+          const s = countAndFirstMatch(block.text);
+          if (s.count > 0) {
+            const pageBadge = block.pageNumber ? `PDF P.${String(block.pageNumber).padStart(2, '0')}` : '章节';
+            items.push({
+              hitIndex: hitIdx,
+              kind: block.pageNumber ? 'pdf' : 'heading',
+              badge: pageBadge,
+              eyebrow: '',
+              excerpt: s.clean
+            });
+          }
+          hitIdx += s.count;
+          return;
+        }
+
+        if (effectiveField === 'heading') {
+          // Still advance hitIdx for non-heading blocks so indices remain aligned if rendered
+          if (block.type === 'table') {
+            (block.headers || []).forEach(h => { hitIdx += countAndFirstMatch(h).count; });
+            (block.rows || []).forEach(row => row.forEach(cell => { hitIdx += countAndFirstMatch(cell).count; }));
+          } else if (block.type === 'attachments') {
+            (block.items || []).forEach(att => { hitIdx += countAndFirstMatch(att.name).count; });
+          } else {
+            hitIdx += countAndFirstMatch(block.text || '').count;
+          }
+          return;
+        }
+
+        if (block.type === 'callout') {
+          const s = countAndFirstMatch(block.text);
+          if (s.count > 0) {
+            items.push({ hitIndex: hitIdx, kind: 'callout', badge: '提示', eyebrow: '', excerpt: buildExcerpt(s.clean, s.first) });
+          }
+          hitIdx += s.count;
+        } else if (block.type === 'ocr') {
+          const s = countAndFirstMatch(block.text);
+          if (s.count > 0) {
+            items.push({
+              hitIndex: hitIdx,
+              kind: 'ocr',
+              badge: '图片文字',
+              eyebrow: block.sourceTitle || '图片附件',
+              excerpt: buildExcerpt(s.clean, s.first)
+            });
+          }
+          hitIdx += s.count;
         } else if (block.type === 'table') {
           tableNum++;
           const tblLabel = `表 ${tableNum}`;
-          (block.headers || []).forEach(h => scanText(h, tblLabel));
+          (block.headers || []).forEach(h => {
+            const s = countAndFirstMatch(h);
+            if (s.count > 0) {
+              items.push({ hitIndex: hitIdx, kind: 'table', badge: tblLabel, eyebrow: currentHeading, excerpt: s.clean });
+            }
+            hitIdx += s.count;
+          });
           (block.rows || []).forEach((row, rIdx) => {
-            row.forEach(cell => scanText(cell, `${tblLabel}·行${rIdx + 1}`));
+            let rowFirstHit = null;
+            const rowText = row.join(' · ');
+            row.forEach(cell => {
+              const s = countAndFirstMatch(cell);
+              if (s.count > 0 && rowFirstHit === null) rowFirstHit = hitIdx;
+              hitIdx += s.count;
+            });
+            if (rowFirstHit !== null) {
+              const rs = countAndFirstMatch(rowText);
+              items.push({
+                hitIndex: rowFirstHit,
+                kind: 'table',
+                badge: `${tblLabel}·行${rIdx + 1}`,
+                eyebrow: currentHeading,
+                excerpt: rs.first ? buildExcerpt(rs.clean, rs.first) : rowText
+              });
+            }
           });
         } else if (block.type === 'attachments') {
-          (block.items || []).forEach(att => scanText(att.name, '附件'));
+          (block.items || []).forEach(att => {
+            const s = countAndFirstMatch(att.name);
+            if (s.count > 0) {
+              items.push({ hitIndex: hitIdx, kind: 'attachment', badge: '附件名', eyebrow: '', excerpt: s.clean });
+            }
+            hitIdx += s.count;
+          });
         } else {
-          scanText(block.text || '', currentHeading);
+          const s = countAndFirstMatch(block.text || '');
+          if (s.count > 0) {
+            const isPdf = Boolean(block.pageNumber);
+            items.push({
+              hitIndex: hitIdx,
+              kind: isPdf ? 'pdf' : 'body',
+              badge: isPdf ? `PDF P.${String(block.pageNumber).padStart(2, '0')}` : null,
+              eyebrow: currentHeading,
+              excerpt: buildExcerpt(s.clean, s.first)
+            });
+          }
+          hitIdx += s.count;
         }
       });
 
-      return hits;
+      const matchedTags = effectiveField === 'all'
+        ? (target.tags || []).filter(t => textMatchesAnyTerm(t, terms))
+        : [];
+      const matchedAliases = effectiveField === 'all'
+        ? (target.aliases || []).filter(a => textMatchesAnyTerm(a, terms))
+        : [];
+
+      const capped = items.length > 5;
+      return { titleHit, items: items.slice(0, 5), matchedTags, matchedAliases, capped };
     }
 
     function getFilteredDocs() {
       const parsed = parseSearchQuery(state.searchQuery);
-      const q = parsed.keyword.toLowerCase();
+      const terms = resolveSearchTerms(parsed.keyword);
       const effectiveField = parsed.inlineField || state.searchField;
 
       return DOCUMENTS.filter(doc => {
@@ -2723,14 +2915,15 @@
         if (parsed.inlineFolder && !(doc.folderName || '').toLowerCase().includes(parsed.inlineFolder)) return false;
         if (state.searchFolder !== 'all' && doc.folderName !== state.searchFolder) return false;
 
-        if (!q) return true;
-        const titleHit = doc.title.toLowerCase().includes(q);
+        if (!terms.length) return true;
+        const titleHit = textMatchesAllTerms(doc.title, terms);
         if (effectiveField === 'title') return titleHit;
-        const headingHit = getDocHeadingsText(doc).toLowerCase().includes(q);
+        const headingHit = textMatchesAllTerms(doc.title + ' ' + getDocHeadingsText(doc), terms);
         if (effectiveField === 'heading') return titleHit || headingHit;
 
-        const selfMatch = titleHit || doc.snippet.toLowerCase().includes(q) || doc.tags.some(t => t.toLowerCase().includes(q)) || getDocPlainText(doc).toLowerCase().includes(q);
-        const subMatch = (doc.subpages || []).some(sp => sp.title.toLowerCase().includes(q) || sp.snippet.toLowerCase().includes(q) || getDocPlainText(sp).toLowerCase().includes(q));
+        const selfCorpus = [doc.title, ...(doc.tags || []), ...(doc.aliases || []), getDocPlainText(doc)].join(' ');
+        const selfMatch = textMatchesAllTerms(selfCorpus, terms);
+        const subMatch = (doc.subpages || []).some(sp => textMatchesAllTerms(sp.title + ' ' + getDocPlainText(sp), terms));
         return selfMatch || subMatch;
       });
     }
@@ -2945,6 +3138,14 @@
               <span class="font-mono-eng text-[11px] ml-0.5 whitespace-nowrap shrink-0" style="color:var(--ink-tertiary)">${q ? `${filtered.length} 篇 · 9ms` : `${filtered.length} 篇`}</span>
             </div>
 
+            <div class="flex items-center gap-1.5 flex-wrap text-[11px]">
+              <span style="color:var(--ink-tertiary)">示例：</span>
+              ${SEARCH_DEMO_PRESETS.map(p => {
+                const active = state.searchQuery.trim().toLowerCase() === p.query.toLowerCase();
+                return `<button class="px-2 py-0.5 rounded-full transition-colors cursor-pointer ${active ? 'font-medium' : 'hover:bg-black/5'}" data-demo-query="${escapeHtml(p.query)}" title="${escapeHtml(p.hint)}" style="background:${active ? 'var(--bg-active)' : 'var(--bg-subtle)'}; color:${active ? 'var(--accent)' : 'var(--ink-secondary)'}">${escapeHtml(p.label)}</button>`;
+              }).join('')}
+            </div>
+
             ${activeChips.length > 0 ? `
               <div class="flex items-center gap-1.5 flex-wrap animate-view">
                 ${activeChips.map(ch => `
@@ -2985,60 +3186,157 @@
                   `).join('')}
                 </div>
               ` : `
-                <div class="inset-group">
+                <div class="space-y-2.5">
                   ${filtered.map(doc => {
                     const lib = getLib(doc.library);
                     const isSel = doc.id === state.selectedDocId && !state.activeSubpageId;
-                    const matchedSubs = (doc.subpages || []).filter(sp => !q || sp.title.toLowerCase().includes(q.toLowerCase()) || sp.snippet.toLowerCase().includes(q.toLowerCase()) || getDocPlainText(sp).toLowerCase().includes(q.toLowerCase()));
-                    const subsExpanded = state.expandedSubpages.has(doc.id);
+                    const effectiveField = parsed.inlineField || state.searchField;
+                    const terms = resolveSearchTerms(q);
+                    const evidence = q ? extractTargetEvidence(doc, q, effectiveField) : { titleHit: false, items: [], matchedTags: [], matchedAliases: [], capped: false };
+                    const matchedSubs = (effectiveField === 'all' && terms.length)
+                      ? (doc.subpages || []).map(sp => {
+                          const spEv = extractTargetEvidence(sp, q, 'all');
+                          const spMatches = spEv.titleHit || spEv.items.length > 0;
+                          return spMatches ? { sp, ev: spEv } : null;
+                        }).filter(Boolean)
+                      : (!q ? (doc.subpages || []).map(sp => ({ sp, ev: { titleHit: false, items: [] } })) : []);
 
-                    const docHitsList = q ? extractTargetHits(doc, q) : [];
-                    const bodyHits = docHitsList.filter(h => h.anchorLabel !== '标题');
-                    const displayHits = bodyHits.length > 0 ? bodyHits : docHitsList;
-                    const hitsExpanded = state.expandedHits.has(doc.id);
-                    const visibleHits = hitsExpanded ? displayHits : displayHits.slice(0, 1);
+                    const expanded = state.expandedHits.has(doc.id);
+                    const DEFAULT_VISIBLE = 2;
+                    const visibleItems = expanded ? evidence.items : evidence.items.slice(0, DEFAULT_VISIBLE);
+                    const extraItemsCount = Math.max(0, evidence.items.length - DEFAULT_VISIBLE);
+                    const parentDirectlyMatched = evidence.titleHit || evidence.items.length > 0 || evidence.matchedTags.length > 0 || evidence.matchedAliases.length > 0;
+                    const showSubsDirectly = Boolean(q && !parentDirectlyMatched && matchedSubs.length > 0);
+                    const showSubsSection = matchedSubs.length > 0 && (expanded || showSubsDirectly || (!q && state.expandedSubpages.has(doc.id)));
+
+                    // Honest status badge (no fake full-text count)
+                    const statusParts = [];
+                    if (q) {
+                      if (effectiveField === 'title') {
+                        statusParts.push('仅标题命中');
+                      } else if (evidence.items.length > 0) {
+                        statusParts.push(expanded ? `本页 ${evidence.items.length} 段${evidence.capped ? '+' : ''}` : `显示 ${visibleItems.length} 段`);
+                      } else if (evidence.matchedTags.length || evidence.matchedAliases.length) {
+                        statusParts.push('标签/别名命中');
+                      } else if (evidence.titleHit) {
+                        statusParts.push('仅标题命中');
+                      }
+                      if (matchedSubs.length > 0) {
+                        statusParts.push(`另有 ${matchedSubs.length} 篇子页`);
+                      }
+                    }
+
+                    const renderEvidenceRow = (hit, prevEyebrow, onClickAttr, activeRow) => {
+                      const showEyebrow = hit.eyebrow && hit.eyebrow !== prevEyebrow;
+                      const badgeHtml = hit.badge
+                        ? `<span class="font-mono-eng text-[10px] font-medium px-1.5 py-[1px] rounded shrink-0" style="${EVIDENCE_BADGE_STYLES[hit.kind] || EVIDENCE_BADGE_STYLES.heading}">${escapeHtml(hit.badge)}</span>`
+                        : '';
+                      return `
+                        <button class="group w-full text-left px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer relative ${activeRow ? '' : 'hover:bg-black/[0.035]'}" ${onClickAttr} style="background:${activeRow ? 'rgba(0,122,255,0.075)' : 'transparent'}; border-left:2px solid ${activeRow ? 'var(--accent)' : 'transparent'}">
+                          ${(badgeHtml || showEyebrow) ? `
+                            <div class="flex items-center gap-1.5 mb-0.5 min-w-0">
+                              ${badgeHtml}
+                              ${showEyebrow ? `<span class="text-[10.5px] font-medium truncate" style="color:var(--ink-tertiary)">${escapeHtml(hit.eyebrow)}</span>` : ''}
+                            </div>
+                          ` : ''}
+                          <div class="flex items-start gap-2">
+                            <span class="text-[12px] leading-[1.55] line-clamp-2 flex-1" style="color:var(--ink-secondary)">${highlightSnippet(hit.excerpt, q)}</span>
+                            <span class="text-[11px] shrink-0 mt-0.5 transition-opacity ${activeRow ? 'opacity-100' : 'opacity-0 group-hover:opacity-65'}" style="color:var(--accent)" aria-hidden="true">↗</span>
+                          </div>
+                        </button>
+                      `;
+                    };
+
+                    const hasMoreToToggle = q && (extraItemsCount > 0 || (matchedSubs.length > 0 && !showSubsDirectly));
+                    const toggleLabelParts = [];
+                    if (extraItemsCount > 0) toggleLabelParts.push(`其余 ${extraItemsCount} 段${evidence.capped ? '+' : ''}`);
+                    if (matchedSubs.length > 0 && !showSubsDirectly) toggleLabelParts.push(`${matchedSubs.length} 篇子页`);
 
                     return `
-                      <div class="inset-row px-3.5 py-3 cursor-pointer ${isSel ? 'selected' : ''}" data-doc-id="${doc.id}">
+                      <div class="paper-sheet px-3.5 py-3 cursor-pointer transition-all" data-doc-id="${doc.id}" style="border-radius:12px; border-color:${isSel ? 'rgba(0,122,255,0.35)' : 'var(--hairline)'}; box-shadow:${isSel ? '0 0 0 1px rgba(0,122,255,0.12), var(--card-shadow)' : 'var(--card-shadow)'}">
                         <div class="flex items-center justify-between gap-2 mb-1">
-                          <span class="inline-flex items-center gap-1.5 text-[11px] font-medium" style="color:var(--ink-secondary)">
-                            <span class="w-1.5 h-1.5 rounded-full" style="background:${lib.color}"></span>
-                            ${lib.short}
-                            ${docHitsList.length > 0 ? `<span class="font-mono-eng text-[10px] px-1.5 py-0.5 rounded" style="background:var(--bg-subtle); color:var(--ink-tertiary)">${docHitsList.length} 处命中</span>` : ''}
+                          <span class="inline-flex items-center gap-1.5 text-[11px] font-medium min-w-0" style="color:var(--ink-secondary)">
+                            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:${lib.color}"></span>
+                            <span class="shrink-0">${lib.short}</span>
+                            ${statusParts.length ? `<span class="font-mono-eng text-[10px] px-1.5 py-0.5 rounded truncate" style="background:var(--bg-subtle); color:var(--ink-tertiary)">${statusParts.join(' · ')}</span>` : ''}
                           </span>
-                          <div class="flex items-center gap-1.5">
+                          <div class="flex items-center gap-1.5 shrink-0">
                             <button class="hover-reveal icon-btn !w-5 !h-5 ${doc.favorite ? '!opacity-100 active' : ''}" data-row-fav="${doc.id}" title="收藏"><i data-lucide="star" class="w-3 h-3"></i></button>
                             <span class="font-mono-eng text-[10.5px]" style="color:var(--ink-tertiary)">${doc.updated}</span>
                           </div>
                         </div>
                         <div class="text-[13.5px] font-medium leading-snug mb-1.5">${highlightSnippet(doc.title, q)}</div>
 
-                        ${q && displayHits.length > 0 ? `
-                          <div class="space-y-1">
-                            ${visibleHits.map(hit => {
-                              const isActiveHit = isSel && state.inDocHitIndex === hit.hitIndex;
-                              return `
-                                <button class="w-full text-left px-2 py-1.5 rounded-lg flex items-start gap-2 transition-colors cursor-pointer ${isActiveHit ? '' : 'hover:bg-black/5'}" data-jump-doc-hit="${doc.id}|${hit.hitIndex}" style="background:${isActiveHit ? 'rgba(0,122,255,0.09)' : 'rgba(15,23,42,0.025)'}">
-                                  <span class="font-mono-eng text-[10px] px-1.5 py-0.5 rounded shrink-0 mt-0.5" style="background:var(--bg-paper); border:0.5px solid var(--hairline); color:${isActiveHit ? 'var(--accent)' : 'var(--ink-tertiary)'}">${escapeHtml(hit.anchorLabel)}</span>
-                                  <span class="text-[12px] leading-relaxed line-clamp-2 flex-1" style="color:var(--ink-secondary)">${highlightSnippet(hit.excerpt, q)}</span>
-                                </button>
-                              `;
-                            }).join('')}
-                            ${displayHits.length > 1 ? `
-                              <button class="inline-flex items-center gap-1 px-1 py-0.5 text-[11px] font-medium cursor-pointer hover:underline" style="color:var(--ink-tertiary)" data-toggle-hits="${doc.id}">
-                                <i data-lucide="${hitsExpanded ? 'chevron-up' : 'chevron-down'}" class="w-3 h-3"></i>
-                                <span>${hitsExpanded ? '收起命中段落' : `展开其余 ${displayHits.length - 1} 处命中`}</span>
-                              </button>
-                            ` : ''}
-                          </div>
-                        ` : `
-                          <div class="text-[12px] line-clamp-2 leading-relaxed" style="color:var(--ink-secondary)">${highlightSnippet(doc.snippet, q)}</div>
+                        ${q ? (
+                          effectiveField === 'title' ? `
+                            <div class="text-[11px]" style="color:var(--ink-tertiary)">匹配范围：仅标题（已隐藏正文与子页证据）</div>
+                          ` : (
+                            visibleItems.length > 0 ? `
+                              <div class="space-y-0.5 -mx-1">
+                                ${visibleItems.map((hit, idx) => {
+                                  const prevEyebrow = idx > 0 ? visibleItems[idx - 1].eyebrow : '';
+                                  const isActiveHit = isSel && state.inDocHitIndex === hit.hitIndex;
+                                  return renderEvidenceRow(hit, prevEyebrow, `data-jump-doc-hit="${doc.id}|${hit.hitIndex}"`, isActiveHit);
+                                }).join('')}
+                              </div>
+                            ` : (evidence.matchedTags.length || evidence.matchedAliases.length) ? `
+                              <div class="flex items-center flex-wrap gap-1.5 pt-0.5">
+                                ${evidence.matchedTags.map(t => `<span class="font-mono-eng text-[10.5px] px-2 py-0.5 rounded-md" style="${EVIDENCE_BADGE_STYLES.tag}">命中标签 #${highlightSnippet(t, q)}</span>`).join('')}
+                                ${evidence.matchedAliases.map(a => `<span class="text-[10.5px] px-2 py-0.5 rounded-md" style="${EVIDENCE_BADGE_STYLES.alias}">命中别名：${highlightSnippet(a, q)}</span>`).join('')}
+                              </div>
+                            ` : showSubsDirectly ? `
+                              <div class="text-[11px] mb-1" style="color:var(--ink-tertiary)">父页未直接命中 · 以下来自关联子页</div>
+                            ` : `
+                              <div class="text-[11px]" style="color:var(--ink-tertiary)">仅标题命中，正文无匹配片段</div>
+                            `
+                          )
+                        ) : `
+                          <div class="text-[12px] line-clamp-2 leading-relaxed" style="color:var(--ink-secondary)">${escapeHtml(doc.snippet)}</div>
                         `}
 
-                        ${matchedSubs.length > 0 ? `
-                          <div class="mt-2.5 pt-2 hairline-t">
-                            <button class="inline-flex items-center gap-1 text-[11.5px] font-medium cursor-pointer hover:underline" style="color:var(--accent)" data-toggle-subs="${doc.id}"><i data-lucide="${subsExpanded ? 'chevron-down' : 'chevron-right'}" class="w-3.5 h-3.5"></i><span>${subsExpanded ? `收起 ${matchedSubs.length} 篇关联子页面` : `展开其余 ${matchedSubs.length} 项子页面`}</span></button>
-                            ${subsExpanded ? `<div class="mt-2 pl-3 space-y-1.5" style="border-left:1.5px solid var(--hairline-strong)">${matchedSubs.map(sp => { const subSel = state.selectedDocId === doc.id && state.activeSubpageId === sp.id; return `<div class="px-2.5 py-1.5 rounded-lg cursor-pointer" data-sub-parent="${doc.id}" data-sub-id="${sp.id}" style="background:${subSel ? 'var(--bg-active)' : 'var(--bg-surface)'}"><div class="text-[12.5px] font-medium truncate" style="color:${subSel ? 'var(--accent)' : 'var(--ink-primary)'}">${highlightSnippet(sp.title, q)}</div><div class="text-[11.5px] line-clamp-1 mt-0.5" style="color:var(--ink-secondary)">${highlightSnippet(sp.snippet, q)}</div></div>`; }).join('')}</div>` : ''}
+                        ${showSubsSection ? `
+                          <div class="mt-2 pt-2 hairline-t space-y-1">
+                            <div class="flex items-center justify-between text-[10.5px] font-medium px-1" style="color:var(--ink-tertiary)">
+                              <span>关联子页 (${matchedSubs.length})</span>
+                              ${!q ? `<button class="hover:underline cursor-pointer" data-toggle-subs="${doc.id}">收起</button>` : ''}
+                            </div>
+                            <div class="pl-2.5 space-y-1" style="border-left:1.5px solid var(--hairline-strong)">
+                              ${matchedSubs.map(({ sp, ev }) => {
+                                const subSel = state.selectedDocId === doc.id && state.activeSubpageId === sp.id;
+                                const firstSubHit = ev.items[0];
+                                const jumpIdx = firstSubHit ? firstSubHit.hitIndex : 0;
+                                return `
+                                  <button class="group w-full text-left px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${subSel ? '' : 'hover:bg-black/[0.035]'}" data-jump-sub-hit="${doc.id}|${sp.id}|${jumpIdx}" style="background:${subSel ? 'rgba(0,122,255,0.075)' : 'transparent'}">
+                                    <div class="flex items-center justify-between gap-2">
+                                      <span class="text-[12px] font-medium truncate" style="color:${subSel ? 'var(--accent)' : 'var(--ink-primary)'}">${highlightSnippet(sp.title, q)}</span>
+                                      <span class="text-[10.5px] shrink-0 opacity-0 group-hover:opacity-65" style="color:var(--accent)">↗</span>
+                                    </div>
+                                    ${firstSubHit ? `
+                                      <div class="text-[11.5px] leading-relaxed line-clamp-2 mt-0.5" style="color:var(--ink-secondary)">${firstSubHit.badge ? `<span class="font-mono-eng text-[9.5px] px-1 py-[0.5px] rounded mr-1" style="${EVIDENCE_BADGE_STYLES[firstSubHit.kind] || EVIDENCE_BADGE_STYLES.heading}">${escapeHtml(firstSubHit.badge)}</span>` : ''}${highlightSnippet(firstSubHit.excerpt, q)}</div>
+                                    ` : `
+                                      <div class="text-[11px] mt-0.5" style="color:var(--ink-tertiary)">${q ? '子页标题命中' : escapeHtml(sp.snippet)}</div>
+                                    `}
+                                  </button>
+                                `;
+                              }).join('')}
+                            </div>
+                          </div>
+                        ` : ''}
+
+                        ${hasMoreToToggle ? `
+                          <div class="mt-2 pt-1.5 hairline-t flex items-center justify-between">
+                            <button class="inline-flex items-center gap-1 text-[11px] font-medium cursor-pointer hover:underline" style="color:var(--ink-tertiary)" data-toggle-hits="${doc.id}">
+                              <i data-lucide="${expanded ? 'chevron-up' : 'chevron-down'}" class="w-3 h-3"></i>
+                              <span>${expanded ? '收起其余命中与子页' : `展开 ${toggleLabelParts.join(' · ')}`}</span>
+                            </button>
+                            ${expanded && evidence.capped ? `<span class="font-mono-eng text-[10px]" style="color:var(--ink-muted)">最多展示 5 段</span>` : ''}
+                          </div>
+                        ` : (!q && matchedSubs.length > 0 && !showSubsSection) ? `
+                          <div class="mt-2 pt-1.5 hairline-t">
+                            <button class="inline-flex items-center gap-1 text-[11px] font-medium cursor-pointer hover:underline" style="color:var(--accent)" data-toggle-subs="${doc.id}">
+                              <i data-lucide="chevron-right" class="w-3 h-3"></i>
+                              <span>展开 ${matchedSubs.length} 篇子页面</span>
+                            </button>
                           </div>
                         ` : ''}
                       </div>
@@ -3183,11 +3481,28 @@
         renderMain();
       }));
 
+      stage.querySelectorAll('[data-demo-query]').forEach(b => b.addEventListener('click', () => {
+        state.searchQuery = b.dataset.demoQuery;
+        state.inDocHitIndex = 0;
+        state.activeSubpageId = null;
+        renderMain();
+      }));
+
       stage.querySelectorAll('[data-jump-doc-hit]').forEach(b => b.addEventListener('click', e => {
         e.stopPropagation();
         const [docId, hitIdxStr] = b.dataset.jumpDocHit.split('|');
         state.selectedDocId = docId;
         state.activeSubpageId = null;
+        state.inDocHitIndex = Number(hitIdxStr) || 0;
+        renderMain();
+        scrollAndPulseHit(state.inDocHitIndex);
+      }));
+
+      stage.querySelectorAll('[data-jump-sub-hit]').forEach(b => b.addEventListener('click', e => {
+        e.stopPropagation();
+        const [docId, subId, hitIdxStr] = b.dataset.jumpSubHit.split('|');
+        state.selectedDocId = docId;
+        state.activeSubpageId = subId;
         state.inDocHitIndex = Number(hitIdxStr) || 0;
         renderMain();
         scrollAndPulseHit(state.inDocHitIndex);
