@@ -157,7 +157,7 @@ it("keeps an unsaved feedback draft and the current discovery while masking cont
  const area=document.querySelector<HTMLTextAreaElement>('textarea[aria-label="你的补充"]')!;
  await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value")!.set!.call(area,"未保存的验证范围补充");area.dispatchEvent(new Event("input",{bubbles:true}));});
  await act(async()=>window.dispatchEvent(new Event("focus")));
- expect(document.querySelector('dialog[aria-label="发现与依据"]')).not.toBeNull();
+ expect(document.querySelector('section[aria-label="发现与依据"]')).not.toBeNull();
  expect(document.body.textContent).not.toContain("本周已完成原型验证。");
  expect(document.body.textContent).toContain("未保存的补充已暂时保留");
  await act(async()=>vi.advanceTimersByTimeAsync(160));
@@ -229,7 +229,7 @@ it("reports confirmed partial saves if a later selection has an unknown result",
 
 it("saves manual replacement links without completing or changing the original discovery",async()=>{
  const old=item("old"),fresh=item("fresh");old.processingState="done";old.snapshot!.text="需要保留的原发现。";fresh.snapshot!.text="拆分后单独保存的新发现。";store.items=[old,fresh];
- await mount();await click("查看发现");await act(async()=>{const section=document.querySelector<HTMLDetailsElement>(".insights-relations")!;section.open=true;section.dispatchEvent(new Event("toggle"));});const choice=document.querySelector<HTMLInputElement>('input[aria-label="替代：需要保留的原发现。"]')!;expect(choice).not.toBeNull();await act(async()=>choice.click());expect(button("保存替代关系").disabled).toBe(true);
+ await mount();await act(async()=>host.querySelector<HTMLButtonElement>('button[aria-label="拆分后单独保存的新发现。"]')!.click());await act(async()=>{const section=document.querySelector<HTMLDetailsElement>(".insights-relations")!;section.open=true;section.dispatchEvent(new Event("toggle"));});const choice=document.querySelector<HTMLInputElement>('input[aria-label="替代：需要保留的原发现。"]')!;expect(choice).not.toBeNull();await act(async()=>choice.click());expect(button("保存替代关系").disabled).toBe(true);
  const confirm=[...document.querySelectorAll<HTMLLabelElement>('.insights-relations label')].find(label=>label.textContent?.includes("我已核对这些发现"))!.querySelector<HTMLInputElement>('input')!;await act(async()=>confirm.click());await click("保存替代关系");
  expect(invoke.mock.calls.find(([,v])=>v.args.action==="insightRelate")?.[1].args).toMatchObject({insightId:"fresh",expectedRevision:1,supersedes:["old"]});expect(old.processingState).toBe("done");expect(old.headRevision).toBe(1);expect(fresh.headRevision).toBe(1);expect(fresh.supersedes).toEqual(["old"]);expect(document.querySelector('.insights-relations')!.textContent).toContain("1 条");
 });
@@ -280,7 +280,7 @@ it("persists stars separately and enables the real history and public cases",asy
  await act(async()=>[...host.querySelectorAll<HTMLButtonElement>("nav button")].find(b=>b.textContent?.startsWith("真实案例"))!.click());expect(host.textContent).toContain("五个由公开文档支持");expect(store.items).toHaveLength(1);expect(invoke.mock.calls.some(([,v])=>v.args.action==="run")).toBe(false);
 });
 it("preserves feedback while navigating adjacent findings and changing focus",async()=>{
- const second=item("two");second.snapshot!.text="第二条不同发现";store.items.push(second);await mount();await click("查看发现");const input=document.querySelector<HTMLTextAreaElement>('[aria-label="你的补充"]')!;await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value")!.set!.call(input,"还没保存的纠正");input.dispatchEvent(new Event("input",{bubbles:true}));});await click("下一条");await click("上一条");expect(document.querySelector<HTMLTextAreaElement>('[aria-label="你的补充"]')!.value).toBe("还没保存的纠正");await click("专注阅读");expect(document.body.textContent).toContain("退出专注");
+ const second=item("two");second.updatedAt=store.items[0].updatedAt-1;second.snapshot!.text="第二条不同发现";store.items.push(second);await mount();await click("查看发现");const input=document.querySelector<HTMLTextAreaElement>('[aria-label="你的补充"]')!;await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value")!.set!.call(input,"还没保存的纠正");input.dispatchEvent(new Event("input",{bubbles:true}));});await click("下一条");await click("上一条");expect(document.querySelector<HTMLTextAreaElement>('[aria-label="你的补充"]')!.value).toBe("还没保存的纠正");await click("专注阅读");expect(document.body.textContent).toContain("退出专注");
 });
 it("prepares explicit task comparison without starting a model or changing the task",async()=>{
  await mount();await click("寻找旧知识");const work=document.querySelector<HTMLSelectElement>('[aria-label="原事项"]')!;await act(async()=>{work.value="work-a";work.dispatchEvent(new Event("change",{bubbles:true}));});const mode=document.querySelector<HTMLSelectElement>('[aria-label="核对方式"]')!;await act(async()=>{mode.value="status";mode.dispatchEvent(new Event("change",{bubbles:true}));});const task=document.querySelector<HTMLSelectElement>('[aria-label="核对的任务"]')!;await act(async()=>{task.selectedIndex=1;task.dispatchEvent(new Event("change",{bubbles:true}));});const question=document.querySelector<HTMLInputElement>('.insights-recall input[type="text"]')!;await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(question,"验证完成了吗？");question.dispatchEvent(new Event("input",{bubbles:true}));});await click("保存问题并打开原事项");expect(invoke.mock.calls.find(([,v])=>v.args.action==="insightAnalysisPrepare")?.[1].args).toMatchObject({mode:"status",task:{kind:"task",sourceId:"t1"},expectedRevision:2});expect(openWork).toHaveBeenCalledWith({workId:"work-a"});expect(invoke.mock.calls.some(([,v])=>["run","respond","resume","updateTask"].includes(v.args.action))).toBe(false);
@@ -323,6 +323,9 @@ it("uses the finding body for a sectioned card heading without changing the stor
  store.items[0].snapshot!.text=raw;await mount();
  expect(host.querySelector('.insights-card h2')!.textContent).toBe("先核对常用目录的深度。");
  expect(host.querySelector('.insights-card-summary')!.textContent).toContain("模板是理想目标");
+ await click("查看发现");
+ expect(host.querySelector(".insights-finding-heading")!.textContent).toBe("先核对常用目录的深度。");
+ expect(host.querySelector(".insights-finding-text")!.textContent).toContain("用于日常工作区。");
  expect(store.items[0].snapshot!.text).toBe(raw);
 });
 
@@ -331,4 +334,45 @@ it("preserves card menu identity during focus refresh while hiding stale evidenc
  await act(async()=>window.dispatchEvent(new Event("focus")));
  expect(document.querySelector('.insights-card-menu')).toBe(menu);expect(menu.open).toBe(true);expect(document.body.textContent).not.toContain("本周已完成原型验证。");expect(document.body.textContent).toContain("正在核对依据");
  await act(async()=>vi.advanceTimersByTimeAsync(160));expect(document.querySelector('.insights-card-menu')).toBe(menu);expect(menu.open).toBe(true);
+});
+
+it("opens a native finding from the property table and rechecks its quoted source",async()=>{
+ await mount();
+ await click("查看发现");
+ await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="全宽属性表格"]')!.click());
+ expect(host.querySelector(".insights-table")?.textContent).toContain("依据已核对");
+ expect(host.querySelector('section[aria-label="发现与依据"]')).toBeNull();
+ await act(async()=>host.querySelector<HTMLButtonElement>(".insights-table-open")!.click());
+ expect(host.querySelector('section[aria-label="发现与依据"]')).not.toBeNull();
+ await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="原文引文核对"]')!.click());
+ await click("查看引用原文");
+ expect(host.querySelector('[aria-label="引用定位"]')).not.toBeNull();
+ expect(invoke.mock.calls.find(([,value])=>value.args.action==="insightSource")?.[1].args).toMatchObject({insightId:"one",revision:1,sourceIndex:0});
+ expect(invoke.mock.calls.every(([,value])=>["insightList","insightDetail","insightSource"].includes(value.args.action))).toBe(true);
+ await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="关闭核对抽屉"]')!.click());
+ await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="关闭详情"]')!.click());
+ expect(host.querySelector(".insights-table")).not.toBeNull();
+ expect(host.querySelector("[class*=insights-inline-detail]")).toBeNull();
+});
+
+it("stops a batch on an uncertain write and keeps the native operation receipt",async()=>{
+ const now=Date.now();
+ store.items=[item("one"),item("two"),item("three")].map((finding,index)=>({...finding,updatedAt:now-index}));
+ const normal=invoke.getMockImplementation()!;
+ invoke.mockImplementation(async(command,request)=>{
+  if(request.args.action==="insightStatus"&&request.args.insightId==="two")throw Error("reply lost");
+  return normal(command,request);
+ });
+ await mount();
+ await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="全宽属性表格"]')!.click());
+ await act(async()=>host.querySelector<HTMLInputElement>('[aria-label="选择当前可操作发现"]')!.click());
+ await click("批量标为已处理");
+ const writes=invoke.mock.calls.filter(([,request])=>request.args.action==="insightStatus").map(([,request])=>request.args);
+ expect(writes.map(request=>request.insightId)).toEqual(["one","two"]);
+ expect(writes.map(request=>request.expectedRevision)).toEqual([1,1]);
+ expect(store.items[0].processingState).toBe("done");
+ expect(store.items[2].processingState).toBe("attention");
+ expect(JSON.parse(userProfileStorage.getItem("hub.insights.pending-write.v1")!).operationId).toBe(writes[1].operationId);
+ expect(host.textContent).toContain("已确认 1 / 3 条");
+ expect(button("批量标为已处理").disabled).toBe(true);
 });
