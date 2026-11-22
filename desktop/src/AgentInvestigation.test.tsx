@@ -252,7 +252,7 @@ it("opens a quote in an independent assistant and preserves both chats when dock
   const resizeSide = document.querySelector(`.agent-panel-resizer[aria-controls="${side.id}"]`)!;
   await act(async () => resizeSide.dispatchEvent(new KeyboardEvent("keydown", {key:"ArrowLeft", bubbles:true})));
   expect(document.body.style.getPropertyValue("--agent-extra-panel-width")).toBe("450px");
-  expect(document.body.style.getPropertyValue("--agent-panel-width")).toBe("480px");
+  expect(document.body.style.getPropertyValue("--agent-panel-width")).toBe("510px");
   await click("关闭助手");
   expect(main.hidden).toBe(true);
   expect(side.hidden).toBe(false);
@@ -729,27 +729,27 @@ it("restores both dimensions in a newly mounted floating assistant and respects 
 });
 it("ignores invalid persisted panel dimensions without preventing the assistant from opening",async()=>{
  localStorage.setItem('hub.agent.panel.width.v1','NaN');localStorage.setItem('hub.agent.panel.height.v1','-20');
- const dock=await openResizeDock();expect(dock.width()).toBe(480);
- expect(Number.parseInt(document.body.style.getPropertyValue('--agent-panel-height'))).toBe(Math.max(320,window.innerHeight-64));
+ const dock=await openResizeDock();expect(dock.width()).toBe(460);
+ expect(Number.parseInt(document.body.style.getPropertyValue('--agent-panel-height'))).toBe(Math.max(320,window.innerHeight-24));
 });
 it("resizes the assistant from its divider, clamps to the viewport limits and releases the drag", async () => {
   const dock = await openResizeDock();
-  expect(dock.separator.getAttribute("aria-valuenow")).toBe("480");
+  expect(dock.separator.getAttribute("aria-valuenow")).toBe("460");
   await act(async () => dock.separator.dispatchEvent(resizePointer("pointerdown", 600)));
   await act(async () => window.dispatchEvent(resizePointer("pointermove", 400, 2)));
-  expect(dock.width()).toBe(480);
+  expect(dock.width()).toBe(460);
   await act(async () => window.dispatchEvent(resizePointer("pointermove", 400)));
-  expect(dock.width()).toBe(680);
+  expect(dock.width()).toBe(660);
   await openAddPage("更多设置");
-  expect(dock.separator.getAttribute("aria-valuenow")).toBe("680");
+  expect(dock.separator.getAttribute("aria-valuenow")).toBe("660");
   await act(async () => window.dispatchEvent(resizePointer("pointermove", 900)));
-  expect(dock.width()).toBe(180);
+  expect(dock.width()).toBe(160);
   await act(async () => window.dispatchEvent(resizePointer("pointerup", 900)));
   expect(document.body.classList.contains("resizing-agent-panel")).toBe(false);
   await act(async () => window.dispatchEvent(resizePointer("pointermove", 400)));
-  expect(dock.width()).toBe(180);
+  expect(dock.width()).toBe(160);
   await act(async () => dock.separator.dispatchEvent(new MouseEvent("dblclick", { bubbles: true })));
-  expect(dock.width()).toBe(480);
+  expect(dock.width()).toBe(460);
   expect(invoke.mock.calls.map(([, { args }]) => args.action).filter(action=>action!=="skills")).toEqual(["list", "list"]);
 });
 it("keeps divider, sliders and keyboard adjustment aligned when the viewport becomes narrower", async () => {
@@ -769,7 +769,7 @@ it("keeps divider, sliders and keyboard adjustment aligned when the viewport bec
   await act(async () => dock.separator.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", shiftKey: true, bubbles: true })));
   expect(dock.width()).toBe(40);
   await act(async () => dock.separator.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
-  expect(dock.width()).toBe(480);
+  expect(dock.width()).toBe(460);
 });
 it("ends a cancelled or closed divider drag without losing the conversation draft", async () => {
   const dock = await openResizeDock(); await fill("investigationGoal", "保留这条未发送草稿");
@@ -777,13 +777,13 @@ it("ends a cancelled or closed divider drag without losing the conversation draf
   await act(async () => window.dispatchEvent(resizePointer("pointermove", 560)));
   await act(async () => window.dispatchEvent(resizePointer("pointercancel", 560)));
   expect(document.body.classList.contains("resizing-agent-panel")).toBe(false);
-  expect(dock.width()).toBe(520);
+  expect(dock.width()).toBe(500);
   await act(async () => dock.separator.dispatchEvent(resizePointer("pointerdown", 600)));
   await click("关闭助手");
   expect(document.body.classList.contains("resizing-agent-panel")).toBe(false);
   await act(async () => window.dispatchEvent(resizePointer("pointermove", 400)));
   await click("调查这篇笔记");
-  expect(dock.width()).toBe(520);
+  expect(dock.width()).toBe(500);
   expect(document.body.querySelector<HTMLTextAreaElement>('[name="investigationGoal"]')!.value).toBe("保留这条未发送草稿");
   expect(invoke.mock.calls.some(([, { args }]) => args.action === "respond")).toBe(false);
 });
@@ -792,10 +792,10 @@ it("mirrors divider movement for an RTL preview", async () => {
   const dock = await openResizeDock();
   await act(async () => dock.separator.dispatchEvent(resizePointer("pointerdown", 600)));
   await act(async () => window.dispatchEvent(resizePointer("pointermove", 640)));
-  expect(dock.width()).toBe(520);
+  expect(dock.width()).toBe(500);
   await act(async () => window.dispatchEvent(resizePointer("pointerup", 640)));
   await act(async () => dock.separator.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })));
-  expect(dock.width()).toBe(530);
+  expect(dock.width()).toBe(510);
 });
 it("grants only explicitly selected extra documents across libraries before the first model run",async()=>{
  const fallback=invoke.getMockImplementation()!;

@@ -11,7 +11,7 @@ import { conversationTitle } from "./AgentConversationHistoryData";
 import { AgentAnswerSave, type AnswerSave } from "./AgentAnswerSave";
 import { AgentTaskMode } from "./AgentTaskMode";
 import { AgentDetailSummary } from "./AgentDetailSummary";
-import { Brain, Globe2, FolderBookmark, Layers, Tags } from "lucide-react";
+import { Brain, Globe2, FolderBookmark, Layers, Tags, Target } from "lucide-react";
 import { AgentScopeTrigger } from "./AgentScopeTrigger";
 import { useAgentLibraryRegistry, resolveAgentLibraries } from "./useAgentLibraryRegistry";
 import { AgentCitationPreview, type CitationLocation } from "./AgentCitationPreview";
@@ -81,7 +81,7 @@ type TaskLocator = { kind: "task"; libraryId: string; sourceId: string };
 type AttachmentLocator = { kind: "attachment"; libraryId: string; documentId: string; sourceItemId: string; chunkId: string; pageNumber: number };
 export type InvestigationLocator = NoteLocator | ReadingLocator | TaskLocator | AttachmentLocator;
 type ReportContinuation = { expectedWorkRevision:number; expectedAuthorizationVersion:number; artifactId:string; artifactRevision:number; expectedContentHash:string };
-type View = { conversationTitle?: string | null; goalMode?: {round:number;maximumRounds:number;stopReason?:string|null} | null; fileAnalyses?:FileAnalysis[]; answerSaves?:AnswerSave[];tagTasks?:TagTaskRecord[]; followups?:Followup[]; codexAccountBinding?:{scopeId:string;historyShared?:boolean}|null; nativeContext?:NativeContext|null; nativeInputs?: NativeInput[]; contextCompaction?:NativeCompaction; materialBudget?:MaterialBudget|null; workingState?: WorkingState; lifecycle?: Lifecycle; goalRevision?: GoalRevision; taskTree?: TaskTree; goalAssessment?: GoalAssessment; analysisArtifacts?: AnalysisChart[]; sleepDatasets?: SleepDatasetItem[]; activity?:ActivityRun[]; recordVersion?:number; assistantOptions?: AssistantOptions; draftRequest?: {runId:string;kind:string} | null; work: { id: string; anchor?:InvestigationLocator|null; actionTarget?:NoteLocator|null; actionTargetIdentity?:string; goal: string; revision?: number; authorizationVersion?: number; state: string; report: Report | null; grant: { images?:ImageGrant[]; libraryIds: string[]; notes?: NoteLocator[]; sources?:InvestigationLocator[]; readingItemKeys?:string[]; manifest?: {members:NoteLocator[];selection:SourceSelection;snapshot:string} } }; evidence: Evidence[]; decisions: { text: string; author: string }[]; run: { id?: string; error?: string; usage: { agentSessions?: number; modelCalls?: number; modelRetries?: number; outputRepairs?: number; entitiesRead?: number; bodyChars?: number; localScanDocuments?: number; localScanBytes?: number } } | null; validity: string; conversation?: Conversation; progress?: Progress | null; history?: HistoricalDelivery[]; runActive?: boolean; actionActive?: boolean; actions?: AgentActions; watch?: AgentCondition | null; memoryUse?: MemoryUse | null; modelSelection?: CodexSettings | null; modelExecutions?: ModelExecution[] };
+type View = { conversationTitle?: string | null; goalMode?: {round:number;maximumRounds:number;stopReason?:string|null} | null; fileAnalyses?:FileAnalysis[]; answerSaves?:AnswerSave[];tagTasks?:TagTaskRecord[]; followups?:Followup[]; codexAccountBinding?:{scopeId:string;historyShared?:boolean}|null; nativeContext?:NativeContext|null; nativeInputs?: NativeInput[]; contextCompaction?:NativeCompaction; materialBudget?:MaterialBudget|null; workingState?: WorkingState; lifecycle?: Lifecycle; goalRevision?: GoalRevision; taskTree?: TaskTree; goalAssessment?: GoalAssessment; analysisArtifacts?: AnalysisChart[]; sleepDatasets?: SleepDatasetItem[]; activity?:ActivityRun[]; recordVersion?:number; assistantOptions?: AssistantOptions; draftRequest?: {runId:string;kind:string} | null; work: { id: string; anchor?:InvestigationLocator|null; actionTarget?:NoteLocator|null; actionTargetIdentity?:string; goal: string; successCriteria?: string; revision?: number; authorizationVersion?: number; state: string; report: Report | null; grant: { images?:ImageGrant[]; libraryIds: string[]; notes?: NoteLocator[]; sources?:InvestigationLocator[]; readingItemKeys?:string[]; manifest?: {members:NoteLocator[];selection:SourceSelection;snapshot:string} } }; evidence: Evidence[]; decisions: { text: string; author: string }[]; run: { id?: string; error?: string; usage: { agentSessions?: number; modelCalls?: number; modelRetries?: number; outputRepairs?: number; entitiesRead?: number; bodyChars?: number; localScanDocuments?: number; localScanBytes?: number } } | null; validity: string; conversation?: Conversation; progress?: Progress | null; history?: HistoricalDelivery[]; runActive?: boolean; actionActive?: boolean; actions?: AgentActions; watch?: AgentCondition | null; memoryUse?: MemoryUse | null; modelSelection?: CodexSettings | null; modelExecutions?: ModelExecution[] };
 function historyViewScope(view: View | null) {
   return view ? JSON.stringify([view.work.id,view.work.revision,view.work.authorizationVersion,view.work.grant,view.work.state,view.recordVersion]) : "";
 }
@@ -843,6 +843,9 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const scopeOptions = view ? view.assistantOptions ?? defaultAssistantOptions : assistantOptions;
   const usesDeepSeek = (scopeOptions.model?.provider ?? runtime.settings.provider) === "deepseek";
   const goalMode = !!scopeOptions.goalMode && !tagMode;
+  const savedCompletionCriteria = view?.work.successCriteria?.trim();
+  const goalModeProgress = view?.goalMode && `第 ${view.goalMode.round} / ${view.goalMode.maximumRounds} 轮${view.goalMode.stopReason ? ` · ${view.goalMode.stopReason}` : ""}`;
+  const goalModeLabel = savedCompletionCriteria || goalModeProgress || "按完成条件推进，遇到阻碍时暂停";
   const scopePolicy = scopeOptions.researchPolicy ?? "material-first";
   const materialsOnly = scopePolicy === "materials-only";
   const memory = useSharedMemory({workId:view?.work.state === "revoked"?undefined:view?.work.id,runId:view?.run?.id,active:active||!open,blocked:busy||active||!open||view?.work.state==="revoked",selection:memorySelection,onSelectionChange:setMemorySelection});
@@ -1192,6 +1195,14 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     } else setAssistantOptions(options);
     if(remember&&(JSON.stringify(previous.model)!==JSON.stringify(options.model) || previous.webSearch!==options.webSearch)) rememberAgentPreferences(options,previous,runtime.settings?.provider);
   };
+  const changeTaskMode = async (nextGoalMode: boolean) => {
+    try {
+      if (nextGoalMode !== !!scopeOptions.goalMode) {
+        await saveAssistantOptions({ ...scopeOptions, goalMode: nextGoalMode }, false);
+      }
+      if (tagMode) setTagMode(false);
+    } catch (reason) { setError(String(reason)); }
+  };
   const changeMaterialPolicy = async (policy: NonNullable<AssistantOptions["researchPolicy"]>) => {
     try {
       await saveAssistantOptions({ ...scopeOptions, researchPolicy: policy }, false);
@@ -1470,7 +1481,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
               onKeyDown={event=>{if(event.nativeEvent.isComposing)return;if(event.key==="Enter"){event.preventDefault();event.currentTarget.blur();}if(event.key==="Escape"){event.preventDefault();event.stopPropagation();setTitleEdit(null);}}}/>
           : <button type="button" className="agent-chat-title" title={chatTitle} aria-label="重命名对话" disabled={busy||!!active} onClick={()=>setTitleEdit({id:titleScope,value:chatTitle.slice(0,100)})}><span>{chatTitle}</span></button>}
         <div className="agent-header-end">
-        <AgentTaskMode activeTopic={research?.topic} onUnpinTopic={async topic=>{const scope=selectionScope.current;const saved=await call<ResearchTopic>({action:"saveResearchTopic",topic:{...topic,pinned:false}});if(alive.current&&selectionScope.current===scope&&research?.topic.id===saved.id)setResearch({...research,topic:{...research.topic,revision:saved.revision,pinned:false}});}} title={chatTitle} disabled={busy || !!active} tagMode={tagMode} goalMode={goalMode} goalDisabled={(scopeOptions.model ?? runtime.settings)?.provider === "deepseek"} onGeneral={()=>{setTagMode(false);if(scopeOptions.goalMode)void saveAssistantOptions({...scopeOptions,goalMode:false},false).catch(reason=>setError(String(reason)));}} onGoal={()=>{setTagMode(false);void saveAssistantOptions({...scopeOptions,goalMode:true},false).catch(reason=>setError(String(reason)));}} onTag={enableTagMode} selectedSkills={selectedSkills.map(token=>token.slice(1))} onTopics={()=>{setRequestedTopic(undefined);setTopicSave(false);setTopicsOpen(true);}} onTopic={topic=>{setRequestedTopic(topic.id);setTopicSave(false);setTopicsOpen(true);}} onUsage={()=>{detailsReturn.current=document.getElementById(panelId)?.querySelector<HTMLElement>(".agent-task-mode>summary")||null;setTaskStatusOnly(true);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current)workControls.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-heading button")?.focus();},0);}}/>
+        <AgentTaskMode activeTopic={research?.topic} onUnpinTopic={async topic=>{const scope=selectionScope.current;const saved=await call<ResearchTopic>({action:"saveResearchTopic",topic:{...topic,pinned:false}});if(alive.current&&selectionScope.current===scope&&research?.topic.id===saved.id)setResearch({...research,topic:{...research.topic,revision:saved.revision,pinned:false}});}} title={chatTitle} disabled={busy || !!active} tagMode={tagMode} goalMode={goalMode} goalDisabled={(scopeOptions.model ?? runtime.settings)?.provider === "deepseek"} onGeneral={()=>void changeTaskMode(false)} onGoal={()=>void changeTaskMode(true)} onTag={enableTagMode} selectedSkills={selectedSkills.map(token=>token.slice(1))} onTopics={()=>{setRequestedTopic(undefined);setTopicSave(false);setTopicsOpen(true);}} onTopic={topic=>{setRequestedTopic(topic.id);setTopicSave(false);setTopicsOpen(true);}} onUsage={()=>{detailsReturn.current=document.getElementById(panelId)?.querySelector<HTMLElement>(".agent-task-mode>summary")||null;setTaskStatusOnly(true);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current)workControls.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-heading button")?.focus();},0);}}/>
           <button ref={detailsTrigger} type="button" title="对话详情" aria-label="对话详情" onClick={event=>{if(detailsMenu.current?.open&&!historyExpanded){detailsPopover.close();event.currentTarget.focus();return;}detailsReturn.current=event.currentTarget;setTaskStatusOnly(false);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;
             void call<{skills?:{available:boolean}[]}>({action:"skills"}).then(value=>{
               if(alive.current&&Array.isArray(value.skills))setAvailableSkillCount(value.skills.filter(skill=>skill.available).length);
@@ -1494,6 +1505,15 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
           <button type="button" title={extra ? "关闭第二个助手（Esc）" : "关闭助手（Esc）"} aria-label={extra ? "关闭第二个助手" : "关闭助手"} onClick={closePanel}><X size={19} /></button>
         </div>
       </header>
+      {tagMode && <AgentTagWorkspace value={tagPreparation} disabled={busy||!!active} onChange={setTagPreparation} onCancel={()=>setTagMode(false)}/>}
+      {goalMode && view?.work.state!=="revoked" && (!publicUrl || !!view) && <section className="agent-mode-context agent-goal-context" aria-label="目标模式">
+        <Target size={14} aria-hidden="true"/>
+        {!view ? <input name="goalCompletionCriteria" aria-label="完成条件" value={completionCriteria} disabled={busy}
+          maxLength={2000} onChange={event=>setCompletionCriteria(event.target.value)} placeholder="输入完成条件，遇到阻碍时暂停"/> :
+          <span role="status" title={goalModeLabel}>{goalModeLabel}</span>}
+        <button type="button" className="agent-mode-exit" aria-label="退出目标模式" disabled={busy||!!active}
+          onClick={()=>void changeTaskMode(false)}><X size={14}/></button>
+      </section>}
       <div className="agent-body" inert={memory.managerOpen}>
       <div className="agent-conversation-wrap" aria-busy={loadingConversation || sourceLoading}>
       {loadingConversation && <div className="agent-conversation-loading" role="status" aria-label="正在打开对话"><span/><span/><span/></div>}
@@ -1504,8 +1524,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       {controlsNeedAttention && (!recovery || reportReading) && view?.work.state!=="revoked" && <div className="agent-task-notice" role="status"><span>{view?.materialBudget?.preflight?.allowed===false || !!view?.materialBudget?.overrunBytes ? "资料处理容量不足" : view?.lifecycle?.requiresExplicitResume ? "任务已暂停，需手动恢复" : view?.lifecycle?.usageCompleteness==="incomplete" ? "部分模型用量尚未返回" : "任务状态需要处理"}</span><button type="button" onClick={()=>{setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current){workControls.current.open=true;workControls.current.querySelector("summary")?.focus();setTimeout(()=>workControls.current?.querySelector("summary")?.focus(),0);}}}>查看任务详情</button></div>}
 
       {newSource && <div className="agent-notice"><p>正在讨论「{sourceTitle || currentObjectLabel}」。当前浏览：{newSource.title}</p><button type="button" disabled={busy || !!active} onClick={newSource.use}>用当前材料新建对话</button></div>}
-      {tagMode&&<AgentTagWorkspace value={tagPreparation} disabled={busy||!!active} onChange={setTagPreparation} onCancel={()=>setTagMode(false)}/>}
-      {view?.goalMode && view.work.state !== "revoked" && <p className="agent-note" role="status">目标模式 · 第 {view.goalMode.round} / {view.goalMode.maximumRounds} 轮{view.goalMode.stopReason && ` · ${view.goalMode.stopReason}`}</p>}
+      {(!goalMode || savedCompletionCriteria) && goalModeProgress && view?.work.state !== "revoked" && <p className="agent-note" role="status">目标模式 · {goalModeProgress}</p>}
       {!view && !tagMode && !loadingConversation && <div className="agent-welcome">
         <h2>{hasDraftSources?"从这份材料开始":"有什么可以帮你？"}</h2><p>{hasDraftSources?"提一个问题，或试试下面的建议。":"直接提问，或从＋添加需要使用的资料。"}</p>
         {hasDraftSources && <div className="agent-suggestions">{suggestions.map(({ label, icon: Icon, prompt }) => <button key={label} type="button" disabled={busy} onClick={() => { setGoal(prompt); goalInput.current?.focus(); }}><Icon size={18} aria-hidden="true" /><span>{label}</span></button>)}</div>}
@@ -1618,8 +1637,11 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         {imageChanges.removeImages.length>0&&<p className="agent-note">将随下一条问题移除 {imageChanges.removeImages.length} 张图片。<button type="button" disabled={busy} onClick={()=>setImageDraft(current=>[...(current||[]),...imageChanges.removeImages])}>撤销图片撤回</button></p>}
         </div>
         {view?.work.state !== "revoked" && <form onSubmit={event=>void create(event)}>
-          {goalMode && !view && !publicUrl && <label className="agent-question"><span>完成条件</span><input name="goalCompletionCriteria" value={completionCriteria} disabled={busy} maxLength={2000} onChange={event=>setCompletionCriteria(event.target.value)} placeholder="例如，交付对照表并独立复算关键数字" /></label>}
-          {tagSuggestion&&<button type="button" className="agent-tag-open" disabled={busy||!!active} onClick={()=>prepareTagTask(tagSuggestion)}>准备标签任务 · {tagTaskNames[tagSuggestion]}</button>}<AgentTagReferences value={tagPreparation} mode={tagMode} disabled={busy||!!active} onChange={setTagPreparation} searchOpen={tagSearchOpen} onSearchClose={()=>setTagSearchOpen(false)}/><AgentTagRelated tags={[...tagPreparation.references,...(tagMode&&tagPreparation.tag?[tagPreparation.tag]:[])]} grant={researchGrant(manualResearchGrant(),research?.topic.grant,research?.includeManual)} disabled={busy||!!active} onAdd={item=>setMaterials(items=>items.some(m=>materialKey(m.locator)===materialKey(item.locator))?items:[...items,item])}/>
+          <div className="agent-composer-tag-tools">
+            {tagSuggestion&&<button type="button" className="agent-tag-open" disabled={busy||!!active} onClick={()=>prepareTagTask(tagSuggestion)}>准备标签任务 · {tagTaskNames[tagSuggestion]}</button>}
+            <AgentTagReferences value={tagPreparation} mode={tagMode} disabled={busy||!!active} onChange={setTagPreparation} searchOpen={tagSearchOpen} onSearchClose={()=>setTagSearchOpen(false)}/>
+            <AgentTagRelated tags={[...tagPreparation.references,...(tagMode&&tagPreparation.tag?[tagPreparation.tag]:[])]} grant={researchGrant(manualResearchGrant(),research?.topic.grant,research?.includeManual)} disabled={busy||!!active} onAdd={item=>setMaterials(items=>items.some(m=>materialKey(m.locator)===materialKey(item.locator))?items:[...items,item])}/>
+          </div>
 
           {suggestedQuestion&&usedQuestion!==suggestedQuestion.id&&view?.work.id===initialWorkId&&<div className="agent-note"><p>关联核对提问已准备，不会自动发送。{goal.trim()?"先保留当前输入，再使用这条提问。":"可先检查资料范围，再开始核对。"}</p><button type="button" disabled={busy||!!active||!!goal.trim()} onClick={()=>{setGoal(suggestedQuestion.text);setUsedQuestion(suggestedQuestion.id);goalInput.current?.focus();}}>使用关联核对提问</button><button type="button" onClick={()=>setUsedQuestion(suggestedQuestion.id)}>忽略这条提问</button></div>}
           {relatedMatches.length>0&&<section className="agent-related-conversations" aria-label="相关旧对话">

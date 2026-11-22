@@ -659,18 +659,43 @@ describe("site v71 assistant controls",()=>{
   it("switches task modes without clearing the current input or dispatching a model",async()=>{
     await render(<StandaloneInvestigation initiallyOpen startFresh/>);
     const input=select<HTMLTextAreaElement>('[name="investigationGoal"]');await type(input,"保留这段手写草稿");
+    expect(select('.agent-task-mode').querySelector(".agent-mode-dot")).toBeNull();
     await activate(select<HTMLElement>('.agent-task-mode>summary'));
     const choice=(name:string)=>[...document.querySelectorAll<HTMLButtonElement>('.agent-mode-menu button')].find(button=>button.querySelector('strong')?.textContent===name)!;
     await activate(choice("标签助手"));expect(input.value).toBe("保留这段手写草稿");expect(select('.agent-tag-workspace')).not.toBeNull();
+    expect(select('.agent-panel > header + .agent-tag-workspace').querySelectorAll('nav button')).toHaveLength(3);
     await activate(select<HTMLElement>('.agent-task-mode>summary'));await activate(choice("通用助手"));
     expect(input.value).toBe("保留这段手写草稿");expect(document.querySelector('.agent-tag-workspace')).toBeNull();
+    expect(select('.agent-task-mode').querySelector(".agent-mode-dot")).toBeNull();
+    await activate(select<HTMLElement>('.agent-task-mode>summary'));await activate(choice("目标模式"));
+    const completion=select<HTMLInputElement>('.agent-panel > header + .agent-goal-context input');
+    await type(completion,"核对关键数字");
+    await activate(select<HTMLButtonElement>('[aria-label="退出目标模式"]'));
+    expect(document.querySelector(".agent-goal-context")).toBeNull();
+    expect(input.value).toBe("保留这段手写草稿");
     expect(calls("create")).toHaveLength(0);expect(calls("respond")).toHaveLength(0);
+  });
+  it("shows the saved completion criteria in the goal banner alongside the actual progress",async()=>{
+    const savedGoal = {
+      ...current,
+      work:{...current.work,successCriteria:"核对关键数字并附上来源"},
+      assistantOptions:{goalMode:true},
+      goalMode:{round:2,maximumRounds:4},
+    };
+    list = async()=>({works:[{id:savedGoal.work.id,goal:savedGoal.work.goal,state:savedGoal.work.state}],nextCursor:null});
+    invoke.mockImplementation((command,payload)=>payload?.args?.action==="status" ? Promise.resolve(savedGoal) : native(command,payload));
+    await render(<StandaloneInvestigation initiallyOpen/>);
+    await openHistory();
+    await activate(select<HTMLButtonElement>('[data-work-id="new-work"]'));
+    expect(select(".agent-goal-context").textContent).toContain("核对关键数字并附上来源");
+    expect(select(".agent-conversation").textContent).toContain("第 2 / 4 轮");
   });
   it("switches the existing dock and preview through the window layout menu",async()=>{
     await render(<StandaloneInvestigation initiallyOpen startFresh/>);
     const panel=select<HTMLElement>('.agent-panel');const wasDocked=panel.dataset.agentDocked;
     const dock = () => select<HTMLElement>('.agent-window-layout > summary');
     const resize = select<HTMLElement>('.agent-panel-resizer');
+    await act(async()=>resize.dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowLeft",bubbles:true})));
     const width = resize.getAttribute("aria-valuenow");
     await activate(dock());
     const options = Array.from(panel.querySelectorAll<HTMLButtonElement>(".agent-window-menu > button"));

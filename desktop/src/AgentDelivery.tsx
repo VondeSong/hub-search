@@ -1,8 +1,9 @@
-import { FileText, PencilLine } from "lucide-react";
+import { ArrowUpRight, FileText, PencilLine } from "lucide-react";
 import { type MaterialKind } from "./AgentMaterialCard";
 import {AgentRequestContent, requestPresentation, type MessageSkill} from "./AgentRequestContent";
 import type {InvestigationLocator} from "./AgentInvestigation";
-import { AgentWebSources, type WebSource } from "./AgentWebSources";
+import { AgentWebSources, publicWebHref, type WebSource } from "./AgentWebSources";
+import { WebsiteIcon } from "./AgentActivityIdentity";
 import { AgentAnswerActions } from "./AgentAnswerActions";
 import { AgentArtifactRevision } from "./AgentArtifactRevision";
 import { createContext, Fragment, memo, useContext, type ReactNode } from "react";
@@ -30,15 +31,25 @@ export function prependConversation(current: Conversation, older: Conversation):
 }
 export type CitationOpening = (runId: string, evidenceIndex: number, quote: string) => void;
 
-const ReportCitationContext = createContext<{ citations: Citation[]; evidence: Evidence[]; runId?: string; onOpenCitation?: CitationOpening }>({ citations: [], evidence: [] });
-function ReportLink({ href, children }: { href?: string; children?: ReactNode }) {
-  const { citations, evidence, runId, onOpenCitation } = useContext(ReportCitationContext);
+const ReportCitationContext = createContext<{ citations: Citation[]; evidence: Evidence[]; runId?: string; workId?: string; onOpenCitation?: CitationOpening }>({ citations: [], evidence: [] });
+function ReportLink({ href, children, node }: { href?: string; children?: ReactNode; node?: Element }) {
+  const { citations, evidence, runId, workId, onOpenCitation } = useContext(ReportCitationContext);
   const index = href?.match(/^#hub-citation-(\d+)$/)?.[1];
   if (index) {
     const citation = citations[Number(index) - 1];
     const sourceIndex = Number(citation?.evidenceId.slice(1)) - 1;
     const source = evidence[sourceIndex];
     return citation ? <button type="button" className="agent-inline-citation" title={source?.title || "查看引用原文"} aria-label={"查看引用 " + index + "：" + (source?.title || citation.evidenceId)} disabled={!source || !runId || !onOpenCitation} onClick={() => runId && onOpenCitation?.(runId, sourceIndex, citation.quote)}>{children}</button> : <span>{children}</span>;
+  }
+  const webHref = publicWebHref(href);
+  if (webHref) {
+    const source = node?.properties.dataAgentLink === "source";
+    const host = new URL(webHref).hostname;
+    return <a href={href} target="_blank" rel="noreferrer" className={source ? "agent-report-source-pill" : "agent-report-inline-link"}>
+      {source && <WebsiteIcon url={webHref} title={host} hosts={[host]} workId={workId}/>}
+      <span>{children}</span>
+      {!source && <ArrowUpRight size={10} aria-hidden="true"/>}
+    </a>;
   }
   return <a href={href} target="_blank" rel="noreferrer">{children}</a>;
 }
@@ -49,6 +60,37 @@ const reportMarkdownComponents = {
   table: AgentMarkdownTable,
 };
 const reportRemarkPlugins = [remarkGfm];
+function reportSourceLinks() {
+  const separators = /^[\s·・、,，;；]*$/;
+  const isWebLink = (child: Root["children"][number]): child is Element =>
+    child.type === "element" && child.tagName === "a" && typeof child.properties.href === "string" && !!publicWebHref(child.properties.href);
+  return (tree: Root) => {
+    function visit(parent: Root | Element) {
+      for (const child of parent.children) if (child.type === "element") visit(child);
+      if (parent.type !== "element" || !["p", "li"].includes(parent.tagName)) return;
+      const children = parent.children;
+      let index = children.length - 1;
+      while (children[index]?.type === "text" && separators.test((children[index] as Text).value)) index--;
+      const end = index;
+      const links: Element[] = [];
+      while (index >= 0) {
+        const child = children[index];
+        if (isWebLink(child)) links.unshift(child);
+        else if (child.type !== "text" || !separators.test(child.value)) break;
+        index--;
+      }
+      if (!links.length || index < 0 || (children[index].type === "text" && !/\S/.test((children[index] as Text).value))) return;
+      // A final link after prose punctuation, or a series of trailing links, is a source group.
+      const prefix = children[index];
+      if (links.length === 1 && (prefix.type !== "text" || !/[。！？.!?][\s·・]*$/.test(prefix.value))) return;
+      for (const link of links) link.properties.dataAgentLink = "source";
+      children.splice(index + 1, end - index, {
+        type: "element", tagName: "span", properties: { className: ["agent-report-source-group"] }, children: links,
+      });
+    }
+    visit(tree);
+  };
+}
 function reportCitations(citationCount: number) {
   return (tree: Root) => {
     function replaceIn(parent: Root | Element) {
@@ -78,7 +120,7 @@ function reportCitations(citationCount: number) {
 // Keep unchanged parsed markup and table nodes. Citation consumers still receive
 // the latest source eligibility and opening handler through their local context.
 const ReportMarkdown = memo(function ReportMarkdown({ markdown, citationCount }: { markdown: string; citationCount: number }) {
-  return <ReactMarkdown remarkPlugins={reportRemarkPlugins} rehypePlugins={citationCount ? [[reportCitations, citationCount]] : []} skipHtml components={reportMarkdownComponents}>{markdown}</ReactMarkdown>;
+  return <ReactMarkdown remarkPlugins={reportRemarkPlugins} rehypePlugins={[[reportCitations, citationCount], reportSourceLinks]} skipHtml components={reportMarkdownComponents}>{markdown}</ReactMarkdown>;
 });
 
 function SourceExcerpt({ value }: { value: Evidence }) {
@@ -104,7 +146,7 @@ function AnswerSources({ citations, evidence, runId, onOpenCitation }: { citatio
   </div>;
 }
 
-function ReportContent({ value, evidence, runId, onOpenCitation, actions }: { value: Report; evidence: Evidence[]; runId?: string; onOpenCitation?: CitationOpening; actions?:ReactNode }) {
+function ReportContent({ value, evidence, runId, workId, onOpenCitation, actions }: { value: Report; evidence: Evidence[]; runId?: string; workId?: string; onOpenCitation?: CitationOpening; actions?:ReactNode }) {
   if (value.prose) {
     const prose=value.prose;
     const copySources=prose.citations.map((citation,index)=>{
@@ -112,7 +154,7 @@ function ReportContent({ value, evidence, runId, onOpenCitation, actions }: { va
       return `[${index+1}] ${source?.title || "引用原文"}${source?.sourcePath ? `（${source.sourcePath}）` : ""}：${citation.quote}`;
     });
     return <div className="agent-report agent-answer">
-      <ReportCitationContext.Provider value={{ citations: prose.citations, evidence, runId, onOpenCitation }}><ReportMarkdown markdown={prose.markdown} citationCount={prose.citations.length} /></ReportCitationContext.Provider>
+      <ReportCitationContext.Provider value={{ citations: prose.citations, evidence, runId, workId, onOpenCitation }}><ReportMarkdown markdown={prose.markdown} citationCount={prose.citations.length} /></ReportCitationContext.Provider>
       {!!value.limitations.length && <p className="agent-note">{value.limitations.join("；")}</p>}
       <AnswerSources citations={prose.citations} evidence={evidence} runId={runId} onOpenCitation={onOpenCitation}/>
       <div className="agent-answer-toolbar"><AgentAnswerActions showLabel text={[prose.markdown,...value.limitations,copySources.length ? "来源：\n"+copySources.join("\n") : ""].filter(Boolean).join("\n\n")}/>{actions}<AgentWebSources sources={prose.webSources??[]}/></div>
@@ -139,7 +181,7 @@ function BoundReport({ value, report, evidence, runId, onOpenCitation, workId, r
   keepHistoricalTextVisible?: boolean; actions?:ReactNode;
 }) {
   if (value.artifactState === "unavailable") return null;
-  const body = <ReportContent value={report} evidence={evidence} runId={runId} onOpenCitation={onOpenCitation} actions={actions}/>;
+  const body = <ReportContent value={report} evidence={evidence} runId={runId} workId={workId} onOpenCitation={onOpenCitation} actions={actions}/>;
   const references = !!value.artifactRefs?.length && <p className="agent-note" aria-label="回答使用的图表版本">
     {value.artifactRefs.map((ref, index) => <span key={ref.artifactId}>{index > 0 ? "；" : ""}图表 {index + 1} · 第 {ref.revision} 版{ref.currentRevision !== ref.revision ? `（当前第 ${ref.currentRevision} 版）` : ""}</span>)}
   </p>;
@@ -155,7 +197,7 @@ export function AgentDelivery({ report, evidence, progress, history = [], runnin
 }) {
   if (revoked) return null;
   return <>
-    {report && <ReportContent value={report} evidence={evidence} runId={runId} onOpenCitation={onOpenCitation} actions={actions}/>}
+    {report && <ReportContent value={report} evidence={evidence} runId={runId} workId={workId} onOpenCitation={onOpenCitation} actions={actions}/>}
     {!report && progress && <section className="agent-progress" aria-label="已取得的材料">
       <h3>已取得的材料</h3>
       <p className="agent-note">{running ? "调查仍在进行，以下材料已保存。" : "本轮尚未形成完整结论，已有材料可继续核对。"} 检索候选尚未证明关联成立。</p>

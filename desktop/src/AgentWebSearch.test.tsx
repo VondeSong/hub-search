@@ -40,6 +40,16 @@ it("CN04 failed saves remain visible",async()=>{
  await act(async()=>root.render(<AgentAssistantOptions section="connection" value={{...initial,webSearch:"cached"}} disabled={false} canAuto={false} onSave={save}/>));
  await choose("disabled");await apply();expect(host.querySelector('[role="alert"]')?.textContent).toContain("保存失败");expect(select().value).toBe("disabled");
 });
+it("renders trailing web references as pills and links within sentences as inline text",async()=>{
+ const markdown="可参阅[规范](https://example.org/spec)，以及后续说明。 [来源甲](https://example.org/a) · [来源乙](https://example.org/b)\n\n- 原文有记录。 [独立来源](https://www.example.org/c)\n- 查看[另一页](https://example.org/page)";
+ const report:Report={status:"completed",summary:"资料",findings:[],nextSteps:[],questions:[],limitations:[],waitCondition:"",prose:{markdown,citations:[]}};
+ await act(async()=>root.render(<AgentConversation conversation={{messages:[{id:"saved",role:"assistant",runId:"run",createdAt:1,report}],hasEarlier:false}} revoked={false} onOpenCitation={vi.fn()}/>));
+ const groups=[...host.querySelectorAll(".agent-report-source-group")];
+ expect(groups.map(group=>[...group.querySelectorAll("a")].map(link=>link.textContent))).toEqual([["来源甲","来源乙"],["独立来源"]]);
+ expect(host.querySelectorAll(".agent-report-source-pill .agent-site-icon")).toHaveLength(3);
+ expect([...host.querySelectorAll(".agent-report-inline-link")].map(link=>link.textContent)).toEqual(["规范","另一页"]);
+ expect(host.querySelector('a[href="https://example.org/a"]')?.getAttribute("rel")).toBe("noreferrer");
+});
 it("CN04 restored web sources have safe clickable links and explicit provenance",async()=>{
  const report:Report={status:"completed",summary:"文章",findings:[],nextSteps:[],questions:[],limitations:[],waitCondition:"",prose:{markdown:"参考[官方文章](https://example.org/a)",citations:[],webSources:[{url:"https://example.org/a",title:"官方文章",provenance:"providerAccess"},{url:"https://example.org/b",title:"候选资料",provenance:"modelReference"}]}};
  await act(async()=>root.render(<AgentConversation conversation={{messages:[{id:"saved",role:"assistant",runId:"run",createdAt:1,report}],hasEarlier:false}} revoked={false} onOpenCitation={vi.fn()}/>));

@@ -602,3 +602,5 @@ Windows 热开发实窗使用已有的 38 秒同题回合，验证工具组展�
 - **中断与规则。** 能先展开失败的参数记录，再关闭整轮查看未核验草稿。模拟续跑完成后，重新打开原组仍可看到前次异常。成功标记描述恢复后的结果，历史记录保留当时的状态。
 
 [三组线上截图](assets/agents-ui/2026-11-22-html6/process.png) · [逐区验证与桌面边界](AGENTS_UI_INTERACTION_PLAN.md#html6-reference-audit)
+
+Windows 截图复核补充了网页检索两层行的样式规则。展开后，搜索词与阅页子行的图标为 14 px 中性灰，降低次级动作的视觉权重。折叠行的站点标识用平面叠放，去除阴影，保留原有图标回退。相邻的网页批次、公开说明和各自的展开状态沿用实际时间线。[Windows 截图整改](AGENTS_UI_INTERACTION_PLAN.md#desktop-screenshot-followup)

@@ -360,8 +360,13 @@ it("groups adjacent material receipts apart from commands and preserves an open 
   const draw=(events:ActivityRun["events"])=>act(async()=>root.render(<ActivityDisclosureProvider><AgentActivity value={{...run,native:true,events}}/></ActivityDisclosureProvider>));
   await draw([rule]);
   expect(host.querySelector('.agent-operation-group')).toBeNull();
-  await act(async()=>host.querySelector<HTMLElement>('.agent-context-event summary')!.click());
-  await vi.waitFor(()=>expect(host.querySelector('.agent-context-event details[open]')).not.toBeNull());
+  const ruleDetails=host.querySelector<HTMLDetailsElement>('.agent-context-event details')!;
+  await act(async()=>{
+    const toggled=new Promise(resolve=>ruleDetails.addEventListener('toggle',resolve,{once:true}));
+    ruleDetails.querySelector<HTMLElement>('summary')!.click();
+    await toggled;
+  });
+  expect(ruleDetails.open).toBe(true);
   await draw([rule,preview,missed,progress,command,{...command,id:"command-2",createdAt:1500}]);
   const [materials,commands]=host.querySelectorAll<HTMLDetailsElement>('.agent-operation-group');
   expect(materials.querySelector('.agent-phase-label')?.textContent).toBe('已载入上下文 · 2 项材料回执 · 1 条规则');

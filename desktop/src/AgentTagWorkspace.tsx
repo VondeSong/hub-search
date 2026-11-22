@@ -25,7 +25,14 @@ export function useTagPreparation(key:string){
   return [saved.key===key?saved.value:initial,(value:TagPreparation)=>{setSaved({key,value});try{userProfileStorage.setItem("hub.agent.tags."+key,JSON.stringify(value));}catch{}}] as const;
 }
 export function AgentTagWorkspace({value,disabled,onChange,onCancel}:{value:TagPreparation;disabled:boolean;onChange:(v:TagPreparation)=>void;onCancel:()=>void}){
-  return <section className="agent-tag-workspace" aria-label="标签助手"><nav aria-label="标签任务">{(Object.keys(tagTaskNames) as TagPreparation["task"][]).map(task=><button type="button" key={task} disabled={disabled} aria-pressed={value.task===task} onClick={()=>onChange({...value,task,resume:false})}>{tagTaskNames[task]}</button>)}<button type="button" aria-label="取消标签任务" onClick={onCancel}><X size={14}/></button></nav><h2>{value.task==="definition"?"起草标签定义":value.task==="missing"?"查找可能漏标":"比较标签关系"}</h2><p className="agent-note">{value.task==="definition"?"按当前可检索资料库起草，确认后保存定义。":value.task==="missing"?"在当前资料库与已保存定义范围的交集中检查，每批最多 5 项。":"明确选择两个标签，或只选目标标签以自动寻找相关候选。"} 页面不会自动授权整个库。</p></section>;
+  const title=value.task==="definition"?"起草标签定义":value.task==="missing"?"查找可能漏标":"比较标签关系";
+  const hint=value.task==="definition"?"确认后保存定义。":value.task==="missing"?"在当前资料库与已保存定义的交集中检查，每批最多 5 项。":"明确选择两个标签，或只选目标标签以查找相关候选。";
+  return <section className="agent-mode-context agent-tag-workspace" aria-label="标签助手" title={hint}>
+    <span className="agent-visually-hidden">{title}。{hint}</span>
+    <nav aria-label="标签任务">{(Object.keys(tagTaskNames) as TagPreparation["task"][]).map(task=>
+      <button type="button" key={task} disabled={disabled} aria-pressed={value.task===task} onClick={()=>onChange({...value,task,resume:false})}>{tagTaskNames[task]}</button>)}</nav>
+    <button type="button" className="agent-mode-exit" aria-label="取消标签任务" onClick={onCancel}><X size={14}/></button>
+  </section>;
 }
 export function AgentTagReferences({value,mode,disabled,onChange,searchOpen,onSearchClose}:{value:TagPreparation;mode:boolean;disabled:boolean;onChange:(v:TagPreparation)=>void;searchOpen:boolean;onSearchClose:()=>void}){
   const [replacing,setReplacing]=useState<string|null>(null);
