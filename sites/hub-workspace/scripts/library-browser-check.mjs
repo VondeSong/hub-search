@@ -25,7 +25,7 @@ check("搜索隔离资料库并支持正文多个关键词",()=>{
 check("空目录有节点，附件不计入笔记数",()=>{
  assert.ok(nodeById["c-empty"]);assert.equal(childrenOf("c-empty").length,0);
  assert.ok(nodeById["o-archive"]);assert.equal(childrenOf("o-archive").length,0);
- assert.equal(childrenOf("o-attachments").length,1);assert.equal(childrenOf("o-attachments").filter(isContent).length,0);
+ assert.deepEqual(childrenOf("o-attachments").map(n=>n.id),["o-pdf","o-reading-image"]);assert.equal(childrenOf("o-attachments").filter(isContent).length,0);
 });
 check("同名笔记通过完整路径保持独立",()=>{
  const results=searchLibrary("obsidian","每周回顾");assert.equal(results.length,2);assert.equal(new Set(results.map(pathOf)).size,2);assert.equal(searchLibrary("obsidian","每周回顾","o-projects").length,1);

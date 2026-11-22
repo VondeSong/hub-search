@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "8e239633224e7635e5b4682b6912f75de775822c",
-  "published_version": 153,
-  "deployment_id": "appgdep_6b02b0e7391081919d807ae2b0bdd3cb",
+  "source_commit": "cee6dd09f67fdb85d78810646d8023aa5a909e54",
+  "published_version": 154,
+  "deployment_id": "appgdep_6b02b37c0afc819183d4486730c6ace5",
   "files": {
     ".gitignore": {
       "sha256": "ca0e1575efb181d784f15bf6c86e3c012fd5c7ede4daa34b924d0d8b590d4e77",
@@ -198,9 +198,9 @@
       "bytes": 24776
     },
     "app/LibraryBrowser.tsx": {
-      "sha256": "f00538db810752dfc4cbc0c7442500d3c80d58aeffbf00588c1c730c14394672",
+      "sha256": "381d3705c423d2d30f8a2d1df86e88a54dd5e06efb21def7a279f783e7b6e470",
       "mode": "100644",
-      "bytes": 35788
+      "bytes": 43118
     },
     "app/LocalFolderSource.tsx": {
       "sha256": "1ae0bdf427803aa7f572b9e550ea7c00f48527d370371172e3c663602818e972",
@@ -543,9 +543,9 @@
       "bytes": 993
     },
     "app/library-browser.css": {
-      "sha256": "6db05cedd61d12fa1dec4ecf64864167c04835231d6b38e0a248654379320ae6",
+      "sha256": "67f273b1326f3d3b387cf0bc51be1d1595e8cd9e9df7181953cdad9f99cfefde",
       "mode": "100644",
-      "bytes": 24399
+      "bytes": 28321
     },
     "app/library-data.ts": {
       "sha256": "f004d8af2157d7be7482822522c65a6530a0263b484d11651ebbe338b2c16a9a",
@@ -1083,9 +1083,9 @@
       "bytes": 2645
     },
     "docs/library-browser-prototype.md": {
-      "sha256": "f01f0abdef85a505adb3f652b56654cdfa2f21dde1401dd2a09d5059cf92aeaa",
+      "sha256": "af00b36c79b1a5d118c8c7e3141345620ea260c96ab5e7122ab02bdd0546cba0",
       "mode": "100644",
-      "bytes": 9906
+      "bytes": 10905
     },
     "docs/navigation-heatmap-prototype.md": {
       "sha256": "770157b68faf7febcc1af171f3670de5190dd13afa70480dde76ac3405ca4601",
@@ -1388,9 +1388,9 @@
       "bytes": 5688
     },
     "scripts/library-browser-check.mjs": {
-      "sha256": "c9a33372ea2f3f216856b5f20c14ac6d001e6e970558e86eb203650ef6f3944a",
+      "sha256": "d1a2263526b48dff6117076c330f110dfaef8c8b9d83578447a5ea5bdb37fc61",
       "mode": "100644",
-      "bytes": 5479
+      "bytes": 5515
     },
     "scripts/memo-check.mjs": {
       "sha256": "b167a3cadd66ef90053531cdce5ef4644fa3bb5182e086add7dab398defb44d2",
@@ -1488,5 +1488,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-22T09:09:41.921346+00:00"
+  "imported_at": "2026-11-22T09:20:51.918782+00:00"
 }
