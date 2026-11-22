@@ -488,6 +488,9 @@ pub(crate) fn ui(root: &Path, args: &Value) -> Result<Value, String> {
             store::materials::source(root, &text(args, "id", 150)?, &args["locator"])
         }
         "skills" => skills::view(root),
+        "setSkillMcpSharing" => {
+            skills::set_mcp_sharing(root, args["enabled"].as_bool().ok_or("技能互通开关无效")?)
+        }
         "skillSourceFile" => {
             skills::source_file(root, &text(args, "name", 100)?, args["reveal"] == true)
         }

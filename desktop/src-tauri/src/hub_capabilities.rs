@@ -19,6 +19,13 @@ pub(crate) fn take_test_catalog_builds() -> usize {
     TEST_CATALOG_BUILDS.with(|count| count.replace(0))
 }
 
+fn is_shared_skill_tool(name: &str) -> bool {
+    matches!(
+        name,
+        "hub_list_skills" | "hub_loadSkill" | "hub_readSkillReference"
+    )
+}
+
 pub(crate) fn catalog() -> Value {
     #[cfg(test)]
     TEST_CATALOG_BUILDS.with(|count| count.set(count.get() + 1));
@@ -170,10 +177,20 @@ impl Session {
             .unwrap_or_else(|| instructions().into())
     }
     pub(crate) fn mcp_tools(&self) -> Value {
-        self.external
+        let mut tools = self
+            .external
             .as_ref()
-            .map(|w| w.tools())
-            .unwrap_or_else(catalog)
+            .map(|work| work.tools())
+            .unwrap_or_else(catalog);
+        if (self.scope.is_none() || self.external.is_some())
+            && !crate::agent_work::skills::mcp_sharing_enabled(&self.root).unwrap_or(false)
+        {
+            tools["tools"]
+                .as_array_mut()
+                .unwrap()
+                .retain(|tool| !is_shared_skill_tool(tool["name"].as_str().unwrap_or_default()));
+        }
+        tools
     }
     pub(crate) fn mcp_flushed(&mut self) -> Result<(), String> {
         if let Some(w) = &mut self.external {
@@ -480,6 +497,12 @@ impl Session {
         arguments: &Value,
         request: &str,
     ) -> Result<Value, String> {
+        if (self.scope.is_none() || self.external.is_some())
+            && is_shared_skill_tool(name)
+            && !crate::agent_work::skills::mcp_sharing_enabled(&self.root)?
+        {
+            return Err("Hub MCP 技能互通已关闭，请在技能管理中启用。".into());
+        }
         if let Some(work) = &mut self.external {
             return work.call(name, arguments);
         }
@@ -492,9 +515,11 @@ impl Session {
                 &json!({"type":"object","properties":{},"additionalProperties":false}),
             )?;
             *self = Self::new(&self.root, None)?;
-            return Ok(
-                json!({"contextChanged":true,"skills":self.skills.metadata(),"instruction":"旧规则和技能读取依赖已清空。重新读取相关库的 AGENTS.md、需要的技能和原文，再评估后续操作。"}),
-            );
+            let mut refreshed = json!({"contextChanged":true,"instruction":"旧规则和技能读取依赖已清空。重新读取相关库的 AGENTS.md 和原文，再评估后续操作。"});
+            if crate::agent_work::skills::mcp_sharing_enabled(&self.root).unwrap_or(false) {
+                refreshed["skills"] = self.metadata();
+            }
+            return Ok(refreshed);
         }
         self.verify()?;
         if self.scope.is_some() && arguments.to_string().len() > 131_072 {

@@ -51,6 +51,20 @@ it("offers retry after discovery failure and opens the owned directory only on a
   expect(host.textContent).toContain("Hub MCP");
 });
 
+it("uses the native sharing setting and removes availability badges only after confirmation",async()=>{
+  invoke.mockImplementation(async(_,{args})=>args.action==="skillPackages"?{sources:[]}
+    :args.action==="setSkillMcpSharing"?{mcpSharingEnabled:args.enabled}:{...catalog,mcpSharingEnabled:true});
+  await act(async()=>root.render(<AgentSkills embedded manageInitially disabled={false} onSelect={select}/>));
+  const sharing=host.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Hub MCP 技能互通"]')!;
+  expect(sharing.getAttribute("aria-checked")).toBe("true");
+  expect(host.querySelector(".agent-skill-card-shared")).not.toBeNull();
+  await act(async()=>sharing.click());
+  expect(invoke).toHaveBeenLastCalledWith("agent_investigation",{args:{action:"setSkillMcpSharing",enabled:false}});
+  expect(sharing.getAttribute("aria-checked")).toBe("false");
+  expect(host.querySelector(".agent-skill-card-shared")).toBeNull();
+  expect(host.querySelectorAll(".agent-skill-manager-card")).toHaveLength(3);
+});
+
 it("explains the purpose before origin and does not require a skill for ordinary questions",async()=>{
   await render(); await open();
   expect(host.textContent).toContain("按需自动选用");

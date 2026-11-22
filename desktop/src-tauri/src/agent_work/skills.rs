@@ -648,8 +648,40 @@ fn mentions(request: &str, name: &str) -> bool {
         })
 }
 
+const MCP_SHARING_KEY: &str = "agent_mcp_skill_sharing";
+
+pub(crate) fn mcp_sharing_enabled(root: &Path) -> Result<bool, String> {
+    let connection = crate::source_evidence::open_read_database(root)?;
+    let saved = connection
+        .query_row(
+            "SELECT value FROM metadata WHERE key = ?1",
+            [MCP_SHARING_KEY],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|error| error.to_string())?;
+    match saved.as_deref() {
+        None | Some("true") => Ok(true),
+        Some("false") => Ok(false),
+        _ => Err("技能互通设置无法核验".into()),
+    }
+}
+
+pub(super) fn set_mcp_sharing(root: &Path, enabled: bool) -> Result<Value, String> {
+    store::write(root, |connection| {
+        connection.execute(
+            "INSERT INTO metadata(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            params![MCP_SHARING_KEY, enabled.to_string()],
+        ).map_err(|error| error.to_string())?;
+        Ok(())
+    })?;
+    Ok(json!({"mcpSharingEnabled": enabled}))
+}
+
 pub(super) fn view(root: &Path) -> Result<Value, String> {
-    Ok(Catalog::discover(root)?.ui())
+    let mut catalog = Catalog::discover(root)?.ui();
+    catalog["mcpSharingEnabled"] = json!(mcp_sharing_enabled(root)?);
+    Ok(catalog)
 }
 
 pub(super) fn fixed_instruction_identity(version: &Value) -> Result<(String, String), String> {

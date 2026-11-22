@@ -336,7 +336,11 @@ impl WorkSession {
                 "toolCall",
                 &json!({"operation":"workContext","stepId":call}),
             )?;
-            json!({"conversation":store::conversation::context(&self.root,&self.work)?,"readEvidence":self.context.excerpts,"sleepDatasets":artifacts::sleep::manifest_on(&self.root,&crate::source_evidence::open_read_database(&self.root)?,&self.work)?,"charts":artifacts::manifest_on(&self.root,&crate::source_evidence::open_read_database(&self.root)?,&self.work)?,"method":self.context.skills.as_ref().unwrap().metadata(),"goalState":store::goal::completion::read_context(&self.root,&self.work,&self.run)?,"executionPurpose":"finishSavedReport; reuse data and record; no re-extraction, recalculation or actions"})
+            let mut context = json!({"conversation":store::conversation::context(&self.root,&self.work)?,"readEvidence":self.context.excerpts,"sleepDatasets":artifacts::sleep::manifest_on(&self.root,&crate::source_evidence::open_read_database(&self.root)?,&self.work)?,"charts":artifacts::manifest_on(&self.root,&crate::source_evidence::open_read_database(&self.root)?,&self.work)?,"goalState":store::goal::completion::read_context(&self.root,&self.work,&self.run)?,"executionPurpose":"finishSavedReport; reuse data and record; no re-extraction, recalculation or actions"});
+            if crate::agent_work::skills::mcp_sharing_enabled(&self.root).unwrap_or(false) {
+                context["method"] = self.context.skills.as_ref().unwrap().metadata();
+            }
+            context
         } else {
             if matches!(name, "hub_sleepDataset" | "hub_chart" | "hub_workingState")
                 && args["request"]["action"] != "read"

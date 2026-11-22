@@ -33,8 +33,8 @@ export function SkillManagerCard({title,version,description,shared,status,action
  </article>;
 }
 
-export function AgentSkillPackages({onChanged,initiallyExpanded=false,importTarget,onShowImport,cardSkills,refreshKey}:{
- onChanged:()=>void;initiallyExpanded?:boolean;importTarget?:HTMLElement|null;onShowImport?:()=>void;cardSkills?:AgentSkill[];refreshKey?:number;
+export function AgentSkillPackages({onChanged,initiallyExpanded=false,importTarget,onShowImport,cardSkills,refreshKey,sharingEnabled=true}:{
+ onChanged:()=>void;initiallyExpanded?:boolean;importTarget?:HTMLElement|null;onShowImport?:()=>void;cardSkills?:AgentSkill[];refreshKey?:number;sharingEnabled?:boolean;
 }) {
  const panel=useRef<HTMLElement|null>(null);
  const alive=useRef(true),sequence=useRef(0),listSequence=useRef(0),writing=useRef(false),pending=useRef<Record<string,unknown>|null>(null),fileReturn=useRef<HTMLButtonElement|null>(null),closeFile=useRef<HTMLButtonElement|null>(null);
@@ -132,7 +132,8 @@ export function AgentSkillPackages({onChanged,initiallyExpanded=false,importTarg
     const skill=cardSkills.find(item=>item.packageId===src.packageId||(!item.packageId&&item.name===src.name));
     const paused=detail?.source?.packageId===src.packageId?detail.paused===true:skill?.unavailableReasons.includes("技能已停用")===true;
     return <SkillManagerCard key={src.packageId} title={skill?.title||src.name} version={`第 ${src.revision} 版`} description={skill?.description}
-      shared={!!skill?.available&&skill.allowImplicitInvocation&&!paused} status={paused?"已停用":skill&&!skill.available?"暂不可用":undefined}
+      shared={sharingEnabled&&!!skill?.available&&skill.allowImplicitInvocation&&!paused}
+      status={paused?"已停用":skill&&!skill.available?skill.unavailableReasons.join("；")||"暂不可用":undefined}
       disabled={blocked} onOpen={()=>void read({action:"skillPackageDetails",packageId:src.packageId},"detail")}
       action={skill&&<button type="button" className="agent-skill-card-switch" role="switch" aria-label={`启用 ${skill.title}`} aria-checked={!paused} disabled={blocked}
         onClick={()=>void changeCloudState({action:"skillPackagePause",packageId:src.packageId,expectedRevision:src.revision,paused:!paused},undefined,false)}/>}/>;

@@ -14,7 +14,7 @@ const builtinDocuments: Record<string, string> = {"hub-research": builtin0,"hub-
 
 
 export type AgentSkill = { name: string; title: string; description: string; origin: "builtin" | "user" | "registered"; packageId?: string; methodVersion?: string; version: string; available: boolean; allowImplicitInvocation: boolean; unavailableReasons: string[] };
-type Catalog = { skills: AgentSkill[]; diagnostics: { name: string; message: string }[]; directory: string };
+type Catalog = { skills: AgentSkill[]; diagnostics: { name: string; message: string }[]; directory: string; mcpSharingEnabled?:boolean };
 
 const builtinTitles: Record<string,string> = {"hub-research":"资料分析与核对","hub-statistics":"材料统计与覆盖核对","hub-flashcards":"有来源的闪卡","hub-note-edit":"笔记整理与修改","hub-archive":"阅读材料归档","hub-tool-guide":"Hub 工具使用方法"};
 export const skillTitle = (name:string) => builtinTitles[name] || name;
@@ -29,6 +29,7 @@ export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], o
   const [query,setQuery]=useState("");
   const returnPin=useRef<string|null>(null);
   const [loading, setLoading] = useState(false);
+  const [savingSharing,setSavingSharing] = useState(false);
   const [error, setError] = useState("");
   const popover = useAgentPopover();
   const details = popover.ref;
@@ -43,6 +44,19 @@ export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], o
       if (alive.current && ticket === request.current) setCatalog(result);
     } catch (reason) { if (alive.current && ticket === request.current) setError(String(reason)); }
     finally { if (alive.current && ticket === request.current) setLoading(false); }
+  }
+  async function toggleSharing() {
+    if(loading||savingSharing||typeof catalog?.mcpSharingEnabled!=="boolean")return;
+    const enabled=!catalog.mcpSharingEnabled;
+    setSavingSharing(true);setError("");
+    try{
+      const value=await invoke<{mcpSharingEnabled:boolean}>("agent_investigation",{args:{action:"setSkillMcpSharing",enabled}});
+      if(alive.current){
+        if(value.mcpSharingEnabled!==enabled)throw new Error("技能互通状态未确认");
+        setCatalog(previous=>previous&&{...previous,mcpSharingEnabled:value.mcpSharingEnabled});
+      }
+    }catch(reason){if(alive.current)setError(String(reason));}
+    finally{if(alive.current)setSavingSharing(false);}
   }
   useEffect(()=>{if(embedded)void load();},[embedded]);
   const [detail, setDetail] = useState<AgentSkill | null>(null);
@@ -114,22 +128,28 @@ export function AgentSkills({ disabled, onSelect, embedded=false, selected=[], o
 
     </section> : managing ? <section className="agent-skill-detail agent-skill-management" aria-label="技能管理">
       {!standaloneManagement&&<button type="button" className="agent-menu-back" onClick={back}><ChevronLeft size={15}/>返回技能</button>}
-      <div className="agent-skill-interoperability" data-shared={catalog?.skills.some(skill=>skill.available&&skill.allowImplicitInvocation)||undefined}>
+      <div className="agent-skill-interoperability" data-shared={catalog?.mcpSharingEnabled}>
         <div><h3 ref={detailHeading} tabIndex={-1}>Hub &amp; Codex 技能库互通</h3><p>外部 Codex 通过 Hub MCP 按授权读取本地 SKILL.md 技能</p></div>
-        <button type="button" aria-label="打开用户技能文件夹" disabled={loading} onClick={()=>void load("openSkillDirectory")}>打开目录<ArrowUpRight size={13} aria-hidden="true"/></button>
+        <div className="agent-skill-interoperability-actions">
+          <button type="button" className="agent-skill-open-directory" aria-label="打开用户技能文件夹" disabled={loading||savingSharing} onClick={()=>void load("openSkillDirectory")}>打开目录<ArrowUpRight size={13} aria-hidden="true"/></button>
+          <button type="button" className="agent-skill-card-switch" role="switch" aria-label="Hub MCP 技能互通"
+            aria-checked={catalog?.mcpSharingEnabled===true} aria-busy={savingSharing}
+            disabled={loading||savingSharing||typeof catalog?.mcpSharingEnabled!=="boolean"} onClick={()=>void toggleSharing()}/>
+        </div>
       </div>
       <div className="agent-skill-manager-filters"><div role="group" aria-label="技能来源">
         {(["全部","本地技能","方法包"] as const).map(tab=><button type="button" key={tab} aria-pressed={managementTab===tab} onClick={()=>setManagementTab(tab)}>{tab}</button>)}
-      </div><button type="button" className="agent-skill-refresh" aria-label="刷新技能" title="刷新技能" disabled={loading} onClick={()=>{setPackageRefresh(previous=>previous+1);void load();}}><RefreshCw size={14}/>刷新</button></div>
+      </div><button type="button" className="agent-skill-refresh" aria-label="刷新技能" title="刷新技能" disabled={loading||savingSharing} onClick={()=>{setPackageRefresh(previous=>previous+1);void load();}}><RefreshCw size={14}/>刷新</button></div>
       {managementTab!=="方法包"&&<div className="agent-skill-manager-catalog">
         {catalog?.skills.filter(skill=>skill.origin!=="registered").map(skill=><SkillManagerCard key={skill.name} title={skill.title} version={skill.version}
-          description={purposes[skill.name]||skill.description} shared={skill.available&&skill.allowImplicitInvocation}
+          description={purposes[skill.name]||skill.description} shared={catalog?.mcpSharingEnabled!==false&&skill.available&&skill.allowImplicitInvocation}
           status={!skill.available?skill.unavailableReasons.join("；")||"暂不可用":undefined}
           action={<small className="agent-skill-card-availability" data-available={skill.available}>{skill.available?"可用":"暂不可用"}</small>}/>)}
         {catalog&&!catalog.skills.some(skill=>skill.origin!=="registered")&&managementTab==="本地技能"&&<p className="agent-note">此处暂无本地技能。</p>}
       </div>}
       <div hidden={managementTab==="本地技能"}><AgentSkillPackages initiallyExpanded importTarget={importTarget} onShowImport={()=>setManagementTab("方法包")}
-        cardSkills={catalog?.skills.filter(skill=>skill.origin==="registered")??[]} refreshKey={packageRefresh} onChanged={()=>void load()}/></div>
+        cardSkills={catalog?.skills.filter(skill=>skill.origin==="registered")??[]} sharingEnabled={catalog?.mcpSharingEnabled}
+        refreshKey={packageRefresh} onChanged={()=>void load()}/></div>
       <details className="agent-skill-management-help"><summary>导入格式与容量规范</summary>
         <p className="agent-note">每个方法包应包含 SKILL.md。每包最多 33 个文件、原始内容 128 KiB，文字参考和模板单份最多 32 KiB。修改本地技能后可刷新，已登记方法包可先检查变化再发布新版本。</p>
         <p className="agent-note">Hub 的用户技能与 Codex 的用户技能独立。</p>

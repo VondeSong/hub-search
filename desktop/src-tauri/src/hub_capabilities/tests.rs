@@ -2,6 +2,53 @@ use super::*;
 use crate::source_evidence::tests::Fixture;
 
 #[test]
+fn external_skill_sharing_updates_existing_sessions_and_preserves_embedded_skills() {
+    let f = Fixture::new();
+    let mut external = Session::new(&f.root, None).unwrap();
+    let mut embedded =
+        Session::new(&f.root, Some(EvidenceScope::new(vec![], vec![]).unwrap())).unwrap();
+    let advertised = |session: &Session| {
+        session.mcp_tools()["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|tool| tool["name"] == "hub_loadSkill")
+    };
+
+    assert!(advertised(&external));
+    assert!(external.call("hub_list_skills", &json!({}), "").is_ok());
+    crate::agent_work::ui(
+        &f.root,
+        &json!({"action":"setSkillMcpSharing","enabled":false}),
+    )
+    .unwrap();
+    assert!(!advertised(&external));
+    for name in ["hub_list_skills", "hub_loadSkill", "hub_readSkillReference"] {
+        assert!(external
+            .call(name, &json!({}), "")
+            .unwrap_err()
+            .contains("已关闭"));
+    }
+    assert!(external.call("hub_list_libraries", &json!({}), "").is_ok());
+    assert!(external
+        .call("hub_refresh_context", &json!({}), "")
+        .unwrap()
+        .get("skills")
+        .is_none());
+    assert!(embedded.call("hub_list_skills", &json!({}), "").is_ok());
+    crate::agent_work::ui(
+        &f.root,
+        &json!({"action":"setSkillMcpSharing","enabled":true}),
+    )
+    .unwrap();
+    assert!(advertised(&external));
+    assert_eq!(
+        crate::agent_work::ui(&f.root, &json!({"action":"skills"})).unwrap()["mcpSharingEnabled"],
+        true
+    );
+}
+
+#[test]
 fn resolve_link_shares_scoped_and_mcp_identity_without_implicit_read_or_grant() {
     let f = Fixture::new();
     f.note("notes", "selected", "真实隔离正文");
