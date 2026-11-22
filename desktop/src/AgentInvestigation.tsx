@@ -41,7 +41,7 @@ import { AgentScopeCoverage } from "./AgentScopeCoverage";
 import { useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { AssistantSelectionActions } from "./AgentSelectionActions";
 import { createPortal } from "react-dom";
-import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronRight, CircleAlert, FileText, Image, ListChecks, Menu, MessageSquare, Maximize, PanelRightOpen, PanelsTopLeft, SlidersHorizontal, Quote, Plus, Search, X, Zap } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Check, Square, ChevronRight, CircleAlert, FileText, Image, ListChecks, Menu, MessageSquare, SlidersHorizontal, Quote, Plus, Search, X, Zap } from "lucide-react";
 import type { SearchResult } from "./SearchTypes";
 import { isTaskPreviewResult } from "./TaskResultIdentity";
 import { runtimeCapabilities } from "./RuntimePlatform";
@@ -53,7 +53,7 @@ import { AgentBusinessActions, ArchiveRecord, FlashcardRecord } from "./AgentBus
 import { AgentObsidianEdit, AgentObsidianTarget, AgentReportSave } from "./AgentObsidianEdit";
 import { AgentConditions, type AgentCondition } from "./AgentConditions";
 import { codexSelectionLabel, useCodexSuite, type CodexSettings, type ModelExecution } from "./CodexSuite";
-import { InlineMemoryProposals, MemoryAndSavePopover, MemoryManager } from "./SharedMemory";
+import { InlineMemoryProposals, MemoryAndSavePopover, MemoryManager, MemoryToolbarButton, wrapDialogTab } from "./SharedMemory";
 import { useSharedMemory, type MemoryUse } from "./useSharedMemory";
 import type { MemorySelection } from "./AgentPreferences";
 import { AgentCharts, type AnalysisChart } from "./AgentCharts";
@@ -114,6 +114,21 @@ export function investigationAnchor(result: SearchResult): Exclude<Investigation
   }
   if (!["craft", "obsidian", "feishu"].includes(result.provider)) return null;
   return { kind: "note", libraryId: result.libraryId || result.spaceId, documentId: result.documentId, pageId: result.provider === "craft" ? result.pageId || result.blockId || result.documentId : null };
+}
+
+const windowShapes = [
+  {id:"docked",label:"右侧分屏停靠",description:"与文档并排对照，互不遮挡"},
+  {id:"floating",label:"悬浮浮窗",description:"浮在文档上方，不触发重排"},
+  {id:"expanded",label:"专注展开",description:"居中宽屏阅读长报告与表格"},
+] as const;
+
+function WindowShapeIcon({shape}:{shape:typeof windowShapes[number]["id"]}) {
+  return <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {shape==="expanded"?<path d="M15 4h5v5M9 20H4v-5M20 4l-6 6M4 20l6-6"/>:
+      <><rect x={3} y={4} width={18} height={16} rx={2.5} strokeOpacity={shape==="floating"?.45:1}/>
+        {shape==="docked"?<path d="M14 4v16"/>:<rect x={10.5} y={7} width={8.5} height={10} rx={1.8} fill="currentColor" fillOpacity={.14}/>}
+      </>}
+  </svg>;
 }
 
 export function AgentInvestigation(props: { result: SearchResult; compact?: boolean; onPreviewCitation?: (value: CitationLocation | null) => void }) {
@@ -195,13 +210,13 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const materialReturn=useRef<HTMLElement|null>(null);
   const materialPopover=useAgentPopover({returnFocusRef:materialReturn,onEscape:backInMaterials});
   const [addMenuOpen,setAddMenuOpen]=useState(false);
-  const [addPage,setAddPage]=useState<"home"|"materials"|"scope"|"skills"|"web"|"images"|"pages"|"files">("home");
+  const [addPage,setAddPage]=useState<"home"|"materials"|"scope"|"web"|"images"|"pages"|"files">("home");
   const [scopeTab,setScopeTab]=useState<"docs"|"libraries"|"policy">("docs");
   const addBack=useRef<HTMLButtonElement>(null);
   useEffect(()=>{
     if(!addMenuOpen)return;
     const panel=materialPopover.ref.current;
-    const focus=["pages","files","images","skills"].includes(addPage) ? panel?.querySelector<HTMLInputElement>("[data-material-focus] input[type='search']:not(:disabled), .agent-material-search input:not(:disabled), .agent-skill-search input") :
+    const focus=["pages","files","images"].includes(addPage) ? panel?.querySelector<HTMLInputElement>("[data-material-focus] input[type='search']:not(:disabled), .agent-material-search input:not(:disabled)") :
       ["scope","materials"].includes(addPage) ? panel?.querySelector<HTMLButtonElement>(".agent-scope-tabs button") :
       addPage==="home" ? panel?.querySelector<HTMLButtonElement>(".agent-add-choices button:not(:disabled)") : addBack.current;
     (focus??addBack.current??panel?.querySelector<HTMLButtonElement>(".agent-popover-header>button:last-child"))?.focus({preventScroll:true});
@@ -238,6 +253,14 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const skillPrefix = goal.match(/^(?:\$[a-z0-9]+(?:-[a-z0-9]+)*(?:\s+|$))+/)?.[0] || "";
   const selectedSkills = [...new Set(skillPrefix.match(/\$[a-z0-9]+(?:-[a-z0-9]+)*/g) || [])];
   const questionText = goal.slice(skillPrefix.length);
+  const setSkillAttached = (name: string, attached?: boolean) => setGoal(current=>{
+    const prefix=current.match(/^(?:\$[a-z0-9]+(?:-[a-z0-9]+)*(?:\s+|$))+/)?.[0]||"";
+    const token="$"+name;
+    const previous:string[]=prefix.match(/\$[a-z0-9]+(?:-[a-z0-9]+)*/g)||[];
+    const skills=previous.filter(item=>item!==token);
+    if(attached??!previous.includes(token))skills.push(token);
+    return skills.map(item=>item+" ").join("")+current.slice(prefix.length);
+  });
   function prepareSourceRecheck() {
     if (!questionText.trim()) setGoal(skillPrefix + "请按当前授权重新读取发生变化的资料，核对后再更新结论。");
     goalInput.current?.focus();
@@ -361,10 +384,19 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const canDock = !!extra || !onDismiss;
   const [docked, setDocked] = useState(() => canDock && sessionStorage.getItem(dockKey) === "true");
   const [expandedLayout, setExpandedLayout] = useState(false);
+  const windowShape=expandedLayout?"expanded":docked?"docked":"floating";
   const windowLayout = useAgentPopover();
   const [accountOpen, setAccountOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [manageSkills, setManageSkills] = useState(false);
+  const skillReturn = useRef<HTMLElement|null>(null);
+  const skillPicker = useAgentPopover({returnFocusRef:skillReturn,anchorToSummary:true});
+  const [skillPickerOpen,setSkillPickerOpen] = useState(false);
+  const [skillManagerOpener,setSkillManagerOpener] = useState<HTMLElement|null>(null);
+  const [skillImportTarget,setSkillImportTarget] = useState<HTMLSpanElement|null>(null);
+  useEffect(()=>{if(!open){setSkillPickerOpen(false);setSkillManagerOpener(null);}},[open]);
+  useEffect(()=>{
+    if(skillPickerOpen&&skillReturn.current===goalInput.current)skillPicker.ref.current?.querySelector<HTMLInputElement>(".agent-skill-search input")?.focus({preventScroll:true});
+  },[skillPickerOpen,skillPicker.ref]);
   const [availableSkillCount, setAvailableSkillCount] = useState<number>();
   const [titleEdit,setTitleEdit] = useState<{id:string; value:string} | null>(null);
   const [draftTitle,setDraftTitle] = useState("");
@@ -848,7 +880,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const goalModeLabel = savedCompletionCriteria || goalModeProgress || "按完成条件推进，遇到阻碍时暂停";
   const scopePolicy = scopeOptions.researchPolicy ?? "material-first";
   const materialsOnly = scopePolicy === "materials-only";
-  const memory = useSharedMemory({workId:view?.work.state === "revoked"?undefined:view?.work.id,runId:view?.run?.id,active:active||!open,blocked:busy||active||!open||view?.work.state==="revoked",selection:memorySelection,onSelectionChange:setMemorySelection});
+  const memory = useSharedMemory({workId:view?.work.state === "revoked"?undefined:view?.work.id,runId:view?.run?.id,active:active||!open,blocked:busy||active||!open||view?.work.state==="revoked",selection:memorySelection,onSelectionChange:setMemorySelection,showToolbarScope:open});
   const [relatedConversations,setRelatedConversations]=useState<{key:string;works:(WorkSummary & {excerpt?:string|null})[]}|null>(null);
   const relatedScope=JSON.stringify({anchor:pageAnchor,projectId:memorySelection.projectId});
   const draftSearch=questionText.trim();
@@ -897,11 +929,18 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     if (materialPopover.ref.current) materialPopover.ref.current.open = true;
   };
   function openSkills(returnTo: HTMLElement | null, manage = false) {
-    setManageSkills(manage);
-    materialReturn.current=returnTo;
-    setAddPage("skills");
-    setAddMenuOpen(true);
-    if(materialPopover.ref.current)materialPopover.ref.current.open=true;
+    if(manage){
+      skillPicker.close();
+      setSkillManagerOpener(returnTo);
+      return;
+    }
+    skillReturn.current=returnTo;
+    setSkillPickerOpen(true);
+    if(skillPicker.ref.current)skillPicker.ref.current.open=true;
+  }
+  function closeSkillManager() {
+    setSkillManagerOpener(null);
+    requestAnimationFrame(()=>skillManagerOpener?.focus({preventScroll:true}));
   }
   function closeDetailsMemory(returnToDetails = false) {
     const opener = detailsMemoryOpener;
@@ -1396,7 +1435,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         if(event.dataTransfer.files?.length){event.preventDefault();event.stopPropagation();setReportReading(false);void addFiles(Array.from(event.dataTransfer.files));return;}const data=event.dataTransfer.getData("application/x-hub-agent-source");if(!data)return;event.preventDefault();event.stopPropagation();setReportReading(false);try{if(data.length>65536)throw new Error();addExternalMaterial(JSON.parse(data));}catch{setError("无法识别拖入的资料，请重新拖入。");}}} onKeyDown={event => {
       if (event.key === "Escape" && !event.nativeEvent.isComposing && !event.defaultPrevented && !(event.target instanceof Element && event.target.closest(".agent-token-disclosure"))) { event.preventDefault(); event.stopPropagation(); const menu=((!reportReading || addMenuOpen) && event.currentTarget.querySelector<HTMLDetailsElement>(".agent-composer details[open]")) || (detailsMenu.current?.open ? detailsMenu.current : null); if(menu){menu.open=false;menu.querySelector("summary")?.focus();}else if(citationOpen){returnFromCitation();}else if(reportReading){setReportReading(false);event.currentTarget.querySelector<HTMLButtonElement>('.agent-header-end button[aria-label="对话详情"]')?.focus();}else closePanel(); }
     }}>
-      <header className="agent-panel-header" inert={memory.managerOpen}>
+      <header className="agent-panel-header" inert={memory.managerOpen||!!skillManagerOpener}>
         <div className="agent-header-start">
         <details ref={detailsMenu} data-history={historyExpanded} className="agent-dialogue-details" data-task-status={taskStatusOnly} onClickCapture={event=>{const menu=event.currentTarget;if(!menu.open&&(event.target as Element).closest("summary")===menu.firstElementChild){detailsReturn.current=menu.firstElementChild as HTMLElement;setHistoryExpanded(true);setTaskStatusOnly(false);void reloadWorks();}}} onToggle={event=>{if(event.target!==event.currentTarget)return;const menu=event.currentTarget;setDetailsOpen(menu.open);if(!menu.open&&detailsReturn.current?.isConnected&&(menu.contains(document.activeElement)||document.activeElement===document.body))detailsReturn.current.focus();}}><summary aria-label="对话历史" title="对话历史"><Menu size={18} aria-hidden="true"/></summary><div className="agent-details-content" role="region" aria-label={historyExpanded?"对话历史":taskStatusOnly?"任务状态":"对话详情"}>
           <div hidden={!historyExpanded} className="agent-history-container">
@@ -1482,7 +1521,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
           : <button type="button" className="agent-chat-title" title={chatTitle} aria-label="重命名对话" disabled={busy||!!active} onClick={()=>setTitleEdit({id:titleScope,value:chatTitle.slice(0,100)})}><span>{chatTitle}</span></button>}
         <div className="agent-header-end">
         <AgentTaskMode activeTopic={research?.topic} onUnpinTopic={async topic=>{const scope=selectionScope.current;const saved=await call<ResearchTopic>({action:"saveResearchTopic",topic:{...topic,pinned:false}});if(alive.current&&selectionScope.current===scope&&research?.topic.id===saved.id)setResearch({...research,topic:{...research.topic,revision:saved.revision,pinned:false}});}} title={chatTitle} disabled={busy || !!active} tagMode={tagMode} goalMode={goalMode} goalDisabled={(scopeOptions.model ?? runtime.settings)?.provider === "deepseek"} onGeneral={()=>void changeTaskMode(false)} onGoal={()=>void changeTaskMode(true)} onTag={enableTagMode} selectedSkills={selectedSkills.map(token=>token.slice(1))} onTopics={()=>{setRequestedTopic(undefined);setTopicSave(false);setTopicsOpen(true);}} onTopic={topic=>{setRequestedTopic(topic.id);setTopicSave(false);setTopicsOpen(true);}} onUsage={()=>{detailsReturn.current=document.getElementById(panelId)?.querySelector<HTMLElement>(".agent-task-mode>summary")||null;setTaskStatusOnly(true);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current)workControls.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-heading button")?.focus();},0);}}/>
-          <button ref={detailsTrigger} type="button" title="对话详情" aria-label="对话详情" onClick={event=>{if(detailsMenu.current?.open&&!historyExpanded){detailsPopover.close();event.currentTarget.focus();return;}detailsReturn.current=event.currentTarget;setTaskStatusOnly(false);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;
+          <button ref={detailsTrigger} type="button" title="对话详情与工具" aria-label="对话详情" aria-expanded={detailsOpen&&!historyExpanded&&!taskStatusOnly} onClick={event=>{if(detailsMenu.current?.open&&!historyExpanded){detailsPopover.close();event.currentTarget.focus();return;}windowLayout.close();detailsReturn.current=event.currentTarget;setTaskStatusOnly(false);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;
             void call<{skills?:{available:boolean}[]}>({action:"skills"}).then(value=>{
               if(alive.current&&Array.isArray(value.skills))setAvailableSkillCount(value.skills.filter(skill=>skill.available).length);
             },()=>{});
@@ -1490,15 +1529,15 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
           {canDock&&<>
             <span className="agent-window-separator" aria-hidden="true"/>
             <details ref={windowLayout.ref} className="agent-window-layout" onKeyDown={event=>{if(event.key==="Escape"){event.preventDefault();event.stopPropagation();windowLayout.close(true);}}}>
-              <summary aria-label="切换窗口形态" title="切换窗口形态">{expandedLayout?<Maximize size={16}/>:docked?<PanelsTopLeft size={16}/>:<PanelRightOpen size={16}/>}</summary>
+              <summary aria-label="切换窗口形态" title="切换助手窗口形态"><WindowShapeIcon shape={windowShape}/></summary>
               <div className="agent-window-menu" aria-label="助手显示形态">
-                {[
-                  {id:"docked",label:"右侧分屏停靠",Icon:PanelsTopLeft},
-                  {id:"floating",label:"悬浮浮窗",Icon:PanelRightOpen},
-                  {id:"expanded",label:"专注展开",Icon:Maximize},
-                ].map(({id,label,Icon})=><button type="button" key={id} aria-pressed={id===(expandedLayout?"expanded":docked?"docked":"floating")} onClick={()=>{
-                  setDocked(id==="docked");setExpandedLayout(id==="expanded");detailsPopover.close();windowLayout.close(true);
-                }}><Icon size={15} aria-hidden="true"/>{label}</button>)}
+                <div className="agent-window-menu-title">助手窗口形态</div>
+                {windowShapes.map(({id,label,description})=>{
+                  const selected=id===windowShape;
+                  return <button type="button" key={id} aria-label={label} aria-description={description} aria-pressed={selected} onClick={()=>{
+                    setDocked(id==="docked");setExpandedLayout(id==="expanded");detailsPopover.close();windowLayout.close(true);
+                  }}><WindowShapeIcon shape={id}/><span><strong>{label}</strong><small>{description}</small></span>{selected&&<Check size={14} aria-hidden="true"/>}</button>;
+                })}
               </div>
             </details>
           </>}
@@ -1514,7 +1553,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         <button type="button" className="agent-mode-exit" aria-label="退出目标模式" disabled={busy||!!active}
           onClick={()=>void changeTaskMode(false)}><X size={14}/></button>
       </section>}
-      <div className="agent-body" inert={memory.managerOpen}>
+      <div className="agent-body" inert={memory.managerOpen||!!skillManagerOpener}>
       <div className="agent-conversation-wrap" aria-busy={loadingConversation || sourceLoading}>
       {loadingConversation && <div className="agent-conversation-loading" role="status" aria-label="正在打开对话"><span/><span/><span/></div>}
       <div className="agent-conversation" data-running={running && !reportReading || undefined} hidden={loadingConversation || (sourceScope.current===sourceScopeKey && (!!sourcePreview || !!sourceError || sourceLoading))} ref={conversationScroll.element} tabIndex={0} aria-label="对话与报告" onScroll={conversationScroll.onScroll} onClickCapture={event=>{if((event.target as Element).closest(".agent-activity-toggle,details > summary"))conversationScroll.holdPosition();}}>
@@ -1676,10 +1715,10 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
             <details ref={materialPopover.ref} className="agent-add-menu agent-popover" onToggle={event=>{if(event.target!==event.currentTarget)return;setAddMenuOpen(event.currentTarget.open);if(!event.currentTarget.open){setMaterialSelection(null);setAddPage("home");}}}>
               <summary aria-label="添加附件" title="添加附件" onClick={()=>{materialReturn.current=null;}}><Plus size={16} aria-hidden="true"/></summary>
               {addMenuOpen && ["materials","scope","pages","files","images"].includes(addPage) && <div className="agent-scope-backdrop" aria-hidden="true" onClick={()=>materialPopover.close(true)}/>}
-              <div className={`agent-add-content${["materials","scope","pages","files","images"].includes(addPage)?" agent-add-materials":addPage==="skills"?" agent-add-skills":""}`}>
+              <div className={`agent-add-content${["materials","scope","pages","files","images"].includes(addPage)?" agent-add-materials":""}`}>
                 <div className="agent-popover-header">
-                  {!["home","scope","materials","skills"].includes(addPage)&&<button type="button" className="agent-menu-back" ref={addBack} aria-label={["files","images"].includes(addPage)?"返回材料列表":"返回资料范围"} onClick={backInMaterials}><ArrowLeft size={16}/></button>}
-                  <strong>{addPage==="home"?"添加到本次对话":addPage==="skills"?"技能":addPage==="pages"?"选择材料":addPage==="files"?"资料库文件":addPage==="images"?"图片与 PDF 页面":addPage==="web"?"公共链接":"资料范围"}</strong>
+                  {!["home","scope","materials"].includes(addPage)&&<button type="button" className="agent-menu-back" ref={addBack} aria-label={["files","images"].includes(addPage)?"返回材料列表":"返回资料范围"} onClick={backInMaterials}><ArrowLeft size={16}/></button>}
+                  <strong>{addPage==="home"?"添加到本次对话":addPage==="pages"?"选择材料":addPage==="files"?"资料库文件":addPage==="images"?"图片与 PDF 页面":addPage==="web"?"公共链接":"资料范围"}</strong>
                   <button type="button" aria-label="关闭添加菜单" title="关闭" onClick={()=>materialPopover.close(true)}><X size={16}/></button>
                 </div>
                 {addPage==="home" && <div className="agent-add-choices">
@@ -1698,7 +1737,6 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
                   }}/>
                 </div>}
                 {addMenuOpen && addPage==="web" && <div className="agent-add-section"><label>公共网页地址<input type="url" aria-label="公共网页地址" value={publicUrl} disabled={busy} onChange={event=>setPublicUrl(event.target.value)} placeholder="https://example.org/article"/></label><p className="agent-note">发送问题即读取并保存此公开网页。仅支持 HTTPS 文本与 HTML 源码；不登录、不跟随跳转，不加载脚本和图片。每次最多 256 KiB，30 秒超时。遇到代理虚拟地址时向 Cloudflare 加密查询域名，不发送正文。</p><button type="button" onClick={()=>{materialPopover.close(true);goalInput.current?.focus();}}>返回填写问题</button></div>}
-                {addMenuOpen && addPage==="skills" && <AgentSkills key={manageSkills?"manage":"pick"} manageInitially={manageSkills} pinned={pinnedSkills} onPin={toggleSkillPin} selected={selectedSkills.map(token=>token.slice(1))} onReset={()=>setGoal(questionText)} disabled={busy || (!!active && !steerable)} onSelect={name=>{setGoal(current=>new RegExp(`(^|[^a-zA-Z0-9_$\\\\-])\\$${name}(?=$|[^a-zA-Z0-9_-])`).test(current)?current:`$${name} ${current}`);materialPopover.close(false);goalInput.current?.focus();}} embedded/>}
                 {addMenuOpen && (addPage==="materials" || addPage==="scope") && <div className="agent-add-section agent-scope-body">
             <div className="agent-scope-tabs" role="group" aria-label="资料范围分区">
               <button type="button" aria-pressed={scopeTab==="docs"} onClick={()=>setScopeTab("docs")}>核心材料 ({coreMaterialCount})</button>
@@ -1768,8 +1806,17 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
               </div>
             </details>
             <AgentScopeTrigger selected={detailGrant ? detailGrant.libraryIds.map(id=>({id,name:id})) : composerLibraries} registry={libraryRegistry} fallbackLabel={detailGrant ? (detailCoreCount ? `${detailCoreCount} 份资料` : "添加资料范围") : view?.work.grant.manifest ? `固定 ${view.work.grant.manifest.members.length} 份资料` : (pageAttached ? "当前页面" : hasEffectiveMaterials ? "已添加资料" : "添加资料范围")} pending={libraryDraft!==null} disabled={busy || filePreparing || !!publicUrl} onClick={()=>openMaterialScope()}/>
-          <button type="button" className="agent-current-page agent-skill-shortcut" aria-label="添加技能" title="技能：选择本次使用的处理方法" data-selected={selectedSkills.length>0} disabled={busy || (!!active && !steerable)} onClick={event=>openSkills(event.currentTarget)}><Zap size={14} aria-hidden="true"/></button>
-            <MemoryAndSavePopover model={memory} value={scopeOptions} disabled={busy || !!active} materialsOnly={materialsOnly} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
+            <details ref={skillPicker.ref} className="agent-skill-disclosure agent-popover" data-hub-keyboard-scope="agent-skills" onToggle={event=>{if(event.target===event.currentTarget)setSkillPickerOpen(event.currentTarget.open);}}>
+              <summary className="agent-skill-shortcut" aria-label="添加技能" title="挂载技能" data-selected={selectedSkills.length>0} aria-disabled={busy||!!active&&!steerable}
+                onClick={event=>{if(busy||!!active&&!steerable){event.preventDefault();return;}skillReturn.current=event.currentTarget;}}><Zap size={14} aria-hidden="true"/></summary>
+              {skillPickerOpen&&<div className="agent-add-content agent-add-skills" aria-label="技能">
+                <AgentSkills embedded compact pinned={pinnedSkills} onPin={toggleSkillPin} selected={selectedSkills.map(token=>token.slice(1))}
+                  disabled={busy||!!active&&!steerable} onManage={()=>openSkills(skillPicker.ref.current?.querySelector("summary")??null,true)}
+                  onSelect={name=>{setSkillAttached(name,true);skillPicker.close();goalInput.current?.focus();}}
+                  onQuickToggle={setSkillAttached}/>
+              </div>}
+            </details>
+            <MemoryToolbarButton model={memory} materialsOnly={materialsOnly}/>
           {textMaterials?.selection&&<button type="button" className="agent-current-page agent-selection-tool" aria-label="添加所选文字" title="添加所选文字（文字快照，不是区块）" disabled={busy||filePreparing||!!view?.work.grant.manifest} onMouseDown={event=>event.preventDefault()} onClick={()=>{addTextMaterial(textMaterials.selection!);textMaterials.clearSelection();}}><Quote size={18}/></button>}
             <AgentAssistantOptions onOpenAccounts={accountVisible?()=>setAccountOpen(true):undefined} value={(view ? view.assistantOptions || defaultAssistantOptions : assistantOptions)} disabled={busy || !!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
             {active && <button className="agent-send" type="button" aria-label="停止本轮" title="停止本轮" disabled={busy || stopping || !!view?.lifecycle && !view.lifecycle.activeRunId} onClick={()=>void mutate("cancel")}><Square size={13} fill="currentColor" aria-hidden="true" /></button>}
@@ -1783,7 +1830,18 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       </div>
       </div>
       {open && accountOpen && <CodexAccountDialog onClose={()=>setAccountOpen(false)}/>}
+      {open && skillManagerOpener && <div className="agent-reference-overlay" onClick={event=>{if(event.target===event.currentTarget&&!event.currentTarget.querySelector("[data-agent-native-dialog]"))closeSkillManager();}}>
+        <section className="agent-reference-modal agent-skill-manager-dialog" role="dialog" aria-modal="true" aria-label="管理技能" onKeyDown={event=>{
+          if(event.key==="Escape"&&!event.defaultPrevented&&!event.nativeEvent.isComposing&&!event.currentTarget.querySelector("[data-agent-native-dialog]")){event.preventDefault();event.stopPropagation();closeSkillManager();}
+          wrapDialogTab(event);
+        }}>
+          <header><strong>Hub &amp; Codex 通用技能中心</strong><span ref={setSkillImportTarget}/><button type="button" aria-label="关闭技能管理" onClick={closeSkillManager}><X size={16}/></button></header>
+          <AgentSkills embedded manageInitially standaloneManagement importTarget={skillImportTarget} disabled={busy||!!active&&!steerable} onSelect={()=>{}}/>
+        </section>
+      </div>}
       {open && memory.managerOpen && <MemoryManager key={view?.work.id || draftRevision} model={memory} materialsOnly={materialsOnly} usage={view?.memoryUse}
+        settings={<MemoryAndSavePopover inManager model={memory} value={scopeOptions} disabled={busy||!!active} materialsOnly={materialsOnly} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>}
+        centered
         onBack={detailsMemoryOpener ? () => closeDetailsMemory(true) : undefined}
         onClose={detailsMemoryOpener ? () => closeDetailsMemory() : undefined}/>}
     </aside></>, document.body)}

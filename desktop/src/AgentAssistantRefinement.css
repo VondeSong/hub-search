@@ -534,7 +534,9 @@ details[open] > summary > .agent-detail-caret { transform:rotate(180deg); }
 }
 .agent-mode-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--hub-accent); }
 .agent-mode-dot:is([data-mode="目标模式"],[data-mode="标签助手"]) { background:var(--mode-solid); }
-.agent-panel .agent-panel-header:has(.agent-task-mode[open]) { z-index: 43; }
+.agent-panel .agent-panel-header:has(.agent-task-mode[open],.agent-window-layout[open]) { z-index: 43; }
+.agent-panel .agent-header-end > button[aria-expanded=true] { background:var(--agent-chat-hover); color:var(--agent-chat-ink); }
+.agent-panel .agent-header-end > button[aria-label="对话详情"] > svg { width:14px; height:14px; }
 .agent-dialogue-details[open]::details-content, .agent-task-mode[open]::details-content { display: contents; }
 .agent-panel .agent-header-end .agent-mode-menu {
   inset-inline: auto 8px; width: min(310px,calc(100cqw - 16px)); transform: none;
@@ -796,8 +798,54 @@ details[open] > summary > .agent-detail-caret { transform:rotate(180deg); }
   padding: 0; border: 0; border-radius: 50%; background: rgba(0,0,0,.68); color: #fff;
 }
 .agent-panel .agent-composer .agent-add-menu > summary,
-.agent-panel .agent-composer-controls > .agent-skill-shortcut { width: 28px; min-width: 28px; height: 28px; min-height: 28px; border-radius: 8px; }
-.agent-panel .agent-composer-controls > .agent-skill-shortcut[data-selected=true] { color: var(--hub-accent); }
+.agent-panel .agent-skill-disclosure { position:static; flex:none; margin:0; }
+.agent-panel .agent-skill-disclosure > .agent-skill-shortcut {
+  display:grid; place-items:center; width:28px; height:28px; padding:0; border:0; border-radius:8px;
+  background:transparent; color:var(--agent-chat-secondary); cursor:pointer; list-style:none;
+}
+.agent-skill-shortcut::-webkit-details-marker { display:none; }
+.agent-panel .agent-skill-disclosure > .agent-skill-shortcut[aria-disabled=true] { opacity:.45; cursor:default; }
+.agent-panel .agent-skill-disclosure > .agent-skill-shortcut:hover:not([aria-disabled=true]),
+.agent-panel .agent-skill-disclosure[open] > .agent-skill-shortcut { background:var(--agent-chat-hover); color:var(--agent-chat-ink); }
+.agent-panel .agent-skill-disclosure > .agent-skill-shortcut[data-selected=true] {
+  color:var(--hub-accent); background:color-mix(in srgb,var(--hub-accent) 9%,var(--agent-chat-surface));
+}
+.agent-panel .agent-composer .agent-skill-disclosure > .agent-add-skills {
+  width:min(288px,100%); max-width:none; padding:8px;
+  inset:auto auto calc(100% + 8px) clamp(0px,var(--agent-popover-anchor,0px),calc(100% - min(288px,100%)));
+  background:color-mix(in srgb,var(--agent-chat-surface) 95%,transparent); backdrop-filter:blur(18px) saturate(160%);
+  box-shadow:var(--agent-chat-popover-shadow);
+}
+.agent-skill-compact-heading { display:flex; justify-content:space-between; gap:8px; padding:3px 6px; font-size:11px; color:var(--agent-chat-muted); }
+.agent-panel .agent-skill-menu-compact .agent-skill-toolbar { padding:5px 5px 2px; }
+.agent-panel .agent-skill-menu-compact .agent-skill-search > input { min-height:28px; padding:3px 0; font-size:12px; }
+.agent-skill-menu-compact .agent-skill-scroll { max-height:208px; padding:0 2px; }
+.agent-panel .agent-skill-menu-compact .agent-skill-choice > button:first-child { min-height:37px; padding:4px 5px; }
+.agent-panel .agent-skill-menu-compact .agent-skill-choice:focus-within { background:var(--agent-chat-hover); }
+.agent-panel .agent-skill-menu-compact .agent-skill-copy > strong { font-size:12px; }
+.agent-panel .agent-skill-menu-compact .agent-skill-copy > span { font-size:10.5px; }
+.agent-panel .agent-skill-menu-compact .agent-skill-pin { opacity:.48; }
+.agent-panel .agent-skill-menu-compact .agent-skill-pin:is(:hover,:focus-visible,[aria-pressed=true]) { opacity:1; }
+.agent-panel .agent-skill-menu-compact .agent-skill-quick {
+  display:grid; place-items:center; flex:0 0 24px; width:24px; height:24px; min-height:24px; padding:0; border:0;
+  border-radius:7px; background:var(--agent-chat-subtle); color:var(--agent-chat-secondary); box-shadow:none;
+}
+.agent-panel .agent-skill-menu-compact .agent-skill-quick[aria-pressed=true] { color:var(--hub-accent); background:var(--hub-accent-soft); }
+.agent-skill-compact-footer { flex:none; margin-top:4px; padding-top:5px; border-top:1px solid var(--agent-chat-border); }
+.agent-panel .agent-skill-compact-footer button {
+  display:flex; align-items:center; justify-content:space-between; width:100%; min-height:28px; padding:4px 6px;
+  border:0; background:transparent; box-shadow:none; color:var(--agent-chat-secondary); font-size:11.5px;
+}
+.agent-panel .agent-skill-compact-footer button:hover { background:var(--agent-chat-hover); color:var(--agent-chat-ink); }
+.agent-panel .agent-add-skills .agent-skill-menu-compact .agent-skill-detail { padding:4px; }
+.agent-skill-detail-navigation { display:flex; justify-content:space-between; align-items:center; gap:6px; }
+.agent-panel .agent-skill-detail-navigation :is(.agent-menu-back,.agent-skill-source-link) { min-height:26px; padding:2px 0; border:0; background:transparent; box-shadow:none; font-size:11.5px; }
+.agent-panel .agent-skill-source-link { color:var(--hub-accent); }
+.agent-skill-menu-compact .agent-skill-detail-title { margin-block:6px; }
+.agent-skill-menu-compact .agent-skill-detail-title > h3 { font-size:13px; }
+.agent-panel .agent-skill-menu-compact .agent-skill-actions > button:first-child {
+  width:100%; background:var(--agent-chat-ink); color:var(--agent-chat-surface); border-radius:10px;
+}
 .agent-panel .agent-composer :is(.agent-scope-trigger,.agent-memory-trigger,.agent-model-controls > details > summary) { height: 28px; min-height: 28px; border-radius: 8px; font-size: 11.5px; }
 .agent-panel .agent-composer :is(.agent-add-menu > summary,.agent-skill-shortcut,.agent-scope-trigger,.agent-memory-trigger) { color: var(--agent-chat-secondary); }
 .agent-panel .agent-composer .agent-memory-trigger > span { font-size: inherit; }
@@ -858,16 +906,24 @@ details[open] > summary > .agent-detail-caret { transform:rotate(180deg); }
 }
 .agent-window-layout > summary::-webkit-details-marker { display: none; }
 .agent-window-layout > summary:hover, .agent-window-layout[open] > summary { background: var(--agent-chat-hover); }
-.agent-window-separator { width: 1px; height: 14px; background: var(--agent-chat-border); }
+.agent-window-separator { width:1px; height:14px; margin-inline:2px; background:var(--agent-chat-border); }
 .agent-window-menu {
-  position: absolute; z-index: 10; inset: 34px 0 auto auto; width: min(224px, calc(100cqw - 28px));
-  padding: 5px; border: 1px solid var(--agent-chat-border); border-radius: 16px; background: var(--agent-chat-surface);
-  box-shadow: var(--agent-chat-popover-shadow);
+  position:absolute; z-index:1; inset:calc(100% + 8px) 0 auto auto; width:min(224px,calc(100cqw - 28px));
+  box-sizing:border-box; max-height:var(--agent-header-popover-room,none); overflow:auto; overscroll-behavior:contain;
+  padding:6px; border:1px solid var(--agent-chat-border); border-radius:16px;
+  background:color-mix(in srgb,var(--agent-chat-surface) 95%,transparent);
+  box-shadow:var(--agent-chat-popover-shadow); backdrop-filter:blur(18px) saturate(160%);
 }
+.agent-window-menu-title { padding:4px 8px; color:var(--agent-chat-muted); font:500 10.5px/1.5 var(--agent-chat-font); }
 .agent-window-menu > button {
-  display: flex; align-items: center; width: 100%; gap: 8px; padding: 7px 8px;
-  border: 0; border-radius: 8px; background: transparent; color: var(--agent-chat-ink); font: inherit; text-align: start;
+  display:flex; align-items:center; width:100%; gap:10px; padding:8px;
+  border:0; border-radius:12px; background:transparent; color:var(--agent-chat-ink); font:12px/1.45 var(--agent-chat-font); text-align:start; cursor:pointer;
 }
+.agent-window-menu > button > svg { flex:none; }
+.agent-window-menu > button > span { flex:1; min-width:0; }
+.agent-window-menu > button :is(strong,small) { display:block; }
+.agent-window-menu > button strong { font-weight:500; }
+.agent-window-menu > button small { font-size:10.5px; color:var(--agent-chat-muted); }
 .agent-window-menu > button:is(:hover,[aria-pressed=true]) { background: var(--agent-chat-subtle); }
 body > .agent-panel[data-agent-expanded=true] {
   inset: 12px auto; left: 50%; transform: translateX(-50%);
@@ -905,6 +961,27 @@ body > .agent-panel[data-agent-expanded=true] {
 .agent-reference-modal > header > button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--agent-chat-secondary); }
 .agent-reference-modal > header > button:hover { background: var(--agent-chat-hover); }
 .agent-reference-modal-body { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 12px; }
+.agent-skill-manager-dialog { width:min(576px,100%); max-height:84%; background:var(--agent-chat-canvas); }
+.agent-skill-manager-dialog > header { flex:none; justify-content:start; gap:8px; background:var(--agent-chat-surface); }
+.agent-skill-manager-dialog > header > strong { margin-inline-end:auto; }
+.agent-skill-manager-dialog > header button.agent-skill-import {
+  min-height:28px; padding:4px 9px; border:0; border-radius:8px; background:var(--agent-chat-ink); color:var(--agent-chat-surface);
+  white-space:nowrap; font:500 11.5px/1.5 var(--agent-chat-font);
+}
+.agent-skill-manager-dialog > header button.agent-skill-import:disabled { opacity:.5; }
+.agent-skill-manager-dialog > .agent-menu-embedded { min-height:0; overflow:auto; overscroll-behavior:contain; }
+.agent-panel .agent-skill-manager-dialog .agent-skill-menu { max-height:none; padding:16px 20px; overflow:visible; }
+.agent-skill-manager-filters { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.agent-skill-manager-filters > div { display:flex; flex-wrap:wrap; gap:2px; padding:2px; border:1px solid var(--agent-chat-border); border-radius:10px; background:var(--agent-chat-subtle); }
+.agent-panel .agent-skill-manager-filters > div > button { padding:4px 8px; border:0; border-radius:7px; background:transparent; color:var(--agent-chat-secondary); font:inherit; }
+.agent-panel .agent-skill-manager-filters > div > button[aria-pressed=true] { background:var(--agent-chat-surface); color:var(--agent-chat-ink); }
+.agent-skill-manager-catalog { display:grid; gap:7px; margin-top:10px; }
+.agent-skill-manager-catalog > article { padding:10px 12px; border:1px solid var(--agent-chat-border); border-radius:12px; background:var(--agent-chat-surface); }
+.agent-skill-manager-catalog > article > small {
+  margin-inline-start:6px; padding:1px 4px; border:1px solid var(--agent-chat-border); border-radius:4px;
+  background:var(--agent-chat-subtle); color:var(--agent-chat-muted); font:10px/1.4 var(--agent-chat-mono);
+}
+.agent-skill-manager-catalog > article > p { margin:3px 0 0; color:var(--agent-chat-secondary); }
 .agent-web-source-search { display: flex; align-items: center; gap: 8px; margin: 12px; padding: 4px 10px; border: 1px solid var(--agent-chat-border); border-radius: 12px; background: var(--agent-chat-subtle); color: var(--agent-chat-secondary); }
 .agent-web-source-search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--agent-chat-ink); font: inherit; }
 .agent-web-source-list { display: grid; grid-template-columns: minmax(0,1fr); gap: 6px; margin: 0; padding: 0; list-style: none; }

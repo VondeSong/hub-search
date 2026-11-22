@@ -237,7 +237,7 @@ it("opens a quote in an independent assistant and preserves both chats when dock
   const dock = async (panel: HTMLElement) => {
     const label = panel.dataset.agentDocked === "true" ? "悬浮浮窗" : "右侧分屏停靠";
     await act(async () => panel.querySelector<HTMLElement>('.agent-window-layout > summary')!.click());
-    const choice=[...panel.querySelectorAll<HTMLButtonElement>(".agent-window-menu button")].find(item=>item.textContent===label)!;
+    const choice=[...panel.querySelectorAll<HTMLButtonElement>(".agent-window-menu button")].find(item=>item.getAttribute("aria-label")===label)!;
     await act(async () => choice.click());
   };
   await dock(side);
@@ -404,7 +404,7 @@ it("reading investigations grant only the explicit item and do not assume a note
   expect(create.grant).toEqual({ libraryIds: [], notes: [], readingItemKeys: ["reading-1"] });
 });
 async function openAddPage(label:string){
- if(label==="使用技能"){await click("添加技能");return;}
+ if(label==="使用技能"){await act(async()=>document.querySelector<HTMLElement>('.agent-skill-shortcut')!.click());await act(async()=>{await new Promise(resolve=>setTimeout(resolve,0));});return;}
  if(label==="资料范围"){await click("搜索范围：");await click("资料库 (");return;}
  if(label==="资料库与页面"){await click("搜索范围：");await click("核心材料");return;}
  if(label==="从笔记库添加"){await click("搜索范围：");await click("核心材料");return;}
@@ -996,9 +996,9 @@ it("binds preflight memory before the first model call and stops if binding fail
       return makeView(args.action === 'create' ? 'ready' : 'completed');
     });
     await open();
-    const memory = Array.from(document.body.querySelectorAll('details')).find(detail => detail.querySelector('summary')?.textContent?.includes('记忆'))!;
-    await act(async () => { memory.open = true; memory.dispatchEvent(new Event('toggle')); });
-    await act(async () => memory.querySelector<HTMLInputElement>('[type="checkbox"]')!.click());
+    await click("记忆与保存");
+    await act(async () => document.querySelector<HTMLInputElement>('[aria-label="启用或关闭本对话记忆"]')!.click());
+    await click("关闭记忆管理");
     await fill('investigationGoal', '沿用当前项目决定'); await click('开始调查');
     const calls = invoke.mock.calls.map(([command, { args }]) => `${command}:${args.action}`);
     expect(calls).toContain('shared_memory:selectScope');
@@ -1248,7 +1248,7 @@ it("withdraws the source grant without changing source business objects", async 
   await open(); await fill("investigationGoal", "核对方案"); await click("开始调查"); await click("撤回来源授权");
   expect(document.body.textContent).toContain("授权已撤回");
   expect(invoke.mock.calls.every(([command,params]) => command === "agent_investigation" ||
-    command === "shared_memory" && params.args.action === "workProposals")).toBe(true);
+    command === "shared_memory" && params.args.prepareRuntime===false && ["workProposals","status"].includes(params.args.action))).toBe(true);
 });
 it.each(["paused","cancelled","failed"])("verifies lifecycle before reporting a late run error after stop (%s)",async state=>{
  let rejectRun!:(reason:Error)=>void;
@@ -2116,12 +2116,14 @@ it("keeps Escape inside a focused disclosure surface without closing the assista
 });
 it("closes only memory settings when WebView delivers Escape to the document body",async()=>{
  await open();
- const menu=document.querySelector<HTMLDetailsElement>('.agent-memory-disclosure')!;
+ await click("记忆与保存");
+ const menu=document.querySelector<HTMLDetailsElement>('.agent-memory-inline-settings')!;
  const panel=document.querySelector<HTMLElement>('.agent-panel')!;
  await act(async()=>{menu.open=true;menu.dispatchEvent(new Event('toggle'));});
  await act(async()=>document.body.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})));
  expect(menu.open).toBe(false);
  expect(panel.hidden).toBe(false);
+ expect(document.querySelector(".agent-memory-overlay [role=dialog]")).not.toBeNull();
  expect(document.activeElement).toBe(menu.querySelector('summary'));
 });
 it("dismisses header details after outside interaction or losing window focus without closing the assistant",async()=>{

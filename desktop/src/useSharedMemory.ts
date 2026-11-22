@@ -29,9 +29,9 @@ export function readMemoryHistory(id: string) {
   return read<{versions: MemoryVersion[]}>({action:"history",id});
 }
 
-export function useSharedMemory({workId,runId,active,blocked,selection,onSelectionChange}: {
+export function useSharedMemory({workId,runId,active,blocked,selection,onSelectionChange,showToolbarScope=false}: {
   workId?:string; runId?:string; active:boolean; blocked:boolean; selection:MemorySelection;
-  onSelectionChange:(value:MemorySelection)=>void;
+  onSelectionChange:(value:MemorySelection)=>void;showToolbarScope?:boolean;
 }) {
   const [view,setView] = useState<MemoryView|null>(null);
   const [proposals,setProposals] = useState<MemoryProposal[]>([]);
@@ -51,6 +51,7 @@ export function useSharedMemory({workId,runId,active,blocked,selection,onSelecti
   const locked = useRef(false);
   const request = useRef<{payload:string; key:string}|null>(null);
   const version = useRef(0);
+  const scopeReadFor = useRef<string|undefined>(undefined);
   const proposalRead = useRef(0);
   const browseRead = useRef(0);
   const onSelect = useRef(onSelectionChange);
@@ -86,7 +87,10 @@ export function useSharedMemory({workId,runId,active,blocked,selection,onSelecti
           effective = {projectId:"",enabled:false};
           rememberMemoryPreference(effective); onSelect.current(effective); setNotice(missingProject);
         }
-      } else if (workId) onSelect.current(effective);
+      } else if (workId) {
+        scopeReadFor.current=workId;
+        onSelect.current(effective);
+      }
       setView(next);
       return effective;
     } catch (reason) {
@@ -108,6 +112,10 @@ export function useSharedMemory({workId,runId,active,blocked,selection,onSelecti
   }
   const callbacks = useRef({loadView,loadBrowse,refreshProposals});
   callbacks.current = {loadView,loadBrowse,refreshProposals};
+
+  useEffect(() => {
+    if(workId&&showToolbarScope&&!current.current.managerOpen)void callbacks.current.loadView();
+  },[workId,showToolbarScope]);
 
   useEffect(() => {
     if (!settingsOpen && !managerOpen) return;
@@ -147,7 +155,7 @@ export function useSharedMemory({workId,runId,active,blocked,selection,onSelecti
       ok=true;
       if (mounted.current && current.current.workId===context) {
         setLoading(false); setView(next); setNotice(message);
-        if (selectScope) { onSelect.current(next.selection); rememberMemoryPreference(next.selection); }
+        if (selectScope) { scopeReadFor.current=workId; onSelect.current(next.selection); rememberMemoryPreference(next.selection); }
         if (args.proposalId) setProposals(values=>values.filter(item=>item.id!==args.proposalId));
         if (args.action==="createProject" && current.current.managerOpen) {
           const created=next.projects.find(project=>project.name===args.name && !view?.projects.some(previous=>previous.id===project.id));
@@ -201,6 +209,6 @@ export function useSharedMemory({workId,runId,active,blocked,selection,onSelecti
 
   return {view,selection,select,proposals,settingsOpen,setSettingsOpen,managerOpen,openManager,closeManager,
     browseScope,browseProject,browseProposals:browse?.scope===browseScope ? browse.items : undefined,projectLabel,
-    perform,save,busy,loading,error,notice,blocked:blocked||busy,retryRead};
+    perform,save,busy,loading,error,notice,scopePending:!!workId&&(!view||scopeReadFor.current!==workId),blocked:blocked||busy,retryRead};
 }
 export type SharedMemoryModel = ReturnType<typeof useSharedMemory>;

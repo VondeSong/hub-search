@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from "react";
+import {createPortal} from "react-dom";
 import {invoke} from "@tauri-apps/api/core";
 import {open} from "@tauri-apps/plugin-dialog";
 
@@ -15,7 +16,9 @@ function validate(value:Inspection,packageId?:string,methodVersion?:string) {
  return value;
 }
 
-export function AgentSkillPackages({onChanged,initiallyExpanded=false}:{onChanged:()=>void;initiallyExpanded?:boolean}) {
+export function AgentSkillPackages({onChanged,initiallyExpanded=false,importTarget,onShowImport}:{
+ onChanged:()=>void;initiallyExpanded?:boolean;importTarget?:HTMLElement|null;onShowImport?:()=>void;
+}) {
  const panel=useRef<HTMLElement|null>(null);
  const alive=useRef(true),sequence=useRef(0),writing=useRef(false),pending=useRef<Record<string,unknown>|null>(null),fileReturn=useRef<HTMLButtonElement|null>(null),closeFile=useRef<HTMLButtonElement|null>(null);
  const manager=useRef<HTMLButtonElement|null>(null),deleteReturn=useRef<HTMLButtonElement|null>(null);
@@ -53,7 +56,7 @@ export function AgentSkillPackages({onChanged,initiallyExpanded=false}:{onChange
   owner?.setAttribute("data-agent-native-dialog","");
   try{return await open({directory:true,multiple:false,title});}
   finally{
-   if(alive.current&&previousFocus instanceof HTMLElement&&owner?.contains(previousFocus))previousFocus.focus();
+   if(alive.current&&previousFocus instanceof HTMLElement&&(owner?.contains(previousFocus)||importTarget?.contains(previousFocus)))previousFocus.focus();
    owner?.removeAttribute("data-agent-native-dialog");
   }
  }
@@ -91,7 +94,8 @@ export function AgentSkillPackages({onChanged,initiallyExpanded=false}:{onChange
    <p className="agent-note">从包含 SKILL.md 的文件夹添加技能，检查后保存。已添加的技能可在下方查看版本、检查更新或导出。</p>
    {notice&&<p role="status">{notice}</p>}{error&&<p role="alert">{error}</p>}{busy&&<p role="status">正在核对方法包…</p>}
    {uncertain&&<div role="status"><strong>结果待核对</strong><button type="button" disabled={busy} onClick={()=>void resolve()}>核对本次保存结果</button><button type="button" disabled={busy} onClick={()=>void mutate({},true)}>以同一请求重试</button></div>}
-   <button type="button" disabled={blocked} onClick={()=>void choose()}>检查方法文件夹</button>
+   {importTarget?createPortal(<button type="button" className="agent-skill-import" disabled={blocked} onClick={()=>{onShowImport?.();void choose();}}>＋ 导入技能</button>,importTarget):
+     <button type="button" disabled={blocked} onClick={()=>void choose()}>检查方法文件夹</button>}
    {candidates.map(item=><details key={item.packageId}><summary>{item.name} · 有多个云端候选版本</summary>
     <ul>{item.candidates.map((candidate,index)=><li key={index}><span>{candidate.device} · {candidate.paused?"停用":"启用"} · {candidate.version}</span><button type="button" disabled={blocked} onClick={()=>void changeCloudState({action:"skillPackageAdoptCloud",packageId:item.packageId,methodVersion:candidate.version,paused:candidate.paused,expectedFingerprint:item.fingerprint},candidate.version)}>采用此版本</button></li>)}</ul>
    </details>)}

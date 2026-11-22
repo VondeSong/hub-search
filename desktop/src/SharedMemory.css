@@ -117,3 +117,52 @@
 .agent-body .agent-memory-proposal .agent-memory-actions > button:hover:not(:disabled) { background:var(--hub-control-fill); }
 .agent-body .agent-memory-proposal .agent-memory-actions > .agent-memory-primary,
 .agent-body .agent-memory-proposal .agent-memory-actions > .agent-memory-primary:hover:not(:disabled) { background:var(--hub-text-primary); color:var(--hub-content-surface); border-color:var(--hub-text-primary); }
+
+.agent-panel .agent-composer .agent-memory-toolbar {
+  display:inline-flex; align-items:center; flex:0 1 auto; min-width:28px; height:28px; padding:0 8px; gap:6px;
+  border:0; border-radius:8px; background:transparent; color:var(--agent-chat-secondary); font:500 12px/1.5 var(--agent-chat-font);
+}
+.agent-panel .agent-memory-toolbar:hover { background:var(--agent-chat-hover); color:var(--agent-chat-ink); }
+.agent-memory-toolbar-icon { position:relative; display:inline-flex; flex:none; color:var(--agent-chat-muted); }
+.agent-memory-toolbar[data-enabled=true] .agent-memory-toolbar-icon { color:var(--agent-chat-amber); }
+.agent-memory-toolbar[data-enabled=true] .agent-memory-toolbar-icon::after {
+  content:""; position:absolute; inset:-2px -2px auto auto; width:6px; height:6px;
+  box-sizing:content-box; border:1px solid var(--agent-chat-surface); border-radius:50%; background:#f59e0b;
+}
+.agent-memory-toolbar-label { max-width:78px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+@container agent-assistant (max-width:420px) {
+  .agent-memory-toolbar-label { display:none; }
+}
+.agent-panel .agent-memory-overlay > .agent-memory-manager {
+  position:relative; inset:auto; width:min(576px,100%); max-height:84%; min-height:min(340px,84%);
+  padding:0; border-radius:16px; background:var(--agent-chat-canvas); box-shadow:0 24px 60px rgba(28,25,23,.17);
+}
+.agent-panel .agent-memory-overlay .agent-memory-manager > .agent-popover-header {
+  justify-content:start; gap:8px; min-height:48px; padding:10px 16px; border-bottom:1px solid var(--agent-chat-border);
+  background:var(--agent-chat-surface);
+}
+.agent-memory-overlay .agent-memory-manager > header > strong { flex:none; font-size:14px; }
+.agent-memory-current { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--agent-chat-muted); font-size:11px; }
+.agent-memory-overlay .agent-memory-manager .agent-popover-header > .agent-memory-actions { flex:none; margin-inline-start:auto; align-items:center; gap:7px; }
+.agent-memory-overlay .agent-memory-manager .agent-popover-header .agent-memory-actions > button:first-child {
+  display:inline-flex; min-height:28px; gap:4px; padding:3px 7px; border:1px solid var(--agent-chat-border); background:var(--agent-chat-subtle);
+}
+.agent-memory-overlay .agent-memory-switch { min-height:28px; }
+.agent-memory-overlay .agent-memory-switch input:checked { background:var(--agent-chat-ink); border-color:var(--agent-chat-ink); }
+.agent-memory-overlay .agent-memory-switch input:checked::before { background:var(--agent-chat-surface); }
+.agent-memory-overlay .agent-memory-manager-filters {
+  display:flex; flex:none; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:10px 16px;
+  border-bottom:1px solid var(--agent-chat-border); background:var(--agent-chat-surface);
+}
+.agent-memory-overlay .agent-memory-manager-controls { grid-template-columns:auto minmax(0,1fr); margin:0; }
+.agent-memory-overlay .agent-memory-tabs { gap:2px; padding:2px; border:1px solid var(--agent-chat-border); border-radius:10px; background:var(--agent-chat-subtle); }
+.agent-memory-overlay .agent-memory-tabs > button { min-height:25px; padding:3px 7px; border:0; border-radius:7px; }
+.agent-memory-overlay .agent-memory-tabs > button[aria-pressed=true] { background:var(--agent-chat-surface); }
+.agent-memory-overlay .agent-memory-list { padding:12px 16px; }
+.agent-memory-overlay .agent-memory-manager .agent-memory-entry { margin-block-end:8px; padding:0 10px; border:1px solid var(--agent-chat-border); border-radius:12px; background:var(--agent-chat-surface); }
+.agent-memory-overlay .agent-memory-manager > .agent-memory-manager-footer { max-height:32%; overflow:auto; margin:0; padding:8px 16px; }
+.agent-memory-inline-settings > summary { color:var(--hub-accent); cursor:pointer; }
+.agent-memory-inline-settings > .agent-memory-permissions { width:auto; max-height:none; padding:6px 0 0; }
+@container agent-assistant (max-width:510px) {
+  .agent-memory-current { display:none; }
+}

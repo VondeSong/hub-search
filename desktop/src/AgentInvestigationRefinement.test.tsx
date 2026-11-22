@@ -69,6 +69,7 @@ async function native(command: string, payload?: { args: Request }) {
       diagnostics: [], directory: "/fixture/skills",
     };
     case "skillSourceFile": return { path: "/fixture/skills/hub-research/SKILL.md" };
+    case "skillPackages": return { sources: [] };
     case "uiTimingClock": return { hostEpochMs: Date.now() };
     case "uiTiming": return null;
     default: throw new Error(`Unexpected agent request: ${args.action}`);
@@ -210,7 +211,7 @@ describe("assistant refinement integration", () => {
       await flushToggle();
     };
     await key("/");
-    expect(select(".agent-add-skills .agent-popover-header").textContent).toBe("技能");
+    expect(select(".agent-skill-disclosure .agent-skill-compact-heading").textContent).toContain("通用技能");
     await escape();
     expect(document.activeElement).toBe(input);
     await key("@");
@@ -551,18 +552,57 @@ describe("assistant refinement integration", () => {
 
   it("reaches skills through the bottom toolbar and applies the selected skill to the next message", async () => {
     await render(<StandaloneInvestigation initiallyOpen startFresh />);
-    await activate(select<HTMLButtonElement>('button[aria-label="添加技能"]'));
+    await activate(select<HTMLElement>('summary[aria-label="添加技能"]'));
     expect(calls("skills")).toHaveLength(1);
     await activate(select<HTMLButtonElement>('button[aria-label="查看技能 资料分析与核对"]'));
     const add = [...select(".agent-skill-actions").querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "添加到本次对话");
     expect(add).toBeDefined();
     await activate(add!);
     expect(select(".agent-selected-skills").textContent).toContain("资料分析与核对");
-    expect(select<HTMLDetailsElement>(".agent-add-menu").open).toBe(false);
+    expect(select<HTMLDetailsElement>(".agent-skill-disclosure").open).toBe(false);
     expect(document.activeElement).toBe(select('[name="investigationGoal"]'));
 
     await submit("请比较这两项观点");
     expect(calls("create")[0].goal).toBe("$hub-research 请比较这两项观点");
+  });
+  it("keeps quick skill selection in place and opens skill and memory management above the chat", async () => {
+    await render(<StandaloneInvestigation initiallyOpen startFresh/>);
+    const prompt=select<HTMLTextAreaElement>('[name="investigationGoal"]');
+    await type(prompt,"保留问题");
+    const skills=select<HTMLElement>('summary[aria-label="添加技能"]');
+    await activate(skills);
+    await activate(select<HTMLButtonElement>('button[aria-label="挂载技能 资料分析与核对"]'));
+    expect(select<HTMLDetailsElement>(".agent-skill-disclosure").open).toBe(true);
+    expect(select(".agent-selected-skills").textContent).toContain("资料分析与核对");
+    const quickToggle=select<HTMLButtonElement>(".agent-skill-quick");
+    expect(quickToggle.getAttribute("aria-pressed")).toBe("true");
+    await activate(quickToggle);
+    expect(document.querySelector(".agent-selected-skills")).toBeNull();
+    await activate(select<HTMLButtonElement>('.agent-skill-compact-footer button'));
+    expect(select(".agent-skill-manager-dialog").textContent).toContain("Hub & Codex 通用技能中心");
+    expect(select(".agent-skill-manager-dialog .agent-skill-import").textContent).toContain("导入技能");
+    expect(select<HTMLDetailsElement>(".agent-skill-disclosure").open).toBe(false);
+    await activate(select<HTMLButtonElement>('[aria-label="关闭技能管理"]'));
+    const memory=select<HTMLButtonElement>('button[aria-label="记忆与保存"]');
+    await activate(memory);
+    expect(select(".agent-memory-overlay [role=dialog]").textContent).toContain("记忆管理");
+    expect(select(".agent-memory-overlay [role=dialog]").textContent).toContain("记忆与保存设置");
+    await activate(select<HTMLButtonElement>('[aria-label="关闭记忆管理"]'));
+    expect(prompt.value).toBe("保留问题");
+    expect(calls("create")).toHaveLength(0);
+  });
+  it("shows the saved memory scope before opening management", async () => {
+    list=async()=>({works:[{id:current.work.id,goal:current.work.goal,state:current.work.state}],nextCursor:null});
+    invoke.mockImplementation((command,payload)=>command==="shared_memory"?
+      Promise.resolve({configured:true,entries:[],projects:[{id:"project",name:"当前项目"}],selection:{projectId:"project",enabled:true}}):
+      native(command,payload));
+    await render(<StandaloneInvestigation initiallyOpen/>);
+    await openHistory();
+    await activate(select<HTMLButtonElement>('[data-work-id="new-work"]'));
+    const trigger=select(".agent-memory-toolbar");
+    expect(trigger.textContent).toBe("当前项目");
+    expect(trigger.getAttribute("data-enabled")).toBe("true");
+    expect(document.querySelector(".agent-memory-overlay")).toBeNull();
   });
 });
 
@@ -699,7 +739,9 @@ describe("site v71 assistant controls",()=>{
     const width = resize.getAttribute("aria-valuenow");
     await activate(dock());
     const options = Array.from(panel.querySelectorAll<HTMLButtonElement>(".agent-window-menu > button"));
-    await activate(options.find(item=>item.textContent===(wasDocked==="true"?"悬浮浮窗":"右侧分屏停靠"))!);
+    expect(select(".agent-window-menu-title").textContent).toBe("助手窗口形态");
+    expect(options.filter(item=>item.getAttribute("aria-pressed")==="true")).toHaveLength(1);
+    await activate(options.find(item=>item.getAttribute("aria-label")===(wasDocked==="true"?"悬浮浮窗":"右侧分屏停靠"))!);
     expect(panel.dataset.agentDocked).not.toBe(wasDocked);
     expect(resize.hidden).toBe(false);
     expect(resize.getAttribute("aria-valuenow")).toBe(width);

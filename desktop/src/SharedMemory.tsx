@@ -9,13 +9,24 @@ const usageLabel = (kind: string) => kind === "rule" ? "每次使用" : "相关�
 const labels: Record<string,string> = {pending:"等待核验", inactive:"已停用", review:"待重新确认", deleting:"清理未完成"};
 const date = (time?:number) => time ? new Date(time).toLocaleString("zh-CN",{dateStyle:"short",timeStyle:"short"}) : "";
 
-function wrapDialogTab(event:React.KeyboardEvent<HTMLElement>) {
+export function wrapDialogTab(event:React.KeyboardEvent<HTMLElement>) {
   if(event.key!=="Tab")return;
   const fields=Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary')).filter(item=>item.getClientRects().length>0);
   if(!fields.length)return;
   const first=fields[0],last=fields[fields.length-1];
   if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
   if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+}
+
+export function MemoryToolbarButton({model,materialsOnly}:{model:SharedMemoryModel;materialsOnly:boolean}) {
+  const enabled=!model.scopePending&&model.selection.enabled&&!materialsOnly;
+  const label=model.scopePending&&!materialsOnly?"记忆":enabled?model.projectLabel(model.selection.projectId):"记忆关";
+  return <button type="button" className="agent-memory-toolbar" data-enabled={enabled} aria-label="记忆与保存"
+    aria-description={model.scopePending?"尚未读取记忆范围":enabled?`记忆范围：${label}`:"本轮记忆关闭"} aria-haspopup="dialog" title={enabled?`记忆：${label}`:label}
+    onClick={event=>model.openManager(event.currentTarget)}>
+    <span className="agent-memory-toolbar-icon"><Brain size={14} aria-hidden="true"/></span>
+    <span className="agent-memory-toolbar-label">{label}</span>
+  </button>;
 }
 
 function MemoryStatus({model, showNotice=true}: {model:SharedMemoryModel;showNotice?:boolean}) {
@@ -31,8 +42,8 @@ function ManageLink({model,onClick}: {model:SharedMemoryModel;onClick:()=>void})
   </button>;
 }
 
-export function MemoryAndSavePopover({model,value,canAuto,materialsOnly,disabled,onSave}: {
-  model:SharedMemoryModel;value:AssistantOptions;canAuto:boolean;materialsOnly:boolean;disabled:boolean;onSave:(value:AssistantOptions)=>Promise<void>;
+export function MemoryAndSavePopover({model,value,canAuto,materialsOnly,disabled,onSave,inManager=false}: {
+  model:SharedMemoryModel;value:AssistantOptions;canAuto:boolean;materialsOnly:boolean;disabled:boolean;onSave:(value:AssistantOptions)=>Promise<void>;inManager?:boolean;
 }) {
   const popover=useAgentPopover({aboveComposer:true});
   const trigger=useRef<HTMLElement|null>(null);
@@ -51,17 +62,17 @@ export function MemoryAndSavePopover({model,value,canAuto,materialsOnly,disabled
     catch(reason) { setSaveError(String(reason)); }
     finally { setSaving(false); }
   }
-  return <details ref={popover.ref} className="agent-assistant-options agent-popover agent-memory-disclosure" data-hub-keyboard-scope="memory-settings" onToggle={event=>{
+  return <details ref={popover.ref} className={inManager?"agent-memory-inline-settings":"agent-assistant-options agent-popover agent-memory-disclosure"} data-hub-keyboard-scope="memory-settings" onToggle={event=>{
     if(event.target!==event.currentTarget)return;
     const open=event.currentTarget.open;
     model.setSettingsOpen(open);
     if(open){setAuto(value.autoFlashcardInbox);setSaveError("");closeButton.current?.focus({preventScroll:true});}
   }}>
-    <summary ref={trigger} className="agent-memory-trigger" data-memory-enabled={model.selection.enabled&&!materialsOnly} aria-label="记忆与保存" title="记忆与保存">
+    {inManager?<summary ref={trigger}>记忆与保存设置</summary>:<summary ref={trigger} className="agent-memory-trigger" data-memory-enabled={model.selection.enabled&&!materialsOnly} aria-label="记忆与保存" title="记忆与保存">
       <ShieldCheck size={18} aria-hidden="true"/><span className="agent-memory-trigger-full">{model.selection.enabled&&!materialsOnly ? model.projectLabel(activeProject) : "记忆与保存"}</span><span className="agent-memory-trigger-short">记忆</span>
-    </summary>
-    <section className="agent-assistant-settings agent-memory-permissions" role="dialog" aria-modal="true" aria-label="记忆与保存" onKeyDown={wrapDialogTab}>
-      <header className="agent-popover-header"><strong>记忆与保存</strong><button ref={closeButton} type="button" aria-label="关闭记忆与保存" onClick={()=>popover.close(true)}><X size={16}/></button></header>
+    </summary>}
+    <section className="agent-assistant-settings agent-memory-permissions" role={inManager?undefined:"dialog"} aria-modal={inManager?undefined:true} aria-label="记忆与保存" onKeyDown={inManager?undefined:wrapDialogTab}>
+      {!inManager&&<header className="agent-popover-header"><strong>记忆与保存</strong><button ref={closeButton} type="button" aria-label="关闭记忆与保存" onClick={()=>popover.close(true)}><X size={16}/></button></header>}
       <div className="agent-memory-permissions-body">
       <section className="agent-memory-settings-section" aria-label="记忆">
         <h3>记忆</h3>
@@ -84,7 +95,7 @@ export function MemoryAndSavePopover({model,value,canAuto,materialsOnly,disabled
         {saveError&&<p role="alert">{saveError}</p>}
       </section>
       </div>
-      <footer className="agent-memory-permissions-footer"><ManageLink model={model} onClick={()=>{popover.close();if(trigger.current) model.openManager(trigger.current);}}/></footer>
+      {!inManager&&<footer className="agent-memory-permissions-footer"><ManageLink model={model} onClick={()=>{popover.close();if(trigger.current) model.openManager(trigger.current);}}/></footer>}
     </section>
   </details>;
 }
@@ -221,7 +232,9 @@ function Audit({usage,model}: {usage:MemoryUse;model:SharedMemoryModel}) {
   </details>;
 }
 
-export function MemoryManager({model,materialsOnly,usage,onBack,onClose=model.closeManager}: {model:SharedMemoryModel;materialsOnly:boolean;usage?:MemoryUse|null;onBack?:()=>void;onClose?:()=>void}) {
+export function MemoryManager({model,materialsOnly,usage,onBack,onClose=model.closeManager,settings,centered=false}: {
+  model:SharedMemoryModel;materialsOnly:boolean;usage?:MemoryUse|null;onBack?:()=>void;onClose?:()=>void;settings?:React.ReactNode;centered?:boolean;
+}) {
   const scopeId=useId();
   const [tab,setTab]=useState<"saved"|"pending">("saved");
   const [editing,setEditing]=useState<{id:string,entry?:MemoryEntry}|null>(null);
@@ -250,14 +263,18 @@ export function MemoryManager({model,materialsOnly,usage,onBack,onClose=model.cl
     wrapDialogTab(event);
   }
   const switchBlocked=!!editing||model.busy;
-  return <section ref={dialog} className="agent-memory-manager" role="dialog" aria-modal="true" aria-label="管理记忆" onKeyDown={keys}>
+  const content=<section ref={dialog} className={`agent-memory-manager${centered?" agent-reference-modal":""}`} role="dialog" aria-modal="true" aria-label="管理记忆" onKeyDown={keys}>
     <header className="agent-popover-header">
       {onBack&&<button type="button" className="agent-memory-back" aria-label="返回对话详情" title="返回对话详情" disabled={switchBlocked} onClick={onBack}><ArrowLeft size={17} aria-hidden="true"/></button>}
-      <strong>管理记忆</strong><div className="agent-memory-actions">
-      <button type="button" title="新增记忆" aria-label="新增记忆" disabled={switchBlocked||model.blocked||!model.view} onClick={()=>{setTab("saved");setEditing({id:"new"});}}><Plus size={16}/></button>
+      <strong>{centered?"记忆管理":"管理记忆"}</strong>{centered&&<span className="agent-memory-current">本对话生效：{model.selection.enabled&&!materialsOnly?model.projectLabel(model.selection.projectId):"已关闭"}</span>}
+      <div className="agent-memory-actions">
+      <button type="button" title="新增记忆" aria-label="新增记忆" disabled={switchBlocked||model.blocked||!model.view} onClick={()=>{setTab("saved");setEditing({id:"new"});}}><Plus size={15}/>{centered&&<span>新建</span>}</button>
+      {centered&&<label className="agent-memory-switch" title="启用或关闭本对话记忆"><input type="checkbox" role="switch" aria-label="启用或关闭本对话记忆"
+        checked={model.selection.enabled&&!materialsOnly} disabled={switchBlocked||model.blocked||model.loading||!model.view||materialsOnly}
+        onChange={event=>model.select({...model.selection,enabled:event.target.checked})}/></label>}
       <button ref={closeButton} type="button" aria-label="关闭记忆管理" disabled={switchBlocked} onClick={onClose}><X size={17}/></button>
     </div></header>
-    <div className="agent-memory-manager-controls">
+    <div className="agent-memory-manager-filters"><div className="agent-memory-manager-controls">
       <label htmlFor={scopeId}>查看范围</label><select id={scopeId} value={model.browseScope} disabled={switchBlocked||!model.view} onChange={event=>model.browseProject(event.target.value)}>
         <option value="">个人通用</option>{projects.map(project=><option key={project.id} value={project.id}>{project.name}</option>)}
       </select>
@@ -266,7 +283,7 @@ export function MemoryManager({model,materialsOnly,usage,onBack,onClose=model.cl
       <button type="button" aria-pressed={tab==="saved"} disabled={switchBlocked} onClick={()=>setTab("saved")}>已保存{tab==="saved"&&!!entries.length&&<small>{entries.length}</small>}</button>
       <button type="button" aria-pressed={tab==="pending"} disabled={switchBlocked} onClick={()=>setTab("pending")}>待确认{(model.browseProposals?.length??0)>0&&<small>{model.browseProposals?.length}</small>}</button>
       <button className="agent-memory-more" type="button" aria-expanded={utility} disabled={switchBlocked} onClick={()=>setUtility(!utility)}>更多</button>
-    </div>
+    </div></div>
     {editing&&<p className="agent-memory-edit-notice" role="status">先保存或取消当前编辑，再切换范围或关闭。</p>}
     <div className="agent-memory-list">
       {utility&&<section className="agent-memory-tools" aria-label="记忆管理选项">
@@ -293,8 +310,10 @@ export function MemoryManager({model,materialsOnly,usage,onBack,onClose=model.cl
       <span>{materialsOnly?"本轮不使用记忆（只用所选资料）":"本对话记忆："+(model.selection.enabled?model.projectLabel(model.selection.projectId)+(model.selection.projectId?"＋个人通用":""):"关闭")}</span>
       <small>查看其他范围不会更改本对话。</small>
       {usage&&<Audit usage={usage} model={model}/>}
+      {settings}
     </footer>
   </section>;
+  return centered?<div className="agent-reference-overlay agent-memory-overlay" onClick={event=>{if(event.target===event.currentTarget&&!switchBlocked)onClose();}}>{content}</div>:content;
 }
 
 export function InlineMemoryProposals({model,items}: {model:SharedMemoryModel;items:MemoryProposal[]}) {

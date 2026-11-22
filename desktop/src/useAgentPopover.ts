@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 /** Native details keeps disclosure semantics; dismissal never submits a form. */
-export function useAgentPopover(options: { deferEscapeSelector?: string; onEscape?: () => boolean; triggerRef?: RefObject<HTMLElement | null>; returnFocusRef?: RefObject<HTMLElement | null>; aboveComposer?: boolean } = {}) {
+export function useAgentPopover(options: { deferEscapeSelector?: string; onEscape?: () => boolean; triggerRef?: RefObject<HTMLElement | null>; returnFocusRef?: RefObject<HTMLElement | null>; aboveComposer?: boolean; anchorToSummary?: boolean } = {}) {
   const ref = useRef<HTMLDetailsElement>(null);
   const [element, setElement] = useState<HTMLDetailsElement | null>(null);
   const deferredEscape = useRef(options.deferEscapeSelector);
@@ -9,6 +9,7 @@ export function useAgentPopover(options: { deferEscapeSelector?: string; onEscap
   const trigger = options.triggerRef;
   const returnFocus = options.returnFocusRef;
   const aboveComposer = options.aboveComposer;
+  const anchorToSummary = options.anchorToSummary;
   deferredEscape.current = options.deferEscapeSelector;
   handleEscape.current = options.onEscape;
   // The assistant's disclosures mount after its launcher is first opened.
@@ -61,7 +62,12 @@ export function useAgentPopover(options: { deferEscapeSelector?: string; onEscap
       if (!controls || !body) return;
       // The scroll clip starts below the panel header, not at the viewport edge.
       if (panel) element.style.setProperty("--agent-skill-height", `${Math.floor(panel.getBoundingClientRect().height / 2)}px`);
-      const controlTop = controls.getBoundingClientRect().top;
+      const controlRect = controls.getBoundingClientRect();
+      const controlTop = controlRect.top;
+      if (anchorToSummary) {
+        const summary = element.querySelector("summary");
+        if (summary) element.style.setProperty("--agent-popover-anchor", `${summary.getBoundingClientRect().left - controlRect.left}px`);
+      }
       const top = aboveComposer && composer ? composer.getBoundingClientRect().top : controlTop;
       if (aboveComposer) element.style.setProperty("--agent-popover-offset", `${Math.max(0, controlTop-top)}px`);
       const available = top - Math.max(8, body.getBoundingClientRect().top) - 8;
@@ -88,6 +94,6 @@ export function useAgentPopover(options: { deferEscapeSelector?: string; onEscap
       window.removeEventListener("resize", fit);
       resize?.disconnect();
     };
-  }, [element, trigger, returnFocus, aboveComposer]);
+  }, [element, trigger, returnFocus, aboveComposer, anchorToSummary]);
   return { ref, close };
 }
