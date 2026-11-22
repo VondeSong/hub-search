@@ -10,7 +10,7 @@ import { conversationTitle } from "./AgentConversationHistoryData";
 import { AgentAnswerSave, type AnswerSave } from "./AgentAnswerSave";
 import { AgentTaskMode } from "./AgentTaskMode";
 import { AgentDetailSummary } from "./AgentDetailSummary";
-import { Activity, Brain, Globe2, FolderBookmark, Layers, Library, NotebookPen, SlidersHorizontal, Tags } from "lucide-react";
+import { Brain, Globe2, FolderBookmark, Layers, NotebookPen, Tags } from "lucide-react";
 import { AgentScopeTrigger } from "./AgentScopeTrigger";
 import { useAgentLibraryRegistry, resolveAgentLibraries } from "./useAgentLibraryRegistry";
 import type { CitationLocation } from "./AgentCitationPreview";
@@ -26,7 +26,7 @@ import {useInsightWork} from "./useInsights";
 import { CodexAccountBadge } from "./CodexAccountsSettings";
 import { authorizeCodexConversation, getCodexAccountSnapshot, refreshCodexAccounts } from "./CodexAccounts";
 import { isInsideKeyboardDialog } from "./AppKeyboardScope";
-import { AgentActiveTopic, AgentResearchPolicy, AgentResearchTopics, policyNames, researchGrant, useResearchSelection, type ResearchGrant, type ResearchTopic } from "./AgentResearch";
+import { AgentActiveTopic, AgentResearchPolicy, AgentResearchTopics, researchGrant, useResearchSelection, type ResearchGrant, type ResearchTopic } from "./AgentResearch";
 import { AgentTagWorkspace, suggestedTagTask, AgentTagReferences, AgentTagRelated, AgentTagResult, useTagPreparation, tagTaskNames, type TagTaskRecord } from "./AgentTagWorkspace";
 import { userProfileStorage } from "./UserProfileStorage";
 import {AgentNativeContext,type NativeContext} from "./AgentNativeContext";
@@ -40,14 +40,14 @@ import { AgentScopeCoverage } from "./AgentScopeCoverage";
 import { useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { AssistantSelectionActions } from "./AgentSelectionActions";
 import { createPortal } from "react-dom";
-import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronDown, ChevronRight, WandSparkles, FileText, Image, ListChecks, Maximize2, Menu, MessageSquare, Minimize2, PanelRight, PanelRightOpen, PanelsTopLeft, Quote, Plus, Search, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Square, ChevronDown, ChevronRight, FileText, Image, ListChecks, Menu, MessageSquare, PanelRight, Quote, Plus, Search, X, Zap } from "lucide-react";
 import type { SearchResult } from "./SearchTypes";
 import { isTaskPreviewResult } from "./TaskResultIdentity";
 import { runtimeCapabilities } from "./RuntimePlatform";
 import { useDocumentVisible } from "./WindowVisibility";
 import { useAgentUiTiming, type TimedEvent } from "./useAgentUiTiming";
 import { AgentTagAction, type AgentActions } from "./AgentTagAction";
-import { AgentAssistantOptions, defaultAssistantOptions, webSearchNames, type AssistantOptions } from "./AgentAssistantOptions";
+import { AgentAssistantOptions, defaultAssistantOptions, type AssistantOptions } from "./AgentAssistantOptions";
 import { AgentBusinessActions, ArchiveRecord, FlashcardRecord } from "./AgentBusinessActions";
 import { AgentObsidianEdit, AgentObsidianTarget, AgentReportSave } from "./AgentObsidianEdit";
 import { AgentConditions, type AgentCondition } from "./AgentConditions";
@@ -187,7 +187,6 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const detailsReturn=useRef<HTMLElement|null>(null);
   const detailsPopover=useAgentPopover({triggerRef:detailsTrigger,returnFocusRef:detailsReturn,deferEscapeSelector:".agent-history-search input, .agent-history-action-menu, .agent-details-sections .agent-popover[open]"});
   const detailsMenu=detailsPopover.ref;
-  const windowPopover=useAgentPopover();
   const [detailsMemoryOpener,setDetailsMemoryOpener]=useState<HTMLButtonElement|null>(null);
   const [historyExpanded,setHistoryExpanded]=useState(true);
   const [taskStatusOnly,setTaskStatusOnly]=useState(false);
@@ -196,12 +195,13 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const materialPopover=useAgentPopover({returnFocusRef:materialReturn,onEscape:backInMaterials});
   const [addMenuOpen,setAddMenuOpen]=useState(false);
   const [addPage,setAddPage]=useState<"home"|"materials"|"scope"|"skills"|"web"|"images"|"pages"|"files">("home");
+  const [scopeTab,setScopeTab]=useState<"docs"|"libraries"|"policy">("docs");
   const addBack=useRef<HTMLButtonElement>(null);
   useEffect(()=>{
     if(!addMenuOpen)return;
     const panel=materialPopover.ref.current;
     const focus=["pages","files","images","skills"].includes(addPage) ? panel?.querySelector<HTMLInputElement>("[data-material-focus] input[type='search']:not(:disabled), .agent-material-search input:not(:disabled), .agent-skill-search input") :
-      ["scope","materials"].includes(addPage) ? panel?.querySelector<HTMLButtonElement>(".agent-scope-overview>button") :
+      ["scope","materials"].includes(addPage) ? panel?.querySelector<HTMLButtonElement>(".agent-scope-tabs button") :
       addPage==="home" ? panel?.querySelector<HTMLButtonElement>(".agent-add-choices button:not(:disabled)") : addBack.current;
     (focus??addBack.current??panel?.querySelector<HTMLButtonElement>(".agent-popover-header>button:last-child"))?.focus({preventScroll:true});
   },[addPage,addMenuOpen]);
@@ -360,10 +360,23 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const canDock = !!extra || !onDismiss;
   const [docked, setDocked] = useState(() => canDock && sessionStorage.getItem(dockKey) === "true");
   const [panelPreset, setPanelPreset] = useState<"focus" | "full" | null>(null);
+  const floatingWidth = useRef<number | null>(null);
   const [titleEdit,setTitleEdit] = useState<{id:string; value:string} | null>(null);
   const [draftTitle,setDraftTitle] = useState("");
   const panelResize = useAgentPanelResize(open, panel, "width", !!extra);
   const panelHeightResize = useAgentPanelResize(open && !docked, panel, "height", !!extra);
+  function setViewport(next: "sidebar" | "focus" | "full" | null) {
+    if(next==="sidebar" && !docked && !extra){
+      floatingWidth.current=panelResize.width;
+      panelResize.setWidth(480);
+    }else if(next!=="sidebar" && floatingWidth.current!==null){
+      panelResize.setWidth(floatingWidth.current);
+      floatingWidth.current=null;
+    }
+    setDocked(next==="sidebar");
+    setPanelPreset(next==="sidebar"?null:next);
+    detailsPopover.close();
+  }
   useEffect(() => { if (canDock) sessionStorage.setItem(dockKey, String(docked)); }, [docked, canDock, dockKey]);
   const titleQuestion=(view?.work.goal||questionText).replace(/^(?:\$[a-z0-9]+(?:-[a-z0-9]+)*(?:\s+|$))+/g, "").trim();
   const chatTitle = (view ? view.conversationTitle : draftTitle) || (titleQuestion || "新聊天").replace(/\s+/g, " ");
@@ -876,10 +889,17 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const scopeRecovery = "当前只用所选资料。请添加资料，或切换为普通提问。";
   const openMaterialScope = (returnTo?: HTMLElement | null) => {
     materialReturn.current=returnTo ?? panel.current?.querySelector<HTMLButtonElement>(".agent-scope-trigger") ?? null;
+    setScopeTab("docs");
     setAddPage("scope");
     setAddMenuOpen(true);
     if (materialPopover.ref.current) materialPopover.ref.current.open = true;
   };
+  function openSkills(returnTo: HTMLElement | null) {
+    materialReturn.current=returnTo;
+    setAddPage("skills");
+    setAddMenuOpen(true);
+    if(materialPopover.ref.current)materialPopover.ref.current.open=true;
+  }
   function closeDetailsMemory(returnToDetails = false) {
     const opener = detailsMemoryOpener;
     setDetailsMemoryOpener(null);
@@ -1276,9 +1296,6 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const detailLibraries=detailGrant?detailGrant.libraryIds.length:composerLibraries.length;
   const retainedFiles = view?.work.grant.notes?.filter(note=>isTextAttachment(note)&&!removals.some(item=>materialKey(item)===materialKey(note))) ?? [];
   const scopeStatus = [detailCoreCount ? `${detailCoreCount} 份资料` : "", detailLibraries ? `${detailLibraries} 个库` : "", currentImages.length ? `${currentImages.length} 张图片` : ""].filter(Boolean).join(" · ") || (hasEffectiveMaterials ? "已选资料" : "未选资料");
-  const provider = (scopeOptions.model ?? runtime.settings)?.provider;
-  const searchStatus = materialsOnly ? "只用所选资料" : provider === "deepseek" ? "搜索不可用" :
-    scopeOptions.webSearch && scopeOptions.webSearch !== "disabled" ? webSearchNames[scopeOptions.webSearch] : "搜索关闭";
   const scopeAttachments = view && view.work.state !== "revoked" && (currentImages.length > 0 || retainedFiles.length > 0) && (
     <details className="agent-material-advanced">
       <summary>已授权的图片与文本附件</summary>
@@ -1351,6 +1368,14 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         if(event.dataTransfer.files?.length){event.preventDefault();event.stopPropagation();setReportReading(false);void addFiles(Array.from(event.dataTransfer.files));return;}const data=event.dataTransfer.getData("application/x-hub-agent-source");if(!data)return;event.preventDefault();event.stopPropagation();setReportReading(false);try{if(data.length>65536)throw new Error();addExternalMaterial(JSON.parse(data));}catch{setError("无法识别拖入的资料，请重新拖入。");}}} onKeyDown={event => {
       if (event.key === "Escape" && !event.nativeEvent.isComposing && !event.defaultPrevented && !(event.target instanceof Element && event.target.closest(".agent-token-disclosure"))) { event.preventDefault(); event.stopPropagation(); const menu=((!reportReading || addMenuOpen) && event.currentTarget.querySelector<HTMLDetailsElement>(".agent-composer details[open]")) || (detailsMenu.current?.open ? detailsMenu.current : null); if(menu){menu.open=false;menu.querySelector("summary")?.focus();}else if(citationOpen){returnFromCitation();}else if(reportReading){setReportReading(false);event.currentTarget.querySelector<HTMLButtonElement>('.agent-header-end button[aria-label="对话详情"]')?.focus();}else closePanel(); }
     }}>
+      {canDock && <div className="agent-viewport-bar" role="group" aria-label="助手视图" inert={memory.managerOpen}>
+        <button type="button" aria-pressed={docked} aria-label="展开为侧边栏" onClick={()=>setViewport("sidebar")}>{extra?"侧栏":"侧栏 480px"}</button>
+        {!extra && <>
+          <button type="button" aria-pressed={panelPreset==="focus"} onClick={()=>setViewport("focus")}>专注 780px</button>
+          <button type="button" aria-pressed={panelPreset==="full"} onClick={()=>setViewport("full")}>全屏</button>
+        </>}
+        {(docked||panelPreset) && <button type="button" aria-label="切换为浮窗" onClick={()=>setViewport(null)}>恢复浮窗</button>}
+      </div>}
       <header className="agent-panel-header" inert={memory.managerOpen}>
         <div className="agent-header-start">
         <details ref={detailsMenu} data-history={historyExpanded} className="agent-dialogue-details" data-task-status={taskStatusOnly} onClickCapture={event=>{const menu=event.currentTarget;if(!menu.open&&(event.target as Element).closest("summary")===menu.firstElementChild){detailsReturn.current=menu.firstElementChild as HTMLElement;setHistoryExpanded(true);setTaskStatusOnly(false);void reloadWorks();}}} onToggle={event=>{if(event.target!==event.currentTarget)return;const menu=event.currentTarget;if(!menu.open&&detailsReturn.current?.isConnected&&(menu.contains(document.activeElement)||document.activeElement===document.body))detailsReturn.current.focus();}}><summary aria-label="对话历史" title="对话历史"><Menu size={18} aria-hidden="true"/></summary><div className="agent-details-content" role="region" aria-label={historyExpanded?"对话历史":taskStatusOnly?"任务状态":"对话详情"}>
@@ -1358,19 +1383,28 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
       <AgentConversationHistory query={historyQuery} archived={historyArchived} onQueryChange={query=>filterHistory(query,historyFilter.current.archived)} onArchivedChange={archived=>filterHistory(historyFilter.current.query,archived)} works={works} currentId={view?.work.id} disabled={busy||!!active} more={!!worksCursor} loading={worksLoading} error={worksError} states={states} onRetry={()=>void reloadWorks()} onClose={()=>{if(detailsMenu.current)detailsMenu.current.open=false;}} onMore={()=>void loadEarlierWorks()} onChange={changeHistory} onOpen={work=>void openHistoryWork(work)}/>
           </div>
           <div className="agent-details-sections" hidden={historyExpanded}>
+          <div className="agent-inspector-backdrop" aria-hidden="true" onClick={()=>detailsPopover.close(true)}/>
+          <section className="agent-inspector-drawer" role="dialog" aria-modal="true" aria-label={taskStatusOnly?"任务状态":"对话详情"}
+            onKeyDown={event=>{
+              if(event.key!=="Tab")return;
+              const controls=Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,a[href]'))
+                .filter(element=>element.getClientRects().length>0);
+              const first=controls[0],last=controls[controls.length-1];
+              if(event.shiftKey && event.target===first && last){event.preventDefault();last.focus();}
+              if(!event.shiftKey && event.target===last && first){event.preventDefault();first.focus();}
+            }}>
           <div className="agent-details-heading agent-popover-header"><strong>{taskStatusOnly?"任务状态":"对话详情"}</strong><button type="button" aria-label={taskStatusOnly?"关闭任务状态":"关闭对话详情"} onClick={()=>{detailsPopover.close();detailsReturn.current?.focus();}}><X size={16}/></button></div>
-          <div className="agent-display-controls" hidden={taskStatusOnly}>
-
-            {report && view?.work.state!=="revoked" && <button type="button" className="agent-reading-toggle" aria-pressed={reportReading} disabled={!!active} onClick={()=>{if(!reportReading)readingOrigin.current={scope:sourceScopeKey,scrollTop:conversationScroll.element.current?.scrollTop||0,focus:detailsReturn.current||goalInput.current};clearSourcePreview();setReportReading(current=>!current);detailsPopover.close();}}>{reportReading?<Minimize2 size={16}/>:<Maximize2 size={16}/>} {reportReading?"返回对话布局":"只看最新回答"}</button>}
-
-            {onTopicBack&&<button type="button" disabled={busy||!!active} onClick={onTopicBack}><ArrowLeft size={16}/>返回专题所在工作</button>}
-          </div>
-          <section className="agent-detail-section agent-detail-materials" hidden={taskStatusOnly}><h3 className="agent-detail-group-title">资料与工具</h3>
+          <div className="agent-inspector-body">
+          <section className="agent-inspector-card" hidden={taskStatusOnly}>
+            <h3>视图与工具</h3>
+            <button type="button" className="agent-inspector-switch" aria-pressed={reportReading} disabled={!report||!!active||view?.work.state==="revoked"} onClick={()=>{if(!reportReading)readingOrigin.current={scope:sourceScopeKey,scrollTop:conversationScroll.element.current?.scrollTop||0,focus:detailsReturn.current||goalInput.current};clearSourcePreview();setReportReading(current=>!current);detailsPopover.close();}}><span>{reportReading?"返回对话布局":"只看最新回答"}</span><span aria-hidden="true"/></button>
+            <AgentAssistantOptions workId={view?.work.id} section="connection" inspector value={view?view.assistantOptions||defaultAssistantOptions:assistantOptions} disabled={busy||!!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
+          </section>
+          <section className="agent-inspector-card agent-detail-materials" hidden={taskStatusOnly}><h3>当前上下文</h3>
           <button type="button" className="agent-detail-link agent-detail-scope-link" aria-haspopup="dialog" disabled={busy||filePreparing||!!publicUrl}
             onClick={()=>{detailsPopover.close();openMaterialScope(detailsTrigger.current);}}>
             <AgentDetailSummary icon={<Layers size={16}/>} title="资料范围" status={scopeStatus} link/>
           </button>
-          <details className="agent-run-details agent-detail-row"><summary><AgentDetailSummary icon={<Globe2 size={16}/>} title="联网与工具" status={searchStatus}/></summary><AgentAssistantOptions workId={view?.work.id} section="connection" value={view?view.assistantOptions||defaultAssistantOptions:assistantOptions} disabled={busy||!!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/></details>
           {anchor?.kind==="note"&&canEditNote&&<AgentTopics key={`topics-${view?.work.id||draftRevision}`} anchor={anchor} work={view?.work} disabled={businessDisabled||!!active} onOpenWork={async (id,source,draft)=>{if(source&&!sameNoteAnchor(source.anchor,anchor)){if(!onOpenTopicWork)throw new Error("此入口尚不支持跨笔记继续，请从本期笔记打开原工作");onOpenTopicWork(id,source,view?.work.id,draft);return;}setLibraryDraft(null);setError("");setGoal("");setMaterials([]);setDropped([]);setRemovals([]);setSourcePreview(null);sourceSequence.current++;await refresh(id);if(alive.current){void reloadWorks();if(draft){setGoal(draft);goalInput.current?.focus();}}}}/>}
           <button type="button" className="agent-detail-link agent-detail-memory-link" aria-haspopup="dialog" onClick={event=>{
             setDetailsMemoryOpener(event.currentTarget);
@@ -1379,9 +1413,14 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
           }}>
             <AgentDetailSummary icon={<Brain size={16}/>} title="管理记忆" status={memory.proposals.length ? `${memory.proposals.length} 条待确认` : undefined} link/>
           </button>
+          <button type="button" className="agent-detail-link agent-inspector-skills" aria-haspopup="dialog" disabled={busy||!!active&&!steerable} onClick={()=>{
+            detailsPopover.close();
+            openSkills(detailsTrigger.current);
+          }}><AgentDetailSummary icon={<Zap size={14}/>} title="技能" status={selectedSkills.length ? `${selectedSkills.length} 个已选` : "未选择"} link/></button>
+          {onTopicBack&&<button type="button" className="agent-detail-link" disabled={busy||!!active} onClick={onTopicBack}><ArrowLeft size={16}/>返回专题所在工作</button>}
           </section>
-          <section className="agent-detail-section agent-detail-progress"><h3 className="agent-detail-group-title" hidden={taskStatusOnly}>进度与成果</h3>
-        <details ref={workControls} className="agent-work-controls agent-detail-row" open={taskStatusOnly||undefined}><summary hidden={taskStatusOnly}><AgentDetailSummary icon={<Activity size={16}/>} title="任务状态" status={controlsNeedAttention?"需要处理":active?"正在处理":view?states[view.work.state]||view.work.state:"尚未开始"}/></summary>
+          <section className="agent-inspector-card agent-inspector-diagnostics">
+        <details ref={workControls} className="agent-work-controls agent-inspector-disclosure" open={taskStatusOnly||undefined}><summary hidden={taskStatusOnly}><span>运行诊断与用量</span><small>{controlsNeedAttention?"需要处理":active?"正在处理":view?states[view.work.state]||view.work.state:"尚未开始"}</small><ChevronDown size={14}/></summary>
         <dl className="agent-task-facts"><div><dt>任务进展</dt><dd>{active?"正在处理":view?states[view.work.state]||view.work.state:"尚未开始"}</dd></div><div><dt>对话消息</dt><dd>{view?.conversation?.messages.length||0} 条</dd></div><div><dt>上下文占用</dt><dd>{view?.nativeContext?.usedPercent==null?"尚未报告":view.nativeContext.usedPercent+"%"}</dd></div></dl>
         {materialUsage}
         {view&&<label className="agent-confirm-message"><input type="checkbox" checked={confirmMessage} disabled={busy||!!active} onChange={event=>setConfirmMessage(event.target.checked)}/>这条内容是我确认的决定</label>}
@@ -1399,7 +1438,10 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         {view.lifecycle && <AgentLifecycle value={view.lifecycle} mode={mode} disabled={busy || !!active} onResume={()=>{uiTiming.begin("resume");void run(view.work.id,view.lifecycle);}} onCancel={()=>void mutate("cancelGoal")}/> }
         </> : <p className="agent-note">{view?"来源授权已撤回，保留历史记录供查看。":"尚未开始任务，发送消息后可查看实际用量和任务控制。"}</p>}
         </details>
-        <div className="agent-detail-outcomes" hidden={taskStatusOnly}>{conversationDetails}</div></section>
+          </section>
+          <div className="agent-inspector-card agent-detail-outcomes" hidden={taskStatusOnly}>{conversationDetails}</div>
+          </div>
+          </section>
         </div>
         </div></details>
           <button type="button" title="新对话" aria-label="新对话" disabled={busy || !!active} onClick={()=>newInvestigation()}><Plus size={19} /></button>
@@ -1410,16 +1452,6 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
               onKeyDown={event=>{if(event.nativeEvent.isComposing)return;if(event.key==="Enter"){event.preventDefault();event.currentTarget.blur();}if(event.key==="Escape"){event.preventDefault();event.stopPropagation();setTitleEdit(null);}}}/>
           : <button type="button" className="agent-chat-title" title={chatTitle} aria-label="重命名对话" disabled={busy||!!active} onClick={()=>setTitleEdit({id:titleScope,value:chatTitle.slice(0,100)})}><span>{chatTitle}</span></button>}
         <div className="agent-header-end">
-          {canDock && <button type="button" aria-label={docked?"切换为浮窗":"展开为侧边栏"} title={docked?"切换为浮窗":"展开为侧边栏"} onClick={()=>{setPanelPreset(null);setDocked(value=>!value);detailsPopover.close();}}>{docked?<PanelsTopLeft size={18}/>:<PanelRightOpen size={18}/>}</button>}
-          {canDock && !extra && <details ref={windowPopover.ref} name="hub-agent-header" className="agent-window-menu">
-            <summary aria-label="助手视图" title="助手视图"><ChevronDown size={13} aria-hidden="true"/></summary>
-            <div className="agent-window-presets" role="group" aria-label="助手视图">
-              <button type="button" aria-pressed={docked} onClick={()=>{panelResize.setWidth(480);setPanelPreset(null);setDocked(true);windowPopover.close(true);}}>侧栏 480px</button>
-              <button type="button" aria-pressed={panelPreset==="focus"} onClick={()=>{setDocked(false);setPanelPreset("focus");windowPopover.close(true);}}>专注 780px</button>
-              <button type="button" aria-pressed={panelPreset==="full"} onClick={()=>{setDocked(false);setPanelPreset("full");windowPopover.close(true);}}>全屏</button>
-              {panelPreset && <button type="button" onClick={()=>{setPanelPreset(null);windowPopover.close(true);}}>恢复浮窗</button>}
-            </div>
-          </details>}
         <AgentTaskMode activeTopic={research?.topic} onUnpinTopic={async topic=>{const scope=selectionScope.current;const saved=await call<ResearchTopic>({action:"saveResearchTopic",topic:{...topic,pinned:false}});if(alive.current&&selectionScope.current===scope&&research?.topic.id===saved.id)setResearch({...research,topic:{...research.topic,revision:saved.revision,pinned:false}});}} title={chatTitle} disabled={busy || !!active} tagMode={tagMode} goalMode={goalMode} goalDisabled={(scopeOptions.model ?? runtime.settings)?.provider === "deepseek"} onGeneral={()=>{setTagMode(false);if(scopeOptions.goalMode)void saveAssistantOptions({...scopeOptions,goalMode:false},false).catch(reason=>setError(String(reason)));}} onGoal={()=>{setTagMode(false);void saveAssistantOptions({...scopeOptions,goalMode:true},false).catch(reason=>setError(String(reason)));}} onTag={enableTagMode} selectedSkills={selectedSkills.map(token=>token.slice(1))} onTopics={()=>{setRequestedTopic(undefined);setTopicSave(false);setTopicsOpen(true);}} onTopic={topic=>{setRequestedTopic(topic.id);setTopicSave(false);setTopicsOpen(true);}} onUsage={()=>{detailsReturn.current=document.getElementById(panelId)?.querySelector<HTMLElement>(".agent-task-mode>summary")||null;setTaskStatusOnly(true);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;if(workControls.current)workControls.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-heading button")?.focus();},0);}}/>
           <button ref={detailsTrigger} type="button" title="对话详情" aria-label="对话详情" onClick={event=>{if(detailsMenu.current?.open&&!historyExpanded){detailsPopover.close();event.currentTarget.focus();return;}detailsReturn.current=event.currentTarget;setTaskStatusOnly(false);setHistoryExpanded(false);if(detailsMenu.current)detailsMenu.current.open=true;setTimeout(()=>{if(detailsMenu.current?.open)detailsMenu.current.querySelector<HTMLButtonElement>(".agent-details-sections .agent-details-heading button")?.focus();},0);}}><PanelRight size={17}/></button>
           <button type="button" title={extra ? "关闭第二个助手（Esc）" : "关闭助手（Esc）"} aria-label={extra ? "关闭第二个助手" : "关闭助手"} onClick={closePanel}><X size={19} /></button>
@@ -1550,12 +1582,28 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
               </div>
             </div>)}
           </section>}
-          <label className="agent-question"><span className="agent-visually-hidden">{view ? "继续对话" : "希望助手做什么"}</span><textarea rows={2} ref={goalInput} name="investigationGoal" value={questionText} maxLength={(view?4000:2000)-skillPrefix.length} disabled={busy} onChange={event => setGoal(skillPrefix+event.target.value)} placeholder={view?"继续追问，或告诉我接下来做什么…":hasDraftSources?"询问 Hub 助手…":"询问 Hub 助手…"} onKeyDown={event => {
-            if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
+          <label className="agent-question"><span className="agent-visually-hidden">{view ? "继续对话" : "希望助手做什么"}</span><textarea rows={2} ref={goalInput} name="investigationGoal" value={questionText} maxLength={(view?4000:2000)-skillPrefix.length} disabled={busy} onChange={event => setGoal(skillPrefix+event.target.value)} placeholder={view?"继续追问，输入 / 调用技能，@ 引用资料…":"询问 Hub 助手，或输入 / 调用技能…"} onKeyDown={event => {
+            if(event.nativeEvent.isComposing || event.keyCode===229)return;
+            if(event.key === "Enter" && (!event.shiftKey || event.ctrlKey || event.metaKey)) {
+              event.preventDefault(); event.currentTarget.form?.requestSubmit(); return;
+            }
+            const caret=event.currentTarget.selectionStart;
+            if(event.currentTarget.selectionEnd!==caret || (caret>0 && !/\s/.test(questionText[caret-1])) || event.ctrlKey || event.metaKey || event.altKey || busy || active)return;
+            if(event.key==="/"){
+              event.preventDefault();
+              openSkills(event.currentTarget);
+            }else if(event.key==="@" && !pickerDisabled && !publicUrl){
+              event.preventDefault();
+              materialReturn.current=event.currentTarget;
+              openCoreMaterials();
+              setAddMenuOpen(true);
+              if(materialPopover.ref.current)materialPopover.ref.current.open=true;
+            }
           }} /></label>
           <div className="agent-composer-controls">
             <details ref={materialPopover.ref} className="agent-add-menu agent-popover" onToggle={event=>{if(event.target!==event.currentTarget)return;setAddMenuOpen(event.currentTarget.open);if(!event.currentTarget.open){setMaterialSelection(null);setAddPage("home");}}}>
               <summary aria-label="添加附件" title="添加附件" onClick={()=>{materialReturn.current=null;}}><Plus size={20} aria-hidden="true"/></summary>
+              {addMenuOpen && ["materials","scope","pages","files","images"].includes(addPage) && <div className="agent-scope-backdrop" aria-hidden="true" onClick={()=>materialPopover.close(true)}/>}
               <div className={`agent-add-content${["materials","scope","pages","files","images"].includes(addPage)?" agent-add-materials":addPage==="skills"?" agent-add-skills":""}`}>
                 <div className="agent-popover-header">
                   {!["home","scope","materials","skills"].includes(addPage)&&<button type="button" className="agent-menu-back" ref={addBack} aria-label={["files","images"].includes(addPage)?"返回材料列表":"返回资料范围"} onClick={backInMaterials}><ArrowLeft size={16}/></button>}
@@ -1580,18 +1628,20 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
                 {addMenuOpen && addPage==="web" && <div className="agent-add-section"><label>公共网页地址<input type="url" aria-label="公共网页地址" value={publicUrl} disabled={busy} onChange={event=>setPublicUrl(event.target.value)} placeholder="https://example.org/article"/></label><p className="agent-note">发送问题即读取并保存此公开网页。仅支持 HTTPS 文本与 HTML 源码；不登录、不跟随跳转，不加载脚本和图片。每次最多 256 KiB，30 秒超时。遇到代理虚拟地址时向 Cloudflare 加密查询域名，不发送正文。</p><button type="button" onClick={()=>{materialPopover.close(true);goalInput.current?.focus();}}>返回填写问题</button></div>}
                 {addMenuOpen && addPage==="skills" && <AgentSkills pinned={pinnedSkills} onPin={toggleSkillPin} selected={selectedSkills.map(token=>token.slice(1))} onReset={()=>setGoal(questionText)} disabled={busy || (!!active && !steerable)} onSelect={name=>{setGoal(current=>new RegExp(`(^|[^a-zA-Z0-9_$\\\\-])\\$${name}(?=$|[^a-zA-Z0-9_-])`).test(current)?current:`$${name} ${current}`);materialPopover.close(false);goalInput.current?.focus();}} embedded/>}
                 {addMenuOpen && (addPage==="materials" || addPage==="scope") && <div className="agent-add-section agent-scope-body">
+            <div className="agent-scope-tabs" role="group" aria-label="资料范围分区">
+              <button type="button" aria-pressed={scopeTab==="docs"} onClick={()=>setScopeTab("docs")}>核心材料 ({coreMaterialCount})</button>
+              <button type="button" aria-pressed={scopeTab==="libraries"} onClick={()=>setScopeTab("libraries")}>资料库 ({composerLibraries.length})</button>
+              <button type="button" aria-pressed={scopeTab==="policy"} onClick={()=>setScopeTab("policy")}>使用策略</button>
+            </div>
             <div className="agent-scope-overview">
-              <button type="button" onClick={()=>openCoreMaterials()}><FileText size={16}/><strong>核心材料</strong><span>{coreMaterialCount?`${coreMaterialCount} 份资料`:"添加页面"}</span><ChevronRight size={14}/></button>
-              <details><summary><Library size={16}/><strong>可检索的资料库</strong><small>{composerLibraries.length?composerLibraries.length+" 个库":"未选择"}</small><ChevronDown size={14}/></summary>{!view?.work.grant.manifest&&<AgentLibraryScope registry={libraryRegistry} selected={composerLibraries} disabled={businessDisabled||!!active||confirmMessage||view?.work.state==="revoked"} onChange={changeLibraries}/>}</details>
-              {hasEffectiveMaterials && <details>
-                <summary><SlidersHorizontal size={16}/><strong>怎样使用资料</strong><small>{policyNames[scopePolicy]}</small><ChevronDown size={14}/></summary>
-                <AgentResearchPolicy value={scopePolicy} disabled={busy || !!active} onChange={changeMaterialPolicy}/>
-              </details>}
+              {scopeTab==="docs" && <button type="button" onClick={()=>openCoreMaterials()}><FileText size={16}/><strong>核心材料</strong><span>{coreMaterialCount?`${coreMaterialCount} 份资料`:"添加页面"}</span><ChevronRight size={14}/></button>}
+              {scopeTab==="libraries" && (!view?.work.grant.manifest ? <AgentLibraryScope registry={libraryRegistry} selected={composerLibraries} disabled={businessDisabled||!!active||confirmMessage||view?.work.state==="revoked"} onChange={changeLibraries}/> : <p className="agent-note">当前使用固定清单。</p>)}
+              {scopeTab==="policy" && <AgentResearchPolicy value={scopePolicy} disabled={busy || !!active} onChange={changeMaterialPolicy}/>}
               {needsMaterials && <div className="agent-scope-recovery">
                 <p className="agent-note" role="status">{scopeRecovery}</p>
                 <button type="button" disabled={busy || !!active} onClick={() => void changeMaterialPolicy("material-first")}>切换为普通提问</button>
               </div>}
-            </div>{scopeAttachments}{scopeVerification}</div>}
+            </div>{scopeTab==="docs" && scopeAttachments}{scopeTab!=="policy" && scopeVerification}</div>}
             {addMenuOpen && selection && ["pages","files","images"].includes(addPage) && <div className="agent-core-selection" hidden={addPage!=="pages"}>
             {view?.work.grant.manifest ? <div className="agent-scope-body">{scopeVerification}</div> : <AgentMaterials embedded hideFooter
               anchor={view&&anchor?.kind==="note"?anchor:undefined}
@@ -1645,9 +1695,9 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
 
               </div>
             </details>
-            <MemoryAndSavePopover model={memory} value={scopeOptions} disabled={busy || !!active} materialsOnly={materialsOnly} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
             <AgentScopeTrigger selected={detailGrant ? detailGrant.libraryIds.map(id=>({id,name:id})) : composerLibraries} registry={libraryRegistry} fallbackLabel={detailGrant ? (detailCoreCount ? `${detailCoreCount} 份资料` : "添加资料范围") : view?.work.grant.manifest ? `固定 ${view.work.grant.manifest.members.length} 份资料` : (pageAttached ? "当前页面" : hasEffectiveMaterials ? "已添加资料" : "添加资料范围")} pending={libraryDraft!==null} disabled={busy || filePreparing || !!publicUrl} onClick={()=>openMaterialScope()}/>
-          <button type="button" className="agent-current-page agent-skill-shortcut" aria-label="添加技能" title="技能：选择本次使用的处理方法" disabled={busy || (!!active && !steerable)} onClick={event=>{materialReturn.current=event.currentTarget;setAddPage("skills");setAddMenuOpen(true);if(materialPopover.ref.current)materialPopover.ref.current.open=true;}}><WandSparkles size={18} aria-hidden="true"/></button>
+          <button type="button" className="agent-current-page agent-skill-shortcut" aria-label="添加技能" title="技能：选择本次使用的处理方法" data-selected={selectedSkills.length>0} disabled={busy || (!!active && !steerable)} onClick={event=>openSkills(event.currentTarget)}><Zap size={14} aria-hidden="true"/></button>
+            <MemoryAndSavePopover model={memory} value={scopeOptions} disabled={busy || !!active} materialsOnly={materialsOnly} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
           {textMaterials?.selection&&<button type="button" className="agent-current-page agent-selection-tool" aria-label="添加所选文字" title="添加所选文字（文字快照，不是区块）" disabled={busy||filePreparing||!!view?.work.grant.manifest} onMouseDown={event=>event.preventDefault()} onClick={()=>{addTextMaterial(textMaterials.selection!);textMaterials.clearSelection();}}><Quote size={18}/></button>}
             <AgentAssistantOptions value={(view ? view.assistantOptions || defaultAssistantOptions : assistantOptions)} disabled={busy || !!active} canAuto={anchor?.kind==="note"} onSave={saveAssistantOptions}/>
             {active && <button className="agent-send" type="button" aria-label="停止本轮" title="停止本轮" disabled={busy || stopping || !!view?.lifecycle && !view.lifecycle.activeRunId} onClick={()=>void mutate("cancel")}><Square size={13} fill="currentColor" aria-hidden="true" /></button>}

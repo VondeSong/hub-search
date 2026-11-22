@@ -47,7 +47,7 @@ export function AgentModelMenu({value,disabled,onSave}:{value:AssistantOptions;d
 
     <details ref={modelMenu.ref} className="agent-assistant-options agent-popover agent-option-model" onToggle={event=>{if(event.target===event.currentTarget&&event.currentTarget.open){effortMenu.close();void load();}}}>
       <summary aria-label={`选择模型：${modelName}${fastActive?"，Fast 已开启":""}`} title={`${modelName} · ${effortName(resolvedEffort)}`}>
-        {fastActive&&<Zap size={13} className="agent-model-fast-active"/>}<span className="agent-model-name">{modelName}</span>
+        {effective&&<img className="agent-provider-icon agent-model-brand" src={`/brands/${activeProvider==="deepseek"?"deepseek":"openai"}.ico`} alt="" aria-hidden="true"/>}{fastActive&&<Zap size={13} className="agent-model-fast-active"/>}<span className="agent-model-name">{modelName}</span>
       </summary>
       <div className="agent-assistant-settings agent-model-menu" aria-label="模型与速度">
         <div className="agent-popover-header"><span>模型与速度</span><button type="button" aria-label="关闭模型选择" onClick={()=>modelMenu.close(true)}><X size={16}/></button></div>

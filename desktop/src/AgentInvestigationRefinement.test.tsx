@@ -111,7 +111,7 @@ it.each(["live", "cached", "disabled"] as const)("restores Codex search after a 
   expect(configured.model.provider).toBe("codex");
 });
 
-it("keeps pinned skills in the skill library and hides the policy with empty scope",async()=>{
+it("keeps pinned skills in the skill library and exposes the three material scope tabs",async()=>{
   await render(<StandaloneInvestigation initiallyOpen/>);
   await activate(select<HTMLButtonElement>('.agent-skill-shortcut'));
   await activate(select<HTMLButtonElement>('[aria-label="置顶技能 资料分析与核对"]'));
@@ -122,7 +122,7 @@ it("keeps pinned skills in the skill library and hides the policy with empty sco
   await activate(select<HTMLButtonElement>('[aria-label="关闭任务模式"]'));
   await activate(select<HTMLButtonElement>('.agent-scope-trigger'));
   const panel=select<HTMLElement>('.agent-add-materials');
-  expect([...panel.querySelectorAll('.agent-scope-overview>button strong,.agent-scope-overview>details>summary strong')].map(e=>e.textContent)).toEqual(['核心材料','可检索的资料库']);
+  expect([...panel.querySelectorAll('.agent-scope-tabs button')].map(e=>e.textContent)).toEqual(['核心材料 (0)','资料库 (0)','使用策略']);
   expect(panel.querySelector('.agent-popover-header')?.textContent).toBe('资料范围');
   expect(panel.querySelector('[aria-label="返回资料范围"]')).toBeNull();
   expect(panel.querySelector('.agent-scope-extra')).toBeNull();
@@ -143,12 +143,15 @@ it("blocks an empty materials-only scope until the user switches to ordinary cha
   localStorage.setItem("hub.agent.preferences.v1", JSON.stringify({ webSearch: "cached" }));
   await render(<StandaloneInvestigation initiallyOpen startFresh />);
   await activate(select<HTMLButtonElement>(".agent-scope-trigger"));
-  const library = select<HTMLInputElement>('input[aria-label="允许查找 资料库 A"]');
-  await activate(library);
-  const policy = select<HTMLDetailsElement>(".agent-scope-overview details:has(.agent-research-policies)");
-  expect(policy.querySelector("summary")?.textContent).toContain("怎样使用资料");
+  const libraryTab = () => select<HTMLButtonElement>('.agent-scope-tabs button:nth-child(2)');
+  const library = () => select<HTMLInputElement>('input[aria-label="允许查找 资料库 A"]');
+  await activate(libraryTab());
+  await activate(library());
+  await activate(select<HTMLButtonElement>('.agent-scope-tabs button:last-child'));
+  const policy = select<HTMLElement>(".agent-scope-overview .agent-research-policies");
   await activate([...policy.querySelectorAll("button")].find(button => button.textContent?.startsWith("只用所选资料"))!);
-  await activate(library);
+  await activate(libraryTab());
+  await activate(library());
   expect(document.body.textContent).toContain("请添加资料，或切换为普通提问");
   await submit("保留这条提问");
   expect(calls("create")).toHaveLength(0);
@@ -198,6 +201,24 @@ function deferred<T>() {
 }
 
 describe("assistant refinement integration", () => {
+  it("opens skills and core materials with composer shortcuts without sending", async () => {
+    await render(<StandaloneInvestigation initiallyOpen startFresh/>);
+    const input = select<HTMLTextAreaElement>('[name="investigationGoal"]');
+    await type(input, "核对这份资料 ");
+    const key = async (value: string) => {
+      await act(async () => input.dispatchEvent(new KeyboardEvent("keydown",{key:value,bubbles:true,cancelable:true})));
+      await flushToggle();
+    };
+    await key("/");
+    expect(select(".agent-add-skills .agent-popover-header").textContent).toBe("技能");
+    await escape();
+    expect(document.activeElement).toBe(input);
+    await key("@");
+    expect(select(".agent-add-materials .agent-popover-header").textContent).toBe("选择材料");
+    expect(input.value).toBe("核对这份资料 ");
+    expect(calls("create")).toHaveLength(0);
+  });
+
   it("keeps a draft title local until the first question and stores it separately from the question", async () => {
     await render(<StandaloneInvestigation initiallyOpen/>);
     const titleButton = () => select<HTMLButtonElement>('button[aria-label="重命名对话"]');
@@ -343,6 +364,7 @@ describe("assistant refinement integration", () => {
   it.each([false, true])("keeps library checkboxes, the inline scope and sent IDs consistent when legacy current-library selection is removed=%s", async removeCurrent => {
     await render(<PersistentSourceInvestigation result={source} initiallyOpen startFresh />);
     await activate(select<HTMLButtonElement>(".agent-scope-trigger"));
+    await activate(select<HTMLButtonElement>('.agent-scope-tabs button:nth-child(2)'));
     const a = select<HTMLInputElement>('input[aria-label="允许查找 资料库 A"]');
     const b = select<HTMLInputElement>('input[aria-label="允许查找 资料库 B"]');
     const legacy = select<HTMLInputElement>('.agent-grant input[type="checkbox"]');
@@ -647,10 +669,10 @@ describe("site v71 assistant controls",()=>{
   it("toggles the layout directly and keeps layout choices out of conversation details",async()=>{
     await render(<StandaloneInvestigation initiallyOpen startFresh/>);
     const panel=select<HTMLElement>('.agent-panel');const wasDocked=panel.dataset.agentDocked;
-    await activate(select<HTMLButtonElement>('.agent-header-end>button:first-child'));
+    await activate(select<HTMLButtonElement>('.agent-viewport-bar button[aria-label="展开为侧边栏"]'));
     expect(panel.dataset.agentDocked).not.toBe(wasDocked);
     await activate(select<HTMLButtonElement>('button[aria-label="对话详情"]'));
-    expect(select('.agent-display-controls').textContent).not.toContain('浮窗');expect(select('.agent-display-controls').textContent).not.toContain('侧边栏');
+    expect(select('.agent-inspector-drawer').textContent).not.toContain('浮窗');expect(select('.agent-inspector-drawer').textContent).not.toContain('侧边栏');
     expect(document.querySelector('.agent-provider-budget')).toBeNull();expect(document.querySelector('.agent-followup-mode')).toBeNull();
   });
 });

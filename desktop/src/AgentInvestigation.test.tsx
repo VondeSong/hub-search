@@ -221,7 +221,8 @@ it("opens a quote in an independent assistant and preserves both chats when dock
   expect(side.querySelector("[aria-label='待添加资料']")?.textContent).toContain(excerpt);
   expect(side.querySelector("textarea")?.value).toBe("");
   const dock = async (panel: HTMLElement) => {
-    await act(async () => panel.querySelector<HTMLButtonElement>('[aria-label="展开为侧边栏"],[aria-label="切换为浮窗"]')!.click());
+    const label = panel.dataset.agentDocked === "true" ? "切换为浮窗" : "展开为侧边栏";
+    await act(async () => panel.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!.click());
   };
   await dock(side);
   expect(side.dataset.agentDocked).toBe("true");
@@ -235,7 +236,7 @@ it("opens a quote in an independent assistant and preserves both chats when dock
   const resizeSide = document.querySelector(`.agent-panel-resizer[aria-controls="${side.id}"]`)!;
   await act(async () => resizeSide.dispatchEvent(new KeyboardEvent("keydown", {key:"ArrowLeft", bubbles:true})));
   expect(document.body.style.getPropertyValue("--agent-extra-panel-width")).toBe("450px");
-  expect(document.body.style.getPropertyValue("--agent-panel-width")).toBe("440px");
+  expect(document.body.style.getPropertyValue("--agent-panel-width")).toBe("480px");
   await click("关闭助手");
   expect(main.hidden).toBe(true);
   expect(side.hidden).toBe(false);
@@ -306,7 +307,7 @@ it.each(["mcp","web"])("cn07c binds a standalone %s-only choice before the first
   await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));await fill("investigationGoal","查询官方说明");await openAddPage("更多设置");
   await act(async()=>{const details=document.body.querySelector<HTMLDetailsElement>(".agent-menu-advanced")!;details.open=true;});
   if(kind==="mcp") {await click("发现 / 刷新");await act(async()=>document.body.querySelector<HTMLInputElement>('.agent-connection-settings fieldset input[type="checkbox"]')!.click());}
-  else {await act(async()=>{const select=[...document.body.querySelectorAll<HTMLSelectElement>(".agent-connection-settings select")].find(s=>s.parentElement?.textContent?.startsWith("联网搜索"))!;select.value="cached";select.dispatchEvent(new Event("change",{bubbles:true}));});}
+  else {await act(async()=>{const select=document.body.querySelector<HTMLSelectElement>(".agent-connection-advanced select")!;select.value="cached";select.dispatchEvent(new Event("change",{bubbles:true}));});}
   await click("应用到本对话");expect(invoke.mock.calls.some(([,p])=>p?.args?.action==="configureAssistant")).toBe(false);
   await act(async()=>document.body.querySelector<HTMLFormElement>(".agent-composer form")!.requestSubmit());
   const calls=invoke.mock.calls.map(([,p])=>p.args).filter(a=>["create","configureAssistant","respond"].includes(a.action));
@@ -388,10 +389,10 @@ it("reading investigations grant only the explicit item and do not assume a note
 });
 async function openAddPage(label:string){
  if(label==="使用技能"){await click("添加技能");return;}
- if(label==="资料范围"){await click("搜索范围：");return;}
+ if(label==="资料范围"){await click("搜索范围：");await click("资料库 (");return;}
  if(label==="资料库与页面"){await click("搜索范围：");await click("核心材料");return;}
  if(label==="从笔记库添加"){await click("搜索范围：");await click("核心材料");return;}
- if(label==="更多设置"){await openDialogueDetails();const connection=[...document.body.querySelectorAll<HTMLDetailsElement>(".agent-details-sections details")].find(d=>d.querySelector(".agent-detail-title")?.textContent==="联网与工具")!;connection.open=true;connection.classList.add("agent-menu-advanced");return;}
+ if(label==="更多设置"){await openDialogueDetails();const advanced=document.body.querySelector<HTMLDetailsElement>(".agent-connection-advanced")!;advanced.open=true;advanced.classList.add("agent-menu-advanced");return;}
  if(label==="从资料库添加图片"){await click("搜索范围：");await click("核心材料");await click("选择资料库图片");return;}
  if(label==="读取公共链接"){await click("搜索范围：");await click("核心材料");await click("读取公共链接");return;}
  const menu=document.body.querySelector<HTMLDetailsElement>(".agent-add-menu")!;
@@ -2327,7 +2328,7 @@ it("keeps history and menu sections visible when there are no saved conversation
  invoke.mockImplementation(async(_,{args})=>args.action==='list'?{works:[]}:current);
  await act(async()=>root.render(<StandaloneInvestigation initiallyOpen/>));
  const menu=document.querySelector('.agent-details-content')!;
- expect(menu.textContent).toContain('还没有历史对话');expect(menu.textContent).toContain('资料范围');expect(menu.textContent).toContain('成果与保存');expect(menu.textContent).toContain('任务状态');
+ expect(menu.textContent).toContain('还没有历史对话');expect(menu.textContent).toContain('资料范围');expect(menu.textContent).toContain('成果与保存');expect(menu.textContent).toContain('运行诊断与用量');
  expect(menu.querySelector('.agent-provider-budget')).toBeNull();expect(button('停止此任务')).toBeUndefined();
 });
 
@@ -2412,7 +2413,7 @@ it("new chat enables live search while restoring an old chat does not change its
  await open();
  expect(invoke.mock.calls.some(([,p])=>p?.args?.action==="configureAssistant")).toBe(false);
  await openAddPage("更多设置");
- const select=[...document.querySelectorAll<HTMLSelectElement>(".agent-connection-settings select")].find(s=>s.parentElement?.textContent?.startsWith("联网搜索"))!;
+ const select=document.querySelector<HTMLSelectElement>(".agent-connection-advanced select")!;
  expect(select.value).toBe("disabled");
 });
 

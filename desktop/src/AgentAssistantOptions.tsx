@@ -11,11 +11,11 @@ export const defaultAssistantOptions: AssistantOptions = {model:null,autoFlashca
 export const webSearchNames = { disabled: "关闭", cached: "缓存搜索", live: "实时搜索" };
 type Section = "model" | "connection";
 
-type Props = {workId?:string;section?:Section;value:AssistantOptions;disabled:boolean;canAuto:boolean;onSave:(value:AssistantOptions)=>Promise<void>};
+type Props = {workId?:string;section?:Section;inspector?:boolean;value:AssistantOptions;disabled:boolean;canAuto:boolean;onSave:(value:AssistantOptions)=>Promise<void>};
 export function AgentAssistantOptions(props:Props) {
   return props.section==="connection" ? <AgentConnectionOptions {...props}/> : <AgentModelMenu value={props.value} disabled={props.disabled} onSave={props.onSave}/>;
 }
-function AgentConnectionOptions({value,disabled,onSave,section,workId}:Props) {
+function AgentConnectionOptions({value,disabled,onSave,section,workId,inspector}:Props) {
   const runtime = useCodexSuite();
   const effective = value.model ?? (runtime.loaded ? runtime.settings : null);
   const [draft,setDraft]=useState(value);
@@ -36,15 +36,28 @@ function AgentConnectionOptions({value,disabled,onSave,section,workId}:Props) {
   const deepseek = effective?.provider === "deepseek";
   const searchBlocked = materialsOnly || deepseek;
   const webStatus = materialsOnly ? "当前对话只使用所选资料。" : deepseek ? "当前模型不支持网页搜索。" : "";
+  const searchOn = !searchBlocked && !!draft.webSearch && draft.webSearch !== "disabled";
+  const rememberedSearch = useRef<"live"|"cached">("live");
+  useEffect(()=>{
+    if(draft.webSearch==="cached" || draft.webSearch==="live") rememberedSearch.current=draft.webSearch;
+  },[draft.webSearch]);
+  const webSelect = <label>{inspector?"搜索方式":"联网搜索"}<select value={searchBlocked ? "disabled" : draft.webSearch ?? "disabled"} disabled={disabled || saving || searchBlocked} onChange={event=>setDraft(current=>{const next={...current};if(event.target.value==="disabled")delete next.webSearch;else next.webSearch=event.target.value as "cached"|"live";return next;})}>
+    <option value="disabled">{webSearchNames.disabled}</option><option value="cached">{webSearchNames.cached}</option><option value="live">{webSearchNames.live}</option>
+  </select></label>;
+  const mcpPicker = <details className="agent-mcp-settings"><summary>{inspector?"MCP 外部工具":"外部工具（MCP）"}<small>{draft.mcpServices?.length ? `已选 ${draft.mcpServices.length} 项` : "未选择"}</small></summary><AgentMcpServices value={draft.mcpServices ?? []} disabled={disabled || saving || searchBlocked} onChange={services=>setDraft(current=>{const next={...current};if(services.length)next.mcpServices=services;else delete next.mcpServices;return next;})}/></details>;
   const contents=<>
     {section==="connection" && <>
-      <label>联网搜索<select value={searchBlocked ? "disabled" : draft.webSearch ?? "disabled"} disabled={disabled || saving || searchBlocked} onChange={event=>setDraft(current=>{const next={...current};if(event.target.value==="disabled")delete next.webSearch;else next.webSearch=event.target.value as "cached"|"live";return next;})}>
-        <option value="disabled">{webSearchNames.disabled}</option><option value="cached">{webSearchNames.cached}</option><option value="live">{webSearchNames.live}</option>
-      </select></label>
+      {inspector ? <button type="button" className="agent-inspector-switch" aria-pressed={searchOn} disabled={disabled||saving||searchBlocked} onClick={()=>setDraft(current=>{
+        const next={...current};
+        if(searchOn)delete next.webSearch;
+        else next.webSearch=rememberedSearch.current;
+        return next;
+      })}><span>联网搜索</span><span aria-hidden="true"/></button> : webSelect}
       {webStatus && <p className="agent-note" role="status">{webStatus}</p>}
+      {inspector && mcpPicker}
       <details className="agent-connection-explanation"><summary>搜索说明</summary><p className="agent-note">新聊天默认实时搜索；此处可关闭，选择会用于后续新聊天。已有对话保留各自设置。仅支持 Codex。开启后，检索词会发送给联网搜索服务；不会因此开放其他本地资料。缓存搜索可能不是最新信息，实时搜索可获取更新内容。搜索记录和链接随对话保存，网页全文需另行读取。提供方内部检索材料不计入 Hub 的材料字节统计。</p></details>
       <details className="agent-connection-advanced"><summary>高级设置</summary>
-        <details className="agent-mcp-settings"><summary>外部工具（MCP）<small>{draft.mcpServices?.length ? `已选 ${draft.mcpServices.length} 项` : "未选择"}</small></summary><AgentMcpServices value={draft.mcpServices ?? []} disabled={disabled || saving || searchBlocked} onChange={services=>setDraft(current=>{const next={...current};if(services.length)next.mcpServices=services;else delete next.mcpServices;return next;})}/></details>
+        {inspector ? webSelect : mcpPicker}
         <details className="agent-connection-explanation"><summary>执行与协作<small>{draft.nativeCapabilities?.workspace?draft.nativeCapabilities.multiAgent?"工作区与子代理":"独立工作区":"受控计算"}</small></summary>
           <label><input type="checkbox" checked={!!draft.knowledgeReview} disabled={disabled || saving || deepseek} onChange={event=>setDraft(current=>({...current,knowledgeReview:event.target.checked}))}/>分工复核资料</label>
           <p className="agent-note">两位助手分头看已授权的原文，并各自核对共同的重点。主助手会汇总发现、分歧和未读部分。</p>
