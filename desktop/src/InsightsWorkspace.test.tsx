@@ -376,3 +376,236 @@ it("stops a batch on an uncertain write and keeps the native operation receipt",
  expect(host.textContent).toContain("已确认 1 / 3 条");
  expect(button("批量标为已处理").disabled).toBe(true);
 });
+
+it("aligns desktop single-row 3-mode topbar, list-header filters, stable split drag/reset, and inline Escape focus exit",async()=>{
+ const second=item("two");second.processingState="done";second.validity="review";second.perspective="decision";second.starred=true;second.updatedAt=store.items[0].updatedAt-1000;second.snapshot!.text="决定保留双栏默认布局。";
+ store.items[0].perspective="knowledge";
+ store.items.push(second);
+ const normal=invoke.getMockImplementation()!;
+ invoke.mockImplementation(async(command,request)=>{
+  if(request.args.action==="insightWorkspace")return {entries:[],hasMore:false,nextBefore:null};
+  return normal(command,request);
+ });
+ await mount();
+ const workspace=host.querySelector<HTMLElement>(".insights-workspace")!;
+ expect(workspace.classList.contains("insights-navigation-closed")).toBe(true);
+
+ // Single-row 3-mode switch switches between 全部发现 / 阶段回顾 / 关注主题
+ const modeTabs=[...host.querySelectorAll<HTMLButtonElement>('.insights-mode-switch [role="tab"]')];
+ expect(modeTabs.map(t=>t.textContent?.replace(/\d+\+?$/,"").trim())).toEqual(["全部发现","阶段回顾","关注主题"]);
+ await act(async()=>modeTabs[1].click());
+ expect(host.querySelector('[aria-label="回顾问题"]')).not.toBeNull();
+ await act(async()=>modeTabs[2].click());
+ expect(host.querySelector(".insight-notebook")).not.toBeNull();
+ await act(async()=>modeTabs[0].click());
+
+ // List header quick scope pills and inline perspective/status filters work without model calls
+ const reviewPill=[...host.querySelectorAll<HTMLButtonElement>('.insights-scope-pills [role="tab"]')].find(b=>b.textContent?.includes("待复核"))!;
+ await act(async()=>reviewPill.click());
+ expect(host.querySelectorAll(".insights-card")).toHaveLength(1);
+ const allPill=host.querySelector<HTMLButtonElement>('.insights-scope-pills [role="tab"]')!;
+ await act(async()=>allPill.click());
+ expect(host.querySelectorAll(".insights-card")).toHaveLength(2);
+
+ const persSelect=host.querySelector<HTMLSelectElement>('select[aria-label="按视角筛选"]')!;
+ await act(async()=>{persSelect.value="decision";persSelect.dispatchEvent(new Event("change",{bubbles:true}));});
+ expect(host.querySelectorAll(".insights-card")).toHaveLength(1);
+ await act(async()=>button("重置筛选").click());
+ expect(host.querySelectorAll(".insights-card")).toHaveLength(2);
+
+ // Split gutter ignores bare single click, persists real drag, and resets on double click
+ const gutter=host.querySelector<HTMLDivElement>(".insights-split-gutter")!;
+ expect(gutter.getAttribute("aria-valuenow")).toBe("344");
+ await act(async()=>{
+  gutter.dispatchEvent(new MouseEvent("pointerdown",{clientX:346,bubbles:true}));
+  gutter.dispatchEvent(new MouseEvent("pointerup",{clientX:346,bubbles:true}));
+ });
+ expect(gutter.getAttribute("aria-valuenow")).toBe("344");
+ await act(async()=>{
+  gutter.dispatchEvent(new MouseEvent("pointerdown",{clientX:346,bubbles:true}));
+  gutter.dispatchEvent(new MouseEvent("pointermove",{clientX:406,bubbles:true}));
+  gutter.dispatchEvent(new MouseEvent("pointerup",{clientX:406,bubbles:true}));
+ });
+ expect(gutter.getAttribute("aria-valuenow")).toBe("404");
+ expect(userProfileStorage.getItem("hub.insights.list-width.v1")).toBe("404");
+ await act(async()=>{gutter.dispatchEvent(new MouseEvent("dblclick",{bubbles:true}));});
+ expect(gutter.getAttribute("aria-valuenow")).toBe("344");
+
+ // Inline desktop focus mode enters on click and exits cleanly on Escape
+ await click("查看发现");
+ await click("专注阅读");
+ expect(workspace.classList.contains("insights-focus")).toBe(true);
+ expect(host.querySelector("section.insights-v4-detail")).not.toBeNull();
+ await act(async()=>{window.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}));});
+ expect(workspace.classList.contains("insights-focus")).toBe(false);
+ expect(invoke.mock.calls.some(([,v])=>["respond","resume","run"].includes(v.args.action))).toBe(false);
+});
+
+it("switches to discoveries when typing in topbar search from stageReview, topic, and history while keeping focus, filters, and drafts",async()=>{
+ const liveSync=item("livesync-1");
+ liveSync.perspective="knowledge";
+ liveSync.snapshot!.text="LiveSync 同步冲突已通过独立副本解决。";
+ liveSync.workTitle="LiveSync 排查";
+ const other=item("other-1");
+ other.perspective="decision";
+ other.updatedAt=liveSync.updatedAt-500;
+ other.snapshot!.text="其他决策记录。";
+ store.items=[liveSync,other];
+ const normal=invoke.getMockImplementation()!;
+ invoke.mockImplementation(async(command,request)=>{
+  if(request.args.action==="insightWorkspace")return {items:[],drafts:[],nextBefore:null};
+  return normal(command,request);
+ });
+ await mount();
+
+ const modeTabs=()=>[...host.querySelectorAll<HTMLButtonElement>('.insights-mode-switch [role="tab"]')];
+ const searchInput=host.querySelector<HTMLInputElement>('input[aria-label="搜索发现与依据"]')!;
+ const typeQuery=async(value:string)=>{
+  searchInput.focus();
+  await act(async()=>{
+   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(searchInput,value);
+   searchInput.dispatchEvent(new Event("input",{bubbles:true}));
+  });
+ };
+
+ // 1) From 阶段回顾: preserve unsaved review draft + input focus + existing filter while rendering real LiveSync match
+ await act(async()=>modeTabs()[1].click());
+ const questionArea=host.querySelector<HTMLTextAreaElement>('textarea[aria-label="回顾问题"]')!;
+ const noteArea=host.querySelector<HTMLTextAreaElement>('textarea[aria-label="回顾笔记"]')!;
+ await act(async()=>{
+  Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value")!.set!.call(questionArea,"本周 LiveSync 同步复盘");
+  questionArea.dispatchEvent(new Event("input",{bubbles:true}));
+  Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value")!.set!.call(noteArea,"实测 11-23 同步耗时");
+  noteArea.dispatchEvent(new Event("input",{bubbles:true}));
+ });
+ await typeQuery("LiveSync");
+ expect(modeTabs()[0].getAttribute("aria-selected")).toBe("true");
+ expect(document.activeElement).toBe(searchInput);
+ expect(host.querySelectorAll(".insights-card")).toHaveLength(1);
+ expect(host.querySelector(".insights-card")?.textContent).toContain("LiveSync 同步冲突");
+ // Returning to 阶段回顾 preserves both draft fields intact
+ await act(async()=>modeTabs()[1].click());
+ expect(host.querySelector<HTMLTextAreaElement>('textarea[aria-label="回顾问题"]')!.value).toBe("本周 LiveSync 同步复盘");
+ expect(host.querySelector<HTMLTextAreaElement>('textarea[aria-label="回顾笔记"]')!.value).toBe("实测 11-23 同步耗时");
+
+ // 2) From 关注主题: typing switches to discoveries while preserving open topic draft
+ await act(async()=>host.querySelector<HTMLButtonElement>('button[aria-label="清除搜索"]')!.click());
+ await act(async()=>modeTabs()[2].click());
+ await click("关注一个问题");
+ const topicTitle=host.querySelector<HTMLInputElement>('.insight-notebook input[required]')!;
+ await act(async()=>{
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(topicTitle,"持续观察同步稳定性");
+  topicTitle.dispatchEvent(new Event("input",{bubbles:true}));
+ });
+ await typeQuery("LiveSync");
+ expect(modeTabs()[0].getAttribute("aria-selected")).toBe("true");
+ expect(document.activeElement).toBe(searchInput);
+ expect(host.querySelectorAll(".insights-card")).toHaveLength(1);
+ expect(host.querySelector(".insights-card")?.textContent).toContain("LiveSync 同步冲突");
+ await act(async()=>modeTabs()[2].click());
+ expect(host.querySelector<HTMLInputElement>('.insight-notebook input[required]')!.value).toBe("持续观察同步稳定性");
+ // Pressing Enter on an already-filled search query from a secondary mode also jumps back to discoveries
+ searchInput.focus();
+ await act(async()=>{searchInput.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true}));});
+ expect(modeTabs()[0].getAttribute("aria-selected")).toBe("true");
+ expect(document.activeElement).toBe(searchInput);
+
+ // 3) From 处理记录 (legacy history entry): typing switches to discoveries and preserves focus
+ await act(async()=>host.querySelector<HTMLButtonElement>('button[aria-label="清除搜索"]')!.click());
+ expect(document.activeElement).toBe(searchInput);
+ await click("处理记录");
+ expect(host.textContent).toContain("更新了星标");
+ await typeQuery("LiveSync");
+ expect(modeTabs()[0].getAttribute("aria-selected")).toBe("true");
+ expect(document.activeElement).toBe(searchInput);
+ expect(host.querySelectorAll(".insights-card")).toHaveLength(1);
+ expect(host.querySelector(".insights-card")?.textContent).toContain("LiveSync 同步冲突");
+ // Returning to 处理记录 still displays real history entries
+ await click("处理记录");
+ expect(host.textContent).toContain("更新了星标");
+
+ // 4) Existing discovery filter is preserved when search switches from secondary mode back to discoveries
+ await act(async()=>modeTabs()[0].click());
+ await act(async()=>host.querySelector<HTMLButtonElement>('button[aria-label="清除搜索"]')!.click());
+ const persSelect=host.querySelector<HTMLSelectElement>('select[aria-label="按视角筛选"]')!;
+ await act(async()=>{persSelect.value="decision";persSelect.dispatchEvent(new Event("change",{bubbles:true}));});
+ await act(async()=>modeTabs()[1].click());
+ await typeQuery("LiveSync");
+ expect(modeTabs()[0].getAttribute("aria-selected")).toBe("true");
+ expect(persSelect.value).toBe("decision");
+ expect(host.querySelectorAll(".insights-card")).toHaveLength(0);
+ await act(async()=>button("重置筛选").click());
+ expect(host.querySelectorAll(".insights-card")).toHaveLength(2);
+
+ // 5) Compact 2-row list header keeps sort/filter/layout accessibility and single-row default layout CSS
+ const sortBtn=host.querySelector<HTMLButtonElement>(".insights-sort")!;
+ expect(sortBtn.textContent?.trim()).toBe("最近");
+ expect(sortBtn.getAttribute("aria-label")).toBe("按最近更新排序");
+ await act(async()=>sortBtn.click());
+ expect(sortBtn.textContent?.trim()).toBe("最早");
+ expect(sortBtn.getAttribute("aria-label")).toBe("按最早更新排序");
+ expect(host.querySelector('summary[aria-label="筛选发现"]')).not.toBeNull();
+ expect(host.querySelectorAll('.insights-layout-switch button')).toHaveLength(3);
+ expect(invoke.mock.calls.some(([,v])=>["respond","resume","run"].includes(v.args.action))).toBe(false);
+});
+
+it("keeps Android mobile unmounted per section with original query forwarding and no hidden generation reloads",async()=>{
+ const previousPlatform=document.documentElement.dataset.runtimePlatform;
+ document.documentElement.dataset.runtimePlatform="android";
+ try{
+  const normal=invoke.getMockImplementation()!;
+  invoke.mockImplementation(async(command,request)=>{
+   if(request.args.action==="insightWorkspace"){
+    return {
+     items:[
+      {id:"topic-1",kind:"topic",workId:"work-a",version:1,title:"LiveSync 同步观察",body:"移动端主题正文",createdAt:Date.now(),updatedAt:Date.now(),state:"active",assumptions:[],observations:[]},
+      {id:"topic-2",kind:"topic",workId:"work-a",version:1,title:"其他无关主题",body:"常规笔记",createdAt:Date.now(),updatedAt:Date.now(),state:"active",assumptions:[],observations:[]},
+     ],
+     drafts:[],
+     nextBefore:null,
+    };
+   }
+   return normal(command,request);
+  });
+  await mount();
+
+  // Visiting 阶段回顾 then 关注主题 mounts only the active section (no desktop keep-alive slots)
+  await click("阶段回顾");
+  expect(host.querySelector(".insights-panel-slot")).toBeNull();
+  expect(host.querySelector('[aria-label="回顾问题"]')).not.toBeNull();
+
+  await click("关注主题");
+  expect(host.querySelector(".insights-panel-slot")).toBeNull();
+  expect(host.querySelector('[aria-label="回顾问题"]')).toBeNull();
+  expect(host.textContent).toContain("LiveSync 同步观察");
+  expect(host.textContent).toContain("其他无关主题");
+
+  // Mobile topbar search stays in 关注主题 and filters current section directly
+  const searchInput=host.querySelector<HTMLInputElement>('input[aria-label="搜索发现与依据"]')!;
+  await act(async()=>{
+   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(searchInput,"LiveSync");
+   searchInput.dispatchEvent(new Event("input",{bubbles:true}));
+  });
+  expect(host.querySelector(".insight-notebook")).not.toBeNull();
+  expect(host.textContent).toContain("LiveSync 同步观察");
+  expect(host.textContent).not.toContain("其他无关主题");
+
+  // Leaving 关注主题 for 发现 unmounts the notebook so later generation refreshes never re-fetch insightWorkspace
+  await click("工作草稿");
+  const navDiscoveries=[...host.querySelectorAll<HTMLButtonElement>("nav button")].find(b=>b.textContent?.startsWith("发现"))!;
+  await act(async()=>navDiscoveries.click());
+  expect(host.querySelector(".insights-panel-slot")).toBeNull();
+  expect(host.querySelector(".insight-notebook")).toBeNull();
+  expect(host.querySelector('[aria-label="回顾问题"]')).toBeNull();
+
+  const workspaceCallsBefore=invoke.mock.calls.filter(([,v])=>v.args.action==="insightWorkspace").length;
+  vi.useFakeTimers();
+  await act(async()=>{listeners.get("library-registry-updated")?.({payload:{}});});
+  await act(async()=>{await vi.advanceTimersByTimeAsync(160);});
+  const workspaceCallsAfter=invoke.mock.calls.filter(([,v])=>v.args.action==="insightWorkspace").length;
+  expect(workspaceCallsAfter).toBe(workspaceCallsBefore);
+ }finally{
+  if(previousPlatform===undefined)delete document.documentElement.dataset.runtimePlatform;
+  else document.documentElement.dataset.runtimePlatform=previousPlatform;
+ }
+});

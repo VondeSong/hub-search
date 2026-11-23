@@ -15,16 +15,32 @@ import type {WorkSummary} from "./AgentConversationHistoryData";
 import {AgentPanelContext} from "./StandaloneAgentLauncher";
 import {AgentCitationPreview} from "./AgentCitationPreview";
 import {WorkspaceHeaderContext} from "./WorkspaceChrome";
+import {userProfileStorage} from "./UserProfileStorage";
 import "./InsightsWorkspace.css";
 
 const stateNames={attention:"待关注",later:"稍后",done:"已处理"};
 const validityNames={available:"依据已核对",review:"待复核",unavailable:"来源不可用"};
 const perspectiveNames:Record<string,string>={knowledge:"知识与工作",life:"生活与进展",decision:"决定与变化"};
 const stateTabs=["all","attention","later","done"] as const;
-const defaultListWidth=360;
-const minimumListWidth=250;
-const maximumListWidth=520;
-const clampListWidth=(width:number)=>Math.max(minimumListWidth,Math.min(maximumListWidth,width));
+const defaultListWidth=344;
+const minimumListWidth=260;
+const maximumListWidth=500;
+const INSIGHTS_LIST_WIDTH_KEY="hub.insights.list-width.v1";
+const SPLIT_DRAG_THRESHOLD_PX=3;
+const clampListWidth=(width:number)=>Math.max(minimumListWidth,Math.min(maximumListWidth,Math.round(width)));
+const loadInsightsListWidth=()=>{
+ try{
+  const raw=userProfileStorage.getItem(INSIGHTS_LIST_WIDTH_KEY);
+  if(raw===null)return defaultListWidth;
+  const parsed=Number(raw);
+  return Number.isFinite(parsed)?clampListWidth(parsed):defaultListWidth;
+ }catch{return defaultListWidth;}
+};
+const saveInsightsListWidth=(width:number)=>{
+ try{userProfileStorage.setItem(INSIGHTS_LIST_WIDTH_KEY,String(clampListWidth(width)));}catch{
+  // Ignore storage errors so resizing remains responsive.
+ }
+};
 const reviewNatureNames={fact:"资料陈述",selfReported:"用户自述",coOccurrence:"共同出现",inference:"模型推测"};
 const inputNatureNames:Record<string,string>={selfReport:"本人记录",repost:"转贴材料",quotation:"引用他人",unknown:"性质未明确"};
 const reasonNames:Record<string,string>={methodContextChanged:"分析方法或工作约定已变化",sourceChanged:"资料内容已变化",sourceUnavailable:"资料已删除或撤回访问",feedback:"有待处理的用户纠正",restore:"恢复后需要核对来源",userContextChanged:"已采用的用户补充发生变化",reviewDependencyChanged:"回顾的材料、窗口或覆盖发生变化"};
@@ -120,20 +136,21 @@ function InsightDetail({data,item,onClose,onUpdate,onOpenWork,inline=false,onPre
  const citations=<div className="insights-source-list">{item.snapshot?.sourceCitations.map((citation,index)=><article key={index}><strong>{citation.excerpt.title}</strong><blockquote>{citation.quote}</blockquote><button type="button" disabled={data.busy} onClick={()=>void openCitation(index)}>查看引用原文 <ArrowUpRight size={13}/></button></article>)}</div>;
  const navigation=<div className="insights-detail-navigation"><button type="button" disabled={!onPrevious} onClick={onPrevious}>上一条</button><button type="button" disabled={!onNext} onClick={onNext}>下一条</button><button type="button" aria-pressed={focus} onClick={onFocus}>{focus?"退出专注":"专注阅读"}</button>
    {desktop&&<div className="insights-detail-tools">
-    <button type="button" className="icon-button" aria-label="原文引文核对" title="原文引文核对" aria-expanded={drawer==="sources"} disabled={!item.snapshot||item.checking} onClick={()=>toggleDrawer("sources")}><FileSearch size={16}/></button>
+    <button type="button" className="icon-button insights-tool-quote" aria-label="原文引文核对" title="原文引文核对" aria-expanded={drawer==="sources"} disabled={!item.snapshot||item.checking} onClick={()=>toggleDrawer("sources")}>{item.validity==="review"&&<span className="insights-review-dot" aria-hidden="true"/>}<FileSearch size={16}/></button>
     <button type="button" className="icon-button" aria-label="版本与溯源" title="版本与溯源" aria-expanded={drawer==="inspect"} disabled={!item.snapshot||item.checking} onClick={()=>toggleDrawer("inspect")}><ShieldCheck size={16}/></button>
-    <button type="button" className="icon-button" aria-label="打开原事项助手" title="打开原事项助手" disabled={!item.snapshot||item.checking} onClick={()=>onOpenWork(item.workId)}><MessageSquare size={16}/></button>
+    <button type="button" className="insights-tool-ask" aria-label="打开原事项助手" title="打开原事项助手" disabled={!item.snapshot||item.checking} onClick={()=>onOpenWork(item.workId)}><Sparkles size={13}/><span>问助手</span></button>
    </div>}
  </div>;
  const body=<>
   {(!inline||!desktop)&&navigation}
-  <div className="insights-detail-body">{!desktop&&source&&item.snapshot&&!item.checking?<AgentCitationPreview value={{excerpt:source.excerpt,quote:source.quote??"",onReturn:()=>setSource(null)}}/>:<>
+  <div className="insights-detail-body"><div className="insights-detail-article">{!desktop&&source&&item.snapshot&&!item.checking?<AgentCitationPreview value={{excerpt:source.excerpt,quote:source.quote??"",onReturn:()=>setSource(null)}}/>:<>
    {separateTitle&&<h2 className="insights-finding-heading">{title}</h2>}
    <div className="insights-detail-meta">{desktop?<><FindingStatus item={item}/><FindingValidity item={item}/></>:<><span>{stateNames[item.processingState]}</span><span>{validityNames[item.validity]}</span></>}
     {desktop&&item.snapshot?revisions:<span>内容版本 {item.contentRevision??item.headRevision}</span>}
     {desktop&&item.snapshot&&current&&<button type="button" className="insights-star" disabled={data.busy} aria-label={item.starred?"取消星标":"星标发现"} aria-pressed={!!item.starred} onClick={()=>void act("insightStar",{starred:!item.starred})}><Star size={15} fill={item.starred?"currentColor":"none"}/></button>}
     {!desktop&&<span>{time(item.updatedAt)}</span>}
    </div>
+   {desktop&&<div className="insights-detail-divider" aria-hidden="true"/>}
    {!item.snapshot?<section className="insights-notice"><p>{item.checking?"正在重新核对当前访问；未保存的补充已暂时保留。":item.restorePending?"这条发现来自恢复的备份。请重新确认原事项的资料访问，旧授权不会自动恢复。":"来源或原事项当前不可访问，已隐藏正文、引文与历史内容。"}</p>{item.restorePending&&<><button type="button" onClick={()=>onOpenWork(item.workId)}>到原事项查看资料范围</button><label className="insights-confirm"><input type="checkbox" checked={restoreConfirmed} onChange={e=>setRestoreConfirmed(e.target.checked)}/>我已核对当前本机资料的访问范围；远端最新状态仍需在来源库核对</label><button type="button" disabled={data.busy||!restoreConfirmed} onClick={()=>void act("insightRestoreAccess",{confirmCurrentAccess:true})}>重新确认原事项的本机访问</button></>}</section>:<>
     {desktop&&!current&&<div className="insights-notice insights-readonly" role="status"><History size={15}/><span>正在查看历史版本 {item.contentRevision}</span><button type="button" onClick={()=>void data.open(item.id).catch(e=>setError(String(e)))}>切换至当前版本</button></div>}
     {item.validity==="review"&&<section className={desktop?"insights-notice insights-evidence-review":"insights-notice"} aria-label="依据待复核">
@@ -144,7 +161,7 @@ function InsightDetail({data,item,onClose,onUpdate,onOpenWork,inline=false,onPre
     <div className="insights-finding-text"><ReactMarkdown skipHtml allowedElements={["p","strong","em","code","br","ul","ol","li","blockquote"]} unwrapDisallowed>{displayedText}</ReactMarkdown></div>
     <section className="insights-review-outcome">{item.snapshot.reviewOutcome&&<details><summary>{item.snapshot.reviewOutcome.kind==="maintain"?"本次核对：维持原判断":"本次核对：采用修订"}</summary><p className="insights-muted">对照修订 {item.snapshot.reviewOutcome.previousRevision}；原判断与本次新依据均在历史中保留。</p><ReactMarkdown skipHtml allowedElements={["p","strong","em","code","br","ul","ol","li","blockquote"]} unwrapDisallowed>{item.snapshot.reviewOutcome.comparison}</ReactMarkdown></details>}</section><div className="insights-detail-actions"><button type="button" onClick={()=>onOpenWork(item.workId)}><ArrowUpRight size={15}/>原事项</button><button type="button" disabled={!current||data.busy} onClick={()=>void act("insightFollow",{followed:!item.followed})}>{desktop?<Bell size={15}/>:<Star size={15}/>}{item.followed?"不再关注":"重新关注"}</button><button type="button" disabled={!current||data.busy} onClick={onUpdate}><RefreshCw size={15}/>选择新成果更新</button></div>
     {item.snapshot.reviewDependency&&<section><h4>回顾依据 · {{fact:"资料陈述",selfReported:"用户自述",coOccurrence:"共同出现",inference:"模型推测"}[item.snapshot.reviewDependency.nature]}</h4><p className="insights-muted">性质保留于保存时；“依据已核对”表示出处可用。</p>{item.snapshot.reviewDependency.dependencies.filter(d=>d.kind==="userInput").map((d,i)=><blockquote key={i}>{d.quote}<small>贴入材料 · {inputNatureNames[d.nature??"unknown"]} · 版本 {d.version}</small></blockquote>)}</section>}
-    {current&&<label>发现视角<select aria-label="发现视角" value={item.perspective??""} disabled={data.busy} onChange={e=>void act("insightPerspective",{perspective:e.target.value})}><option value="">未指定</option><option value="knowledge">知识与工作</option><option value="life">生活与进展</option><option value="decision">决定与变化</option></select></label>}
+    {current&&<label className="insights-perspective-field"><span>发现视角</span><select aria-label="发现视角" value={item.perspective??""} disabled={data.busy} onChange={e=>void act("insightPerspective",{perspective:e.target.value})}><option value="">未指定</option><option value="knowledge">知识与工作</option><option value="life">生活与进展</option><option value="decision">决定与变化</option></select></label>}
     <InsightMethods entries={item.snapshot.methodDependencies}/><h4>资料依据</h4><p className="insights-muted">保存时的精确引文；查看原文时会再次核对当前权限和版本。</p>
     {drawer!=="sources"&&citations}
     {!!item.snapshot.contextDependencies.length&&<section><h4>共同背景</h4>{item.snapshot.contextDependencies.map((context,index)=><p key={index}>{context.excerpt.title}</p>)}</section>}
@@ -157,7 +174,7 @@ function InsightDetail({data,item,onClose,onUpdate,onOpenWork,inline=false,onPre
      <ol className="insights-events">{item.events?.map(event=><li key={event.id}><span>{time(event.createdAt)}</span><p>{event.restricted?"该修订当前不可访问":event.body?.text??eventLabel(event)}</p>{current&&!event.restricted&&event.kind==="insightFeedback"&&event.body?.kind==="correction"&&item.reasons.some(r=>r.active&&r.reference?.feedbackId===event.id)&&<button type="button" disabled={data.busy} onClick={()=>void act("insightWithdrawFeedback",{feedbackId:event.id})}>撤回这条纠正</button>}</li>)}</ol>
     </section>
    </>}
-  </>}{error&&<p className="insights-error" role="alert">{error}</p>}</div>
+  </>}{error&&<p className="insights-error" role="alert">{error}</p>}</div></div>
   {desktop&&drawer&&item.snapshot&&!item.checking&&<aside className="insights-reading-drawer" aria-label={drawer==="sources"?"原文引文核对":"版本与溯源"}>
    <header><strong>{drawer==="sources"?<><FileSearch size={16}/>原文引文核对</>:<><ShieldCheck size={16}/>版本与溯源</>}</strong>
     <button type="button" className="icon-button" aria-label="关闭核对抽屉" onClick={closeDrawer}><X size={16}/></button></header>
@@ -237,20 +254,37 @@ export function InsightsWorkspace(){
  const [workFilter,setWorkFilter]=useState(""),[focus,setFocus]=useState(false);
  const detailDrafts=useRef<Record<string,string>>({});
  const navigationClose=useRef<HTMLButtonElement>(null),navigationTrigger=useRef<HTMLButtonElement>(null);
- const [scope,setScope]=useState<"all"|"review"|"starred"|"knowledge"|"life"|"decision">("all"),[validity,setValidity]=useState("all"),[layout,setLayout]=useState<"cards"|"split"|"table">(desktop?"split":"cards"),[navigation,setNavigation]=useState<"auto"|"open"|"closed">("auto");
- const [sortOldest,setSortOldest]=useState(false),[listWidth,setListWidth]=useState(defaultListWidth);
+ const [scope,setScope]=useState<"all"|"review"|"starred"|"knowledge"|"life"|"decision">("all"),[perspectiveFilter,setPerspectiveFilter]=useState<""|"knowledge"|"life"|"decision">(""),[validity,setValidity]=useState("all"),[layout,setLayout]=useState<"cards"|"split"|"table">(desktop?"split":"cards"),[navigation,setNavigation]=useState<"auto"|"open"|"closed">(desktop?"closed":"auto");
+ const [sortOldest,setSortOldest]=useState(false),[listWidth,setListWidth]=useState(loadInsightsListWidth);
  const [checkedIds,setCheckedIds]=useState<string[]>([]),[batchBusy,setBatchBusy]=useState(false),[batchResult,setBatchResult]=useState("");
- const splitDrag=useRef<{x:number;width:number}|null>(null), listPane=useRef<HTMLDivElement>(null),navPane=useRef<HTMLElement>(null);
+ const splitDrag=useRef<{pointerId:number;x:number;width:number;dragged:boolean}|null>(null), listPane=useRef<HTMLDivElement>(null),navPane=useRef<HTMLElement>(null);
  const initialPreviewOpened=useRef(false);
+ const visitedSections=useRef(new Set<typeof section>(["discoveries"]));
+ if(desktop)visitedSections.current.add(section);
  const searchInput=useRef<HTMLInputElement>(null),tableClose=useRef<HTMLButtonElement>(null),tableRowTrigger=useRef<HTMLButtonElement|null>(null);
 
- useEffect(()=>{if(navigation==="open")navigationClose.current?.focus();else if(navigation==="closed")navigationTrigger.current?.focus();},[navigation]);
+ useEffect(()=>{if(navigation==="open")navigationClose.current?.focus();else if(navigation==="closed"&&navPane.current?.contains(document.activeElement))navigationTrigger.current?.focus();},[navigation]);
+ useEffect(()=>{
+  if(!desktop||!focus)return;
+  const onWindowKeyDown=(event:KeyboardEvent)=>{
+   if(event.key!=="Escape"||event.defaultPrevented)return;
+   const target=event.target instanceof Element?event.target:null;
+   if(target?.closest("dialog, input, textarea, select, [contenteditable]"))return;
+   event.preventDefault();
+   setFocus(false);
+  };
+  window.addEventListener("keydown",onWindowKeyDown);
+  return()=>window.removeEventListener("keydown",onWindowKeyDown);
+ },[desktop,focus]);
  const openWork=(id:string,question?:string)=>{data.closeDetail();setPicker(null);setRecall(false);setDecisions(false);setDiscovery(null);openAgent?.({workId:id,...(question?{question:{id:crypto.randomUUID(),text:question}}:{})});};
- const visible=useMemo(()=>{const rows=data.items.filter(item=>(filter==="all"||item.processingState===filter)&&(scope!=="review"||item.validity==="review")&&(scope!=="starred"||item.starred)&&(!["knowledge","life","decision"].includes(scope)||item.perspective===scope)&&(!workFilter||item.workId===workFilter)&&(validity==="all"||item.validity===validity)&&(!days||item.createdAt>=Date.now()-days*86_400_000)&&(!query.trim()||item.snapshot?.text.toLowerCase().includes(query.trim().toLowerCase())||item.snapshot?.sourceCitations.some(s=>`${s.excerpt.title} ${s.quote??""} ${s.excerpt.content??""}`.toLowerCase().includes(query.trim().toLowerCase()))||item.snapshot&&`${item.workTitle??""} ${item.workId}`.toLowerCase().includes(query.trim().toLowerCase())));return desktop?rows.sort((first,second)=>sortOldest?first.updatedAt-second.updatedAt:second.updatedAt-first.updatedAt):rows;
- },[data.items,filter,query,days,scope,validity,workFilter,desktop,sortOldest]);
+ const visible=useMemo(()=>{const rows=data.items.filter(item=>(filter==="all"||item.processingState===filter)&&(scope!=="review"||item.validity==="review")&&(scope!=="starred"||item.starred)&&(!["knowledge","life","decision"].includes(scope)||item.perspective===scope)&&(!perspectiveFilter||item.perspective===perspectiveFilter)&&(!workFilter||item.workId===workFilter)&&(validity==="all"||item.validity===validity)&&(!days||item.createdAt>=Date.now()-days*86_400_000)&&(!query.trim()||item.snapshot?.text.toLowerCase().includes(query.trim().toLowerCase())||item.snapshot?.sourceCitations.some(s=>`${s.excerpt.title} ${s.quote??""} ${s.excerpt.content??""}`.toLowerCase().includes(query.trim().toLowerCase()))||item.snapshot&&`${item.workTitle??""} ${item.workId}`.toLowerCase().includes(query.trim().toLowerCase())));return desktop?rows.sort((first,second)=>sortOldest?first.updatedAt-second.updatedAt:second.updatedAt-first.updatedAt):rows;
+ },[data.items,filter,query,days,scope,perspectiveFilter,validity,workFilter,desktop,sortOldest]);
+ const attentionCount=data.items.filter(item=>item.processingState==="attention").length;
  const reviewCount=data.items.filter(item=>item.validity==="review").length;
+ const starredCount=data.items.filter(item=>item.starred).length;
  const filtered=days!==0||validity!=="all"||!!workFilter;
- const reset=()=>{setFilter("all");setQuery("");setDays(0);setValidity("all");setScope("all");setWorkFilter("");};
+ const hasActiveFilter=filtered||filter!=="all"||scope!=="all"||!!perspectiveFilter||!!query.trim();
+ const reset=()=>{setFilter("all");setQuery("");setDays(0);setValidity("all");setScope("all");setPerspectiveFilter("");setWorkFilter("");};
  const openFinding=(item:Insight)=>{initialPreviewOpened.current=true;void data.open(item.id).catch(()=>undefined);};
  useEffect(()=>{
   if(!desktop||section!=="discoveries"||layout!=="split"||data.detail||initialPreviewOpened.current)return;
@@ -261,11 +295,11 @@ export function InsightsWorkspace(){
  },[desktop,section,layout,visible,data.detail,data.open]);
  const position=visible.findIndex(i=>i.id===data.detail?.id);
  const go=(delta:number)=>{const item=visible[position+delta];if(item)openFinding(item);};
- const navigate=(value:typeof section)=>{setSection(value);setCheckedIds([]);data.closeDetail();};
+ const navigate=(value:typeof section)=>{setSection(value);setCheckedIds([]);setFocus(false);data.closeDetail();if(desktop&&navigation==="open")setNavigation("closed");};
  const selectedRows=visible.filter(item=>item.snapshot&&!item.checking&&checkedIds.includes(item.id));
  const canChoose=!data.busy&&!data.unresolved&&!batchBusy;
  const toggleRow=(id:string)=>setCheckedIds(previous=>previous.includes(id)?previous.filter(value=>value!==id):[...previous,id]);
- const chooseScope=(value:typeof scope)=>{setSection("discoveries");setScope(value);setFilter(desktop?"all":value==="all"?"attention":"all");setCheckedIds([]);};
+ const chooseScope=(value:typeof scope)=>{setSection("discoveries");setScope(value);setPerspectiveFilter(value==="knowledge"||value==="life"||value==="decision"?value:"");setFilter(desktop?"all":value==="all"?"attention":"all");setCheckedIds([]);if(desktop&&navigation==="open")setNavigation("closed");};
  const canBatch=selectedRows.length>0&&canChoose;
  const applyBatch=async(action:"done"|"later"|"unfollow")=>{
   if(!canBatch)return;
@@ -284,8 +318,22 @@ export function InsightsWorkspace(){
    setBatchResult(`已确认 ${completed} / ${selectedRows.length} 条，批量操作已暂停。请先核对当前操作的提交结果。`);
   }finally{setBatchBusy(false);}
  };
- const closeFinding=()=>{data.closeDetail();if(layout==="table")requestAnimationFrame(()=>tableRowTrigger.current?.focus());};
- useEffect(()=>{if(layout==="table"&&data.detail?.id)tableClose.current?.focus();},[layout,data.detail?.id]);
+ const closeFinding=()=>{setFocus(false);data.closeDetail();if(layout==="table")requestAnimationFrame(()=>tableRowTrigger.current?.focus());};
+ useEffect(()=>{if(layout==="table"&&data.detail?.id&&document.activeElement!==searchInput.current)tableClose.current?.focus();},[layout,data.detail?.id]);
+ const handleSearchChange=(value:string)=>{
+  setQuery(value);
+  setCheckedIds([]);
+  if(desktop&&section!=="discoveries"&&value.trim()){
+   setSection("discoveries");
+   setFocus(false);
+   if(navigation==="open")setNavigation("closed");
+  }
+ };
+ const clearSearch=()=>{
+  setQuery("");
+  setCheckedIds([]);
+  searchInput.current?.focus();
+ };
  const statusTabs=<div className="insights-tabs" role="tablist" aria-label="发现处理状态">
   {(desktop?stateTabs:[...stateTabs.slice(1),stateTabs[0]]).map((state,index,states)=><button type="button" key={state} role="tab" aria-selected={filter===state} tabIndex={filter===state?0:-1}
    onClick={()=>{setFilter(state);setCheckedIds([]);}}
@@ -293,39 +341,67 @@ export function InsightsWorkspace(){
    {state==="all"?"全部":stateNames[state]}<span>{data.items.filter(i=>state==="all"||i.processingState===state).length}</span>
   </button>)}
  </div>;
+ const primaryModes=[["discoveries","全部发现"],["stageReview","阶段回顾"],["topic","关注主题"]] as const;
+ const secondarySectionNames:Record<string,string>={cases:"真实案例",draft:"工作草稿",history:"处理记录",decision:"决定与条件"};
+ const modeSwitch=<div className="insights-mode-switch" role="tablist" aria-label="洞察工作区视图">
+  {primaryModes.map(([mode,label],index)=><button type="button" key={mode} role="tab" className={section===mode?"active":""} aria-selected={section===mode}
+   onClick={()=>navigate(mode)}
+   onKeyDown={e=>{if(e.key!=="ArrowLeft"&&e.key!=="ArrowRight")return;e.preventDefault();const next=(index+(e.key==="ArrowRight"?1:-1)+primaryModes.length)%primaryModes.length;navigate(primaryModes[next][0]);(e.currentTarget.parentElement?.children[next] as HTMLElement)?.focus();}}>
+   <span>{label}</span>
+   {mode==="discoveries"&&<span className="insights-mode-count">{data.items.length}{data.more?"+":""}</span>}
+  </button>)}
+ </div>;
  const mainActions=<div className="insights-header-actions">
-  {scope==="decision"&&<button type="button" onClick={()=>setDecisions(true)}>记录与回顾决定</button>}
-  <button type="button" className="insights-primary" onClick={()=>setDiscovery({})}><Plus size={15}/>开始发现</button>
+  {(scope==="decision"||perspectiveFilter==="decision")&&<button type="button" onClick={()=>setDecisions(true)}>记录与回顾决定</button>}
+  <button type="button" className="insights-primary" onClick={()=>setDiscovery({})}><Plus size={14}/>开始发现</button>
   {desktop&&<button type="button" className="insights-import" title="从已有分析导入" onClick={()=>setPicker({})}>从已有分析导入</button>}
-  <details className="insights-menu"><summary aria-label="洞察更多操作"><MoreHorizontal size={20}/></summary><div className="insights-menu-content">
+  <details className="insights-menu"><summary aria-label="洞察更多操作"><MoreHorizontal size={18}/></summary><div className="insights-menu-content">
    {!desktop&&<button type="button" onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setPicker({});}}>从已有分析导入</button>}
    {data.detail?.snapshot&&<button type="button" onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setDiscovery({target:data.detail!});}}>加入新记录并核对当前发现</button>}
    <button type="button" onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setRecall(true);}}><BookOpen size={15}/>寻找旧知识</button>
    <button type="button" aria-label="核对当前来源" disabled={data.loading||data.busy} onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");void data.refresh();}}><RefreshCw size={15}/>核对当前来源</button>
+   {desktop&&<>
+    <div className="insights-menu-sep" role="separator"/>
+    <button type="button" onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");navigate("draft");}}><FileText size={15}/>工作草稿</button>
+    <button type="button" onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");navigate("history");}}><History size={15}/>处理记录</button>
+    <button type="button" onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");navigate("cases");}}><Globe2 size={15}/>真实案例</button>
+   </>}
   </div></details>
  </div>;
  const topbar=<div className="insights-topbar">
   <div className="insights-breadcrumb" onMouseDown={chrome?.onMouseDown}>
-   <button type="button" ref={navigationTrigger} className="insights-nav-trigger icon-button" aria-label="展开洞察侧边栏" onClick={()=>setNavigation(navigation==="open"||(navigation==="auto"&&!!navPane.current?.offsetWidth)?"closed":"open")}><PanelLeft size={17}/></button>
-   {!desktop&&<><span>我的 Hub</span><ChevronRight size={14}/></>}
-   {desktop&&<span className="insights-title-dot" aria-hidden="true"/>}<span>洞察</span>
+   <button type="button" ref={navigationTrigger} className="insights-nav-trigger icon-button" aria-label="展开洞察侧边栏" title="展开洞察侧边栏" onClick={()=>setNavigation(navigation==="open"||(navigation==="auto"&&!!navPane.current?.offsetWidth)?"closed":"open")}><PanelLeft size={16}/></button>
+   {!desktop&&<><span>我的 Hub</span><ChevronRight size={14}/><span>洞察</span></>}
+   {desktop&&modeSwitch}
+   {desktop&&secondarySectionNames[section]&&<span className="insights-secondary-badge">{secondarySectionNames[section]}</span>}
   </div>
-  {desktop&&section==="discoveries"&&statusTabs}
-  <label className="insights-search"><Search size={15}/><input ref={searchInput} aria-label="搜索发现与依据" value={query} onChange={e=>{setQuery(e.target.value);setCheckedIds([]);}} placeholder="搜索发现、事项与依据…"/></label>
-  {desktop&&section==="discoveries"&&mainActions}
+  <label className="insights-search"><Search size={14}/><input ref={searchInput} aria-label="搜索发现与依据" value={query} onChange={e=>handleSearchChange(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&desktop&&section!=="discoveries"&&query.trim()){e.preventDefault();setSection("discoveries");setFocus(false);if(navigation==="open")setNavigation("closed");}}} placeholder="搜索发现、事项与依据…"/>{query?<button type="button" className="insights-search-clear" aria-label="清除搜索" onClick={clearSearch}><X size={12}/></button>:desktop?<span className="insights-search-kbd" aria-hidden="true">/</span>:null}</label>
+  {desktop&&mainActions}
   {chrome?.actions}
+ </div>;
+ const desktopViewTools=<div className="insights-view-tools">
+  <button type="button" className="insights-sort" aria-pressed={sortOldest} aria-label={sortOldest?"按最早更新排序":"按最近更新排序"} title={sortOldest?"当前按最早更新排序，点击切换":"当前按最近更新排序，点击切换"} onClick={()=>setSortOldest(!sortOldest)}><ArrowDownUp size={12}/><span>{sortOldest?"最早":"最近"}</span></button>
+  <details className="insights-menu insights-filter-menu"><summary aria-label="筛选发现" title="更多筛选（关联事项、时间与依据状态）" className={filtered?"is-filtered":""}><SlidersHorizontal size={13}/>{filtered&&<b>{Number(days!==0)+Number(validity!=="all")+Number(!!workFilter)}</b>}</summary><div className="insights-filter-popover"><header><strong>筛选发现</strong><button type="button" onClick={()=>{setDays(0);setValidity("all");setWorkFilter("");}}>重置</button></header><label>关联事项<select aria-label="关联事项" value={workFilter} onChange={e=>setWorkFilter(e.target.value)}><option value="">全部事项</option>{[...new Set(data.items.map(i=>i.workId))].map(id=><option key={id} value={id}>{data.items.find(i=>i.workId===id)?.workTitle??id}</option>)}</select></label><label>时间范围<select aria-label="发现时间" value={days} onChange={e=>setDays(Number(e.target.value))}><option value={0}>全部时间</option><option value={7}>最近 7 天</option><option value={30}>最近 30 天</option></select></label><label>结论有效性<select aria-label="结论有效性" value={validity} onChange={e=>setValidity(e.target.value)}><option value="all">全部结论</option><option value="available">依据已核对</option><option value="review">待复核</option><option value="unavailable">来源不可用</option></select></label><button type="button" className="insights-primary" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}>完成</button></div></details>
+  <div className="insights-layout-switch" aria-label="发现布局">
+   <button type="button" aria-label="卡片浏览" title="卡片浏览" aria-pressed={layout==="cards"} onClick={()=>setLayout("cards")}><LayoutGrid size={13}/></button>
+   <button type="button" aria-label="列表与详情" title="双栏列表" aria-pressed={layout==="split"} onClick={()=>setLayout("split")}><PanelRight size={13}/></button>
+   <button type="button" aria-label="全宽属性表格" title="全宽属性表格" aria-pressed={layout==="table"} onClick={()=>{if(layout!=="table")data.closeDetail();setLayout("table");}}><Table2 size={13}/></button>
+  </div>
  </div>;
 
  return <section className={`insights-workspace${desktop?" insights-v4":""}${focus?" insights-focus":""} insights-navigation-${navigation}`} aria-label="洞察发现工作区" data-hub-keyboard-scope="insights"
   onKeyDown={e=>{
-   if(!desktop||section!=="discoveries"||e.isDefaultPrevented()||e.ctrlKey||e.metaKey||e.altKey||e.nativeEvent.isComposing)return;
+   if(!desktop||e.isDefaultPrevented()||e.ctrlKey||e.metaKey||e.altKey||e.nativeEvent.isComposing)return;
    if((e.target as HTMLElement).closest("input,textarea,select,[contenteditable],dialog"))return;
-   if(e.key==="/"){e.preventDefault();searchInput.current?.focus();}
+   if(e.key==="/"){e.preventDefault();searchInput.current?.focus();return;}
+   if(section!=="discoveries")return;
+   if(e.key==="Escape"&&focus&&!e.defaultPrevented){e.preventDefault();setFocus(false);}
    else if(e.key==="Escape"&&layout==="table"&&data.detail&&!e.defaultPrevented){e.preventDefault();closeFinding();}
    else if(e.key.toLowerCase()==="j"||e.key.toLowerCase()==="k"){
     e.preventDefault();go(e.key.toLowerCase()==="j"?1:-1);
    }
   }}>
+  {desktop&&data.loading&&data.items.length>0&&<div className="insights-sweep-bar" aria-hidden="true"/>}
   {desktop&&topbar}
   <aside ref={navPane} className="insights-navigation" aria-label="洞察导航" onKeyDown={e=>{if(e.key==="Escape"){e.preventDefault();e.stopPropagation();setNavigation("closed");}}}>
    <header><strong>洞察</strong><button type="button" ref={navigationClose} className="icon-button" aria-label="收起洞察侧边栏" onClick={()=>setNavigation("closed")}><PanelLeft size={17}/></button></header>
@@ -340,14 +416,47 @@ export function InsightsWorkspace(){
   </aside>
   <div className="insights-page">
    {!desktop&&topbar}
-   {section==="stageReview"?<StageReview onOpenWork={openWork}/>:section==="cases"?<InsightCases query={query} onDraft={()=>navigate("draft")}/>:section==="history"?<InsightHistory key={data.generation} query={query} label={eventLabel} onOpen={id=>{setSection("discoveries");void data.open(id);}}/>:["topic","draft","decision"].includes(section)?<InsightNotebookWorkspace key={section} generation={data.generation} kind={section as "topic"|"draft"|"decision"} query={query} onOpenWork={openWork}/>:<>
+   {desktop?<>
+    {visitedSections.current.has("stageReview")&&<div className="insights-panel-slot" hidden={section!=="stageReview"}><StageReview onOpenWork={openWork}/></div>}
+    {visitedSections.current.has("topic")&&<div className="insights-panel-slot" hidden={section!=="topic"}><InsightNotebookWorkspace generation={data.generation} kind="topic" query="" onOpenWork={openWork}/></div>}
+    {visitedSections.current.has("draft")&&<div className="insights-panel-slot" hidden={section!=="draft"}><InsightNotebookWorkspace generation={data.generation} kind="draft" query="" onOpenWork={openWork}/></div>}
+    {section==="decision"&&<InsightNotebookWorkspace key="decision" generation={data.generation} kind="decision" query="" onOpenWork={openWork}/>}
+    {section==="cases"&&<InsightCases query="" onDraft={()=>navigate("draft")}/>}
+    {section==="history"&&<InsightHistory key={data.generation} query="" label={eventLabel} onOpen={id=>{setSection("discoveries");void data.open(id);}}/>}
+   </>:(section==="stageReview"?<StageReview onOpenWork={openWork}/>:section==="cases"?<InsightCases query={query} onDraft={()=>navigate("draft")}/>:section==="history"?<InsightHistory key={data.generation} query={query} label={eventLabel} onOpen={id=>{setSection("discoveries");void data.open(id);}}/>:["topic","draft","decision"].includes(section)?<InsightNotebookWorkspace key={section} generation={data.generation} kind={section as "topic"|"draft"|"decision"} query={query} onOpenWork={openWork}/>:null)}
+   {section==="discoveries"&&<>
    {!desktop&&<header className="insights-heading"><div className="insights-title"><div className="insights-title-icon" aria-hidden="true"><Sparkles size={25}/></div><div><span className="insights-overline">让已有的积累，接着发挥作用</span><h1>洞察</h1><p>看见资料里的变化与关联，找到可以继续的一步。</p></div></div>{mainActions}</header>}
-   <div className="insights-controls">{!desktop&&statusTabs}<div className="insights-view-tools">{desktop&&<button type="button" className="insights-sort" aria-pressed={sortOldest} onClick={()=>setSortOldest(!sortOldest)}><ArrowDownUp size={14}/>{sortOldest?"最早更新":"最近更新"}</button>}<details className="insights-menu insights-filter-menu"><summary aria-label="筛选发现" className={filtered?"is-filtered":""}><SlidersHorizontal size={16}/><span>筛选</span>{filtered&&<b>{Number(days!==0)+Number(validity!=="all")+Number(!!workFilter)}</b>}</summary><div className="insights-filter-popover"><header><strong>筛选发现</strong><button type="button" onClick={()=>{setDays(0);setValidity("all");setWorkFilter("");}}>重置</button></header><label>关联事项<select aria-label="关联事项" value={workFilter} onChange={e=>setWorkFilter(e.target.value)}><option value="">全部事项</option>{[...new Set(data.items.map(i=>i.workId))].map(id=><option key={id} value={id}>{data.items.find(i=>i.workId===id)?.workTitle??id}</option>)}</select></label><label>时间范围<select aria-label="发现时间" value={days} onChange={e=>setDays(Number(e.target.value))}><option value={0}>全部时间</option><option value={7}>最近 7 天</option><option value={30}>最近 30 天</option></select></label><label>结论有效性<select aria-label="结论有效性" value={validity} onChange={e=>setValidity(e.target.value)}><option value="all">全部结论</option><option value="available">依据已核对</option><option value="review">待复核</option><option value="unavailable">来源不可用</option></select></label><button type="button" className="insights-primary" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}>完成</button></div></details><span className="insights-toolbar-divider"/><div className="insights-layout-switch" aria-label="发现布局"><button type="button" aria-label="卡片浏览" aria-pressed={layout==="cards"} onClick={()=>setLayout("cards")}><LayoutGrid size={16}/></button><button type="button" aria-label="列表与详情" aria-pressed={layout==="split"} onClick={()=>setLayout("split")}><PanelRight size={16}/></button>{desktop&&<button type="button" aria-label="全宽属性表格" title="全宽属性表格" aria-pressed={layout==="table"} onClick={()=>{if(layout!=="table")data.closeDetail();setLayout("table");}}><Table2 size={16}/></button>}</div></div></div>
+   {!desktop&&<div className="insights-controls">{statusTabs}<div className="insights-view-tools"><details className="insights-menu insights-filter-menu"><summary aria-label="筛选发现" className={filtered?"is-filtered":""}><SlidersHorizontal size={16}/><span>筛选</span>{filtered&&<b>{Number(days!==0)+Number(validity!=="all")+Number(!!workFilter)}</b>}</summary><div className="insights-filter-popover"><header><strong>筛选发现</strong><button type="button" onClick={()=>{setDays(0);setValidity("all");setWorkFilter("");}}>重置</button></header><label>关联事项<select aria-label="关联事项" value={workFilter} onChange={e=>setWorkFilter(e.target.value)}><option value="">全部事项</option>{[...new Set(data.items.map(i=>i.workId))].map(id=><option key={id} value={id}>{data.items.find(i=>i.workId===id)?.workTitle??id}</option>)}</select></label><label>时间范围<select aria-label="发现时间" value={days} onChange={e=>setDays(Number(e.target.value))}><option value={0}>全部时间</option><option value={7}>最近 7 天</option><option value={30}>最近 30 天</option></select></label><label>结论有效性<select aria-label="结论有效性" value={validity} onChange={e=>setValidity(e.target.value)}><option value="all">全部结论</option><option value="available">依据已核对</option><option value="review">待复核</option><option value="unavailable">来源不可用</option></select></label><button type="button" className="insights-primary" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}>完成</button></div></details><span className="insights-toolbar-divider"/><div className="insights-layout-switch" aria-label="发现布局"><button type="button" aria-label="卡片浏览" aria-pressed={layout==="cards"} onClick={()=>setLayout("cards")}><LayoutGrid size={16}/></button><button type="button" aria-label="列表与详情" aria-pressed={layout==="split"} onClick={()=>setLayout("split")}><PanelRight size={16}/></button></div></div></div>}
    {data.error&&<p className="insights-error" role="alert">{data.error}</p>}
    {data.unresolved&&!data.busy&&<div className="insights-notice" role="status"><p>上一次操作的提交结果需要核对。</p><button type="button" onClick={()=>void data.inspectPending()}>核对提交结果</button><button type="button" onClick={()=>void data.retryPending().catch(()=>undefined)}>按原请求重试</button>{data.pendingChecked&&<button type="button" onClick={data.discardPending}>放弃未提交请求并刷新</button>}</div>}
    <div className={`insights-panels insights-layout-${layout}${data.detail?" has-detail":""}`} style={{"--insights-list-width":`${listWidth}px`} as CSSProperties}>
-    <div className="insights-browse" ref={listPane}><div className="insights-list-heading"><h2>{scope==="review"?"需要重新核对":filter==="later"?"留给稍后的发现":filter==="done"?"已经留下的收获":filter==="all"?"全部已保存发现":"值得留意"}<span>{visible.length}{data.more?"+":""}</span></h2>{!desktop&&<span>每个发现，都能回到依据</span>}</div>
-     <div className="insights-content" aria-busy={data.loading}>
+    <div className="insights-browse" ref={listPane}>
+     {desktop?<div className="insights-list-header">
+      <div className="insights-scope-pills" role="tablist" aria-label="快捷范围">
+       <button type="button" role="tab" className={`insights-scope-pill${scope==="all"&&filter==="all"?" active":""}`} aria-selected={scope==="all"&&filter==="all"} onClick={()=>{setScope("all");setPerspectiveFilter("");setFilter("all");setCheckedIds([]);}}><span>全部</span><span className="insights-pill-num">{data.items.length}{data.more?"+":""}</span></button>
+       <button type="button" role="tab" className={`insights-scope-pill${scope==="all"&&filter==="attention"?" active":""}`} aria-selected={scope==="all"&&filter==="attention"} onClick={()=>{setScope("all");setPerspectiveFilter("");setFilter("attention");setCheckedIds([]);}}><span>待关注</span><span className="insights-pill-num">{attentionCount}</span></button>
+       <button type="button" role="tab" className={`insights-scope-pill${reviewCount>0?" has-review":""}${scope==="review"?" active":""}`} aria-selected={scope==="review"} onClick={()=>{setScope("review");setPerspectiveFilter("");setFilter("all");setCheckedIds([]);}}>{reviewCount>0&&<span className="insights-review-dot" aria-hidden="true"/>}<span>待复核</span><span className="insights-pill-num">{reviewCount}</span></button>
+       <button type="button" role="tab" className={`insights-scope-pill${scope==="starred"?" active":""}`} aria-selected={scope==="starred"} onClick={()=>{setScope("starred");setPerspectiveFilter("");setFilter("all");setCheckedIds([]);}}><span>星标</span><span className="insights-pill-num">{starredCount}</span></button>
+      </div>
+      <div className="insights-filter-row">
+       <div className="insights-filter-selects">
+        <select className={`insights-mini-select${perspectiveFilter?" is-filtered":""}`} aria-label="按视角筛选" value={perspectiveFilter} onChange={e=>{const next=e.target.value as ""|"knowledge"|"life"|"decision";setPerspectiveFilter(next);if(["knowledge","life","decision"].includes(scope))setScope("all");setCheckedIds([]);}}>
+         <option value="">全部视角</option>
+         <option value="knowledge">知识与工作</option>
+         <option value="decision">决定与变化</option>
+         <option value="life">生活与进展</option>
+        </select>
+        <select className={`insights-mini-select${filter!=="all"?" is-filtered":""}`} aria-label="按处理状态筛选" value={filter} onChange={e=>{setFilter(e.target.value as typeof filter);setCheckedIds([]);}}>
+         <option value="all">全部状态</option>
+         <option value="attention">待关注</option>
+         <option value="later">稍后</option>
+         <option value="done">已处理</option>
+        </select>
+       </div>
+       {desktopViewTools}
+      </div>
+     </div>:<div className="insights-list-heading"><h2>{scope==="review"?"需要重新核对":filter==="later"?"留给稍后的发现":filter==="done"?"已经留下的收获":filter==="all"?"全部已保存发现":"值得留意"}<span>{visible.length}{data.more?"+":""}</span></h2><span>每个发现，都能回到依据</span></div>}
+     <div className={`insights-content${selectedRows.length?" has-selection":""}`} aria-busy={data.loading}>
       {layout==="cards"&&!query&&scope==="all"&&filter==="attention"&&<button type="button" className="insights-case-intro" onClick={()=>navigate("cases")}><span className="insights-case-intro-icon"><Globe2 size={22}/></span><span><strong>从一个真实案例，理解洞察</strong><small>5 个案例 · 官方资料、应用场景和可尝试的下一步</small></span><span className="insights-case-intro-link">浏览案例<ArrowUpRight size={16}/></span></button>}
       {!!selectedRows.length&&desktop&&<div className="insights-batch" aria-label="批量处理所选发现"><span>已选 {selectedRows.length} 条</span>
        <button type="button" disabled={!canBatch} onClick={()=>void applyBatch("done")}>批量标为已处理</button>
@@ -364,18 +473,21 @@ export function InsightsWorkspace(){
        <td><button type="button" className="insights-table-open" aria-current={data.detail?.id===item.id||undefined} onClick={e=>{tableRowTrigger.current=e.currentTarget;openFinding(item);}}><span>{item.snapshot?findingPreview(item.snapshot.text).title:item.checking?"正在核对依据":"来源当前不可访问"}</span>{item.starred&&<Star size={13} fill="currentColor"/>}</button></td>
        <td><FindingValidity item={item}/></td><td>{perspectiveNames[item.perspective??""]??"—"}</td><td>v{item.headRevision}</td>
        <td><span className="insights-table-work" title={item.snapshot?item.workTitle:undefined}>{item.snapshot?(item.workTitle??"原事项"):"—"}</span></td><td><time dateTime={new Date(item.updatedAt).toISOString()}>{time(item.updatedAt)}</time></td>
-      </tr>)}</tbody></table></div>:<div className="insights-grid">{visible.map(item=>{const preview=findingPreview(item.snapshot?.text??(item.checking?"正在核对这条发现的依据":"这条发现的来源当前不可访问"));return <article className={`insights-card${data.detail?.id===item.id?" is-current":""}`} key={item.id}>{desktop&&layout==="split"&&<input className="insights-card-check" type="checkbox" aria-label="选择发现" disabled={!canChoose||!item.snapshot||item.checking} checked={checkedIds.includes(item.id)&&!!item.snapshot} onChange={()=>toggleRow(item.id)}/>}<div className="insights-card-main"><div className="insights-card-meta"><span className="insights-category" title={item.snapshot?item.workTitle:undefined}><Sparkles size={13}/>{desktop&&layout==="split"&&item.snapshot?.origin&&item.workTitle?item.workTitle:item.perspective?perspectiveNames[item.perspective]:item.snapshot?.reviewDependency?reviewNatureNames[item.snapshot.reviewDependency.nature]:"已保存发现"}</span>{item.validity!=="available"&&<span className={`insights-validity insights-validity-${item.validity}`}>{item.checking?"正在核对依据":validityNames[item.validity]}</span>}<time dateTime={new Date(item.updatedAt).toISOString()} title={time(item.updatedAt)}>{new Intl.DateTimeFormat("zh-CN",{month:"numeric",day:"numeric"}).format(item.updatedAt)}</time><button type="button" className="insights-star" aria-label={item.starred?"取消星标":"星标发现"} aria-pressed={!!item.starred} disabled={data.busy||!item.snapshot} onClick={()=>void data.change(item,"insightStar",{starred:!item.starred}).catch(()=>undefined)}><Star size={15} fill={item.starred?"currentColor":"none"}/></button></div><button type="button" className="insights-card-open" aria-label={item.snapshot?.text??"查看来源不可用的发现"} onClick={()=>openFinding(item)}><h2>{preview.title}</h2></button>{preview.body&&<p className="insights-card-summary">{preview.body}</p>}{desktop&&layout==="split"&&<div className="insights-stream-properties"><FindingStatus item={item}/><FindingValidity item={item}/><span>v{item.headRevision}</span></div>}<p className="insights-card-sources"><Layers3 size={14}/><span>{item.workTitle??item.snapshot?.sourceCitations.map(s=>s.excerpt.title).filter((v,i,a)=>a.indexOf(v)===i).join(" · ")??"用户处理记录与历史身份已保留"}</span></p>{(item.processingState!=="attention"||!item.followed)&&<p className="insights-card-state">{stateNames[item.processingState]}{!item.followed&&<> · <BellOff size={12}/>不再关注</>}</p>}</div><footer><span><Layers3 size={14}/>{item.snapshot?`${item.snapshot.sourceCitations.length+(item.snapshot.reviewDependency?.dependencies.filter(d=>d.kind==="userInput").length??0)} 处依据`:"正文已隐藏"}{item.headRevision>1?` · 修订 ${item.headRevision}`:""}</span><details className="insights-menu insights-card-menu"><summary aria-label="发现快捷操作"><MoreHorizontal size={17}/></summary><div className="insights-menu-content"><button type="button" disabled={data.busy||!item.snapshot} onClick={()=>setDiscovery({target:item})}>加入后续记录并核对</button><button type="button" disabled={data.busy||!item.snapshot} onClick={()=>openSnooze(item)}>选择稍后时间</button>{(["attention","later","done"] as const).map(state=><button type="button" key={state} disabled={data.busy||!item.snapshot} onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");void data.change(item,"insightStatus",{state,...(state==="later"?{snoozeUntil:Date.now()+86400000}:{})}).catch(()=>undefined);}}>{stateNames[state]}{state==="later"?"一天":""}</button>)}</div></details><button type="button" onClick={()=>openFinding(item)}>{item.validity==="review"?"核对这条发现":"查看发现"}<ArrowUpRight size={14}/></button></footer></article>;})}</div>}
-     {data.more&&<button type="button" className="insights-load-more" disabled={data.loading} onClick={()=>void data.refresh(true)}>再看更多发现<ChevronDown size={14}/></button>}
+      </tr>)}</tbody></table></div>:<div className="insights-grid">{visible.map(item=>{const preview=findingPreview(item.snapshot?.text??(item.checking?"正在核对这条发现的依据":"这条发现的来源当前不可访问"));return <article className={`insights-card${data.detail?.id===item.id?" is-current":""}${checkedIds.includes(item.id)?" is-checked":""}`} key={item.id}>{desktop&&layout==="split"&&<input className="insights-card-check" type="checkbox" aria-label="选择发现" disabled={!canChoose||!item.snapshot||item.checking} checked={checkedIds.includes(item.id)&&!!item.snapshot} onChange={()=>toggleRow(item.id)}/>}<div className="insights-card-main"><div className="insights-card-meta"><span className="insights-category" title={item.snapshot?item.workTitle:undefined}><Sparkles size={13}/>{desktop&&layout==="split"&&item.snapshot?.origin&&item.workTitle?item.workTitle:item.perspective?perspectiveNames[item.perspective]:item.snapshot?.reviewDependency?reviewNatureNames[item.snapshot.reviewDependency.nature]:"已保存发现"}</span>{item.validity!=="available"&&<span className={`insights-validity insights-validity-${item.validity}`}>{item.checking?"正在核对依据":validityNames[item.validity]}</span>}<time dateTime={new Date(item.updatedAt).toISOString()} title={time(item.updatedAt)}>{new Intl.DateTimeFormat("zh-CN",{month:"numeric",day:"numeric"}).format(item.updatedAt)}</time><button type="button" className="insights-star" aria-label={item.starred?"取消星标":"星标发现"} aria-pressed={!!item.starred} disabled={data.busy||!item.snapshot} onClick={()=>void data.change(item,"insightStar",{starred:!item.starred}).catch(()=>undefined)}><Star size={15} fill={item.starred?"currentColor":"none"}/></button></div><button type="button" className="insights-card-open" aria-label={item.snapshot?.text??"查看来源不可用的发现"} onClick={()=>openFinding(item)}><h2>{preview.title}</h2></button>{preview.body&&<p className="insights-card-summary">{preview.body}</p>}{desktop&&layout==="split"&&<div className="insights-stream-properties"><FindingStatus item={item}/><FindingValidity item={item}/><span>v{item.headRevision}</span></div>}<p className="insights-card-sources"><Layers3 size={14}/><span>{item.workTitle??item.snapshot?.sourceCitations.map(s=>s.excerpt.title).filter((v,i,a)=>a.indexOf(v)===i).join(" · ")??"用户处理记录与历史身份已保留"}</span></p>{(item.processingState!=="attention"||!item.followed)&&<p className="insights-card-state">{stateNames[item.processingState]}{!item.followed&&<> · <BellOff size={12}/>不再关注</>}</p>}</div><footer><span><Layers3 size={14}/>{item.snapshot?`${item.snapshot.sourceCitations.length+(item.snapshot.reviewDependency?.dependencies.filter(d=>d.kind==="userInput").length??0)} 处依据`:"正文已隐藏"}{item.headRevision>1?` · 修订 ${item.headRevision}`:""}</span><details className="insights-menu insights-card-menu"><summary aria-label="发现快捷操作"><MoreHorizontal size={17}/></summary><div className="insights-menu-content"><button type="button" disabled={data.busy||!item.snapshot} onClick={()=>setDiscovery({target:item})}>加入后续记录并核对</button><button type="button" disabled={data.busy||!item.snapshot} onClick={()=>openSnooze(item)}>选择稍后时间</button>{(["attention","later","done"] as const).map(state=><button type="button" key={state} disabled={data.busy||!item.snapshot} onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");void data.change(item,"insightStatus",{state,...(state==="later"?{snoozeUntil:Date.now()+86400000}:{})}).catch(()=>undefined);}}>{stateNames[state]}{state==="later"?"一天":""}</button>)}</div></details><button type="button" onClick={()=>openFinding(item)}>{item.validity==="review"?"核对这条发现":"查看发现"}<ArrowUpRight size={14}/></button></footer></article>;})}</div>}
+      {!desktop&&data.more&&<button type="button" className="insights-load-more" disabled={data.loading} onClick={()=>void data.refresh(true)}>再看更多发现<ChevronDown size={14}/></button>}
      </div>
+     {desktop&&<div className="insights-list-footer"><div><span>共 {visible.length}{data.more?"+":""} 条发现</span>{hasActiveFilter&&<button type="button" className="insights-link-btn" onClick={reset}>重置筛选</button>}</div>{data.more&&<button type="button" className="insights-link-btn" disabled={data.loading} onClick={()=>void data.refresh(true)}>加载更多</button>}</div>}
     </div>
     {desktop&&layout==="split"&&<div className="insights-split-gutter" role="separator" aria-label="调整洞察列表宽度" aria-orientation="vertical"
      aria-valuemin={minimumListWidth} aria-valuemax={maximumListWidth} aria-valuenow={listWidth} tabIndex={0}
-     title="拖动或用方向键调整，双击恢复默认" onDoubleClick={()=>setListWidth(defaultListWidth)}
-     onPointerDown={event=>{if(event.button!==0)return;event.preventDefault();event.currentTarget.focus();event.currentTarget.setPointerCapture(event.pointerId);splitDrag.current={x:event.clientX,width:listPane.current?.offsetWidth??listWidth};}}
-     onPointerMove={event=>{const drag=splitDrag.current;if(drag)setListWidth(clampListWidth(drag.width+event.clientX-drag.x));}}
-     onLostPointerCapture={()=>{splitDrag.current=null;}}
-     onKeyDown={event=>{if(event.key!=="ArrowLeft"&&event.key!=="ArrowRight")return;event.preventDefault();setListWidth(width=>clampListWidth(width+(event.key==="ArrowRight"?16:-16)));}}/>}
-    {data.detail&&<InsightDetail key={data.detail.id} desktop={desktop} closeRef={layout==="table"?tableClose:undefined} onReview={()=>setDiscovery({target:data.detail!})} inline={layout!=="cards"&&!focus} onSnooze={()=>openSnooze(data.detail!)} initialFeedback={detailDrafts.current[data.detail.id]??""} onFeedback={value=>{detailDrafts.current[data.detail!.id]=value;}} focus={focus} onFocus={()=>setFocus(!focus)} onPrevious={position>0?()=>go(-1):undefined} onNext={position>=0&&position<visible.length-1?()=>go(1):undefined} data={data} item={data.detail} onClose={closeFinding} onUpdate={()=>setPicker({target:data.detail!})} onOpenWork={openWork}/>}
+     title="拖动或用方向键调整，双击恢复默认" onDoubleClick={()=>{setListWidth(defaultListWidth);saveInsightsListWidth(defaultListWidth);}}
+     onPointerDown={event=>{if(event.button!==0)return;event.preventDefault();event.currentTarget.focus();event.currentTarget.setPointerCapture?.(event.pointerId);splitDrag.current={pointerId:event.pointerId,x:event.clientX,width:listPane.current?.offsetWidth||listWidth,dragged:false};}}
+     onPointerMove={event=>{const drag=splitDrag.current;if(!drag||event.pointerId!==drag.pointerId)return;if(!drag.dragged){if(Math.abs(event.clientX-drag.x)<SPLIT_DRAG_THRESHOLD_PX)return;drag.dragged=true;document.body.classList.add("resizing-panes");}const next=clampListWidth(drag.width+event.clientX-drag.x);setListWidth(next);}}
+     onPointerUp={event=>{const drag=splitDrag.current;if(!drag||event.pointerId!==drag.pointerId)return;if(drag.dragged){const next=clampListWidth(drag.width+event.clientX-drag.x);setListWidth(next);saveInsightsListWidth(next);}document.body.classList.remove("resizing-panes");if(event.currentTarget.hasPointerCapture?.(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);splitDrag.current=null;}}
+     onPointerCancel={event=>{const drag=splitDrag.current;if(!drag||event.pointerId!==drag.pointerId)return;if(drag.dragged)saveInsightsListWidth(listWidth);document.body.classList.remove("resizing-panes");if(event.currentTarget.hasPointerCapture?.(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);splitDrag.current=null;}}
+     onLostPointerCapture={()=>{document.body.classList.remove("resizing-panes");splitDrag.current=null;}}
+     onKeyDown={event=>{if(event.key==="Home"){event.preventDefault();setListWidth(minimumListWidth);saveInsightsListWidth(minimumListWidth);return;}if(event.key==="End"){event.preventDefault();setListWidth(maximumListWidth);saveInsightsListWidth(maximumListWidth);return;}if(event.key==="Enter"){event.preventDefault();setListWidth(defaultListWidth);saveInsightsListWidth(defaultListWidth);return;}if(event.key!=="ArrowLeft"&&event.key!=="ArrowRight")return;event.preventDefault();const next=clampListWidth(listWidth+(event.key==="ArrowRight"?16:-16));setListWidth(next);saveInsightsListWidth(next);}}/>}
+    {data.detail&&<InsightDetail key={data.detail.id} desktop={desktop} closeRef={layout==="table"?tableClose:undefined} onReview={()=>setDiscovery({target:data.detail!})} inline={layout!=="cards"&&(desktop||!focus)} onSnooze={()=>openSnooze(data.detail!)} initialFeedback={detailDrafts.current[data.detail.id]??""} onFeedback={value=>{detailDrafts.current[data.detail!.id]=value;}} focus={focus} onFocus={()=>setFocus(!focus)} onPrevious={position>0?()=>go(-1):undefined} onNext={position>=0&&position<visible.length-1?()=>go(1):undefined} data={data} item={data.detail} onClose={closeFinding} onUpdate={()=>setPicker({target:data.detail!})} onOpenWork={openWork}/>}
     {layout==="split"&&!data.detail&&<div className="insights-detail-empty"><Sparkles size={30}/><h2>从一条发现，接着看下去</h2><p>选择左侧发现，查看资料依据与处理记录。</p></div>}
    </div><p className="insights-footnote">{data.more?"当前数量仅含已载入发现 · ":""}保存在本机 · 资料按 Hub 当前同步内容核对 · 打开和筛选不会启动分析</p></>}
   </div>

@@ -107,4 +107,55 @@ describe("SettingsDialog accessibility", () => {
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); expect(close).not.toHaveBeenCalled();
     crop.remove();
   });
+
+  it("renders the desktop 7-category Base White shell with live search and Escape clear-before-close", async () => {
+    const onCategoryChange = vi.fn();
+    const onClose = vi.fn();
+    await act(async () => root.render(
+      <SettingsDialog canClose category="libraries" onCategoryChange={onCategoryChange} onClose={onClose}>
+        <div>当前分类内容</div>
+      </SettingsDialog>,
+    ));
+
+    const dialog = container.querySelector<HTMLElement>(".settings-desktop-shell")!;
+    expect(dialog).not.toBeNull();
+    const navButtons = [...container.querySelectorAll<HTMLButtonElement>(".settings-category-tabs button")];
+    expect(navButtons.map((btn) => btn.textContent?.trim())).toEqual([
+      "资料库", "云同步", "显示", "操作", "模型与运行", "MCP", "数据管理",
+    ]);
+    expect(container.querySelector(".settings-pane-title")?.textContent).toBe("资料库");
+
+    // Live search matches real categories and jumps on click
+    const input = container.querySelector<HTMLInputElement>('input[aria-label="搜索设置"]')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "MCP");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const hits = [...container.querySelectorAll<HTMLButtonElement>(".settings-search-hit")];
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits.some((hit) => hit.textContent?.includes("MCP"))).toBe(true);
+
+    // Pressing Escape while search is active clears search instead of closing the dialog
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    expect(input.value).toBe("");
+    expect(onClose).not.toHaveBeenCalled();
+
+    // Searching and clicking a hit jumps to that category and clears search
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "快捷键");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const behaviorHit = container.querySelector<HTMLButtonElement>(".settings-search-hit")!;
+    await act(async () => behaviorHit.click());
+    expect(onCategoryChange).toHaveBeenCalledWith("behavior");
+    expect(input.value).toBe("");
+
+    // Pressing Escape when search is empty closes the dialog
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
 });
