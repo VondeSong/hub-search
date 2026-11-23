@@ -20,8 +20,9 @@ export type AgentQuestion={id:string;text:string};
 type PanelEntry=Entry|{workId:string;question?:AgentQuestion};
 export type TextMaterial={kind:"text"|"flashcard"|"conversation";title:string;text:string;file?:boolean;conversationId?:string;selectedFromChat?:true};
 export type ExtraAgentControls = {add: (entry: TextMaterial) => boolean; focus: () => void};
-export type ExtraAgentEntry = {open: boolean; firstQuote: TextMaterial; controls: RefObject<ExtraAgentControls | null>};
-export const AgentExtraPanelContext = createContext<((entry: TextMaterial) => boolean) | null>(null);
+export type ExtraAgentEntry = {open: boolean; firstQuote?: TextMaterial; controls: RefObject<ExtraAgentControls | null>};
+export type ExtraAgentPanelApi = {open: (entry?: TextMaterial) => boolean; focusMain: () => void; isExtraOpen: boolean};
+export const AgentExtraPanelContext = createContext<ExtraAgentPanelApi | null>(null);
 export const AgentTextMaterialContext=createContext<{selection:TextMaterial|null;clearSelection:()=>void;pending:TextMaterial|null;setPending:(value:TextMaterial|null)=>void}|null>(null);
 export type AgentTagRequest={tagId:string;label:string;task:"definition"|"missing"|"relations"};
 export const AgentTagRequestContext=createContext<{pending:AgentTagRequest|null;setPending:(v:AgentTagRequest|null)=>void}|null>(null);
@@ -69,20 +70,50 @@ export function AgentPanelProvider({children}:{children:ReactNode}) {
   return()=>window.removeEventListener("hub:agent-account-changed",change);
  },[owner,entry]);
  const open=(next:PanelEntry)=>{setEntries(values=>{const current=values[owner];return {...values,[owner]:next&&'workId' in next?next:current===undefined?next:current&&next&&'result' in current&&'result' in next?next:current};});setRequest(n=>n+1);};
- const openExtra=(quote: TextMaterial) => {
+ const openExtra=(quote?: TextMaterial) => {
   const entry = extraEntries[owner];
-  const accepted = entry?.controls.current?.add(quote) ?? true;
-  setExtraEntries(current => ({...current,[owner]: entry ? {...entry,open:true} : {open:true,firstQuote:quote,controls:createRef<ExtraAgentControls>()}}));
-  if (entry?.open) entry.controls.current?.focus();
+  const accepted = quote ? (entry?.controls.current?.add(quote) ?? true) : true;
+  setExtraEntries(current => ({...current,[owner]: entry ? {...entry,open:true} : {open:true,...(quote?{firstQuote:quote}:{}),controls:createRef<ExtraAgentControls>()}}));
+  if (entry) requestAnimationFrame(() => entry.controls.current?.focus());
   return accepted;
+ };
+ const focusMain=()=>{
+  open(null);
+  requestAnimationFrame(() => {
+   const primary = document.querySelector<HTMLElement>(".agent-panel:not([data-agent-extra]):not([hidden])");
+   (primary?.querySelector<HTMLElement>(".agent-composer textarea:not(:disabled)") ?? primary?.querySelector<HTMLElement>(".agent-conversation"))?.focus({preventScroll:true});
+  });
  };
  const closeExtra=(key: string) => {
   setExtraEntries(current => ({...current,[key]:{...current[key],open:false}}));
   requestAnimationFrame(() => document.querySelector<HTMLElement>(".agent-panel:not([data-agent-extra]):not([hidden]) .agent-conversation")?.focus({preventScroll:true}));
  };
+ useEffect(()=>{
+  if(!runtimeCapabilities.desktop)return;
+  const hasBlockingDialog=(target:EventTarget|null)=>{
+   if(target instanceof Element && target.closest('.shortcut-setting-control, dialog[open], [role="dialog"][aria-modal="true"], [role="alertdialog"]'))return true;
+   if(document.querySelector('dialog[open], [role="alertdialog"]:not([hidden])'))return true;
+   return Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')).some(el=>{
+    if(el.closest('[hidden]'))return false;
+    const details=el.closest('details');
+    return !details || details.open;
+   });
+  };
+  const onKeyDown=(event:KeyboardEvent)=>{
+   if(event.defaultPrevented||event.isComposing)return;
+   if(!event.altKey||event.ctrlKey||event.metaKey||event.shiftKey)return;
+   if(event.key.toLowerCase()!=="j"&&event.code!=="KeyJ")return;
+   if(hasBlockingDialog(event.target))return;
+   event.preventDefault();
+   openExtra();
+  };
+  window.addEventListener("keydown",onKeyDown);
+  return()=>window.removeEventListener("keydown",onKeyDown);
+ },[owner,extraEntries]);
  useEffect(()=>{if(request)window.dispatchEvent(new Event('hub:show-agent'));},[request,owner]);
+ const extraPanelApi: ExtraAgentPanelApi = { open: openExtra, focusMain, isExtraOpen: Boolean(extraEntries[owner]?.open) };
  return <AgentTagRequestContext.Provider value={{pending:tagRequest,setPending:setTagRequest}}><AgentCitationContext.Provider value={{value:citation,show:setCitation}}><AgentTextMaterialContext.Provider value={{selection,clearSelection:()=>setSelection(null),pending,setPending}}><AgentBrowsingContext.Provider value={{entry:browsing,setEntry:setBrowsing}}><AgentPanelContext.Provider value={open}>
-  <AgentExtraPanelContext.Provider value={openExtra}>
+  <AgentExtraPanelContext.Provider value={extraPanelApi}>
   {children}
   {runtimeCapabilities.desktop && entry===undefined && createPortal(<button type="button" className="agent-floating-launcher" aria-label="打开助手" aria-expanded={false} title="打开 Hub 助手" onClick={()=>open(null)}><span className="agent-launcher-orb" aria-hidden="true"/>助手</button>,document.body)}
   {runtimeCapabilities.desktop && Object.entries(entries).map(([key,value])=>value===undefined?null:<AgentAccountVisibleContext.Provider key={key} value={key===owner}><div hidden={key!==owner} className="agent-global-owner"><Suspense fallback={<p role="status">正在打开助手…</p>}>

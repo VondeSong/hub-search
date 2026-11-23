@@ -582,6 +582,10 @@ body > .agent-panel-resizer[data-agent-docked=true] { top:0; bottom:0; right:cal
 body.resizing-agent-panel-height * { cursor:row-resize !important; user-select:none !important; }
 .agent-panel .agent-conversation-wrap { min-height:0; }
 .agent-panel .agent-body { overflow:visible; }
+.agent-panel .agent-body[hidden] { display:none; }
+.agent-panel .agent-cloud-embed { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; overflow:hidden; position:relative; }
+.agent-panel .agent-cloud-embed-loading { margin:0; padding:20px; color:var(--hub-text-secondary); font-size:13px; }
+body > .agent-panel:focus-within { z-index:206; }
 .agent-panel .agent-composer { flex-shrink:0; }
 .agent-panel-header { padding:14px 18px; gap:8px; }
 .agent-panel-header > strong { text-align:center; border-radius:999px; background:var(--hub-control-fill); padding:6px 12px; }
@@ -812,6 +816,7 @@ body.resizing-agent-panel-height * { cursor:row-resize !important; user-select:n
 .agent-analysis-handoff { margin-top:10px; }
 .agent-body .agent-analysis-handoff > label { flex-direction:row; align-items:center; max-width:100%; }
 .agent-analysis-handoff select { min-width:0; max-width:100%; }
+.agent-analysis-handoff-note { flex:1 1 100%; margin:0; }
 .agent-activity .agent-web-activity > summary > span,
 .agent-activity .agent-tool-activity > summary > span:first-child { flex:0 1 auto; }
 .agent-activity .agent-web-activity > summary > svg[data-activity-icon] { width:14px; height:14px; color:var(--agent-chat-muted,var(--hub-text-secondary)); stroke-width:1.75; }

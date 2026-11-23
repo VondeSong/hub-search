@@ -1,5 +1,8 @@
 import {AgentAnalysisInputs} from "./AgentAnalysisInputs";
 import {AgentAnalysisFiles,type FileAnalysis} from "./AgentAnalysisFiles";
+import {CloudHandoffReceiptBanner,type CloudHandoff,type CloudHandoffReceiptStatus} from "./CloudHandoff";
+import {outbox as cloudOutbox} from "./CloudAgentMedia";
+import type {CloudCatalogUpdate,CloudContinuationPayload,CloudEmbedRequest,CloudThreadSummary} from "./CloudAgents";
 import {AgentPluginWriteRecord} from "./AgentPluginWriteRecord";
 import {AgentFollowups,type Followup} from "./AgentFollowups";
 import { loadAgentPreferences, rememberAgentPreferences, loadCodexWebSearchPreference, loadMemoryPreference, rememberMemoryPreference } from "./AgentPreferences";
@@ -38,10 +41,10 @@ import { AgentMaterials, materialKey, type AgentMaterial } from "./AgentMaterial
 import {AgentLibraryScope,libraryDragType,readLibraryDrop,type AgentLibrary} from "./AgentLibraryScope";
 import { AgentSourceScope, type SourceSelection } from "./AgentSourceScope";
 import { AgentScopeCoverage } from "./AgentScopeCoverage";
-import { useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { AssistantSelectionActions } from "./AgentSelectionActions";
 import { createPortal } from "react-dom";
-import { ArrowDown, ArrowLeft, ArrowUp, Check, Square, ChevronRight, CircleAlert, FileText, Image, ListChecks, Menu, MessageSquare, SlidersHorizontal, Quote, Plus, Search, X, Zap } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Check, Columns2, ExternalLink, Square, ChevronRight, CircleAlert, FileText, Image, ListChecks, Menu, MessageSquare, SlidersHorizontal, Smartphone, Quote, Plus, Search, X, Zap } from "lucide-react";
 import type { SearchResult } from "./SearchTypes";
 import { isTaskPreviewResult } from "./TaskResultIdentity";
 import { runtimeCapabilities } from "./RuntimePlatform";
@@ -179,15 +182,23 @@ export function PersistentReadingInvestigation({ itemKey, initiallyOpen=false, s
 export function ExtraInvestigation({entry,onClose}: {entry: ExtraAgentEntry; onClose: () => void}) {
   return <Investigation anchor={null} libraryName="" initialOpen startNew extra={entry} onDismiss={onClose}/>;
 }
+const LazyCloudAgents = lazy(() => import("./CloudAgents"));
 const selectableChatText = ".agent-user-message-content,.agent-report,.agent-commentary";
 
 function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pageLibraryName, sourceTitle: pageTitle, canEditNote: pageCanEditNote = false, compact = false, initialOpen = false, initialWorkId, initialDraft, suggestedQuestion, startNew=false, onDismiss, onNewConversation, onOpenTopicWork, onTopicBack, onPin, newSource, extra }: { onPreviewCitation?: (value: CitationLocation | null) => void; anchor: InvestigationLocator|null; libraryName: string; sourceTitle?: string; canEditNote?: boolean; compact?: boolean; initialOpen?: boolean; initialWorkId?:string; initialDraft?:string; suggestedQuestion?:AgentQuestion; startNew?:boolean; onDismiss?:()=>void; onNewConversation?:()=>void; onOpenTopicWork?:(id:string,source:TopicWorkSource,originId?:string,draft?:string)=>void; onTopicBack?:()=>void; onPin?: () => void; newSource?: { title: string; use: () => void }; extra?: ExtraAgentEntry }) {
   const browsing=useContext(AgentBrowsingContext);
   const tagRequest=useContext(AgentTagRequestContext);
   const textMaterials=useContext(AgentTextMaterialContext);
-  const [snippets,setSnippets]=useState<TextMaterial[]>(() => extra ? [extra.firstQuote] : []);
+  const [snippets,setSnippets]=useState<TextMaterial[]>(() => extra?.firstQuote ? [extra.firstQuote] : []);
   const panel = useRef<HTMLElement>(null);
-  const openExtraPanel = useContext(AgentExtraPanelContext);
+  const extraPanel = useContext(AgentExtraPanelContext);
+  const [cloudEmbed,setCloudEmbed]=useState<CloudEmbedRequest|null>(null);
+  const [cloudCatalog,setCloudCatalog]=useState<{loaded:boolean;configured:boolean;loading:boolean;error:string;management:boolean;resultQuery:string;endpoint?:string;pendingThreadId?:string;threads:CloudThreadSummary[]}>({loaded:false,configured:false,loading:false,error:"",management:false,resultQuery:"",threads:[]});
+  const cloudCatalogRequest=useRef(0);
+  const [handoffReceipts,setHandoffReceipts]=useState<Record<string,CloudHandoff>>({});
+  const [handoffVerifications,setHandoffVerifications]=useState<Record<string,CloudHandoffReceiptStatus>>({});
+  const handoffReceiptsRef=useRef(handoffReceipts);
+  handoffReceiptsRef.current=handoffReceipts;
   const [imageDraft,setImageDraft]=useState<ImageGrant[]|null>(null);
   const [reattachedImages,setReattachedImages]=useState<ImageGrant[]>([]);
   const resetImageDraft=()=>{setImageDraft(null);setReattachedImages([]);};
@@ -591,7 +602,10 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     return refresh(id);
   };
   useEffect(() => {
-    if (open && visible && view) void revalidate(view.work.id).catch(reason => { if (alive.current) setError(String(reason)); });
+    if (open && visible && view) {
+      void revalidate(view.work.id).catch(reason => { if (alive.current) setError(String(reason)); });
+      void verifyWorkHandoffs(view.work.id);
+    }
   }, [open, visible]);
   const reloadWorks = async ():Promise<WorkListPage|null> => {
     const ticket=++worksRequest.current;
@@ -605,11 +619,163 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     }catch(reason){if(alive.current && ticket===worksRequest.current)setWorksError(String(reason));return null;}
     finally{if(alive.current && ticket===worksRequest.current)setWorksLoading(false);}
   };
+  const loadCloudCatalog = async (queryText = historyFilter.current.query) => {
+    if (!runtimeCapabilities.desktop) return;
+    const trimmedQuery = queryText.trim();
+    const ticket = ++cloudCatalogRequest.current;
+    setCloudCatalog(prev => ({ ...prev, loading: true, error: "" }));
+    let config: { endpoint: string; binding: string } | null = null;
+    try {
+      const value = await invoke<{ endpoint: string; binding: string } | null>("cloud_agents", { action: { op: "config" } });
+      config = value && typeof value.binding === "string" && typeof value.endpoint === "string" ? value : null;
+    } catch {
+      if (alive.current && ticket === cloudCatalogRequest.current) {
+        setCloudCatalog({ loaded: true, configured: false, loading: false, error: "", management: false, resultQuery: "", threads: [] });
+      }
+      return;
+    }
+    if (!alive.current || ticket !== cloudCatalogRequest.current) return;
+    if (!config) {
+      setCloudCatalog({ loaded: true, configured: false, loading: false, error: "", management: false, resultQuery: "", threads: [] });
+      return;
+    }
+    try {
+      const [data, pendingOutbox] = await Promise.all([
+        invoke<{ threads?: CloudThreadSummary[]; threadManagement?: boolean; accessDenied?: boolean; error?: string }>("cloud_agents", { action: { op: "list", query: trimmedQuery } }),
+        cloudOutbox(config.binding).catch(() => undefined),
+      ]);
+      if (!alive.current || ticket !== cloudCatalogRequest.current) return;
+      if (data?.accessDenied) {
+        setCloudCatalog({ loaded: true, configured: true, loading: false, error: data.error || "云端访问已撤销，缓存已清除。", management: false, resultQuery: "", endpoint: config.endpoint, threads: [] });
+        return;
+      }
+      setCloudCatalog({
+        loaded: true,
+        configured: true,
+        loading: false,
+        error: "",
+        management: Boolean(data?.threadManagement),
+        resultQuery: trimmedQuery,
+        endpoint: config.endpoint,
+        pendingThreadId: pendingOutbox?.thread,
+        threads: Array.isArray(data?.threads) ? data.threads : [],
+      });
+    } catch (reason) {
+      if (alive.current && ticket === cloudCatalogRequest.current) {
+        setCloudCatalog(prev => ({ ...prev, loaded: true, configured: true, loading: false, endpoint: config.endpoint, error: reason instanceof Error ? reason.message : String(reason) }));
+      }
+    }
+  };
+  const openCloudEmbed = (mode: CloudEmbedRequest["mode"], threadId?: string) => {
+    detailsPopover.close();
+    windowLayout.close();
+    setCloudEmbed(prev => ({ token: (prev?.token ?? 0) + 1, mode, threadId }));
+  };
+  const handleCloudCatalogUpdated = (update: CloudCatalogUpdate) => {
+    if (historyFilter.current.query.trim()) return;
+    setCloudCatalog(prev => ({
+      ...prev,
+      loaded: true,
+      configured: true,
+      loading: false,
+      error: "",
+      management: update.threadManagement,
+      resultQuery: "",
+      endpoint: update.endpoint ?? prev.endpoint,
+      threads: update.threads,
+    }));
+  };
+  const recordHandoffSent = (workId: string, executionId: string, receipt: CloudHandoff) => {
+    setHandoffReceipts(prev => ({ ...prev, [`${workId}:${executionId}`]: receipt }));
+    setHandoffVerifications(prev => ({ ...prev, [receipt.id]: { state: "verified" } }));
+    void loadCloudCatalog();
+  };
+  const applySyncedHandoff = (remote: CloudHandoff, verification: CloudHandoffReceiptStatus, cached = false) => {
+    const origin = remote.manifest?.origin;
+    const originKey = origin?.workId && origin?.executionId ? `${origin.workId}:${origin.executionId}` : "";
+    const existingWithdrawn = cached && remote.state !== "withdrawn" && (
+      Object.values(handoffReceiptsRef.current).some(item => (item.id === remote.id || item.thread === remote.thread) && item.state === "withdrawn")
+      || (originKey ? handoffReceiptsRef.current[originKey]?.state === "withdrawn" : false)
+    );
+    if (existingWithdrawn) return;
+    setHandoffReceipts(prev => {
+      const next = { ...prev };
+      let matched = false;
+      for (const [key, item] of Object.entries(next)) {
+        if (item.id === remote.id || item.thread === remote.thread) {
+          matched = true;
+          if (cached && item.state === "withdrawn" && remote.state !== "withdrawn") continue;
+          next[key] = remote;
+        }
+      }
+      if (originKey && remote.state !== "uploading") {
+        if (!(cached && next[originKey]?.state === "withdrawn" && remote.state !== "withdrawn")) {
+          next[originKey] = remote;
+          matched = true;
+        }
+      }
+      return matched ? next : prev;
+    });
+    setHandoffVerifications(prev => ({ ...prev, [remote.id]: verification }));
+  };
+  const verifyWorkHandoffs = async (workId: string) => {
+    if (!runtimeCapabilities.desktop) return;
+    const prefix = `${workId}:`;
+    const candidates: CloudHandoff[] = [];
+    const seen = new Set<string>();
+    for (const [key, receipt] of Object.entries(handoffReceiptsRef.current)) {
+      if (!key.startsWith(prefix) || receipt.state !== "published" || seen.has(receipt.id)) continue;
+      seen.add(receipt.id);
+      candidates.push(receipt);
+    }
+    if (!candidates.length) return;
+    await Promise.all(candidates.map(async receipt => {
+      try {
+        const data = await invoke<{ cached?: boolean; accessDenied?: boolean; error?: string; thread?: { handoff?: CloudHandoff | null } | null }>(
+          "cloud_agents",
+          { action: { op: "read", thread: receipt.thread } },
+        );
+        if (!alive.current) return;
+        if (data?.accessDenied) {
+          setHandoffVerifications(prev => ({ ...prev, [receipt.id]: { state: "error", note: data.error || "云端访问已撤销，无法确认当前交接状态。" } }));
+          return;
+        }
+        const remote = data?.thread?.handoff;
+        if (!data?.thread || !remote || remote.state === "withdrawn") {
+          applySyncedHandoff({ ...receipt, state: "withdrawn" }, { state: "verified" });
+        } else if (data.cached) {
+          applySyncedHandoff(remote, { state: "cached", note: "当前仅读取到本机缓存，恢复连接后再核对云端是否已撤回。" }, true);
+        } else {
+          applySyncedHandoff(remote, { state: "verified" });
+        }
+      } catch {
+        if (!alive.current) return;
+        setHandoffVerifications(prev => ({ ...prev, [receipt.id]: { state: "error", note: "暂未联机核对云端状态，手机端撤回后可能已失效。" } }));
+      }
+    }));
+  };
+  const closeCloudEmbed = () => {
+    setCloudEmbed(null);
+    if (view?.work.id) void verifyWorkHandoffs(view.work.id);
+    requestAnimationFrame(() => goalInput.current?.focus({ preventScroll: true }));
+  };
+  const markHandoffWithdrawn = (handoffId: string) => {
+    setHandoffReceipts(prev => {
+      const next = { ...prev };
+      for (const [key, item] of Object.entries(next)) {
+        if (item.id === handoffId) next[key] = { ...item, state: "withdrawn" };
+      }
+      return next;
+    });
+    setHandoffVerifications(prev => ({ ...prev, [handoffId]: { state: "verified" } }));
+    void loadCloudCatalog();
+  };
   const filterHistory = (query:string,archived:boolean) => {
     const next={query:query.slice(0,200),archived};
     historyFilter.current=next;setHistoryQuery(next.query);setHistoryArchived(archived);
     setWorks([]);setWorksCursor(null);
     void reloadWorks();
+    if (cloudCatalog.configured) void loadCloudCatalog(next.query);
   };
   const load = async () => {
     setError("");
@@ -664,6 +830,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   }
   const openHistoryWork = async (work: WorkSummary, draft = "") => {
     if(detailsMenu.current)detailsMenu.current.open=false;
+    setCloudEmbed(null);
     if(work.id===view?.work.id)return;
     setTitleEdit(null);
     setLibraryDraft(null);setError("");setGoal(draft);setMaterials([]);setDropped([]);setSnippets([]);resetImageDraft();setRemovals([]);clearSourcePreview();
@@ -1312,8 +1479,20 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
   const quote = (text: string): TextMaterial => ({kind:"conversation", title:"对话摘录", text, conversationId:view!.work.id, selectedFromChat:true});
   function openSideChat(text: string) {
     if (text.length > 2500) { setError("文字资料每份最多 2500 字，请缩小选区。"); return false; }
-    return openExtraPanel?.(quote(text)) ?? false;
+    return extraPanel?.open(quote(text)) ?? false;
   }
+  const continueCloudInLocal = (payload: CloudContinuationPayload) => {
+    setCloudEmbed(null);
+    if (reportReading) setReportReading(false);
+    if (addTextMaterial({ kind: "conversation", title: payload.title || "云端对话摘录", text: payload.text })) {
+      requestAnimationFrame(() => goalInput.current?.focus({ preventScroll: true }));
+    }
+  };
+  const attachCloudImageToLocal = (file: File) => {
+    setCloudEmbed(null);
+    if (reportReading) setReportReading(false);
+    void addFiles([file]);
+  };
   useLayoutEffect(() => { if (open && extra) goalInput.current?.focus({preventScroll:true}); }, [open, !!extra]);
   useEffect(()=>{if(!extra && open && !busy && textMaterials?.pending){addTextMaterial(textMaterials.pending);textMaterials.setPending(null);}},[open,busy,active,textMaterials?.pending,!!extra]);
   const scopeVerification=<details className="agent-material-advanced"><summary>固定清单与覆盖核对</summary><p className="agent-note">{selectedLibraries.length ? `当前库范围：${selectedLibraries.map(l=>l.name).join("、")}` : (!view && !hasDraftSources || !!view && !anchor && !view.work.grant.notes?.length) ? "未添加资料，可直接对话；可在这里添加资料" : view?.work.state==="revoked" ? "来源授权已撤回" : view?.work.grant.manifest ? `已固定授权 ${view.work.grant.manifest.members.length} 份资料` : (view ? !!view.work.grant.libraryIds.length : wholeLibrary) ? `当前范围：${view?.work.grant.libraryIds.length || 1} 个资料库` : !anchor && view ? `当前范围：${view.work.grant.notes?.length || 0} 份明确选中的文档/页面` : `当前范围：${sourceTitle || currentObjectLabel}，另有 ${view ? Math.max(0,(view.work.grant.notes?.length || 1)-1) : Math.max(0,materials.length+dropped.length-(pageAttached?0:1))} 份资料`}。这里的固定清单按已有版本核验；添加资料不会改动原文件。</p>
@@ -1338,6 +1517,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
     setDropped(current=>current.some(m=>JSON.stringify(m.locator)===key)?current:[...current,{locator,title:(entry.title||entry.result?.title||"阅读条目").slice(0,200)}]);
   };
   const newInvestigation = (preserveHistory=false) => {
+    setCloudEmbed(null);
     setTitleEdit(null);
     setDraftTitle("");
     setDraftSession(crypto.randomUUID());
@@ -1407,6 +1587,39 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
           {!active && view.work.state !== "revoked" && <button type="button" disabled={busy} onClick={() => { setError(""); void revalidate(view.work.id).catch(reason => setError(String(reason))); }}>核对来源</button>}
         </div>
   </>;
+  const workHandoffReceipts: Record<string, CloudHandoff> = {};
+  const workHandoffList: CloudHandoff[] = [];
+  if (view) {
+    const prefix = `${view.work.id}:`;
+    const seenHandoffIds = new Set<string>();
+    for (const [key, receipt] of Object.entries(handoffReceipts)) {
+      if (!key.startsWith(prefix)) continue;
+      workHandoffReceipts[key.slice(prefix.length)] = receipt;
+      if (!seenHandoffIds.has(receipt.id)) {
+        seenHandoffIds.add(receipt.id);
+        workHandoffList.push(receipt);
+      }
+    }
+  }
+  const cloudHistoryProps = runtimeCapabilities.desktop ? {
+    configured: cloudCatalog.configured,
+    loading: cloudCatalog.loading,
+    error: cloudCatalog.error,
+    management: cloudCatalog.management,
+    resultQuery: cloudCatalog.resultQuery,
+    threads: cloudCatalog.threads,
+    activeThreadId: cloudEmbed?.mode === "thread" ? cloudEmbed.threadId : undefined,
+    pendingThreadId: cloudCatalog.pendingThreadId,
+    onOpenThread: (threadId: string) => openCloudEmbed("thread", threadId),
+    onNewThread: () => openCloudEmbed("new"),
+    onOpenSettings: () => openCloudEmbed("settings"),
+    onRefresh: () => void loadCloudCatalog(),
+    onFilterChange: (filter: "all" | "cloud") => {
+      if (filter === "cloud" && !cloudCatalog.loaded && !cloudCatalog.loading) void loadCloudCatalog();
+    },
+  } : undefined;
+  const cloudActiveCount = cloudCatalog.threads.filter(item => !item.archived).length;
+  const cloudInspectorStatus = cloudCatalog.error ? "连接异常" : cloudCatalog.loaded ? (cloudCatalog.configured ? `${cloudActiveCount} 条会话` : "未连接") : "查看与连接";
   return <>
     {!extra && <button ref={launcher} type="button" className={`agent-launcher${compact ? " agent-launcher-compact" : ""}`} title="打开 Hub 助手" aria-label={entryLabel} aria-expanded={open} aria-controls={panelId} onClick={() => {
       if (open) return;
@@ -1433,14 +1646,14 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
           return;
         }
         if(event.dataTransfer.files?.length){event.preventDefault();event.stopPropagation();setReportReading(false);void addFiles(Array.from(event.dataTransfer.files));return;}const data=event.dataTransfer.getData("application/x-hub-agent-source");if(!data)return;event.preventDefault();event.stopPropagation();setReportReading(false);try{if(data.length>65536)throw new Error();addExternalMaterial(JSON.parse(data));}catch{setError("无法识别拖入的资料，请重新拖入。");}}} onKeyDown={event => {
-      if (event.key === "Escape" && !event.nativeEvent.isComposing && !event.defaultPrevented && !(event.target instanceof Element && event.target.closest(".agent-token-disclosure"))) { event.preventDefault(); event.stopPropagation(); const menu=((!reportReading || addMenuOpen) && event.currentTarget.querySelector<HTMLDetailsElement>(".agent-composer details[open]")) || (detailsMenu.current?.open ? detailsMenu.current : null); if(menu){menu.open=false;menu.querySelector("summary")?.focus();}else if(citationOpen){returnFromCitation();}else if(reportReading){setReportReading(false);event.currentTarget.querySelector<HTMLButtonElement>('.agent-header-end button[aria-label="对话详情"]')?.focus();}else closePanel(); }
+      if (event.key === "Escape" && !event.nativeEvent.isComposing && !event.defaultPrevented && !(event.target instanceof Element && event.target.closest(".agent-token-disclosure"))) { event.preventDefault(); event.stopPropagation(); const menu=((!reportReading || addMenuOpen) && event.currentTarget.querySelector<HTMLDetailsElement>(".agent-composer details[open]")) || (detailsMenu.current?.open ? detailsMenu.current : null); if(menu){menu.open=false;menu.querySelector("summary")?.focus();}else if(cloudEmbed){closeCloudEmbed();}else if(citationOpen){returnFromCitation();}else if(reportReading){setReportReading(false);event.currentTarget.querySelector<HTMLButtonElement>('.agent-header-end button[aria-label="对话详情"]')?.focus();}else closePanel(); }
     }}>
       <header className="agent-panel-header" inert={memory.managerOpen||!!skillManagerOpener}>
         <div className="agent-header-start">
-        <details ref={detailsMenu} data-history={historyExpanded} className="agent-dialogue-details" data-task-status={taskStatusOnly} onClickCapture={event=>{const menu=event.currentTarget;if(!menu.open&&(event.target as Element).closest("summary")===menu.firstElementChild){detailsReturn.current=menu.firstElementChild as HTMLElement;setHistoryExpanded(true);setTaskStatusOnly(false);void reloadWorks();}}} onToggle={event=>{if(event.target!==event.currentTarget)return;const menu=event.currentTarget;setDetailsOpen(menu.open);if(!menu.open&&detailsReturn.current?.isConnected&&(menu.contains(document.activeElement)||document.activeElement===document.body))detailsReturn.current.focus();}}><summary aria-label="对话历史" title="对话历史"><Menu size={18} aria-hidden="true"/></summary><div className="agent-details-content" role="region" aria-label={historyExpanded?"对话历史":taskStatusOnly?"任务状态":"对话详情"}>
+        <details ref={detailsMenu} data-history={historyExpanded} className="agent-dialogue-details" data-task-status={taskStatusOnly} onClickCapture={event=>{const menu=event.currentTarget;if(!menu.open&&(event.target as Element).closest("summary")===menu.firstElementChild){detailsReturn.current=menu.firstElementChild as HTMLElement;setHistoryExpanded(true);setTaskStatusOnly(false);void reloadWorks();void loadCloudCatalog();}}} onToggle={event=>{if(event.target!==event.currentTarget)return;const menu=event.currentTarget;setDetailsOpen(menu.open);if(!menu.open&&detailsReturn.current?.isConnected&&(menu.contains(document.activeElement)||document.activeElement===document.body))detailsReturn.current.focus();}}><summary aria-label="对话历史" title="对话历史"><Menu size={18} aria-hidden="true"/></summary><div className="agent-details-content" role="region" aria-label={historyExpanded?"对话历史":taskStatusOnly?"任务状态":"对话详情"}>
           <div hidden={!historyExpanded} className="agent-history-container">
       <div className="agent-history-backdrop" aria-hidden="true" onClick={()=>detailsPopover.close(true)}/>
-      <AgentConversationHistory query={historyQuery} archived={historyArchived} onQueryChange={query=>filterHistory(query,historyFilter.current.archived)} onArchivedChange={archived=>filterHistory(historyFilter.current.query,archived)} works={works} currentId={view?.work.id} disabled={busy||!!active} more={!!worksCursor} loading={worksLoading} error={worksError} states={states} onRetry={()=>void reloadWorks()} onClose={()=>{if(detailsMenu.current)detailsMenu.current.open=false;}} onMore={()=>void loadEarlierWorks()} onChange={changeHistory} onOpen={work=>void openHistoryWork(work)}/>
+      <AgentConversationHistory query={historyQuery} archived={historyArchived} onQueryChange={query=>filterHistory(query,historyFilter.current.archived)} onArchivedChange={archived=>filterHistory(historyFilter.current.query,archived)} works={works} currentId={view?.work.id} disabled={busy||!!active} more={!!worksCursor} loading={worksLoading} error={worksError} states={states} onRetry={()=>void reloadWorks()} onClose={()=>{if(detailsMenu.current)detailsMenu.current.open=false;}} onMore={()=>void loadEarlierWorks()} onChange={changeHistory} onOpen={work=>void openHistoryWork(work)} cloud={cloudHistoryProps}/>
           </div>
           <div className="agent-details-sections" hidden={historyExpanded}>
           <div className="agent-inspector-backdrop" aria-hidden="true" onClick={()=>detailsPopover.close(true)}/>
@@ -1478,6 +1691,10 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
             detailsPopover.close();
             openSkills(detailsTrigger.current, true);
           }}><AgentDetailSummary icon={<Zap size={14}/>} title="管理通用技能" status={availableSkillCount===undefined ? undefined : `${availableSkillCount} 个可用`} link/></button>
+          {runtimeCapabilities.desktop && <button type="button" className="agent-detail-link agent-detail-cloud-link" onClick={()=>{
+            detailsPopover.close();
+            openCloudEmbed(!cloudCatalog.loaded || cloudCatalog.configured ? "list" : "settings");
+          }}><AgentDetailSummary icon={<Smartphone size={15}/>} title="个人云端与手机" status={cloudInspectorStatus} link/></button>}
           {onTopicBack&&<button type="button" className="agent-detail-link" disabled={busy||!!active} onClick={onTopicBack}><ArrowLeft size={16}/>返回专题所在工作</button>}
           </section>
           <section className="agent-inspector-card agent-inspector-diagnostics">
@@ -1514,6 +1731,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         </div></details>
           <button type="button" title="新对话" aria-label="新对话" disabled={busy || !!active} onClick={()=>newInvestigation()}><Plus size={19} /></button>
         </div>
+        {extra && <span className="agent-window-badge">窗口 2</span>}
         {titleEdit && titleEdit.id===titleScope
           ? <input autoFocus className="agent-chat-title" aria-label="对话标题" maxLength={100} value={titleEdit.value}
               onChange={event=>setTitleEdit({...titleEdit,value:event.target.value})} onBlur={event=>void saveConversationTitle(event.currentTarget.value)}
@@ -1529,7 +1747,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
           {canDock&&<>
             <span className="agent-window-separator" aria-hidden="true"/>
             <details ref={windowLayout.ref} className="agent-window-layout" onKeyDown={event=>{if(event.key==="Escape"){event.preventDefault();event.stopPropagation();windowLayout.close(true);}}}>
-              <summary aria-label="切换窗口形态" title="切换助手窗口形态"><WindowShapeIcon shape={windowShape}/></summary>
+              <summary aria-label="切换窗口形态" title="切换窗口形态与多窗口"><WindowShapeIcon shape={windowShape}/></summary>
               <div className="agent-window-menu" aria-label="助手显示形态">
                 <div className="agent-window-menu-title">助手窗口形态</div>
                 {windowShapes.map(({id,label,description})=>{
@@ -1538,14 +1756,27 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
                     setDocked(id==="docked");setExpandedLayout(id==="expanded");detailsPopover.close();windowLayout.close(true);
                   }}><WindowShapeIcon shape={id}/><span><strong>{label}</strong><small>{description}</small></span>{selected&&<Check size={14} aria-hidden="true"/>}</button>;
                 })}
+                {extraPanel && <>
+                  <div className="agent-window-menu-divider" role="separator" />
+                  <div className="agent-window-menu-title">多窗口与并行</div>
+                  {!extra ? <button type="button" className="agent-window-action" aria-label="双开第二个助手" onClick={() => {
+                    windowLayout.close();
+                    extraPanel.open();
+                  }}><Columns2 size={15} aria-hidden="true"/><span><strong>{extraPanel.isExtraOpen ? "聚焦第二个助手" : "双开第二个助手"}</strong><small>独立会话并行处理另一件事</small></span><kbd className="agent-window-kbd">Alt+J</kbd></button>
+                    : <button type="button" className="agent-window-action" aria-label="切换到主助手" onClick={() => {
+                      windowLayout.close();
+                      extraPanel.focusMain();
+                    }}><Columns2 size={15} aria-hidden="true"/><span><strong>切换到主助手</strong><small>保留窗口 2 草稿并返回主助手</small></span></button>}
+                  <div className="agent-window-menu-hint"><ExternalLink size={14} aria-hidden="true"/><span><strong>独立桌面窗口</strong><small>可用全局快捷键 Ctrl+Alt+J 或系统托盘「打开 Hub 助手」唤起</small></span></div>
+                </>}
               </div>
             </details>
           </>}
           <button type="button" title={extra ? "关闭第二个助手（Esc）" : "关闭助手（Esc）"} aria-label={extra ? "关闭第二个助手" : "关闭助手"} onClick={closePanel}><X size={19} /></button>
         </div>
       </header>
-      {tagMode && <AgentTagWorkspace value={tagPreparation} disabled={busy||!!active} onChange={setTagPreparation} onCancel={()=>setTagMode(false)}/>}
-      {goalMode && view?.work.state!=="revoked" && (!publicUrl || !!view) && <section className="agent-mode-context agent-goal-context" aria-label="目标模式">
+      {!cloudEmbed && tagMode && <AgentTagWorkspace value={tagPreparation} disabled={busy||!!active} onChange={setTagPreparation} onCancel={()=>setTagMode(false)}/>}
+      {!cloudEmbed && goalMode && view?.work.state!=="revoked" && (!publicUrl || !!view) && <section className="agent-mode-context agent-goal-context" aria-label="目标模式">
         <Target size={14} aria-hidden="true"/>
         {!view ? <input name="goalCompletionCriteria" aria-label="完成条件" value={completionCriteria} disabled={busy}
           maxLength={2000} onChange={event=>setCompletionCriteria(event.target.value)} placeholder="输入完成条件，遇到阻碍时暂停"/> :
@@ -1553,7 +1784,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         <button type="button" className="agent-mode-exit" aria-label="退出目标模式" disabled={busy||!!active}
           onClick={()=>void changeTaskMode(false)}><X size={14}/></button>
       </section>}
-      <div className="agent-body" inert={memory.managerOpen||!!skillManagerOpener}>
+      <div className="agent-body" hidden={Boolean(cloudEmbed)} inert={memory.managerOpen||!!skillManagerOpener}>
       <div className="agent-conversation-wrap" aria-busy={loadingConversation || sourceLoading}>
       {loadingConversation && <div className="agent-conversation-loading" role="status" aria-label="正在打开对话"><span/><span/><span/></div>}
       <div className="agent-conversation" data-running={running && !reportReading || undefined} hidden={loadingConversation || (sourceScope.current===sourceScopeKey && (!!sourcePreview || !!sourceError || sourceLoading))} ref={conversationScroll.element} tabIndex={0} aria-label="对话与报告" onScroll={conversationScroll.onScroll} onClickCapture={event=>{if((event.target as Element).closest(".agent-activity-toggle,details > summary"))conversationScroll.holdPosition();}}>
@@ -1588,7 +1819,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
             }).catch(()=>{/* Refresh reports its own error; the saved answer remains acknowledged. */});
           }
         }}/>) }
-        <AgentAnalysisFiles workId={view.work.id} items={view.fileAnalyses||[]}/><AgentCharts workId={view.work.id} recordVersion={view.recordVersion} items={view.analysisArtifacts || []} revoked={view.work.state === "revoked"} />
+        <AgentAnalysisFiles workId={view.work.id} items={view.fileAnalyses||[]} revoked={view.work.state==="revoked"} handoffReceipts={workHandoffReceipts} handoffVerifications={handoffVerifications} onHandoffSent={(executionId,receipt)=>recordHandoffSent(view.work.id,executionId,receipt)} onOpenCloudThread={threadId=>openCloudEmbed("thread",threadId)} onOpenCloudList={runtimeCapabilities.desktop?()=>openCloudEmbed("list"):undefined}/>{workHandoffList.map(receipt=><CloudHandoffReceiptBanner key={receipt.id} handoff={receipt} verification={handoffVerifications[receipt.id]} onOpenThread={threadId=>openCloudEmbed("thread",threadId)} onSyncHandoff={(next,status)=>applySyncedHandoff(next,status,status.state==="cached")} onWithdrawn={markHandoffWithdrawn}/>)}<AgentCharts workId={view.work.id} recordVersion={view.recordVersion} items={view.analysisArtifacts || []} revoked={view.work.state === "revoked"} />
         {view.work.report?.status!=="completed" && view.work.state!=="revoked" && (view.workingState?.revision||0)>0 && view.work.revision!==undefined && view.work.authorizationVersion!==undefined && <AgentExternalReport key={`${view.work.id}:${view.work.revision}:${view.work.authorizationVersion}`} id={view.work.id} revision={view.work.revision} authorization={view.work.authorizationVersion} disabled={busy||!!active||view.lifecycle?.executionModes?.quick!==true||!!view.lifecycle?.requiresExplicitResume} onChanged={()=>{void revalidate(view.work.id).catch(reason=>setError(String(reason)));}}/>}
         {reportContinuation && <div>
           <button type="button" disabled={reportDisabled} aria-describedby={`agent-report-only-${view.work.id}`} onClick={()=>{
@@ -1625,7 +1856,7 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
           if (reportReading) setReportReading(false);
           requestAnimationFrame(() => goalInput.current?.focus({preventScroll:true}));
           return true;
-        }} onSide={!extra && openExtraPanel ? openSideChat : undefined}/>}
+        }} onSide={!extra && extraPanel ? openSideChat : undefined}/>}
       {conversationScroll.showLatest && !reportReading && !citationOpen && <button type="button" className="agent-jump-latest" aria-label="回到最新内容" title="回到最新内容" data-working={running || undefined} onClick={conversationScroll.jumpToLatest}>
         <ArrowDown size={18} aria-hidden="true"/>
         {running && <span className="agent-jump-dots" aria-hidden="true"><span/><span/><span/></span>}
@@ -1830,6 +2061,25 @@ function Investigation({ onPreviewCitation, anchor: pageAnchor, libraryName: pag
         </form>}
       </div>
       </div>
+      {cloudEmbed && <div className="agent-cloud-embed" inert={memory.managerOpen||!!skillManagerOpener}>
+        <Suspense fallback={<p className="agent-cloud-embed-loading" role="status">正在打开个人云端会话…</p>}>
+          <LazyCloudAgents
+            embedded
+            request={cloudEmbed}
+            onBackToLocal={closeCloudEmbed}
+            onContinueInLocal={continueCloudInLocal}
+            onAttachImageToLocal={attachCloudImageToLocal}
+            onCatalogUpdated={handleCloudCatalogUpdated}
+            onHandoffStateChange={(handoff, meta) => applySyncedHandoff(
+              handoff,
+              meta.cached
+                ? { state: "cached", note: "当前仅读取到本机缓存，恢复连接后再核对云端是否已撤回。" }
+                : { state: "verified" },
+              meta.cached,
+            )}
+          />
+        </Suspense>
+      </div>}
       {open && accountOpen && <CodexAccountDialog onClose={()=>setAccountOpen(false)}/>}
       {open && skillManagerOpener && <div className="agent-reference-overlay" onClick={event=>{if(event.target===event.currentTarget&&!event.currentTarget.querySelector("[data-agent-native-dialog]"))closeSkillManager();}}>
         <section className="agent-reference-modal agent-skill-manager-dialog" role="dialog" aria-modal="true" aria-label="管理技能" onKeyDown={event=>{

@@ -1,7 +1,6 @@
 import { BookOpenCheck, ChevronLeft, Filter, LoaderCircle, PanelRight } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import { StandaloneAgentLauncher } from "./StandaloneAgentLauncher";
-import { CloudAgentsLauncher } from "./CloudAgentsLauncher";
 
 type SearchHeaderActionsProps = {
   showAgent?: boolean;
@@ -38,7 +37,7 @@ export function SearchHeaderActions({
 }: SearchHeaderActionsProps) {
   return (
     <div className="search-header-actions">
-      {!isMobileLayout && showAgent && <><StandaloneAgentLauncher /><CloudAgentsLauncher /></>}
+      {!isMobileLayout && showAgent && <StandaloneAgentLauncher />}
       {searching && <LoaderCircle className="spin muted" size={20} />}
       {!isMobileLayout && onOpenFlashcards && <button
         className={`icon-button flashcards-toggle ${flashcardsActive ? "active" : ""}`}

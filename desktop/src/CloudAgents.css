@@ -330,3 +330,258 @@ html[data-runtime-platform="android"] .app-shell.mobile-app-shell .main-content-
 
 .cloud-agents.is-mobile .cloud-agents-compose textarea:focus-visible { outline: none; }
 .cloud-agents.is-mobile .cloud-agents-compose:focus-within { border-color: var(--cloud-accent); }
+
+/* Desktop embedded personal-cloud view inside Hub 助手 (strictly scoped away from Android/mobile). */
+.cloud-agents.is-desktop-embedded {
+  flex: 1 1 auto;
+  min-height: 0;
+  --cloud-text: var(--agent-chat-ink, #18181b);
+  --cloud-muted: var(--agent-chat-secondary, #52525b);
+  --cloud-line: var(--agent-chat-border, #e6e8ee);
+  --cloud-accent: var(--hub-accent, #007aff);
+  --cloud-control: var(--agent-chat-surface, #ffffff);
+  --cloud-fill: var(--agent-chat-subtle, #f4f5f7);
+  background: var(--agent-chat-canvas, #ffffff);
+  color: var(--cloud-text);
+  font-family: var(--agent-chat-font, inherit);
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-context-strip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--cloud-line);
+  background: #f7f9fc;
+  font-size: 11.5px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-context-copy {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 160px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-context-copy > svg {
+  flex: none;
+  color: var(--cloud-accent);
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-context-copy > strong {
+  font-weight: 600;
+  color: var(--cloud-text);
+  white-space: nowrap;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-context-copy > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--cloud-muted);
+  font-size: 11px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-context-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-context-btn {
+  min-height: 26px;
+  min-width: 0;
+  padding: 3px 9px;
+  border-radius: 7px;
+  border: 1px solid var(--cloud-line);
+  background: var(--cloud-control);
+  color: var(--cloud-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-context-btn:hover {
+  color: var(--cloud-text);
+  background: var(--agent-chat-hover, #eef0f4);
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-context-btn.is-accent {
+  color: var(--cloud-accent);
+  border-color: color-mix(in srgb, var(--cloud-accent) 26%, var(--cloud-line));
+  background: color-mix(in srgb, var(--cloud-accent) 7%, var(--cloud-control));
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-context-btn.is-accent:hover {
+  background: color-mix(in srgb, var(--cloud-accent) 13%, var(--cloud-control));
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-header {
+  padding: 7px 14px;
+  gap: 6px;
+  background: var(--cloud-control);
+  backdrop-filter: none;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-header h1 {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-header span {
+  margin-top: 1px;
+  font-size: 11px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-header > button,
+.cloud-agents.is-desktop-embedded .cloud-agents-menu > summary {
+  min-width: 30px;
+  min-height: 30px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cloud-muted);
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-header > button:hover,
+.cloud-agents.is-desktop-embedded .cloud-agents-menu > summary:hover {
+  background: var(--agent-chat-hover, #eef0f4);
+  color: var(--cloud-text);
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-home {
+  padding: 14px 16px 20px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-home > h2 {
+  font-size: 15px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-lede {
+  margin: 4px 0 12px;
+  font-size: 12px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-connection-card {
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: var(--cloud-fill);
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-search {
+  margin-top: 12px;
+  border-radius: 10px;
+  padding: 0 10px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-search input {
+  min-height: 34px;
+  padding: 6px 0;
+  font-size: 12.5px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-scopes {
+  margin: 8px 0 12px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-scopes button {
+  min-height: 28px;
+  min-width: 0;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11.5px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-thread {
+  padding: 10px 6px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-thread-copy strong {
+  font-size: 13px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-thread-copy small {
+  font-size: 11.5px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-messages {
+  padding: 14px 16px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-turn {
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-user {
+  border-radius: 16px;
+  border: 1px solid var(--cloud-line);
+  background: var(--cloud-fill);
+  padding: 9px 13px;
+  font-size: 13.5px;
+  line-height: 1.62;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-answer {
+  font-size: 14px;
+  line-height: 1.72;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-answer-actions button {
+  min-height: 28px;
+  min-width: 0;
+  padding: 4px 9px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--cloud-muted);
+  font-size: 11.5px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-answer-actions button:hover {
+  background: var(--agent-chat-hover, #eef0f4);
+  color: var(--cloud-text);
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-process {
+  min-height: 30px;
+  padding: 4px 9px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-compose {
+  padding: 10px 14px 12px;
+  background: var(--cloud-control);
+  backdrop-filter: none;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-compose textarea {
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 13.5px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-compose button,
+.cloud-agents.is-desktop-embedded .cloud-agents-tools label {
+  min-height: 30px;
+  min-width: 30px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-sheet-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(6px);
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-sheet {
+  position: absolute;
+  inset: 12px;
+  z-index: 31;
+  border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+}
+.cloud-agents.is-desktop-embedded .cloud-agents-sheet.is-compact {
+  inset: auto 12px 12px;
+  max-height: calc(100% - 24px);
+}
+.cloud-agent-attachment-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.cloud-agent-attachment-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid var(--cloud-line);
+  border-radius: 8px;
+  background: var(--cloud-control);
+  color: var(--cloud-text);
+  font-size: 12px;
+  text-decoration: none;
+}
+.cloud-agent-attachment-link:hover {
+  background: var(--cloud-fill);
+}

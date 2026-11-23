@@ -265,5 +265,109 @@
 .agent-conversations.agent-history-popover .agent-history-action-menu > button:hover { background: var(--hub-control-fill); }
 .agent-conversations.agent-history-popover .agent-history-menu-divider { height: 1px; margin: 4px 5px; background: var(--hub-separator); }
 .agent-conversations.agent-history-popover .agent-history-action-menu > .agent-history-delete { color: var(--hub-danger, #b44a4a); }
+.agent-conversations.agent-history-popover .agent-history-source-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--hub-separator) 75%, transparent);
+}
+.agent-conversations.agent-history-popover .agent-history-source-tabs > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--agent-chat-subtle, var(--hub-control-fill));
+  color: var(--hub-text-secondary);
+  font: 500 11px/1.4 var(--agent-chat-font, inherit);
+}
+.agent-conversations.agent-history-popover .agent-history-source-tabs > button:hover {
+  background: var(--agent-chat-hover, var(--hub-control-fill));
+  color: var(--hub-text-primary);
+}
+.agent-conversations.agent-history-popover .agent-history-source-tabs > button[aria-pressed="true"] {
+  background: var(--agent-chat-ink, #18181b);
+  color: #fff;
+}
+.agent-conversations.agent-history-popover .agent-history-cloud-bar {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--hub-separator) 70%, transparent);
+}
+.agent-conversations.agent-history-popover .agent-history-cloud-bar > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  padding: 3px 8px;
+  border: 1px solid var(--hub-separator);
+  border-radius: 7px;
+  background: var(--hub-content-surface);
+  color: var(--hub-text-primary);
+  font: 500 11px/1.4 var(--agent-chat-font, inherit);
+}
+.agent-conversations.agent-history-popover .agent-history-cloud-bar > button:hover {
+  background: var(--agent-chat-hover, var(--hub-control-fill));
+}
+.agent-conversations.agent-history-popover .agent-history-cloud-pending {
+  flex: 0 0 auto;
+  padding: 6px 10px 0;
+}
+.agent-conversations.agent-history-popover .agent-history-cloud-pending > button {
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--hub-accent) 28%, var(--hub-separator));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--hub-accent) 7%, var(--hub-content-surface));
+  color: var(--hub-accent);
+  font: 500 11px/1.4 var(--agent-chat-font, inherit);
+  text-align: start;
+}
+.agent-conversations.agent-history-popover .agent-history-cloud-cta {
+  margin-top: 10px;
+  min-height: 30px;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--agent-chat-ink, #18181b);
+  color: #fff;
+  font: 500 11.5px/1.4 var(--agent-chat-font, inherit);
+}
+.agent-conversations.agent-history-popover .agent-history-open > .agent-history-title-cloud {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.agent-conversations.agent-history-popover .agent-history-open > .agent-history-title-cloud > svg {
+  flex: none;
+  color: var(--hub-accent, #007aff);
+}
+.agent-conversations.agent-history-popover .agent-history-open > .agent-history-title-cloud > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-conversations.agent-history-popover .agent-history-meta-cloud {
+  grid-area: 2 / 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 10.5px;
+  color: var(--hub-text-secondary);
+}
+.agent-conversations.agent-history-popover .agent-history-cloud-origin {
+  color: var(--hub-accent, #007aff);
+  white-space: nowrap;
+}
 @media (hover: none) { .agent-conversations.agent-history-popover .agent-history-actions { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .agent-conversations.agent-history-popover .agent-history-actions { transition: none; } }

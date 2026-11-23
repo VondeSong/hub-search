@@ -1,5 +1,6 @@
 import {invoke} from "@tauri-apps/api/core";
 import {save} from "@tauri-apps/plugin-dialog";
+import {Smartphone} from "lucide-react";
 import {useEffect,useRef,useState} from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -23,7 +24,25 @@ export function canHandoffAnalysis(item:FileAnalysis) {
   return item.available && !item.superseded && item.files.some(file=>file.type==="md" && file.bytes>0 && file.bytes<=48000);
 }
 
-export function AgentCloudHandoff({workId,item}:{workId:string;item:FileAnalysis}){
+export function AgentCloudHandoff({
+ workId,
+ item,
+ triggerLabel="手机继续查看",
+ triggerClassName,
+ showRequirementNote=true,
+ sentReceipt,
+ onSent,
+ onOpenCloudThread,
+}:{
+ workId:string;
+ item:FileAnalysis;
+ triggerLabel?:string;
+ triggerClassName?:string;
+ showRequirementNote?:boolean;
+ sentReceipt?:CloudHandoff;
+ onSent?:(handoff:CloudHandoff)=>void;
+ onOpenCloudThread?:(threadId:string)=>void;
+}){
  const [open,setOpen]=useState(false),[files,setFiles]=useState<string[]>([]),[report,setReport]=useState("");
  const [preview,setPreview]=useState<Preview>(),[busy,setBusy]=useState(false),[error,setError]=useState(""),[done,setDone]=useState<CloudHandoff>();
  const scope=useRef("");scope.current=workId+":"+item.executionId;
@@ -42,12 +61,16 @@ export function AgentCloudHandoff({workId,item}:{workId:string;item:FileAnalysis
   if(sending.current)return;const owner=scope.current;sending.current=true;setBusy(true);setError("");
   try{
    const request={work:workId,execution:item.executionId,files,report};
-   if(send&&preview){const result=await handoffCall<{handoff:CloudHandoff}>({...request,op:"send",confirm:true,expectedSha256:preview.manifestSha256,expectedId:preview.id,expectedEndpoint:preview.endpoint});if(scope.current===owner)setDone(result.handoff);}
+   if(send&&preview){
+    const result=await handoffCall<{handoff:CloudHandoff}>({...request,op:"send",confirm:true,expectedSha256:preview.manifestSha256,expectedId:preview.id,expectedEndpoint:preview.endpoint});
+    if(scope.current===owner){setDone(result.handoff);onSent?.(result.handoff);}
+   }
    else{const result=await handoffCall<Preview>({...request,op:"preview"});if(scope.current===owner)setPreview(result);}
   }catch(e){if(scope.current===owner)setError(message(e));}
   finally{sending.current=false;if(scope.current===owner)setBusy(false);}
  }
- return <><button type="button" disabled={!item.available||item.superseded||!reports.length} onClick={show}>手机继续查看</button>{!reports.length&&<small> · 需要一份不超过 48 KB 的 Markdown 报告</small>}
+ const published = sentReceipt?.state === "published";
+ return <><button type="button" className={triggerClassName} data-handoff-sent={published || undefined} disabled={!item.available||item.superseded||!reports.length} onClick={show}>{triggerClassName&&<Smartphone size={14} aria-hidden="true"/>}{triggerLabel}</button>{showRequirementNote&&!reports.length&&<small> · 需要一份不超过 48 KB 的 Markdown 报告</small>}
  {open&&<div className="hub-handoff-dialog"><CloudAgentSheet title="发送到个人云端" onClose={()=>setOpen(false)} busy={busy}>
   <div className="hub-handoff-form"><h3>{item.title} · 第 {item.revision||1} 版</h3>
    <p>选择手机上需要的成果副本。个人云端可根据报告继续讨论；其他文件供你取回。</p>
@@ -56,9 +79,89 @@ export function AgentCloudHandoff({workId,item}:{workId:string;item:FileAnalysis
    <p className="hub-handoff-note">这是交接时的固定副本。后续桌面资料变化不会自动更新；撤回本地授权也不会删除已导出的云端副本。云端可另行撤回，已保存的副本及历史回答会保留。</p>
    {error&&<p role="alert">{error}{preview&&"。若发送结果未确认，请保留原选择重试，系统会核对同一交接编号。"}</p>}
    {preview&&<section aria-label="本次交接预览"><h3>确认交接内容</h3><p>目标：{preview.endpoint}</p><p>{preview.manifest.files.length} 个文件 · {size(preview.manifest.files.reduce((n,f)=>n+f.bytes,0))} · 第 {preview.manifest.origin.revision} 版</p><details><summary>查看报告正文</summary><pre>{preview.manifest.report?.text}</pre></details><p className="hub-handoff-note">只上传以上所选成果、来源标题和哈希。没有交接原始表格、完整桌面聊天或桌面工具权限。云端续聊只读取这份报告正文。</p></section>}
-   {done?<p role="status">已交接并核对全部文件。手机进入「助手」，打开“{done.manifest.title}”查看报告与文件；可在同一云端会话继续提问。</p>:<footer><button type="button" disabled={busy||!files.length||!files.includes(report)} onClick={()=>void perform(false)}>{busy?"正在核对交接…":"预览交接内容"}</button>{preview&&<button type="button" disabled={busy} onClick={()=>void perform(true)}>确认发送到个人云端</button>}</footer>}
+   {done?<div className="hub-handoff-done"><p role="status">已交接并核对全部文件。手机进入「助手」，打开“{done.manifest.title}”查看报告与文件；可在同一云端会话继续提问。</p>{onOpenCloudThread&&<button type="button" onClick={()=>{setOpen(false);onOpenCloudThread(done.thread);}}>在云端会话中查看</button>}</div>:<footer><button type="button" disabled={busy||!files.length||!files.includes(report)} onClick={()=>void perform(false)}>{busy?"正在核对交接…":"预览交接内容"}</button>{preview&&<button type="button" className="hub-handoff-primary" disabled={busy} onClick={()=>void perform(true)}>确认发送到个人云端</button>}</footer>}
   </div>
  </CloudAgentSheet></div>}</>;
+}
+
+export type CloudHandoffReceiptStatus={state:"unverified"|"verified"|"cached"|"error";note?:string};
+
+export function CloudHandoffReceiptBanner({
+ handoff,
+ verification,
+ onOpenThread,
+ onSyncHandoff,
+ onWithdrawn,
+}:{
+ handoff:CloudHandoff;
+ verification?:CloudHandoffReceiptStatus;
+ onOpenThread?:(threadId:string)=>void;
+ onSyncHandoff?:(handoff:CloudHandoff,verification:CloudHandoffReceiptStatus)=>void;
+ onWithdrawn?:(handoffId:string)=>void;
+}){
+ const [busy,setBusy]=useState(false),[checking,setChecking]=useState(false),[error,setError]=useState("");
+ async function checkCloudState(){
+  if(busy||checking)return;
+  setChecking(true);setError("");
+  try{
+   const data=await invoke<{cached?:boolean;accessDenied?:boolean;error?:string;thread?:{handoff?:CloudHandoff|null}|null}>("cloud_agents",{action:{op:"read",thread:handoff.thread}});
+   if(data?.accessDenied){
+    const msg=data.error||"云端访问已撤销，无法确认当前交接状态。";
+    setError(msg);
+    onSyncHandoff?.(handoff,{state:"error",note:msg});
+    return;
+   }
+   const remote=data?.thread?.handoff;
+   if(!data?.thread||!remote||remote.state==="withdrawn"){
+    onSyncHandoff?.({...handoff,state:"withdrawn"},{state:"verified"});
+    return;
+   }
+   if(data.cached){
+    onSyncHandoff?.(remote,{state:"cached",note:"当前仅读取到本机缓存，恢复连接后再核对云端是否已撤回。"});
+   }else{
+    onSyncHandoff?.(remote,{state:"verified",note:"已联机核对：云端交接当前仍有效。"});
+   }
+  }catch(e){
+   const msg=`暂无法核对云端状态：${message(e)}`;
+   setError(msg);
+   onSyncHandoff?.(handoff,{state:"error",note:msg});
+  }finally{setChecking(false);}
+ }
+ async function withdraw(){
+  if(busy||checking)return;
+  if(!window.confirm("撤回这份云端交接？将移除 Hub 云端交接副本，停止下载和续聊。此前已发给模型的内容、历史回答及已保存的副本保留，原桌面成果不变。"))return;
+  setBusy(true);setError("");
+  try{
+   await handoffCall({op:"withdraw",thread:handoff.id,confirm:true});
+   onWithdrawn?.(handoff.id);
+  }catch(e){setError(message(e));}
+  finally{setBusy(false);}
+ }
+ const label=`「${handoff.manifest.title}」第 ${handoff.manifest.origin.revision} 版`;
+ if(handoff.state==="withdrawn"){
+  return <div className="hub-handoff-receipt is-withdrawn" role="status">
+   <div className="hub-handoff-receipt-copy">
+    <Smartphone size={14} aria-hidden="true"/>
+    <span>已撤回{label}的云端交接副本（已停止手机端下载与续聊，桌面原成果与历史回答保留）</span>
+   </div>
+   {onOpenThread&&<div className="hub-handoff-receipt-actions">
+    <button type="button" onClick={()=>onOpenThread(handoff.thread)}>查看原云端记录</button>
+   </div>}
+  </div>;
+ }
+ return <div className={`hub-handoff-receipt${verification?.state==="error"||verification?.state==="cached"?" is-unverified":""}`} aria-label="云端交接回执">
+  <div className="hub-handoff-receipt-copy">
+   <Smartphone size={14} aria-hidden="true"/>
+   <span>{label}已发至个人云端（固定静态副本 · {handoff.manifest.files.length} 个文件，未上传原资料库）</span>
+  </div>
+  <div className="hub-handoff-receipt-actions">
+   <button type="button" disabled={busy||checking} onClick={()=>void checkCloudState()}>{checking?"正在核对…":"核对云端状态"}</button>
+   {onOpenThread&&<button type="button" disabled={busy||checking} onClick={()=>onOpenThread(handoff.thread)}>打开云端会话</button>}
+   <button type="button" className="hub-handoff-withdraw-btn" disabled={busy||checking} onClick={()=>void withdraw()}>{busy?"正在撤回…":"撤回交接"}</button>
+  </div>
+  {verification?.note&&!error&&<p className="hub-handoff-receipt-status" role="status">{verification.note}</p>}
+  {error&&<p className="hub-handoff-receipt-error" role="alert">{error}</p>}
+ </div>;
 }
 
 function HandoffFile({handoff,file}:{handoff:CloudHandoff;file:FileMeta}){
