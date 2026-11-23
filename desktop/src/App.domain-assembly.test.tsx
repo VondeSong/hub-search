@@ -205,3 +205,91 @@ it("preserves the saved library scope after a failed local registry read and rec
   expect(invokeMock.mock.calls.filter(call => call[0] === "list_libraries")).toHaveLength(2);
   expect(invokeMock.mock.calls.filter(call => call[0] === "restore_connections")).toHaveLength(1);
 });
+
+it("syncs or clears search list selection and keeps keyboard/focus actions aligned when opening from sidebar Recently Opened", async () => {
+  const original = invokeMock.getMockImplementation()!;
+  const searchA: SearchResult = { ...result, id: "hit-a", entityKey: "craft:a", documentId: "doc-a", title: "搜索命中 A", documentTitle: "搜索命中 A", snippet: "线束 A" };
+  const searchB: SearchResult = { ...result, id: "hit-b", entityKey: "craft:b", documentId: "doc-b", title: "搜索命中 B", documentTitle: "搜索命中 B", snippet: "线束 B" };
+  const recentOnly: SearchResult = { ...result, id: "recent-x", entityKey: "craft:x", documentId: "doc-x", title: "最近独有文档 X", documentTitle: "最近独有文档 X", snippet: "历史预览" };
+  localStorage.setItem("hub-desktop-sidebar-enabled-v1", "true");
+  localStorage.setItem("hub-desktop-view-history-v1", JSON.stringify([recentOnly, searchB]));
+  const openedDocuments: string[] = [];
+  invokeMock.mockImplementation((command, args) => {
+    if (command === "local_search") return Promise.resolve([searchA, searchB]);
+    if (command === "local_document") {
+      const docId = (args as { documentId?: string })?.documentId;
+      return Promise.resolve(`# 正文 ${docId}\n\n## 第一节\n\n## 第二节`);
+    }
+    if (command === "open_result") {
+      openedDocuments.push((args as { documentId?: string })?.documentId ?? "");
+      return Promise.resolve({});
+    }
+    if (command === "hide_window") return Promise.resolve();
+    if (command === "result_link") return Promise.resolve("craftdocs://open?blockId=doc");
+    return original(command, args);
+  });
+
+  const selectedRows = () => host.querySelectorAll(".quick-craft-result-block.selected, .grouped-page-hit.selected, .result-group.selected, .recent-item.selected");
+
+  await act(async () => root.render(<App />)); await advance(400);
+  const input = host.querySelector<HTMLInputElement>('input[aria-label^="搜索"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "线束");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await advance(400);
+
+  // Initially searchA is highlighted
+  expect(selectedRows()).toHaveLength(1);
+  expect(selectedRows()[0].closest(".quick-craft-result-group")?.textContent).toContain("搜索命中 A");
+
+  // Expand sidebar Recently Opened and click recentOnly (not in visible search results)
+  const recentToggle = host.querySelector<HTMLButtonElement>(".sidebar-recent-toggle")!;
+  await act(async () => recentToggle.click());
+  const recentButtons = Array.from(host.querySelectorAll<HTMLButtonElement>(".sidebar-recent-open"));
+  expect(recentButtons.map(b => b.textContent)).toEqual(["最近独有文档 X", "搜索命中 B"]);
+
+  await act(async () => recentButtons[0].click()); await advance(100);
+  // Stale blue selection on searchA is cleared, preview shows recentOnly
+  expect(selectedRows()).toHaveLength(0);
+  expect(host.querySelector(".preview-pane .preview-heading")?.textContent).toContain("最近独有文档 X");
+
+  // Hovering searchA while previewing recentOnly does not resurrect stale blue selection
+  const firstHit = host.querySelector<HTMLElement>(".quick-craft-result-block, .grouped-page-hit")!;
+  await act(async () => firstHit.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })));
+  expect(selectedRows()).toHaveLength(0);
+
+  // Focus mode toggles on .workspace.with-preview and Escape restores split without closing preview
+  const focusBtn = host.querySelector<HTMLButtonElement>(".preview-focus-btn")!;
+  await act(async () => focusBtn.click());
+  expect(host.querySelector(".workspace.with-preview.preview-focus-mode")).not.toBeNull();
+  await act(async () => host.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })));
+  expect(host.querySelector(".workspace.with-preview.preview-focus-mode")).toBeNull();
+  expect(host.querySelector(".workspace.with-preview")).not.toBeNull();
+
+  // Pressing Enter opens recentOnly (matches actual preview), NOT searchA
+  await act(async () => host.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })));
+  await advance(2600);
+  expect(openedDocuments).toEqual(["doc-x"]);
+
+  // Pressing ArrowDown selects searchA, switches preview to searchA, and Enter opens searchA
+  await act(async () => host.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true })));
+  await advance(100);
+  expect(selectedRows()).toHaveLength(1);
+  expect(selectedRows()[0].closest(".quick-craft-result-group")?.textContent).toContain("搜索命中 A");
+  expect(host.querySelector(".preview-pane .preview-heading")?.textContent).toContain("搜索命中 A");
+  await act(async () => host.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })));
+  await advance(2600);
+  expect(openedDocuments).toEqual(["doc-x", "doc-a"]);
+
+  // Clicking searchB from Recently Opened (present in visible results) syncs left selection to searchB
+  const recentButtonsAfter = Array.from(host.querySelectorAll<HTMLButtonElement>(".sidebar-recent-open"));
+  const searchBButton = recentButtonsAfter.find(b => b.textContent === "搜索命中 B")!;
+  await act(async () => searchBButton.click()); await advance(100);
+  expect(selectedRows()).toHaveLength(1);
+  expect(selectedRows()[0].closest(".quick-craft-result-group")?.textContent).toContain("搜索命中 B");
+  expect(host.querySelector(".preview-pane .preview-heading")?.textContent).toContain("搜索命中 B");
+  await act(async () => host.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })));
+  await advance(2600);
+  expect(openedDocuments).toEqual(["doc-x", "doc-a", "doc-b"]);
+});

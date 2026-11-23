@@ -33,6 +33,7 @@ import { canHandleSearchWorkspaceKeyboard, isInsideKeyboardDialog } from "./AppK
 import "./WorkspaceRefresh.css";
 import "./InterfaceSelection.css";
 import "./LiquidWorkspace.css";
+import "./BaseWhiteTheme.css";
 import "./DisplayPreferences.css";
 import "./JournalWorkspace.css";
 import "./MobileExperience.css";
@@ -61,10 +62,11 @@ import { LibraryIconCrop } from "./LibraryIconCrop";
 import { MobileBrowse, MobileConnections, MobileNavigation, type MobileBrowseView, type MobileDestination } from "./MobileNavigation";
 import { providerName, providerUnavailableLabel } from "./ProviderLabels";
 import { EMPTY_PREVIEW_NAVIGATION, movePreviewNavigation, pushPreviewNavigation } from "./PreviewNavigation";
+import { pageFavoriteKey } from "./PageFavorites";
 import { runtimeCapabilities } from "./RuntimePlatform";
 import { queryTerms, resultDisplayTitle, resultSectionTitle } from "./SearchResultPresentation";
 import { resultMatchTerms, searchResultSummary } from "./QuickSearchGrouping";
-import { deriveSearchWorkspaceResults, journalDateKey } from "./SearchWorkspacePresentation";
+import { deriveSearchWorkspaceResults, findMatchingResultIndex, journalDateKey } from "./SearchWorkspacePresentation";
 import { buildSearchSuggestions, searchSyntaxHints, type SearchSuggestion } from "./SearchSuggestions";
 import { type SmartCollection } from "./SmartCollections";
 import type { LibrarySummary, SearchResult } from "./SearchTypes";
@@ -159,6 +161,7 @@ function AppContent() {
   const [previewNavigation, setPreviewNavigation] = useState(EMPTY_PREVIEW_NAVIGATION);
   const [previewPinned, setPreviewPinned] = useState(false);
   const [previewHistoryActive, setPreviewHistoryActive] = useState(false);
+  const [previewFocusMode, setPreviewFocusMode] = useState(false);
   const isMobileLayout = runtimeCapabilities.mobile;
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [desktopSidebarView, setDesktopSidebarView] = useState<DesktopSidebarView>("home");
@@ -235,28 +238,56 @@ function AppContent() {
   }, [spaces.length, selectDesktopSidebarView]);
 
   const resizePreviewPanes = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
     const workspace = workspaceRef.current;
     if (!workspace) return;
     event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
+    const handle = event.currentTarget;
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    handle.setPointerCapture?.(pointerId);
     const bounds = workspace.getBoundingClientRect();
+    if (bounds.width <= 0) return;
     const minimum = Math.min(42, Math.max(25, (320 / bounds.width) * 100));
-    const update = (clientX: number) => {
-      const next = Math.min(100 - minimum, Math.max(minimum, ((clientX - bounds.left) / bounds.width) * 100));
-      setResultsPanePercent(next);
+    const clamp = (clientX: number) =>
+      Math.min(100 - minimum, Math.max(minimum, ((clientX - bounds.left) / bounds.width) * 100));
+    let dragged = false;
+    let latest = resultsPanePercent;
+    const move = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
+      if (!dragged) {
+        if (Math.abs(moveEvent.clientX - startX) < 3) return;
+        dragged = true;
+        document.body.classList.add("resizing-panes");
+      }
+      latest = clamp(moveEvent.clientX);
+      setResultsPanePercent(latest);
     };
-    const move = (moveEvent: PointerEvent) => update(moveEvent.clientX);
-    const finish = (upEvent: PointerEvent) => {
-      update(upEvent.clientX);
+    const cleanup = () => {
       document.body.classList.remove("resizing-panes");
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", finish);
-      savePreviewSplit(Math.min(100 - minimum, Math.max(minimum, ((upEvent.clientX - bounds.left) / bounds.width) * 100)));
+      window.removeEventListener("pointercancel", cancel);
+      if (handle.hasPointerCapture?.(pointerId)) handle.releasePointerCapture(pointerId);
     };
-    document.body.classList.add("resizing-panes");
+    const finish = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== pointerId) return;
+      if (dragged) {
+        latest = clamp(upEvent.clientX);
+        setResultsPanePercent(latest);
+        savePreviewSplit(latest);
+      }
+      cleanup();
+    };
+    const cancel = (cancelEvent: PointerEvent) => {
+      if (cancelEvent.pointerId !== pointerId) return;
+      if (dragged) savePreviewSplit(latest);
+      cleanup();
+    };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", finish);
-  }, [savePreviewSplit, setResultsPanePercent]);
+    window.addEventListener("pointercancel", cancel);
+  }, [resultsPanePercent, savePreviewSplit, setResultsPanePercent]);
   const { indexStatus, refreshStatus } = useIndexStatus(ready, currentStatusSpaceArg);
   const { storageInfo, storageMode, setStorageMode, storageCustomPath, setStorageCustomPath, changingStorage, chooseStorageFolder, applyStorageLocation, revealStorageLocation, cleaning, cleanupLocalData, retryingOcr, retryFailedOcr, retryingFailedJobs, retryFailedJobs, dismissingFailedJobs, dismissFailedJobs, restartingWatcher, restartWatcher, exportingLibraryId, exportProgress, lastExportPath, exportError, exportCraftVault, chooseExportDirectory, openExportInObsidian, openExportPath, maintenanceMessage, setMaintenanceMessage } = useStorageMaintenance({ statusSpaceId: currentStatusSpaceArg, refreshStatus, settingsOpen: showConnection });
   useEffect(() => { if (maintenanceMessage) showOperationStatus(maintenanceMessage, "success", 6000); }, [maintenanceMessage, showOperationStatus]);
@@ -354,9 +385,12 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
     setPreviewNavigation((current) => pushPreviewNavigation(current, result));
   }, []);
   const navigatePreviewHistory = useCallback((direction: -1 | 1) => {
-    setPreviewNavigation((current) => movePreviewNavigation(current, direction));
+    const next = movePreviewNavigation(previewNavigation, direction);
+    const target = next.index >= 0 ? next.entries[next.index] : undefined;
+    setPreviewNavigation(next);
     setPreviewHistoryActive(true);
-  }, []);
+    setSelectedIndex(findMatchingResultIndex(visibleResults, target));
+  }, [previewNavigation, visibleResults]);
   const togglePreviewPinned = useCallback(() => {
     setPreviewPinned((current) => {
       if (!current && previewSelected) pushPreviewHistory(previewSelected);
@@ -374,13 +408,54 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
     && desktopSidebarView === "tags"
     && !selectedSidebarTag
     && !query.trim();
+  const preservePreviewOnViewSwitch = useRef(false);
+  const preserveHistoryOnQueryChange = useRef(false);
+  const pendingSelectionSyncRef = useRef<SearchResult | null>(null);
+  const prevQueryRef = useRef(query);
   useEffect(() => {
+    if (prevQueryRef.current === query) return;
+    prevQueryRef.current = query;
+    if (preserveHistoryOnQueryChange.current) {
+      preserveHistoryOnQueryChange.current = false;
+      return;
+    }
+    pendingSelectionSyncRef.current = null;
+    setPreviewHistoryActive(false);
+  }, [query]);
+  useEffect(() => {
+    if (preservePreviewOnViewSwitch.current) {
+      preservePreviewOnViewSwitch.current = false;
+      return;
+    }
     if (desktopSidebarEnabled && desktopSidebarView === "home" && !query.trim()) {
       setSelectedIndex(-1);
       setPreviewOpen(false);
     }
   }, [desktopSidebarEnabled, desktopSidebarView, query]);
+  useEffect(() => {
+    const target = pendingSelectionSyncRef.current;
+    if (!target) return;
+    if (desktopSidebarView === "tasks" || desktopSidebarView === "collections" || desktopSidebarView === "insights" || desktopSidebarView === "flashcards" || desktopSidebarView === "libraries") {
+      return;
+    }
+    pendingSelectionSyncRef.current = null;
+    const matchedIndex = findMatchingResultIndex(visibleResults, target);
+    setSelectedIndex(matchedIndex);
+    if (matchedIndex >= 0 && (visibleResults[matchedIndex].entityKey === target.entityKey || visibleResults[matchedIndex].id === target.id)) {
+      setPreviewHistoryActive(false);
+    }
+  }, [desktopSidebarView, visibleResults]);
   const showPreviewPane = librariesActive ? Boolean(browsingPreview) : previewOpen && (!isMobileLayout || mobilePreviewOpen) && (!showingTagOverview || previewHistoryActive) && (!!previewSelected || visibleResults.length > 0);
+  const activeResult = (showPreviewPane ? previewSelected : undefined) ?? selected;
+  useEffect(() => {
+    if (!showPreviewPane) setPreviewFocusMode(false);
+  }, [showPreviewPane]);
+  useEffect(() => {
+    setPreviewFocusMode(false);
+  }, [desktopSidebarView]);
+  const togglePreviewFocus = useCallback(() => setPreviewFocusMode((current) => !current), []);
+  const toggleSnippetFavorite = useCallback((result: SearchResult) => toggleFavorite({ ...result, favoriteKind: "snippet" }), [toggleFavorite]);
+  const notifyPreviewAction = useCallback((message: string, tone: "success" | "error" = "success") => showOperationStatus(message, tone, tone === "error" ? 6000 : 2500), [showOperationStatus]);
   const selectedMatchTerms = useMemo(
     () => previewSelected ? resultMatchTerms(previewSelected, query) : queryTerms(query),
     [previewSelected, query],
@@ -552,6 +627,11 @@ useEffect(() => {
           setQuery("");
           return;
         }
+        if (previewFocusMode) {
+          if (document.querySelector(".preview-toc-popover, details.preview-more-menu[open]")) return;
+          setPreviewFocusMode(false);
+          return;
+        }
         if (isMobileLayout && mobilePreviewOpen) setMobilePreviewOpen(false);
         else if (spaceMenuOpen) setSpaceMenuOpen(false);
         else if (searchScopeMenuOpen) setSearchScopeMenuOpen(false);
@@ -595,7 +675,7 @@ useEffect(() => {
         const direction = event.shiftKey ? -1 : 1;
         if (previewMatchCount) navigatePreviewMatch(direction);
         else pendingPreviewDirection.current = direction;
-      } else if (event.key === "F12" && selected) {
+      } else if (event.key === "F12" && activeResult) {
         event.preventDefault();
         event.stopImmediatePropagation();
         pendingPreviewDirection.current = event.shiftKey ? -1 : 1;
@@ -611,39 +691,48 @@ useEffect(() => {
         setPreviewOpen((open) => !open);
       } else if (event.key === "ArrowDown" || event.key === "PageDown") {
         event.preventDefault();
+        if (visibleResults.length === 0) return;
+        setPreviewHistoryActive(false);
         setPreviewOpen(true);
         const step = event.key === "PageDown" ? 8 : 1;
-        setSelectedIndex((index) => Math.min(index + step, Math.max(visibleResults.length - 1, 0)));
+        setSelectedIndex((index) => index < 0 ? 0 : Math.min(index + step, visibleResults.length - 1));
       } else if (event.key === "ArrowUp" || event.key === "PageUp") {
         event.preventDefault();
+        if (visibleResults.length === 0) return;
+        setPreviewHistoryActive(false);
         setPreviewOpen(true);
         const step = event.key === "PageUp" ? 8 : 1;
-        setSelectedIndex((index) => Math.max(index - step, 0));
+        setSelectedIndex((index) => index < 0 ? 0 : Math.max(index - step, 0));
       } else if (event.key === "Home") {
         event.preventDefault();
+        if (visibleResults.length === 0) return;
+        setPreviewHistoryActive(false);
         setPreviewOpen(true);
         setSelectedIndex(0);
       } else if (event.key === "End") {
         event.preventDefault();
+        if (visibleResults.length === 0) return;
+        setPreviewHistoryActive(false);
         setPreviewOpen(true);
-        setSelectedIndex(Math.max(visibleResults.length - 1, 0));
-      } else if (event.key === "Enter" && selected && !searchFocused && !editing) {
+        setSelectedIndex(visibleResults.length - 1);
+      } else if (event.key === "Enter" && activeResult && !searchFocused && !editing) {
         event.preventDefault();
         rememberQuery(query);
-        openSelectedResult(selected);
+        openSelectedResult(activeResult);
       } else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey && !searchFocused && !editing) {
         searchInput.current?.focus();
       }
     }
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [insightsActive, collectionsActive, commandPaletteOpen, dateMenuOpen, filtersOpen, flashcardsActive, folderMenuOpen, isMobileLayout, librariesActive, mobileBrowseOpen, mobilePreviewOpen, navigatePreviewHistory, navigatePreviewMatch, openHubSearch, openSelectedResult, previewMatchCount, previewNavigation.entries.length, previewNavigation.index, previewOpen, query, rememberQuery, searchFocused, searchScopeMenuOpen, selected, showConnection, showingTagOverview, spaceMenuOpen, spaces.length, tasksActive, visibleResults.length]);
+  }, [activeResult, insightsActive, collectionsActive, commandPaletteOpen, dateMenuOpen, filtersOpen, flashcardsActive, folderMenuOpen, isMobileLayout, librariesActive, mobileBrowseOpen, mobilePreviewOpen, navigatePreviewHistory, navigatePreviewMatch, openHubSearch, openSelectedResult, previewFocusMode, previewMatchCount, previewNavigation.entries.length, previewNavigation.index, previewOpen, query, rememberQuery, searchFocused, searchScopeMenuOpen, showConnection, showingTagOverview, spaceMenuOpen, spaces.length, tasksActive, visibleResults.length]);
 
   const restoredResultIndex = useRef<number | null>(null);
   const restoreResultSelection = useCallback((index: number) => {
+    if (previewHistoryActive || pendingSelectionSyncRef.current) return;
     restoredResultIndex.current = index;
     setSelectedIndex(index);
-  }, []);
+  }, [previewHistoryActive]);
   useEffect(() => {
     if (restoredResultIndex.current !== null) {
       if (selectedIndex === restoredResultIndex.current) restoredResultIndex.current = null;
@@ -809,21 +898,21 @@ useEffect(() => {
       {
         id: "result:copy-link",
         label: "复制当前结果链接",
-        description: selected ? resultDisplayTitle(selected) : "尚未选择搜索结果",
+        description: activeResult ? resultDisplayTitle(activeResult) : "尚未选择搜索结果",
         category: "result",
         keywords: ["copy", "link", "链接"],
-        disabled: !selected,
+        disabled: !activeResult,
         run: () => void copySelectedLink(),
       },
       {
         id: "result:open-original",
         label: "在原应用中打开",
-        description: selected ? `${providerName(selected.provider)} · ${resultDisplayTitle(selected)}` : "尚未选择搜索结果",
+        description: activeResult ? `${providerName(activeResult.provider)} · ${resultDisplayTitle(activeResult)}` : "尚未选择搜索结果",
         category: "result",
         shortcut: "Enter",
         keywords: ["open", "original", "原文"],
-        disabled: !canOpenResultSource(selected, spaces, runtimeCapabilities.platform),
-        run: () => openSelectedResult(selected),
+        disabled: !canOpenResultSource(activeResult, spaces, runtimeCapabilities.platform),
+        run: () => openSelectedResult(activeResult),
       },
       {
         id: "view:preview",
@@ -846,9 +935,9 @@ useEffect(() => {
     ];
     return items;
   }, [
-    activeFilterCount, activeSpaces.length, changeDesktopSidebarSetting, copySelectedLink,
+    activeFilterCount, activeResult, activeSpaces.length, changeDesktopSidebarSetting, copySelectedLink,
     desktopSidebarEnabled, favoriteResults.length, filtersOpen, journalSummary.count,
-    openSelectedResult, previewOpen, refreshIndex, selected, selectedLibraryIds,
+    openSelectedResult, previewOpen, refreshIndex, selectedLibraryIds,
     showOperationStatus, sidebarTags.length, spaces, syncing,
   ]);
   const shortcutHelpGroups = useMemo<ShortcutHelpGroup[]>(() => [
@@ -979,6 +1068,43 @@ useEffect(() => {
     setShowConnection(true);
   }, []);
 
+  const openPinnedLibrary = useCallback((libraryId: string) => {
+    setFlashcardsStandaloneOpen(false);
+    setLibraryPosition({ libraryId, folderId: "" });
+    selectDesktopSidebarView("libraries");
+  }, [selectDesktopSidebarView, setLibraryPosition]);
+
+  const openPinnedResult = useCallback((result: SearchResult) => {
+    rememberViewedResult(result);
+    pushPreviewHistory(result);
+    setPreviewPinned(false);
+    setPreviewOpen(true);
+    setFlashcardsStandaloneOpen(false);
+    const switchingFromStandalone = desktopSidebarView === "tasks" || desktopSidebarView === "collections" || desktopSidebarView === "insights" || desktopSidebarView === "flashcards" || desktopSidebarView === "libraries";
+    if (switchingFromStandalone) {
+      preservePreviewOnViewSwitch.current = true;
+      if (query) preserveHistoryOnQueryChange.current = true;
+      pendingSelectionSyncRef.current = result;
+      setSelectedIndex(-1);
+      setPreviewHistoryActive(true);
+      moduleQueries.current[desktopSidebarView] = query;
+      setQuery("");
+      setDesktopSidebarView("home");
+      return;
+    }
+    const matchedIndex = findMatchingResultIndex(visibleResults, result);
+    setSelectedIndex(matchedIndex);
+    const exactMatch = matchedIndex >= 0 && (visibleResults[matchedIndex].entityKey === result.entityKey || visibleResults[matchedIndex].id === result.id);
+    setPreviewHistoryActive(!exactMatch);
+    if (desktopSidebarView === "history") {
+      pendingSelectionSyncRef.current = result;
+    }
+  }, [desktopSidebarView, pushPreviewHistory, query, rememberViewedResult, setQuery, visibleResults]);
+
+  const hoverResult = useCallback((index: number) => {
+    if (!previewPinned && !previewHistoryActive) setSelectedIndex(index);
+  }, [previewHistoryActive, previewPinned]);
+
   const selectDesktopJournalDate = useCallback((date: string) => {
     setSelectedJournalDate(date);
     setSelectedIndex(0);
@@ -1019,6 +1145,7 @@ useEffect(() => {
   const workspaceProps: WorkspaceProps = {
     workspaceRef,
     showPreviewPane,
+    previewFocusMode,
     resultsPanePercent,
     onResizePreviewPanes: resizePreviewPanes,
     onResetPreviewSplit: resetPreviewSplit,
@@ -1047,12 +1174,14 @@ useEffect(() => {
       showSelection: previewOpen || Boolean(query.trim()) || desktopSidebarView !== "home",
       isMobileLayout,
       semanticRecentDates: appSettings.semanticRecentDates,
-      onHoverResult: setSelectedIndex,
+      onHoverResult: hoverResult,
       onSelectResult: selectResultForPreview,
       onOpenResult: openSelectedResult,
       onPreviewEvidence: (result) => {
         rememberViewedResult(result);
         pushPreviewHistory(result);
+        const matchedIndex = findMatchingResultIndex(visibleResults, result);
+        setSelectedIndex(matchedIndex);
         setPreviewHistoryActive(true);
         setPreviewPinned(false);
         setPreviewOpen(true);
@@ -1167,6 +1296,13 @@ useEffect(() => {
       canNavigateJournalOlder: desktopSidebarView === "journals" && journalDates.some((item) => item.date < previewJournalDate),
       canNavigateJournalNewer: desktopSidebarView === "journals" && journalDates.some((item) => item.date > previewJournalDate),
       onNavigateJournalDate: navigatePreviewJournalDate,
+      isFavorite: previewSelected ? favoriteIds.has(pageFavoriteKey(previewSelected)) : false,
+      snippetFavoriteIds: !isMobileLayout ? snippetFavoriteIds : undefined,
+      onToggleFavorite: !isMobileLayout ? toggleFavorite : undefined,
+      onToggleSnippetFavorite: !isMobileLayout ? toggleSnippetFavorite : undefined,
+      previewFocusMode,
+      onTogglePreviewFocus: !isMobileLayout ? togglePreviewFocus : undefined,
+      onNotify: notifyPreviewAction,
     },
   };
   const settingsContentProps: SettingsContentProps = {
@@ -1342,6 +1478,8 @@ useEffect(() => {
       onPreview={previewLibraryResult}
       onClosePreview={() => setLibraryPreview(undefined)}
       onExit={() => selectDesktopSidebarView("home")}
+      focusMode={previewFocusMode}
+      onExitFocusMode={() => setPreviewFocusMode(false)}
       preview={browsingPreview && <PreviewPane {...workspaceProps.previewPaneProps} label="文档预览" onClose={() => setLibraryPreview(undefined)} />}
     /> : insightsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开洞察…</div>}><LazyInsightsWorkspace/></Suspense> : collectionsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开阅读…</div>}><LazyCollectionsWorkspace
       initialItemKey={moduleTarget?.kind==="reading"?moduleTarget.id:undefined}
@@ -1357,6 +1495,10 @@ useEffect(() => {
       onOpenResult={openSelectedResult}
       onStatusMessage={showOperationStatus}
       onToggleDesktopSidebar={!isMobileLayout ? () => changeDesktopSidebarSetting(!desktopSidebarEnabled) : undefined}
+      favoriteIds={favoriteIds}
+      snippetFavoriteIds={snippetFavoriteIds}
+      onToggleFavorite={toggleFavorite}
+      onToggleSnippetFavorite={toggleSnippetFavorite}
     /></Suspense> : flashcardsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开闪卡…</div>}><LazyFlashcardsWorkspace
       initialCardId={moduleTarget?.kind==="flashcard"?moduleTarget.id:undefined}
       onSearchTargetHandled={clearModuleTarget}
@@ -1390,7 +1532,7 @@ useEffect(() => {
       syntaxHints,
       filterSummary,
       searching,
-      selected,
+      selected: activeResult,
       selectedLibraryIds,
       showPreviewPane,
       spaceMenuOpen,
@@ -1526,6 +1668,10 @@ useEffect(() => {
       onSelectAllLibrariesOnly: selectAllLibraries,
       onManageLibraries: openDesktopLibraryManagement,
       favoriteCount: favoriteResults.length,
+      favoriteResults,
+      viewHistory,
+      onOpenPinnedLibrary: openPinnedLibrary,
+      onOpenPinnedResult: openPinnedResult,
       taskOpenCount,
       journalCount: journalSummary.count,
       journalDates,

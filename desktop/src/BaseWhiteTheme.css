@@ -1,0 +1,902 @@
+/* =====================================================================
+   Hub Desktop Base White Design System (Phase 1)
+   Strictly scoped to desktop; Android mobile layouts remain untouched.
+   ===================================================================== */
+
+html:not([data-runtime-platform="android"]) {
+  --hub-canvas: #F5F6F8;
+  --hub-paper: #FFFFFF;
+  --hub-hairline: rgba(15, 23, 42, 0.08);
+  --hub-hairline-strong: rgba(15, 23, 42, 0.13);
+  --hub-text: #18181B;
+  --hub-text-primary: #18181B;
+  --hub-text-secondary: #52525B;
+  --hub-text-tertiary: #8A8F98;
+  --hub-secondary: #52525B;
+  --hub-line: rgba(15, 23, 42, 0.08);
+  --hub-separator: rgba(15, 23, 42, 0.08);
+  --hub-sidebar-material: #F7F8FA;
+  --hub-toolbar-material: rgba(255, 255, 255, 0.94);
+  --hub-content-surface: #FFFFFF;
+  --hub-control-fill: #F2F4F7;
+  --hub-accent: #007AFF;
+  --hub-accent-soft: rgba(0, 122, 255, 0.085);
+  --hub-selection: rgba(0, 122, 255, 0.085);
+  --hub-selection-strong: rgba(0, 122, 255, 0.14);
+  --hub-row-selection-bg: rgba(0, 122, 255, 0.085);
+  --hub-row-selection-text: #18181B;
+  --hub-row-selection-shadow: inset 2px 0 0 #007AFF;
+  --hub-paper-shadow: 0 2px 10px -2px rgba(15, 23, 42, 0.05), 0 0 0 0.5px rgba(15, 23, 42, 0.08);
+  --hub-popover-shadow: 0 12px 32px -6px rgba(15, 23, 42, 0.14), 0 0 0 0.5px rgba(15, 23, 42, 0.08);
+}
+
+/* 1. Shell & Sidebar Base White Surfaces */
+html:not([data-runtime-platform="android"]) .desktop-app-shell {
+  background: var(--hub-canvas);
+  border-color: var(--hub-hairline-strong);
+  box-shadow: 0 14px 40px -10px rgba(15, 23, 42, 0.14), 0 1px 4px rgba(15, 23, 42, 0.06);
+}
+
+html:not([data-runtime-platform="android"]) .workspace-rail {
+  background: #F6F7F9;
+  border-right: 0.5px solid var(--hub-hairline);
+}
+
+html:not([data-runtime-platform="android"]) .workspace-rail button {
+  color: var(--hub-text-secondary);
+}
+
+html:not([data-runtime-platform="android"]) .workspace-rail button:hover {
+  background: rgba(15, 23, 42, 0.055);
+  color: var(--hub-text-primary);
+}
+
+html:not([data-runtime-platform="android"]) .workspace-rail button.active {
+  background: var(--hub-paper);
+  color: var(--hub-accent);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.09), 0 0 0 0.5px rgba(15, 23, 42, 0.07);
+}
+
+html:not([data-runtime-platform="android"]) .desktop-sidebar {
+  background: var(--hub-sidebar-material);
+  backdrop-filter: none;
+  border-right: 0.5px solid var(--hub-hairline);
+  box-shadow: none;
+  padding: 12px 10px;
+}
+
+html:not([data-runtime-platform="android"]) .sidebar-primary-nav button {
+  min-height: 34px;
+  height: 34px;
+  color: var(--hub-text-secondary);
+  border-radius: 8px;
+}
+
+html:not([data-runtime-platform="android"]) .sidebar-primary-nav button:hover {
+  background: rgba(15, 23, 42, 0.045);
+  color: var(--hub-text-primary);
+}
+
+html:not([data-runtime-platform="android"]) .sidebar-primary-nav button.active {
+  background: var(--hub-accent-soft);
+  color: var(--hub-accent);
+  box-shadow: none;
+  font-weight: 560;
+}
+
+html:not([data-runtime-platform="android"]) .sidebar-primary-nav button.active svg {
+  color: var(--hub-accent);
+}
+
+/* 2. Global Optical Icon Calibration (desktop only) */
+html:not([data-runtime-platform="android"]) .workspace-rail button > svg {
+  width: 17px;
+  height: 17px;
+}
+
+html:not([data-runtime-platform="android"]) .sidebar-primary-nav button > svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+html:not([data-runtime-platform="android"]) .library-browser-row > svg {
+  width: 16px;
+  height: 16px;
+}
+
+html:not([data-runtime-platform="android"]) .library-browser {
+  --library-line: var(--hub-hairline);
+  --library-muted: var(--hub-text-secondary);
+  --library-surface: var(--hub-paper);
+  --library-tint: var(--hub-canvas);
+  --library-active: var(--hub-accent-soft);
+  --library-active-text: var(--hub-accent);
+}
+
+html:not([data-runtime-platform="android"]) .desktop-app-shell .search-header {
+  background: rgba(255, 255, 255, 0.94);
+  border-bottom: 0.5px solid var(--hub-hairline);
+}
+
+html:not([data-runtime-platform="android"]) .desktop-app-shell .search-box {
+  background: #FFFFFF;
+  border: 0.5px solid var(--hub-hairline-strong);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+html:not([data-runtime-platform="android"]) .desktop-app-shell .search-box:focus-within {
+  border-color: rgba(0, 122, 255, 0.55);
+  box-shadow: 0 0 0 2.5px rgba(0, 122, 255, 0.12);
+}
+
+/* 3. Sidebar Plan C: Pinned + Collapsible Recently Opened */
+.sidebar-plan-c {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.sidebar-pin-section,
+.sidebar-recent-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-pin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 2px 6px;
+  color: var(--hub-text-tertiary);
+  font-size: 11px;
+  font-weight: 560;
+  position: relative;
+}
+
+.sidebar-pin-header-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.sidebar-pin-add-btn {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--hub-text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.sidebar-pin-add-btn:hover,
+.sidebar-pin-add-btn[aria-expanded="true"] {
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--hub-text-primary);
+}
+
+.sidebar-pin-picker {
+  position: relative;
+  margin: 2px 2px 4px;
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--hub-paper);
+  border: 0.5px solid var(--hub-hairline-strong);
+  box-shadow: var(--hub-popover-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.sidebar-pin-picker-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sidebar-pin-picker-title {
+  padding: 3px 6px 2px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--hub-text-tertiary);
+}
+
+.sidebar-pin-picker-item {
+  width: 100%;
+  border: 0;
+  border-radius: 7px;
+  padding: 5px 7px;
+  background: transparent;
+  color: var(--hub-text-primary);
+  font: inherit;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-pin-picker-item:hover {
+  background: var(--hub-control-fill);
+}
+
+.sidebar-pin-picker-item span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-pin-picker-empty {
+  padding: 8px 6px;
+  color: var(--hub-text-tertiary);
+  font-size: 11.5px;
+  text-align: center;
+}
+
+.sidebar-pin-list,
+.sidebar-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sidebar-pin-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 8px;
+}
+
+.sidebar-pin-row:hover {
+  background: rgba(15, 23, 42, 0.045);
+}
+
+.sidebar-pin-open,
+.sidebar-recent-open {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--hub-text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-recent-open:hover {
+  background: rgba(15, 23, 42, 0.045);
+  color: var(--hub-text-primary);
+}
+
+.sidebar-pin-row:hover .sidebar-pin-open {
+  color: var(--hub-text-primary);
+}
+
+.sidebar-pin-open > svg,
+.sidebar-recent-open > svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--hub-text-tertiary);
+}
+
+.sidebar-pin-open > span,
+.sidebar-recent-open > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-pin-remove {
+  width: 22px;
+  height: 22px;
+  margin-right: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--hub-text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+
+.sidebar-pin-row:hover .sidebar-pin-remove,
+.sidebar-pin-row:focus-within .sidebar-pin-remove {
+  opacity: 1;
+}
+
+.sidebar-pin-remove:hover {
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--hub-text-primary);
+}
+
+.sidebar-pin-empty {
+  padding: 4px 8px;
+  color: var(--hub-text-tertiary);
+  font-size: 11.5px;
+}
+
+.sidebar-recent-toggle {
+  width: 100%;
+  height: 26px;
+  border: 0;
+  border-radius: 7px;
+  padding: 0 6px;
+  background: transparent;
+  color: var(--hub-text-tertiary);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 560;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.sidebar-recent-toggle:hover {
+  background: rgba(15, 23, 42, 0.04);
+  color: var(--hub-text-secondary);
+}
+
+.sidebar-recent-toggle small {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--hub-text-tertiary);
+}
+
+/* 4. Unified Floating Paper Preview Surface */
+html:not([data-runtime-platform="android"]) :is(.desktop-workspace, .task-workspace, .collections-workspace, .library-browser-reader) .preview-pane {
+  background: var(--hub-canvas);
+  padding: 10px 10px 10px 8px;
+}
+
+html:not([data-runtime-platform="android"]) :is(.desktop-workspace, .task-workspace, .collections-workspace, .library-browser-reader) .preview-card {
+  background: var(--hub-paper);
+  border: 0.5px solid var(--hub-hairline);
+  border-radius: 12px;
+  box-shadow: var(--hub-paper-shadow);
+}
+
+html:not([data-runtime-platform="android"]) :is(.desktop-workspace, .task-workspace, .collections-workspace, .library-browser-reader) .preview-heading {
+  background: var(--hub-paper);
+  border-bottom: 0.5px solid var(--hub-hairline);
+}
+
+html:not([data-runtime-platform="android"]) :is(.desktop-workspace, .task-workspace, .collections-workspace, .library-browser-reader) .preview-actions {
+  overflow: visible;
+  border: 0.5px solid var(--hub-hairline-strong);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+}
+
+html:not([data-runtime-platform="android"]) :is(.desktop-workspace, .task-workspace, .collections-workspace, .library-browser-reader) .preview-actions > button,
+html:not([data-runtime-platform="android"]) :is(.desktop-workspace, .task-workspace, .collections-workspace, .library-browser-reader) .preview-actions .preview-toc-wrap > button.preview-toc-trigger {
+  color: var(--hub-text-secondary);
+}
+
+html:not([data-runtime-platform="android"]) :is(.desktop-workspace, .task-workspace, .collections-workspace, .library-browser-reader) .preview-actions .preview-toc-wrap > button.preview-toc-trigger {
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 6px;
+  line-height: 0;
+}
+
+html:not([data-runtime-platform="android"]) :is(.desktop-workspace, .task-workspace, .collections-workspace, .library-browser-reader) .preview-actions > button:hover,
+html:not([data-runtime-platform="android"]) :is(.desktop-workspace, .task-workspace, .collections-workspace, .library-browser-reader) .preview-actions .preview-toc-wrap > button.preview-toc-trigger:hover {
+  background: var(--hub-control-fill);
+  color: var(--hub-text-primary);
+}
+
+html:not([data-runtime-platform="android"]) .preview-actions > button.preview-favorite-btn.active,
+html:not([data-runtime-platform="android"]) .preview-actions > button.preview-focus-btn.active,
+html:not([data-runtime-platform="android"]) .preview-actions .preview-toc-wrap > button.preview-toc-trigger.active {
+  background: var(--hub-accent-soft);
+  color: var(--hub-accent);
+}
+
+/* LibraryBrowse shares PreviewPane's .preview-more-menu without WorkspaceRefresh's workspace selector */
+html:not([data-runtime-platform="android"]) .library-browser-reader .preview-more-menu {
+  position: relative;
+  flex: 0 0 28px;
+  height: 28px;
+}
+
+html:not([data-runtime-platform="android"]) .library-browser-reader .preview-more-menu > summary {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  border-radius: 6px;
+  color: var(--hub-text-secondary);
+  cursor: pointer;
+  list-style: none;
+  line-height: 0;
+}
+
+html:not([data-runtime-platform="android"]) .library-browser-reader .preview-more-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+html:not([data-runtime-platform="android"]) .library-browser-reader .preview-more-menu > summary:hover,
+html:not([data-runtime-platform="android"]) .library-browser-reader .preview-more-menu[open] > summary {
+  background: var(--hub-control-fill);
+  color: var(--hub-text-primary);
+}
+
+html:not([data-runtime-platform="android"]) .library-browser-reader .preview-more-menu > div {
+  position: absolute;
+  z-index: 32;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 170px;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border: 0.5px solid var(--hub-hairline-strong);
+  border-radius: 10px;
+  background: var(--hub-paper);
+  box-shadow: var(--hub-popover-shadow);
+}
+
+html:not([data-runtime-platform="android"]) .desktop-app-shell .library-browser-reader .preview-actions .preview-more-menu > div button,
+html:not([data-runtime-platform="android"]) .library-browser-reader .preview-actions .preview-more-menu > div button {
+  width: 100%;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 9px;
+  border-radius: 7px;
+  color: var(--hub-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+}
+
+html:not([data-runtime-platform="android"]) .desktop-app-shell .library-browser-reader .preview-actions .preview-more-menu > div button:hover,
+html:not([data-runtime-platform="android"]) .library-browser-reader .preview-actions .preview-more-menu > div button:hover {
+  background: var(--hub-control-fill);
+  color: var(--hub-text-primary);
+}
+
+/* Unified "问助手" soft-blue pill styling inside preview toolbars */
+html:not([data-runtime-platform="android"]) :is(.preview-actions, .reading-article-toolbar) .agent-launcher {
+  height: 28px;
+  width: auto;
+  padding: 0 9px;
+  border-radius: 7px;
+  background: var(--hub-accent-soft);
+  color: var(--hub-accent);
+  font-size: 12px;
+  font-weight: 540;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+html:not([data-runtime-platform="android"]) :is(.preview-actions, .reading-article-toolbar) .agent-launcher:hover {
+  background: rgba(0, 122, 255, 0.14);
+  color: #0066D6;
+}
+
+html:not([data-runtime-platform="android"]) :is(.preview-actions, .reading-article-toolbar) .agent-launcher svg {
+  width: 14px;
+  height: 14px;
+  color: var(--hub-accent);
+}
+
+/* Preview Focus-Expand & Wide-Text Reading Mode */
+html:not([data-runtime-platform="android"]) .workspace.with-preview.preview-focus-mode,
+html:not([data-runtime-platform="android"]) .unified-shell .workspace.with-preview.preview-focus-mode,
+html:not([data-runtime-platform="android"]) .workspace.with-preview.preview-focus-mode:has(.agent-panel:not([hidden])),
+html:not([data-runtime-platform="android"]) .unified-shell .workspace.with-preview.preview-focus-mode:has(.agent-panel:not([hidden])) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+html:not([data-runtime-platform="android"]) .workspace.preview-focus-mode > .results-pane,
+html:not([data-runtime-platform="android"]) .workspace.preview-focus-mode > .search-results-column,
+html:not([data-runtime-platform="android"]) .workspace.preview-focus-mode > .pane-resizer {
+  display: none !important;
+}
+
+html:not([data-runtime-platform="android"]) .workspace.preview-focus-mode > .preview-pane {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  padding: 12px 18px;
+}
+
+html:not([data-runtime-platform="android"]) .workspace.preview-focus-mode > .preview-pane:not(:has(> .agent-panel:not([hidden]))) > .preview-card {
+  width: 100%;
+  max-width: 1060px;
+  margin-inline: auto;
+}
+
+html:not([data-runtime-platform="android"]) .workspace.preview-focus-mode > .preview-pane:has(> .agent-panel:not([hidden])) > .preview-card {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+
+html:not([data-runtime-platform="android"]) .preview-pane.preview-wide-text .preview-content,
+html:not([data-runtime-platform="android"]) .preview-pane.preview-wide-text .preview-title,
+html:not([data-runtime-platform="android"]) .preview-pane.preview-wide-text .preview-content .preview-document,
+html:not([data-runtime-platform="android"]) .collections-workspace .collection-detail.preview-wide-text .preview-content,
+html:not([data-runtime-platform="android"]) .collections-workspace .collection-detail.preview-wide-text .collection-detail-content > * {
+  max-width: none;
+}
+
+/* Floating TOC Popover */
+.preview-toc-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.preview-toc-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 32;
+  box-sizing: border-box;
+  width: 240px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: 11px;
+  background: var(--hub-paper);
+  border: 0.5px solid var(--hub-hairline-strong);
+  box-shadow: var(--hub-popover-shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.preview-toc-popover.align-left {
+  left: 0;
+  right: auto;
+}
+
+.preview-toc-head {
+  padding: 4px 8px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--hub-text-tertiary);
+  border-bottom: 0.5px solid var(--hub-hairline);
+  margin-bottom: 2px;
+}
+
+html:not([data-runtime-platform="android"]) .desktop-app-shell .preview-actions .preview-toc-popover button.preview-toc-item,
+html:not([data-runtime-platform="android"]) .preview-actions .preview-toc-popover button.preview-toc-item,
+.preview-toc-popover button.preview-toc-item {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: auto;
+  min-height: 28px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 7px;
+  padding: 6px 8px;
+  background: transparent;
+  color: var(--hub-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html:not([data-runtime-platform="android"]) .desktop-app-shell .preview-actions .preview-toc-popover button.preview-toc-item.level-2,
+html:not([data-runtime-platform="android"]) .preview-actions .preview-toc-popover button.preview-toc-item.level-2,
+.preview-toc-popover button.preview-toc-item.level-2 {
+  padding-left: 16px;
+}
+
+html:not([data-runtime-platform="android"]) .desktop-app-shell .preview-actions .preview-toc-popover button.preview-toc-item.level-3,
+html:not([data-runtime-platform="android"]) .preview-actions .preview-toc-popover button.preview-toc-item.level-3,
+.preview-toc-popover button.preview-toc-item.level-3 {
+  padding-left: 24px;
+  font-size: 11.5px;
+  color: var(--hub-text-tertiary);
+}
+
+html:not([data-runtime-platform="android"]) .desktop-app-shell .preview-actions .preview-toc-popover button.preview-toc-item:not(:disabled):hover,
+html:not([data-runtime-platform="android"]) .preview-actions .preview-toc-popover button.preview-toc-item:not(:disabled):hover,
+.preview-toc-popover button.preview-toc-item:hover {
+  background: var(--hub-control-fill);
+  color: var(--hub-text-primary);
+}
+
+/* Unified Text-Selection Floating Action Pill */
+.preview-selection-pill {
+  position: fixed;
+  z-index: 1200;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(18px) saturate(160%);
+  border: 0.5px solid var(--hub-hairline-strong);
+  box-shadow: 0 10px 28px -6px rgba(15, 23, 42, 0.2), 0 0 0 0.5px rgba(15, 23, 42, 0.06);
+  user-select: none;
+}
+
+.preview-selection-pill button {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--hub-text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 110ms ease, color 110ms ease;
+}
+
+.preview-selection-pill button:hover {
+  background: var(--hub-control-fill);
+}
+
+.preview-selection-pill button.primary-ask {
+  color: var(--hub-accent);
+}
+
+.preview-selection-pill button.primary-ask:hover {
+  background: var(--hub-accent-soft);
+}
+
+.preview-selection-pill-sep {
+  width: 0.5px;
+  height: 14px;
+  background: var(--hub-hairline-strong);
+  flex-shrink: 0;
+}
+
+/* 5. Unified 6px Base White Split Resizers Across All Desktop Workspaces */
+html:not([data-runtime-platform="android"]) .pane-resizer,
+html:not([data-runtime-platform="android"]) .context-sidebar-resizer,
+html:not([data-runtime-platform="android"]) .collections-workspace .reading-preview-resizer {
+  position: relative;
+  flex: 0 0 6px;
+  width: 6px;
+  min-width: 6px;
+  background: transparent;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 8;
+}
+
+html:not([data-runtime-platform="android"]) .pane-resizer::before,
+html:not([data-runtime-platform="android"]) .context-sidebar-resizer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2.5px;
+  width: 1px;
+  background: var(--hub-hairline);
+  transition: background-color 140ms ease, width 140ms ease, left 140ms ease;
+}
+
+html:not([data-runtime-platform="android"]) .pane-resizer:hover::before,
+html:not([data-runtime-platform="android"]) .pane-resizer:focus-visible::before,
+html:not([data-runtime-platform="android"]) body.resizing-panes .pane-resizer::before,
+html:not([data-runtime-platform="android"]) .context-sidebar-resizer:hover::before,
+html:not([data-runtime-platform="android"]) .context-sidebar-resizer:focus-visible::before,
+html:not([data-runtime-platform="android"]) body.resizing-context-sidebar .context-sidebar-resizer::before {
+  left: 2px;
+  width: 2px;
+  background: var(--hub-accent);
+}
+
+html:not([data-runtime-platform="android"]) .collections-workspace .reading-preview-resizer::after {
+  background: var(--hub-hairline);
+}
+
+html:not([data-runtime-platform="android"]) .collections-workspace .reading-preview-resizer:hover::after,
+html:not([data-runtime-platform="android"]) .collections-workspace .reading-preview-resizer:focus-visible::after {
+  background: var(--hub-accent);
+}
+
+/* Parameterized Resizable Split: Tasks & Libraries */
+html:not([data-runtime-platform="android"]) .task-workspace-body.has-preview .task-workspace-list {
+  flex: 1 1 auto;
+  min-width: 280px;
+}
+
+html:not([data-runtime-platform="android"]) .task-workspace-body.has-preview > .task-preview-pane,
+html:not([data-runtime-platform="android"]) .task-workspace-body.has-preview > .task-planning-panel {
+  flex: 0 0 var(--task-preview-percent, 44%);
+  min-width: 300px;
+  max-width: 68%;
+  border-left: 0;
+}
+
+@media (max-width: 820px) {
+  html:not([data-runtime-platform="android"]) .task-workspace-body.has-preview > .pane-resizer {
+    display: none;
+  }
+
+  html:not([data-runtime-platform="android"]) .task-workspace-body.has-preview > .task-preview-pane,
+  html:not([data-runtime-platform="android"]) .task-workspace-body.has-preview > .task-planning-panel {
+    flex: 1 1 100%;
+    max-width: none;
+    min-width: 0;
+  }
+}
+
+html:not([data-runtime-platform="android"]) .library-browser-body:not(:has(> .library-browser-reader[hidden])) > .library-browser-list {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 220px;
+  border-right: 0;
+}
+
+html:not([data-runtime-platform="android"]) .library-browser-body:not(:has(> .library-browser-reader[hidden])) > .library-browser-reader {
+  flex: 0 0 var(--library-reader-percent, 54%);
+  min-width: 300px;
+  max-width: 72%;
+}
+
+@container library-workspace (max-width: 960px) {
+  html:not([data-runtime-platform="android"]) .library-browser-body > .library-reader-resizer {
+    display: none;
+  }
+
+  html:not([data-runtime-platform="android"]) .library-browser-body.library-browser-reading:not(:has(> .library-browser-reader[hidden])) > .library-browser-reader,
+  html:not([data-runtime-platform="android"]) .library-browser-body.library-browser-reading > .library-browser-reader {
+    flex: 1 1 100%;
+    max-width: none;
+    min-width: 0;
+  }
+}
+
+/* Reading Focus Mode (desktop only) */
+html:not([data-runtime-platform="android"]) .collections-workspace .collection-body.reading-focus-mode > .reading-browse-paper,
+html:not([data-runtime-platform="android"]) .collections-workspace .collection-body.reading-focus-mode > .reading-preview-resizer {
+  display: none !important;
+}
+
+html:not([data-runtime-platform="android"]) .collections-workspace .collection-body.reading-focus-mode > .collection-detail.preview-pane {
+  flex: 1 1 100%;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  padding: 12px 18px;
+}
+
+html:not([data-runtime-platform="android"]) .collections-workspace .collection-body.reading-focus-mode > .collection-detail.preview-pane:not(:has(> .agent-panel:not([hidden]))) > .preview-card {
+  width: 100%;
+  max-width: 1060px;
+  margin-inline: auto;
+}
+
+html:not([data-runtime-platform="android"]) .collections-workspace .collection-body.reading-focus-mode > .collection-detail.preview-pane:has(> .agent-panel:not([hidden])) > .preview-card {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+
+/* Task & Library Focus Mode (desktop only) */
+html:not([data-runtime-platform="android"]) .task-workspace-body.task-focus-mode > .task-workspace-list,
+html:not([data-runtime-platform="android"]) .task-workspace-body.task-focus-mode > .pane-resizer {
+  display: none !important;
+}
+
+html:not([data-runtime-platform="android"]) .task-workspace-body.has-preview.task-focus-mode > .task-preview-pane,
+html:not([data-runtime-platform="android"]) .task-workspace-body.task-focus-mode > .task-preview-pane {
+  flex: 1 1 100%;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  padding: 12px 18px;
+}
+
+html:not([data-runtime-platform="android"]) .task-workspace-body.task-focus-mode > .task-preview-pane:not(:has(> .agent-panel:not([hidden]))) > .preview-card {
+  width: 100%;
+  max-width: 1060px;
+  margin-inline: auto;
+}
+
+html:not([data-runtime-platform="android"]) .task-workspace-body.task-focus-mode > .task-preview-pane:has(> .agent-panel:not([hidden])) > .preview-card {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+
+html:not([data-runtime-platform="android"]) .library-browser.library-focus-mode > .library-browser-navigation,
+html:not([data-runtime-platform="android"]) .library-browser.library-focus-mode > .context-sidebar-resizer,
+html:not([data-runtime-platform="android"]) .library-browser.library-focus-mode .library-browser-body > .library-browser-list,
+html:not([data-runtime-platform="android"]) .library-browser.library-focus-mode .library-browser-body > .library-browser-columns,
+html:not([data-runtime-platform="android"]) .library-browser.library-focus-mode .library-browser-body > .library-reader-resizer {
+  display: none !important;
+}
+
+html:not([data-runtime-platform="android"]) .library-browser.library-focus-mode .library-browser-body:not(:has(> .library-browser-reader[hidden])) > .library-browser-reader,
+html:not([data-runtime-platform="android"]) .library-browser.library-focus-mode .library-browser-body > .library-browser-reader {
+  flex: 1 1 100%;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+html:not([data-runtime-platform="android"]) .library-browser.library-focus-mode .library-browser-reader > .preview-pane {
+  border: 0;
+  background: var(--hub-canvas);
+  padding: 12px 18px;
+}
+
+html:not([data-runtime-platform="android"]) .library-browser.library-focus-mode .library-browser-reader > .preview-pane:not(:has(> .agent-panel:not([hidden]))) > .preview-card {
+  width: 100%;
+  max-width: 1060px;
+  margin-inline: auto;
+}
+
+html:not([data-runtime-platform="android"]) .library-browser.library-focus-mode .library-browser-reader > .preview-pane:has(> .agent-panel:not([hidden])) > .preview-card {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  html:not([data-runtime-platform="android"]) .preview-selection-pill {
+    background: #FFFFFF;
+    backdrop-filter: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .preview-selection-pill,
+  .preview-toc-popover,
+  .sidebar-pin-picker {
+    border: 1px solid ButtonText;
+  }
+}

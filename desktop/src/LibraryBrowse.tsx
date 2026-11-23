@@ -7,6 +7,7 @@ import { pageFavoriteKey } from "./PageFavorites";
 import { normalizeResults } from "./SearchResultNormalization";
 import type { LibrarySummary, SearchResult } from "./SearchTypes";
 import { WorkspaceHeaderContext } from "./WorkspaceChrome";
+import { useSplitPanePercent } from "./useSplitPanePercent";
 import { userProfileStorage, USER_PROFILE_PREPARE_FLUSH_EVENT } from "./UserProfileStorage";
 import { LIBRARY_TOPICS_KEY, LIBRARY_FOLDER_FAVORITES_KEY, loadFolderFavorites, loadLibraryBrowseState, loadLibraryTopics, persistLibraryBrowseState, referenceKey, referenceLibrary, toggleTopicReference, type LibraryBrowseState, type LibraryReference, type LibraryTopic } from "./LibraryBrowseState";
 import "./LibraryBrowse.css";
@@ -138,7 +139,7 @@ function rootResult(library: LibrarySummary, document: DocumentNode): SearchResu
 }
 
 export function LibraryBrowse({
-  libraries, favorites = [], position, onPosition, selected, onPreview, onClosePreview, onExit, onToggleFavorite, preview,
+  libraries, favorites = [], position, onPosition, selected, onPreview, onClosePreview, onExit, onToggleFavorite, preview, focusMode = false, onExitFocusMode,
 }: {
   libraries: LibrarySummary[];
   favorites?: SearchResult[];
@@ -150,6 +151,8 @@ export function LibraryBrowse({
   onExit?: () => void;
   onToggleFavorite?: (result: SearchResult) => void;
   preview?: ReactNode;
+  focusMode?: boolean;
+  onExitFocusMode?: () => void;
 }) {
   const header = useContext(WorkspaceHeaderContext);
   const [savedView] = useState(loadLibraryBrowseState);
@@ -178,6 +181,14 @@ export function LibraryBrowse({
   // shortcut: loaded batches stay mounted; use windowing if real-library profiling requires it.
   const [limits, setLimits] = useState<Record<string, number>>({});
   const columnStrip = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const readerSplit = useSplitPanePercent({
+    storageKey: "hub.library-browse.reader-percent.v1",
+    defaultPercent: 54,
+    minPercent: 30,
+    maxPercent: 72,
+    containerRef: bodyRef,
+  });
   const listPane = useRef<HTMLElement>(null);
   const treePane = useRef<HTMLElement>(null);
   const currentFolders = useRef<Record<string, string>>(savedView.positions ?? {});
@@ -485,7 +496,7 @@ export function LibraryBrowse({
     : library && tree ? (tree.children.get(folderId)?.length ?? 0) + (tree.pages.get(folderId)?.length ?? 0) + (!folderId ? tree.unresolved.length : 0)
       : library ? undefined : allDocuments.length;
 
-  return <div className="library-browser" data-hub-keyboard-scope onKeyDown={event => {
+  return <div className={`library-browser${focusMode && preview && readerOpen ? " library-focus-mode" : ""}`} data-hub-keyboard-scope onKeyDown={event => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
       event.preventDefault(); event.stopPropagation();
       event.currentTarget.querySelector<HTMLInputElement>(".library-browser-search input")?.focus();
@@ -493,6 +504,8 @@ export function LibraryBrowse({
       event.preventDefault(); event.stopPropagation(); setTopicEditor(undefined);
     } else if (event.key === "Escape" && (input || folderQuery)) {
       event.preventDefault(); event.stopPropagation(); clearSearch(); setFolderQuery("");
+    } else if (event.key === "Escape" && focusMode && onExitFocusMode && !(event.target instanceof Element && event.target.closest("dialog[open], details[open], .preview-toc-popover, .agent-panel"))) {
+      event.preventDefault(); event.stopPropagation(); onExitFocusMode();
     } else if (event.target instanceof HTMLElement && event.target.closest(".library-browser-tree") && ["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
       const row = event.target.closest<HTMLButtonElement>("button.library-browser-row")
         ?? event.target.closest(".library-browser-tree-row")?.querySelector<HTMLButtonElement>("button.library-browser-row");
@@ -626,7 +639,11 @@ export function LibraryBrowse({
         {inColumns && <button className="library-browser-icon" aria-label={readerOpen ? "收起阅读区" : "显示阅读区"}
           aria-pressed={readerOpen} onClick={() => setReaderOpen(value => !value)}><PanelRight size={16} /></button>}
       </div>
-      <div className={`library-browser-body${inColumns ? " library-browser-column-mode" : ""}${preview && readerOpen ? " library-browser-reading" : ""}`}>
+      <div
+        ref={bodyRef}
+        className={`library-browser-body${inColumns ? " library-browser-column-mode" : ""}${preview && readerOpen ? " library-browser-reading" : ""}`}
+        style={{ "--library-reader-percent": `${readerSplit.percent}%` } as CSSProperties}
+      >
         {inColumns ? <div className="library-browser-columns" ref={columnStrip} aria-label="目录分栏" onScroll={event => rememberScroll("columns", event.currentTarget.scrollLeft)}>
           <section className="library-browser-column"><h2>全部库</h2>{libraryRows()}
             {!libraries.length && <p className="library-browser-hint">在设置中接入资料库后，即可在这里浏览。</p>}
@@ -667,6 +684,22 @@ export function LibraryBrowse({
             {!libraries.length && !query && !showFavorites && <p className="library-browser-hint">在设置中接入资料库后，即可在这里浏览。</p>}
           </div>
         </section>}
+        {readerOpen && (
+          <div
+            className="pane-resizer library-reader-resizer"
+            role="separator"
+            tabIndex={0}
+            aria-label="调整资料库列表和阅读区的宽度"
+            aria-orientation="vertical"
+            aria-valuemin={30}
+            aria-valuemax={72}
+            aria-valuenow={Math.round(readerSplit.percent)}
+            title="拖动调整宽度，双击恢复默认"
+            onPointerDown={readerSplit.onPointerDown}
+            onKeyDown={readerSplit.onKeyDown}
+            onDoubleClick={readerSplit.onDoubleClick}
+          />
+        )}
         <section className="library-browser-reader desktop-workspace" aria-label="阅读区" hidden={!readerOpen}>
           <div className="library-browser-reader-toolbar"><BookOpen size={15} /><span>{selected?.title || "文档预览"}</span></div>
           {(selected && libraryIds.includes(selected.libraryId) ? preview : undefined) ?? <div className="library-browser-reader-empty">

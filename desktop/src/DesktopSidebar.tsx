@@ -26,7 +26,8 @@ import {
 } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
-import type { LibrarySummary } from "./SearchTypes";
+import type { LibrarySummary, SearchResult } from "./SearchTypes";
+import { SidebarPinnedSection } from "./SidebarPinnedSection";
 import { smartCollectionSourceLabel, type SmartCollection } from "./SmartCollections";
 import { CollectionNavigation } from "./CollectionNavigation";
 import { resolveTagColor, type TagUserPropertyMap } from "./TagProperties";
@@ -191,6 +192,10 @@ type DesktopSidebarProps = {
   onSelectAllLibrariesOnly?: () => void;
   onManageLibraries: () => void;
   favoriteCount: number;
+  favoriteResults?: SearchResult[];
+  viewHistory?: SearchResult[];
+  onOpenPinnedLibrary?: (libraryId: string) => void;
+  onOpenPinnedResult?: (result: SearchResult) => void;
   taskOpenCount: number;
   journalCount: number;
   journalDates: Array<{ date: string; sources: number }>;
@@ -235,6 +240,10 @@ export const DesktopSidebar = memo(function DesktopSidebar({
   onToggleAllLibraries,
   onManageLibraries,
   favoriteCount,
+  favoriteResults,
+  viewHistory,
+  onOpenPinnedLibrary,
+  onOpenPinnedResult,
   taskOpenCount,
   journalCount,
   journalDates,
@@ -466,6 +475,18 @@ export const DesktopSidebar = memo(function DesktopSidebar({
           onSelectDate={onSelectJournalDate}
         />
       </section>}
+
+      {activeView !== "tags" && activeView !== "flashcards" && (
+        <SidebarPinnedSection
+          spaces={spaces}
+          smartCollections={smartCollections}
+          favoriteResults={favoriteResults}
+          viewHistory={viewHistory}
+          onApplySmartCollection={onApplySmartCollection}
+          onOpenPinnedLibrary={onOpenPinnedLibrary}
+          onOpenPinnedResult={onOpenPinnedResult}
+        />
+      )}
 
       {activeView === "tags" && (
         <section className="sidebar-tags" aria-label="标签导航">

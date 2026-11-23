@@ -4,6 +4,8 @@ import { writeResultDragData } from "./ResultActions";
 import { userProfileStorage } from "./UserProfileStorage";
 import { resolveTaskResult, taskSearchResult } from "./TaskWorkspaceResult";
 import { TaskPreviewPane } from "./TaskPreviewPane";
+import { pageFavoriteKey } from "./PageFavorites";
+import type { SelectionSnippetOutcome } from "./PreviewSelectionActions";
 import { usePreviewLinkCopy } from "./usePreviewLinkCopy";
 import "./TaskSyncResume.css";
 import { resultLinkRequest } from "./ResultActions";
@@ -25,7 +27,6 @@ import {
   LayoutList,
   Link2,
   ListFilter,
-  MoreHorizontal,
   PanelLeft,
   PanelRight,
   Plus,
@@ -49,6 +50,7 @@ import { useUnifiedTasks } from "./UnifiedTaskData";
 import { TaskStatusControl, TaskStatusNotice } from "./TaskStatusControl";
 export type { UnifiedTaskDashboard } from "./UnifiedTaskData";
 import { useWorkspaceSession, useWorkspaceScroll } from "./useWorkspaceSession";
+import { useSplitPanePercent } from "./useSplitPanePercent";
 import { runtimeCapabilities } from "./RuntimePlatform";
 import { WorkspaceFilterSummary } from "./WorkspaceFilterSummary";
 import {
@@ -131,6 +133,10 @@ type Props = {
   onCountChange?: (count: number) => void;
   onStatusMessage?: (message: string, tone?: OperationTone, duration?: number) => void;
   onOpenResult?: (result: SearchResult, source?: "result" | "preview") => void;
+  favoriteIds?: ReadonlySet<string>;
+  snippetFavoriteIds?: ReadonlySet<string>;
+  onToggleFavorite?: (result: SearchResult) => SelectionSnippetOutcome;
+  onToggleSnippetFavorite?: (result: SearchResult) => SelectionSnippetOutcome;
 };
 
 type TaskViewMode = "list" | "board" | "table";
@@ -325,6 +331,10 @@ export function TaskWorkspace({
   onCountChange,
   onStatusMessage,
   onOpenResult,
+  favoriteIds,
+  snippetFavoriteIds,
+  onToggleFavorite,
+  onToggleSnippetFavorite,
 }: Props) {
   useEffect(() => { setPlanning(null); }, [selectedLibraryIds]);
   const initialViewPreferences = useMemo(loadTaskViewPreferences, []);
@@ -378,9 +388,32 @@ export function TaskWorkspace({
   const [savingBackgroundInterval, setSavingBackgroundInterval] = useState(false);
   const [conflictChoices, setConflictChoices] = useState<Record<number, ConflictResolution>>({});
   const [previewEnabled,setPreviewEnabled]=useState(true);
+  const [taskFocusMode, setTaskFocusMode] = useState(false);
+  const taskBodyRef = useRef<HTMLDivElement>(null);
+  const taskSplit = useSplitPanePercent({
+    storageKey: "hub.tasks.preview-percent.v1",
+    defaultPercent: 44,
+    minPercent: 28,
+    maxPercent: 66,
+    containerRef: taskBodyRef,
+  });
   const [selectedTask, setSelectedTask] = useWorkspaceSession<UnifiedTask | null>("tasks.selection", null);
   const [previewPinned, setPreviewPinned] = useState(false);
   useEffect(() => { if (!selectedTask) setPreviewPinned(false); }, [selectedTask]);
+  useEffect(() => { if (!previewEnabled || !selectedTask || planning) setTaskFocusMode(false); }, [previewEnabled, selectedTask, planning]);
+  useEffect(() => {
+    if (!taskFocusMode) return;
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+      if (event.target instanceof Element && event.target.closest("dialog, details[open], .preview-toc-popover, .agent-panel")) return;
+      if (document.querySelector(".preview-toc-popover, details.preview-more-menu[open]")) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setTaskFocusMode(false);
+    };
+    window.addEventListener("keydown", onEscape, true);
+    return () => window.removeEventListener("keydown", onEscape, true);
+  }, [taskFocusMode]);
   const [previewHistory, setPreviewHistory] = useState<{ entries: UnifiedTask[]; index: number }>(() => ({
     entries: selectedTask ? [selectedTask] : [], index: selectedTask ? 0 : -1,
   }));
@@ -1295,7 +1328,11 @@ export function TaskWorkspace({
         ...(sourceFilter !== "all" ? [{ label: sourceOptions.find(source => source.id === sourceFilter)!.label, clear: () => setSourceFilter("all") }] : []),
       ]} onReset={resetFilters} />
       <div className="task-planning-toolbar" aria-label="任务 AI 操作"><span><Sparkles size={14}/>围绕原任务分析</span><button onClick={() => beginPlanning("today")}><CalendarCheck size={14}/>安排今天</button><button onClick={() => beginPlanning("project")}>梳理项目</button><button disabled={!selectedTask || !planningEligible(selectedTask)} onClick={() => beginPlanning("task")}>推进任务</button><button aria-pressed={todayOnly} onClick={() => setTodayOnly(v => !v)}>今日计划 {scopedTasks.filter(t => planningEligible(t) && planningRecord(t)?.day === planningDay).length}</button></div>
-      <div className={`task-workspace-body ${planning || selectedTask && previewEnabled ? "has-preview" : ""}`}>
+      <div
+        ref={taskBodyRef}
+        className={`task-workspace-body ${planning || selectedTask && previewEnabled ? "has-preview" : ""}${!runtimeCapabilities.mobile && !planning && previewEnabled && selectedTask && taskFocusMode ? " task-focus-mode" : ""}`}
+        style={{ "--task-preview-percent": `${taskSplit.percent}%` } as CSSProperties}
+      >
       <div className={`task-workspace-list ${viewMode} density-${taskDensity}`} ref={listRef} onScroll={rememberScroll}>
         {error && <div className="task-empty error">{error}</div>}
         {!error && loading && dashboard.tasks.length === 0 && <div className="task-empty">正在读取任务…</div>}
@@ -1353,6 +1390,22 @@ export function TaskWorkspace({
           </section>)}
         </div>}
       </div>
+      {!runtimeCapabilities.mobile && (planning || (previewEnabled && selectedTask && selectedResult)) && (
+        <div
+          className="pane-resizer"
+          role="separator"
+          tabIndex={0}
+          aria-label="调整任务列表和预览的宽度"
+          aria-orientation="vertical"
+          aria-valuemin={28}
+          aria-valuemax={66}
+          aria-valuenow={Math.round(taskSplit.percent)}
+          title="拖动调整宽度，双击恢复默认"
+          onPointerDown={taskSplit.onPointerDown}
+          onKeyDown={taskSplit.onKeyDown}
+          onDoubleClick={taskSplit.onDoubleClick}
+        />
+      )}
       {planning ? <TaskPlanningPanel key={planning.id} request={planning} onClose={() => setPlanning(null)} onSaved={refreshPlanningRecords} onTask={task => { setPreviewPinned(false); setPlanning(null); setCollectionKey(taskCollectionKey(task)); setSourceFilter("all"); setStatusFilter("all"); setQuery(""); setTodayOnly(false); setSelectedTask(task); setPreviewEnabled(true); }} /> : previewEnabled && selectedTask && selectedResult && <TaskPreviewPane
           selected={selectedResult} libraries={libraries}
           copiedResultId={previewLink.copiedKey === selectedTask.id ? selectedResult.id : ""}
@@ -1361,12 +1414,15 @@ export function TaskWorkspace({
           onClose={() => { setPreviewPinned(false); setSelectedTask(null); }} onStatus={showPreviewStatus}
           canGoBack={previewHistory.index > 0} canGoForward={previewHistory.index < previewHistory.entries.length - 1}
           previewPinned={previewPinned} onNavigate={navigateTaskPreview} onTogglePinned={() => setPreviewPinned(value => !value)}
-          toolbarActions={selectedTask.provider === "craft" && (selectedTask.syncState === "linked" || selectedTask.syncState === "conflict") && <details className="preview-more-menu" key={selectedTask.id} onKeyDown={event => {
-            if (event.key === "Escape") { event.stopPropagation(); event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); }
-          }}>
-            <summary title="更多预览操作" aria-label="更多预览操作"><MoreHorizontal size={18}/></summary>
-            <div><button className="danger" disabled={syncing} onClick={event => { event.currentTarget.closest("details")?.removeAttribute("open"); void removeSelectedTaskFromDida(); }}>保留 Craft，移除滴答</button></div>
-          </details>}
+          isFavorite={Boolean(favoriteIds?.has(pageFavoriteKey(selectedResult)))}
+          snippetFavoriteIds={snippetFavoriteIds}
+          onToggleFavorite={!runtimeCapabilities.mobile ? onToggleFavorite : undefined}
+          onToggleSnippetFavorite={!runtimeCapabilities.mobile ? onToggleSnippetFavorite : undefined}
+          previewFocusMode={taskFocusMode}
+          onTogglePreviewFocus={!runtimeCapabilities.mobile ? () => setTaskFocusMode(value => !value) : undefined}
+          moreMenuItems={selectedTask.provider === "craft" && (selectedTask.syncState === "linked" || selectedTask.syncState === "conflict") ? (
+            <button className="danger" disabled={syncing} onClick={event => { event.currentTarget.closest("details")?.removeAttribute("open"); void removeSelectedTaskFromDida(); }}>保留 Craft，移除滴答</button>
+          ) : undefined}
           contentBefore={<><div className="task-planning-detail"><button disabled={!planningEligible(selectedTask)} onClick={() => beginPlanning("task", selectedTask)}><Sparkles size={14}/>分析并推进这条任务</button><button onClick={() => setPlanning({ id: crypto.randomUUID(), mode: "task", label: selectedTask.title, tasks: [selectedTask], historyOnly: true })}>查看来源操作记录</button>{planningRecord(selectedTask)?.day === planningDay && <button onClick={() => void removePlanningDay(selectedTask).then(refreshPlanningRecords).catch(e => onStatusMessage?.(String(e), "error"))}>移出今日计划</button>}{planningRecord(selectedTask)?.note && <section><h3>Hub 建议笔记</h3><p>{planningRecord(selectedTask)?.note}</p></section>}</div>{selectedTask.provider === "craft" && selectedTask.syncState === "paused" && <div className="task-sync-resume">
               <div><strong>{selectedTask.isProject ? "这个项目已停止同步到滴答" : "这个任务已停止同步到滴答"}</strong>
                 <p>{selectedTask.isProject ? "之前保存了停止同步规则。恢复后，缺少的项目父任务会进入收件箱；现有子任务的关联和所在清单会保留。" : "之前保存了停止同步规则。恢复后保留现有关联；尚未关联的任务会进入收件箱。"}</p>

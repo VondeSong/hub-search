@@ -17,6 +17,27 @@ export type SearchWorkspaceResultPresentation = {
   journalDayCount: number;
 };
 
+export function findMatchingResultIndex(results: readonly SearchResult[], target?: SearchResult): number {
+  if (!target) return -1;
+  const byEntity = target.entityKey
+    ? results.findIndex((item) => item.entityKey && item.entityKey === target.entityKey)
+    : -1;
+  if (byEntity >= 0) return byEntity;
+  const byId = target.id
+    ? results.findIndex((item) => item.id && item.id === target.id)
+    : -1;
+  if (byId >= 0) return byId;
+  if (target.documentId) {
+    return results.findIndex((item) =>
+      item.provider === target.provider
+      && item.libraryId === target.libraryId
+      && item.documentId === target.documentId
+      && (item.pageId ?? "") === (target.pageId ?? ""),
+    );
+  }
+  return -1;
+}
+
 export function journalDateKey(result?: SearchResult): string {
   if (result?.journalDate) return result.journalDate;
   const value = result?.title.trim().replace(/\./g, "-") ?? "";

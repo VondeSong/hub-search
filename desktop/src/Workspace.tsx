@@ -16,6 +16,7 @@ export type WorkspaceProps = {
   searchHeader?: ReactNode;
   workspaceRef: RefObject<HTMLElement | null>;
   showPreviewPane: boolean;
+  previewFocusMode?: boolean;
   resultsPanePercent: number;
   resultsPaneProps: SearchResultsPaneProps;
   previewPaneProps: PreviewPaneProps;
@@ -30,6 +31,7 @@ type WorkspaceContentProps = WorkspaceProps & {
 function WorkspaceContent({
   workspaceRef,
   showPreviewPane,
+  previewFocusMode = false,
   resultsPanePercent,
   resultsPaneProps,
   previewPaneProps,
@@ -45,7 +47,7 @@ function WorkspaceContent({
   return (
     <section
       ref={workspaceRef}
-      className={`workspace ${layout}-workspace ${previewVisible ? "with-preview" : ""}`}
+      className={`workspace ${layout}-workspace ${previewVisible ? "with-preview" : ""}${previewVisible && previewFocusMode ? " preview-focus-mode" : ""}`}
       style={{ "--results-pane-percent": `${resultsPanePercent}%` } as CSSProperties}
     >
       {searchHeader ? <div className="search-results-column">

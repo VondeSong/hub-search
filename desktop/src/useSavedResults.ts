@@ -1,5 +1,5 @@
 import { userProfileStorage } from "./UserProfileStorage";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SearchResult } from "./SearchTypes";
 import { normalizePageFavorites, pageFavoriteKey, snippetFavoriteKey, togglePageFavorite, toggleSnippetFavorite } from "./PageFavorites";
 
@@ -71,12 +71,20 @@ const removeSearchHistoryItem = useCallback((value: string) => {
     });
   }, []);
 
-const toggleFavorite = useCallback((result: SearchResult) => {
-    setFavoriteResults((current) => {
-      const next = result.favoriteKind === "snippet" ? toggleSnippetFavorite(current, result) : togglePageFavorite(current, result);
-      userProfileStorage.setItem(DESKTOP_FAVORITES_KEY, JSON.stringify(next));
-      return next;
-    });
+const favoriteResultsRef = useRef(favoriteResults);
+favoriteResultsRef.current = favoriteResults;
+
+const toggleFavorite = useCallback((result: SearchResult): "added" | "removed" => {
+    const current = favoriteResultsRef.current;
+    const isSnippet = result.favoriteKind === "snippet";
+    const existed = isSnippet
+      ? current.some(item => item.favoriteKind === "snippet" && snippetFavoriteKey(item) === snippetFavoriteKey(result))
+      : normalizePageFavorites(current).some(item => item.favoriteKind !== "snippet" && pageFavoriteKey(item) === pageFavoriteKey(result));
+    const next = isSnippet ? toggleSnippetFavorite(current, result) : togglePageFavorite(current, result);
+    userProfileStorage.setItem(DESKTOP_FAVORITES_KEY, JSON.stringify(next));
+    favoriteResultsRef.current = next;
+    setFavoriteResults(next);
+    return existed ? "removed" : "added";
   }, []);
 
 const rememberViewedResult = useCallback((result: SearchResult) => {

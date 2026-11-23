@@ -12,6 +12,7 @@ export function useSearchResultData({ selectionActive = true, ...options }: Omit
   const publishResults = useCallback((next: SearchResult[], keepSelection: boolean) => {
     setData(current => {
       if (!selectionActive) return { ...current, results: next };
+      if (keepSelection && current.selectedIndex < 0) return { results: next, selectedIndex: -1 };
       const selected = keepSelection ? current.results[current.selectedIndex] : undefined;
       const preserved = selected ? next.findIndex(result => result.libraryId === selected.libraryId && result.entityKey === selected.entityKey && result.id === selected.id) : -1;
       return { results: next, selectedIndex: preserved >= 0 ? preserved : 0 };

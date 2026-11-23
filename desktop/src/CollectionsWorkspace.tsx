@@ -26,11 +26,13 @@ import { ReadingArticleTools, type ReadingArticleToolsHandle } from "./ReadingAr
 import { ReadingInvestigation } from "./AgentInvestigation";
 import "./PreviewContent.css";
 import { PreviewFrame, PreviewHeading, PreviewTitle, PreviewToolbar } from "./PreviewFrame";
+import { PreviewSelectionActions } from "./PreviewSelectionActions";
+import { PreviewTocPopover } from "./PreviewTocPopover";
 import { usePreviewLinkCopy } from "./usePreviewLinkCopy";
 import { open as chooseDirectory } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useContext, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { ArrowLeft, ArrowUpRight, Bookmark, Archive, GripVertical, PanelRight, Circle, PanelLeft, RefreshCw, Search, FolderOpen, X, LoaderCircle, LayoutList, Table2, Columns3, LayoutGrid, Paperclip, MoreHorizontal, Link2, Check, RotateCcw, Layers, Heart, Send, CircleCheck } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Bookmark, Archive, GripVertical, PanelRight, Circle, PanelLeft, RefreshCw, Search, FolderOpen, X, LoaderCircle, LayoutList, Table2, Columns3, LayoutGrid, Paperclip, MoreHorizontal, Link2, Check, RotateCcw, Layers, Heart, Send, CircleCheck, Maximize2, Minimize2 } from "lucide-react";
 import { WorkspaceHeaderContext } from "./WorkspaceChrome";
 import { useVisiblePolling } from "./useVisiblePolling";
 import { SerialRefresh } from "./SerialRefresh";
@@ -103,6 +105,9 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const [openReadingKey,setOpenReadingKey]=useState<string|null>(null);
   const [checkedKeys,setCheckedKeys]=useState<Set<string>>(()=>new Set());
   const [articleMenu,setArticleMenu]=useState(false);
+  const [readingFocusMode,setReadingFocusMode]=useState(false);
+  const [readingWideText,setReadingWideText]=useState<boolean>(()=>{try{return userProfileStorage.getItem("hub.preview.wide-text.v1")==="true";}catch{return false;}});
+  const readingContentRef=useRef<HTMLDivElement>(null);
   const previewEnabled=session.previewEnabled;
   const setPreviewEnabled=(previewEnabled:boolean)=>updateSession({previewEnabled});
   const cards = {...defaultCollectionCards,...view.cards};
@@ -303,6 +308,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const selectedSource=selected?.post.source||"bookmarks";
   const detailOpen=!!selected&&previewEnabled&&!useSplitReading&&(runtimeCapabilities.mobile||openReadingKey===selected.key||searchItemKey===selected.key);
   const showReading=!!selected&&previewEnabled&&(useSplitReading||detailOpen);
+  useEffect(()=>{if(!showReading)setReadingFocusMode(false);},[showReading]);
   const openItem=(key:string)=>{
     setArticleMenu(false);
     setOpenReadingKey(key);
@@ -565,6 +571,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
     if(event.key==="Escape"){
       if(target.closest(".collection-property-menu,.collection-destination-menu,details[open]"))return;
       if(articleMenu)setArticleMenu(false);
+      else if(readingFocusMode)setReadingFocusMode(false);
       else if(syncMenu)setSyncMenu(false);
       else if(searchOpen)dismissSearch();
       else if(detailOpen)closeReading();
@@ -630,7 +637,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
     <div className="reading-workspace-body">
     {shellHeader?.readingNavigation}
     {shellHeader?.readingNavigation && shellHeader.navigationResizer}
-    <div ref={bodyRef} className={`collection-body ${showReading?"has-preview":""} ${detailOpen?"compact-preview":""}`} style={{"--reading-preview-width":`${resizeCleanup.current?previewWidthRef.current:effectivePreviewWidth}px`} as CSSProperties}>
+    <div ref={bodyRef} className={`collection-body ${showReading?"has-preview":""} ${detailOpen?"compact-preview":""}${!runtimeCapabilities.mobile&&showReading&&readingFocusMode?" reading-focus-mode":""}`} style={{"--reading-preview-width":`${resizeCleanup.current?previewWidthRef.current:effectivePreviewWidth}px`} as CSSProperties}>
       <div className="reading-browse-paper" hidden={detailOpen}>
         {!runtimeCapabilities.mobile&&<>
     <div className="task-view-toolbar collection-toolbar">
@@ -698,7 +705,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
       </div>
       </div>
       {!runtimeCapabilities.mobile&&!detailOpen&&batchItems.length>=2&&<div className="reading-batch-bar" role="group" aria-label="批量阅读操作"><strong>已选 {batchItems.length} 篇</strong><button disabled={propertyBusy} onClick={()=>void applyBatch("read")}>已读</button><button disabled={propertyBusy} onClick={()=>void applyBatch("in_progress")}>进行中</button><button disabled={propertyBusy||batchItems.some(item=>item.lifecycle==="archived"||item.lifecycle==="deleting")} onClick={()=>void applyBatch("archived")}>归档</button><button aria-label="清除选择" onClick={()=>setCheckedKeys(new Set())}><X size={14}/></button></div>}
-      {selected&&showReading&&<>{useSplitReading&&<div className="reading-preview-resizer" role="separator" tabIndex={compactPreview?-1:0} aria-label="调整阅读预览宽度" aria-orientation="vertical" aria-valuemin={MIN_READING_PANEL} aria-valuemax={maximumPreviewWidth} aria-valuenow={effectivePreviewWidth} title="拖动调整预览宽度；双击恢复默认" onPointerDown={resizePreview} onKeyDown={resizePreviewWithKeyboard} onDoubleClick={resetPreviewWidth}/>}<PreviewFrame className="collection-detail" label="阅读详情">
+      {selected&&showReading&&<>{useSplitReading&&<div className="reading-preview-resizer" role="separator" tabIndex={compactPreview?-1:0} aria-label="调整阅读预览宽度" aria-orientation="vertical" aria-valuemin={MIN_READING_PANEL} aria-valuemax={maximumPreviewWidth} aria-valuenow={effectivePreviewWidth} title="拖动调整预览宽度；双击恢复默认" onPointerDown={resizePreview} onKeyDown={resizePreviewWithKeyboard} onDoubleClick={resetPreviewWidth}/>}<PreviewFrame className={`collection-detail${!runtimeCapabilities.mobile&&readingWideText?" preview-wide-text":""}`} label="阅读详情">
         {runtimeCapabilities.mobile?<>
         <PreviewHeading source={<>{badge(selected)}<span className="preview-path" title={selected.post.authorName}>{selected.post.authorName}{selected.post.authorHandle&&` / @${selected.post.authorHandle}`}</span></>} actions={<PreviewToolbar
           copied={previewLink.copiedKey===selected.key} onCopy={()=>previewLink.copy(selected.key,()=>selected.post.url)}
@@ -709,12 +716,15 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
           {detailOpen&&<button ref={previewBackRef} className="collection-preview-back" aria-label="返回阅读列表" onClick={closeReading}><ArrowLeft size={14}/>{compactPreview?"返回列表":"收起阅读"}</button>}
           <span className="reading-article-source">{badge(selected)}{selected.post.authorHandle?" · @"+selected.post.authorHandle:""}</span>
           <div className="preview-actions" role="group" aria-label="预览操作">
+            <PreviewTocPopover contentRef={readingContentRef} contentKey={selected.key}/>
+            <button type="button" className={`preview-focus-btn${readingFocusMode?" active":""}`} aria-label={readingFocusMode?"退出专注阅读":"全宽专注阅读"} title={readingFocusMode?"退出专注阅读（Esc）":"全宽专注阅读"} aria-pressed={readingFocusMode} onClick={()=>setReadingFocusMode(v=>!v)}>{readingFocusMode?<Minimize2 size={15}/>:<Maximize2 size={15}/>}</button>
             {selected.post.source!=="dida"&&selected.post.url&&<button type="button" className="preview-copy-action" aria-label={previewLink.copiedKey===selected.key?"已复制":"复制来源链接"} title="复制来源链接" onClick={()=>void previewLink.copy(selected.key,()=>selected.post.url)}>{previewLink.copiedKey===selected.key?<Check size={15}/>:<Link2 size={15}/>}</button>}
             <ReadingInvestigation itemKey={selected.key} title={fullTitle(selected)}/>
             <ReadingArticleTools key={selected.key} ref={inspectorRef} reference needsAttention={issues(selected).length>0||Boolean(selected.attentionIssues?.length)} itemKey={selected.key} revision={JSON.stringify([selected.post,readingStatus(selected),selected.tags||[],selected.lifecycle])}/>
             <div className="reading-article-menu" onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))setArticleMenu(false);}}>
               <button type="button" aria-label="归档或更多阅读操作" title="归档 / 永久删除" aria-expanded={articleMenu} onClick={()=>setArticleMenu(!articleMenu)}><MoreHorizontal size={17}/></button>
               <div className="reading-article-menu-panel" hidden={!articleMenu}>
+                <button type="button" aria-pressed={readingWideText} onClick={()=>{setReadingWideText(current=>{const next=!current;try{userProfileStorage.setItem("hub.preview.wide-text.v1",String(next));}catch{}return next;});setArticleMenu(false);}}>{readingWideText?"✓ 宽松行宽":"宽松行宽"}</button>
                 {selected.post.source!=="dida"&&selected.post.url&&<button aria-label="打开原文" onClick={()=>{setArticleMenu(false);void open(selected.post.url);}}>打开原文</button>}
                 <button className="collection-refresh-content" aria-label="更新内容" disabled={selected.post.source==="dida"?sourceConnectionRunning("dida"):jobRunning} onClick={()=>{setArticleMenu(false);selected.post.source==="dida"?void sync("dida",false):selected.post.source==="telegram"?void sync("telegram",false):void refreshContent(selected.key);}}>更新内容</button>
                 <button disabled={propertyBusy} onClick={()=>{setArticleMenu(false);void lifecycle(selected,selected.lifecycle==="archived"?"active":"archived");}}>{selected.lifecycle==="archived"?"恢复到阅读":"归档"}</button>
@@ -724,7 +734,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
           </div>
         </div>
         </>}
-        <div className="preview-content collection-detail-content preview-document" key={selected.key}>{!runtimeCapabilities.mobile&&<>
+        <div ref={readingContentRef} className="preview-content collection-detail-content preview-document" key={selected.key}>{!runtimeCapabilities.mobile&&<>
           {selected.lifecycle==="archived"&&<div className="reading-context-alert"><span>已归档 · 已保存的资料库副本保持不变</span><button disabled={propertyBusy} onClick={()=>void lifecycle(selected,"active")}>恢复到阅读</button></div>}
           {selected.lifecycle!=="archived"&&issues(selected).length>0&&<div className="reading-context-alert warning"><span>{issues(selected)[0]?.detail||"这篇内容有待处理的资料库副本"}</span><button onClick={()=>openReview(selected.key,issues(selected)[0]?.target)}>查看处理记录</button></div>}
           <div className="reading-article-kicker"><strong>{readingSourceLabel(selectedSource)}</strong><span aria-hidden="true">·</span><span>约 {readingMinutes(selected.post.text)} 分钟阅读</span></div>
@@ -735,7 +745,23 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
           <span aria-hidden="true">·</span>
           <button type="button" disabled={propertyBusy} onClick={()=>void lifecycle(selected,selected.lifecycle==="archived"?"active":"archived")}><Archive size={14}/>{selected.lifecycle==="archived"?"恢复到阅读":"归档"}</button>
         </footer>}
-      </div></PreviewFrame></>}
+      </div>
+      {/* Reading items (provider="hub") are excluded from external-library favorites/context menus
+          (ResultList.tsx:97, RecentResultList.tsx:119, SearchResultsPane.tsx:131), so snippet favorite
+          is intentionally omitted here rather than creating orphaned hub entries in hub-desktop-favorites-v2. */}
+      <PreviewSelectionActions
+        scrollRef={readingContentRef}
+        contentKey={selected.key}
+        title={fullTitle(selected)}
+        agentEntry={{ itemKey: selected.key, title: fullTitle(selected) }}
+        onNotify={(message, tone) => {
+          if (tone === "error") setError(message);
+          else setNotice(message);
+          publishCodexNotice(message, tone === "error" ? "error" : "success", tone === "error" ? 6000 : 2500);
+        }}
+        enabled={!runtimeCapabilities.mobile}
+      />
+      </PreviewFrame></>}
     </div>
     </div>
 

@@ -6,16 +6,24 @@ import {
   ArrowUpRight,
   ArrowLeft,
   ArrowRight,
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
   LoaderCircle,
+  Maximize2,
+  Minimize2,
   MoreHorizontal,
   Pin,
   PinOff,
+  Star,
 } from "lucide-react";
 import { lazy, memo, Suspense, useCallback, useLayoutEffect, useEffect, useRef, useState, type Dispatch, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject, type SetStateAction } from "react";
+import { snippetFavoriteKey } from "./PageFavorites";
+import { PreviewSelectionActions, type SelectionNotifyTone, type SelectionSnippetOutcome } from "./PreviewSelectionActions";
+import { PreviewTocPopover } from "./PreviewTocPopover";
+import { userProfileStorage } from "./UserProfileStorage";
 import { SharedTaskPreviewStatus } from "./SharedTaskPreviewStatus";
 import { isTaskPreviewResult } from "./TaskResultIdentity";
 import type { SearchProvider } from "./ProviderLabels";
@@ -34,12 +42,22 @@ import type {
 
 const LazyPreviewTaskTitle = lazy(() => import("./PreviewTaskTitle"));
 const LazyAgentInvestigation = lazy(() => import("./AgentInvestigation").then(module => ({ default: module.AgentInvestigation })));
+const PREVIEW_WIDE_TEXT_KEY = "hub.preview.wide-text.v1";
+
+function loadPreviewWideText(): boolean {
+  try {
+    return userProfileStorage.getItem(PREVIEW_WIDE_TEXT_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
 
 export type PreviewPaneProps = {
   className?: string;
   label?: string;
   onClose?: () => void;
   toolbarActions?: ReactNode;
+  moreMenuItems?: ReactNode;
   contentBefore?: ReactNode;
   selected?: SearchResult;
   canGoBack: boolean;
@@ -73,6 +91,13 @@ export type PreviewPaneProps = {
   canNavigateJournalOlder?: boolean;
   canNavigateJournalNewer?: boolean;
   onNavigateJournalDate?: (direction: -1 | 1) => void;
+  isFavorite?: boolean;
+  snippetFavoriteIds?: ReadonlySet<string>;
+  onToggleFavorite?: (result: SearchResult) => SelectionSnippetOutcome;
+  onToggleSnippetFavorite?: (result: SearchResult) => SelectionSnippetOutcome;
+  previewFocusMode?: boolean;
+  onTogglePreviewFocus?: () => void;
+  onNotify?: (message: string, tone?: SelectionNotifyTone) => void;
 };
 
 export const PreviewPane = memo(function PreviewPane({
@@ -80,6 +105,7 @@ export const PreviewPane = memo(function PreviewPane({
   label,
   onClose,
   toolbarActions,
+  moreMenuItems,
   contentBefore,
   selected,
   canGoBack,
@@ -113,9 +139,28 @@ export const PreviewPane = memo(function PreviewPane({
   canNavigateJournalOlder,
   canNavigateJournalNewer,
   onNavigateJournalDate,
+  isFavorite = false,
+  snippetFavoriteIds,
+  onToggleFavorite,
+  onToggleSnippetFavorite,
+  previewFocusMode = false,
+  onTogglePreviewFocus,
+  onNotify,
 }: PreviewPaneProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const previewTheme = usePreviewTheme(contentRef);
+  const [wideText, setWideText] = useState<boolean>(loadPreviewWideText);
+  const toggleWideText = useCallback(() => {
+    setWideText((current) => {
+      const next = !current;
+      try {
+        userProfileStorage.setItem(PREVIEW_WIDE_TEXT_KEY, String(next));
+      } catch {
+        // Ignore storage unavailability so reading still works.
+      }
+      return next;
+    });
+  }, []);
   const [citation, setCitation] = useState<CitationLocation | null>(null);
   const previousScroll = useRef<number | null>(null);
   const showCitation = useCallback((value: CitationLocation | null) => {
@@ -142,8 +187,10 @@ export const PreviewPane = memo(function PreviewPane({
   const taskPreview = isTaskPreviewResult(selected);
   const themedDocument = runtimeCapabilities.platform !== "android" && !isPdfContent(selected?.contentType) && !pdfPreview && !ocrImagePreview && !taskPreview && !!renderedPreviewMarkdown;
   const canOpenSource = canOpenResultSource(selected, spaces, runtimeCapabilities.platform);
+  const supportsFavorites = Boolean(selected && selected.provider !== "hub");
+  const showMoreMenu = Boolean(journalDate || moreMenuItems || (runtimeCapabilities.platform !== "android" && onTogglePreviewFocus));
   return (
-    <PreviewFrame className={`${className || ""}${citation ? " preview-citation-active" : ""}${themedDocument && previewTheme.theme === "craft" ? " preview-theme-craft" : ""}`} label={label} cardRef={previewCard} empty={!selected ? <div className="preview-placeholder">选择一个结果以预览完整页面</div> : undefined} onMouseDown={(event) => {
+    <PreviewFrame className={`${className || ""}${citation ? " preview-citation-active" : ""}${themedDocument && previewTheme.theme === "craft" ? " preview-theme-craft" : ""}${runtimeCapabilities.platform !== "android" && wideText ? " preview-wide-text" : ""}`} label={label} cardRef={previewCard} empty={!selected ? <div className="preview-placeholder">选择一个结果以预览完整页面</div> : undefined} onMouseDown={(event) => {
       if (event.target === event.currentTarget) startWindowDrag(event);
     }}>
       {selected && (
@@ -167,9 +214,43 @@ export const PreviewPane = memo(function PreviewPane({
                   <button title="上一个预览（Alt+←）" aria-label="上一个预览" disabled={!canGoBack} onClick={() => onNavigatePreviewHistory(-1)}><ArrowLeft size={16} /></button>
                   <button title="下一个预览（Alt+→）" aria-label="下一个预览" disabled={!canGoForward} onClick={() => onNavigatePreviewHistory(1)}><ArrowRight size={16} /></button>
                   {onTogglePreviewPinned && <button className={`preview-pin ${previewPinned ? "active" : ""}`} title={previewPinned ? "解除固定预览" : "固定预览"} aria-label={previewPinned ? "解除固定预览" : "固定预览"} aria-pressed={previewPinned} onClick={onTogglePreviewPinned}>{previewPinned ? <PinOff size={16} /> : <Pin size={16} />}</button>}
+                  {runtimeCapabilities.platform !== "android" && !citation && !isPdfContent(selected.contentType) && (
+                    <PreviewTocPopover contentRef={contentRef} contentKey={`${selected.id}:${previewMarkdown?.length ?? 0}`} />
+                  )}
+                  {runtimeCapabilities.platform !== "android" && onTogglePreviewFocus && (
+                    <button
+                      type="button"
+                      className={`preview-focus-btn${previewFocusMode ? " active" : ""}`}
+                      title={previewFocusMode ? "退出专注阅读（Esc）" : "全宽专注阅读"}
+                      aria-label={previewFocusMode ? "退出专注阅读" : "全宽专注阅读"}
+                      aria-pressed={previewFocusMode}
+                      onClick={onTogglePreviewFocus}
+                    >
+                      {previewFocusMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                    </button>
+                  )}
+                  {runtimeCapabilities.platform !== "android" && supportsFavorites && onToggleFavorite && (
+                    <button
+                      type="button"
+                      className={`preview-favorite-btn${isFavorite ? " active" : ""}`}
+                      title={isFavorite ? "取消收藏本页" : "收藏本页"}
+                      aria-label={isFavorite ? "取消收藏本页" : "收藏本页"}
+                      aria-pressed={isFavorite}
+                      onClick={() => {
+                        try {
+                          onToggleFavorite(selected);
+                        } catch (reason) {
+                          const detail = reason instanceof Error ? reason.message : String(reason);
+                          onNotify?.(`收藏操作失败：${detail}`, "error");
+                        }
+                      }}
+                    >
+                      <Star size={15} fill={isFavorite ? "currentColor" : "none"} />
+                    </button>
+                  )}
                   {toolbarActions}
                   {runtimeCapabilities.desktop && selected.provider !== "hub" && <Suspense fallback={null}><LazyAgentInvestigation result={selected} compact onPreviewCitation={showCitation} /></Suspense>}
-                  {journalDate && <details className="preview-more-menu" onKeyDown={(event) => {
+                  {showMoreMenu && <details className="preview-more-menu" onKeyDown={(event) => {
                     if (event.key === "Escape") {
                       event.stopPropagation();
                       event.currentTarget.open = false;
@@ -182,7 +263,13 @@ export const PreviewPane = memo(function PreviewPane({
                         <button disabled={!canNavigateJournalOlder} onClick={() => onNavigateJournalDate?.(1)}><ChevronLeft size={16} /><span>较早的日志</span></button>
                         <button disabled={!canNavigateJournalNewer} onClick={() => onNavigateJournalDate?.(-1)}><ChevronRight size={16} /><span>较新的日志</span><small>{journalDate}</small></button>
                       </>}
-
+                      {moreMenuItems}
+                      {runtimeCapabilities.platform !== "android" && onTogglePreviewFocus && (
+                        <button type="button" aria-pressed={wideText} onClick={toggleWideText}>
+                          {wideText ? <Check size={14} /> : null}
+                          <span>宽松行宽</span>
+                        </button>
+                      )}
                     </div>
                   </details>}
             </PreviewToolbar>}>
@@ -232,6 +319,16 @@ export const PreviewPane = memo(function PreviewPane({
               const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
               contentRef.current?.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
             }}><ArrowUp size={18} aria-hidden="true" /></button>}
+            <PreviewSelectionActions
+              scrollRef={contentRef}
+              contentKey={selected.id}
+              title={resultDisplayTitle(selected)}
+              agentEntry={selected.provider !== "hub" ? { result: selected } : null}
+              isSnippetSaved={supportsFavorites && snippetFavoriteIds ? (text) => snippetFavoriteIds.has(snippetFavoriteKey({ ...selected, favoriteKind: "snippet", snippet: text })) : undefined}
+              onSaveSnippet={supportsFavorites && onToggleSnippetFavorite ? (text) => onToggleSnippetFavorite({ ...selected, favoriteKind: "snippet", snippet: text }) : undefined}
+              onNotify={onNotify}
+              enabled={!citation && !isPdfContent(selected.contentType) && !previewLoading}
+            />
         </>
       )}
     </PreviewFrame>

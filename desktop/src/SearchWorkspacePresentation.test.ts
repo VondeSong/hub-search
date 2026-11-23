@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveSearchWorkspaceResults, journalDateKey } from "./SearchWorkspacePresentation";
+import { deriveSearchWorkspaceResults, findMatchingResultIndex, journalDateKey } from "./SearchWorkspacePresentation";
 import type { SearchResult } from "./SearchTypes";
 
 function result(id: string, title: string, libraryId = "main", modifiedAt?: number): SearchResult {
@@ -109,5 +109,14 @@ it("uses grouped hit order for main-window navigation", () => {
   const presentation = derive({ query: "match", results: [first, result("b", "Page B"), third] });
   expect(presentation.visibleResults.map(r => r.id)).toEqual(["a1", "a2", "a3", "b"]);
   expect(presentation.visibleResults[1].blockId).toBe("block-a2");
+});
+
+it("matches visible results by entityKey, id, or document identity and returns -1 when absent", () => {
+  const first = result("a", "Doc A", "lib-1");
+  const second = { ...result("b", "Doc B", "lib-1"), entityKey: "craft:b", documentId: "doc-b", pageId: "p-2" };
+  expect(findMatchingResultIndex([first, second], second)).toBe(1);
+  expect(findMatchingResultIndex([first, second], { ...second, entityKey: "other-key" })).toBe(1);
+  expect(findMatchingResultIndex([first, second], { ...second, id: "hit-b", entityKey: "hit:b" })).toBe(1);
+  expect(findMatchingResultIndex([first, second], result("missing", "Other", "lib-1"))).toBe(-1);
 });
 
