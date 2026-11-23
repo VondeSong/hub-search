@@ -24,6 +24,7 @@
 ```text
 local sites/
 ├── index.html          # 统一入口（双击或通过本地服务打开）
+├── workspace.css       # 主工作台样式
 ├── modules/
 │   ├── agents.html     # Hub 助手高保真工作区（支持 ?embed=1 嵌入）
 │   ├── reading.html    # 阅读工作区 v2（支持 ?embed=1 嵌入）
