@@ -17,6 +17,11 @@ const DESKTOP_FAVORITE_TAGS_KEY = "hub-desktop-favorite-tags-v1";
 const DESKTOP_RECENT_TAGS_KEY = "hub-desktop-recent-tags-v1";
 const DESKTOP_TAG_GROUPS_KEY = "hub-desktop-tag-groups-v1";
 const DESKTOP_TAG_PROPERTIES_KEY = "hub-desktop-tag-properties-v1";
+const DESKTOP_TOPICS_KEY = "hub-desktop-topics-v1";
+
+function topicId(name: string): string {
+  return name.trim().replace(/^#+/, "").trim().toLowerCase();
+}
 
 function loadStoredStrings(key: string, limit: number): string[] {
   try {
@@ -57,15 +62,29 @@ type Options = {
 
 /** Owns tag queries, facets, taxonomy invalidation and all saved tag organization. */
 export function useSidebarTags({ ready, libraryCount, currentSpaceIds, effectiveSpaceIds, effectiveFolderId, query, dateFilter, sourceFilters, searchScope, documentCount, dynamicFacetCountsEnabled, activeView, normalizeResults, setError }: Options) {
-const [sidebarTags, setSidebarTags] = useState<SidebarTagSummary[]>([]);
+const [indexedTags, setIndexedTags] = useState<SidebarTagSummary[]>([]);
+const [localTopics, setLocalTopics] = useState<string[]>(() => loadStoredStrings(DESKTOP_TOPICS_KEY, Infinity));
+const sidebarTags = useMemo(() => {
+    const indexed = new Set(indexedTags.map(tag => tag.normalizedName));
+    return [...indexedTags, ...localTopics.flatMap(name => indexed.has(topicId(name)) ? [] : [{ name, normalizedName: topicId(name), count: 0 }])];
+  }, [indexedTags, localTopics]);
 
 const [selectedSidebarTag, setSelectedSidebarTag] = useState("");
+const [visitedTopic, setVisitedTopic] = useState<SidebarTagSummary | null>(null);
+const selectWorkspaceTopic = useCallback((tag: SidebarTagSummary) => {
+    if (!sidebarTags.some(item => item.normalizedName === tag.normalizedName)) setVisitedTopic(tag);
+    setSelectedSidebarTag(tag.normalizedName);
+  }, [sidebarTags]);
+const selectedSidebarTagSummary = useMemo(() => (
+    sidebarTags.find(item => item.normalizedName === selectedSidebarTag)
+    ?? (visitedTopic?.normalizedName === selectedSidebarTag ? visitedTopic : undefined)
+  ), [selectedSidebarTag, sidebarTags, visitedTopic]);
 
 const [tagResults, setTagResults] = useState<SearchResult[]>([]);
 
 const [tagResultsFor, setTagResultsFor] = useState("");
 
-const [relatedSidebarTags, setRelatedSidebarTags] = useState<SidebarTagSummary[]>([]);
+const [relatedSnapshot, setRelatedSnapshot] = useState<{ key: string; tags: SidebarTagSummary[] }>({ key: "", tags: [] });
 
 const [tagsLoading, setTagsLoading] = useState(false);
 
@@ -81,9 +100,13 @@ const [tagProperties, setTagProperties] = useState<TagUserPropertyMap>(() => (
     parseTagUserProperties(userProfileStorage.getItem(DESKTOP_TAG_PROPERTIES_KEY))
   ));
 
-const [selectedTagTaxonomy, setSelectedTagTaxonomy] = useState<TagTaxonomySummary | null>(null);
+const [taxonomySnapshot, setTaxonomySnapshot] = useState<{ key: string; summary: TagTaxonomySummary } | null>(null);
 
 const [tagTaxonomyRevision, setTagTaxonomyRevision] = useState(0);
+const taxonomyKey = JSON.stringify([selectedSidebarTag, tagTaxonomyRevision]);
+const relatedKey = JSON.stringify([selectedSidebarTag, effectiveSpaceIds, tagTaxonomyRevision]);
+const selectedTagTaxonomy = activeView === "tags" && taxonomySnapshot?.key === taxonomyKey ? taxonomySnapshot.summary : null;
+const relatedSidebarTags = useMemo(() => activeView === "tags" && relatedSnapshot.key === relatedKey ? relatedSnapshot.tags : [], [activeView, relatedKey, relatedSnapshot]);
 
 const displayedSidebarTags = useMemo(() => dynamicFacetCountsEnabled
     ? sidebarTags.map((tag) => ({ ...tag, count: dynamicFacets.tags[tag.normalizedName] ?? 0 }))
@@ -126,9 +149,9 @@ useEffect(() => {
       limit: 500,
     }).then((tags) => {
       if (cancelled) return;
-      setSidebarTags(tags);
+      setIndexedTags(tags);
       setSelectedSidebarTag((current) => (
-        current && tags.some((tag) => tag.normalizedName === current) ? current : ""
+        current && (tags.some((tag) => tag.normalizedName === current) || localTopics.some(name => topicId(name) === current) || visitedTopic?.normalizedName === current) ? current : ""
       ));
     }).catch((reason) => {
       if (!cancelled) setError(String(reason));
@@ -136,7 +159,7 @@ useEffect(() => {
       if (!cancelled) setTagsLoading(false);
     });
     return () => { cancelled = true; };
-  }, [currentSpaceIds, ready, libraryCount, tagTaxonomyRevision]);
+  }, [currentSpaceIds, ready, libraryCount, tagTaxonomyRevision, localTopics, visitedTopic]);
 
 const tagResultContext = JSON.stringify([selectedSidebarTag, effectiveSpaceIds, effectiveFolderId, dateFilter, sourceFilters.craft, sourceFilters.task, tagTaxonomyRevision]);
 
@@ -146,7 +169,7 @@ useEffect(() => {
       setTagResultsFor("");
       return;
     }
-    const selectedTag = sidebarTags.find((tag) => tag.normalizedName === selectedSidebarTag);
+    const selectedTag = selectedSidebarTagSummary;
     if (!selectedTag) return;
     let cancelled = false;
     void invoke<unknown>("local_search", {
@@ -171,11 +194,10 @@ useEffect(() => {
       if (!cancelled) setError(String(reason));
     });
     return () => { cancelled = true; };
-  }, [dateFilter, activeView, effectiveFolderId, effectiveSpaceIds, ready, selectedSidebarTag, sidebarTags, sourceFilters.craft, sourceFilters.task, tagTaxonomyRevision, tagResultContext]);
+  }, [dateFilter, activeView, effectiveFolderId, effectiveSpaceIds, ready, selectedSidebarTag, selectedSidebarTagSummary, sourceFilters.craft, sourceFilters.task, tagTaxonomyRevision, tagResultContext]);
 
 useEffect(() => {
     if (activeView !== "tags" || !selectedSidebarTag || !ready) {
-      setRelatedSidebarTags([]);
       return;
     }
     let cancelled = false;
@@ -184,16 +206,15 @@ useEffect(() => {
       spaceIds: effectiveSpaceIds,
       limit: 3,
     }).then((tags) => {
-      if (!cancelled) setRelatedSidebarTags(tags);
+      if (!cancelled) setRelatedSnapshot({ key: relatedKey, tags });
     }).catch((reason) => {
       if (!cancelled) setError(String(reason));
     });
     return () => { cancelled = true; };
-  }, [activeView, effectiveSpaceIds, ready, selectedSidebarTag, tagTaxonomyRevision]);
+  }, [activeView, effectiveSpaceIds, ready, selectedSidebarTag, relatedKey]);
 
 useEffect(() => {
     if (activeView !== "tags" || !selectedSidebarTag || !ready) {
-      setSelectedTagTaxonomy(null);
       return;
     }
     let cancelled = false;
@@ -201,15 +222,15 @@ useEffect(() => {
       tag: selectedSidebarTag,
       limit: 100,
     }).then((result) => {
-      if (!cancelled) setSelectedTagTaxonomy(result.summary);
+      if (!cancelled) setTaxonomySnapshot({ key: taxonomyKey, summary: result.summary });
     }).catch((reason) => {
       if (!cancelled) {
-        setSelectedTagTaxonomy(null);
+        setTaxonomySnapshot(null);
         setError(String(reason));
       }
     });
     return () => { cancelled = true; };
-  }, [activeView, ready, selectedSidebarTag, tagTaxonomyRevision]);
+  }, [activeView, ready, selectedSidebarTag, taxonomyKey]);
 
 const toggleFavoriteSidebarTag = useCallback((normalizedName: string) => {
     setFavoriteSidebarTags((current) => {
@@ -276,10 +297,19 @@ const updateSidebarTagProperty = useCallback((normalizedName: string, property: 
     });
   }, []);
 
-const selectedSidebarTagSummary = useMemo(
-    () => sidebarTags.find((item) => item.normalizedName === selectedSidebarTag),
-    [selectedSidebarTag, sidebarTags],
-  );
+const createSidebarTopic = useCallback((rawName: string, groupId: string, description: string): SidebarTagSummary | null => {
+    const name = rawName.trim().replace(/^#+/, "").trim();
+    const normalizedName = topicId(name);
+    if (!normalizedName || sidebarTags.some(tag => tag.normalizedName === normalizedName)) return null;
+    setLocalTopics(current => {
+      const next = [...current, name];
+      userProfileStorage.setItem(DESKTOP_TOPICS_KEY, JSON.stringify(next));
+      return next;
+    });
+    if (groupId) assignSidebarTagToGroup(normalizedName, groupId);
+    if (description) updateSidebarTagProperty(normalizedName, { description });
+    return { name, normalizedName, count: 0 };
+  }, [sidebarTags, assignSidebarTagToGroup, updateSidebarTagProperty]);
 
 const selectedSidebarTagGroup = useMemo(() => {
     if (!selectedSidebarTagSummary) return "未分组";
@@ -309,5 +339,5 @@ const selectedSidebarTagRelated = useMemo(() => (
   ), [relatedSidebarTags, tagProperties]);
 
   const refreshSidebarTags = useCallback(() => setTagTaxonomyRevision(current => current + 1), []);
-  return { sidebarTags, selectedSidebarTag, setSelectedSidebarTag, tagResults, tagResultsFor, relatedSidebarTags, tagsLoading, dynamicFacets, favoriteSidebarTags, recentSidebarTags, sidebarTagGroups, tagProperties, selectedTagTaxonomy, tagTaxonomyRevision, tagResultContext, displayedSidebarTags, cleanupSidebarTags, selectedSidebarTagSummary, selectedSidebarTagGroup, selectedSidebarTagLibraryCount, selectedSidebarTagLastUpdated, selectedSidebarTagRelated, toggleFavoriteSidebarTag, rememberSidebarTag, createSidebarTagGroup, deleteSidebarTagGroup, assignSidebarTagToGroup, updateSidebarTagProperty, refreshSidebarTags };
+  return { sidebarTags, selectedSidebarTag, setSelectedSidebarTag, selectWorkspaceTopic, tagResults, tagResultsFor, relatedSidebarTags, tagsLoading, dynamicFacets, favoriteSidebarTags, recentSidebarTags, sidebarTagGroups, tagProperties, selectedTagTaxonomy, tagTaxonomyRevision, tagResultContext, displayedSidebarTags, cleanupSidebarTags, selectedSidebarTagSummary, selectedSidebarTagGroup, selectedSidebarTagLibraryCount, selectedSidebarTagLastUpdated, selectedSidebarTagRelated, toggleFavoriteSidebarTag, rememberSidebarTag, createSidebarTagGroup, deleteSidebarTagGroup, assignSidebarTagToGroup, updateSidebarTagProperty, createSidebarTopic, refreshSidebarTags };
 }

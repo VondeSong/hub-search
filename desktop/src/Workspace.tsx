@@ -8,6 +8,7 @@ import type {
 import { PreviewPane } from "./PreviewPane";
 import { SearchResultsPane } from "./SearchResultsPane";
 import { useState } from "react";
+import { DesktopTagsWorkspace, type DesktopTopicCatalog } from "./DesktopTagsWorkspace";
 
 type SearchResultsPaneProps = ComponentProps<typeof SearchResultsPane>;
 type PreviewPaneProps = ComponentProps<typeof PreviewPane>;
@@ -20,6 +21,7 @@ export type WorkspaceProps = {
   resultsPanePercent: number;
   resultsPaneProps: SearchResultsPaneProps;
   previewPaneProps: PreviewPaneProps;
+  desktopTopicCatalog?: DesktopTopicCatalog;
   onResizePreviewPanes: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onResetPreviewSplit: () => void;
 };
@@ -78,6 +80,9 @@ function WorkspaceContent({
 }
 
 export function DesktopWorkspace(props: WorkspaceProps) {
+  if (props.resultsPaneProps.collectionView === "tags" && !props.resultsPaneProps.query.trim() && props.desktopTopicCatalog) {
+    return <DesktopTagsWorkspace workspaceRef={props.workspaceRef} data={props.resultsPaneProps} preview={props.previewPaneProps} catalog={props.desktopTopicCatalog} />;
+  }
   return <WorkspaceContent {...props} layout="desktop" />;
 }
 

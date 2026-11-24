@@ -292,7 +292,7 @@ function AppContent() {
   const { storageInfo, storageMode, setStorageMode, storageCustomPath, setStorageCustomPath, changingStorage, chooseStorageFolder, applyStorageLocation, revealStorageLocation, cleaning, cleanupLocalData, retryingOcr, retryFailedOcr, retryingFailedJobs, retryFailedJobs, dismissingFailedJobs, dismissFailedJobs, restartingWatcher, restartWatcher, exportingLibraryId, exportProgress, lastExportPath, exportError, exportCraftVault, chooseExportDirectory, openExportInObsidian, openExportPath, maintenanceMessage, setMaintenanceMessage } = useStorageMaintenance({ statusSpaceId: currentStatusSpaceArg, refreshStatus, settingsOpen: showConnection });
   useEffect(() => { if (maintenanceMessage) showOperationStatus(maintenanceMessage, "success", 6000); }, [maintenanceMessage, showOperationStatus]);
 
-  const { sidebarTags, selectedSidebarTag, setSelectedSidebarTag, tagResults, tagResultsFor, tagsLoading, dynamicFacets, favoriteSidebarTags, recentSidebarTags, sidebarTagGroups, tagProperties, selectedTagTaxonomy, tagTaxonomyRevision, tagResultContext, displayedSidebarTags, cleanupSidebarTags, selectedSidebarTagSummary, selectedSidebarTagGroup, selectedSidebarTagLibraryCount, selectedSidebarTagLastUpdated, selectedSidebarTagRelated, toggleFavoriteSidebarTag, rememberSidebarTag, createSidebarTagGroup, deleteSidebarTagGroup, assignSidebarTagToGroup, updateSidebarTagProperty, refreshSidebarTags } = useSidebarTags({ ready, libraryCount: spaces.length, currentSpaceIds, effectiveSpaceIds, effectiveFolderId, query, dateFilter, sourceFilters, searchScope, documentCount: indexStatus?.documentCount, dynamicFacetCountsEnabled: appSettings.dynamicFacetCountsEnabled, activeView: desktopSidebarView, normalizeResults, setError });
+  const { sidebarTags, selectedSidebarTag, setSelectedSidebarTag, selectWorkspaceTopic, tagResults, tagResultsFor, tagsLoading, dynamicFacets, favoriteSidebarTags, recentSidebarTags, sidebarTagGroups, tagProperties, selectedTagTaxonomy, tagTaxonomyRevision, tagResultContext, displayedSidebarTags, cleanupSidebarTags, selectedSidebarTagSummary, selectedSidebarTagGroup, selectedSidebarTagLibraryCount, selectedSidebarTagLastUpdated, selectedSidebarTagRelated, toggleFavoriteSidebarTag, rememberSidebarTag, createSidebarTagGroup, deleteSidebarTagGroup, assignSidebarTagToGroup, updateSidebarTagProperty, createSidebarTopic, refreshSidebarTags } = useSidebarTags({ ready, libraryCount: spaces.length, currentSpaceIds, effectiveSpaceIds, effectiveFolderId, query, dateFilter, sourceFilters, searchScope, documentCount: indexStatus?.documentCount, dynamicFacetCountsEnabled: appSettings.dynamicFacetCountsEnabled, activeView: desktopSidebarView, normalizeResults, setError });
   const libraryManagement = useLibraryManagement(ready, async () => { await reloadSpaces(); refreshSidebarTags(); });
   const { syncing, refreshIndex } = useWorkspaceIndexing({ ready, spaces, activeSpaces, selectedLibraryIds, documentCount: indexStatus?.documentCount, libraryManagement, reloadSpaces, refreshStatus, setError, showOperationStatus });
 const searchUpdatedAfter = useMemo(() => updatedAfter(dateFilter), [dateFilter]);
@@ -1144,6 +1144,17 @@ useEffect(() => {
   const shellStyle = appShellStyle(appSettings);
   const workspaceProps: WorkspaceProps = {
     workspaceRef,
+    desktopTopicCatalog: desktopSidebarView === "tags" && !isMobileLayout ? {
+      tags: sidebarTags,
+      groups: sidebarTagGroups,
+      properties: tagProperties,
+      favorites: favoriteSidebarTags,
+      recent: recentSidebarTags,
+      cleanupCount: cleanupSidebarTags.length,
+      onCloseCleanup: selectSidebarTagOverview,
+      onSearch: (name) => { selectDesktopSidebarView("home"); setQuery(name); },
+      onCreate: createSidebarTopic,
+    } : undefined,
     showPreviewPane,
     previewFocusMode,
     resultsPanePercent,
@@ -1242,8 +1253,11 @@ useEffect(() => {
       onSelectCollectionTag: (tag) => {
         if (isMobileLayout) {
           window.history.pushState({ ...(window.history.state ?? {}), hubMobileRoute: "tags", hubMobileTag: tag.normalizedName }, "");
+          setSelectedSidebarTag(tag.normalizedName);
+        } else {
+          setPreviewHistoryActive(false);
+          selectWorkspaceTopic(tag);
         }
-        setSelectedSidebarTag(tag.normalizedName);
         rememberSidebarTag(tag.normalizedName);
         setSelectedIndex(0);
       },
