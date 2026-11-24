@@ -96,7 +96,10 @@ const SidebarLibraryPanel = memo(function SidebarLibraryPanel({
       if (!libraryMenuRef.current?.contains(event.target as Node)) setLibraryMenuOpen(false);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setLibraryMenuOpen(false);
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setLibraryMenuOpen(false);
+      libraryMenuRef.current?.querySelector<HTMLButtonElement>(".sidebar-library-more")?.focus();
     };
     document.addEventListener("pointerdown", closeOnOutsidePress);
     document.addEventListener("keydown", closeOnEscape);
@@ -135,7 +138,7 @@ const SidebarLibraryPanel = memo(function SidebarLibraryPanel({
               <MoreHorizontal size={15} />
             </button>
             {libraryMenuOpen && (
-              <div className="sidebar-library-menu" role="menu" aria-label="资料库操作">
+              <div className="sidebar-library-menu" role="menu" aria-label="资料库操作" data-hub-keyboard-scope="sidebar-library-menu" data-keyboard-open="true">
                 <button role="menuitem" disabled={spaces.length === 0} onClick={() => { onToggleAllLibraries(); setLibraryMenuOpen(false); }}>
                   <Check size={13} />
                   <span>{allLibrariesSelected ? "取消全部选择" : "选择全部"}</span>
