@@ -6,19 +6,48 @@ export type ReadMode='fresh'|'cached'|'partial';
 export type AnalysisRequest={id:number;mode:AnalysisMode;label:string;taskIds:string[]};
 export type TaskEvidence={id:string;title:string;source:string;text:string};
 export type TaskAdvice={id:string;taskId:string;title:string;reason:string;text:string;kind:'today'|'note'|'source';revision:string;evidence:TaskEvidence[]};
-export type AdoptionReceipt={id:string;taskId:string;message:string;at:string};
-export type AnalysisMemory={today:Record<string,string>;notes:Record<string,string>;receipts:AdoptionReceipt[]};
-export const emptyAnalysisMemory=():AnalysisMemory=>({today:{},notes:{},receipts:[]});
+export type AdoptionReceipt={id:string;taskId:string;message:string;at:string;before?:string;after?:string;revision?:string};
+export type WaitingCondition={person:string;reason:string;reviewDate?:string};
+export type AnalysisMemory={today:Record<string,string>;notes:Record<string,string>;waiting?:Record<string,WaitingCondition>;receipts:AdoptionReceipt[]};
+export const emptyAnalysisMemory=():AnalysisMemory=>({today:{},notes:{},waiting:{},receipts:[]});
 export function parseAnalysisMemory(raw:string|null):AnalysisMemory|null {
  if(!raw)return emptyAnalysisMemory();
  try{const value=JSON.parse(raw);const record=(x:unknown)=>!!x&&typeof x==='object'&&!Array.isArray(x);
   if(!record(value)||!record(value.today)||!record(value.notes)||!Array.isArray(value.receipts))return null;
   if(!Object.values(value.today).every(x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x))||!Object.values(value.notes).every(x=>typeof x==='string'))return null;
   if(!value.receipts.every((r:AdoptionReceipt)=>r&&['id','taskId','message','at'].every(k=>typeof r[k as keyof AdoptionReceipt]==='string')))return null;
-  return value;
+  const waiting:Record<string,WaitingCondition>={};
+  if(record(value.waiting)){
+   for(const [k,v] of Object.entries(value.waiting as Record<string,unknown>)){
+    if(record(v)){
+     const item=v as Record<string,unknown>;
+     if(typeof item.person==='string'&&typeof item.reason==='string'){
+      waiting[k]={person:item.person,reason:item.reason,...(typeof item.reviewDate==='string'?{reviewDate:item.reviewDate}:{})};
+     }
+    }
+   }
+  }
+  return {today:value.today,notes:value.notes,waiting,receipts:value.receipts};
  }catch{return null;}
 }
 export const analysisRevision=(task:AnalysisTask)=>JSON.stringify([task.id,task.title,task.description,task.project,task.source,task.date,task.status,task.priority,task.parent]);
+export function shortRevisionHash(revision:string):string {
+ let hash=2166136261;
+ for(let i=0;i<revision.length;i++){hash^=revision.charCodeAt(i);hash=Math.imul(hash,16777619);}
+ return (hash>>>0).toString(16).padStart(8,'0');
+}
+export function toggleTodayPlan(memory:AnalysisMemory,taskId:string,day:string):AnalysisMemory {
+ const nextToday={...memory.today};
+ if(nextToday[taskId]===day)delete nextToday[taskId];
+ else nextToday[taskId]=day;
+ return {...memory,today:nextToday};
+}
+export function setWaitingCondition(memory:AnalysisMemory,taskId:string,condition:WaitingCondition|null):AnalysisMemory {
+ const nextWaiting={...(memory.waiting||{})};
+ if(!condition||(!condition.person.trim()&&!condition.reason.trim()))delete nextWaiting[taskId];
+ else nextWaiting[taskId]={person:condition.person.trim()||'外部协作者',reason:condition.reason.trim()||'等待确认条件',...(condition.reviewDate?{reviewDate:condition.reviewDate}:{})};
+ return {...memory,waiting:nextWaiting};
+}
 export function buildTaskAdvice(tasks:AnalysisTask[],request:AnalysisRequest,evidence:Record<string,TaskEvidence[]>,readMode:ReadMode,day:string):TaskAdvice[]{
  const ids=new Set(request.taskIds);
  const scoped=tasks.filter(task=>ids.has(task.id)&&task.status!=='done');
@@ -43,9 +72,9 @@ export function adoptionError(task:AnalysisTask|undefined,advice:TaskAdvice,read
  if(advice.kind==='source'&&readMode==='cached')return '当前使用旧数据，请先刷新并重新分析，再修改来源。';
  return '';
 }
-export function applyLocalAdvice(memory:AnalysisMemory,advice:TaskAdvice,day:string,at:string):AnalysisMemory {
+export function applyLocalAdvice(memory:AnalysisMemory,advice:TaskAdvice,day:string,at:string,beforeText?:string):AnalysisMemory {
  if(memory.receipts.some(r=>r.id===advice.id))return memory;
  return {...memory,today:advice.kind==='today'?{...memory.today,[advice.taskId]:day}:memory.today,
   notes:advice.kind==='note'?{...memory.notes,[advice.taskId]:advice.text}:memory.notes,
-  receipts:[{id:advice.id,taskId:advice.taskId,at,message:advice.kind==='today'?'已加入 Hub 今日计划，只引用原任务；来源日期与状态未改。':advice.kind==='note'?'已保留到这条任务的 Hub 建议笔记，原任务未改。':'演示来源已确认更新任务说明，保留任务 ID、日期、状态与清单。'},...memory.receipts].slice(0,50)};
+  receipts:[{id:advice.id,taskId:advice.taskId,at,message:advice.kind==='today'?'已加入 Hub 今日计划，只引用原任务；来源日期与状态未改。':advice.kind==='note'?'已保留到这条任务的 Hub 建议笔记，原任务未改。':'演示来源已确认更新任务说明，保留任务 ID、日期、状态与清单。',...(advice.kind==='source'?{before:beforeText??'',after:advice.text}:{})},...memory.receipts].slice(0,50)};
 }
