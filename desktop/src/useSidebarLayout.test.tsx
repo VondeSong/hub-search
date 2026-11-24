@@ -31,6 +31,32 @@ it("returns to the user's expanded layout after leaving focus", async () => {
   } finally { await act(async()=>root.unmount()); host.remove(); }
 });
 
+it("temporarily collapses navigation for the docked assistant and allows reopening it", async () => {
+  const { host, root, toggle } = await exercise(false);
+  const status = () => host.querySelector("output")!.textContent;
+  const dock = async (open: boolean) => {
+    await act(async () => { document.body.classList.toggle("agent-sidebar-open", open); });
+  };
+  try {
+    await dock(true);
+    expect(status()).toBe("focus:false:240");
+    expect(localStorage.getItem("hub.sidebar.mode")).toBe("standard");
+    await dock(false);
+    expect(status()).toBe("standard:true:240");
+
+    await dock(true);
+    await act(async () => toggle.click());
+    expect(status()).toBe("standard:true:240");
+    await dock(false);
+    await dock(true);
+    expect(status()).toBe("focus:false:240");
+  } finally {
+    await dock(false);
+    await act(async () => root.unmount());
+    host.remove();
+  }
+});
+
 it("keeps the library navigation width separate from other workspaces", async () => {
   localStorage.setItem("hub.sidebar.context-width-v1", "362");
   const {host,root}=await exercise(false);

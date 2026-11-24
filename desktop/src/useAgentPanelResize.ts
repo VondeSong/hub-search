@@ -4,6 +4,11 @@ const MIN_WIDTH = 0;
 const VIEWPORT_GAP = 24;
 const clamp = (value: number, maximum = Number.MAX_SAFE_INTEGER, minimum = MIN_WIDTH) => Math.min(maximum, Math.max(minimum, Math.round(value)));
 
+function panelMaximum(available: number, docked: boolean) {
+  const reserve = docked ? Math.min(520, Math.ceil(available / 2)) : VIEWPORT_GAP;
+  return clamp(Math.floor(available - reserve));
+}
+
 // Both edge handles use the same drag lifecycle; resizing never starts an investigation.
 export function useAgentPanelResize(open: boolean, panel: RefObject<HTMLElement | null>, axis: "width" | "height" = "width", extra = false, docked = false) {
   const vertical = axis === "height";
@@ -21,7 +26,8 @@ export function useAgentPanelResize(open: boolean, panel: RefObject<HTMLElement 
     return null;
   };
   const [preferredWidth, setPreferredWidth] = useState<number | null>(readSize);
-  const [maximum, setMaximum] = useState(() => clamp((vertical ? window.innerHeight : window.innerWidth) - VIEWPORT_GAP));
+  const [availableSize, setAvailableSize] = useState(() => vertical ? window.innerHeight : window.innerWidth);
+  const maximum = panelMaximum(availableSize, docked && !vertical);
   const finishDrag = useRef<(() => void) | null>(null);
   const minimum = vertical ? Math.min(320, maximum) : MIN_WIDTH;
   const width = clamp(preferredWidth ?? defaultSize, maximum, minimum);
@@ -48,7 +54,7 @@ export function useAgentPanelResize(open: boolean, panel: RefObject<HTMLElement 
     const measure = () => {
       const available = availableWidth(element);
       if (available > 0) {
-        setMaximum(clamp(Math.floor(available - VIEWPORT_GAP)));
+        setAvailableSize(available);
         if (!vertical && available <= 640) finishDrag.current?.();
       }
     };
@@ -81,7 +87,7 @@ export function useAgentPanelResize(open: boolean, panel: RefObject<HTMLElement 
     document.body.classList.add(vertical ? "resizing-agent-panel-height" : "resizing-agent-panel");
     const move = (next: globalThis.PointerEvent) => {
       if (next.pointerId !== pointer) return;
-      const limit = clamp(Math.floor(availableWidth(element) - VIEWPORT_GAP));
+      const limit = panelMaximum(availableWidth(element), docked && !vertical);
       saveSize(clamp(startWidth + direction * ((vertical ? next.clientY : next.clientX) - startX), limit, vertical ? Math.min(320, limit) : MIN_WIDTH));
     };
     let active = true;

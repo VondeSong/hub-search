@@ -135,7 +135,13 @@ html:not([data-runtime-platform="android"]) .collections-workspace .task-workspa
 .collections-workspace .reading-preview-resizer:hover::after,
 .collections-workspace .reading-preview-resizer:focus-visible::after { background: #71717a; }
 
-html:not([data-runtime-platform="android"]) .collections-workspace .collection-database[data-reading-layout="list"] { padding: 10px; background: var(--reading-well); }
+html:not([data-runtime-platform="android"]) .collections-workspace .reading-browse-paper > .collection-database[data-reading-layout="list"] {
+  width: 100%;
+  box-sizing: border-box;
+  overflow: auto;
+  padding: 10px;
+  background: var(--reading-well);
+}
 html:not([data-runtime-platform="android"]) .collections-workspace .collection-row {
   position: relative;
   display: grid;

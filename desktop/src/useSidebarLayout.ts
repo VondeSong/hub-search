@@ -1,5 +1,5 @@
 import { userProfileStorage } from "./UserProfileStorage";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { loadSidebarMode, type SidebarMode } from "./WorkspaceChrome";
 
@@ -9,6 +9,23 @@ const LIBRARY_SIDEBAR_WIDTH_KEY = "hub.library-browse.navigation-width-v1";
 const DEFAULT_SIDEBAR_WIDTH = 240;
 const MIN_SIDEBAR_WIDTH = 200;
 const MAX_SIDEBAR_WIDTH = 380;
+const DOCK_COLLAPSE_WINDOW_WIDTH = 1440;
+const MULTI_COLUMN_VIEWS = new Set(["home", "favorites", "collections", "tasks", "insights", "libraries"]);
+
+function readAgentDockLayout() {
+  if (!document.body.classList.contains("agent-sidebar-open")) return "undocked";
+  return window.innerWidth < DOCK_COLLAPSE_WINDOW_WIDTH ? "narrow" : "wide";
+}
+
+function subscribeToAgentDockLayout(notify: () => void) {
+  const observer = new MutationObserver(notify);
+  observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  window.addEventListener("resize", notify);
+  return () => {
+    observer.disconnect();
+    window.removeEventListener("resize", notify);
+  };
+}
 
 function clampSidebarWidth(value: number) {
   return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(value)));
@@ -28,7 +45,12 @@ function loadSidebarWidth(key: string) {
 
 export function useSidebarLayout(view?: string) {
   const widthKey = view === "collections" ? READING_SIDEBAR_WIDTH_KEY : view === "libraries" ? LIBRARY_SIDEBAR_WIDTH_KEY : SIDEBAR_WIDTH_KEY;
-  const [mode, setMode] = useState(loadSidebarMode);
+  const [savedMode, setSavedMode] = useState(loadSidebarMode);
+  const dockLayout = useSyncExternalStore(subscribeToAgentDockLayout, readAgentDockLayout);
+  const agentDocked = dockLayout !== "undocked";
+  const [dockOverride, setDockOverride] = useState(false);
+  const autoCollapsed = !dockOverride && agentDocked && (dockLayout === "narrow" || MULTI_COLUMN_VIEWS.has(view ?? ""));
+  const mode = autoCollapsed ? "focus" : savedMode;
   const [narrow, setNarrow] = useState(() => window.matchMedia?.("(max-width: 1000px)").matches ?? false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => loadSidebarWidth(widthKey));
@@ -38,7 +60,9 @@ export function useSidebarLayout(view?: string) {
     sidebarWidthRef.current = width;
     setSidebarWidth(width);
   }, [widthKey]);
-  const expandedMode = useRef<SidebarMode>(mode === "focus" ? "compact" : mode);
+  const expandedMode = useRef<SidebarMode>(savedMode === "focus" ? "compact" : savedMode);
+  useEffect(() => { if (!agentDocked) setDockOverride(false); }, [agentDocked]);
+  useEffect(() => { if (autoCollapsed) setDrawerOpen(false); }, [autoCollapsed]);
   useEffect(() => { sidebarWidthRef.current = sidebarWidth; }, [sidebarWidth]);
   const persistSidebarWidth = useCallback((next: number) => {
     const width = clampSidebarWidth(next);
@@ -82,13 +106,16 @@ export function useSidebarLayout(view?: string) {
     persistSidebarWidth(next);
   }, [persistSidebarWidth, widthKey]);
   const changeMode = useCallback((next: SidebarMode) => {
-    setMode(next); setDrawerOpen(false);
+    if (agentDocked) setDockOverride(true);
+    setSavedMode(next); setDrawerOpen(false);
     if (next !== "focus") expandedMode.current = next;
     try { userProfileStorage.setItem("hub.sidebar.mode", next); } catch { /* session only */ }
-  }, []);
+  }, [agentDocked]);
   const togglePanel = () => {
-    if (narrow) setDrawerOpen(open => !open);
-    else changeMode(mode === "focus" ? expandedMode.current : "focus");
+    if (narrow) {
+      if (agentDocked) setDockOverride(true);
+      setDrawerOpen(open => !open);
+    } else changeMode(mode === "focus" ? expandedMode.current : "focus");
   };
   useEffect(() => {
     const query = window.matchMedia?.("(max-width: 1000px)");

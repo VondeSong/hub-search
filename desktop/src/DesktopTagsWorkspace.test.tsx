@@ -46,9 +46,12 @@ it("keeps node clicks in the graph, refreshes the preview, and rewinds the trail
     await act(async () => finishQuery());
     await act(async () => host.querySelectorAll<HTMLButtonElement>(".mode-btn")[1].click());
     expect(host.querySelector(".graph-preview-card h2")?.textContent).toBe(first.name);
+    expect(host.querySelector(".g-node.center small")?.textContent).toBe("1 篇");
+    expect(host.querySelector('[aria-label="代表笔记"] .section-cap .mono')?.textContent).toBe("1 篇");
     expect(host.querySelector(".graph-preview-card")?.textContent).toContain(firstNote.title);
     await act(async () => host.querySelector<HTMLButtonElement>("button.g-node:not(.center)")!.click());
     expect(host.querySelector(".graph-preview-card h2")?.textContent).toBe(neighbor.name);
+    expect(host.querySelector(".g-node.center small")).toBeNull();
     expect(host.querySelector(".graph-preview-card")?.textContent).not.toContain(firstNote.title);
     expect([...host.querySelectorAll(".crumb-btn")].map(button => button.textContent)).toEqual([first.name, neighbor.name]);
     await act(async () => finishQuery());

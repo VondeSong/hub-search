@@ -88,7 +88,7 @@ export function TopicRelationView({ topic, description, group, meta, notes, busy
           </button>
         </div>)}
         <button type="button" className="g-node center" style={{ left: "50%", top: "50%" }} onClick={() => onRead()}>
-          <span className="g-node-title"><span>{topic.name}</span><small className="mono">{topic.count} 篇</small></span>
+          <span className="g-node-title"><span>{topic.name}</span>{!busy && <small className="mono">{notes.length} 篇</small>}</span>
           <span className="g-node-sub">{description || "尚未填写主题说明"}</span>
           <span className="g-center-foot"><span>{relations.length ? `${relations.length} 条关联` : "暂无已索引关联"}</span><span>在主题浏览中精读 →</span></span>
         </button>
