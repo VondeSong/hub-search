@@ -377,7 +377,7 @@ html:not([data-runtime-platform="android"]) .sidebar-tag-search {
   border-radius:8px;
   background:#fff;
 }
-html:not([data-runtime-platform="android"]) :is(.sidebar-smart-menu,.sidebar-library-menu,.sidebar-tag-menu,.space-menu,.search-history,.search-suggestions,.scope-menu,.journal-calendar) {
+html:not([data-runtime-platform="android"]) :is(.sidebar-smart-menu,.sidebar-tag-menu,.space-menu,.search-history,.search-suggestions,.scope-menu,.journal-calendar) {
   border-color:rgba(45,55,66,.15);
   border-radius:11px;
   background:rgba(255,255,255,.94);
@@ -1253,7 +1253,7 @@ html:not([data-runtime-platform="android"]) .workspace-rail button:focus-visible
 }
 
 @media (prefers-reduced-transparency:reduce) {
-  html:not([data-runtime-platform="android"]) :is(.workspace-rail,.search-header,.sidebar-smart-menu,.sidebar-library-menu,.sidebar-tag-menu,.space-menu,.search-history,.search-suggestions,.scope-menu,.journal-calendar,.desktop-sidebar.view-tags,.sidebar-tag-modes,.sidebar-tag-search,.sidebar-tag-section.pinned,.tag-workspace-tabs,.tag-library-filter,.tag-layout-switch,.tag-overview-tools select) {
+  html:not([data-runtime-platform="android"]) :is(.workspace-rail,.search-header,.sidebar-smart-menu,.sidebar-tag-menu,.space-menu,.search-history,.search-suggestions,.scope-menu,.journal-calendar,.desktop-sidebar.view-tags,.sidebar-tag-modes,.sidebar-tag-search,.sidebar-tag-section.pinned,.tag-workspace-tabs,.tag-library-filter,.tag-layout-switch,.tag-overview-tools select) {
     background:#fff;
     -webkit-backdrop-filter:none;
     backdrop-filter:none;

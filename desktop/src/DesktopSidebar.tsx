@@ -18,6 +18,7 @@ import {
   Pencil,
   Plus,
   Search,
+  SlidersHorizontal,
   ShieldCheck,
   Star,
   Tags,
@@ -139,12 +140,13 @@ const SidebarLibraryPanel = memo(function SidebarLibraryPanel({
             </button>
             {libraryMenuOpen && (
               <div className="sidebar-library-menu" role="menu" aria-label="资料库操作" data-hub-keyboard-scope="sidebar-library-menu" data-keyboard-open="true">
-                <button role="menuitem" disabled={spaces.length === 0} onClick={() => { onToggleAllLibraries(); setLibraryMenuOpen(false); }}>
-                  <Check size={13} />
+                <button type="button" role="menuitem" disabled={spaces.length === 0} onClick={() => { onToggleAllLibraries(); setLibraryMenuOpen(false); }}>
+                  <Check size={14} aria-hidden="true" />
                   <span>{allLibrariesSelected ? "取消全部选择" : "选择全部"}</span>
                 </button>
                 <div className="sidebar-library-menu-separator" role="separator" />
-                <button role="menuitem" onClick={() => { onManageLibraries(); setLibraryMenuOpen(false); }}>
+                <button type="button" role="menuitem" onClick={() => { onManageLibraries(); setLibraryMenuOpen(false); }}>
+                  <SlidersHorizontal size={14} aria-hidden="true" />
                   <span>管理资料库…</span>
                 </button>
               </div>

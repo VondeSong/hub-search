@@ -146,9 +146,9 @@ describe("DesktopSidebar render isolation", () => {
 
     await act(async () => container.querySelector<HTMLButtonElement>(".sidebar-library-more")!.click());
     const menu = container.querySelector<HTMLElement>("[role=menu]")!;
-    expect(menu.textContent).toContain("取消全部选择");
     const menuButtons = Array.from(menu.querySelectorAll("button"));
-    await act(async () => menuButtons[menuButtons.length - 1].click());
+    expect(menuButtons.map((button) => button.textContent)).toEqual(["取消全部选择", "管理资料库…"]);
+    await act(async () => menuButtons[1].click());
     expect(manageLibraries).toHaveBeenCalledTimes(1);
     expect(container.querySelector("[role=menu]")).toBeNull();
 
