@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Plus, Sparkles, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useJournalDailyData, type JournalDailyTaskEntry } from "./JournalDailyData";
@@ -36,16 +36,19 @@ type Props = {
   onChoose: (date: string) => void; onPreview: (result: SearchResult) => void;
   onCreate?: (date: string) => void;
   composer?: ReactNode;
+  topComposer?: ReactNode;
   composerDate?: string;
+  onReviewDay?: (date: string) => void;
   onOpen?: (entry:SearchResult)=>void;
   onTaskCount?:(count:number)=>void;
+  desktop?: boolean;
 };
 
-export function JournalDailyStream({ store, today, scope, dataVersion, selectedKey, canCreate, onChoose, onPreview, onCreate, composer, composerDate, onOpen, onTaskCount }: Props) {
+export function JournalDailyStream({ store, today, scope, dataVersion, selectedKey, canCreate, onChoose, onPreview, onCreate, composer, topComposer, composerDate, onReviewDay, onOpen, onTaskCount, desktop = false }: Props) {
   const { view } = store;
   const records=useJournalRecords();
   const sharedTasks=useUnifiedTasks();
-  const resultMode=journalUsesResultDays(view);
+  const resultMode=desktop||journalUsesResultDays(view);
   const [resultLimit,setResultLimit]=useState(35);
   useEffect(()=>setResultLimit(35),[view.query,view.period,view.day,view.month,view.recordFilter,JSON.stringify(view.libraries),JSON.stringify(scope)]);
   const quick=records.items.filter(item=>{const meta={id:item.record.id,date:item.record.date,libraryId:item.libraryId,hasAttachments:item.record.attachments.length>0,hasTags:/(?:^|\s)#[^\s#]+/u.test(item.body)};return journalIndexInView(meta,view,scope)&&journalRecordMatches(meta,view.recordFilter||"all",records.pins)&&`${item.body} ${item.record.attachments.map(a=>a.name).join(" ")}`.toLowerCase().includes(view.query.trim().toLowerCase());});
@@ -94,6 +97,7 @@ export function JournalDailyStream({ store, today, scope, dataVersion, selectedK
   }, [page.items, range.from, range.to,view.recordFilter,view.period,view.day,view.month,resultMode,records.index,records.pins]);
   const [previewError, setPreviewError] = useState(""), [openingTask, setOpeningTask] = useState("");
   const [completedDate, setCompletedDate] = useState("");
+  const [expandedCompleted, setExpandedCompleted] = useState<Set<string>>(() => new Set());
   const completedDialog = useRef<HTMLDialogElement>(null), completedTrigger = useRef<HTMLButtonElement | null>(null);
   const completedTitle = useId();
   const closeCompleted = () => {
@@ -142,11 +146,13 @@ export function JournalDailyStream({ store, today, scope, dataVersion, selectedK
     const busy = daily.taskBusyIds.has(task.id);
     const collection = task.collectionName || task.libraryName;
     const context = entry.reasons.join(" · ");
+    const title = desktop ? task.title.replace(/^\[([^\]]+)\]\(https?:\/\/.+\)$/u, "$1") : task.title;
     return <div key={task.id} data-task-id={task.id} className={`journal-daily-task ${task.completed ? "is-completed" : ""}`}>
       <TaskStatusControl task={task} busy={busy} pendingStatus={daily.taskStatusTargets?.get(task.id)} onChange={(task, completed) => void completeTask(task, completed)} />
       <button onClick={() => void previewTask(task)} aria-busy={openingTask === task.id} title={`${task.libraryName}${context ? ` · ${context}` : ""}${bucket === "completed" ? ` · ${completedTimeLabel(entry.completedAt)}` : ""}`} aria-label={`查看任务：${task.title} · ${collection}${context ? ` · ${context}` : ""}`}>
-        {bucket === "completed" && <span className="journal-completed-date">{Number(date.slice(5, 7))}月{Number(date.slice(8))}日</span>}
-        <span className="task-title">{task.title}</span>{bucket !== "completed" && <span className="task-library">{collection}</span>}
+        {bucket === "completed" && !desktop && <span className="journal-completed-date">{Number(date.slice(5, 7))}月{Number(date.slice(8))}日</span>}
+        <span className="task-title">{title}</span>{(desktop || bucket !== "completed") && <span className="task-library">{collection}</span>}
+        {desktop&&bucket!=="completed"&&context&&<span className="journal-daily-task-context">{bucket==="created"?"当天新建":context}</span>}
         {bucket === "completed" && <span className="journal-daily-task-history">{completedTimeLabel(entry.completedAt)}{entry.completedSource === "hub" ? " · Hub 记录" : ""}{task.syncState === "conflict" ? " · 状态待核对" : task.status === "abandoned" ? " · 后来已放弃" : entry.reopened ? " · 完成后重开" : ""}</span>}
       </button>
       {task.statusMutation?.state === "failed" && <button type="button" className="journal-task-retry" title={task.statusMutation.error}
@@ -154,7 +160,7 @@ export function JournalDailyStream({ store, today, scope, dataVersion, selectedK
         onClick={() => void daily.setTaskCompleted(task, task.statusMutation?.targetStatus === "completed")}>重试同步</button>}
     </div>;
   };
-  const matchingDates=journalResultDates([...grouped.keys(),...quick.map(item=>item.record.date),...daily.tasksByDate.keys()],view);
+  const matchingDates=journalResultDates([...grouped.keys(),...quick.map(item=>item.record.date),...daily.tasksByDate.keys()],desktop?{...view,ascending:false}:view);
   const continuousDates = journalDailyDates(range.from, range.to);
   const dates = resultMode ? matchingDates.slice(0, resultLimit) : range.latestFirst ? continuousDates.reverse() : continuousDates;
   const taskCount=new Set([...daily.tasksByDate.values()].flatMap(groups=>[...groups.scheduled,...groups.created,...groups.completed].map(entry=>entry.task.id))).size;
@@ -168,6 +174,7 @@ export function JournalDailyStream({ store, today, scope, dataVersion, selectedK
     if (completedDate && !daily.tasksLoading && !completedTasks.length) closeCompleted();
   }, [completedDate, completedTasks.length, daily.tasksLoading]);
   return <div className="journal-daily-stream" aria-busy={page.loading || daily.tasksLoading}>
+    {topComposer}
     {(!composerDate || !dates.includes(composerDate)) && composer}
     {range.latestFirst ? laterDays : earlierDays}
     <p className="journal-daily-status journal-daily-loading" role="status">{page.loading || daily.tasksLoading ? "正在读取当天记录…" : ""}</p>
@@ -179,26 +186,45 @@ export function JournalDailyStream({ store, today, scope, dataVersion, selectedK
       const relative = date === today ? "今天" : date === shiftJournalDay(today, 1) ? "明天" : date === shiftJournalDay(today, -1) ? "昨天" : "";
       const entries = grouped.get(date) || [], tasks = daily.tasksByDate.get(date) || { scheduled: [], completed: [], created: [] };
       const hasTasks = tasks.scheduled.length + tasks.completed.length + tasks.created.length > 0;
+      const dayQuick = quick.filter(item => item.record.date === date);
+      const dayEntryTotal = entries.length + dayQuick.length;
+      const dayPendingCount = tasks.scheduled.length + tasks.created.length;
+      const dayStatParts: string[] = [];
+      if (desktop && dayQuick.length > 0) dayStatParts.push(`${dayQuick.length} 篇速记`);
+      const logCount = desktop ? entries.length : dayEntryTotal;
+      if (logCount > 0) dayStatParts.push(`${logCount} 篇日志`);
+      if (dayPendingCount > 0) dayStatParts.push(`${dayPendingCount} 待办`);
+      if (tasks.completed.length > 0) dayStatParts.push(`${tasks.completed.length} 已完成`);
       return <section key={date} className={`journal-daily-day ${date === today ? "is-today" : ""}`} data-journal-day={date} aria-label={journalDateLabel(date)}>
         <div className="journal-daily-day-head">
-          <button className="journal-daily-date" aria-label={`选择 ${journalDateLabel(date)}`} aria-pressed={store.anchor === date} onClick={() => onChoose(date)}><span className="date-title">{Number(date.slice(5, 7))}月{Number(date.slice(8))}日</span>{relative && <span className="relative-day">{relative}</span>}<span className="weekday">星期{weekday}</span></button>
+          <button className="journal-daily-date" aria-label={`选择 ${journalDateLabel(date)}`} aria-pressed={store.anchor === date} onClick={() => onChoose(date)}><span className="date-title">{Number(date.slice(5, 7))}月{Number(date.slice(8))}日</span>{desktop?<span className="weekday">{relative&&<>{relative} · </>}星期{weekday}</span>:<>{relative && <span className="relative-day">{relative}</span>}<span className="weekday">星期{weekday}</span></>}{dayStatParts.length > 0 && <span className="journal-day-stats">{dayStatParts.join(" · ")}</span>}</button>
           <div className="journal-day-hover-actions">
             {canCreate && onCreate && <button type="button" className="journal-day-inline-btn journal-daily-add" aria-expanded={date === composerDate} onClick={() => onCreate(date)}><Plus size={12} aria-hidden="true"/><span>补记</span></button>}
+            {onReviewDay && <button type="button" className="journal-day-inline-btn accent" onClick={() => onReviewDay(date)}><Sparkles size={12} aria-hidden="true"/><span>复盘本日</span></button>}
           </div>
         </div>
         <div className="journal-daily-content">
           {date === composerDate && composer}
-          {(entries.length>0||quick.some(item=>item.record.date===date))&&<div className="journal-daily-records memo-embedded" aria-label="当天日志">{entries.map(entry=><JournalRecordCard key={entry.entityKey} entry={entry} summary={view.summary} source={view.source} onPreview={onPreview} onOpen={onOpen} selected={entry.entityKey===selectedKey} disabled={page.loading}/>)}{quick.filter(item=>item.record.date===date).map(item=><QuickJournalCard key={item.record.id} item={item} mobile={false} onPreview={onPreview} onTag={tag=>store.update({query:"#"+tag})}/>)}</div>}
+          {(entries.length>0||dayQuick.length>0)&&<div className="journal-daily-records memo-embedded" aria-label="当天日志">{entries.map(entry=><JournalRecordCard key={entry.entityKey} entry={entry} timeline={desktop} summary={view.summary} source={view.source} onPreview={onPreview} onOpen={onOpen} selected={entry.entityKey===selectedKey} disabled={page.loading}/>)}{dayQuick.map(item=><QuickJournalCard key={item.record.id} item={item} mobile={false} timeline={desktop} onPreview={onPreview} onTag={tag=>store.update({query:"#"+tag})}/>)}</div>}
           {hasTasks && <div className="journal-daily-tasks" aria-label="当天任务">
             {tasks.scheduled.map(entry => taskRow(entry, "scheduled"))}
-            {!!tasks.created.length && <details className="journal-daily-created" open><summary><b>{tasks.created.length}</b>当天新建</summary>{tasks.created.map(entry => taskRow(entry, "created"))}</details>}
-            {tasks.completed.length > 0 && <button type="button" className="journal-daily-completed-trigger" aria-haspopup="dialog" aria-expanded={completedDate === date} aria-label={`${tasks.completed.length} 已完成的任务 · ${journalDateLabel(date)}`} onClick={event => { completedTrigger.current = event.currentTarget; setCompletedDate(date); }}><b>{tasks.completed.length}</b><span>已完成的任务</span></button>}
+            {desktop ? tasks.created.map(entry => taskRow(entry, "created")) : !!tasks.created.length && <details className="journal-daily-created" open><summary><b>{tasks.created.length}</b>当天新建</summary>{tasks.created.map(entry => taskRow(entry, "created"))}</details>}
+            {tasks.completed.length > 0 && (desktop ? <>
+              <button type="button" className="journal-daily-completed-trigger" aria-expanded={expandedCompleted.has(date)} aria-controls={`journal-done-${date}`}
+                onClick={()=>setExpandedCompleted(current=>{const next=new Set(current);if(next.has(date)) next.delete(date);else next.add(date);return next;})}>
+                <i aria-hidden="true"/><span>当日足迹 · 已完成 {tasks.completed.length} 项任务</span>
+                <small>{expandedCompleted.has(date)?"收起":"展开"} <ChevronDown size={11} aria-hidden="true"/></small>
+              </button>
+              <div id={`journal-done-${date}`} hidden={!expandedCompleted.has(date)}>{expandedCompleted.has(date)&&tasks.completed.map(entry=>taskRow(entry,"completed",date))}</div>
+            </> : <button type="button" className="journal-daily-completed-trigger" aria-haspopup="dialog" aria-expanded={completedDate === date} aria-label={`${tasks.completed.length} 已完成的任务 · ${journalDateLabel(date)}`} onClick={event => { completedTrigger.current = event.currentTarget; setCompletedDate(date); }}><b>{tasks.completed.length}</b><span>已完成的任务</span></button>)}
           </div>}
         </div>
       </section>;
     })}
     {range.latestFirst ? earlierDays : laterDays}
-    {resultMode&&!dates.length&&!page.loading&&!records.loading&&!daily.tasksLoading&&!page.error&&!records.error&&!daily.tasksError&&<div className="journal-search-empty"><h2>没有符合筛选的记录</h2><p>可以调整日期、资料库或内容类型。</p><button onClick={()=>store.update({query:"",period:"all",day:"",libraries:null,recordFilter:"all"})}>清除搜索和筛选</button></div>}
+    {resultMode&&!dates.length&&!page.loading&&!records.loading&&!daily.tasksLoading&&!page.error&&!records.error&&!daily.tasksError&&<div className="journal-search-empty">
+      {desktop ? <><p>{singleDay?`${view.day} 当日暂无日志或任务记录`:"当前筛选条件下暂无日志或任务记录"}</p>{singleDay&&canCreate&&onCreate&&composerDate!==view.day&&<button type="button" onClick={()=>onCreate(view.day)}><Plus size={14}/>补记 {view.day}</button>}</> : <><h2>没有符合筛选的记录</h2><p>可以调整日期、资料库或内容类型。</p><button onClick={()=>store.update({query:"",period:"all",day:"",libraries:null,recordFilter:"all"})}>清除搜索和筛选</button></>}
+    </div>}
     {resultMode&&dates.length<matchingDates.length&&<button className="journal-daily-next" onClick={()=>setResultLimit(n=>n+35)}>继续显示（{dates.length} / {matchingDates.length} 天）</button>}
     {completedDate && createPortal(<dialog ref={completedDialog} className="journal-completed-dialog" aria-labelledby={completedTitle} onCancel={event => { event.preventDefault(); closeCompleted(); }} onClose={() => setCompletedDate("")} onClick={event => { if (event.target !== event.currentTarget) return; const bounds = event.currentTarget.getBoundingClientRect(); if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) closeCompleted(); }}>
       <span className="journal-completed-handle" aria-hidden="true" />

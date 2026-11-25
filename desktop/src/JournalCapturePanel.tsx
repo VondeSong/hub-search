@@ -15,10 +15,12 @@ type CapturePanelProps = {
   dataVersion: string;
   scope: string[] | null;
   view: JournalViewConfig;
-  children?: (inlineEditor: ReactNode) => ReactNode;
+  desktop?: boolean;
+  topDay?: string;
+  children?: (inlineEditor: ReactNode, topEditor?: ReactNode) => ReactNode;
 };
 
-export function JournalCapturePanel({ libraries, day, placement = "floating", onDay, dataVersion, scope, view, children }: CapturePanelProps) {
+export function JournalCapturePanel({ libraries, day, placement = "floating", onDay, dataVersion, scope, view, children, desktop, topDay }: CapturePanelProps) {
   const [days, setDays] = useState(readDays);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -28,7 +30,6 @@ export function JournalCapturePanel({ libraries, day, placement = "floating", on
   activeDay.current = day;
   currentDays.current = days;
   const floating = placement === "floating";
-  const backfill = placement === "day";
 
   function remember(next: string[]) {
     try {
@@ -52,37 +53,39 @@ export function JournalCapturePanel({ libraries, day, placement = "floating", on
     return () => document.removeEventListener("pointerdown", outside);
   }, [day, floating, onDay]);
 
-  const editor = day && <section ref={panel} className={floating ? "journal-floating-editor" : `journal-inline-editor journal-inline-editor-${placement}`}
-    data-hub-keyboard-scope="journal-capture" aria-label={backfill ? `补记至 ${day}` : "新建日志"}
+  const renderEditor = (date: string, location: NonNullable<CapturePanelProps["placement"]>) => date && <section ref={location==="floating"?panel:undefined} className={location==="floating" ? "journal-floating-editor" : `journal-inline-editor journal-inline-editor-${location}`}
+    data-hub-keyboard-scope="journal-capture" aria-label={location==="day" ? `补记至 ${date}` : "新建日志"}
     onBlur={event => {
-      if (floating && event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) onDay("");
+      if (location==="floating" && event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) onDay("");
     }}
     onKeyDown={event => {
-      if (placement !== "top" && event.key === "Escape" && !event.nativeEvent.isComposing && !event.defaultPrevented) {
+      if (location !== "top" && event.key === "Escape" && !event.nativeEvent.isComposing && !event.defaultPrevented) {
         event.preventDefault();
         event.stopPropagation();
         onDay("");
       }
     }}>
-    {floating && <header><div><h2>新建日志</h2><time>{day}</time></div><button type="button" aria-label="收起日志草稿" onClick={() => onDay("")}><X size={18} /></button></header>}
-    {backfill && <header>补记至 <time dateTime={day}>{day}</time></header>}
-    <QuickJournal key={day} mode="calendar" captureDate={day} libraries={libraries} scope={scope} view={view} dataVersion={dataVersion}
-      inlineCapture={floating ? undefined : placement}
-      onCancelCapture={backfill ? () => onDay("") : undefined}
-      onDraftEdited={() => { if (!currentDays.current.includes(day)) remember([...currentDays.current, day]); }}
+    {location==="floating" && <header><div><h2>新建日志</h2><time>{date}</time></div><button type="button" aria-label="收起日志草稿" onClick={() => onDay("")}><X size={18} /></button></header>}
+    {location==="day" && <header>补记至 <time dateTime={date}>{date}</time></header>}
+    <QuickJournal key={date} mode="calendar" captureDate={date} libraries={libraries} scope={scope} view={view} dataVersion={dataVersion}
+      desktopComposer={desktop && location === "top"}
+      inlineCapture={location==="floating" ? undefined : location}
+      onCancelCapture={location==="day" ? () => onDay("") : undefined}
+      onDraftEdited={() => { if (!currentDays.current.includes(date)) remember([...currentDays.current, date]); }}
       onSaved={saved => {
         setNotice(saved.notice + ((view.query || view.libraries !== null || (view.recordFilter && view.recordFilter !== "all")) ? " 当前有筛选；若未显示，可调整筛选查看。" : ""));
-        remember(currentDays.current.filter(value => value !== day));
-        if (placement !== "top" && activeDay.current === day) onDay("");
+        remember(currentDays.current.filter(value => value !== date));
+        if (location !== "top" && activeDay.current === date) onDay("");
       }}
     />
   </section>;
+  const editor = renderEditor(day, placement);
 
   return <>
     {error && <p role="alert">{error}</p>}
     {notice && <div className="journal-capture-notice" role="status">{notice}<button type="button" aria-label="关闭日志保存提示" onClick={() => setNotice("")}><X size={14} /></button></div>}
     {floating && editor}
-    {children?.(floating ? null : editor)}
-    <div className="journal-draft-dock" aria-label="日志草稿">{days.filter(value => value !== day).map(value => <button type="button" key={value} onClick={() => onDay(value)} aria-label={`继续编辑 ${value} 的日志草稿`}><Pencil size={14} />{Number(value.slice(5, 7))}月{Number(value.slice(8))}日 · 继续编辑</button>)}</div>
+    {children?.(floating || topDay && placement==="top" ? null : editor, topDay ? renderEditor(topDay, "top") : undefined)}
+    <div className="journal-draft-dock" aria-label="日志草稿">{days.filter(value => value !== day && value !== topDay).map(value => <button type="button" key={value} onClick={() => onDay(value)} aria-label={`继续编辑 ${value} 的日志草稿`}><Pencil size={14} />{Number(value.slice(5, 7))}月{Number(value.slice(8))}日 · 继续编辑</button>)}</div>
   </>;
 }

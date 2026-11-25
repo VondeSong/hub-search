@@ -1,7 +1,7 @@
 import { JournalAudio, isJournalAudio, openJournalVoice } from "./JournalVoice";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Mic, Bold, CalendarDays, ExternalLink, Hash, ImagePlus, List, ListOrdered, Quote, SquareCheck, Pin, Copy, MoreHorizontal, Paperclip, Plus, RefreshCw, Send, X } from "lucide-react";
+import { AtSign, Image as ImageIcon, Mic, Bold, CalendarDays, ExternalLink, Hash, ImagePlus, List, ListOrdered, Quote, SquareCheck, Pin, Copy, MoreHorizontal, Paperclip, Plus, RefreshCw, Send, X } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -16,6 +16,7 @@ import { QUICK_JOURNAL_UPDATED, openQuickJournalCapture } from "./QuickJournalEv
 import { openCloudSyncSettings } from "./CloudSyncEvents";
 import { JournalRichEditor, type JournalRichEditorHandle } from "./JournalRichEditor";
 import "./MobileJournal.css";
+import { useJournalDesktopRecording } from "./useJournalDesktopRecording";
 
 type Attachment = { hash: string; name: string; size: number; image: boolean };
 type Record = { version: 1; id: string; date: string; text: string; attachments: Attachment[] };
@@ -33,16 +34,26 @@ export function Image({ hash, name }: { hash: string; name: string }) {
   useEffect(() => { let live = true; void invoke<string>("quick_journal_image", { hash }).then(v => { if (live) setUrl(v); }).catch(() => {}); return () => { live = false; }; }, [hash]);
   return url ? <img src={url} alt={name} loading="lazy" /> : <span>{name} · 图片暂不可用</span>;
 }
-export function QuickJournalCard({ item, mobile, onTag, onPreview }: { item: Item; mobile: boolean; onTag?: (tag: string) => void;onPreview?:(entry:SearchResult)=>void }) {
+export function QuickJournalCard({ item, mobile, onTag, onPreview, timeline = false }: { item: Item; mobile: boolean; onTag?: (tag: string) => void;onPreview?:(entry:SearchResult)=>void;timeline?:boolean }) {
   const records=useJournalRecords();
   const normalized=(value:string)=>value.replace(/\\/g,"/").toLowerCase();
   const preview=records.index.find(meta=>meta.preview&&meta.libraryId===item.libraryId&&meta.path&&item.path&&normalized(item.path).endsWith("/"+normalized(meta.path)))?.preview;
   const [expanded, setExpanded] = useState(false), [error, setError] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
+  const attachmentDialog = useRef<HTMLDialogElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const pinned = records.pins.has(item.record.id);
+  const titleMatch = timeline ? item.body.match(/^(?:#{1,6}\s+([^\n]+)|([^\n]{1,55})\r?\n\r?\n)(?:\r?\n|$)?/) : null;
+  const title = titleMatch?.[1] || titleMatch?.[2];
+  const body = title ? item.body.slice(titleMatch![0].length).trimStart() : item.body;
+  const hashes = item.record.attachments.map(file=>file.hash).join("|");
+  useEffect(()=>{if(attachment)attachmentDialog.current?.showModal();},[attachment]);
   // Refreshes must preserve the renderer identities and loaded image state.
   const markdownComponents = useMemo<Components>(() => ({
-    img: ({ src, alt }) => { const hash = src?.match(/(?:^|\/)\_hub-assets\/([a-f0-9]{64})(?:\.[a-z0-9]{1,12})?$/)?.[1]; return hash ? <Image hash={hash} name={alt || "照片"} /> : <span>{alt || "图片"}</span>; },
+    img: ({ src, alt }) => { const hash = src?.match(/(?:^|\/)\_hub-assets\/([a-f0-9]{64})(?:\.[a-z0-9]{1,12})?$/)?.[1]; return hash ? timeline && hashes.split("|").includes(hash) ? null : <Image hash={hash} name={alt || "照片"} /> : <span>{alt || "图片"}</span>; },
     a: ({ href, children }) => /^https?:\/\//i.test(href || "") ? <a href={href} onClick={e => { e.preventDefault(); void openUrl(href!).catch(e => setError(message(e))); }}>{children}</a> : <span>{children}</span>,
-  }), []);
+  }), [hashes,timeline]);
   const collapsible = item.body.length > 350 || item.body.split("\n").length > 8 || item.record.attachments.length > 1;
   async function exportAttachment(a: Attachment) {
     try {
@@ -51,16 +62,35 @@ export function QuickJournalCard({ item, mobile, onTag, onPreview }: { item: Ite
       await invoke("export_quick_journal_attachment", { id: item.record.id, hash: a.hash, destination });
     } catch (e) { setError(message(e)); }
   }
+  async function syncRecord() {
+    if (syncing) return;
+    setSyncing(true);
+    setError("");
+    try {
+      await invoke("sync_quick_journal");
+      records.refresh();
+    } catch (e) { setError(message(e)); }
+    finally { setSyncing(false); }
+  }
   return <article className="quick-journal-card memo-card" data-journal-day={item.record.date}>
-    <header><span>{records.pins.has(item.record.id)&&<Pin size={12}/>} {item.record.date}</span><span>{item.applied ? "已写入 OS" : item.uploaded ? "已上传，等待电脑写入" : "已保存到本机"}</span>
+    <header>{timeline ? <><time dateTime={item.record.date}>{item.record.date}</time><span className={`journal-card-receipt ${item.applied ? "applied" : "pending"}`}><i aria-hidden="true"/>{item.applied ? "已归档 OS" : item.uploaded ? "待写入 OS" : "已保存到本机"}</span>{(!item.applied||item.sourceError)&&<button className="journal-card-sync" type="button" disabled={syncing} onClick={()=>void syncRecord()}>{syncing?"同步中…":"立即同步"}</button>}{pinned&&<span className="journal-card-pin">置顶</span>}</> : <><span>{pinned&&<Pin size={12}/>} {item.record.date}</span><span>{item.applied ? "已写入 OS" : item.uploaded ? "已上传，等待电脑写入" : "已保存到本机"}</span></>}
       {item.applied && !mobile && <button aria-label={`打开 ${item.record.date} 的 OS 日记`} onClick={() => { void invoke("open_quick_journal", { id: item.record.id }).catch(e => setError(message(e))); }}><ExternalLink size={16} /></button>}
     </header>
     {!mobile&&<details className="journal-record-menu"><summary aria-label={`记录操作 ${item.record.date}`}><MoreHorizontal size={18}/></summary><div><button onClick={()=>records.togglePin(item.record.id)}><Pin size={14}/>{records.pins.has(item.record.id)?"取消置顶":"置顶"}</button><button onClick={()=>void navigator.clipboard.writeText(item.body).then(()=>{},e=>setError(`复制失败：${String(e)}`))}><Copy size={14}/>复制正文</button>{preview&&onPreview&&<button onClick={()=>onPreview(preview)}>在阅读面板打开</button>}{item.applied&&!mobile&&<button onClick={()=>void invoke("open_quick_journal",{id:item.record.id}).catch(e=>setError(String(e)))}><ExternalLink size={14}/>在 OS 中打开 / 编辑</button>}</div></details>}
-    <div className={`quick-journal-prose ${collapsible && !expanded ? "is-collapsed" : ""}`}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={markdownComponents}>{item.body}</ReactMarkdown>
-      {(!item.path || item.sourceError) && item.record.attachments.map(a => a.image ? <Image key={a.hash} hash={a.hash} name={a.name} /> : <p key={a.hash}><Paperclip size={14} /> {a.name}</p>)}
-    </div>
-    {!!item.record.attachments.length && <div className="quick-journal-attachments">{item.record.attachments.map((a, i) => <button key={`${a.hash}-${i}`} onClick={() => { void exportAttachment(a); }}><Paperclip size={14} />保存 {a.name}</button>)}</div>}
+    {title&&<h3 className="journal-card-title">{title}</h3>}
+    {body&&<div className={`quick-journal-prose ${collapsible && !expanded ? "is-collapsed" : ""}`}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={markdownComponents}>{body}</ReactMarkdown>
+      {!timeline && (!item.path || item.sourceError) && item.record.attachments.map(a => a.image ? <Image key={a.hash} hash={a.hash} name={a.name} /> : <p key={a.hash}><Paperclip size={14} /> {a.name}</p>)}
+    </div>}
+    {!!item.record.attachments.length && <div className="quick-journal-attachments">{item.record.attachments.map((a, i) => timeline ? isJournalAudio(a.name) ? <JournalAudio key={`${a.hash}-${i}`} attachment={a}/> :
+      <button type="button" className="journal-attachment-card" key={`${a.hash}-${i}`} aria-label={`${a.image?"预览":"保存"}附件 ${a.name}`} onClick={event=>{if(a.image){trigger.current=event.currentTarget;setAttachment(a);}else void exportAttachment(a);}}>
+        <span className="journal-attachment-icon">{a.image?<ImageIcon size={16}/>:<Paperclip size={16}/>}</span>
+        <span><strong>{a.name}</strong><small>{a.image?"图片":"附件"} · {a.size >= 1048576 ? `${(a.size/1048576).toFixed(1)} MB` : `${Math.max(1,Math.round(a.size/1024))} KB`}</small></span>
+      </button> : <button key={`${a.hash}-${i}`} onClick={() => { void exportAttachment(a); }}><Paperclip size={14} />保存 {a.name}</button>)}</div>}
+    {attachment&&<dialog className="journal-attachment-dialog" ref={attachmentDialog} aria-label={attachment.name} onClose={()=>{setAttachment(null);trigger.current?.focus({preventScroll:true});}}>
+      <header><strong>{attachment.name}</strong><button type="button" onClick={()=>void exportAttachment(attachment)}>保存附件</button><button type="button" aria-label="关闭附件预览" onClick={()=>attachmentDialog.current?.close()}><X size={16}/></button></header>
+      <Image hash={attachment.hash} name={attachment.name}/>
+    </dialog>}
     {collapsible && <button className="quick-journal-expand" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? "收起" : "展开全文"}</button>}
     {error && <p role="alert">{error}</p>}
     {item.sourceError && <p role="status">{item.sourceError}</p>}
@@ -68,11 +98,12 @@ export function QuickJournalCard({ item, mobile, onTag, onPreview }: { item: Ite
   </article>;
 }
 export type QuickJournalSaved = { id: string; date: string; notice: string };
-export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all", captureDate, inlineCapture, onCancelCapture, onDraftEdited, onSaved, onSyncSettings, onViewChange }: {
+export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all", captureDate, inlineCapture, desktopComposer, onCancelCapture, onDraftEdited, onSaved, onSyncSettings, onViewChange }: {
   libraries: LibrarySummary[]; scope: string[] | null; view: JournalViewConfig; dataVersion: string;
   mode?: "all" | "compose" | "feed" | "settings" | "calendar";
   captureDate?:string;
   inlineCapture?: "top" | "day";
+  desktopComposer?: boolean;
   onCancelCapture?: () => void;
   onDraftEdited?: () => void;
   onSaved?: (record: QuickJournalSaved) => void;
@@ -97,6 +128,7 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
   const richInput=useRef<JournalRichEditorHandle>(null);
   const openSyncSettings = onSyncSettings || openCloudSyncSettings;
   const draftLatest = useRef(draft), fileInput = useRef<HTMLInputElement>(null), mounted = useRef(true);
+  const recording = useJournalDesktopRecording(file => void attach([file]), setError);
   const persist = (value: Record) => {
     draftLatest.current = value; setDraft(value);
     if (value.text.trim() || value.attachments.length) onDraftEdited?.();
@@ -160,7 +192,7 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
     } catch (e) { setError(message(e)); } finally { setBusy(false); }
   }
   async function save() {
-    if (savePending.current || saving || uploading || !ready) return;
+    if (savePending.current || saving || uploading || !ready || recording.state !== "idle") return;
     if(mode==="calendar"&&!capture.text.trim()&&!capture.tasks.length&&!draft.attachments.length){setError("请填写日志正文或任务内容");return;}
     if(mode==="calendar"&&capture.tasks.length&&(!taskLibrary||!taskProject)){setError("请选择任务保存到的滴答资料库和清单");return;}
     savePending.current=true;setSaving(true); setError(""); setNotice("");
@@ -181,7 +213,7 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
       if (!mobile) void sync(false);
     } catch (e) { setError(message(e));if(mode==="calendar")window.dispatchEvent(new CustomEvent(QUICK_JOURNAL_UPDATED)); } finally { savePending.current=false;setSaving(false); }
   }
-  async function attach(files: FileList | null) {
+  async function attach(files: FileList | File[] | null) {
     if (!files?.length) return;
     const selectedFiles = Array.from(files);
     setUploading(true); setError("");
@@ -228,19 +260,41 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
     persist({ ...draftLatest.current, text: draftLatest.current.text.slice(0, start) + value + draftLatest.current.text.slice(end) });
     requestAnimationFrame(() => { input.focus({ preventScroll: true }); input.setSelectionRange(start + (kind === "bold" ? 2 : value.length), start + value.length - (kind === "bold" ? 2 : 0)); });
   }
-  const compose = <form className={`quick-journal-compose ${mobile ? "is-mobile" : ""}`} onSubmit={e => { e.preventDefault(); void save(); }}>
-    {mode==="compose"&&mobile?<JournalRichEditor ref={richInput} value={draft.text} onChange={text=>persist({...draftLatest.current,text})} disabled={!ready||saving||uploading} onPhotos={()=>photoInput.current?.click()} onMore={()=>setMoreOpen(!moreOpen)} moreOpen={moreOpen} onSubmit={()=>void save()} actions={<><button type="button" aria-label="进入录音模式" disabled={!ready||saving||uploading} onClick={()=>void draftWrites.then(()=>openJournalVoice({record:draftLatest.current,sourceDraft:true})).catch(e=>setError(message(e)))}><Mic size={21}/></button><button type="submit" className="journal-rich-send" aria-label="保存记录" disabled={!ready||saving||uploading||(!draft.text.trim()&&!draft.attachments.length)}><Send size={20}/></button></>}/>:<>
+  const toolsDisabled = !ready || saving || uploading;
+  const format = (command: string) => richInput.current?.format(command);
+  const desktopTools = <div className="quick-journal-compose-tools" aria-label="正文格式" onMouseDown={event=>event.preventDefault()}>
+    <button type="button" aria-label="插入标签" title="插入标签" disabled={toolsDisabled} onClick={()=>format("tag")}><Hash size={15}/></button>
+    <button type="button" aria-label="照片 / 附件" title="照片 / 附件" disabled={toolsDisabled} onClick={()=>fileInput.current?.click()}><ImageIcon size={15}/></button>
+    <button type="button" aria-label="语音速记" title="语音速记" disabled={toolsDisabled||recording.state!=="idle"} onClick={()=>void recording.start()}><Mic size={15}/></button>
+    <span className="journal-compose-divider" aria-hidden="true"/>
+    <button type="button" aria-label="加粗" title="加粗" disabled={toolsDisabled} onClick={()=>format("bold")}><b>B</b></button>
+    <button type="button" aria-label="斜体" title="斜体" disabled={toolsDisabled} onClick={()=>format("italic")}><i>I</i></button>
+    <button type="button" aria-label="插入项目符号" title="插入项目符号" disabled={toolsDisabled} onClick={()=>format("insertUnorderedList")}><List size={15}/></button>
+    <button type="button" aria-label="插入编号列表" title="插入编号列表" disabled={toolsDisabled} onClick={()=>format("insertOrderedList")}><ListOrdered size={15}/></button>
+    <button type="button" aria-label="插入任务" title="插入滴答任务" disabled={toolsDisabled} onClick={()=>format("task")}><SquareCheck size={15}/></button>
+    <span className="journal-compose-divider" aria-hidden="true"/>
+    <button type="button" aria-label="插入关联文档标记" title="插入关联文档标记" disabled={toolsDisabled} onClick={()=>format("mention")}><AtSign size={15}/></button>
+    <button className="journal-compose-settings" type="button" title="日志保存设置" aria-label="日志保存设置" aria-expanded={settingsOpen} onClick={()=>setSettingsOpen(open=>!open)}><MoreHorizontal size={15}/></button>
+  </div>;
+  const compose = <form className={`quick-journal-compose ${mobile ? "is-mobile" : ""}${desktopComposer ? " journal-desktop-compose" : ""}`} onSubmit={e => { e.preventDefault(); void save(); }}>
+    {desktopComposer?<JournalRichEditor ref={richInput} desktop value={draft.text} onChange={text=>persist({...draftLatest.current,text})} disabled={!ready||saving} onPhotos={()=>fileInput.current?.click()} onMore={()=>setSettingsOpen(open=>!open)} onSubmit={()=>{if(draft.text.trim()||draft.attachments.length)void save();}}/>:mode==="compose"&&mobile?<JournalRichEditor ref={richInput} value={draft.text} onChange={text=>persist({...draftLatest.current,text})} disabled={!ready||saving||uploading} onPhotos={()=>photoInput.current?.click()} onMore={()=>setMoreOpen(!moreOpen)} moreOpen={moreOpen} onSubmit={()=>void save()} actions={<><button type="button" aria-label="进入录音模式" disabled={!ready||saving||uploading} onClick={()=>void draftWrites.then(()=>openJournalVoice({record:draftLatest.current,sourceDraft:true})).catch(e=>setError(message(e)))}><Mic size={21}/></button><button type="submit" className="journal-rich-send" aria-label="保存记录" disabled={!ready||saving||uploading||(!draft.text.trim()&&!draft.attachments.length)}><Send size={20}/></button></>}/>:<>
     <label className="sr-only" htmlFor="quick-journal-text">此刻的想法</label>
     <textarea ref={textInput} id="quick-journal-text" rows={inlineCapture ? 2 : undefined} placeholder={inlineCapture === "day" ? "输入补记内容（支持 - [ ] 拆分任务）…" : inlineCapture === "top" ? "随手记下今日思考或工程备忘…（Ctrl+Enter 保存）" : "现在的想法是…"} value={draft.text} disabled={!ready || saving} maxLength={100000} onChange={e => persist({ ...draftLatest.current, text: e.target.value })} onKeyDown={e => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); void save(); } }} />
     </>}
-    {!!draft.attachments.length && <ul className="quick-journal-draft-files">{draft.attachments.map((a, i) => <li key={`${a.hash}-${i}`} className={mobile&&isJournalAudio(a.name)?"quick-journal-draft-audio":undefined}>{mobile&&isJournalAudio(a.name)?<JournalAudio attachment={a}/>:<>{a.image ? <Image hash={a.hash} name={a.name} /> : <Paperclip size={24} />}<span>{a.name}</span></>}<button type="button" aria-label={`移除附件 ${a.name}`} disabled={saving || uploading} onClick={() => persist({ ...draftLatest.current, attachments: draftLatest.current.attachments.filter((_, n) => i !== n) })}><X size={14} /></button></li>)}</ul>}
+    {!!draft.attachments.length && <ul className="quick-journal-draft-files">{draft.attachments.map((a, i) => <li key={`${a.hash}-${i}`} className={(mobile||desktopComposer)&&isJournalAudio(a.name)?"quick-journal-draft-audio":undefined}>{(mobile||desktopComposer)&&isJournalAudio(a.name)?<JournalAudio attachment={a}/>:<>{a.image ? <Image hash={a.hash} name={a.name} /> : <Paperclip size={24} />}<span>{a.name}</span></>}<button type="button" aria-label={`移除附件 ${a.name}`} disabled={saving || uploading} onClick={() => persist({ ...draftLatest.current, attachments: draftLatest.current.attachments.filter((_, n) => i !== n) })}><X size={14} /></button></li>)}</ul>}
+    {desktopComposer&&recording.state!=="idle"&&<div className="journal-desktop-recording">
+      <span role="status"><i/>{recording.state==="opening"?"正在打开麦克风…":recording.state==="finishing"?"正在保存原音…":"正在录音"}</span>
+      <button type="button" onClick={recording.cancel}>取消</button>
+      {recording.state==="recording"&&<button type="button" onClick={recording.finish}>完成录音</button>}
+    </div>}
     <footer>
-      {mode==="calendar"?<div className="quick-journal-compose-tools">{([["tag",Hash,"插入标签"],["attach",ImagePlus,"照片 / 附件"],["list",List,"插入项目符号"],["number",ListOrdered,"插入编号列表"],["quote",Quote,"插入引用"],["task",SquareCheck,"插入任务"]] as const).map(([kind,Icon,label])=><button key={kind} type="button" aria-label={label} disabled={!ready||saving||uploading} onClick={()=>kind==="attach"?fileInput.current?.click():insert(kind)}><Icon size={18}/></button>)}</div>:mobile ? <div className="quick-journal-compose-tools"><button type="button" aria-label="插入标签" disabled={!ready || saving} onClick={() => insert("tag")}><Hash size={22} /></button><button type="button" aria-label="添加照片" disabled={!ready || saving || uploading} onClick={() => photoInput.current?.click()}><ImagePlus size={22} /></button><button type="button" aria-label="更多记录选项" aria-expanded={moreOpen} onClick={() => setMoreOpen(!moreOpen)}><MoreHorizontal size={22} /></button></div> : <label>日期<input type="date" value={draft.date} disabled={!ready || saving} onChange={e => persist({ ...draftLatest.current, date: e.target.value })} /></label>}
+      {desktopComposer?desktopTools:mode==="calendar"?<div className="quick-journal-compose-tools">{([["tag",Hash,"插入标签"],["attach",ImagePlus,"照片 / 附件"],["list",List,"插入项目符号"],["number",ListOrdered,"插入编号列表"],["quote",Quote,"插入引用"],["task",SquareCheck,"插入任务"]] as const).map(([kind,Icon,label])=><button key={kind} type="button" aria-label={label} disabled={!ready||saving||uploading} onClick={()=>kind==="attach"?fileInput.current?.click():insert(kind)}><Icon size={18}/></button>)}</div>:mobile ? <div className="quick-journal-compose-tools"><button type="button" aria-label="插入标签" disabled={!ready || saving} onClick={() => insert("tag")}><Hash size={22} /></button><button type="button" aria-label="添加照片" disabled={!ready || saving || uploading} onClick={() => photoInput.current?.click()}><ImagePlus size={22} /></button><button type="button" aria-label="更多记录选项" aria-expanded={moreOpen} onClick={() => setMoreOpen(!moreOpen)}><MoreHorizontal size={22} /></button></div> : <label>日期<input type="date" value={draft.date} disabled={!ready || saving} onChange={e => persist({ ...draftLatest.current, date: e.target.value })} /></label>}
       <input ref={fileInput} className="sr-only" type="file" multiple tabIndex={-1} onChange={e => { void attach(e.target.files); }} />
       <input ref={photoInput} className="sr-only" type="file" accept="image/*" multiple tabIndex={-1} onChange={e => { void attach(e.target.files); }} />
       {!mobile && mode!=="calendar" && <button type="button" disabled={!ready || saving || uploading} onClick={() => fileInput.current?.click()}><Paperclip size={16} />{uploading ? "保存附件…" : "照片 / 附件"}</button>}
       {onCancelCapture && <button type="button" className="journal-inline-cancel" onClick={onCancelCapture}>取消</button>}
-      <button type="submit" disabled={!ready || saving || uploading || (!draft.text.trim() && !draft.attachments.length) || (mode==="calendar"&&!capture.text.trim()&&!capture.tasks.length&&!draft.attachments.length)}><Send size={17} />{saving ? "保存中…" : inlineCapture === "day" ? "写入当日" : inlineCapture === "top" ? "记录" : mode==="calendar"?"创建":"记下"}</button>
+      {desktopComposer&&<span className="journal-compose-count" aria-label="正文字数">{draft.text.length}</span>}
+      <button type="submit" disabled={!ready || saving || uploading || recording.state !== "idle" || (!draft.text.trim() && !draft.attachments.length) || (mode==="calendar"&&!capture.text.trim()&&!capture.tasks.length&&!draft.attachments.length)}><Send size={desktopComposer ? 13 : 17} />{saving ? "保存中…" : inlineCapture === "day" ? "写入当日" : inlineCapture === "top" ? "记录" : mode==="calendar"?"创建":"记下"}</button>
     </footer>
     {mobile && moreOpen && <div className="quick-journal-more"><label>记录日期<input type="date" aria-label="记录日期" value={draft.date} disabled={!ready || saving} onChange={e => persist({ ...draftLatest.current, date: e.target.value })} /></label><div><button type="button" disabled={!ready || saving || uploading} onClick={() => fileInput.current?.click()}><Paperclip size={17} />添加文件</button>{mode!=="compose"&&<><button type="button" disabled={!ready || saving} onClick={() => insert("bold")}><Bold size={17} />加粗</button><button type="button" disabled={!ready || saving} onClick={() => insert("list")}><List size={17} />列表</button></>}</div><small>每条最多 9 个附件，单个 20 MB。</small></div>}
     {mobile && <div className="quick-journal-draft-status"><span role="status">{uploading ? "正在保存附件…" : draftStatus}</span><button type="button" onClick={() => setMoreOpen(!moreOpen)}><CalendarDays size={13} />{draft.date === localJournalDate() ? "今天" : draft.date}</button></div>}
@@ -264,7 +318,7 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
       <button disabled={!settingsReady || busy} onClick={() => { void saveSettings(); }}>保存设置</button>
     </details>}
     {mode !== "settings" && mode !== "feed" && compose}
-    {mode==="calendar"&&<p className="journal-capture-destinations">日志 → {libraries.find(l=>l.id===settings.libraryId)?.name||"请先配置 OS 保存位置"}<button type="button" onClick={()=>setSettingsOpen(!settingsOpen)}>保存设置</button></p>}
+    {mode==="calendar"&&(!desktopComposer||settingsOpen)&&<p className="journal-capture-destinations">日志 → {libraries.find(l=>l.id===settings.libraryId)?.name||"请先配置 OS 保存位置"}<button type="button" onClick={()=>setSettingsOpen(!settingsOpen)}>保存设置</button></p>}
     {mode==="calendar"&&capture.tasks.length>0&&<div className="journal-capture-target"><p>{capture.text.trim()||draft.attachments.length?"日志 → OS；":""}{capture.tasks.length} 条任务 → 滴答清单</p><label>任务保存到<select aria-label="任务资料库" value={taskLibrary} disabled={saving} onChange={e=>{setTaskLibrary(e.target.value);setTaskProject("");}}><option value="">选择滴答资料库</option>{libraries.filter(l=>l.provider==="dida365"&&l.connected).map(l=><option key={l.id} value={l.id}>{l.name}</option>)}</select></label>{taskLibrary&&<label>清单<select aria-label="任务清单" value={taskProject} disabled={saving} onChange={e=>setTaskProject(e.target.value)}><option value="">选择清单</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}<p>点击创建后，任务与日志分别保存。</p></div>}
     {notice && !onSaved && <p className="quick-journal-notice" role="status">{notice}</p>}
     {(error || listError) && <div className="quick-journal-error" role="alert">{error || listError}<button onClick={() => { setError(""); setListError(""); if (!ready || !settingsReady) setLoadRevision(v => v + 1); if (mode !== "compose") void refresh().catch(e => setListError(message(e))); }}>重新读取</button></div>}

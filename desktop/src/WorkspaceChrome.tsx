@@ -37,6 +37,7 @@ export const WorkspaceHeaderContext = createContext<{
   readingNavigation?: ReactNode;
   onToggleReadingNavigation?: () => void;
   readingNavigationExpanded?: boolean;
+  journalNavigation?: { dates: Array<{date: string; sources: number}>; onSelectDate: (date: string) => void };
 } | null>(null);
 
 export function WorkspaceModeControl({ mode, onModeChange }: {

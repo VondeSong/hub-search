@@ -1,5 +1,6 @@
 import {calendarDateKey,calendarPeriodKey} from "./JournalCalendarPeriod";
 import {journalHeatLevel} from "./JournalRecords";
+import {useJournalDailyData} from "./JournalDailyData";
 import { CalendarDays, ChevronLeft, ChevronRight, CircleDot, ChevronDown } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
@@ -18,10 +19,12 @@ function shiftMonth(value: string, amount: number) {
   return calendarPeriodKey(target.getFullYear(),target.getMonth()+1)||value.slice(0,7);
 }
 
-export function JournalNavigator({ availableDates, selectedDate, onSelectDate }: {
+export function JournalNavigator({ availableDates, selectedDate, onSelectDate, desktop = false, taskScope = null }: {
   availableDates: Array<{ date: string; sources: number;count?:number }>;
   selectedDate: string;
   onSelectDate: (date: string) => void;
+  desktop?: boolean;
+  taskScope?: string[] | null;
 }) {
   const today = localDateKey();
   const [visibleMonth, setVisibleMonth] = useState(() => (selectedDate || today).slice(0, 7));
@@ -46,8 +49,14 @@ export function JournalNavigator({ availableDates, selectedDate, onSelectDate }:
   }, [focusedDate, visibleMonth]);
 
   const [year, month] = visibleMonth.split("-").map(Number);
+  const taskActivity = useJournalDailyData({from: visibleMonth + "-01", to: shiftMonth(visibleMonth, 1) + "-01", scope: taskScope, query: "", enabled: desktop, dataVersion: ""});
+  const recordedDays = new Set([
+    ...availableDates.filter(entry => entry.date.startsWith(visibleMonth) && (entry.count ?? entry.sources) > 0).map(entry=>entry.date),
+    ...taskActivity.tasksByDate.keys(),
+  ]).size;
   const firstWeekday = new Date(year, month - 1, 1).getDay();
-  const cells = Array.from({ length: 42 }, (_, index) => {
+  const weeks = desktop ? Math.ceil((firstWeekday + new Date(year, month, 0).getDate()) / 7) : 6;
+  const cells = Array.from({ length: weeks * 7 }, (_, index) => {
     const value = new Date(year, month - 1, 1 - firstWeekday + index);
     return { date: localDateKey(value), day: value.getDate(), inMonth: value.getMonth() === month - 1, inRange:calendarPeriodKey(value.getFullYear(),value.getMonth()+1)!==null };
   });
@@ -85,16 +94,17 @@ export function JournalNavigator({ availableDates, selectedDate, onSelectDate }:
   return <div className="journal-navigator">
     <section ref={calendarRef} className="journal-calendar journal-calendar-compact" aria-label="日志日历">
       <header>
-        <button ref={periodTrigger} className={`journal-month-label ${selectedDate === visibleMonth ? "selected" : ""}`}
+        <button ref={periodTrigger} className={`journal-month-label ${!desktop && selectedDate === visibleMonth ? "selected" : ""}`}
           aria-label={`切换日历年月，当前${monthLabel}`} aria-expanded={pickerOpen}
           popoverTarget="journal-period-picker" title="快速切换年份和月份" onClick={() => {if(!pickerOpen)setPickerYear(String(year));}}>
-          <CalendarDays size={15} aria-hidden="true" /><strong>{monthLabel}</strong><ChevronDown size={12} aria-hidden="true"/>
+          {!desktop&&<CalendarDays size={15} aria-hidden="true" />}<strong>{desktop ? `${year} 年 ${month} 月` : monthLabel}</strong>{!desktop&&<ChevronDown size={12} aria-hidden="true"/>}
         </button>
         <div className="journal-month-actions">
           <button onClick={() => {setPickerOpen(false);setVisibleMonth(value => shiftMonth(value, -1));}} aria-label="上个月" title="上个月"><ChevronLeft size={16} /></button>
-          <button className="journal-today-button" onClick={() => { setPickerOpen(false);setVisibleMonth(today.slice(0, 7)); setFocusedDate(today); onSelectDate(today); }} aria-label="回到今天" title="回到今天"><CircleDot size={16} /></button>
+          <button className="journal-today-button" onClick={() => { setPickerOpen(false);setVisibleMonth(today.slice(0, 7)); setFocusedDate(today); onSelectDate(desktop ? today.slice(0, 7) : today); }} aria-label="回到今天" title="回到今天"><CircleDot size={16} /></button>
           <button onClick={() => {setPickerOpen(false);setVisibleMonth(value => shiftMonth(value, 1));}} aria-label="下个月" title="下个月"><ChevronRight size={16} /></button>
         </div>
+        {desktop&&<small className="journal-recorded-days">{recordedDays} 天有记</small>}
       </header>
       <form id="journal-period-picker" ref={periodPopover} popover="auto" className="journal-period-picker" aria-label="选择年份和月份" onToggle={event=>{const open=event.currentTarget.matches(":popover-open");if(open)positionPicker();setPickerOpen(open);}} onSubmit={event=>{event.preventDefault();chooseMonth(month);}} onKeyDown={event=>{if(event.key==="Escape"){event.preventDefault();event.stopPropagation();closePicker();}}}>
         <div className="journal-year-row"><button type="button" aria-label="上一年" disabled={Number(pickerYear)<=100} onClick={()=>stepYear(-1)}><ChevronLeft size={15}/></button><label><span>年份</span><input ref={yearInput} type="number" aria-label="日历年份" min={100} max={9999} step={1} required value={pickerYear} onChange={event=>setPickerYear(event.target.value)}/></label><button type="button" aria-label="下一年" disabled={Number(pickerYear)>=9999} onClick={()=>stepYear(1)}><ChevronRight size={15}/></button></div>
@@ -103,25 +113,31 @@ export function JournalNavigator({ availableDates, selectedDate, onSelectDate }:
       </form>
       <div className="journal-date-grid" role="grid" aria-label={`${year}年${month}月`}>
         <div className="journal-week-row" role="row">{["日", "一", "二", "三", "四", "五", "六"].map(day => <span role="columnheader" key={day}>{day}</span>)}</div>
-        {Array.from({ length: 6 }, (_, week) => <div className="journal-week-row" role="row" key={week}>
+        {Array.from({ length: weeks }, (_, week) => <div className="journal-week-row" role="row" key={week}>
           {cells.slice(week * 7, week * 7 + 7).map(cell => {
             const activity=dates.get(cell.date),sources=activity?.sources??0,count=activity?.count??sources;
             const selected = cell.date === selectedDate;
+            const tasks = taskActivity.tasksByDate.get(cell.date);
+            const pending = (tasks?.created.length ?? 0) + (tasks?.scheduled.length ?? 0);
+            const done = tasks?.completed.length ?? 0;
+            const taskLabel = pending || done ? `，${pending}项待办，${done}项已完成` : "";
+            if (desktop && !cell.inMonth) return <div role="gridcell" key={cell.date} />;
             return <div role="gridcell" aria-selected={selected} key={cell.date}>
-              <button data-heat={journalHeatLevel(count)} data-count={count} data-date={cell.date} disabled={!cell.inRange} tabIndex={cell.inRange&&cell.date === tabDate ? 0 : -1}
+              <button data-heat={journalHeatLevel(count)} data-count={count} data-tasks={pending + done} data-date={cell.date} disabled={!cell.inRange} tabIndex={cell.inRange&&cell.date === tabDate ? 0 : -1}
                 className={`journal-date ${cell.inMonth ? "" : "outside-month"} ${cell.date === today ? "today" : ""} ${selected ? "selected" : ""} ${sources ? "has-journal" : ""}`}
                 aria-current={cell.date === today ? "date" : undefined}
-                aria-label={`${cell.date}${cell.date === today ? "，今天" : ""}，${count}条记录${sources?`，${sources}个资料库`:""}`}
-                title={`${cell.date} · ${count} 条记录（不含任务）${sources?` · ${sources} 个资料库`:""}`}
+                aria-label={`${cell.date}${cell.date === today ? "，今天" : ""}，${count}条记录${sources?`，${sources}个资料库`:""}${taskLabel}`}
+                title={`${cell.date} · ${count} 条记录${desktop ? taskLabel : "（不含任务）"}${sources?` · ${sources} 个资料库`:""}`}
                 onFocus={() => setFocusedDate(cell.date)} onKeyDown={event => handleDateKey(event, cell.date)}
                 onClick={() => { setPickerOpen(false);setFocusedDate(cell.date); setVisibleMonth(cell.date.slice(0, 7)); onSelectDate(cell.date); }}>
                 <span>{cell.day}</span>
+                {desktop&&<span className="journal-date-dots" aria-hidden="true">{count>0&&<i className="notes"/>}{(pending>0||done>0)&&<i className={pending>0?"pending":"done"}/>}</span>}
               </button>
             </div>;
           })}
         </div>)}
       </div>
-      <div className="journal-heat-legend" aria-label="记录热力图图例：0条、1条、2条、3到4条、5条及以上"><span>记录条数</span><span>少</span>{[0,1,2,3,4].map(level=><i key={level} data-heat={level} aria-hidden="true"/>)}<span>多</span><small>0 · 1 · 2 · 3–4 · 5+ 条，不含任务</small></div>
+      {!desktop&&<div className="journal-heat-legend" aria-label="记录热力图图例：0条、1条、2条、3到4条、5条及以上"><span>记录条数</span><span>少</span>{[0,1,2,3,4].map(level=><i key={level} data-heat={level} aria-hidden="true"/>)}<span>多</span><small>0 · 1 · 2 · 3–4 · 5+ 条，不含任务</small></div>}
     </section>
   </div>;
 }

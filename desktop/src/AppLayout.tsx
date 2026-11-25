@@ -85,7 +85,7 @@ export function DesktopAppLayout(props: AppLayoutProps) {
       filterBarProps, workspaceProps, footerStatusProps, settingsDialog, mainContent, desktopSidebarProps,
     } = props;
     const insightsLayout = desktopSidebarProps.activeView === "insights";
-    const journalLayout = desktopSidebarProps.activeView === "journals";
+    const journalLayout = desktopSidebarProps.activeView === "journals" && !headerProps.query.trim();
     const librariesLayout = Boolean(mainContent) && desktopSidebarProps.activeView === "libraries";
     const readingLayout = Boolean(mainContent) && desktopSidebarProps.activeView === "collections";
     const integratedHeader = Boolean(mainContent) && (readingLayout || insightsLayout || librariesLayout);
@@ -111,7 +111,7 @@ export function DesktopAppLayout(props: AppLayoutProps) {
           onToggleLibrary={desktopSidebarProps.onToggleLibrary}
           onManageLibraries={() => footerStatusProps.setShowConnection(true)}
         />
-        {!insightsLayout && !librariesLayout && !readingLayout && <><DesktopSidebar {...desktopSidebarProps} hideTagNavigation={!mainContent && Boolean(activeDesktopTopicCatalog(workspaceProps))} contextualTitle={sidebarMode === "standard" ? undefined : workspaceLabels[desktopSidebarProps.activeView]} onCollapse={collapsePanel} />
+        {!insightsLayout && !librariesLayout && !readingLayout && <><DesktopSidebar {...desktopSidebarProps} hideJournalNavigation={journalLayout} hideTagNavigation={!mainContent && Boolean(activeDesktopTopicCatalog(workspaceProps))} contextualTitle={sidebarMode === "standard" ? undefined : workspaceLabels[desktopSidebarProps.activeView]} onCollapse={collapsePanel} />
         <div
           className="context-sidebar-resizer"
           role="separator"
@@ -143,7 +143,9 @@ export function DesktopAppLayout(props: AppLayoutProps) {
           } : null}>{mainContent}</WorkspaceHeaderContext.Provider></div><FooterStatus {...footerStatusProps} /></> : <>
             {!journalLayout&&<SearchFilterReveal open={filtersOpen}><FilterBar {...filterBarProps} visible={filtersOpen} /></SearchFilterReveal>}
             {(!journalLayout&&(desktopSidebarProps.activeView === "home" || headerProps.query.trim())) && <SearchFilterSummary {...filterBarProps} />}
-            <WorkspaceHeaderContext.Provider value={journalLayout?{actions:<><WorkspaceModeControl mode={sidebarMode} onModeChange={changeMode}/><button className={`workspace-preview-toggle ${headerProps.showPreviewPane ? "active" : ""}`} aria-label="显示预览窗格" aria-pressed={headerProps.showPreviewPane} onClick={()=>headerProps.setPreviewOpen(value=>!value)}><PanelRight size={17}/></button></>,onMouseDown:startWindowDrag}:null}><DesktopWorkspace {...workspaceProps}/></WorkspaceHeaderContext.Provider>
+            <WorkspaceHeaderContext.Provider value={journalLayout?{actions:<><WorkspaceModeControl mode={sidebarMode} onModeChange={changeMode}/><button className={`workspace-preview-toggle ${headerProps.showPreviewPane ? "active" : ""}`} aria-label="显示预览窗格" aria-pressed={headerProps.showPreviewPane} onClick={()=>headerProps.setPreviewOpen(value=>!value)}><PanelRight size={17}/></button></>,onMouseDown:startWindowDrag,
+              journalNavigation:{dates:desktopSidebarProps.journalDates,onSelectDate:desktopSidebarProps.onSelectJournalDate},
+            }:null}><DesktopWorkspace {...workspaceProps}/></WorkspaceHeaderContext.Provider>
             <FooterStatus {...footerStatusProps} />
           </>}
         </div>

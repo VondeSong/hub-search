@@ -182,6 +182,7 @@ export type DesktopSidebarView = "home" | "tasks" | "journals" | "favorites" | "
 type DesktopSidebarProps = {
   contextualTitle?: string;
   hideTagNavigation?: boolean;
+  hideJournalNavigation?: boolean;
   activeView: DesktopSidebarView;
   smartCollections: SmartCollection[];
   activeSmartCollectionId: string;
@@ -279,6 +280,7 @@ export const DesktopSidebar = memo(function DesktopSidebar({
   onCollapse,
   contextualTitle,
   hideTagNavigation,
+  hideJournalNavigation,
 }: DesktopSidebarProps) {
   const [tagFilter, setTagFilter] = useState("");
   const [commonOpen, setCommonOpen] = useState(true);
@@ -457,7 +459,7 @@ export const DesktopSidebar = memo(function DesktopSidebar({
         <button className={activeView === "tasks" ? "active" : ""} onClick={() => onSelectView("tasks")}>
           <ListTodo size={16} /><span>任务</span>{taskOpenCount > 0 && <small>{taskOpenCount}</small>}
         </button>
-        <button className={activeView === "journals" ? "active" : ""} onClick={() => onSelectView("journals")}>
+        <button data-nav="journals" aria-current={activeView === "journals" ? "page" : undefined} className={activeView === "journals" ? "active" : ""} onClick={() => onSelectView("journals")}>
           <CalendarDays size={16} /><span>日志</span>{journalCount > 0 && <small>{journalCount}</small>}
         </button>
         <button className={activeView === "favorites" ? "active" : ""} onClick={() => onSelectView("favorites")}>
@@ -475,7 +477,7 @@ export const DesktopSidebar = memo(function DesktopSidebar({
       </nav>
 
       <div className="sidebar-context-scroll">
-      {activeView === "journals" && <section className="sidebar-journal-navigation">
+      {activeView === "journals" && !hideJournalNavigation && <section className="sidebar-journal-navigation">
         <JournalNavigation
           dates={journalDates}
           selectedDate={selectedJournalDate}

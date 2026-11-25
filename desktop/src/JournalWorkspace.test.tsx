@@ -7,6 +7,7 @@ import { JournalViewsContext,useJournalViewStore } from "./JournalViews";
 import type { JournalViewStore } from "./JournalViews";
 import type { SearchResult } from "./SearchTypes";
 import { pageFavoriteKey } from "./PageFavorites";
+import { WorkspaceHeaderContext } from "./WorkspaceChrome";
 const record=(source:string,id:string)=>({id,entityKey:`document:${source}:${id}`,documentId:id,provider:"craft",spaceId:source,libraryId:source,libraryName:source,contentType:"document",sourceType:"craft_page",spaceName:source,path:"未分类",matchField:"",matchCount:0,title:"2026-10-07",journalDate:"2026-10-07",snippet:"设计复盘与来源证据",matchTerms:[],subMatches:[]}) as SearchResult;
 const items=[record("Car","a"),record("Private","b")];
 const page={items,total:2,days:1,libraries:2,revision:"v1",loading:false,error:"",retry:vi.fn(),loadMore:vi.fn()};
@@ -14,11 +15,40 @@ vi.mock("./useJournalPage",()=>({useJournalPage:()=>page}));
 vi.mock("./JournalDailyData",()=>({canSetJournalTaskStatus:()=>false,useJournalDailyData:()=>({tasksByDate:new Map(),taskBusyIds:new Set(),tasksLoading:false,tasksError:"",retry:vi.fn(),setTaskCompleted:vi.fn()})}));
 let container:HTMLDivElement,root:Root,store:JournalViewStore;
 const preview=vi.fn(),open=vi.fn(),create=vi.fn(),favorite=vi.fn();
-function Fixture(){store=useJournalViewStore();return <JournalViewsContext.Provider value={store}><JournalWorkspace libraries={[{id:"Car",name:"Car",provider:"craft",connected:true,documentCount:1,excludedPaths:[]}]} scope={null} dataVersion="v1" selectedDate="" onPreview={preview} onOpen={open} onCreate={create} onFavorite={favorite} favoriteIds={new Set([pageFavoriteKey(items[0])])} renderIcon={()=>null}/></JournalViewsContext.Provider>;}
+function Fixture({desktop=false}:{desktop?:boolean}) {
+  store=useJournalViewStore();
+  return <JournalViewsContext.Provider value={store}>
+    <WorkspaceHeaderContext.Provider value={desktop?{actions:null,onMouseDown:()=>{},journalNavigation:{dates:[],onSelectDate:()=>{}}}:null}>
+      <JournalWorkspace libraries={[{id:"Car",name:"Car",provider:"craft",connected:true,documentCount:1,excludedPaths:[]}]} scope={null} dataVersion="v1" selectedDate="" onPreview={preview} onOpen={open} onCreate={create} onFavorite={favorite} favoriteIds={new Set([pageFavoriteKey(items[0])])} renderIcon={()=>null}/>
+    </WorkspaceHeaderContext.Provider>
+  </JournalViewsContext.Provider>;
+}
 async function click(selector:string){await act(async()=>container.querySelector<HTMLButtonElement>(selector)!.click());}
 beforeEach(()=>{(globalThis as unknown as {IS_REACT_ACT_ENVIRONMENT:boolean}).IS_REACT_ACT_ENVIRONMENT=true;localStorage.clear();Object.defineProperty(HTMLDialogElement.prototype,"showModal",{configurable:true,value:function(){this.setAttribute("open","");}});Object.defineProperty(HTMLDialogElement.prototype,"close",{configurable:true,value:function(){this.removeAttribute("open");}});vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date(2026,9,13,12));container=document.createElement("div");document.body.appendChild(container);root=createRoot(container);preview.mockClear();open.mockClear();create.mockClear();favorite.mockClear();});
 afterEach(async()=>{await act(async()=>root.unmount());container.remove();vi.useRealTimers();});
 describe("Journal database workspace",()=>{
+ it("keeps the desktop date filter and sidebar disclosure separate from the three workspace layouts",async()=>{
+  await act(async()=>root.render(<Fixture desktop/>));
+  const navigation=container.querySelector<HTMLElement>('#journal-desktop-navigation')!;
+  expect(navigation.hidden).toBe(false);
+  expect(container.querySelector('[aria-label="日志快速布局"]')?.textContent).toBe("每日时间线月历视图紧凑列表");
+  expect(container.querySelector('.journal-inline-editor-top [role="textbox"]')).not.toBeNull();
+  await click('[aria-label="收起日志导航"]');
+  expect(navigation.hidden).toBe(true);
+  await click('[aria-label="展开日志导航"]');
+  await click('.journal-date[data-date="2026-10-07"]');
+  expect(store.view).toMatchObject({period:"day",day:"2026-10-07",layout:"stream"});
+  await click('.journal-daily-day[data-journal-day="2026-10-07"] .journal-daily-add');
+  expect(container.querySelector('.journal-inline-editor-day time')?.textContent).toBe("2026-10-07");
+  expect(container.querySelector('.journal-inline-editor-top [role="textbox"]')).not.toBeNull();
+  await click('.journal-inline-cancel');
+  await click('.journal-date[data-date="2026-10-07"]');
+  expect(store.view).toMatchObject({period:"month",day:""});
+  await click('.journal-layout-segment > button:nth-child(2)');
+  expect(container.querySelector('.journal-desktop-month-grid')).not.toBeNull();
+  await click('.journal-layout-segment > button:nth-child(3)');
+  expect(container.querySelectorAll('.journal-desktop-list-row')).toHaveLength(2);
+ });
  it("keeps same-day sources separate and previews the original page; favorite uses page identity",async()=>{
   await act(async()=>root.render(<Fixture/>));await act(async()=>store.update({layout:"calendar"}));await click('[aria-label="2026年10月7日 · 周三，2条记录"]');expect(container.querySelectorAll(".journal-entry-card")).toHaveLength(2);
   await click('.journal-entry-card:first-child .journal-entry-open');expect(preview).toHaveBeenLastCalledWith(items[0]);

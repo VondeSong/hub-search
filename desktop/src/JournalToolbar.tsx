@@ -1,8 +1,8 @@
 import {useEffect,useId,useRef,useState,type ReactNode} from "react";
-import {ArrowLeft,CalendarDays,Check,ChevronDown,ChevronRight,Layers,ListFilter,Plus,Search,Trash2,X} from "lucide-react";
+import {AlignLeft,ArrowLeft,CalendarDays,CalendarRange,Check,ChevronDown,ChevronRight,Layers,LayoutGrid,List,ListFilter,MoreHorizontal,PanelLeft,Plus,Search,Sparkles,Trash2,X} from "lucide-react";
 import {journalRecordFilters,type JournalRecordFilter} from "./JournalRecords";
 import {JournalViewManager} from "./JournalViewManager";
-import {journalLayouts,localJournalDate,shiftJournalDay,type JournalViewConfig,type JournalViewStore} from "./JournalViews";
+import {journalLayouts,localJournalDate,shiftJournalDay,type JournalLayout,type JournalViewConfig,type JournalViewStore} from "./JournalViews";
 
 import {useContext} from "react";
 import {WorkspaceHeaderContext} from "./WorkspaceChrome";
@@ -16,8 +16,13 @@ type Props={
   store:JournalViewStore;
   resultCount:number;
   taskCount?:number;
+  serifReading?:boolean;
+  onToggleSerifReading?:()=>void;
+  onAiDailySummary?:()=>void;
   onUpdate:(patch:Partial<JournalViewConfig>)=>void;
   onCreate?:(trigger:HTMLButtonElement)=>void;
+  navigationExpanded?: boolean;
+  onToggleNavigation?: () => void;
 };
 
 type FilterProperty="period"|"libraries"|"record";
@@ -28,8 +33,9 @@ const propertyIcons={period:CalendarDays,libraries:Layers,record:ListFilter};
 const monthLabel=(month:string)=>`${month.slice(0,4)}年${Number(month.slice(5,7))}月`;
 const dateLabel=(day:string)=>`${day.slice(0,4)}年${Number(day.slice(5,7))}月${Number(day.slice(8,10))}日`;
 
-export function JournalToolbar({store,libraries,resultCount,taskCount=0,loading=false,error=false,onUpdate,onCreate}:Props){
+export function JournalToolbar({store,libraries,resultCount,taskCount=0,serifReading,onToggleSerifReading,onAiDailySummary,loading=false,error=false,onUpdate,onCreate,navigationExpanded,onToggleNavigation}:Props){
   const shell=useContext(WorkspaceHeaderContext);
+  const desktop = Boolean(onToggleNavigation);
   const knownLibraryIds=new Set(libraries.map(library=>library.id));
   const {view}=store;
   const uid=useId(),filterId=`journal-filters-${uid}`,conditionsId=`journal-conditions-${uid}`,saveId=`journal-save-view-${uid}`;
@@ -45,10 +51,10 @@ export function JournalToolbar({store,libraries,resultCount,taskCount=0,loading=
   const libraryName=(id:string)=>{const library=libraries.find(value=>value.id===id);const providerNames:Record<string,string>={craft:"Craft",obsidian:"Obsidian",dida365:"滴答清单"};return library?`${library.name} · ${providerNames[library.provider]||library.provider}`:`未连接资料库 ${unknownIds.indexOf(id)+1}`;};
   const previousView=useRef(store.activeId);
   const filterCount=Number(view.period!=="all")+Number(view.libraries!==null)+Number((view.recordFilter||"all")!=="all");
-  const [filterBarOpen,setFilterBarOpen]=useState(filterCount>0);
+  const [filterBarOpen,setFilterBarOpen]=useState(!desktop&&filterCount>0);
   const filterKey=JSON.stringify([view.period,view.day,view.month,view.libraries,view.recordFilter]);
-  useEffect(()=>{if(filterCount>0)setFilterBarOpen(true);},[filterKey]);
-  const showSearch=searchExpanded||!!view.query;
+  useEffect(()=>{if(!desktop&&filterCount>0)setFilterBarOpen(true);},[filterKey,desktop]);
+  const showSearch=desktop||searchExpanded||!!view.query;
   const currentMonth=localJournalDate().slice(0,7);
   const periodLabel=view.period==="day"?dateLabel(view.day):view.month===currentMonth?`${Number(view.month.slice(5))}月 · 本月`:monthLabel(view.month);
   const sourceLabel=view.libraries===null?"全部资料库":view.libraries.length===0?"未选择资料库":view.libraries.length===1?libraryName(view.libraries[0]):`${view.libraries.length} 个资料库`;
@@ -148,7 +154,7 @@ export function JournalToolbar({store,libraries,resultCount,taskCount=0,loading=
     else if(restoreSearchFocus.current){restoreSearchFocus.current=false;searchButton.current?.focus({preventScroll:true});}
   },[searchExpanded]);
   function openSearch(){setSearchExpanded(true);}
-  function closeSearch(){onUpdate({query:""});restoreSearchFocus.current=true;setSearchExpanded(false);}
+  function closeSearch(){onUpdate({query:""});if(desktop){searchInput.current?.focus();return;}restoreSearchFocus.current=true;setSearchExpanded(false);}
   function startSave(returnTarget?:HTMLElement|null){
     saveReturn.current=returnTarget?.isConnected?returnTarget:document.activeElement instanceof HTMLElement?document.activeElement:null;
     const base=journalLayouts[view.layout];let name:string=base,index=2;
@@ -178,25 +184,56 @@ export function JournalToolbar({store,libraries,resultCount,taskCount=0,loading=
     </div>;
   }
 
+  const filterToggle = <button ref={filterButton} type="button" className={`journal-filter-trigger ${filterCount?"has-filters":""}`} aria-label={`筛选日志${filterCount?`，${filterCount}项条件`:""}`} title={filterBarOpen?"收起筛选条件栏":"展开筛选条件栏"} aria-controls={conditionsId} aria-expanded={filterBarOpen} aria-pressed={filterBarOpen} onClick={toggleFilterBar}><ListFilter size={16}/>{desktop&&<span>筛选条件</span>}</button>;
+  const create = onCreate&&<button type="button" className="journal-toolbar-create" onClick={event=>onCreate(event.currentTarget)} aria-label="写日志" title="写日志"><Plus size={15}/><span>写日志</span></button>;
   return <section className={`journal-toolbar-shell${showSearch?" is-searching":""}`} aria-label="日志视图与筛选工具栏">
     <div className="journal-toolbar-top" onMouseDown={shell?.onMouseDown}>
-      <JournalViewManager store={store} onNew={startSave}/>
-      <p className="journal-toolbar-results" role="status" aria-live="polite" aria-atomic="true" title={`${resultCount} 条日志${taskCount?` · ${taskCount} 项任务`:""}`}><span>{error?"结果读取失败":loading?"正在读取…":<><strong>{resultCount}</strong> 条日志</>}</span>{taskCount>0&&<span className="journal-toolbar-task-count"> · {taskCount} 项任务</span>}</p>
-      <div className="journal-toolbar-actions">{shell?.actions}
-        {showSearch?<label className="journal-toolbar-search" data-hub-keyboard-scope="journal-search" onBlur={event=>{if(!view.query&&!(event.relatedTarget instanceof Node&&event.currentTarget.contains(event.relatedTarget)))setSearchExpanded(false);}}>
-          <Search size={15}/><span className="journal-toolbar-sr-only">搜索日志内容</span>
-          <input ref={searchInput} type="search" aria-label="搜索日志内容" placeholder="搜索日志…" value={view.query} onChange={event=>onUpdate({query:event.target.value})} onKeyDown={event=>{
+      {desktop ? <button type="button" className="journal-nav-toggle" aria-expanded={navigationExpanded} aria-controls="journal-desktop-navigation" aria-label={navigationExpanded?"收起日志导航":"展开日志导航"} title={navigationExpanded?"收起日志导航":"展开日志导航"} onClick={onToggleNavigation}><PanelLeft size={15}/></button> : <JournalViewManager store={store} onNew={startSave}/>}
+      <div className="journal-layout-segment" role="group" aria-label="日志快速布局">
+        {([
+          ["stream", desktop?"每日时间线":"时间线", desktop?AlignLeft:CalendarRange],
+          ["records", "速记", LayoutGrid],
+          ["calendar", desktop?"月历视图":"月历", CalendarDays],
+          ["list", desktop?"紧凑列表":"列表", List],
+        ] as Array<[JournalLayout, string, typeof CalendarDays]>).filter(([id])=>!desktop||id!=="records").map(([layoutId, label, Icon]) => (
+          <button
+            key={layoutId}
+            type="button"
+            className={view.layout === layoutId ? "active" : ""}
+            aria-pressed={view.layout === layoutId}
+            title={`切换到${journalLayouts[layoutId]}`}
+            onClick={() => onUpdate({ layout: layoutId })}
+          >
+            <Icon size={13} aria-hidden="true" />
+            <span>{label}</span>
+          </button>
+        ))}
+      </div>
+      <p className={desktop?"journal-toolbar-sr-only":"journal-toolbar-results"} role="status" aria-live="polite" aria-atomic="true" title={`${resultCount} 条日志${taskCount?` · ${taskCount} 项任务`:""}`}><span>{error?"结果读取失败":loading?"正在读取…":<><strong>{resultCount}</strong> 条日志</>}</span>{taskCount>0&&<span className="journal-toolbar-task-count"> · {taskCount} 项任务</span>}</p>
+      {desktop&&<details className="journal-toolbar-menu">
+        <summary aria-label="更多日志操作" title="更多日志操作"><MoreHorizontal size={15}/></summary>
+        <div className="journal-toolbar-menu-panel">
+          <JournalViewManager store={store} onNew={startSave}/>
+          <button type="button" aria-pressed={view.layout==="records"} onClick={event=>{onUpdate({layout:"records"});event.currentTarget.closest("details")?.removeAttribute("open");}}><LayoutGrid size={15}/>速记</button>
+          {filterToggle}{create}<div className="journal-toolbar-shell-actions">{shell?.actions}</div>
+        </div>
+      </details>}
+      <div className="journal-toolbar-actions">{!desktop&&shell?.actions}
+        {showSearch?<label className="journal-toolbar-search" data-hub-keyboard-scope="journal-search" data-keyboard-open="true" onBlur={event=>{if(!view.query&&!(event.relatedTarget instanceof Node&&event.currentTarget.contains(event.relatedTarget)))setSearchExpanded(false);}}>
+          <Search size={14}/><span className="journal-toolbar-sr-only">搜索日志内容</span>
+          <input ref={searchInput} type="search" aria-label="搜索日志内容" placeholder="筛选日志或任务…" value={view.query} onChange={event=>onUpdate({query:event.target.value})} onKeyDown={event=>{
             if(event.key!=="Escape"||event.nativeEvent.isComposing)return;
             event.preventDefault();event.stopPropagation();
             if(view.query){onUpdate({query:""});setSearchExpanded(true);}
             else closeSearch();
           }}/>
-          <button type="button" aria-label={view.query?"清空并关闭日志搜索":"关闭日志搜索"} title={view.query?"清空并关闭搜索":"关闭搜索"} onClick={closeSearch}><X size={14}/></button>
-        </label>:<button ref={searchButton} type="button" className="journal-search-trigger" aria-label="搜索日志" title="搜索日志" aria-expanded="false" onClick={openSearch}><Search size={16}/></button>}
-        <button ref={filterButton} type="button" className={`journal-filter-trigger ${filterCount?"has-filters":""}`} aria-label={`筛选日志${filterCount?`，${filterCount}项条件`:""}`} title={filterBarOpen?"收起筛选条件栏":"展开筛选条件栏"} aria-controls={conditionsId} aria-expanded={filterBarOpen} aria-pressed={filterBarOpen} onClick={toggleFilterBar}>
-          <ListFilter size={18}/>
-        </button>
-        {onCreate&&<button type="button" className="journal-toolbar-create" onClick={event=>onCreate(event.currentTarget)} aria-label="写日志" title="写日志"><Plus size={15}/><span>写日志</span></button>}
+          {(!desktop||view.query)&&<button type="button" aria-label={desktop?"清空日志搜索":view.query?"清空并关闭日志搜索":"关闭日志搜索"} title={desktop?"清空搜索":view.query?"清空并关闭搜索":"关闭搜索"} onClick={closeSearch}><X size={14}/></button>}
+        </label>:<button ref={searchButton} type="button" className="journal-search-trigger" aria-label="搜索日志" title="搜索日志" aria-expanded="false" onClick={openSearch}><Search size={15}/></button>}
+        {view.period==="day"&&<button type="button" className="journal-back-month-btn" onClick={()=>onUpdate({period:"month",day:""})} title="返回整月日志视图">回到全月</button>}
+        {!desktop&&filterToggle}
+        {onToggleSerifReading&&<button type="button" className={`journal-serif-toggle${serifReading?" active":""}`} aria-pressed={Boolean(serifReading)} aria-label="切换日志正文衬线体" title="切换日志正文衬线体" onClick={onToggleSerifReading}>Aa</button>}
+        {onAiDailySummary&&<button type="button" className="journal-ai-summary-btn" aria-label="AI 日结" title="将当日真实日志与速记挂载到助手起草复盘" onClick={onAiDailySummary}><Sparkles size={13} aria-hidden="true"/><span>AI 日结</span></button>}
+        {!desktop&&create}
       </div>
     </div>
     {filterBarOpen&&<div id={conditionsId} className="journal-toolbar-conditions" aria-label="日志筛选条件栏">
