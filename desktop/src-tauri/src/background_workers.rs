@@ -1,12 +1,12 @@
 //! Owns automatic scheduling and the process lifetime shared by domain dispatchers.
 use crate::{
     backfill_attachment_discovery, backfill_document_blobs, backfill_ocr_pipeline, blob_store_for,
-    claim_flashcard_auto_sync_due, claim_task_background_sync_due, cleanup_due,
-    cleanup_local_storage, craft_backup, craft_backup_resources, database_path, flashcard_quality,
-    flush_content_pipeline, flush_index_jobs, flush_obsidian_watch_changes, isolated_runtime,
-    library_runtime, now_timestamp, reading_sync, refresh_obsidian_watchers, run_craft_backup,
-    run_task_sync_inner, schedule_library_remove, search_index_root, sync_due_libraries, telegram,
-    x_bookmarks, AppState,
+    claim_flashcard_auto_sync_due, cleanup_due, cleanup_local_storage, craft_backup,
+    craft_backup_resources, database_path, flashcard_quality, flush_content_pipeline,
+    flush_index_jobs, flush_obsidian_watch_changes, isolated_runtime, library_runtime,
+    now_timestamp, reading_sync, refresh_obsidian_watchers, run_craft_backup,
+    schedule_library_remove, search_index_root, sync_due_libraries, telegram, x_bookmarks,
+    AppState,
 };
 use serde_json::{json, Value};
 use std::sync::{
@@ -228,33 +228,6 @@ pub(crate) fn start(app: AppHandle) {
                     }
                 }
                 let _ = sync_due_libraries(worker_app.clone(), state.clone()).await;
-                if database_path(&worker_app)
-                    .and_then(|path| claim_task_background_sync_due(&path))
-                    .unwrap_or(false)
-                {
-                    let _ = worker_app.emit(
-                        "task-sync-updated",
-                        json!({"status": "running", "success": false}),
-                    );
-                    let result =
-                        run_task_sync_inner(worker_app.clone(), state.clone(), Some(false)).await;
-                    let success = result.as_ref().is_ok_and(|summary| summary.failed == 0);
-                    let payload = match &result {
-                        Ok(summary) => json!({
-                            "status": if success { "completed" } else { "completed_with_errors" },
-                            "success": success,
-                            "failed": summary.failed,
-                            "message": summary.message,
-                        }),
-                        Err(error) => json!({
-                            "status": "failed",
-                            "success": false,
-                            "failed": 1,
-                            "message": format!("后台任务同步失败：{error}"),
-                        }),
-                    };
-                    let _ = worker_app.emit("task-sync-updated", payload);
-                }
                 if let (Ok(database), Ok(blob_store), Ok(index_root)) = (
                     database_path(&worker_app),
                     blob_store_for(&worker_app, &state),

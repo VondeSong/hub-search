@@ -90,7 +90,7 @@ const LazyMobileQuickCapture = lazy(() => import("./MobileQuickCapture").then(m 
 const LazySettingsDialog = lazy(() => import("./SettingsDialog").then((module) => ({ default: module.SettingsDialog })));
 const LazySettingsContent = lazy(() => import("./SettingsContent").then((module) => ({ default: module.SettingsContent })));
 const LazyInsightsWorkspace = lazy(() => import("./InsightsWorkspace").then((module) => ({ default: module.InsightsWorkspace })));
-const LazyTaskWorkspace = lazy(() => import("./TaskWorkspace").then((module) => ({ default: module.TaskWorkspace })));
+const LazyTaskWorkspace = lazy(() => import("./ActionWorkspace").then((module) => ({ default: module.TaskWorkspace })));
 const LazyCollectionsWorkspace = lazy(() => import("./CollectionsWorkspace").then((module) => ({ default: module.CollectionsWorkspace })));
 const LazyCloudAgents = lazy(() => import("./CloudAgents"));
 const LazyFlashcardsWorkspace = lazy(() => import("./FlashcardsWorkspace").then((module) => ({ default: module.FlashcardsWorkspace })));
@@ -369,7 +369,7 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
   const browseLibraries = spaces;
   const browsingPreview = browseLibraries.some(space => space.id === libraryPreview?.libraryId) ? libraryPreview : undefined;
   const sharedTasks = useUnifiedTasks({ enabled: ready && !flashcardsStandaloneOpen && (tasksActive || desktopSidebarView === "journals") });
-  useEffect(() => { if (sharedTasks.ready && !sharedTasks.loading) updateTaskOpenCount(sharedTasks.dashboard.open); }, [sharedTasks.dashboard.open, sharedTasks.ready, sharedTasks.loading, updateTaskOpenCount]);
+  useEffect(() => { if (sharedTasks.ready && !sharedTasks.loading) updateTaskOpenCount(sharedTasks.dashboard.tasks.filter(task=>task.provider==="dida365"&&!task.isProject&&task.status==="open").length); }, [sharedTasks.dashboard.tasks, sharedTasks.ready, sharedTasks.loading, updateTaskOpenCount]);
   const taskRegistryKey = JSON.stringify(spaces.map(space => [space.id, space.name, space.provider, space.connected]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
   const taskRegistryVersion = useRef("");
   useEffect(() => {

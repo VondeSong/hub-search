@@ -105,7 +105,6 @@ pub(super) fn persist_changed(
                     .as_ref()
                     .is_some_and(|(_, project)| project == &task.project_id)
             {
-                changed += dida_task_status::enqueue_observed(&tx, library, &task)? as usize;
                 continue;
             }
             let name = tx
@@ -118,7 +117,6 @@ pub(super) fn persist_changed(
                 .map_err(|e| e.to_string())?
                 .unwrap_or_else(|| task.project_id.clone());
             upsert_dida_task(&tx, library, &name, &task, now_timestamp())?;
-            dida_task_status::enqueue_observed(&tx, library, &task)?;
             changed += 1;
         }
         if let Some(cursor) = cursor {

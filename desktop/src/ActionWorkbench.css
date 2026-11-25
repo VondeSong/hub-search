@@ -1,0 +1,315 @@
+.aw-shell {
+  display: grid;
+  grid-template-columns: clamp(144px, 15vw, 224px) minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--text-primary, inherit);
+  background: var(--bg-primary, Canvas);
+  font-size: 13px;
+}
+.aw-shell.has-detail {
+  grid-template-columns: clamp(144px, 15vw, 224px) minmax(235px, 1fr) minmax(260px, 38%);
+}
+.aw-shell.aw-nav-hidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+.aw-shell.aw-nav-hidden.has-detail {
+  grid-template-columns: minmax(235px, 1fr) minmax(260px, 42%);
+}
+.aw-shell * {
+  box-sizing: border-box;
+}
+.aw-shell button,
+.aw-shell input,
+.aw-shell select,
+.aw-shell textarea {
+  font: inherit;
+  color: inherit;
+}
+.aw-shell button,
+.aw-shell summary {
+  cursor: pointer;
+}
+.aw-shell button:disabled {
+  opacity: 0.48;
+  cursor: default;
+}
+.aw-shell button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 5px 8px;
+  text-align: start;
+}
+.aw-shell button:hover,
+.aw-shell button[aria-pressed="true"],
+.aw-row.is-selected {
+  background: color-mix(in srgb, currentColor 7%, transparent);
+}
+.aw-shell input:not([type="checkbox"]),
+.aw-shell select,
+.aw-shell textarea {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 7px;
+  padding: 6px 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+.aw-nav,
+.aw-detail,
+.aw-scroll {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.aw-nav {
+  padding: 16px 10px;
+  background: color-mix(in srgb, currentColor 3%, transparent);
+  border-inline-end: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+.aw-nav > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 3px;
+}
+.aw-nav header,
+.aw-detail header,
+.aw-bar,
+.aw-tools,
+.aw-add,
+.aw-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.aw-nav header,
+.aw-detail header {
+  justify-content: space-between;
+}
+.aw-nav h3,
+.aw-shell small {
+  font-size: 12px;
+  font-weight: 450;
+  opacity: 0.76;
+}
+.aw-nav details label {
+  display: block;
+  margin: 6px 0;
+}
+.aw-center {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.aw-bar {
+  padding: 8px 14px;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  flex-wrap: wrap;
+}
+.aw-bar h2 {
+  font-size: 16px;
+  margin: 0 auto 0 0;
+}
+.aw-bar label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.aw-bar input {
+  width: 145px;
+}
+.aw-scroll {
+  padding: 8px clamp(12px, 2vw, 28px) 28px;
+}
+.aw-shell h3 {
+  font-size: 14px;
+}
+.aw-list h3,
+.aw-detail h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.aw-list {
+  margin-bottom: 18px;
+}
+.aw-list > p {
+  opacity: 0.7;
+}
+.aw-row {
+  display: flex;
+  align-items: flex-start;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 9%, transparent);
+  padding: 6px 0;
+  gap: 2px;
+  border-radius: 6px;
+}
+.aw-pick {
+  flex: 1;
+  min-width: 0;
+}
+.aw-pick strong,
+.aw-wait strong {
+  font-weight: 560;
+}
+.aw-pick small,
+.aw-wait small {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 5px;
+}
+.aw-review {
+  color: var(--accent, #9a5912);
+}
+.aw-harvester {
+  border: 1px solid color-mix(in srgb, #be8728 35%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, #be8728 5%, transparent);
+  margin: 12px 0;
+}
+.aw-capture-toggle {
+  width: 100%;
+  font-weight: 600 !important;
+}
+.aw-harvester article {
+  padding: 12px;
+  border-top: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+}
+.aw-harvester article > input {
+  width: 100%;
+}
+.aw-tools,
+.aw-tabs,
+.aw-add {
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+.aw-tools button,
+.aw-add button,
+.aw-detail section > button,
+.aw-topic button,
+.aw-tabs button,
+.aw-wait button,
+.aw-detail form > button {
+  border-color: color-mix(in srgb, currentColor 16%, transparent);
+}
+.aw-add input {
+  flex: 1;
+}
+.aw-detail {
+  padding: 14px clamp(12px, 1.6vw, 24px) 24px;
+  border-inline-start: 1px solid color-mix(in srgb, currentColor 13%, transparent);
+  min-width: 0;
+}
+.aw-detail h2,
+.aw-topic h2 {
+  font-size: 20px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.aw-detail section {
+  border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  margin-top: 14px;
+  padding-top: 4px;
+}
+.aw-detail textarea {
+  min-height: 70px;
+  width: 100%;
+}
+.aw-form {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+}
+.aw-form label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.aw-wait,
+.aw-topic {
+  border: 1px solid color-mix(in srgb, currentColor 13%, transparent);
+  border-radius: 9px;
+  padding: 12px;
+  margin: 8px 0;
+}
+.aw-step {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin: 6px 0;
+}
+.aw-materials details,
+.aw-claims li {
+  padding: 6px 0;
+}
+.aw-shell blockquote,
+.aw-shell pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 240px;
+  overflow: auto;
+}
+.aw-shell blockquote {
+  margin: 7px 0;
+  padding-left: 10px;
+  border-left: 2px solid color-mix(in srgb, currentColor 23%, transparent);
+}
+.aw-board .aw-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(225px, 100%), 1fr));
+  gap: 6px;
+}
+.aw-board .aw-list h3,
+.aw-board .aw-list > p {
+  grid-column: 1/-1;
+}
+.aw-board .aw-row {
+  border: 1px solid color-mix(in srgb, currentColor 13%, transparent);
+  padding: 8px;
+}
+.aw-today-plan {
+  margin: 8px 0;
+}
+.aw-shell [role="alert"] {
+  color: var(--danger, #ae4529);
+}
+.aw-shell [role="status"] {
+  overflow-wrap: anywhere;
+}
+@container (max-width:760px) {
+  .aw-shell.has-detail {
+    grid-template-columns: minmax(180px, 1fr) minmax(240px, 1fr);
+  }
+  .aw-shell.has-detail .aw-nav {
+    display: none;
+  }
+}
+@media (max-width: 980px) {
+  .aw-shell.has-detail {
+    position: relative;
+  }
+  .aw-shell.has-detail .aw-detail {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: min(90%, 410px);
+    background: var(--bg-primary, Canvas);
+    z-index: 2;
+    box-shadow: -8px 0 30px #0002;
+  }
+  .aw-shell.has-detail {
+    grid-template-columns: 144px minmax(0, 1fr);
+  }
+  .aw-shell.aw-nav-hidden.has-detail {
+    grid-template-columns: 1fr;
+  }
+}

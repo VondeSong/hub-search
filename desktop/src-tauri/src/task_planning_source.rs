@@ -1,6 +1,8 @@
 //! Explicit task reads and user-confirmed source actions share the normal adapters.
 use super::*;
+mod create;
 mod notes;
+mod workbench;
 
 fn eligible(task: &UnifiedTaskItem) -> bool {
     !task.is_project && !task.completed && task.status == "open" && !task.source_id.is_empty()
@@ -141,9 +143,11 @@ pub(super) async fn task_planning_source(
                 serde_json::from_value(args["taskIds"].clone()).map_err(|_| "任务范围无效")?;
             refresh(&app, &state, &ids).await
         }
-        "prepareNote" | "submitNote" | "inspectNote" | "listNotes" => {
+        "prepareNote" | "prepareFields" | "listFields" | "submitNote" | "inspectNote" | "listNotes" => {
             notes::dispatch(&app, &state, &args).await
         }
+        "createTask" => create::dispatch(&app, &state, &args).await,
+        "workbenchModel" | "workbenchPassages" => workbench::dispatch(&app, args).await,
         _ => Err("未知任务来源操作".into()),
     }
 }

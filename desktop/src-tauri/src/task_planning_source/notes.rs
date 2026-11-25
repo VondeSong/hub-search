@@ -24,7 +24,7 @@ fn read(c: &Connection, id: &str) -> Result<Value, String> {
 fn public(v: &Value) -> Value {
     json!({"id":v["id"],"state":v["state"],"taskId":v["taskId"],"libraryName":v["libraryName"],
         "sourceId":v["sourceId"],"title":v["before"]["title"],"before":v["before"]["content"].as_str().unwrap_or_default(),
-        "after":v["after"],"error":v["error"],"updatedAt":v["updatedAt"]})
+        "changes":v["changes"],"beforeDue":v["before"]["dueDate"],"after":v["after"],"error":v["error"],"updatedAt":v["updatedAt"]})
 }
 fn mark(path: &PathBuf, id: &str, state: &str, error: Option<&str>) -> Result<Value, String> {
     let (c, _writer) = open_write_database(path)?;
@@ -57,6 +57,45 @@ fn arguments(source: &str, before: &Value, after: &str) -> Value {
         task["etag"] = etag.clone();
     }
     json!({"task_id":source,"task":task})
+}
+fn source_instant(value: &str) -> Option<chrono::DateTime<chrono::FixedOffset>> {
+    let normalized = task_dates::valid_date(value)?;
+    chrono::DateTime::parse_from_rfc3339(&normalized).ok()
+}
+
+fn workbench_fields(args: &Value) -> Result<Option<Value>, String> {
+    if args["action"] != "prepareFields" {
+        return Ok(None);
+    }
+    let changes = args["changes"]
+        .as_object()
+        .filter(|p| !p.is_empty())
+        .ok_or("没有需要保存的修改")?;
+    for (key, value) in changes {
+        match key.as_str() {
+            "title"
+                if value
+                    .as_str()
+                    .is_some_and(|s| !s.trim().is_empty() && s.chars().count() <= 500) => {}
+            "dueDate"
+                if value.is_null()
+                    || value.as_str().is_some_and(|s| source_instant(s).is_some()) => {}
+            _ => return Err("任务字段或值无效".into()),
+        }
+    }
+    Ok(Some(Value::Object(changes.clone())))
+}
+fn action_arguments(source: &str, baseline: &Value, action: &Value) -> Result<Value, String> {
+    if let Some(fields) = action["changes"].as_object() {
+        let mut task =
+            json!({"id":source,"projectId":baseline["projectId"],"etag":baseline["etag"]});
+        for (k, v) in fields {
+            task[k] = v.clone();
+        }
+        Ok(json!({"task_id":source,"task":task}))
+    } else {
+        Ok(arguments(source, baseline, strarg(action, "after")?))
+    }
 }
 fn source_revision(task: &DidaTask) -> Value {
     json!([
@@ -128,16 +167,25 @@ async fn prepare(
     if task.content_revision != strarg(args, "contentRevision")? {
         return Err("分析后原任务已变化，请重新分析".into());
     }
-    let note = strarg(args, "text")?;
+    let patch = workbench_fields(args)?;
+    let note = if patch.is_some() {
+        ""
+    } else {
+        strarg(args, "text")?
+    };
     let work = strarg(args, "workId")?;
     let path = database_path(app)?;
     let (library, source, name) = target(&path, &task)?;
     let id = format!(
         "{:x}",
         Sha256::digest(
-            json!([work, task_id, library, source, note])
-                .to_string()
-                .as_bytes()
+            (if patch.is_some() {
+                json!([work, task_id, library, source, patch])
+            } else {
+                json!([work, task_id, library, source, note])
+            })
+            .to_string()
+            .as_bytes()
         )
     );
     {
@@ -176,9 +224,20 @@ async fn prepare(
         return Err("分析后滴答原任务已变化；请先核对来源并重新分析，未准备覆盖旧记录".into());
     }
     validate_note_source(&before)?;
-    let after = append(&before.content, note)?;
+    let after = if let Some(changes) = &patch {
+        if let Some(due) = changes.get("dueDate").and_then(Value::as_str) {
+            if let Some(start) = before.start_date.as_ref().and_then(|v| source_instant(v)) {
+                if source_instant(due).is_some_and(|end| end < start) {
+                    return Err("截止时间早于任务开始时间".into());
+                }
+            }
+        }
+        before.content.clone()
+    } else {
+        append(&before.content, note)?
+    };
     let raw = source_snapshot(&before);
-    let value = json!({"id":id,"taskId":task_id,"libraryId":library,"libraryName":name,"sourceId":source,"before":raw,"after":after,"workId":work});
+    let value = json!({"id":id,"taskId":task_id,"libraryId":library,"libraryName":name,"sourceId":source,"before":raw,"after":after,"workId":work,"changes":patch});
     op.checkpoint()?;
     let (c, _writer) = open_write_database(&path)?;
     c.execute("INSERT OR IGNORE INTO task_planning_actions(id,task_id,library_id,source_id,state,payload_json,updated_at) VALUES(?1,?2,?3,?4,'prepared',?5,?6)",params![id,task_id,library,source,value.to_string(),now_timestamp()]).map_err(|e|e.to_string())?;
@@ -213,6 +272,18 @@ fn reconciliation(action: &Value, remote: &DidaTask) -> &'static str {
     ]
     .iter()
     .all(|field| {
+        if let Some(value) = action["changes"].get(*field) {
+            if *field == "dueDate" {
+                let expected = value.as_str().and_then(source_instant);
+                let actual = remote.raw[*field].as_str().and_then(source_instant);
+                return if value.is_null() {
+                    remote.raw[*field].is_null()
+                } else {
+                    expected.is_some() && expected == actual
+                };
+            }
+            return remote.raw.get(*field) == Some(value);
+        }
         action["before"].get(*field).is_none_or(|before| {
             let actual = remote.raw.get(*field).unwrap_or(&Value::Null);
             let empty = |v: &Value| v.is_null() || v.as_array().is_some_and(Vec::is_empty);
@@ -314,7 +385,7 @@ async fn submit(
             &client,
             &session,
             "update_task",
-            arguments(&source, &baseline, strarg(&v, "after")?),
+            action_arguments(&source, &baseline, &v)?,
             95_100_001,
         )
         .await
@@ -379,7 +450,7 @@ pub(super) async fn dispatch(
     args: &Value,
 ) -> Result<Value, String> {
     match args["action"].as_str().unwrap_or_default() {
-        "listNotes" => {
+        "listNotes" | "listFields" => {
             let ids: Vec<String> =
                 serde_json::from_value(args["taskIds"].clone()).map_err(|_| "任务范围无效")?;
             if ids.is_empty() || ids.len() > 32 {
@@ -392,9 +463,12 @@ pub(super) async fn dispatch(
             let path = database_path(app)?;
             let (c, _writer) = open_write_database(&path)?;
             table(&c)?;
-            let mut q=c.prepare("SELECT id FROM task_planning_actions WHERE task_id IN (SELECT value FROM json_each(?1)) ORDER BY updated_at DESC LIMIT 32").map_err(|e|e.to_string())?;
+            let mut q=c.prepare("SELECT id FROM task_planning_actions WHERE task_id IN (SELECT value FROM json_each(?1)) AND COALESCE(json_extract(payload_json,'$.kind'),'') <> 'createTask' AND (json_type(payload_json,'$.changes') IS 'object')=?2 ORDER BY updated_at DESC LIMIT 32").map_err(|e|e.to_string())?;
             let ids = q
-                .query_map([json!(ids).to_string()], |r| r.get::<_, String>(0))
+                .query_map(
+                    params![json!(ids).to_string(), args["action"] == "listFields"],
+                    |r| r.get::<_, String>(0),
+                )
                 .map_err(|e| e.to_string())?
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|e| e.to_string())?;
@@ -403,7 +477,7 @@ pub(super) async fn dispatch(
                 .map(|id| read(&c, id).map(|v| public(&v)))
                 .collect::<Result<Vec<_>, _>>()?))
         }
-        "prepareNote" => prepare(app, state, args).await,
+        "prepareNote" | "prepareFields" => prepare(app, state, args).await,
         "submitNote" => submit(app, state, args, false).await,
         "inspectNote" => submit(app, state, args, true).await,
         _ => Err("未知建议写入操作".into()),
@@ -413,6 +487,32 @@ pub(super) async fn dispatch(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn workbench_changes_only_requested_fields_and_confirms_native_timezone_format() {
+        let before = json!({"id":"t", "projectId":"inbox", "etag":"v1", "title":"原标题", "content":"原备注","priority":3,"status":0});
+        let changes = json!({"title":"新标题","dueDate":"2026-11-26T09:30:00Z"});
+        let action =
+            json!({"action":"prepareFields","changes":changes,"before":before,"after":"原备注"});
+        assert_eq!(workbench_fields(&action).unwrap(), Some(changes));
+        assert!(
+            workbench_fields(&json!({"action":"prepareFields","changes":{"status":2}})).is_err()
+        );
+        let args = action_arguments("t", &before, &action).unwrap();
+        assert!(args["task"].get("priority").is_none() && args["task"].get("content").is_none());
+        let mut remote = before.clone();
+        remote["title"] = json!("新标题");
+        remote["dueDate"] = json!("2026-11-26T17:30:00.000+0800");
+        assert_eq!(
+            reconciliation(&action, &parse_dida(&remote, "inbox", "t").unwrap()),
+            "confirmed"
+        );
+        remote["priority"] = json!(5);
+        assert_eq!(
+            reconciliation(&action, &parse_dida(&remote, "inbox", "t").unwrap()),
+            "unknown"
+        );
+    }
+
     #[test]
     fn note_writes_require_an_editable_task_and_a_source_version() {
         let mut raw = json!({"id":"versioned","projectId":"inbox","title":"Action","content":"Preserve","kind":"TEXT","status":0});

@@ -20065,6 +20065,8 @@ async fn list_unified_tasks(app: AppHandle) -> Result<UnifiedTaskDashboard, Stri
         let mut tasks = unified_task_read::load(&connection, None)?;
         task_dates::capture_source_history(&connection, &tasks)?;
         task_dates::attach_hub_history(&connection, &mut tasks)?;
+        // Resolve a shared action to its Dida master while retaining every source locator.
+        tasks.sort_by_key(|task| task.provider != PROVIDER_DIDA365);
         apply_task_bindings(&connection, &mut tasks)?;
         dida_task_status::decorate(&connection, &mut tasks)?;
         sort_unified_tasks_preserving_markdown_trees(&mut tasks);

@@ -492,39 +492,20 @@ fn bound_status_intent_resolves_dida_identity_and_respects_sync_direction() {
 }
 
 #[test]
-fn source_completion_queues_only_existing_bound_status_and_deduplicates() {
+fn workbench_completion_updates_dida_even_when_a_craft_binding_exists() {
     let f = Fixture::new();
     let c = open_database(&f.path).unwrap();
     c.execute("INSERT INTO libraries(id,provider,name,enabled,added_at) VALUES('craft-test','craft','Craft',1,1)",[]).unwrap();
     c.execute("INSERT INTO craft_task_blocks(space_id,document_id,block_id,title,completed,source_hash,modified_at) VALUES('craft-test','doc-test','block-test','Keep title',0,'original',10)",[]).unwrap();
     c.execute("INSERT INTO unified_task_bindings(hub_task_id,provider,library_id,source_id,document_id,source_hash,last_seen_at) VALUES(?1,'dida365','dida-test','task-test','task-test','original',1)",[&f.task.id]).unwrap();
     c.execute("INSERT INTO unified_task_bindings(hub_task_id,provider,library_id,source_id,document_id,source_hash,last_seen_at) VALUES(?1,'craft','craft-test','block-test','doc-test','original',1)",[&f.task.id]).unwrap();
-    let mut source = local_task(&c, "dida-test", "task-test").unwrap();
-    source.status = 2;
-    source.completed_time = Some("2026-10-13T23:59:58+0800".into());
-    assert!(!enqueue_observed(&c, "dida-test", &source).unwrap());
     c.execute(
         "UPDATE task_sync_settings SET enabled=1,dida_to_craft=1 WHERE id=1",
         [],
     )
     .unwrap();
-    assert!(enqueue_observed(&c, "dida-test", &source).unwrap());
-    assert!(!enqueue_observed(&c, "dida-test", &source).unwrap());
-    let id = c
-        .query_row(
-            "SELECT id FROM task_sync_events WHERE action='direct_task_status'",
-            [],
-            |r| r.get::<_, i64>(0),
-        )
-        .unwrap();
-    let intent = f.intent(id);
-    assert!(intent.automatic && intent.remote_confirmed);
-    assert!(!intent.sent);
-    assert_eq!(intent.mirror.unwrap().modified_at, Some(10));
-    c.execute("UPDATE craft_task_blocks SET completed=1", [])
-        .unwrap();
-    assert!(enqueue_observed(&c, "dida-test", &source).unwrap());
-    assert!(!has_pending(&f.path, &f.task.id).unwrap());
+    let requested = accept(&f.path, &f.task, "completed").unwrap();
+    assert!(f.intent(requested).mirror.is_none());
 }
 
 /// Explicitly selected integration check; only an already-created, owned task

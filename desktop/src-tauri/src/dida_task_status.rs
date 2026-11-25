@@ -236,7 +236,7 @@ fn accept(path: &PathBuf, task: &UnifiedTaskItem, status: &str) -> Result<i64, S
         "SELECT enabled=1 AND CASE WHEN ?1='craft' THEN craft_to_dida=1 ELSE dida_to_craft=1 END FROM task_sync_settings WHERE id=1",
         [&task.provider], |r| r.get(0),
     ).unwrap_or(false);
-    let mirror = if mirror_allowed {
+    let mirror = if task.provider == PROVIDER_CRAFT && mirror_allowed {
         tx.query_row("SELECT b.library_id,b.source_id,b.document_id,t.modified_at FROM unified_task_bindings b JOIN libraries l ON l.id=b.library_id LEFT JOIN craft_task_blocks t ON t.space_id=b.library_id AND t.block_id=b.source_id AND t.document_id=b.document_id WHERE b.hub_task_id=?1 AND b.provider='craft' AND l.enabled=1",
             [&task.id], |r| Ok(CraftTarget {library_id:r.get(0)?,source_id:r.get(1)?,document_id:r.get(2)?,modified_at:r.get(3)?}))
             .optional().map_err(|e| e.to_string())?
@@ -288,72 +288,6 @@ fn save_intent(
         params![id,serde_json::to_string(intent).map_err(|e|e.to_string())?,state,now_timestamp(),error.map(|e|e.chars().take(300).collect::<String>())])
         .map_err(|e| e.to_string())?;
     Ok(())
-}
-
-/// Source-side status changes use the same outbox and only an already-bound
-/// native Craft task. They never create tasks or enable synchronization.
-pub(super) fn enqueue_observed(
-    c: &Connection,
-    library: &str,
-    task: &DidaTask,
-) -> Result<bool, String> {
-    if !matches!(task.status, 0 | 2) {
-        return Ok(false);
-    }
-    let allowed: bool = c
-        .query_row(
-            "SELECT enabled=1 AND dida_to_craft=1 FROM task_sync_settings WHERE id=1",
-            [],
-            |r| r.get(0),
-        )
-        .unwrap_or(false);
-    if !allowed {
-        return Ok(false);
-    }
-    let target:Option<(String,CraftTarget,bool)>=c.query_row(
-        "SELECT d.hub_task_id,b.library_id,b.source_id,b.document_id,t.modified_at,t.completed FROM unified_task_bindings d JOIN unified_task_bindings b ON b.hub_task_id=d.hub_task_id AND b.provider='craft' JOIN libraries l ON l.id=b.library_id AND l.enabled=1 JOIN craft_task_blocks t ON t.space_id=b.library_id AND t.block_id=b.source_id AND t.document_id=b.document_id WHERE d.provider='dida365' AND d.library_id=?1 AND d.source_id=?2",
-        params![library,task.id],|r|Ok((r.get(0)?,CraftTarget{library_id:r.get(1)?,source_id:r.get(2)?,document_id:r.get(3)?,modified_at:r.get(4)?},r.get::<_,i64>(5)?!=0))).optional().map_err(|e|e.to_string())?;
-    let Some((hub, mirror, completed)) = target else {
-        return Ok(false);
-    };
-    if !valid_craft_block_id(&mirror.source_id) || !valid_craft_block_id(&mirror.document_id) {
-        return Ok(false);
-    }
-    if completed == (task.status == 2) {
-        return c.execute("UPDATE task_sync_events SET status='resolved',updated_at=?2,last_error=NULL WHERE hub_task_id=?1 AND action='direct_task_status' AND origin_provider='dida365' AND status IN ('pending','failed')",params![hub,now_timestamp()]).map(|n|n>0).map_err(|e|e.to_string());
-    }
-    let blocked:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM task_sync_events WHERE hub_task_id=?1 AND ((action='direct_task_status' AND status='pending') OR (action='conflict' AND status='review')))",[&hub],|r|r.get(0)).map_err(|e|e.to_string())?;
-    if blocked {
-        return Ok(false);
-    }
-    let previous:Option<String>=c.query_row("SELECT payload_json FROM task_sync_events WHERE hub_task_id=?1 AND action='direct_task_status' AND origin_provider='dida365' AND status='failed' ORDER BY id DESC LIMIT 1",[&hub],|r|r.get(0)).optional().map_err(|e|e.to_string())?;
-    if previous
-        .as_deref()
-        .and_then(|s| serde_json::from_str::<Intent>(s).ok())
-        .is_some_and(|old| {
-            old.status == dida_display_task_status(task.status)
-                && old.baseline_completion == task.completed_time
-        })
-    {
-        return Ok(false);
-    }
-    let intent = Intent {
-        task_id: hub.clone(),
-        library_id: library.into(),
-        source_id: task.id.clone(),
-        status: dida_display_task_status(task.status).into(),
-        expected_status: dida_display_task_status(task.status).into(),
-        account: account(c, library)?,
-        baseline_completion: task.completed_time.clone(),
-        sent: false,
-        remote_confirmed: true,
-        rebase_after_previous_write: false,
-        next_attempt_at: 0,
-        mirror: Some(mirror),
-        automatic: true,
-    };
-    c.execute("INSERT INTO task_sync_events(hub_task_id,origin_provider,target_provider,action,status,payload_json,idempotency_key,created_at,updated_at) VALUES(?1,'dida365','craft','direct_task_status','pending',?2,?3,?4,?4)",params![hub,serde_json::to_string(&intent).map_err(|e|e.to_string())?,format!("source-status:{}",random_url_safe(24)),now_timestamp()]).map_err(|e|e.to_string())?;
-    Ok(true)
 }
 
 pub(super) fn has_pending(path: &PathBuf, hub: &str) -> Result<bool, String> {
@@ -664,6 +598,15 @@ async fn execute(app: &AppHandle, state: &State<'_, AppState>, id: i64) -> Resul
     let path = database_path(app)?;
     let (raw,attempts):(String,i64)=open_database(&path)?.query_row("SELECT payload_json,attempts FROM task_sync_events WHERE id=?1 AND action='direct_task_status' AND status='pending'",[id],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|e|e.to_string())?;
     let mut intent: Intent = serde_json::from_str(&raw).map_err(|_| "任务状态操作记录无效")?;
+    if intent.automatic {
+        return save_intent(
+            &path,
+            id,
+            &intent,
+            "resolved",
+            Some("工作台已停止自动镜像笔记复选框"),
+        );
+    }
     let root = path.parent().ok_or("资料库目录不可用")?;
     let mut used_token = None;
     let mut primary_phase = true;
@@ -698,10 +641,6 @@ async fn execute(app: &AppHandle, state: &State<'_, AppState>, id: i64) -> Resul
             let fresh = read_remote(&task_sync_http_client()?, &session, &cached, 92_900_000+id as u64).await?;
             if dida_display_task_status(fresh.status) != intent.status || fresh.completed_time != intent.baseline_completion {
                 dida_task_refresh::persist_changed(&path,&intent.library_id,vec![fresh],None,None,None,&op)?;
-                if intent.automatic {
-                    intent.remote_confirmed = false;
-                    return save_intent(&path,id,&intent,"resolved",None);
-                }
                 return Err("滴答状态已变化，已停止旧关联操作，请刷新核对".into());
             }
         }
