@@ -91,7 +91,18 @@ html:not([data-theme="dark"],[data-theme="black"],[data-theme="sage"]) .journal-
   height: 11px;
 }
 
-.journal-desktop .journal-navigation .journal-calendar-compact { padding: 0; }
+.journal-desktop .journal-nav-calendar {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.journal-desktop .journal-navigation .journal-calendar-compact {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
 
 .journal-desktop .journal-navigation .journal-calendar-compact > header {
   flex-wrap: nowrap;
@@ -125,12 +136,12 @@ html:not([data-theme="dark"],[data-theme="black"],[data-theme="sage"]) .journal-
 }
 .journal-desktop .journal-navigation .journal-month-actions > button { width: 20px; min-height: 24px; }
 
-.journal-desktop .journal-date-grid { padding: 6.75px; display: grid; gap: 3.4px; }
+.journal-desktop .journal-date-grid { padding: 6.75px; display: grid; gap: 3.4px; border-width: 0.5px; }
 .journal-desktop .journal-date-grid .journal-week-row { gap: 0; }
 .journal-desktop .journal-date-grid [role="columnheader"] {
   height: 15px;
   font-size: 10px;
-  color: var(--hub-text-tertiary);
+  color: var(--hub-text-muted, #b0b5bd);
 }
 .journal-desktop .journal-calendar-compact .journal-date[data-heat] {
   display: flex;
@@ -143,15 +154,30 @@ html:not([data-theme="dark"],[data-theme="black"],[data-theme="sage"]) .journal-
   aspect-ratio: auto;
   border-radius: 7px;
   background: transparent;
-  color: var(--hub-text-tertiary);
-  font-size: 10.5px;
+  color: var(--hub-text-muted, #b0b5bd);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 400;
   line-height: 1;
   box-shadow: none;
 }
-.journal-desktop .journal-calendar-compact .journal-date[data-heat]:is(.has-journal,[data-tasks]:not([data-tasks="0"])) { color: var(--hub-text-primary); }
-.journal-desktop .journal-calendar-compact .journal-date[data-count]:not([data-count="0"],[data-count="1"]) { background: var(--hub-selection); color: var(--hub-accent); }
-.journal-desktop .journal-calendar-compact .journal-date.today[data-heat] { background: var(--hub-accent); color: white; font-weight: 600; }
-.journal-desktop .journal-calendar-compact .journal-date.selected[data-heat] { background: var(--hub-primary-button-bg, #18181b); color: white; outline: 0; }
+.journal-desktop .journal-calendar-compact .journal-date > span:first-child { font-weight: inherit; }
+.journal-desktop .journal-calendar-compact .journal-date[data-heat]:where(.has-journal,[data-tasks]:not([data-tasks="0"])) {
+  color: var(--hub-text-primary);
+  font-weight: 500;
+}
+.journal-desktop .journal-calendar-compact .journal-date[data-heat]:where([data-count]:not([data-count="0"],[data-count="1"])) {
+  background: var(--hub-selection);
+  color: var(--hub-accent);
+  font-weight: 600;
+}
+.journal-desktop .journal-calendar-compact .journal-date[data-heat]:is(.today,.selected) {
+  background: var(--hub-accent);
+  color: white;
+  font-weight: 600;
+  outline: 0;
+}
+.journal-desktop .journal-calendar-compact .journal-date.selected:not(.today)[data-heat] { background: var(--hub-primary-button-bg, #18181b); }
 .journal-desktop .journal-calendar-compact .journal-date[data-heat]:focus-visible { outline: 2px solid var(--hub-accent); outline-offset: 1px; }
 .journal-desktop .journal-calendar-compact .journal-date.today:not(.selected)>span { text-decoration: none; }
 .journal-desktop .journal-date-dots { display: flex; gap: 2px; height: 3.5px; margin-top: 2px; }
