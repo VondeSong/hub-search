@@ -22,7 +22,7 @@ function shiftMonth(value: string, amount: number) {
 export function JournalNavigator({ availableDates, selectedDate, onSelectDate, desktop = false, taskScope = null }: {
   availableDates: Array<{ date: string; sources: number;count?:number }>;
   selectedDate: string;
-  onSelectDate: (date: string) => void;
+  onSelectDate: (date: string, action?: "today") => void;
   desktop?: boolean;
   taskScope?: string[] | null;
 }) {
@@ -63,7 +63,21 @@ export function JournalNavigator({ availableDates, selectedDate, onSelectDate, d
   const tabDate = focusedDate.startsWith(visibleMonth) ? focusedDate : `${visibleMonth}-01`;
   const monthNames = ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"];
   const monthLabel = `${year}年${month}月`;
+  const previousMonth = shiftMonth(visibleMonth, -1);
+  const nextMonth = shiftMonth(visibleMonth, 1);
   const validPickerYear=calendarPeriodKey(Number(pickerYear),month)!==null;
+  function browseMonth(month: string) {
+    setPickerOpen(false);
+    setVisibleMonth(month);
+    if (desktop) onSelectDate(month);
+  }
+  function goToToday() {
+    setPickerOpen(false);
+    setVisibleMonth(today.slice(0, 7));
+    setFocusedDate(today);
+    if (desktop) onSelectDate(today, "today");
+    else onSelectDate(today);
+  }
   function positionPicker(){const panel=periodPopover.current,trigger=periodTrigger.current;if(!panel||!trigger)return;const rect=trigger.getBoundingClientRect(),width=Math.min(Math.max(calendarRef.current?.clientWidth||240,240),360,window.innerWidth-24);panel.style.width=`${width}px`;panel.style.maxHeight=`${window.innerHeight-24}px`;panel.style.left=`${Math.max(12,Math.min(rect.left,window.innerWidth-width-12))}px`;panel.style.top=`${Math.max(12,Math.min(rect.bottom+8,window.innerHeight-panel.offsetHeight-12))}px`;}
   useEffect(()=>{if(!pickerOpen)return;const closeOnScroll=(event:Event)=>{if(!periodPopover.current?.contains(event.target as Node))periodPopover.current?.hidePopover?.();};window.addEventListener("resize",positionPicker);window.addEventListener("scroll",closeOnScroll,true);return()=>{window.removeEventListener("resize",positionPicker);window.removeEventListener("scroll",closeOnScroll,true);};},[pickerOpen]);
   function closePicker(){periodPopover.current?.hidePopover?.();setPickerOpen(false);periodTrigger.current?.focus();}
@@ -99,12 +113,12 @@ export function JournalNavigator({ availableDates, selectedDate, onSelectDate, d
           popoverTarget="journal-period-picker" title="快速切换年份和月份" onClick={() => {if(!pickerOpen)setPickerYear(String(year));}}>
           {!desktop&&<CalendarDays size={15} aria-hidden="true" />}<strong>{desktop ? `${year} 年 ${month} 月` : monthLabel}</strong>{!desktop&&<ChevronDown size={12} aria-hidden="true"/>}
         </button>
-        <div className="journal-month-actions">
-          <button onClick={() => {setPickerOpen(false);setVisibleMonth(value => shiftMonth(value, -1));}} aria-label="上个月" title="上个月"><ChevronLeft size={16} /></button>
-          <button className="journal-today-button" onClick={() => { setPickerOpen(false);setVisibleMonth(today.slice(0, 7)); setFocusedDate(today); onSelectDate(desktop ? today.slice(0, 7) : today); }} aria-label="回到今天" title="回到今天"><CircleDot size={16} /></button>
-          <button onClick={() => {setPickerOpen(false);setVisibleMonth(value => shiftMonth(value, 1));}} aria-label="下个月" title="下个月"><ChevronRight size={16} /></button>
-        </div>
         {desktop&&<small className="journal-recorded-days">{recordedDays} 天有记</small>}
+        <div className="journal-month-actions">
+          <button type="button" disabled={previousMonth===visibleMonth} onClick={()=>browseMonth(previousMonth)} aria-label="上个月" title="上个月"><ChevronLeft size={desktop ? 12 : 16} aria-hidden="true" /></button>
+          <button type="button" className="journal-today-button" onClick={goToToday} aria-label="回到今天" title="回到今天"><CircleDot size={desktop ? 12 : 16} aria-hidden="true" /></button>
+          <button type="button" disabled={nextMonth===visibleMonth} onClick={()=>browseMonth(nextMonth)} aria-label="下个月" title="下个月"><ChevronRight size={desktop ? 12 : 16} aria-hidden="true" /></button>
+        </div>
       </header>
       <form id="journal-period-picker" ref={periodPopover} popover="auto" className="journal-period-picker" aria-label="选择年份和月份" onToggle={event=>{const open=event.currentTarget.matches(":popover-open");if(open)positionPicker();setPickerOpen(open);}} onSubmit={event=>{event.preventDefault();chooseMonth(month);}} onKeyDown={event=>{if(event.key==="Escape"){event.preventDefault();event.stopPropagation();closePicker();}}}>
         <div className="journal-year-row"><button type="button" aria-label="上一年" disabled={Number(pickerYear)<=100} onClick={()=>stepYear(-1)}><ChevronLeft size={15}/></button><label><span>年份</span><input ref={yearInput} type="number" aria-label="日历年份" min={100} max={9999} step={1} required value={pickerYear} onChange={event=>setPickerYear(event.target.value)}/></label><button type="button" aria-label="下一年" disabled={Number(pickerYear)>=9999} onClick={()=>stepYear(1)}><ChevronRight size={15}/></button></div>

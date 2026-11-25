@@ -27,6 +27,20 @@ async function click(selector:string){await act(async()=>container.querySelector
 beforeEach(()=>{(globalThis as unknown as {IS_REACT_ACT_ENVIRONMENT:boolean}).IS_REACT_ACT_ENVIRONMENT=true;localStorage.clear();Object.defineProperty(HTMLDialogElement.prototype,"showModal",{configurable:true,value:function(){this.setAttribute("open","");}});Object.defineProperty(HTMLDialogElement.prototype,"close",{configurable:true,value:function(){this.removeAttribute("open");}});vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date(2026,9,13,12));container=document.createElement("div");document.body.appendChild(container);root=createRoot(container);preview.mockClear();open.mockClear();create.mockClear();favorite.mockClear();});
 afterEach(async()=>{await act(async()=>root.unmount());container.remove();vi.useRealTimers();});
 describe("Journal database workspace",()=>{
+ it("updates the workspace when browsing months and goes directly to today",async()=>{
+  await act(async()=>root.render(<Fixture desktop/>));
+  const calendar=container.querySelector('#journal-desktop-navigation [role="grid"]')!;
+  await click('[aria-label="上个月"]');
+  expect(calendar.getAttribute("aria-label")).toBe("2026年9月");
+  expect(store.view).toMatchObject({period:"month",month:"2026-09",day:""});
+  await click('[aria-label="下个月"]');
+  expect(calendar.getAttribute("aria-label")).toBe("2026年10月");
+  expect(store.view).toMatchObject({period:"month",month:"2026-10",day:""});
+  await click('[aria-label="回到今天"]');
+  await click('[aria-label="回到今天"]');
+  expect(store.view).toMatchObject({period:"day",month:"2026-10",day:"2026-10-13"});
+  expect(calendar.querySelector('[aria-selected="true"] button')?.getAttribute("data-date")).toBe("2026-10-13");
+ });
  it("keeps the desktop date filter and sidebar disclosure separate from the three workspace layouts",async()=>{
   await act(async()=>root.render(<Fixture desktop/>));
   const navigation=container.querySelector<HTMLElement>('#journal-desktop-navigation')!;

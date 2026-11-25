@@ -55,9 +55,9 @@ export function JournalNavigation({dates,selectedDate,onSelectDate,desktop=false
   const archivedQuickCount=records.items.length-pendingQuickCount;
   if(!store)return <JournalNavigator availableDates={activity} selectedDate={selectedDate} onSelectDate={onSelectDate}/>;
   const taskScope = scope === null ? store.view.libraries : store.view.libraries === null ? scope : scope.filter(id => store.view.libraries?.includes(id));
-  const selectDesktopDate = (date: string) => {
+  const selectDesktopDate = (date: string, action?: "today") => {
     const month = date.slice(0, 7);
-    const single = date.length === 10 && (store.view.period !== "day" || store.view.day !== date);
+    const single = date.length === 10 && (action === "today" || store.view.period !== "day" || store.view.day !== date);
     store.update({ period: single ? "day" : "month", month, day: single ? date : "" });
     onSelectDate(single ? date : "");
   };

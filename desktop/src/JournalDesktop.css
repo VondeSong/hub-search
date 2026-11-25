@@ -94,9 +94,8 @@ html:not([data-theme="dark"],[data-theme="black"],[data-theme="sage"]) .journal-
 .journal-desktop .journal-navigation .journal-calendar-compact { padding: 0; }
 
 .journal-desktop .journal-navigation .journal-calendar-compact > header {
-  position: relative;
   flex-wrap: nowrap;
-  min-height: 20px;
+  min-height: 24px;
   padding: 0 5px;
   margin: 0 0 5px;
   gap: 3px;
@@ -110,20 +109,21 @@ html:not([data-theme="dark"],[data-theme="black"],[data-theme="sage"]) .journal-
 }
 
 .journal-desktop .journal-recorded-days {
+  min-width: 0;
   margin-left: auto;
+  overflow: hidden;
   font-size: 10.5px;
   color: var(--hub-text-tertiary);
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .journal-desktop .journal-navigation .journal-month-actions {
-  position: absolute;
-  right: 4px;
-  background: var(--hub-sidebar-material);
-  opacity: 0;
+  flex: none;
+  gap: 1px;
+  margin-left: 0;
 }
-.journal-desktop .journal-navigation .journal-month-actions > button { width: 21px; min-height: 20px; }
-.journal-desktop .journal-calendar-compact > header:is(:hover,:focus-within) .journal-month-actions { opacity: 1; }
+.journal-desktop .journal-navigation .journal-month-actions > button { width: 22px; min-height: 24px; }
 
 .journal-desktop .journal-date-grid { padding: 6.75px; display: grid; gap: 3.4px; }
 .journal-desktop .journal-date-grid .journal-week-row { gap: 0; }
@@ -585,4 +585,6 @@ html:not([data-theme="dark"],[data-theme="black"],[data-theme="sage"]) .journal-
 
 @media (max-width: 900px) {
   .journal-desktop { --journal-pane-width: 190px; }
+  .journal-desktop .journal-recorded-days { display: none; }
+  .journal-desktop .journal-navigation .journal-month-actions { margin-left: auto; }
 }
