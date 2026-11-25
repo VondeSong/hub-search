@@ -136,6 +136,73 @@ html:not([data-theme="dark"],[data-theme="black"],[data-theme="sage"]) .journal-
 }
 .journal-desktop .journal-navigation .journal-month-actions > button { width: 20px; min-height: 24px; }
 
+.journal-desktop .journal-period-picker {
+  box-sizing: border-box;
+  padding: 8px;
+  border: 1px solid var(--hub-hairline);
+  border-radius: 12px;
+  background: var(--hub-content-surface);
+  color: var(--hub-text-primary);
+  box-shadow: var(--hub-popover-shadow);
+  scrollbar-width: thin;
+}
+
+.journal-desktop .journal-period-picker button {
+  min-height: 26px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--hub-text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.journal-desktop .journal-period-picker button:hover:not(:disabled) { background: var(--hub-control-fill); }
+.journal-desktop .journal-period-picker :is(button,input):focus-visible {
+  outline: 1px solid var(--hub-accent);
+  outline-offset: 1px;
+}
+
+.journal-desktop .journal-year-row {
+  grid-template-columns: 24px minmax(0, 1fr) 24px;
+  gap: 6px;
+}
+
+.journal-desktop .journal-year-row label {
+  gap: 6px;
+  font-size: 11px;
+  color: var(--hub-text-secondary);
+}
+
+.journal-desktop .journal-year-row input {
+  min-height: 26px;
+  border-color: var(--hub-hairline);
+  border-radius: 6px;
+  background: var(--hub-control-fill);
+  color: var(--hub-text-primary);
+}
+
+.journal-desktop .journal-picker-months { margin: 8px 0; }
+.journal-desktop .journal-picker-months > button[aria-pressed="true"] {
+  background: var(--hub-selection);
+  color: var(--hub-accent);
+  font-weight: 600;
+}
+
+.journal-desktop .journal-period-picker footer {
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--hub-hairline);
+}
+
+.journal-desktop .journal-period-picker footer > button[type="submit"] {
+  background: var(--hub-primary-button-bg, #18181b);
+  color: var(--hub-primary-button-ink, #fff);
+}
+
+.journal-desktop .journal-period-picker footer > button[type="submit"]:hover:not(:disabled) { filter: brightness(1.16); }
+
 .journal-desktop .journal-date-grid { padding: 6.75px; display: grid; gap: 3.4px; border-width: 0.5px; }
 .journal-desktop .journal-date-grid .journal-week-row { gap: 0; }
 .journal-desktop .journal-date-grid [role="columnheader"] {

@@ -78,7 +78,27 @@ export function JournalNavigator({ availableDates, selectedDate, onSelectDate, d
     if (desktop) onSelectDate(today, "today");
     else onSelectDate(today);
   }
-  function positionPicker(){const panel=periodPopover.current,trigger=periodTrigger.current;if(!panel||!trigger)return;const rect=trigger.getBoundingClientRect(),width=Math.min(Math.max(calendarRef.current?.clientWidth||240,240),360,window.innerWidth-24);panel.style.width=`${width}px`;panel.style.maxHeight=`${window.innerHeight-24}px`;panel.style.left=`${Math.max(12,Math.min(rect.left,window.innerWidth-width-12))}px`;panel.style.top=`${Math.max(12,Math.min(rect.bottom+8,window.innerHeight-panel.offsetHeight-12))}px`;}
+  function positionPicker() {
+    const panel = periodPopover.current, trigger = periodTrigger.current, calendar = calendarRef.current;
+    if (!panel || !trigger) return;
+    const gutter = 12;
+    const gap = desktop ? 6 : 8;
+    const anchor = (desktop ? trigger.closest("header") ?? trigger : trigger).getBoundingClientRect();
+    const calendarRect = calendar?.getBoundingClientRect();
+    const preferredWidth = desktop && calendarRect?.width
+      ? calendarRect.width
+      : Math.min(Math.max(calendar?.clientWidth ?? 240, 240), 360);
+    const width = Math.min(preferredWidth, window.innerWidth - gutter * 2);
+    const left = desktop ? calendarRect?.left ?? anchor.left : anchor.left;
+    panel.style.width = `${width}px`;
+    panel.style.maxHeight = `${window.innerHeight - gutter * 2}px`;
+    panel.style.left = `${Math.max(gutter, Math.min(left, window.innerWidth - width - gutter))}px`;
+    const below = anchor.bottom + gap;
+    const bottomLimit = window.innerHeight - panel.offsetHeight - gutter;
+    const above = anchor.top - gap - panel.offsetHeight;
+    const top = desktop && below > bottomLimit && above >= gutter ? above : Math.min(below, bottomLimit);
+    panel.style.top = `${Math.max(gutter, top)}px`;
+  }
   useEffect(()=>{if(!pickerOpen)return;const closeOnScroll=(event:Event)=>{if(!periodPopover.current?.contains(event.target as Node))periodPopover.current?.hidePopover?.();};window.addEventListener("resize",positionPicker);window.addEventListener("scroll",closeOnScroll,true);return()=>{window.removeEventListener("resize",positionPicker);window.removeEventListener("scroll",closeOnScroll,true);};},[pickerOpen]);
   function closePicker(){periodPopover.current?.hidePopover?.();setPickerOpen(false);periodTrigger.current?.focus();}
   function chooseMonth(value:number){const key=calendarPeriodKey(Number(pickerYear),value);if(!key)return;setVisibleMonth(key);setFocusedDate(key+"-01");onSelectDate(key);closePicker();}
