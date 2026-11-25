@@ -47,7 +47,7 @@ impl OssStore {
             .request(Method::HEAD, key, &[], false)?
             .send()
             .await
-            .map_err(|_| "OSS 对象校验中断")?;
+            .map_err(|err| head_failure(err, key))?;
         if response.status() == StatusCode::NOT_FOUND {
             return Ok(None);
         }

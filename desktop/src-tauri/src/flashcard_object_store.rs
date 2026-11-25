@@ -8,6 +8,47 @@ use url::Url;
 mod media;
 pub(crate) use media::Identity;
 
+// Keep transport evidence without logging signed URLs, headers, or object names.
+fn head_failure(error: reqwest::Error, key: &str) -> String {
+    use std::error::Error;
+    let mut cause = error.source();
+    let mut detail = if error.is_timeout() {
+        "请求超时"
+    } else if error.is_connect() {
+        "连接失败"
+    } else {
+        "发送失败"
+    }
+    .to_string();
+    while let Some(inner) = cause {
+        if let Some(io) = inner.downcast_ref::<std::io::Error>() {
+            detail.push_str(&format!("，I/O {:?}", io.kind()));
+            if let Some(code) = io.raw_os_error() {
+                detail.push_str(&format!(" ({code})"));
+            }
+        }
+        let msg = inner.to_string().to_ascii_lowercase();
+        if msg.contains("dns") {
+            detail.push_str("，DNS");
+        }
+        if msg.contains("certificate") {
+            detail.push_str("，证书验证");
+        }
+        if msg.contains("connection closed before message completed") {
+            detail.push_str("，响应头接收前连接关闭");
+        }
+        if msg.contains("proxy") {
+            detail.push_str("，代理连接");
+        }
+        cause = inner.source();
+    }
+    let stage = ["edit-receipts", "receipts", "edits", "records", "assets"]
+        .into_iter()
+        .find(|s| key.contains(&format!("journal/{s}/")))
+        .unwrap_or("object");
+    format!("OSS 对象校验中断（HEAD {stage}，{detail}）")
+}
+
 pub(crate) struct ObjectBytes {
     pub bytes: Vec<u8>,
     pub identity: Option<Identity>,
@@ -379,7 +420,7 @@ impl OssStore {
             .request(Method::HEAD, key, &[], false)?
             .send()
             .await
-            .map_err(|_| "OSS 对象校验中断")?;
+            .map_err(|err| head_failure(err, key))?;
         if head.status().is_success()
             && head
                 .headers()
@@ -596,6 +637,29 @@ mod http_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn interrupted_head_identifies_stage_without_disclosing_url_or_object_id() {
+        let server = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = server.local_addr().unwrap();
+        let drop_connection = tokio::spawn(async move {
+            drop(server.accept().await.unwrap());
+        });
+        let err = Client::builder()
+            .no_proxy()
+            .build()
+            .unwrap()
+            .head(format!(
+                "http://{addr}/private-name?signature=private-value"
+            ))
+            .send()
+            .await
+            .unwrap_err();
+        drop_connection.await.unwrap();
+        let message = head_failure(err, "prefix/journal/edit-receipts/private-name");
+        assert!(message.contains("HEAD edit-receipts"));
+        assert!(!message.contains("private") && !message.contains("127.0.0.1"));
+    }
+
     #[test]
     fn oss_v4_matches_aliyun_official_sdk_fixed_vector() {
         // Public synthetic credentials/vector from aliyun's Python SDK TestSignerV4.test_auth_header.

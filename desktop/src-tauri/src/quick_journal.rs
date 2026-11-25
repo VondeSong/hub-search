@@ -820,7 +820,7 @@ fn sync_report(db: &PathBuf) -> Result<SyncReport, String> {
 async fn run(app: &AppHandle, automatic: bool) -> Result<SyncReport, String> {
     let _lock = LOCK.lock().await;
     let db = database_path(app)?;
-    let result = async {
+    let result: Result<SyncReport, String> = async {
         apply_local(&db)?;
         let configuration = {
             let c = open_database(&db)?;
@@ -842,6 +842,15 @@ async fn run(app: &AppHandle, automatic: bool) -> Result<SyncReport, String> {
     .await;
     {
         let (c, _guard) = open_write_database(&db)?;
+        if let Err(ref error) = result {
+            if error.starts_with("OSS 对象校验中断") {
+                meta(
+                    &c,
+                    "quick_journal_last_head_failure",
+                    &json!({"at":now_timestamp(),"detail":error}).to_string(),
+                )?;
+            }
+        }
         meta(
             &c,
             "quick_journal_error",
