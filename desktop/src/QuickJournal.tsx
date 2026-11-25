@@ -68,10 +68,13 @@ export function QuickJournalCard({ item, mobile, onTag, onPreview }: { item: Ite
   </article>;
 }
 export type QuickJournalSaved = { id: string; date: string; notice: string };
-export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all", captureDate, onSaved, onSyncSettings, onViewChange }: {
+export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all", captureDate, inlineCapture, onCancelCapture, onDraftEdited, onSaved, onSyncSettings, onViewChange }: {
   libraries: LibrarySummary[]; scope: string[] | null; view: JournalViewConfig; dataVersion: string;
   mode?: "all" | "compose" | "feed" | "settings" | "calendar";
   captureDate?:string;
+  inlineCapture?: "top" | "day";
+  onCancelCapture?: () => void;
+  onDraftEdited?: () => void;
   onSaved?: (record: QuickJournalSaved) => void;
   onSyncSettings?: () => void;
   onViewChange?: (change: Partial<JournalViewConfig>) => void;
@@ -96,6 +99,7 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
   const draftLatest = useRef(draft), fileInput = useRef<HTMLInputElement>(null), mounted = useRef(true);
   const persist = (value: Record) => {
     draftLatest.current = value; setDraft(value);
+    if (value.text.trim() || value.attachments.length) onDraftEdited?.();
     const sequence = ++draftSequence.current; setDraftStatus("正在保存草稿…");
     draftWrites = draftWrites.catch(() => {}).then(() => invoke<void>("save_quick_journal_draft", { draft: JSON.stringify(value), ...(slot?{slot}:{}) }));
     void draftWrites.then(() => { if (mounted.current && sequence === draftSequence.current) setDraftStatus("草稿已保存"); }).catch(e => { if (mounted.current) setError(`草稿保存失败：${message(e)}`); });
@@ -116,13 +120,13 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
     return () => { mounted.current = false; };
   }, [loadRevision, mode]);
   useEffect(() => {
-    if (!ready || (mode !== "compose" && mode !== "calendar")) return;
+    if (!ready || inlineCapture === "top" || (mode !== "compose" && mode !== "calendar")) return;
     const focus = () => { textInput.current?.focus({ preventScroll: true }); if (mode === "compose") { richInput.current?.focus(); if (mobile) void invoke("focus_quick_journal_editor").catch(() => {}); } };
     focus();
     if (mode !== "compose") return;
     window.addEventListener("hub:journal-capture-focus", focus);
     return () => window.removeEventListener("hub:journal-capture-focus", focus);
-  }, [mode, ready, mobile]);
+  }, [mode, ready, mobile, inlineCapture]);
   useEffect(() => {
     if (mode === "compose" || mode === "calendar") return;
     const reload = () => { void refresh().catch(e => setListError(message(e))); };
@@ -227,7 +231,7 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
   const compose = <form className={`quick-journal-compose ${mobile ? "is-mobile" : ""}`} onSubmit={e => { e.preventDefault(); void save(); }}>
     {mode==="compose"&&mobile?<JournalRichEditor ref={richInput} value={draft.text} onChange={text=>persist({...draftLatest.current,text})} disabled={!ready||saving||uploading} onPhotos={()=>photoInput.current?.click()} onMore={()=>setMoreOpen(!moreOpen)} moreOpen={moreOpen} onSubmit={()=>void save()} actions={<><button type="button" aria-label="进入录音模式" disabled={!ready||saving||uploading} onClick={()=>void draftWrites.then(()=>openJournalVoice({record:draftLatest.current,sourceDraft:true})).catch(e=>setError(message(e)))}><Mic size={21}/></button><button type="submit" className="journal-rich-send" aria-label="保存记录" disabled={!ready||saving||uploading||(!draft.text.trim()&&!draft.attachments.length)}><Send size={20}/></button></>}/>:<>
     <label className="sr-only" htmlFor="quick-journal-text">此刻的想法</label>
-    <textarea ref={textInput} id="quick-journal-text" placeholder="现在的想法是…" value={draft.text} disabled={!ready || saving} maxLength={100000} onChange={e => persist({ ...draftLatest.current, text: e.target.value })} onKeyDown={e => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); void save(); } }} />
+    <textarea ref={textInput} id="quick-journal-text" rows={inlineCapture ? 2 : undefined} placeholder={inlineCapture === "day" ? "输入补记内容（支持 - [ ] 拆分任务）…" : inlineCapture === "top" ? "随手记下今日思考或工程备忘…（Ctrl+Enter 保存）" : "现在的想法是…"} value={draft.text} disabled={!ready || saving} maxLength={100000} onChange={e => persist({ ...draftLatest.current, text: e.target.value })} onKeyDown={e => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); void save(); } }} />
     </>}
     {!!draft.attachments.length && <ul className="quick-journal-draft-files">{draft.attachments.map((a, i) => <li key={`${a.hash}-${i}`} className={mobile&&isJournalAudio(a.name)?"quick-journal-draft-audio":undefined}>{mobile&&isJournalAudio(a.name)?<JournalAudio attachment={a}/>:<>{a.image ? <Image hash={a.hash} name={a.name} /> : <Paperclip size={24} />}<span>{a.name}</span></>}<button type="button" aria-label={`移除附件 ${a.name}`} disabled={saving || uploading} onClick={() => persist({ ...draftLatest.current, attachments: draftLatest.current.attachments.filter((_, n) => i !== n) })}><X size={14} /></button></li>)}</ul>}
     <footer>
@@ -235,7 +239,8 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
       <input ref={fileInput} className="sr-only" type="file" multiple tabIndex={-1} onChange={e => { void attach(e.target.files); }} />
       <input ref={photoInput} className="sr-only" type="file" accept="image/*" multiple tabIndex={-1} onChange={e => { void attach(e.target.files); }} />
       {!mobile && mode!=="calendar" && <button type="button" disabled={!ready || saving || uploading} onClick={() => fileInput.current?.click()}><Paperclip size={16} />{uploading ? "保存附件…" : "照片 / 附件"}</button>}
-      <button type="submit" disabled={!ready || saving || uploading || (!draft.text.trim() && !draft.attachments.length) || (mode==="calendar"&&!capture.text.trim()&&!capture.tasks.length&&!draft.attachments.length)}><Send size={17} />{saving ? "保存中…" : mode==="calendar"?"创建":"记下"}</button>
+      {onCancelCapture && <button type="button" className="journal-inline-cancel" onClick={onCancelCapture}>取消</button>}
+      <button type="submit" disabled={!ready || saving || uploading || (!draft.text.trim() && !draft.attachments.length) || (mode==="calendar"&&!capture.text.trim()&&!capture.tasks.length&&!draft.attachments.length)}><Send size={17} />{saving ? "保存中…" : inlineCapture === "day" ? "写入当日" : inlineCapture === "top" ? "记录" : mode==="calendar"?"创建":"记下"}</button>
     </footer>
     {mobile && moreOpen && <div className="quick-journal-more"><label>记录日期<input type="date" aria-label="记录日期" value={draft.date} disabled={!ready || saving} onChange={e => persist({ ...draftLatest.current, date: e.target.value })} /></label><div><button type="button" disabled={!ready || saving || uploading} onClick={() => fileInput.current?.click()}><Paperclip size={17} />添加文件</button>{mode!=="compose"&&<><button type="button" disabled={!ready || saving} onClick={() => insert("bold")}><Bold size={17} />加粗</button><button type="button" disabled={!ready || saving} onClick={() => insert("list")}><List size={17} />列表</button></>}</div><small>每条最多 9 个附件，单个 20 MB。</small></div>}
     {mobile && <div className="quick-journal-draft-status"><span role="status">{uploading ? "正在保存附件…" : draftStatus}</span><button type="button" onClick={() => setMoreOpen(!moreOpen)}><CalendarDays size={13} />{draft.date === localJournalDate() ? "今天" : draft.date}</button></div>}
@@ -261,7 +266,7 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
     {mode !== "settings" && mode !== "feed" && compose}
     {mode==="calendar"&&<p className="journal-capture-destinations">日志 → {libraries.find(l=>l.id===settings.libraryId)?.name||"请先配置 OS 保存位置"}<button type="button" onClick={()=>setSettingsOpen(!settingsOpen)}>保存设置</button></p>}
     {mode==="calendar"&&capture.tasks.length>0&&<div className="journal-capture-target"><p>{capture.text.trim()||draft.attachments.length?"日志 → OS；":""}{capture.tasks.length} 条任务 → 滴答清单</p><label>任务保存到<select aria-label="任务资料库" value={taskLibrary} disabled={saving} onChange={e=>{setTaskLibrary(e.target.value);setTaskProject("");}}><option value="">选择滴答资料库</option>{libraries.filter(l=>l.provider==="dida365"&&l.connected).map(l=><option key={l.id} value={l.id}>{l.name}</option>)}</select></label>{taskLibrary&&<label>清单<select aria-label="任务清单" value={taskProject} disabled={saving} onChange={e=>setTaskProject(e.target.value)}><option value="">选择清单</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}<p>点击创建后，任务与日志分别保存。</p></div>}
-    {notice && <p className="quick-journal-notice" role="status">{notice}</p>}
+    {notice && !onSaved && <p className="quick-journal-notice" role="status">{notice}</p>}
     {(error || listError) && <div className="quick-journal-error" role="alert">{error || listError}<button onClick={() => { setError(""); setListError(""); if (!ready || !settingsReady) setLoadRevision(v => v + 1); if (mode !== "compose") void refresh().catch(e => setListError(message(e))); }}>重新读取</button></div>}
     {mode === "compose" && <p className="quick-journal-capture-help">保存到本机后可锁屏。{!settingsReady ? "正在读取同步设置。" : !settings.sync ? "速记云同步尚未开启。" : cloud.enabled === false ? "云同步总开关尚未开启。" : cloud.auto === false ? "自动同步已暂停，可在日志页手动重试。" : "后台会继续上传。"}<button onClick={openSyncSettings}>同步设置</button></p>}
     {mode !== "compose" && mode !== "calendar" && <>

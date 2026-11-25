@@ -85,6 +85,13 @@ describe("DesktopSidebar render isolation", () => {
     await act(async () => root.render(<DesktopSidebar {...props} favoriteCount={1} selectedLibraryIds={[]} />));
     expect(renderLibraryIcon).toHaveBeenCalledTimes(2);
 
+    await act(async () => root.render(<DesktopSidebar {...props} activeView="tags" hideTagNavigation />));
+    const tagsEntry = [...container.querySelectorAll("button")].find(button => button.textContent === "标签");
+    expect(tagsEntry?.classList.contains("active")).toBe(true);
+    expect(container.querySelector('section[aria-label="标签导航"]')).toBeNull();
+    await act(async () => root.render(<DesktopSidebar {...props} activeView="tags" />));
+    expect(container.querySelector('section[aria-label="标签导航"]')).not.toBeNull();
+
     await act(async () => root.unmount());
   });
 

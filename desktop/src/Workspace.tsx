@@ -79,9 +79,15 @@ function WorkspaceContent({
   );
 }
 
+export function activeDesktopTopicCatalog(props: WorkspaceProps) {
+  const { collectionView, query } = props.resultsPaneProps;
+  return collectionView === "tags" && !query.trim() ? props.desktopTopicCatalog : undefined;
+}
+
 export function DesktopWorkspace(props: WorkspaceProps) {
-  if (props.resultsPaneProps.collectionView === "tags" && !props.resultsPaneProps.query.trim() && props.desktopTopicCatalog) {
-    return <DesktopTagsWorkspace workspaceRef={props.workspaceRef} data={props.resultsPaneProps} preview={props.previewPaneProps} catalog={props.desktopTopicCatalog} />;
+  const catalog = activeDesktopTopicCatalog(props);
+  if (catalog) {
+    return <DesktopTagsWorkspace workspaceRef={props.workspaceRef} data={props.resultsPaneProps} preview={props.previewPaneProps} catalog={catalog} />;
   }
   return <WorkspaceContent {...props} layout="desktop" />;
 }

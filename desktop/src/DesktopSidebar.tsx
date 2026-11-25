@@ -181,6 +181,7 @@ export type DesktopSidebarView = "home" | "tasks" | "journals" | "favorites" | "
 
 type DesktopSidebarProps = {
   contextualTitle?: string;
+  hideTagNavigation?: boolean;
   activeView: DesktopSidebarView;
   smartCollections: SmartCollection[];
   activeSmartCollectionId: string;
@@ -277,6 +278,7 @@ export const DesktopSidebar = memo(function DesktopSidebar({
   onDeleteSmartCollection,
   onCollapse,
   contextualTitle,
+  hideTagNavigation,
 }: DesktopSidebarProps) {
   const [tagFilter, setTagFilter] = useState("");
   const [commonOpen, setCommonOpen] = useState(true);
@@ -493,7 +495,7 @@ export const DesktopSidebar = memo(function DesktopSidebar({
         />
       )}
 
-      {activeView === "tags" && (
+      {activeView === "tags" && !hideTagNavigation && (
         <section className="sidebar-tags" aria-label="标签导航">
           <div className="sidebar-tags-heading">
             <strong>标签管理</strong>

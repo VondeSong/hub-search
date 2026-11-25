@@ -43,12 +43,20 @@ describe("Journal database workspace",()=>{
   await act(async()=>store.select(store.saved[0].id));expect(store.view.layout).toBe("table");
   await act(async()=>store.remove(store.saved[0].id));expect(store.saved).toHaveLength(0);expect(open).not.toHaveBeenCalled();
  });
- it("starts the daily view at today with empty consecutive days and explicit creation date",async()=>{
+ it("starts with the full-width composer and keeps backfill in the selected day",async()=>{
   await act(async()=>root.render(<Fixture/>));
-  expect([...container.querySelectorAll<HTMLElement>('[data-journal-day]')].map(row=>row.dataset.journalDay)).toEqual(['2026-10-13','2026-10-14','2026-10-15','2026-10-16','2026-10-17','2026-10-18','2026-10-19']);
+  const dates=[...container.querySelectorAll<HTMLElement>('[data-journal-day]')].map(row=>row.dataset.journalDay);
+  expect(dates[0]).toBe('2026-10-13');expect(dates[dates.length-1]).toBe('2026-10-06');
+  expect(container.querySelector('.journal-inline-editor-top textarea')).not.toBeNull();
   expect(container.querySelector('.journal-empty-range')).toBeNull();
-  await click('.journal-daily-day.is-today .journal-daily-add');expect(container.querySelector('.journal-floating-editor time')?.textContent).toBe('2026-10-13');expect(create).not.toHaveBeenCalled();
-  await click('[data-journal-day="2026-10-15"] .journal-daily-date');
-  await click('[data-journal-day="2026-10-15"] .journal-daily-add');expect(container.querySelector('.journal-floating-editor time')?.textContent).toBe('2026-10-15');expect(create).not.toHaveBeenCalled();
+  await click('.journal-daily-day.is-today .journal-daily-add');
+  expect(container.querySelector('.journal-daily-day.is-today .journal-inline-editor-day time')?.textContent).toBe('2026-10-13');
+  await click('[data-journal-day="2026-10-12"] .journal-daily-add');
+  expect(container.querySelector('[data-journal-day="2026-10-12"] .journal-inline-editor-day time')?.textContent).toBe('2026-10-12');
+  expect(container.querySelector('.journal-floating-editor')).toBeNull();
+  await click('.journal-inline-cancel');
+  expect(container.querySelector('.journal-inline-editor-day')).toBeNull();
+  expect(container.querySelector('.journal-inline-editor-top textarea')).not.toBeNull();
+  expect(create).not.toHaveBeenCalled();
  });
 });

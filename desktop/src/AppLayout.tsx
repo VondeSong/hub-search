@@ -8,7 +8,7 @@ import { FilterBar, SearchFilterSummary } from "./FilterBar";
 import { FooterStatus } from "./FooterStatus";
 import { MobileAppEntry } from "./MobileAppEntry";
 import { SearchHeader } from "./SearchHeader";
-import { DesktopWorkspace, MobileWorkspace, type WorkspaceProps } from "./Workspace";
+import { activeDesktopTopicCatalog, DesktopWorkspace, MobileWorkspace, type WorkspaceProps } from "./Workspace";
 import { WorkspaceRail } from "./WorkspaceRail";
 import { WorkspaceChrome, WorkspaceHeaderContext, WorkspaceModeControl, workspaceLabels } from "./WorkspaceChrome";
 import { useSidebarLayout } from "./useSidebarLayout";
@@ -111,7 +111,7 @@ export function DesktopAppLayout(props: AppLayoutProps) {
           onToggleLibrary={desktopSidebarProps.onToggleLibrary}
           onManageLibraries={() => footerStatusProps.setShowConnection(true)}
         />
-        {!insightsLayout && !librariesLayout && !readingLayout && <><DesktopSidebar {...desktopSidebarProps} contextualTitle={sidebarMode === "standard" ? undefined : workspaceLabels[desktopSidebarProps.activeView]} onCollapse={collapsePanel} />
+        {!insightsLayout && !librariesLayout && !readingLayout && <><DesktopSidebar {...desktopSidebarProps} hideTagNavigation={!mainContent && Boolean(activeDesktopTopicCatalog(workspaceProps))} contextualTitle={sidebarMode === "standard" ? undefined : workspaceLabels[desktopSidebarProps.activeView]} onCollapse={collapsePanel} />
         <div
           className="context-sidebar-resizer"
           role="separator"

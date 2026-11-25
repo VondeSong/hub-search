@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useJournalDailyData, type JournalDailyTaskEntry } from "./JournalDailyData";
 import { journalMonthDays, shiftJournalDay, type JournalViewStore } from "./JournalViews";
@@ -35,11 +35,13 @@ type Props = {
   selectedKey: string; canCreate: boolean;
   onChoose: (date: string) => void; onPreview: (result: SearchResult) => void;
   onCreate?: (date: string) => void;
+  composer?: ReactNode;
+  composerDate?: string;
   onOpen?: (entry:SearchResult)=>void;
   onTaskCount?:(count:number)=>void;
 };
 
-export function JournalDailyStream({ store, today, scope, dataVersion, selectedKey, canCreate, onChoose, onPreview, onCreate, onOpen, onTaskCount }: Props) {
+export function JournalDailyStream({ store, today, scope, dataVersion, selectedKey, canCreate, onChoose, onPreview, onCreate, composer, composerDate, onOpen, onTaskCount }: Props) {
   const { view } = store;
   const records=useJournalRecords();
   const sharedTasks=useUnifiedTasks();
@@ -50,10 +52,16 @@ export function JournalDailyStream({ store, today, scope, dataVersion, selectedK
   const singleDay = view.period === "day";
   const requested = singleDay ? view.day : (store.anchor.startsWith(view.month+"-") ? store.anchor : "") || (view.month === today.slice(0, 7) ? today : `${view.month}-01`);
   const context = `${view.month}:${view.period}:${view.day}:${store.activeId}`;
-  const [window, setWindow] = useState({ context, anchor: store.anchor, from: requested, to: shiftJournalDay(requested, singleDay ? 1 : 7) });
+  const defaultRecent = view.period === "month" && !store.anchor && requested === today;
+  const initialRange = {
+    context, anchor: store.anchor, latestFirst: defaultRecent,
+    from: defaultRecent ? shiftJournalDay(requested, -7) : requested,
+    to: shiftJournalDay(requested, singleDay || defaultRecent ? 1 : 7),
+  };
+  const [window, setWindow] = useState(initialRange);
   const reset = window.context !== context || (window.anchor !== store.anchor && !!store.anchor && (store.anchor < window.from || store.anchor >= window.to));
   const monthDays=journalMonthDays(view.month);
-  const pendingRange = reset ? { context, anchor: store.anchor, from: requested, to: shiftJournalDay(requested, singleDay ? 1 : 7) } : { ...window, anchor: store.anchor };
+  const pendingRange = reset ? initialRange : { ...window, anchor: store.anchor };
   const range=view.period==="month"?{...pendingRange,from:pendingRange.from<monthDays[0]?monthDays[0]:pendingRange.from,to:pendingRange.to>shiftJournalDay(monthDays[monthDays.length-1],1)?shiftJournalDay(monthDays[monthDays.length-1],1):pendingRange.to}:pendingRange;
   useEffect(() => {
     if (window.context !== range.context || window.anchor !== range.anchor || window.from !== range.from) setWindow(range);
@@ -72,8 +80,7 @@ export function JournalDailyStream({ store, today, scope, dataVersion, selectedK
     return {from:dates[0]||today,to:shiftJournalDay(dates[dates.length-1]||today,1)};
   },[resultMode,view.period,view.day,view.month,range.from,range.to,sharedTasks.dashboard.tasks,today]);
   const daily = useJournalDailyData({ ...taskRange, scope: (view.recordFilter||"all")==="all"?selectedScope:[], query: view.query, enabled: true, dataVersion });
-  // A continuous calendar advances from its anchor toward the future. Saved
-  // list/table sort preferences must not put upcoming days above today.
+  // A continuous calendar keeps date order independent of saved list sorting.
   const grouped = useMemo(() => {
     const groups = new Map<string, SearchResult[]>();
     for (const entry of page.items) {
@@ -148,16 +155,21 @@ export function JournalDailyStream({ store, today, scope, dataVersion, selectedK
     </div>;
   };
   const matchingDates=journalResultDates([...grouped.keys(),...quick.map(item=>item.record.date),...daily.tasksByDate.keys()],view);
-  const dates=resultMode?matchingDates.slice(0,resultLimit):journalDailyDates(range.from,range.to);
+  const continuousDates = journalDailyDates(range.from, range.to);
+  const dates = resultMode ? matchingDates.slice(0, resultLimit) : range.latestFirst ? continuousDates.reverse() : continuousDates;
   const taskCount=new Set([...daily.tasksByDate.values()].flatMap(groups=>[...groups.scheduled,...groups.created,...groups.completed].map(entry=>entry.task.id))).size;
   useEffect(()=>{onTaskCount?.(daily.tasksLoading||daily.tasksError?0:taskCount);},[taskCount,daily.tasksLoading,daily.tasksError,onTaskCount]);
   const canExtend = dates.length < 359;
+  const showDatePaging = !resultMode && !singleDay;
+  const earlierDays = showDatePaging && <button className={range.latestFirst ? "journal-daily-next" : "journal-daily-previous"} disabled={!canExtend || (view.period === "month" && range.from <= monthDays[0])} onClick={() => setWindow({ ...range, from: shiftJournalDay(range.from, -7) })}>{range.latestFirst ? <ArrowDown size={15} /> : <ArrowUp size={15} />}显示前几天</button>;
+  const laterDays = showDatePaging && <button className={range.latestFirst ? "journal-daily-previous" : "journal-daily-next"} disabled={!canExtend || (view.period === "month" && toInclusive >= monthDays[monthDays.length - 1])} onClick={() => setWindow({ ...range, to: shiftJournalDay(range.to, 7) })}>{range.latestFirst ? <ArrowUp size={15} /> : <ArrowDown size={15} />}显示后几天</button>;
   const completedTasks = daily.tasksByDate.get(completedDate)?.completed || [];
   useEffect(() => {
     if (completedDate && !daily.tasksLoading && !completedTasks.length) closeCompleted();
   }, [completedDate, completedTasks.length, daily.tasksLoading]);
   return <div className="journal-daily-stream" aria-busy={page.loading || daily.tasksLoading}>
-    {!resultMode&&!singleDay && <button className="journal-daily-previous" disabled={!canExtend||(view.period==="month"&&range.from<=monthDays[0])} onClick={() => setWindow({ ...range, from: shiftJournalDay(range.from, -7) })}><ArrowUp size={15}/>显示前几天</button>}
+    {(!composerDate || !dates.includes(composerDate)) && composer}
+    {range.latestFirst ? laterDays : earlierDays}
     <p className="journal-daily-status journal-daily-loading" role="status">{page.loading || daily.tasksLoading ? "正在读取当天记录…" : ""}</p>
     {page.error && <p className="journal-daily-status" role="alert">日志读取失败：{page.error} <button onClick={page.retry}>重试日志</button></p>}
     {daily.tasksError && <div className="journal-daily-status" role="alert"><p>任务读取或保存失败：{daily.tasksError}</p><button onClick={daily.retry}>重新读取任务</button></div>}
@@ -168,19 +180,24 @@ export function JournalDailyStream({ store, today, scope, dataVersion, selectedK
       const entries = grouped.get(date) || [], tasks = daily.tasksByDate.get(date) || { scheduled: [], completed: [], created: [] };
       const hasTasks = tasks.scheduled.length + tasks.completed.length + tasks.created.length > 0;
       return <section key={date} className={`journal-daily-day ${date === today ? "is-today" : ""}`} data-journal-day={date} aria-label={journalDateLabel(date)}>
-        <button className="journal-daily-date" aria-label={`选择 ${journalDateLabel(date)}`} aria-pressed={store.anchor === date} onClick={() => onChoose(date)}><span className="date-title">{Number(date.slice(5, 7))}月{Number(date.slice(8))}日</span>{relative && <span className="relative-day">{relative}</span>}<span className="weekday">星期{weekday}</span></button>
+        <div className="journal-daily-day-head">
+          <button className="journal-daily-date" aria-label={`选择 ${journalDateLabel(date)}`} aria-pressed={store.anchor === date} onClick={() => onChoose(date)}><span className="date-title">{Number(date.slice(5, 7))}月{Number(date.slice(8))}日</span>{relative && <span className="relative-day">{relative}</span>}<span className="weekday">星期{weekday}</span></button>
+          <div className="journal-day-hover-actions">
+            {canCreate && onCreate && <button type="button" className="journal-day-inline-btn journal-daily-add" aria-expanded={date === composerDate} onClick={() => onCreate(date)}><Plus size={12} aria-hidden="true"/><span>补记</span></button>}
+          </div>
+        </div>
         <div className="journal-daily-content">
+          {date === composerDate && composer}
           {(entries.length>0||quick.some(item=>item.record.date===date))&&<div className="journal-daily-records memo-embedded" aria-label="当天日志">{entries.map(entry=><JournalRecordCard key={entry.entityKey} entry={entry} summary={view.summary} source={view.source} onPreview={onPreview} onOpen={onOpen} selected={entry.entityKey===selectedKey} disabled={page.loading}/>)}{quick.filter(item=>item.record.date===date).map(item=><QuickJournalCard key={item.record.id} item={item} mobile={false} onPreview={onPreview} onTag={tag=>store.update({query:"#"+tag})}/>)}</div>}
           {hasTasks && <div className="journal-daily-tasks" aria-label="当天任务">
             {tasks.scheduled.map(entry => taskRow(entry, "scheduled"))}
             {!!tasks.created.length && <details className="journal-daily-created" open><summary><b>{tasks.created.length}</b>当天新建</summary>{tasks.created.map(entry => taskRow(entry, "created"))}</details>}
             {tasks.completed.length > 0 && <button type="button" className="journal-daily-completed-trigger" aria-haspopup="dialog" aria-expanded={completedDate === date} aria-label={`${tasks.completed.length} 已完成的任务 · ${journalDateLabel(date)}`} onClick={event => { completedTrigger.current = event.currentTarget; setCompletedDate(date); }}><b>{tasks.completed.length}</b><span>已完成的任务</span></button>}
           </div>}
-          {canCreate && onCreate && <div className="journal-daily-actions"><button className="journal-daily-add" onClick={() => onCreate(date)}><Plus size={13}/>新建</button></div>}
         </div>
       </section>;
     })}
-    {!resultMode&&!singleDay && <button className="journal-daily-next" disabled={!canExtend||(view.period==="month"&&toInclusive>=monthDays[monthDays.length-1])} onClick={() => setWindow({ ...range, to: shiftJournalDay(range.to, 7) })}><ArrowDown size={15}/>显示后几天</button>}
+    {range.latestFirst ? earlierDays : laterDays}
     {resultMode&&!dates.length&&!page.loading&&!records.loading&&!daily.tasksLoading&&!page.error&&!records.error&&!daily.tasksError&&<div className="journal-search-empty"><h2>没有符合筛选的记录</h2><p>可以调整日期、资料库或内容类型。</p><button onClick={()=>store.update({query:"",period:"all",day:"",libraries:null,recordFilter:"all"})}>清除搜索和筛选</button></div>}
     {resultMode&&dates.length<matchingDates.length&&<button className="journal-daily-next" onClick={()=>setResultLimit(n=>n+35)}>继续显示（{dates.length} / {matchingDates.length} 天）</button>}
     {completedDate && createPortal(<dialog ref={completedDialog} className="journal-completed-dialog" aria-labelledby={completedTitle} onCancel={event => { event.preventDefault(); closeCompleted(); }} onClose={() => setCompletedDate("")} onClick={event => { if (event.target !== event.currentTarget) return; const bounds = event.currentTarget.getBoundingClientRect(); if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) closeCompleted(); }}>

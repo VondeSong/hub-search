@@ -107,3 +107,19 @@ it("keeps a save receipt visible after the editor closes",async()=>{
  await act(async()=>root.render(<Editor/>));await text("创建的正文");await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
  expect(host.querySelector('textarea')).toBeNull();expect(host.querySelector('.journal-capture-notice')?.textContent).toContain("创建完成");expect(host.querySelector('.journal-draft-dock')?.textContent).not.toContain("11月15日");
 });
+
+it("writes a backfill to the date shown by the inline editor", async () => {
+  const onDay = vi.fn();
+  await act(async () => root.render(<JournalCapturePanel libraries={libraries} day="2026-11-16"
+    placement="day" onDay={onDay} dataVersion="v1" scope={null} view={defaultJournalView()}>
+    {editor => <div data-inline-date="2026-11-16">{editor}</div>}
+  </JournalCapturePanel>));
+  expect(host.querySelector('[data-inline-date] textarea')).toBe(document.activeElement);
+  expect(host.querySelector(".journal-floating-editor")).toBeNull();
+  await text("补写当天的记录");
+  await click('button[type="submit"]');
+  expect(invoke).toHaveBeenCalledWith("capture_calendar_journal", expect.objectContaining({
+    record: expect.objectContaining({ date: "2026-11-16", text: "补写当天的记录" }),
+  }));
+  expect(onDay).toHaveBeenCalledWith("");
+});
