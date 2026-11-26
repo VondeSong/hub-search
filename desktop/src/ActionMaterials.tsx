@@ -1,14 +1,21 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { FileText, Mic } from "lucide-react";
 import type { QuickJournalItem } from "./JournalRecords";
 import { QuickJournalCard } from "./QuickJournal";
+import { isJournalAudio } from "./JournalVoice";
 import type { PdfPagePreview, SearchResult } from "./SearchTypes";
 import { invoke } from "@tauri-apps/api/core";
 import { isPdfContent } from "./PdfPreviewModel";
 import { journalMaterial, matchingTerms, queryMaterials, terms, type Material } from "./ActionEvidence";
 
 export type RecallCache = Map<string, { items: Material[]; error: string }>;
-export function useRecall(title: string, scope: string[] | null, taskTitles: string[] = [], cache?: RecallCache) {
+export function useRecall(
+  title: string,
+  scope: string[] | null,
+  taskTitles: string[] = [],
+  cache?: RecallCache,
+) {
   const key = JSON.stringify([title, scope, taskTitles]);
   const cached = title ? cache?.get(key) : undefined;
   const [state, setState] = useState({ cache, key: "", items: [] as Material[], error: "" });
@@ -84,7 +91,7 @@ export function assembleMaterials(
     long: Material[] = [],
     related: Material[] = [];
   for (const m of byId.values()) {
-    const isReference = !m.journalId && /规范|标准|图纸|断面图|\.pdf\b|\.dwg\b|\.step\b/i.test(m.title);
+    const isReference = !m.journalId && /规范|标准|图纸|断面图|\.(?:pdf|dwg|step|xlsx?)\b/i.test(m.title);
     if (isReference) long.push(m);
     else if (m.date && m.date <= day && new Date(m.date + "T12:00:00") >= recentDate) recent.push(m);
     else if (linkedKeys.has(sourceKey(m))) related.push(m);
@@ -122,7 +129,11 @@ function PdfSource({ result }: { result: SearchResult }) {
         <figure>
           <figcaption>原 PDF · 第 {page} 页</figcaption>
           {preview.imageDataUrl && (
-            <img style={{ maxWidth: "100%" }} src={preview.imageDataUrl} alt={`${result.title} · 第 ${page} 页`} />
+            <img
+              style={{ maxWidth: "100%" }}
+              src={preview.imageDataUrl}
+              alt={`${result.title} · 第 ${page} 页`}
+            />
           )}
           {preview.text && <p>{preview.text}</p>}
           {preview.note && <small>{preview.note}</small>}
@@ -143,17 +154,20 @@ export function Materials({
   onOpen,
   onPin,
   caption,
+  appearance = "full",
 }: {
   items: Material[];
   journals: QuickJournalItem[];
   onOpen?: (r: SearchResult) => void;
   onPin?: (m: Material) => void;
   caption?: ReactNode;
+  appearance?: "full" | "clue";
 }) {
+  const [expandedClue, setExpandedClue] = useState("");
   if (!items.length) return null;
   const renderedMedia = new Set<string>();
   return (
-    <section className="aw-materials">
+    <section className={appearance === "clue" ? "aw-materials aw-clue-material" : "aw-materials"}>
       {caption && <h4>{caption}</h4>}
       {items.map((m) => {
         const j = m.journalId
@@ -161,35 +175,88 @@ export function Materials({
           : undefined;
         const showMedia = j && j.record.attachments.length > 0 && !renderedMedia.has(j.record.id);
         if (showMedia) renderedMedia.add(j.record.id);
+        const media = showMedia && (
+          <div className="aw-media-strip">
+            <QuickJournalCard item={j} timeline mobile={false} onPreview={onOpen} />
+          </div>
+        );
+        const pdf = !!m.result && (isPdfContent(m.result.contentType) || !!m.result.pageNumber);
+        const provider = m.result?.provider;
+        const sourceType = j
+          ? "日志"
+          : provider === "obsidian"
+            ? "OS"
+            : provider === "craft"
+              ? "Craft"
+              : provider === "feishu"
+                ? "飞书"
+                : "文档";
+        const extension = m.title.match(/\.(xlsx?|dwg|step)$/i)?.[1].toUpperCase();
+        const fileType = pdf ? "PDF" : extension || sourceType;
+        const source = m.result;
+        const openSource =
+          source &&
+          (pdf ? (
+            <PdfSource
+              key={JSON.stringify([source.id, source.pageNumber, source.modifiedAt])}
+              result={source}
+            />
+          ) : onOpen ? (
+            <button onClick={() => onOpen(source)}>打开来源</button>
+          ) : null);
+        if (appearance === "clue") {
+          const clueLabel = (
+            <>
+              {j?.record.attachments.some((a) => isJournalAudio(a.name)) ? (
+                <Mic size={12} aria-hidden="true" />
+              ) : (
+                <FileText size={12} aria-hidden="true" />
+              )}
+              <span>{j ? m.title : sourceType + " · " + m.title}</span>
+            </>
+          );
+          if (!media && !openSource) {
+            return (
+              <span className="aw-clue-source" key={m.id}>
+                {clueLabel}
+              </span>
+            );
+          }
+          const expanded = expandedClue === m.id;
+          return (
+            <div className="aw-clue-disclosure" key={m.id}>
+              <button
+                type="button"
+                className="aw-clue-source"
+                aria-expanded={expanded}
+                onClick={() => setExpandedClue(expanded ? "" : m.id)}
+              >
+                {clueLabel}
+              </button>
+              {expanded && (
+                <>
+                  {media}
+                  {openSource}
+                </>
+              )}
+            </div>
+          );
+        }
         return (
           <Fragment key={m.id}>
-            {showMedia && (
-              <div className="aw-media-strip">
-                <QuickJournalCard item={j} timeline mobile={false} onPreview={onOpen} />
-              </div>
-            )}
+            {media}
             <details>
               <summary>
-                <i className="aw-file-icon">
-                  {j ? "日志" : m.result?.pageNumber ? "PDF" : (m.result?.provider || "文档").toUpperCase()}
-                </i>{" "}
-                {m.title} <small>{m.result?.libraryName || m.date}</small>
+                <i className="aw-file-icon" data-type={fileType}>
+                  {fileType}
+                </i>
+                <span className="aw-material-name">
+                  <b>{m.title}</b>
+                  {(m.result?.libraryName || m.date) && <small>{m.result?.libraryName || m.date}</small>}
+                </span>
               </summary>
               <blockquote>{m.text}</blockquote>
-
-              {m.result && (isPdfContent(m.result.contentType) || m.result.pageNumber) ? (
-                <PdfSource
-                  key={JSON.stringify([m.result.id, m.result.pageNumber, m.result.modifiedAt])}
-                  result={m.result}
-                />
-              ) : (
-                m.result &&
-                onOpen && (
-                  <button onClick={() => onOpen(m.result!)}>
-                    打开来源{m.result.pageNumber ? ` · 第 ${m.result.pageNumber} 页` : ""}
-                  </button>
-                )
-              )}
+              {openSource}
               {onPin && <button onClick={() => onPin(m)}>固定到任务备料</button>}
             </details>
           </Fragment>

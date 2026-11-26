@@ -338,6 +338,31 @@ describe("行动工作台", () => {
     expect(meta.day).toBeUndefined();
     expect(vi.mocked(invoke).mock.calls.map((call) => (call[1] as any)?.args?.action)).not.toContain("createTask");
   });
+  it("线索只展示来源标签，点开后才挂载日志照片预览", async () => {
+    const item = {
+      ...journal,
+      record: {
+        ...journal.record,
+        attachments: [{ hash: "photo", name: "照片.jpg", size: 24, image: true }],
+      },
+    };
+    const material: Material = {
+      id: "quote",
+      originId: JSON.stringify(["journal", item.libraryId, item.record.id]),
+      journalId: item.record.id,
+      title: "现场日志",
+      text: item.body,
+    };
+    await render(<Materials items={[material]} journals={[item]} appearance="clue" />);
+    const source = button("现场日志");
+    expect(source.getAttribute("aria-expanded")).toBe("false");
+    expect(host.querySelector(".aw-media-strip")).toBeNull();
+    await click(source);
+    expect(source.getAttribute("aria-expanded")).toBe("true");
+    expect(host.querySelector(".aw-media-strip")).not.toBeNull();
+    await click(source);
+    expect(host.querySelector(".aw-media-strip")).toBeNull();
+  });
   it("跨清单同名任务要求明确选择，选项标明清单", async () => {
     const sameTitle = {
       ...t,
@@ -361,6 +386,8 @@ describe("行动工作台", () => {
     );
     await click(button("行动捕手"));
     expect(button("关联并补充至已有任务")).toBeUndefined();
+    expect(host.querySelector('select[aria-label="关联已有任务"]')).toBeNull();
+    await click(button("发现 2 项相似任务"));
     const select = host.querySelector<HTMLSelectElement>('select[aria-label="关联已有任务"]')!;
     expect([...select.options].map((option) => option.textContent)).toEqual([
       "选择已有任务",
@@ -398,7 +425,7 @@ describe("行动工作台", () => {
     );
     expect(button("行动捕手 · 1 条")).toBeDefined();
     await click(button("行动捕手"));
-    const title = host.querySelector<HTMLInputElement>('input[aria-label="候选行动标题"]');
+    const title = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="候选行动标题"]');
     expect(title?.value).toBe("将图纸交给结构组");
     expect(host.textContent).toContain("- [ ] 将图纸交给结构组");
     expect(host.textContent).not.toContain("提交扭矩表");
@@ -567,6 +594,10 @@ describe("行动工作台", () => {
     );
     expect(host.textContent).toContain("当前无阻塞项，仍有 1 项并行等回复（供应商 · 耐温报告）");
     expect(identity(t)).toBe(JSON.stringify(["lib", "a"]));
+    await render(<ActionDetail {...props} meta={meta} />);
+    await click(button("恢复等待"));
+    expect(meta.waits[0].resolved).toBeUndefined();
+    expect(meta.waits[1]).toEqual(parallel);
   });
   it("专题证据墙在部分跨库检索失败时，同时保留已找到材料并显示错误提示", async () => {
     const lateSpec = {
@@ -674,6 +705,8 @@ describe("行动工作台", () => {
     };
     await render(<ActionHarvester {...props} revision={0} />);
     await click(button("行动捕手 · 1 条"));
+    expect(host.querySelector('input[aria-label="筛选可关联任务"]')).toBeNull();
+    await click(host.querySelector<HTMLButtonElement>('button[aria-label="关联已有任务"]')!);
     const filterInput = host.querySelector<HTMLInputElement>('input[aria-label="筛选可关联任务"]')!;
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(filterInput, "bev");

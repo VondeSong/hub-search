@@ -1,10 +1,11 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Clock3, Layers3, Plus, Sparkles, Target, X } from "lucide-react";
 import { AgentPanelContext, AgentTextMaterialContext } from "./StandaloneAgentLauncher";
 import { resolveTaskResult } from "./TaskWorkspaceResult";
 import { TaskPlanningPanel } from "./TaskPlanningPanel";
 import { ActionSourceFields } from "./ActionSourceFields";
 import { archiveAction } from "./ActionJournal";
-import { identity } from "./ActionState";
+import { dueDay, identity } from "./ActionState";
 import type { UnifiedTask } from "./TaskWorkspacePresentation";
 import type { QuickJournalItem } from "./JournalRecords";
 import type { SearchResult } from "./SearchTypes";
@@ -213,13 +214,32 @@ export function ActionDetail({
   function pin(material: Material) {
     change((m) => ({ ...m, links: [...m.links.filter((l) => l.id !== material.id), material] }));
   }
+  function resolveWait(id: string, resolved?: string) {
+    change((m) => ({
+      ...m,
+      waits: m.waits.map((row) => (row.id === id ? { ...row, resolved } : row)),
+      draft:
+        resolved && m.draft?.mode === "followup" && (!m.draft.waitId || m.draft.waitId === id)
+          ? undefined
+          : m.draft,
+    }));
+  }
+  const due = dueDay(task);
+  const hasMaterials = pack.all.length > 0;
+  const dueTime =
+    due &&
+    !task.isAllDay &&
+    new Intl.DateTimeFormat("zh-CN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(task.dueAt!));
   return (
     <aside className="aw-detail" aria-label="任务推进台">
       <header>
         <button className="aw-origin" onClick={topicClick}>
           <i className="aw-topic-dot" />
-          {task.collectionName || task.documentTitle}
-        </button>{" "}
+          <span>{task.collectionName || task.documentTitle || "收件箱"}</span>
+        </button>
         <button
           disabled={!!busy}
           onClick={() =>
@@ -260,285 +280,368 @@ export function ActionDetail({
             agent(null);
           }}
         >
-          ✦ 问助手
+          <Sparkles size={14} aria-hidden="true" /> 问助手
         </button>
         <button aria-label="关闭详情" onClick={onClose}>
-          ×
+          <X size={14} aria-hidden="true" />
         </button>
       </header>
-      <div className="aw-detail-title">
-        {completion}
-        <h2>{task.title}</h2>
-      </div>
-      <div className="aw-tools">
-        <button
-          disabled={!!busy || task.completed || (planFull && meta.day !== day)}
-          title={planFull && meta.day !== day ? "今日计划已满" : undefined}
-          aria-pressed={meta.day === day}
-          onClick={() => change((m) => ({ ...m, day: m.day === day ? "" : day }))}
-        >
-          {meta.day === day ? "移出今日计划" : "排入今天"}
-        </button>
-        <button disabled={task.completed} onClick={() => setWaitOpen((v) => !v)}>
-          添加等待项
-        </button>
-        {task.dueAt && <small>截止 {new Date(task.dueAt).toLocaleString("zh-CN")}</small>}
-      </div>
-      {!!meta.waits.length && (
-        <section>
-          <h3>等待交付</h3>
-          {meta.waits.map((w) => (
-            <div
-              className={"aw-wait " + (w.resolved ? "received" : w.blocking ? "blocking" : "parallel")}
-              key={w.id}
+      <div className="aw-detail-scroll">
+        <div className="aw-detail-content">
+          <div className="aw-detail-title">
+            {completion}
+            <h2>{task.title}</h2>
+          </div>
+          <div className="aw-detail-controls">
+            <button
+              disabled={!!busy || task.completed || (planFull && meta.day !== day)}
+              title={planFull && meta.day !== day ? "今日计划已满" : undefined}
+              aria-pressed={meta.day === day}
+              onClick={() => change((m) => ({ ...m, day: m.day === day ? "" : day }))}
             >
-              <strong>
-                {w.who} · {w.what}
-              </strong>
-              <small>
-                {w.resolved ? "已收到 · " + w.resolved : w.blocking ? "阻塞下一步" : "并行等回复"}
-                {!w.resolved && w.review && " · " + w.review + " 回看"}
-              </small>
-              {!w.resolved && !task.completed && (
-                <>
-                  <button
-                    disabled={!!busy}
-                    onClick={() =>
-                      change((m) => ({
-                        ...m,
-                        waits: m.waits.map((row) => (row.id === w.id ? { ...row, resolved: day } : row)),
-                        draft:
-                          m.draft?.mode === "followup" && (!m.draft.waitId || m.draft.waitId === w.id)
-                            ? undefined
-                            : m.draft,
-                      }))
-                    }
-                  >
-                    标记已收到
-                  </button>
-                  <button disabled={!!busy} onClick={() => void act("起草催办", () => draft("followup", w.id))}>
-                    起草催办
-                  </button>
-                </>
-              )}
-            </div>
-          ))}
-        </section>
-      )}
-      {waitOpen && (
-        <form
-          className="aw-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!who.trim() || !what.trim()) return;
-            void act("保存", async () => {
-              await update((m) => ({
-                ...m,
-                waits: [
-                  ...m.waits,
-                  { id: crypto.randomUUID(), who: who.trim(), what: what.trim(), review, blocking },
-                ],
-              }));
-              setWaitOpen(false);
-              setWho("");
-              setWhat("");
-            });
-          }}
-        >
-          <label>
-            等谁
-            <input required value={who} onChange={(e) => setWho(e.target.value)} />
-          </label>
-          <label>
-            等什么交付
-            <input required value={what} onChange={(e) => setWhat(e.target.value)} />
-          </label>
-          <label>
-            回看日
-            <input required type="date" value={review} onChange={(e) => setReview(e.target.value)} />
-          </label>
-          <label>
-            <input type="checkbox" checked={blocking} onChange={(e) => setBlocking(e.target.checked)} /> 阻塞下一步
-          </label>
-          <button disabled={!!busy}>保存等待项</button>
-        </form>
-      )}
-      <section>
-        <h3>
-          执行步骤{" "}
-          <small>
-            {meta.steps.filter((s) => s.done).length}/{meta.steps.length}
-          </small>
-          <button disabled={!!busy || task.completed} onClick={() => void act("拆解步骤", () => draft("steps"))}>
-            AI 拆解步骤
-          </button>
-        </h3>
-        <div className="aw-checklist">
-          {meta.steps.map((s) => (
-            <label className="aw-step" key={s.id}>
-              <input
-                type="checkbox"
-                disabled={!!busy || task.completed}
-                checked={s.done}
-                onChange={() =>
-                  change((m) => ({
-                    ...m,
-                    steps: m.steps.map((row) => (row.id === s.id ? { ...row, done: !row.done } : row)),
-                  }))
-                }
-              />
-              {s.text}
-            </label>
-          ))}
-          {!task.completed && (
+              <Target size={12} aria-hidden="true" />
+              {meta.day === day ? "已在今日计划" : "＋ 加入今日计划"}
+            </button>
+            <button disabled={task.completed} onClick={() => setWaitOpen((v) => !v)}>
+              <Clock3 size={12} aria-hidden="true" /> ＋ 新增等待项
+            </button>
+            <small>
+              截止：{due === day ? "今天" : due || "未排期"}
+              {dueTime && " " + dueTime}
+            </small>
+          </div>
+          {!!meta.waits.length && (
+            <section>
+              <h3>等待交付</h3>
+              {meta.waits.map((w) => (
+                <div
+                  className={"aw-wait " + (w.resolved ? "received" : w.blocking ? "blocking" : "parallel")}
+                  key={w.id}
+                >
+                  <div className="aw-wait-top">
+                    <span className="aw-wait-badge">
+                      {w.resolved ? "✓ 已收到" : w.blocking ? "阻塞下一步" : "并行等回复"}
+                    </span>
+                    <strong>{w.who}</strong>
+                    <time>{w.resolved || (w.review && w.review + " 回看")}</time>
+                  </div>
+                  <div className="aw-wait-deliverable">交付物：{w.what}</div>
+                  {!task.completed && (
+                    <div className="aw-wait-actions">
+                      {w.resolved ? (
+                        <button disabled={!!busy} onClick={() => resolveWait(w.id)}>
+                          恢复等待
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            disabled={!!busy}
+                            onClick={() =>
+                              void act("复制催办", async () => {
+                                await navigator.clipboard.writeText(
+                                  meta.draft?.mode === "followup" && meta.draft.waitId === w.id && !staleDraft
+                                    ? draftText
+                                    : "想跟进一下「" + w.what + "」，方便说一下目前进度和预计交付时间吗？",
+                                );
+                                setStatus("已复制催办");
+                              })
+                            }
+                          >
+                            复制催办
+                          </button>
+                          <button
+                            className="aw-wait-received"
+                            disabled={!!busy}
+                            onClick={() => resolveWait(w.id, day)}
+                          >
+                            标记已收到
+                          </button>
+                          <button
+                            disabled={!!busy}
+                            onClick={() => void act("起草催办", () => draft("followup", w.id))}
+                          >
+                            AI 起草催办
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </section>
+          )}
+          {waitOpen && (
             <form
+              className="aw-form"
               onSubmit={(e) => {
                 e.preventDefault();
-                if (!step.trim()) return;
-                const text = step.trim();
+                if (!who.trim() || !what.trim()) return;
                 void act("保存", async () => {
                   await update((m) => ({
                     ...m,
-                    steps: [...m.steps, { id: crypto.randomUUID(), text, done: false }],
+                    waits: [
+                      ...m.waits,
+                      { id: crypto.randomUUID(), who: who.trim(), what: what.trim(), review, blocking },
+                    ],
                   }));
-                  setStep("");
+                  setWaitOpen(false);
+                  setWho("");
+                  setWhat("");
                 });
               }}
             >
-              <input
-                aria-label="新步骤"
-                placeholder="＋ 添加具体步骤，回车保存…"
-                value={step}
-                onChange={(e) => setStep(e.target.value)}
-              />
+              <label>
+                等谁
+                <input required value={who} onChange={(e) => setWho(e.target.value)} />
+              </label>
+              <label>
+                等什么交付
+                <input required value={what} onChange={(e) => setWhat(e.target.value)} />
+              </label>
+              <label>
+                回看日
+                <input required type="date" value={review} onChange={(e) => setReview(e.target.value)} />
+              </label>
+              <label>
+                <input type="checkbox" checked={blocking} onChange={(e) => setBlocking(e.target.checked)} />{" "}
+                阻塞下一步
+              </label>
+              <button disabled={!!busy}>保存等待项</button>
             </form>
           )}
-        </div>
-      </section>
-      {recall.error && <p role="alert">资料检索失败 · {recall.error}</p>}
-      {!!pack.all.length && (
-        <section>
-          <h3>▧ 关联现场与规范备料包</h3>
-          <Materials
-            items={pack.recent}
-            journals={journals}
-            onOpen={onOpen}
-            onPin={pin}
-            caption="近期现场记录（14 天加权）"
-          />
-          <Materials
-            items={pack.long}
-            journals={journals}
-            onOpen={onOpen}
-            onPin={pin}
-            caption="长期规范与图纸（跨时间窗）"
-          />
-          <Materials
-            items={pack.related}
-            journals={journals}
-            onOpen={onOpen}
-            onPin={pin}
-            caption="已关联的其他来源"
-          />
-          <button disabled={!!busy} onClick={() => void act("起草评审", () => draft("draft"))}>
-            起草评审要点
-          </button>
-        </section>
-      )}
-      {meta.draft && (
-        <section>
-          <h3>
-            {meta.draft.mode === "steps" ? "建议步骤" : meta.draft.mode === "followup" ? "催办消息" : "评审草稿"}
-          </h3>
-          {staleDraft && <p role="status">滴答原任务已更新，请按当前材料重新起草。</p>}
-          {unboundFollowup && <p role="status">旧草稿未关联到具体交付，请在对应的等待卡重新起草。</p>}
-          <DraftView draft={meta.draft} journals={journals} onOpen={onOpen} />
-          <button
-            disabled={unboundFollowup}
-            onClick={() =>
-              void act("复制", async () => {
-                await navigator.clipboard.writeText(draftText);
-                setStatus("已复制草稿");
-              })
-            }
-          >
-            复制草稿
-          </button>
-          {meta.draft.mode === "steps" && !staleDraft && (
+          <section className="aw-detail-steps">
+            <h3>
+              <span>
+                执行步骤清单 ({meta.steps.filter((s) => s.done).length}/{meta.steps.length})
+              </span>
+              <button
+                disabled={!!busy || task.completed}
+                onClick={() => void act("拆解步骤", () => draft("steps"))}
+              >
+                <Sparkles size={12} aria-hidden="true" /> AI 补充拆解步骤
+              </button>
+            </h3>
+            <div className="aw-checklist">
+              {meta.steps.map((s) => (
+                <label className="aw-step" key={s.id}>
+                  <input
+                    type="checkbox"
+                    disabled={!!busy || task.completed}
+                    checked={s.done}
+                    onChange={() =>
+                      change((m) => ({
+                        ...m,
+                        steps: m.steps.map((row) => (row.id === s.id ? { ...row, done: !row.done } : row)),
+                      }))
+                    }
+                  />
+                  <span>{s.text}</span>
+                </label>
+              ))}
+              {!meta.steps.length && <p>暂无子步骤，回车添加或点右上角拆解</p>}
+              {!task.completed && (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!step.trim()) return;
+                    const text = step.trim();
+                    void act("保存", async () => {
+                      await update((m) => ({
+                        ...m,
+                        steps: [...m.steps, { id: crypto.randomUUID(), text, done: false }],
+                      }));
+                      setStep("");
+                    });
+                  }}
+                >
+                  <Plus size={14} aria-hidden="true" />
+                  <input
+                    aria-label="新步骤"
+                    placeholder="添加具体步骤，回车保存…"
+                    value={step}
+                    onChange={(e) => setStep(e.target.value)}
+                  />
+                </form>
+              )}
+            </div>
+          </section>
+          {recall.error && <p role="alert">资料检索失败 · {recall.error}</p>}
+          {(hasMaterials || meta.draft) && (
+            <section className="aw-detail-brief">
+              {hasMaterials && (
+                <div className="aw-brief-heading">
+                  <h3>
+                    <Layers3 size={14} aria-hidden="true" /> 关联现场与规范备料包
+                  </h3>
+                  <small>备料宽松召回 · 草稿结论逐条核对来源</small>
+                </div>
+              )}
+              <div className={hasMaterials ? "aw-brief-box" : undefined}>
+                <Materials
+                  items={pack.recent}
+                  journals={journals}
+                  onOpen={onOpen}
+                  onPin={pin}
+                  caption={
+                    <>
+                      <span>近期现场记录（14 天加权）</span>
+                      <small>可能相关 · 14 天加权</small>
+                    </>
+                  }
+                />
+                <Materials
+                  items={pack.long}
+                  journals={journals}
+                  onOpen={onOpen}
+                  onPin={pin}
+                  caption={
+                    <>
+                      <span>长期规范与图纸（跨时间窗）</span>
+                      <small>不受 14 天时间窗限制</small>
+                    </>
+                  }
+                />
+                <Materials
+                  items={pack.related}
+                  journals={journals}
+                  onOpen={onOpen}
+                  onPin={pin}
+                  caption="已关联的其他来源"
+                />
+                {hasMaterials && (
+                  <button disabled={!!busy} onClick={() => void act("起草评审", () => draft("draft"))}>
+                    起草评审要点
+                  </button>
+                )}
+                {meta.draft && (
+                  <div className="aw-detail-draft">
+                    <details open>
+                      <summary className="aw-draft-summary">
+                        <Sparkles size={14} aria-hidden="true" />
+                        {meta.draft.mode === "steps"
+                          ? "建议步骤"
+                          : meta.draft.mode === "followup"
+                            ? "催办消息"
+                            : "评审草稿"}
+                      </summary>
+                      <div className="aw-draft-body">
+                        {staleDraft && <p role="status">滴答原任务已更新，请按当前材料重新起草。</p>}
+                        {unboundFollowup && (
+                          <p role="status">旧草稿未关联到具体交付，请在对应的等待卡重新起草。</p>
+                        )}
+                        <DraftView draft={meta.draft} journals={journals} onOpen={onOpen} />
+                        <button
+                          disabled={unboundFollowup}
+                          onClick={() =>
+                            void act("复制", async () => {
+                              await navigator.clipboard.writeText(draftText);
+                              setStatus("已复制草稿");
+                            })
+                          }
+                        >
+                          复制草稿
+                        </button>
+                        {meta.draft.mode === "steps" && !staleDraft && (
+                          <button
+                            disabled={!!busy || task.completed}
+                            onClick={() =>
+                              change((m) => ({
+                                ...m,
+                                steps: [
+                                  ...m.steps,
+                                  ...m
+                                    .draft!.claims.filter((c) => !m.steps.some((s) => s.text === c.text))
+                                    .map((c) => ({ id: crypto.randomUUID(), text: c.text, done: false })),
+                                ],
+                              }))
+                            }
+                          >
+                            采纳为执行步骤
+                          </button>
+                        )}
+                        {!staleDraft && !unboundFollowup && (
+                          <SourceAppend
+                            key={draftText}
+                            task={task}
+                            text={draftText}
+                            workId={"workbench-" + task.sourceId}
+                          />
+                        )}
+                      </div>
+                    </details>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+          <section className="aw-detail-note">
+            <h3>任务备注与进展记录</h3>
+            <textarea
+              placeholder="记录推进备注、沟通结论或关键参数…"
+              aria-label="推进备注"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
             <button
-              disabled={!!busy || task.completed}
-              onClick={() =>
-                change((m) => ({
-                  ...m,
-                  steps: [
-                    ...m.steps,
-                    ...m
-                      .draft!.claims.filter((c) => !m.steps.some((s) => s.text === c.text))
-                      .map((c) => ({ id: crypto.randomUUID(), text: c.text, done: false })),
-                  ],
-                }))
-              }
+              disabled={!!busy || note === (meta.note || "")}
+              onClick={() => change((m) => ({ ...m, note }))}
             >
-              采纳为执行步骤
+              保存备注
             </button>
+            {note.trim() && (
+              <SourceAppend key={note} task={task} text={note} workId={"workbench-note-" + task.sourceId} />
+            )}
+          </section>
+          <details className="aw-detail-source">
+            <summary>原任务与来源操作</summary>
+            <ActionSourceFields key={task.contentRevision} task={task} />
+            {onOpen && (
+              <button onClick={() => void act("打开原任务", async () => onOpen(await resolveTaskResult(task)))}>
+                查看滴答原任务
+              </button>
+            )}
+            {!!topics.length && (
+              <details>
+                <summary>关联重点专题</summary>
+                {topics.map((topic) => (
+                  <label className="aw-step" key={topic.key}>
+                    <input
+                      type="checkbox"
+                      checked={meta.topics?.includes(topic.key) || false}
+                      onChange={() =>
+                        change((m) => ({
+                          ...m,
+                          topics: m.topics?.includes(topic.key)
+                            ? m.topics.filter((k) => k !== topic.key)
+                            : [...(m.topics || []), topic.key],
+                        }))
+                      }
+                    />
+                    {topic.name}
+                  </label>
+                ))}
+              </details>
+            )}
+            <button onClick={() => setPlanning((v) => (v ? "" : crypto.randomUUID()))}>
+              分析与来源操作记录
+            </button>
+          </details>
+          {planning && (
+            <TaskPlanningPanel
+              request={{
+                id: planning,
+                mode: "task",
+                label: task.title,
+                tasks: [task],
+                historyOnly: task.completed,
+              }}
+              onClose={() => setPlanning("")}
+              onTask={() => {}}
+              onSaved={() => void update((m) => m)}
+            />
           )}
-          {!staleDraft && !unboundFollowup && (
-            <SourceAppend key={draftText} task={task} text={draftText} workId={"workbench-" + task.sourceId} />
-          )}
-        </section>
-      )}
-      <section>
-        <h3>推进备注</h3>
-        <textarea
-          placeholder="记录推进备注、沟通结论或关键参数…"
-          aria-label="推进备注"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-        <button disabled={!!busy || note === (meta.note || "")} onClick={() => change((m) => ({ ...m, note }))}>
-          保存备注
-        </button>
-        {note.trim() && (
-          <SourceAppend key={note} task={task} text={note} workId={"workbench-note-" + task.sourceId} />
-        )}
-      </section>
-      <ActionSourceFields key={task.contentRevision} task={task} />
-      {onOpen && (
-        <button onClick={() => void act("打开原任务", async () => onOpen(await resolveTaskResult(task)))}>
-          查看滴答原任务
-        </button>
-      )}
-      {!!topics.length && (
-        <details>
-          <summary>关联重点专题</summary>
-          {topics.map((topic) => (
-            <label className="aw-step" key={topic.key}>
-              <input
-                type="checkbox"
-                checked={meta.topics?.includes(topic.key) || false}
-                onChange={() =>
-                  change((m) => ({
-                    ...m,
-                    topics: m.topics?.includes(topic.key)
-                      ? m.topics.filter((k) => k !== topic.key)
-                      : [...(m.topics || []), topic.key],
-                  }))
-                }
-              />
-              {topic.name}
-            </label>
-          ))}
-        </details>
-      )}
-      <button onClick={() => setPlanning((v) => (v ? "" : crypto.randomUUID()))}>分析与来源操作记录</button>
-      {planning && (
-        <TaskPlanningPanel
-          request={{ id: planning, mode: "task", label: task.title, tasks: [task], historyOnly: task.completed }}
-          onClose={() => setPlanning("")}
-          onTask={() => {}}
-          onSaved={() => void update((m) => m)}
-        />
-      )}
+        </div>
+      </div>
       <p role="status">{busy ? busy + "中…" : status}</p>
     </aside>
   );

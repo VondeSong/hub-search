@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Hourglass, Link2, Sparkles } from "lucide-react";
 import type { QuickJournalItem } from "./JournalRecords";
 import type { LibrarySummary, SearchResult } from "./SearchTypes";
 import type { UnifiedTask } from "./TaskWorkspacePresentation";
@@ -19,6 +20,7 @@ import { sourceNoteStatus, type TaskNoteAction } from "./TaskPlanningSource";
 
 type DecisionMap = Record<string, Decision>;
 type Receipt = { state: string; task?: UnifiedTask; error?: string; sourceId?: string };
+const CLUES_PER_PAGE = 3;
 export function ActionHarvester({
   tasks,
   journals,
@@ -60,7 +62,8 @@ export function ActionHarvester({
     [what, setWhat] = useState(""),
     [review, setReview] = useState(day),
     [blocking, setBlocking] = useState(false);
-  const [limit, setLimit] = useState(12),
+  const [limit, setLimit] = useState(CLUES_PER_PAGE),
+    [picker, setPicker] = useState(""),
     [matchSearch, setMatchSearch] = useState("");
   const [choices, setChoices] = useState<Record<string, string>>({}),
     [excluded, setExcluded] = useState<Set<string>>(new Set());
@@ -109,7 +112,9 @@ export function ActionHarvester({
       (d) =>
         d.clue &&
         ((d.state === "linking" && tasks.some((t) => identity(t) === d.taskKey)) ||
-          (["creating", "unknown"].includes(d.state) && d.libraryId && (!scope || scope.includes(d.libraryId)))),
+          (["creating", "unknown"].includes(d.state) &&
+            d.libraryId &&
+            (!scope || scope.includes(d.libraryId)))),
     )
     .map((d) => d.clue!);
   const clues = [...new Map([...retryClues, ...candidates].map((c) => [c.key, c])).values()].filter(
@@ -133,7 +138,11 @@ export function ActionHarvester({
   }, [tasks]);
   const normalizedMatchSearch = matchSearch.trim().toLowerCase();
   const writable = libraries.filter((l) => l.provider === "dida365" && (!scope || scope.includes(l.id)));
-  const destination = writable.some((l) => l.id === target) ? target : writable.length === 1 ? writable[0].id : "";
+  const destination = writable.some((l) => l.id === target)
+    ? target
+    : writable.length === 1
+      ? writable[0].id
+      : "";
   async function decide(key: string, d: Decision) {
     await write("clues", { ...read<DecisionMap>("clues", {}), [key]: d });
     setTick((v) => v + 1);
@@ -238,19 +247,18 @@ export function ActionHarvester({
     <section className="aw-harvester">
       <button className="aw-capture-toggle" aria-expanded={opened} onClick={() => setOpen(!opened)}>
         <strong>
-          ✦ 行动捕手 · {clues.length} 条新线索{matchCount > 0 && `（${matchCount} 条可关联已有任务）`}
+          <Sparkles size={14} aria-hidden="true" />
+          <span>
+            行动捕手 · {clues.length} 条新线索{matchCount > 0 && <>（{matchCount} 条可关联已有任务）</>}
+          </span>
         </strong>
         <small>{opened ? "收起 ▴" : "展开处理 ▾"}</small>
       </button>
       {readError && <p role="alert">笔记线索读取失败 · {readError}</p>}
       {opened && (
         <>
-          <div className="aw-tools">
-            <button disabled={!!busy || !clues.length} onClick={() => void run("model", refine)}>
-              用助手提炼线索
-            </button>
-            {!!excluded.size && <button onClick={() => setExcluded(new Set())}>查看本地预筛全部线索</button>}
-            {writable.length > 1 && (
+          {writable.length > 1 && (
+            <div className="aw-clue-footer">
               <select
                 aria-label="新任务的滴答资料库"
                 value={destination}
@@ -263,200 +271,270 @@ export function ActionHarvester({
                   </option>
                 ))}
               </select>
-            )}
-          </div>
-          <input
-            aria-label="筛选可关联任务"
-            placeholder="按标题查找可关联的任务"
-            value={matchSearch}
-            onChange={(e) => setMatchSearch(e.target.value)}
-          />
-          {clues.slice(0, limit).map((c) => {
-            const actionStatus = messageKey === c.key && (busy || msg) && (
-              <p role="status">{busy ? "正在处理…" : msg}</p>
-            );
-            const matches = possibleMatches.get(c.key) || [],
-              selected = tasks.find(
-                (t) => identity(t) === (choices[c.key] ?? (matches.length === 1 ? identity(matches[0]) : "")),
+            </div>
+          )}
+          <div className="aw-clue-list">
+            {clues.slice(0, limit).map((c) => {
+              const actionStatus = messageKey === c.key && (busy || msg) && (
+                <p role="status">{busy ? "正在处理…" : msg}</p>
               );
-            const saved = decisions[c.key];
-            const pending = saved?.requestId;
-            if (saved?.state === "linking") {
-              const linked = tasks.find((t) => identity(t) === saved.taskKey);
-              return (
-                <article key={c.key}>
-                  <strong>{c.title}</strong>
-                  <p>已关联本地备料，滴答备注待核对。</p>
-                  {linked && (
-                    <button disabled={!!busy} onClick={() => void run(c.key, () => link(linked, c))}>
-                      继续核对并追加到原任务
-                    </button>
-                  )}
-                  <button
-                    disabled={!!busy}
-                    onClick={() =>
-                      void run(c.key, () => decide(c.key, { state: "linked", taskKey: saved.taskKey }))
-                    }
-                  >
-                    仅保留本地关联
-                  </button>
-                  {actionStatus}
-                </article>
-              );
-            }
-            if (pending) {
-              const syncedMatches = tasks.filter(
-                (task) =>
-                  task.libraryId === saved.libraryId &&
-                  (saved.sourceId ? task.sourceId === saved.sourceId : task.title === saved.title),
-              );
-              return (
-                <article key={c.key}>
-                  <strong>{saved.title}</strong>
-                  <p>滴答采纳待确认。核对时会沿用原请求。</p>
-                  <button disabled={!!busy} onClick={() => void run(c.key, () => create(c, "backlog"))}>
-                    核对采纳回执
-                  </button>
-                  {syncedMatches.map((task) => (
+              const matches = possibleMatches.get(c.key) || [],
+                selected = tasks.find(
+                  (t) => identity(t) === (choices[c.key] ?? (matches.length === 1 ? identity(matches[0]) : "")),
+                );
+              const saved = decisions[c.key];
+              const pending = saved?.requestId;
+              const choosing = picker === c.key;
+              const collection = selected?.collectionName || selected?.documentTitle;
+              const togglePicker = () => {
+                setPicker(choosing ? "" : c.key);
+                setMatchSearch("");
+              };
+              if (saved?.state === "linking") {
+                const linked = tasks.find((t) => identity(t) === saved.taskKey);
+                return (
+                  <article key={c.key}>
+                    <strong>{c.title}</strong>
+                    <p>已关联本地备料，滴答备注待核对。</p>
+                    {linked && (
+                      <button disabled={!!busy} onClick={() => void run(c.key, () => link(linked, c))}>
+                        继续核对并追加到原任务
+                      </button>
+                    )}
                     <button
-                      key={identity(task)}
                       disabled={!!busy}
-                      onClick={() => void run(c.key, () => attach(task, c, saved.day || false, saved.wait))}
+                      onClick={() =>
+                        void run(c.key, () => decide(c.key, { state: "linked", taskKey: saved.taskKey }))
+                      }
                     >
-                      采用已同步的任务 · {task.collectionName || task.documentTitle} · {task.sourceId}
+                      仅保留本地关联
                     </button>
-                  ))}
-                  {actionStatus}
-                </article>
-              );
-            }
-            return (
-              <article key={c.key}>
-                <input
-                  aria-label="候选行动标题"
-                  maxLength={500}
-                  value={edits[c.key] ?? titles[c.key] ?? c.title}
-                  onChange={(e) => setEdits((v) => ({ ...v, [c.key]: e.target.value }))}
-                />
-                <Materials items={[c.material]} journals={journals} onOpen={onOpen} />
-                <blockquote>{c.material.text}</blockquote>
-                {selected ? (
-                  <div className="aw-match">
-                    🔗 匹配已有任务：<strong>{selected.title}</strong>
-                    <small>
-                      {" "}
-                      · {selected.collectionName || selected.documentTitle} · {selected.libraryName}
-                    </small>
-                  </div>
-                ) : matches.length > 1 ? (
-                  <div className="aw-match">发现 {matches.length} 项相似任务，请选择要关联的任务。</div>
-                ) : null}
-                <div className="aw-tools">
-                  <select
-                    aria-label="关联已有任务"
-                    value={selected ? identity(selected) : ""}
-                    onChange={(e) => setChoices((v) => ({ ...v, [c.key]: e.target.value }))}
-                  >
-                    <option value="">选择已有任务</option>
-                    {[
-                      ...matches,
-                      ...tasks
-                        .filter(
-                          (t) =>
-                            t.status === "open" &&
-                            !matches.includes(t) &&
-                            (!normalizedMatchSearch ||
-                              (t.title + " " + (t.collectionName || t.documentTitle || ""))
-                                .toLowerCase()
-                                .includes(normalizedMatchSearch)),
-                        )
-                        .slice(0, 40),
-                    ].map((t) => (
-                      <option key={identity(t)} value={identity(t)}>
-                        {t.title} · {t.collectionName || t.documentTitle} · {t.libraryName}
-                        {(duplicateTaskGroups.get(
-                          JSON.stringify([t.libraryId, t.collectionId || t.documentTitle, t.title]),
-                        ) || 0) > 1
-                          ? " · " + t.sourceId.slice(-6)
-                          : ""}
-                      </option>
+                    {actionStatus}
+                  </article>
+                );
+              }
+              if (pending) {
+                const syncedMatches = tasks.filter(
+                  (task) =>
+                    task.libraryId === saved.libraryId &&
+                    (saved.sourceId ? task.sourceId === saved.sourceId : task.title === saved.title),
+                );
+                return (
+                  <article key={c.key}>
+                    <strong>{saved.title}</strong>
+                    <p>滴答采纳待确认。核对时会沿用原请求。</p>
+                    <button disabled={!!busy} onClick={() => void run(c.key, () => create(c, "backlog"))}>
+                      核对采纳回执
+                    </button>
+                    {syncedMatches.map((task) => (
+                      <button
+                        key={identity(task)}
+                        disabled={!!busy}
+                        onClick={() => void run(c.key, () => attach(task, c, saved.day || false, saved.wait))}
+                      >
+                        采用已同步的任务 · {task.collectionName || task.documentTitle} · {task.sourceId}
+                      </button>
                     ))}
-                  </select>
-                  {selected && (
-                    <button
-                      className="aw-primary"
-                      disabled={!!busy}
-                      onClick={() => void run(c.key, () => link(selected, c))}
-                    >
-                      关联并补充至已有任务
+                    {actionStatus}
+                  </article>
+                );
+              }
+              return (
+                <article key={c.key}>
+                  <textarea
+                    className="aw-clue-title"
+                    aria-label="候选行动标题"
+                    rows={1}
+                    maxLength={500}
+                    value={edits[c.key] ?? titles[c.key] ?? c.title}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.preventDefault();
+                    }}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\r?\n/g, " ");
+                      setEdits((v) => ({ ...v, [c.key]: value }));
+                    }}
+                  />
+                  <div className="aw-clue-meta">
+                    <Materials items={[c.material]} journals={journals} onOpen={onOpen} appearance="clue" />
+                    {collection && (
+                      <span>
+                        归属：<b>{collection}</b>
+                      </span>
+                    )}
+                  </div>
+                  <blockquote className="aw-clue-quote">{c.material.text}</blockquote>
+                  {selected ? (
+                    <button type="button" className="aw-match" aria-expanded={choosing} onClick={togglePicker}>
+                      <Link2 size={14} aria-hidden="true" />
+                      <span title={selected.title}>
+                        匹配已有任务：<strong>{selected.title}</strong>
+                      </span>
                     </button>
+                  ) : matches.length > 1 ? (
+                    <button type="button" className="aw-match" aria-expanded={choosing} onClick={togglePicker}>
+                      <Link2 size={14} aria-hidden="true" />
+                      <span>发现 {matches.length} 项相似任务，请选择要关联的任务。</span>
+                    </button>
+                  ) : null}
+                  {choosing && (
+                    <div className="aw-clue-picker">
+                      <input
+                        aria-label="筛选可关联任务"
+                        placeholder="按标题查找可关联的任务"
+                        value={matchSearch}
+                        onChange={(e) => setMatchSearch(e.target.value)}
+                      />
+                      <select
+                        aria-label="关联已有任务"
+                        value={selected ? identity(selected) : ""}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setChoices((v) => ({ ...v, [c.key]: value }));
+                          setPicker("");
+                        }}
+                      >
+                        <option value="">选择已有任务</option>
+                        {[
+                          ...matches,
+                          ...tasks
+                            .filter(
+                              (t) =>
+                                t.status === "open" &&
+                                !matches.includes(t) &&
+                                (!normalizedMatchSearch ||
+                                  (t.title + " " + (t.collectionName || t.documentTitle || ""))
+                                    .toLowerCase()
+                                    .includes(normalizedMatchSearch)),
+                            )
+                            .slice(0, 40),
+                        ].map((t) => (
+                          <option key={identity(t)} value={identity(t)}>
+                            {t.title} · {t.collectionName || t.documentTitle} · {t.libraryName}
+                            {(duplicateTaskGroups.get(
+                              JSON.stringify([t.libraryId, t.collectionId || t.documentTitle, t.title]),
+                            ) || 0) > 1
+                              ? " · " + t.sourceId.slice(-6)
+                              : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   )}
-                </div>
-                <div className="aw-tools">
-                  <button
-                    disabled={!!busy || !destination}
-                    onClick={() => void run(c.key, () => create(c, "backlog"))}
-                  >
-                    {matches.length || selected ? "仍新建待办" : "＋ 采纳到待办"}
-                  </button>
-                  <button
-                    disabled={!!busy || !destination || planFull}
-                    title={planFull ? "今日计划已满" : undefined}
-                    onClick={() => void run(c.key, () => create(c, "today"))}
-                  >
-                    采纳并排入今天
-                  </button>
-                  <button
-                    disabled={!!busy || !destination}
-                    onClick={() => {
-                      setWaiting(c.key);
-                      setWho("");
-                      setWhat(edits[c.key] ?? titles[c.key] ?? c.title);
-                      setReview(day);
-                      setBlocking(false);
-                    }}
-                  >
-                    设为等待
-                  </button>
-                  <button
-                    disabled={!!busy}
-                    onClick={() => void run(c.key, () => decide(c.key, { state: "ignored" }))}
-                  >
-                    忽略
-                  </button>
-                </div>
-                {waiting === c.key && (
-                  <form
-                    className="aw-form"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (who.trim() && what.trim()) void run(c.key, () => create(c, "wait"));
-                    }}
-                  >
-                    <label>
-                      等谁
-                      <input required value={who} onChange={(e) => setWho(e.target.value)} />
-                    </label>
-                    <label>
-                      等什么交付
-                      <input required value={what} onChange={(e) => setWhat(e.target.value)} />
-                    </label>
-                    <label>
-                      回看日
-                      <input required type="date" value={review} onChange={(e) => setReview(e.target.value)} />
-                    </label>
-                    <label>
-                      <input type="checkbox" checked={blocking} onChange={(e) => setBlocking(e.target.checked)} />
-                      阻塞下一步
-                    </label>
-                    <button disabled={!!busy}>采纳并保存等待项</button>
-                  </form>
-                )}
-                {actionStatus}
-              </article>
-            );
-          })}
-          {limit < clues.length && <button onClick={() => setLimit(limit + 12)}>查看更多线索</button>}
+                  <div className="aw-clue-actions">
+                    <div className="aw-clue-actions-left">
+                      {selected && (
+                        <button
+                          className="aw-primary"
+                          disabled={!!busy}
+                          onClick={() => void run(c.key, () => link(selected, c))}
+                        >
+                          <Link2 size={13} aria-hidden="true" /> 关联并补充至已有任务
+                        </button>
+                      )}
+                      <button
+                        className={selected ? "aw-clue-pill" : "aw-primary"}
+                        disabled={!!busy || !destination}
+                        onClick={() => void run(c.key, () => create(c, "backlog"))}
+                      >
+                        {matches.length || selected ? "仍新建待办" : "＋ 采纳到待办"}
+                      </button>
+                      {!selected && (
+                        <>
+                          <button
+                            className="aw-clue-pill"
+                            disabled={!!busy || !destination || planFull}
+                            title={planFull ? "今日计划已满" : undefined}
+                            onClick={() => void run(c.key, () => create(c, "today"))}
+                          >
+                            采纳并排入今天
+                          </button>
+                          <button
+                            className="aw-clue-pill"
+                            disabled={!!busy || !destination}
+                            onClick={() => {
+                              setWaiting(c.key);
+                              setWho("");
+                              setWhat(edits[c.key] ?? titles[c.key] ?? c.title);
+                              setReview(day);
+                              setBlocking(false);
+                            }}
+                          >
+                            <Hourglass size={13} aria-hidden="true" /> 设为等待
+                          </button>
+                          {!matches.length && (
+                            <button
+                              className="aw-clue-dismiss"
+                              type="button"
+                              aria-label="关联已有任务"
+                              title="关联已有任务"
+                              aria-expanded={choosing}
+                              onClick={togglePicker}
+                            >
+                              <Link2 size={13} aria-hidden="true" />
+                            </button>
+                          )}
+                        </>
+                      )}
+                      <button
+                        className="aw-clue-dismiss"
+                        disabled={!!busy}
+                        onClick={() => void run(c.key, () => decide(c.key, { state: "ignored" }))}
+                      >
+                        忽略
+                      </button>
+                    </div>
+                  </div>
+                  {waiting === c.key && (
+                    <form
+                      className="aw-form"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (who.trim() && what.trim()) void run(c.key, () => create(c, "wait"));
+                      }}
+                    >
+                      <label>
+                        等谁
+                        <input required value={who} onChange={(e) => setWho(e.target.value)} />
+                      </label>
+                      <label>
+                        等什么交付
+                        <input required value={what} onChange={(e) => setWhat(e.target.value)} />
+                      </label>
+                      <label>
+                        回看日
+                        <input
+                          required
+                          type="date"
+                          value={review}
+                          onChange={(e) => setReview(e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={blocking}
+                          onChange={(e) => setBlocking(e.target.checked)}
+                        />
+                        阻塞下一步
+                      </label>
+                      <button disabled={!!busy}>采纳并保存等待项</button>
+                    </form>
+                  )}
+                  {actionStatus}
+                </article>
+              );
+            })}
+          </div>
+          <div className="aw-clue-footer">
+            {limit < clues.length && (
+              <button onClick={() => setLimit(limit + CLUES_PER_PAGE)}>查看更多线索</button>
+            )}
+            <button disabled={!!busy || !clues.length} onClick={() => void run("model", refine)}>
+              用助手提炼线索
+            </button>
+            {!!excluded.size && <button onClick={() => setExcluded(new Set())}>查看本地预筛全部线索</button>}
+          </div>
         </>
       )}
       {(msg || busy) && (!opened || !clues.slice(0, limit).some((clue) => clue.key === messageKey)) && (

@@ -180,13 +180,6 @@
   width: 100%;
   font-weight: 600 !important;
 }
-.aw-harvester article {
-  padding: 12px;
-  border-top: 1px solid color-mix(in srgb, currentColor 10%, transparent);
-}
-.aw-harvester article > input {
-  width: 100%;
-}
 .aw-tools,
 .aw-tabs,
 .aw-add {
@@ -373,24 +366,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  cursor: pointer;
+  gap: 8px;
+  border: 0;
   user-select: none;
-}
-.aw-shell .aw-capture-toggle {
-  padding: 10px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.aw-capture-toggle strong {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #92400e;
 }
 .aw-capture-toggle strong {
   min-width: 0;
@@ -492,6 +470,52 @@
   border-color: rgba(5, 150, 105, 0.24);
   opacity: 0.85;
 }
+.aw-wait-top,
+.aw-wait-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.aw-wait-badge {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(217, 119, 6, 0.14);
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 600;
+}
+.aw-wait.blocking .aw-wait-badge {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}
+.aw-wait.received .aw-wait-badge {
+  background: rgba(5, 150, 105, 0.14);
+  color: #047857;
+}
+.aw-wait-top time {
+  margin-inline-start: auto;
+  color: var(--ink-tertiary);
+  font: 11px var(--font-mono);
+}
+.aw-wait-deliverable {
+  color: var(--ink-secondary);
+  font-size: 12.5px;
+}
+.aw-wait.received .aw-wait-deliverable {
+  text-decoration: line-through;
+}
+.aw-shell .aw-wait-actions button {
+  padding: 2px 9px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--bg-subtle);
+  font-size: 11px;
+}
+.aw-shell .aw-wait-actions .aw-wait-received {
+  background: var(--accent-ink);
+  color: var(--bg-paper);
+}
 .aw-shell .aw-step {
   display: flex;
   align-items: flex-start;
@@ -511,16 +535,7 @@
   flex-direction: column;
   gap: 10px;
 }
-.aw-harvester article {
-  padding: 12px 14px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-  background: rgba(255, 255, 255, 0.72);
-  transition: background 140ms ease;
-}
-.aw-harvester article {
+.aw-clue-list > article {
   padding: 13px 14px;
   display: flex;
   flex-direction: column;
@@ -528,20 +543,11 @@
   background: rgba(255, 255, 255, 0.78);
   transition: background 140ms ease;
 }
-.aw-harvester blockquote {
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--ink-tertiary);
-  padding-left: 9px;
-  border-left: 2px solid rgba(217, 119, 6, 0.35);
+.aw-clue-list > article + article {
+  border-top: 0.5px solid var(--hairline);
 }
-.aw-harvester blockquote {
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--ink-secondary);
-  padding: 2px 0 2px 10px;
-  border-left: 2px solid rgba(217, 119, 6, 0.42);
-  word-break: break-word;
+.aw-clue-list > article:hover {
+  background: var(--bg-paper);
 }
 .aw-claims li {
   padding: 9px 11px;
@@ -770,9 +776,9 @@
   display: flex;
   flex-wrap: nowrap;
   margin-top: 0;
-  margin-bottom: 20px;
-  padding: 10px 14px;
-  gap: 10px;
+  margin-bottom: 16.875px;
+  padding: 8.4375px 11.8125px;
+  gap: 8.4375px;
   border-radius: 12px;
 }
 .aw-shell .aw-add input {
@@ -860,11 +866,6 @@
   font-size: 16.5px;
   line-height: 1.38;
   margin: 0 0 12px;
-}
-.aw-detail > .aw-tools button {
-  border-radius: 99px;
-  background: var(--bg-subtle);
-  font-size: 11.5px;
 }
 .aw-detail section {
   border: 0;
@@ -999,10 +1000,6 @@
   color: #007aff;
   background: var(--accent-soft);
 }
-.aw-detail > .aw-tools {
-  border-bottom: 0.5px solid var(--hairline);
-  padding-bottom: 16px;
-}
 .aw-detail h3 > button {
   margin-left: auto;
   color: var(--accent);
@@ -1014,9 +1011,6 @@
   border-radius: 12px;
   background: var(--bg-surface);
   overflow: hidden;
-}
-.aw-checklist form {
-  padding: 8px 12px;
 }
 .aw-shell .aw-checklist input:not([type="checkbox"]) {
   border: 0;
@@ -1133,40 +1127,380 @@
   margin-top: 10px;
 }
 
-.aw-harvester article > input {
-  border: 0 !important;
-  padding: 0 !important;
-  font-weight: 600 !important;
+.aw-capture-toggle strong > span,
+.aw-match > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.aw-harvester .aw-tools button,
-.aw-harvester .aw-tools select {
-  font-size: 11.5px;
-  border-radius: 99px;
+.aw-clue-list {
+  border-top: 0.5px solid rgba(217, 119, 6, 0.22);
 }
-.aw-shell .aw-harvester .aw-primary {
-  background: #18181b;
-  color: white;
+.aw-shell .aw-clue-title {
+  display: block;
+  width: 100%;
+  field-sizing: content;
+  min-height: 1lh;
+  padding: 0;
+  border: 0;
+  resize: none;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
-.aw-harvester .aw-match {
-  background: rgba(37, 99, 235, 0.07);
-  border: 0.5px solid rgba(37, 99, 235, 0.18);
-  padding: 7px 10px;
-  color: #1d4ed8;
-  border-radius: 8px;
+.aw-clue-meta,
+.aw-clue-actions,
+.aw-clue-actions-left,
+.aw-clue-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.aw-clue-meta {
+  gap: 6px 8px;
+  font-size: 11px;
+  color: var(--ink-tertiary);
+}
+.aw-clue-meta > span > b {
+  color: var(--ink-secondary);
+}
+.aw-shell .aw-clue-material {
+  max-width: 100%;
+}
+.aw-shell .aw-clue-material .aw-clue-source {
+  width: fit-content;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1.5px 7px;
+  border: 0;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--ink-secondary);
+  background: var(--bg-hover);
+}
+.aw-clue-source span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.aw-clue-material .aw-media-strip {
+  margin-top: 6px;
+}
+.aw-shell .aw-harvester .aw-clue-quote {
+  width: 100%;
+  margin: 0;
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid rgba(217, 119, 6, 0.42);
+  color: var(--ink-secondary);
   font-size: 12px;
-  margin: 6px 0;
+  line-height: 1.6;
 }
-.aw-harvester > .aw-tools {
-  padding-inline: 14px;
+.aw-shell .aw-harvester .aw-match {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: rgba(37, 99, 235, 0.07);
+  border: 0.5px solid rgba(37, 99, 235, 0.2);
+  padding: 6px 9px;
+  color: #1e40af;
+  border-radius: 8px;
+  font-size: 11.5px;
 }
-.aw-harvester article .aw-materials {
-  margin-block: 4px;
+.aw-match svg,
+.aw-clue-material svg {
+  flex-shrink: 0;
+}
+.aw-clue-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(136px, 100%), 1fr));
+  width: 100%;
+  gap: 6px;
+}
+.aw-clue-actions {
+  gap: 8px;
+  padding-top: 2px;
+}
+.aw-clue-actions-left,
+.aw-clue-footer {
+  gap: 6px;
+}
+.aw-clue-footer {
+  border-top: 0.5px solid var(--hairline);
+  padding: 4px 14px;
+}
+.aw-shell .aw-clue-actions button,
+.aw-shell .aw-clue-footer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.aw-shell .aw-clue-actions .aw-primary,
+.aw-shell .aw-detail-controls button[aria-pressed="true"] {
+  background: var(--accent-ink);
+  color: var(--bg-paper);
+}
+.aw-shell .aw-clue-pill {
+  background: var(--bg-subtle);
+}
+.aw-shell .aw-clue-actions .aw-clue-dismiss,
+.aw-shell .aw-clue-footer button {
+  padding-inline: 6px;
+  color: var(--ink-tertiary);
+}
+
+.aw-shell .aw-detail {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+.aw-detail > header {
+  flex: 0 0 37.125px;
+  margin: 0;
+}
+.aw-detail > header .aw-origin > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.aw-detail > header > button:nth-child(2) {
+  background: var(--bg-subtle);
+}
+.aw-shell .aw-detail > header .aw-ask {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-color: rgba(0, 122, 255, 0.24);
+}
+.aw-detail-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 20px 22px 72px;
+}
+.aw-detail-content {
+  margin-inline: auto;
+  max-width: 65ch;
 }
 .aw-detail-title {
   align-items: flex-start;
+  gap: 10px;
 }
 .aw-shell .aw-detail-title h2 {
-  margin-top: 0;
+  margin: 0;
+  font-size: 16.5px;
+  font-weight: 600;
+}
+.aw-shell .aw-detail-title .task-status-control[aria-checked="false"] {
+  width: 16px;
+  height: 16px;
+  color: var(--hairline-strong);
+}
+.aw-detail-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.aw-shell .aw-detail-controls > :is(button, small) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 10px;
+  background: var(--bg-subtle);
+  font-size: 11.5px;
+  color: var(--ink-secondary);
+}
+.aw-shell .aw-detail-controls > small {
+  color: var(--ink-tertiary);
+  font-family: var(--font-mono);
+}
+.aw-detail-content > section {
+  border-top: 0.5px solid var(--hairline);
+  margin: 20px 0 0;
+  padding-top: 12px;
+}
+.aw-detail-content h3 {
+  margin: 0 0 8px;
+  color: var(--ink-secondary);
+  font-size: 12px;
+}
+.aw-detail-steps h3 button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+.aw-detail-steps .aw-checklist {
+  border-radius: 11px;
+  padding: 6px;
+}
+.aw-checklist .aw-step input {
+  flex: none;
+  margin: 3px 0 0;
+  accent-color: #2563eb;
+}
+.aw-checklist .aw-step input:checked + span {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+.aw-checklist > p {
+  color: var(--ink-muted);
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.aw-checklist form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 0.5px solid var(--hairline);
+  padding: 4px 8px 2px;
+  color: var(--ink-muted);
+}
+.aw-shell .aw-checklist input:not([type="checkbox"]) {
+  padding: 4px 0;
+  color: var(--ink-primary);
+  font-size: 12.5px;
+}
+.aw-brief-heading {
+  margin-bottom: 12px;
+}
+.aw-brief-heading h3 {
+  margin-bottom: 1px;
+  font-size: 12.5px;
+  color: var(--ink-primary);
+}
+.aw-brief-heading svg,
+.aw-draft-summary svg {
+  color: #2563eb;
+}
+.aw-brief-heading > small,
+.aw-brief-box h4 small {
+  font-size: 11px;
+  color: var(--ink-tertiary);
+}
+.aw-brief-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 0.5px solid var(--hairline);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--bg-surface);
+}
+.aw-detail .aw-brief-box .aw-materials {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: 6px;
+}
+.aw-brief-box h4 {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink-tertiary);
+  font-size: 11px;
+}
+.aw-shell .aw-materials:not(.aw-clue-material) > details {
+  margin: 0;
+}
+.aw-materials:not(.aw-clue-material) > details > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.aw-file-icon {
+  flex-shrink: 0;
+}
+.aw-file-icon[data-type="PDF"] {
+  background: rgba(229, 72, 77, 0.12);
+  color: #e5484d;
+}
+.aw-file-icon[data-type="OS"] {
+  background: rgba(124, 58, 237, 0.12);
+  color: #7c3aed;
+}
+.aw-file-icon:is([data-type="XLSX"], [data-type="XLS"]) {
+  background: rgba(5, 150, 105, 0.12);
+  color: #059669;
+}
+.aw-material-name {
+  min-width: 0;
+}
+.aw-material-name > :is(b, small) {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aw-material-name small {
+  color: var(--ink-tertiary);
+  font-size: 11px;
+}
+.aw-brief-box > button,
+.aw-detail-note > button {
+  align-self: flex-start;
+  border-radius: 999px;
+  font-size: 11.5px;
+}
+.aw-draft-summary,
+.aw-draft-body {
+  border: 0.5px solid var(--hairline);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--bg-paper);
+}
+.aw-draft-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.aw-draft-summary::after {
+  content: "展开核对 ▾";
+  margin-left: auto;
+  font: 11px var(--font-mono);
+  color: var(--ink-tertiary);
+}
+.aw-detail-draft details[open] > .aw-draft-summary::after {
+  content: "收起 ▴";
+}
+.aw-draft-body {
+  margin-top: 8px;
+}
+.aw-shell .aw-detail-note textarea {
+  min-height: 96px;
+  padding: 10px 12px;
+  border: 0.5px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--bg-surface);
+}
+.aw-detail-source {
+  margin-top: 12px;
+  color: var(--ink-secondary);
+  font-size: 12px;
 }
 
 .aw-media-strip
@@ -1201,9 +1535,6 @@
 .aw-scroll .aw-list h3 small,
 .aw-total {
   font-variant-numeric: tabular-nums;
-}
-.aw-shell .aw-detail > .aw-tools {
-  flex-wrap: wrap;
 }
 
 .aw-alert-dot {
