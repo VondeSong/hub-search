@@ -165,7 +165,11 @@ export function extractClues(materials: Material[]): Clue[] {
       const key = JSON.stringify([source.id, quote]);
       found.set(key, {
         key,
-        title: quote.replace(/^\s*(?:[-*]\s*)?\[ \]\s*|^TODO[:：]?\s*/gi, "") || quote,
+        title:
+          quote
+            .replace(/^\s*(?:[-*]\s*)?\[ \]\s*|^TODO[:：]?\s*/gi, "")
+            .replace(/\*\*|__/g, "")
+            .trim() || quote,
         material: { ...source, originId: source.id, id: key, text: quote },
       });
     }

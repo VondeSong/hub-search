@@ -466,6 +466,7 @@ describe("行动工作台", () => {
     );
     await click(button("行动捕手"));
     await click(button("采纳并排入今天"));
+    await click(button("确认采纳并排入今天"));
     expect(button("采纳并排入今天")).toBeUndefined();
     expect(button("关联并补充至已有任务")).toBeUndefined();
     await click(button("核对采纳回执"));
@@ -492,6 +493,7 @@ describe("行动工作台", () => {
     await render(<ActionHarvester {...props} tasks={[]} />);
     await click(button("行动捕手"));
     await click(button("＋ 采纳到待办"));
+    await click(button("确认采纳到待办"));
     const matchingTitle = extractClues([{ id: "j", title: "日志", text: journal.body }])[0].title;
     await render(
       <ActionHarvester
@@ -1087,7 +1089,7 @@ describe("行动工作台", () => {
     await click(button("一键顺延未完计划至明天"));
     expect(deferred).toEqual([{ id: t.id, nextDay: "2026-11-27" }]);
   });
-  it("行动捕手二级采纳恢复原请求、目标清单、高优和今日计划", async () => {
+  it("行动捕手先确认采纳去向，核对回执时恢复原请求和各项选择", async () => {
     const payloads: Record<string, unknown>[] = [];
     vi.mocked(invoke).mockImplementation(async (_command, params) => {
       if (workbenchAction(params) === "createTask") {
@@ -1114,7 +1116,8 @@ describe("行动工作台", () => {
       />,
     );
     await click(button("行动捕手"));
-    await click(button("选清单/高优"));
+    await click(button("采纳并排入今天"));
+    expect(payloads).toHaveLength(0);
     const drawer = host.querySelector<HTMLFormElement>(".aw-clue-drawer")!;
     const selects = drawer.querySelectorAll("select");
     await act(async () => {
@@ -1123,9 +1126,15 @@ describe("行动工作台", () => {
       selects[1].value = "5";
       selects[1].dispatchEvent(new Event("change", { bubbles: true }));
     });
-    const checkbox = drawer.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
-    await click(checkbox);
-    await act(async () => drawer.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    const [, todayMode, waitMode] = drawer.querySelectorAll<HTMLButtonElement>(".aw-clue-drawer-tabs button");
+    await click(waitMode);
+    await click(button("+3天"));
+    await click(todayMode);
+    await click(waitMode);
+    expect(drawer.querySelector<HTMLInputElement>('input[type="date"]')?.value).toBe("2026-11-28");
+    await click(todayMode);
+    expect(payloads).toHaveLength(0);
+    await click(button("确认采纳并排入今天"));
     expect(payloads[0]).toMatchObject({ projectId: "project", priority: 5 });
     await click(button("核对采纳回执"));
     expect(payloads).toHaveLength(2);

@@ -1445,23 +1445,55 @@
   background: var(--bg-subtle) !important;
 }
 .aw-clue-drawer {
-  margin-top: 6px;
-  padding: 11px 12px !important;
-  border-radius: 10px;
+  margin-top: 8px;
+  padding: 12px 13px !important;
+  border-radius: 12px;
   background: var(--bg-surface);
   border: 0.5px solid var(--hairline-strong);
+  box-shadow: var(--card-shadow);
+  gap: 10px !important;
+}
+.aw-clue-drawer-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--bg-subtle);
+  border: 0.5px solid var(--hairline);
+}
+.aw-clue-drawer-tabs button {
+  height: 27px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+}
+.aw-clue-drawer-tabs button[aria-pressed="true"] {
+  background: var(--bg-paper);
+  color: var(--ink-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 .aw-clue-drawer-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
   gap: 8px;
 }
-.aw-clue-drawer-grid label {
+.aw-clue-drawer-grid label,
+.aw-clue-quick-dates {
+  display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 4px;
   font-size: 11.5px;
   color: var(--ink-secondary);
+}
+.aw-clue-quick-dates .aw-tools {
+  margin: 0;
 }
 .aw-clue-drawer-foot {
   display: flex;
@@ -1469,8 +1501,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding-top: 4px;
+  padding-top: 6px;
   border-top: 0.5px solid var(--hairline);
+}
+.aw-clue-drawer-foot .aw-tools {
+  margin: 0;
 }
 .aw-harvester article .aw-materials {
   margin-block: 4px;

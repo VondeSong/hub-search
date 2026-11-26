@@ -22,8 +22,9 @@ import { read, write, identity, type ActionMeta, type Decision, type Wait } from
 import { Materials } from "./ActionMaterials";
 import { sourceNoteStatus, type TaskNoteAction } from "./TaskPlanningSource";
 
-type AdoptionOptions = { projectId?: string; priority?: number };
-type DecisionMap = Record<string, Decision & AdoptionOptions>;
+type AdoptionOptions = Pick<Decision, "projectId" | "priority">;
+type DecisionMap = Record<string, Decision>;
+type AdoptionMode = "backlog" | "today" | "wait";
 type Receipt = { state: string; task?: UnifiedTask; error?: string; sourceId?: string };
 const CLUES_PER_PAGE = 3;
 export function ActionHarvester({
@@ -63,8 +64,7 @@ export function ActionHarvester({
     [target, setTarget] = useState("");
   const [edits, setEdits] = useState<Record<string, string>>({}),
     [panelKey, setPanelKey] = useState(""),
-    [panelMode, setPanelMode] = useState<"adopt" | "wait">("adopt"),
-    [adoptKind, setAdoptKind] = useState<"backlog" | "today">("backlog"),
+    [panelMode, setPanelMode] = useState<AdoptionMode>("backlog"),
     [adoptProject, setAdoptProject] = useState(""),
     [adoptPriority, setAdoptPriority] = useState<0 | 5>(0),
     [who, setWho] = useState(""),
@@ -95,6 +95,7 @@ export function ActionHarvester({
       setDeepPicked([]);
       setDeepClues([]);
       setDeepOpen(false);
+      setPanelKey("");
     }
     setReadError("");
     native<unknown>("workbenchPassages", { scope }).then(
@@ -185,7 +186,7 @@ export function ActionHarvester({
     }
     return [...byId.entries()].sort((a, b) => a[1].localeCompare(b[1], "zh-CN"));
   }, [tasks, destination]);
-  async function decide(key: string, d: Decision & AdoptionOptions) {
+  async function decide(key: string, d: Decision) {
     await write("clues", { ...read<DecisionMap>("clues", {}), [key]: d });
     setTick((v) => v + 1);
   }
@@ -242,7 +243,7 @@ export function ActionHarvester({
   }
   async function create(
     c: Clue,
-    kind: "backlog" | "today" | "wait",
+    kind: AdoptionMode,
     options?: AdoptionOptions,
   ) {
     const old = read<DecisionMap>("clues", {})[c.key];
@@ -287,6 +288,23 @@ export function ActionHarvester({
     await onRefresh();
     setPanelKey("");
     setMsg(receipt.error || "滴答已回读确认，来源已保留。");
+  }
+  function openAdoption(c: Clue, mode: AdoptionMode, toggle = false) {
+    if (toggle && panelKey === c.key && panelMode === mode) {
+      setPanelKey("");
+      return;
+    }
+    if (panelKey !== c.key) {
+      const parsed = parseWaitFromText(edits[c.key] ?? titles[c.key] ?? c.title, day);
+      setAdoptProject("");
+      setAdoptPriority(0);
+      setWho(parsed.who);
+      setWhat(parsed.what);
+      setReview(parsed.review);
+      setBlocking(parsed.blocking);
+    }
+    setPanelKey(c.key);
+    setPanelMode(mode);
   }
   async function refine() {
     const batch = clues.filter((clue) => !decisions[clue.key]).slice(0, 32);
@@ -352,7 +370,10 @@ export function ActionHarvester({
               <select
                 aria-label="新任务的滴答资料库"
                 value={destination}
-                onChange={(e) => setTarget(e.target.value)}
+                onChange={(e) => {
+                  setTarget(e.target.value);
+                  setAdoptProject("");
+                }}
               >
                 <option value="">选择滴答资料库</option>
                 {writable.map((l) => (
@@ -557,16 +578,18 @@ export function ActionHarvester({
                       )}
                       <button
                         className={!matches.length && !selected ? "aw-primary" : "aw-clue-pill"}
+                        aria-expanded={panelKey === c.key && panelMode === "backlog"}
                         disabled={!!busy || !destination}
-                        onClick={() => void run(c.key, () => create(c, "backlog"))}
+                        onClick={() => openAdoption(c, "backlog", true)}
                       >
                         {matches.length || selected ? "仍新建待办" : "＋ 采纳到待办"}
                       </button>
                       <button
                         className="aw-clue-pill"
+                        aria-expanded={panelKey === c.key && panelMode === "today"}
                         disabled={!!busy || !destination || planFull}
                         title={planFull ? "今日计划已满" : undefined}
-                        onClick={() => void run(c.key, () => create(c, "today"))}
+                        onClick={() => openAdoption(c, "today", true)}
                       >
                         采纳并排入今天
                       </button>
@@ -574,20 +597,7 @@ export function ActionHarvester({
                         className="aw-clue-pill"
                         aria-expanded={panelKey === c.key && panelMode === "wait"}
                         disabled={!!busy || !destination}
-                        onClick={() => {
-                          if (panelKey === c.key && panelMode === "wait") {
-                            setPanelKey("");
-                            return;
-                          }
-                          const parsed = parseWaitFromText(edits[c.key] ?? titles[c.key] ?? c.title, day);
-                          setPanelKey(c.key);
-                          setPanelMode("wait");
-                          setAdoptProject("");
-                          setWho(parsed.who);
-                          setWhat(parsed.what);
-                          setReview(parsed.review);
-                          setBlocking(parsed.blocking);
-                        }}
+                        onClick={() => openAdoption(c, "wait", true)}
                       >
                         <Hourglass size={13} aria-hidden="true" /> 设为等待
                       </button>
@@ -607,24 +617,6 @@ export function ActionHarvester({
                       )}
                       <button
                         className="aw-clue-ghost"
-                        aria-expanded={panelKey === c.key && panelMode === "adopt"}
-                        disabled={!!busy || !destination}
-                        onClick={() => {
-                          if (panelKey === c.key && panelMode === "adopt") {
-                            setPanelKey("");
-                            return;
-                          }
-                          setPanelKey(c.key);
-                          setPanelMode("adopt");
-                          setAdoptKind("backlog");
-                          setAdoptProject("");
-                          setAdoptPriority(0);
-                        }}
-                      >
-                        选清单/高优
-                      </button>
-                      <button
-                        className="aw-clue-ghost"
                         disabled={!!busy}
                         onClick={() => void run(c.key, () => decide(c.key, { state: "ignored" }))}
                       >
@@ -632,20 +624,49 @@ export function ActionHarvester({
                       </button>
                     </div>
                   </div>
-                  {panelKey === c.key && panelMode === "adopt" && (
+                  {panelKey === c.key && (
                     <form
                       className="aw-form aw-clue-drawer"
                       onSubmit={(e) => {
                         e.preventDefault();
+                        if (panelMode === "wait" && (!who.trim() || !what.trim())) return;
                         void run(c.key, () =>
-                          create(c, adoptKind, { projectId: adoptProject || undefined, priority: adoptPriority }),
+                          create(c, panelMode, { projectId: adoptProject || undefined, priority: adoptPriority }),
                         );
                       }}
                     >
+                      <div className="aw-clue-drawer-tabs" role="group" aria-label="采纳去向">
+                        <button
+                          type="button"
+                          aria-pressed={panelMode === "backlog"}
+                          onClick={() => openAdoption(c, "backlog")}
+                        >
+                          采纳到待办
+                        </button>
+                        <button
+                          type="button"
+                          disabled={planFull}
+                          aria-pressed={panelMode === "today"}
+                          onClick={() => openAdoption(c, "today")}
+                        >
+                          排入今天{planFull ? "（已满）" : ""}
+                        </button>
+                        <button
+                          type="button"
+                          aria-pressed={panelMode === "wait"}
+                          onClick={() => openAdoption(c, "wait")}
+                        >
+                          设为等待
+                        </button>
+                      </div>
                       <div className="aw-clue-drawer-grid">
                         <label>
                           目标清单
-                          <select value={adoptProject} onChange={(e) => setAdoptProject(e.target.value)}>
+                          <select
+                            aria-label="目标清单"
+                            value={adoptProject}
+                            onChange={(e) => setAdoptProject(e.target.value)}
+                          >
                             <option value="">收件箱（默认）</option>
                             {projectOptions.map(([id, name]) => (
                               <option key={id} value={id}>
@@ -657,6 +678,7 @@ export function ActionHarvester({
                         <label>
                           优先级
                           <select
+                            aria-label="优先级"
                             value={String(adoptPriority)}
                             onChange={(e) => setAdoptPriority(e.target.value === "5" ? 5 : 0)}
                           >
@@ -664,64 +686,39 @@ export function ActionHarvester({
                             <option value="5">高优（!高）</option>
                           </select>
                         </label>
+                        {panelMode === "wait" && (
+                          <>
+                            <label>
+                              等谁
+                              <input required value={who} onChange={(e) => setWho(e.target.value)} />
+                            </label>
+                            <label>
+                              等什么交付
+                              <input required value={what} onChange={(e) => setWhat(e.target.value)} />
+                            </label>
+                            <label>
+                              回看日
+                              <input required type="date" value={review} onChange={(e) => setReview(e.target.value)} />
+                            </label>
+                            <div className="aw-clue-quick-dates">
+                              <span>快捷回看</span>
+                              <div className="aw-tools">
+                                <button type="button" className="aw-snooze" onClick={() => setReview(shiftDay(day, 1))}>
+                                  明天
+                                </button>
+                                <button type="button" className="aw-snooze" onClick={() => setReview(shiftDay(day, 3))}>
+                                  +3天
+                                </button>
+                                <button type="button" className="aw-snooze" onClick={() => setReview(nextMonday(day))}>
+                                  下周一
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                       <div className="aw-clue-drawer-foot">
-                        <label>
-                          <input
-                            type="checkbox"
-                            disabled={planFull}
-                            checked={adoptKind === "today"}
-                            onChange={(e) => setAdoptKind(e.target.checked ? "today" : "backlog")}
-                          />
-                          同时排入今日计划{planFull ? "（已满）" : ""}
-                        </label>
-                        <div className="aw-tools">
-                          <button className="aw-primary" disabled={!!busy}>
-                            确认采纳到滴答
-                          </button>
-                          <button type="button" disabled={!!busy} onClick={() => setPanelKey("")}>
-                            取消
-                          </button>
-                        </div>
-                      </div>
-                    </form>
-                  )}
-                  {panelKey === c.key && panelMode === "wait" && (
-                    <form
-                      className="aw-form aw-clue-drawer"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        if (who.trim() && what.trim())
-                          void run(c.key, () => create(c, "wait", { projectId: adoptProject || undefined }));
-                      }}
-                    >
-                      <div className="aw-clue-drawer-grid">
-                        <label>
-                          等谁
-                          <input required value={who} onChange={(e) => setWho(e.target.value)} />
-                        </label>
-                        <label>
-                          等什么交付
-                          <input required value={what} onChange={(e) => setWhat(e.target.value)} />
-                        </label>
-                        <label>
-                          回看日
-                          <input required type="date" value={review} onChange={(e) => setReview(e.target.value)} />
-                        </label>
-                        <label>
-                          目标清单
-                          <select value={adoptProject} onChange={(e) => setAdoptProject(e.target.value)}>
-                            <option value="">收件箱（默认）</option>
-                            {projectOptions.map(([id, name]) => (
-                              <option key={id} value={id}>
-                                {name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      </div>
-                      <div className="aw-clue-drawer-foot">
-                        <div className="aw-tools">
+                        {panelMode === "wait" ? (
                           <label>
                             <input
                               type="checkbox"
@@ -730,22 +727,21 @@ export function ActionHarvester({
                             />
                             阻塞下一步
                           </label>
-                          <button type="button" className="aw-snooze" onClick={() => setReview(shiftDay(day, 1))}>
-                            明天
-                          </button>
-                          <button type="button" className="aw-snooze" onClick={() => setReview(shiftDay(day, 3))}>
-                            +3天
-                          </button>
-                          <button type="button" className="aw-snooze" onClick={() => setReview(nextMonday(day))}>
-                            下周一
-                          </button>
-                        </div>
+                        ) : (
+                          <small>
+                            {panelMode === "today" ? "确认后写入滴答并排入今日计划" : "确认后写入滴答待办并保留原句来源"}
+                          </small>
+                        )}
                         <div className="aw-tools">
-                          <button className="aw-primary" disabled={!!busy}>
-                            采纳并保存等待项
-                          </button>
                           <button type="button" disabled={!!busy} onClick={() => setPanelKey("")}>
                             取消
+                          </button>
+                          <button className="aw-primary" disabled={!!busy || !destination || (panelMode === "today" && planFull)}>
+                            {panelMode === "today"
+                              ? "确认采纳并排入今天"
+                              : panelMode === "wait"
+                                ? "确认采纳并保存等待"
+                                : "确认采纳到待办"}
                           </button>
                         </div>
                       </div>

@@ -30,6 +30,8 @@ export type Decision = {
   requestId?: string;
   sourceId?: string;
   libraryId?: string;
+  projectId?: string;
+  priority?: number;
   title?: string;
   day?: string;
   wait?: Wait;
