@@ -218,24 +218,45 @@ export function ActionHarvester({
       state: linking ? "linking" : "linked",
       taskKey: identity(t),
       clue: linking ? c : undefined,
+      ...(linking ? { noteText: evidence } : {}),
     });
     onSelect(t);
   }
-  async function link(t: UnifiedTask, c: Clue) {
-    await attach(t, c, false, undefined, true);
-    try {
-      const p = await native<TaskNoteAction>("prepareNote", {
-        taskId: t.id,
-        contentRevision: t.contentRevision,
-        workId: "workbench-clue-" + t.sourceId,
-        text: c.material.title + "\n" + c.material.text,
+  async function writeClueNote(t: UnifiedTask, c: Clue, text: string, pending?: Decision) {
+    let noteId = pending?.noteId;
+    if (pending && !pending.noteText && !noteId) {
+      // Earlier versions only saved the clue. Recover its receipt from the appended text.
+      const receipts = await native<TaskNoteAction[]>("listNotes", { taskIds: [t.id] });
+      const candidates = receipts.filter((row) => {
+        const prefix = row.before + (row.before ? "\n\n---\n" : "") + "Hub 建议\n";
+        if (row.taskId !== t.id || row.sourceId !== t.sourceId || !row.after.startsWith(prefix)) return false;
+        const appended = row.after.slice(prefix.length);
+        return appended === text.trim() || appended.startsWith(text.trim() + "\n（已收到「");
       });
-      const result = ["prepared", "retryable"].includes(p.state)
-        ? await native<TaskNoteAction>("submitNote", { id: p.id })
-        : ["unknown", "writing"].includes(p.state)
-          ? await native<TaskNoteAction>("inspectNote", { id: p.id })
-          : p;
-      if (result.state === "confirmed") await decide(c.key, { state: "linked", taskKey: identity(t) });
+      if (candidates.length > 1) throw Error("找到多条对应回执，请在来源操作记录中核对。");
+      noteId = candidates[0]?.id;
+    }
+    const prepared = noteId
+      ? await native<TaskNoteAction>("inspectNote", { id: noteId })
+      : await native<TaskNoteAction>("prepareNote", {
+          taskId: t.id, contentRevision: t.contentRevision, workId: "workbench-clue-" + t.sourceId, text,
+        });
+    if (!pending?.noteId) {
+      await decide(c.key, { state: "linking", taskKey: identity(t), clue: c, noteText: text, noteId: prepared.id });
+    }
+    const result = ["prepared", "retryable"].includes(prepared.state)
+      ? await native<TaskNoteAction>("submitNote", { id: prepared.id })
+      : !noteId && ["unknown", "writing"].includes(prepared.state)
+        ? await native<TaskNoteAction>("inspectNote", { id: prepared.id })
+        : prepared;
+    if (result.state === "confirmed") await decide(c.key, { state: "linked", taskKey: identity(t) });
+    return result;
+  }
+  async function link(t: UnifiedTask, c: Clue, pending?: Decision) {
+    const noteText = pending?.noteText ?? (c.material.title + "\n" + c.material.text);
+    if (!pending) await attach(t, c, false, undefined, true);
+    try {
+      const result = await writeClueNote(t, c, noteText, pending);
       setMsg("已关联到备料与推进备注。" + sourceNoteStatus(result));
     } catch (e) {
       setMsg("已保留来源及本地备注。滴答备注待处理：" + String(e));
@@ -439,7 +460,7 @@ export function ActionHarvester({
                     <strong>{c.title}</strong>
                     <p>已关联本地备料，滴答备注待核对。</p>
                     {linked && (
-                      <button disabled={!!busy} onClick={() => void run(c.key, () => link(linked, c))}>
+                      <button disabled={!!busy} onClick={() => void run(c.key, () => link(linked, c, saved))}>
                         继续核对并追加到原任务
                       </button>
                     )}
@@ -698,7 +719,7 @@ export function ActionHarvester({
                             </label>
                             <label>
                               回看日
-                              <input required type="date" value={review} onChange={(e) => setReview(e.target.value)} />
+                              <input type="date" value={review} onChange={(e) => setReview(e.target.value)} />
                             </label>
                             <div className="aw-clue-quick-dates">
                               <span>快捷回看</span>

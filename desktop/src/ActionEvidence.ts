@@ -48,10 +48,10 @@ export function nextMonday(day: string) {
 const weekdayMap: Record<string, number> = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 日: 0, 天: 0 };
 export function parseWaitFromText(text: string, day: string): ParsedWaitDraft {
   const cleaned = text.trim();
-  let review = day;
+  let review = /今天/.test(cleaned) ? day : "";
   const iso = cleaned.match(/\b(\d{4}-\d{2}-\d{2})\b/);
   const cnDate = cleaned.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?/);
-  const weekday = cleaned.match(/(下)?(?:周|星期)([一二三四五六日天])/);
+  const weekday = cleaned.match(/(下|本|这)?(?:周|星期)([一二三四五六日天])/);
   if (iso) {
     review = iso[1];
   } else if (cnDate) {
@@ -65,8 +65,9 @@ export function parseWaitFromText(text: string, day: string): ParsedWaitDraft {
     const base = new Date(day + "T12:00:00");
     if (Number.isFinite(base.getTime())) {
       const target = weekdayMap[weekday[2]];
-      let diff = (target - base.getDay() + 7) % 7;
-      if (diff === 0 || weekday[1]) diff += 7;
+      const calendarDiff = (target || 7) - (base.getDay() || 7);
+      const diff = weekday[1] === "下" ? calendarDiff + 7
+        : weekday[1] ? calendarDiff : (calendarDiff + 7) % 7;
       review = shiftDay(day, diff);
     }
   }

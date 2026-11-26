@@ -153,7 +153,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
     () => new Map(tasks.map((t) => [identity(t), metaFor(t, legacy)])),
     [tasks, legacy, revision],
   );
-  const meta = (t: UnifiedTask) => allMeta.get(identity(t)) || metaFor(t, legacy);
+  const meta = useCallback((t: UnifiedTask) => allMeta.get(identity(t)) || metaFor(t, legacy), [allMeta, legacy]);
   const openDida = store.dashboard.tasks.filter(
     (task) => task.provider === "dida365" && !task.isProject && task.status === "open",
   );
@@ -206,19 +206,25 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
           .sort((a, b) => (topicCounts.get(b.key) || 0) - (topicCounts.get(a.key) || 0))
           .slice(0, 4)
       : topics.filter((t) => pins.includes(t.key));
-  const matches = (t: UnifiedTask) =>
-    [t.title, t.collectionName, ...(t.tags || []), ...meta(t).waits.flatMap((w) => [w.who, w.what])]
-      .join(" ")
-      .toLowerCase()
-      .includes(search.trim().toLowerCase());
-  const scoped = tasks.filter((t) => (!project || inTopic(t, project, meta(t))) && matches(t));
-  const grouped = groupsFor(scoped, meta, day);
+  const scoped = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query && !project) return tasks;
+    return tasks.filter((task) => {
+      if (project && !inTopic(task, project, meta(task))) return false;
+      if (!query) return true;
+      return [task.title, task.collectionName, ...(task.tags || []), ...meta(task).waits.flatMap((w) => [w.who, w.what])]
+        .join(" ").toLowerCase().includes(query);
+    });
+  }, [tasks, project, meta, search]);
+  const counts = useMemo(() => groupsFor(tasks, meta, day), [tasks, meta, day]);
+  const grouped = useMemo(() => scoped === tasks ? counts : groupsFor(scoped, meta, day), [scoped, tasks, counts, meta, day]);
   const activeWait = (t: UnifiedTask) => t.status === "open" && meta(t).waits.some((w) => !w.resolved);
   // Each section owns disjoint rows, even when a planned task is due today.
   const writable = libraries.filter(
     (l) => l.provider === "dida365" && (!selectedLibraryIds || selectedLibraryIds.includes(l.id)),
   );
-  const lib = project?.libraryId || destination || (writable.length === 1 ? writable[0].id : "");
+  const preferred = project?.libraryId || destination;
+  const lib = writable.some((l) => l.id === preferred) ? preferred : !project && writable.length === 1 ? writable[0].id : "";
   const initialTask =
     view === "done"
       ? grouped.done[0]
@@ -275,6 +281,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
       const key = JSON.stringify([input.lib, input.project || "", input.title]);
       const pending = read<Record<string, QuickRequest>>("quick.requests", {});
       const request = pending[key] || input;
+      if (!writable.some((l) => l.id === request.lib)) throw Error("请重新选择当前范围内的滴答资料库。");
       await write("quick.requests", { ...pending, [key]: request });
       const result = await native<{ state: string; error?: string; task?: UnifiedTask }>("createTask", {
         requestId: request.id,
@@ -309,7 +316,10 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
     ["all", "全部行动", List],
     ["done", "已闭环", CheckCheck],
   ] as const;
+  const [rowLimits, setRowLimits] = useState<Record<string, number>>({});
   function rows(label: string, items: UnifiedTask[], empty?: string) {
+    const listKey = JSON.stringify([scopeKey, view, project?.key, label]);
+    const limit = rowLimits[listKey] || 60;
     return (
       <section className="aw-list" aria-label={label}>
         <h3>
@@ -317,7 +327,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
         </h3>
         <div className="aw-group">
           {!items.length && <p>{empty || "当前分组暂无行动项"}</p>}
-          {items.map((t) => {
+          {items.slice(0, limit).map((t) => {
             const key = identity(t),
               m = meta(t),
               wait = t.completed ? [] : m.waits.filter((w) => !w.resolved),
@@ -400,6 +410,11 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
             );
           })}
         </div>
+        {items.length > limit && (
+          <button type="button" onClick={() => setRowLimits((previous) => ({ ...previous, [listKey]: limit + 60 }))}>
+            显示更多（已显示 {limit} / {items.length}）
+          </button>
+        )}
       </section>
     );
   }
@@ -408,7 +423,6 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
   );
   const dueIds = new Set(dueToday.map(identity));
   const overdue = grouped.due.filter((t) => !dueIds.has(identity(t)));
-  const counts = groupsFor(tasks, meta, day);
   const focusCount = counts.due.length + counts.plan.length + counts.waiting.length;
   const focus = rows("今日到期与到点催办", [...dueToday, ...overdue], "今日无到期承诺或到点催办项");
   const boardColumns = (

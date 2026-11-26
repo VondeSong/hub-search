@@ -27,6 +27,8 @@ export type Decision = {
   state: "ignored" | "linked" | "creating" | "unknown" | "linking";
   clue?: { key: string; title: string; material: Material };
   taskKey?: string;
+  noteText?: string;
+  noteId?: string;
   requestId?: string;
   sourceId?: string;
   libraryId?: string;

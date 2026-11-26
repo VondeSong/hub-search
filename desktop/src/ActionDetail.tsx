@@ -173,7 +173,7 @@ export function ActionDetail({
     [editingWaitId, setEditingWaitId] = useState<string | null>(null),
     [who, setWho] = useState(""),
     [what, setWhat] = useState(""),
-    [review, setReview] = useState(day),
+    [review, setReview] = useState(""),
     [blocking, setBlocking] = useState(true);
   const [step, setStep] = useState(""),
     [note, setNote] = useState(meta.note || ""),
@@ -365,7 +365,7 @@ export function ActionDetail({
                   setEditingWaitId(null);
                   setWho("");
                   setWhat("");
-                  setReview(day);
+                  setReview("");
                   setBlocking(true);
                   setWaitOpen(true);
                 } else {
@@ -478,7 +478,7 @@ export function ActionDetail({
                           setEditingWaitId(w.id);
                           setWho(w.who);
                           setWhat(w.what);
-                          setReview(w.review || day);
+                          setReview(w.review);
                           setBlocking(Boolean(w.blocking));
                           setWaitOpen(true);
                         }}
@@ -539,7 +539,7 @@ export function ActionDetail({
                   setWaitOpen(false);
                   setWho("");
                   setWhat("");
-                  setReview(day);
+                  setReview("");
                   setBlocking(true);
                 });
               }}
@@ -554,7 +554,7 @@ export function ActionDetail({
               </label>
               <label>
                 回看日
-                <input required type="date" value={review} onChange={(e) => setReview(e.target.value)} />
+                <input type="date" value={review} onChange={(e) => setReview(e.target.value)} />
               </label>
               <label>
                 <input type="checkbox" checked={blocking} onChange={(e) => setBlocking(e.target.checked)} /> 阻塞下一步
@@ -569,7 +569,7 @@ export function ActionDetail({
                     setWaitOpen(false);
                     setWho("");
                     setWhat("");
-                    setReview(day);
+                    setReview("");
                     setBlocking(true);
                   }}
                 >

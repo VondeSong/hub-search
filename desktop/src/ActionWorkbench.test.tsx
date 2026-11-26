@@ -115,6 +115,34 @@ const dida = { id: "lib", name: "滴答清单", provider: "dida365" } as Library
 const workbenchAction = (params: unknown) => (params as { args?: { action?: string } } | undefined)?.args?.action;
 
 describe("行动工作台", () => {
+  it("周五记录的下周一回看是三天后，未写日期保留空白", () => {
+    expect(parseWaitFromText("下周一回看报价", "2026-11-27").review).toBe("2026-11-30");
+    expect(parseWaitFromText("本周五回看报价", "2026-11-27").review).toBe("2026-11-27");
+    expect(parseWaitFromText("等供应商补报告", "2026-11-27").review).toBe("");
+  });
+  it("切换到单库后快速新建只写当前库", async () => {
+    const libraries = [dida, { ...dida, id: "second", name: "第二库" }];
+    const writes: string[] = [];
+    vi.mocked(invoke).mockImplementation(async (cmd, params) => {
+      if (workbenchAction(params) === "createTask") {
+        writes.push((params as { args: { libraryId: string } }).args.libraryId);
+        return { state: "confirmed", task: { ...t, libraryId: "second" } };
+      }
+      if (cmd === "list_quick_journal") return { items: [] };
+      return [];
+    });
+    await render(<TaskWorkspace libraries={libraries} desktopSidebarVisible />);
+    const select = host.querySelector<HTMLSelectElement>('[aria-label="新建目标资料库"]')!;
+    await act(async () => { select.value = dida.id; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    await render(<TaskWorkspace libraries={libraries} selectedLibraryIds={["second"]} desktopSidebarVisible />);
+    const input = host.querySelector<HTMLInputElement>('[aria-label="新建行动"]')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "核对试装");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => input.form!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(writes).toEqual(["second"]);
+  });
   it("滴答已建而本地计划未保存时，保留原请求并使用同一个回执恢复", async () => {
     const ids: string[] = [];
     vi.mocked(invoke).mockImplementation(async (command, params) => {
