@@ -28,6 +28,8 @@ import {
   groupsFor,
   identity,
   inTopic,
+  hasBlockingWait,
+  TODAY_PLAN_LIMIT,
   legacyRecords,
   metaFor,
   read,
@@ -109,8 +111,8 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
     Promise.all([
       invoke<{ items: QuickJournalItem[]; error: string }>("list_quick_journal"),
       invoke<{ settings: { libraryId: string } }>("get_quick_journal_settings"),
-    ]).then(
-      ([data, cfg]) => {
+    ])
+      .then(([data, cfg]) => {
         if (!live) return;
         setJournals(
           data.items
@@ -118,11 +120,10 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
             .filter((j) => !j.deleted && (!selectedLibraryIds || selectedLibraryIds.includes(j.libraryId))),
         );
         setJournalError(data.error);
-      },
-      (e) => {
-        if (live) setJournalError(String(e));
-      },
-    );
+      })
+      .catch((error) => {
+        if (live) setJournalError(String(error));
+      });
     return () => {
       live = false;
     };
@@ -150,12 +151,25 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
     [tasks, legacy, revision],
   );
   const meta = (t: UnifiedTask) => allMeta.get(identity(t)) || metaFor(t, legacy);
+  const openDida = store.dashboard.tasks.filter(
+    (task) => task.provider === "dida365" && !task.isProject && task.status === "open",
+  );
+  const plannedCount = openDida.filter((task) => meta(task).day === day).length;
+  const planFull = plannedCount >= TODAY_PLAN_LIMIT;
   const update = useCallback(
     async (t: UnifiedTask, fn: (m: ActionMeta) => ActionMeta) => {
-      await write("task." + identity(t), fn(metaFor(t, legacy)));
+      const before = metaFor(t, legacy);
+      const next = fn(before);
+      if (
+        next.day === day &&
+        before.day !== day &&
+        openDida.filter((task) => metaFor(task, legacy).day === day).length >= TODAY_PLAN_LIMIT
+      )
+        throw Error(`今日计划已满 ${TODAY_PLAN_LIMIT} 项，请先移出一项。`);
+      await write("task." + identity(t), next);
       bump();
     },
-    [legacy],
+    [legacy, day, store.dashboard.tasks],
   );
   const topics = useMemo(() => {
     const all = new Map<string, Topic>();
@@ -209,25 +223,29 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
         ? scoped.find(activeWait)
         : grouped.due[0] || grouped.plan[0] || scoped.find((t) => !t.completed) || scoped[0];
   const selectedTask =
-    selected === null
-      ? wide
-        ? initialTask
-        : undefined
-      : scoped.find((t) => identity(t) === selected);
+    selected === null ? (wide ? initialTask : undefined) : scoped.find((t) => identity(t) === selected);
   const pendingRequests = read<Record<string, QuickRequest>>("quick.requests", {});
+  async function clearQuickRequest(request: QuickRequest) {
+    const key = JSON.stringify([request.lib, request.project || "", request.title]);
+    const pending = read<Record<string, QuickRequest>>("quick.requests", {});
+    if (pending[key]?.id !== request.id) return;
+    delete pending[key];
+    await write("quick.requests", pending);
+  }
+  async function finishQuickRequest(request: QuickRequest, task: UnifiedTask) {
+    if (request.day || request.topicKey)
+      await update(task, (m) => ({
+        ...m,
+        day: request.day || m.day,
+        topics: request.topicKey ? [...new Set([...(m.topics || []), request.topicKey])] : m.topics,
+      }));
+    await clearQuickRequest(request);
+    setSelected(identity(task));
+  }
   async function useSyncedTask(request: QuickRequest, task: UnifiedTask) {
     setPosting(true);
     try {
-      if (request.day) await update(task, (m) => ({ ...m, day: request.day }));
-      if (request.topicKey)
-        await update(task, (m) => ({ ...m, topics: [...new Set([...(m.topics || []), request.topicKey!])] }));
-      const key = JSON.stringify([request.lib, request.project || "", request.title]);
-      const pending = read<Record<string, QuickRequest>>("quick.requests", {});
-      if (pending[key]?.id === request.id) {
-        delete pending[key];
-        await write("quick.requests", pending);
-      }
-      setSelected(identity(task));
+      await finishQuickRequest(request, task);
       setNotice("已采用所选的滴答任务。");
     } catch (e) {
       setNotice(String(e));
@@ -245,7 +263,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
         id: crypto.randomUUID(),
         title: title.replace(/\s*!高\s*$/, "").trim(),
         priority: /!高\s*$/.test(title) ? 5 : 0,
-        day: !project && view === "focus" ? day : undefined,
+        day: !project && view === "focus" && !planFull ? day : undefined,
         lib,
         project: collection,
         topicKey: project?.tag ? project.key : undefined,
@@ -262,24 +280,13 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
         projectId: request.project,
         priority: request.priority || 0,
       });
-      if (["failed", "confirmed"].includes(result.state)) {
-        const latest = read<Record<string, QuickRequest>>("quick.requests", {});
-        delete latest[key];
-        await write("quick.requests", latest);
-      }
-      if (result.state !== "confirmed") throw Error(result.error || "结果待核对，重试会沿用原请求。");
+      if (result.state === "failed") await clearQuickRequest(request);
+      if (result.state !== "confirmed" || !result.task)
+        throw Error(result.error || "结果待核对，重试会沿用原请求。");
       setTitle("");
+      await finishQuickRequest(request, result.task);
       setNotice(result.error || "已采纳到滴答待办");
       await store.refresh();
-      if (result.task) {
-        if (request.day) await update(result.task, (m) => ({ ...m, day: request.day }));
-        if (request.topicKey)
-          await update(result.task, (m) => ({
-            ...m,
-            topics: [...new Set([...(m.topics || []), request.topicKey!])],
-          }));
-        setSelected(identity(result.task));
-      }
     } catch (e) {
       setNotice(String(e));
     } finally {
@@ -361,6 +368,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
                 {!t.completed && (
                   <button
                     className="aw-row-plan"
+                    disabled={planFull && m.day !== day}
                     onClick={() =>
                       void update(t, (m) => ({ ...m, day: m.day === day ? "" : day })).catch((e) =>
                         setNotice(String(e)),
@@ -427,7 +435,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
         placeholder={
           project
             ? "在「" + project.name + "」下新建行动，回车同步滴答…"
-            : view === "focus"
+            : view === "focus" && !planFull
               ? "随手记一条行动，回车加入今日计划并同步滴答（加 !高 标记高优）…"
               : "随手记一条行动，回车同步滴答…"
         }
@@ -520,7 +528,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
             <button onClick={() => navigate("focus")}>← 今日聚焦</button>
           ) : (
             <small className="aw-total">
-              今日共 {focusCount} 项 · 计划 {tasks.filter((t) => !t.completed && meta(t).day === day).length}/5
+              今日共 {focusCount} 项 · 计划 {plannedCount}/{TODAY_PLAN_LIMIT}
             </small>
           )}
           <label>
@@ -550,6 +558,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
             <ActionTodayPlan
               tasks={scoped}
               day={day}
+              planFull={planFull}
               meta={meta}
               onPlan={(t) => update(t, (m) => ({ ...m, day }))}
             />
@@ -574,10 +583,13 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
               onOpen={onOpenResult}
             >
               {quickEntry}
-              {rows("当前外部阻塞 / 等待催办", scoped.filter(activeWait))}
+              {rows(
+                "当前外部阻塞",
+                scoped.filter((t) => !t.completed && hasBlockingWait(meta(t))),
+              )}
               {rows(
                 "下一步行动",
-                scoped.filter((t) => !t.completed && !activeWait(t)),
+                scoped.filter((t) => !t.completed && !hasBlockingWait(meta(t))),
               )}
               {rows("已闭环节点", grouped.done)}
             </ActionTopic>
@@ -594,6 +606,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
                 onSelect={(t) => setSelected(identity(t))}
                 onOpen={onOpenResult}
                 onCount={setClueCount}
+                planFull={planFull}
                 revision={refreshKey}
               />
               {board ? (
@@ -604,7 +617,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
                   {rows(
                     "今日计划（额外自选）",
                     grouped.plan,
-                    `今天已排入 ${tasks.filter((t) => !t.completed && meta(t).day === day).length} 项，建议最多 5 项。`,
+                    `今天已排入 ${plannedCount} 项，最多 ${TODAY_PLAN_LIMIT} 项。`,
                   )}
                   {grouped.waiting.length > 0 && rows("等待他人", grouped.waiting)}
                 </>
@@ -683,6 +696,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
               />
             }
             topics={chosen}
+            planFull={planFull}
             meta={meta(selectedTask)}
             update={(fn) => update(selectedTask, fn)}
             journals={journals}

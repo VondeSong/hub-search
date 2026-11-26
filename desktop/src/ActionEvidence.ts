@@ -48,9 +48,16 @@ export function terms(text: string): string[] {
   flush();
   return [...new Set(tokens)].sort((a, b) => Number(/\d/.test(b)) - Number(/\d/.test(a)));
 }
-export function relevance(anchors: string[], text: string) {
+export function matchingTerms(anchors: string[], text: string) {
   const haystack = text.toLowerCase();
-  return anchors.reduce((n, t) => n + (haystack.includes(t) ? (/\d/.test(t) ? 4 : 1) : 0), 0);
+  return anchors.filter((anchor) => {
+    if (!/\d/.test(anchor)) return haystack.includes(anchor);
+    const escaped = anchor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?<![a-z0-9]|\\d\\.)${escaped}(?![a-z0-9]|\\.\\d)`).test(haystack);
+  });
+}
+export function relevance(anchors: string[], text: string) {
+  return matchingTerms(anchors, text).reduce((score, term) => score + (/\d/.test(term) ? 4 : 1), 0);
 }
 export function documentMaterial(result: SearchResult): Material {
   return {
@@ -123,6 +130,14 @@ export async function queryMaterials(title: string, scope: string[] | null): Pro
     .sort((a, b) => relevance(anchors, b.title + " " + b.text) - relevance(anchors, a.title + " " + a.text))
     .slice(0, 12);
 }
+const evidenceNumbers = /(?:[<>≤≥]\s*)?(?:[±+-]\s*)?\d+(?:[.,]\d+)?/g;
+const engineeringMeasurements =
+  /(?:[<>≤≥]\s*)?(?:[±+-]\s*)?\d+(?:[.,]\d+)?\s*(?:mm|cm|km|m|[μµu]m|mil|in|ft|mpa|kpa|pa|n[·⋅]m|nm|n|kg|g|[°º]\s*[cf]|%|毫米|厘米|米|微米|摄氏度|华氏度|千帕|兆帕)(?![a-z])/gi;
+const normalizeEvidence = (text: string) =>
+  text.normalize("NFKC").toLowerCase().replace(/−/g, "-").replace(/<=\s*/g, "≤").replace(/>=\s*/g, "≥");
+const evidenceMatches = (text: string, pattern: RegExp) =>
+  (text.match(pattern) || []).map((value) => value.replace(/\s+/g, ""));
+
 export async function generate(mode: ModelMode, materials: Material[]): Promise<Claim[]> {
   const input = materials
     .slice(0, 48)
@@ -132,12 +147,18 @@ export async function generate(mode: ModelMode, materials: Material[]): Promise<
   for (const item of value.items) {
     const i = input.findIndex((m) => m.id === item.source);
     if (i < 0 || !item.text.trim() || !item.quote.trim() || !input[i].text.includes(item.quote)) continue;
-    const numbers = item.text.match(/\d+(?:\.\d+)?/g) || [];
-    const quotedNumbers = new Set(item.quote.match(/\d+(?:\.\d+)?/g) || []);
+    const quote = normalizeEvidence(item.quote);
+    const claim = normalizeEvidence(item.text);
     const unsupported =
-      numbers.some((n) => !quotedNumbers.has(n)) ||
+      [evidenceNumbers, engineeringMeasurements].some((pattern) => {
+        const quoted = new Set(evidenceMatches(quote, pattern));
+        return evidenceMatches(claim, pattern).some((token) => !quoted.has(token));
+      }) ||
       (/已达标|放行|符合标准|确认通过/.test(item.text) && !item.quote.includes(item.text));
-    accepted.push({ ...item, verify: item.verify || unsupported, source: materials[i].id });
+    const source = materials[i].id;
+    if (accepted.some((claim) => claim.source === source && (mode === "plan" || claim.text === item.text)))
+      continue;
+    accepted.push({ ...item, verify: item.verify || unsupported, source });
   }
   if (value.items.length && !accepted.length) throw Error("生成内容未能对应原文，请重新选择材料。");
   return accepted;
@@ -149,8 +170,7 @@ export function matchExisting(clue: Clue, tasks: UnifiedTask[]) {
     .map((task) => ({ task, score: relevance(anchors, task.title) }))
     .filter(
       (row) =>
-        row.task.title === clue.title ||
-        (row.score >= 3 && anchors.filter((a) => row.task.title.toLowerCase().includes(a)).length >= 2),
+        row.task.title === clue.title || (row.score >= 3 && matchingTerms(anchors, row.task.title).length >= 2),
     )
     .sort((a, b) => b.score - a.score)
     .slice(0, 5)

@@ -5,7 +5,7 @@ import { QuickJournalCard } from "./QuickJournal";
 import type { PdfPagePreview, SearchResult } from "./SearchTypes";
 import { invoke } from "@tauri-apps/api/core";
 import { isPdfContent } from "./PdfPreviewModel";
-import { journalMaterial, queryMaterials, relevance, terms, type Material } from "./ActionEvidence";
+import { journalMaterial, matchingTerms, queryMaterials, relevance, terms, type Material } from "./ActionEvidence";
 
 export function useRecall(title: string, scope: string[] | null) {
   const key = JSON.stringify([title, scope]);
@@ -35,10 +35,10 @@ export function assembleMaterials(
   day: string,
 ) {
   const anchors = terms(title);
-  const specific = anchors.filter((t) => /\d/.test(t));
-  const matchesSubject = (text: string) =>
-    specific.some((t) => text.toLowerCase().includes(t)) ||
-    relevance(anchors, text) >= Math.min(2, anchors.length);
+  const matchesSubject = (text: string) => {
+    const matches = matchingTerms(anchors, text);
+    return matches.some((term) => /\d/.test(term)) || matches.length >= Math.max(1, Math.min(2, anchors.length));
+  };
   const recentDate = new Date(day + "T12:00:00");
   recentDate.setDate(recentDate.getDate() - 13);
   const byId = new Map(links.map((m) => [m.id, m]));
@@ -67,14 +67,15 @@ export function assembleMaterials(
   ])
     if (!byId.has(m.id)) byId.set(m.id, m);
   const recent: Material[] = [],
-    long: Material[] = [];
+    long: Material[] = [],
+    related: Material[] = [];
   for (const m of byId.values()) {
-    const linked = links.some((a) => a.id === m.id);
-    const isReference = /规范|标准|图纸|断面图|\.pdf\b|\.dwg\b|\.step\b/i.test(m.title);
-    if (!linked && !isReference && m.date && new Date(m.date + "T12:00:00") >= recentDate) recent.push(m);
-    else if (linked || isReference) long.push(m);
+    const isReference = !m.journalId && /规范|标准|图纸|断面图|\.pdf\b|\.dwg\b|\.step\b/i.test(m.title);
+    if (isReference) long.push(m);
+    else if (m.date && m.date <= day && new Date(m.date + "T12:00:00") >= recentDate) recent.push(m);
+    else if (links.some((link) => link.id === m.id)) related.push(m);
   }
-  return { recent, long, all: [...recent, ...long] };
+  return { recent, long, related, all: [...recent, ...long, ...related] };
 }
 function PdfSource({ result }: { result: SearchResult }) {
   const page = result.pageNumber || 1;

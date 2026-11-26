@@ -4,7 +4,7 @@ import type { SearchResult } from "./SearchTypes";
 import type { UnifiedTask } from "./TaskWorkspacePresentation";
 import { archiveAction } from "./ActionJournal";
 import { generate, type Material } from "./ActionEvidence";
-import { read, write, identity, type ActionMeta, type Draft, type Topic } from "./ActionState";
+import { read, write, identity, hasBlockingWait, type ActionMeta, type Draft, type Topic } from "./ActionState";
 import { assembleMaterials, Materials, useRecall } from "./ActionMaterials";
 import { DraftView } from "./ActionDetail";
 
@@ -89,7 +89,7 @@ export function ActionTopic({
         .join("、") || "暂无"),
     "下一步 · " +
       (tasks
-        .filter((t) => !t.completed && !meta(t).waits.some((w) => !w.resolved && w.blocking))
+        .filter((t) => !t.completed && !hasBlockingWait(meta(t)))
         .map((t) => t.title)
         .join("、") || "暂无"),
   ];
@@ -118,9 +118,20 @@ export function ActionTopic({
   return (
     <>
       <section className="aw-topic">
-        <h2><i className="aw-topic-dot" /> {topic.name}</h2>
+        <h2>
+          <i className="aw-topic-dot" /> {topic.name}
+        </h2>
         <small>
-          <span className="aw-stage">{blockers.length?"等待外部交付":tasks.some(t=>!t.completed)?"进行中":tasks.length?"已闭环":"暂无行动"}</span> {tasks.filter((t) => t.status === "open").length} 待办 · {tasks.filter((t) => t.completed).length} 已闭环
+          <span className="aw-stage">
+            {blockers.length
+              ? "等待外部交付"
+              : tasks.some((t) => !t.completed)
+                ? "进行中"
+                : tasks.length
+                  ? "已闭环"
+                  : "暂无行动"}
+          </span>{" "}
+          {tasks.filter((t) => t.status === "open").length} 待办 · {tasks.filter((t) => t.completed).length} 已闭环
           · {blockers.length} 项阻塞 · {parallel.length} 项等回复
         </small>
         <div className="aw-tools">

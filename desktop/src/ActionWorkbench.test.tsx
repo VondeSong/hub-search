@@ -4,25 +4,38 @@ import { createRoot, type Root } from "react-dom/client";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import { archiveAction } from "./ActionJournal";
-import { groupsFor, emptyMeta, identity, type ActionMeta } from "./ActionState";
+import { groupsFor, emptyMeta, identity, write, read, type ActionMeta } from "./ActionState";
 import { extractClues, generate, matchExisting, type Material } from "./ActionEvidence";
 import { ActionHarvester } from "./ActionHarvester";
 import { ActionDetail } from "./ActionDetail";
 import { Materials, assembleMaterials } from "./ActionMaterials";
 import type { SearchResult } from "./SearchTypes";
 import { ActionTopic } from "./ActionTopic";
+import { TaskWorkspace } from "./ActionWorkspace";
+import type { LibrarySummary } from "./SearchTypes";
 import type { UnifiedTask } from "./TaskWorkspacePresentation";
 import type { QuickJournalItem } from "./JournalRecords";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("./QuickJournal", () => ({ QuickJournalCard: () => null }));
 const profile = vi.hoisted(() => new Map<string, string>());
+const flush = vi.hoisted(() => vi.fn(async () => {}));
+const dashboard = vi.hoisted(() => ({ tasks: [] as UnifiedTask[] }));
+vi.mock("./UnifiedTaskData", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./UnifiedTaskData")>()),
+  useUnifiedTasks: () => ({
+    dashboard,
+    refresh: async () => {},
+    taskBusyIds: new Set(),
+    taskStatusTargets: new Map(),
+  }),
+}));
 vi.mock("./UserProfileStorage", () => ({
   userProfileStorage: {
     getItem: (k: string) => profile.get(k) ?? null,
     setItem: (k: string, v: string) => profile.set(k, v),
     flush: async () => {},
   },
-  flushUserProfileStorage: async () => {},
+  flushUserProfileStorage: flush,
 }));
 let root: Root;
 let host: HTMLDivElement;
@@ -78,11 +91,69 @@ const wait = { id: "one", who: "结构组", what: "支架数模", review: day, b
 const parallel = { id: "two", who: "供应商", what: "耐温报告", review: "2026-11-28", blocking: false };
 beforeEach(() => {
   profile.clear();
+  flush.mockReset();
+  flush.mockResolvedValue(undefined);
+  dashboard.tasks = [];
   vi.mocked(invoke).mockReset();
-  vi.mocked(invoke).mockResolvedValue([]);
+  vi.mocked(invoke).mockImplementation(async (command) => {
+    if (command === "list_quick_journal") return { items: [], error: "" };
+    if (command === "get_quick_journal_settings") return { settings: { libraryId: "notes" } };
+    return [];
+  });
 });
 
+const dida = { id: "lib", name: "滴答清单", provider: "dida365" } as LibrarySummary;
+const workbenchAction = (params: unknown) => (params as { args?: { action?: string } } | undefined)?.args?.action;
+
 describe("行动工作台", () => {
+  it("滴答已建而本地计划未保存时，保留原请求并使用同一个回执恢复", async () => {
+    const ids: string[] = [];
+    vi.mocked(invoke).mockImplementation(async (command, params) => {
+      if (command === "list_quick_journal") return { items: [], error: "" };
+      if (command === "get_quick_journal_settings") return { settings: { libraryId: "notes" } };
+      if (workbenchAction(params) === "createTask") {
+        ids.push((params as { args: { requestId: string } }).args.requestId);
+        dashboard.tasks = [t];
+        if (ids.length === 1) flush.mockRejectedValueOnce(new Error("本地保存失败"));
+        return { state: "confirmed", task: t };
+      }
+      return [];
+    });
+    await render(<TaskWorkspace libraries={[dida]} desktopSidebarVisible />);
+    const input = host.querySelector<HTMLInputElement>('input[aria-label="新建行动"]')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, t.title);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => input.form!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(host.textContent).toContain("本地保存失败");
+    expect(Object.keys(read("quick.requests", {}))).toHaveLength(1);
+    await click(button("核对原请求"));
+    expect(ids).toHaveLength(2);
+    expect(ids[0]).toBe(ids[1]);
+    expect(read("quick.requests", {})).toEqual({});
+    expect(host.querySelector('section[aria-label="今日计划（额外自选）"]')?.textContent).toContain(t.title);
+  });
+
+  it("今日计划满五项时不再排入，快捷输入仍可采纳到待办", async () => {
+    dashboard.tasks = Array.from({ length: 6 }, (_, i) => ({
+      ...t,
+      id: "hub-" + i,
+      sourceId: "source-" + i,
+      title: "工程检查 " + i,
+    }));
+    const today = new Intl.DateTimeFormat("sv-SE").format(new Date());
+    for (const task of dashboard.tasks.slice(0, 5)) {
+      await write("task." + identity(task), { ...emptyMeta(), day: today });
+    }
+    await render(<TaskWorkspace libraries={[dida]} desktopSidebarVisible />);
+    expect(host.textContent).toContain("计划 5/5");
+    expect(button("AI 安排今天").disabled).toBe(true);
+    expect(host.querySelector('input[aria-label="新建行动"]')?.getAttribute("placeholder")).toBe(
+      "随手记一条行动，回车同步滴答…",
+    );
+  });
+
   it("同一行动只进一组；按到期、今日计划、未来等待的顺序展示", () => {
     const m = { ...emptyMeta(), day, waits: [wait, parallel] };
     const a = { ...t, dueAt: day },
@@ -121,6 +192,27 @@ describe("行动工作台", () => {
     });
     expect(await generate("draft", sources)).toEqual([
       { source: "rec", text: "实测 210mm", quote: "基本满足要求", verify: true },
+    ]);
+  });
+  it("工程尺寸单位发生变化时标记待核实", async () => {
+    const sources: Material[] = [
+      { id: "record", title: "实测", text: "实测间距为 120 mm，温度为 30 °C，低温上限 ≤ −30 ℃" },
+    ];
+    vi.mocked(invoke).mockResolvedValue({
+      items: [
+        { source: "1", text: "间距为 120cm", quote: "实测间距为 120 mm" },
+        { source: "1", text: "间距为 120mm", quote: "实测间距为 120 mm" },
+        { source: "1", text: "间距为 120 ㎝", quote: "实测间距为 120 mm" },
+        { source: "1", text: "温度为 −30 ℃", quote: "温度为 30 °C" },
+        { source: "1", text: "温度为 30 ℃", quote: "温度为 30 °C" },
+        { source: "1", text: "间距须 ≤ 120mm", quote: "实测间距为 120 mm" },
+        { source: "1", text: "≥ −30 ℃", quote: "低温上限 ≤ −30 ℃" },
+        { source: "1", text: "−30 ℃", quote: "低温上限 ≤ −30 ℃" },
+        { source: "1", text: "<= -30 °C", quote: "低温上限 ≤ −30 ℃" },
+      ],
+    });
+    expect((await generate("draft", sources)).map((item) => item.verify)).toEqual([
+      true, false, true, true, false, true, true, true, false,
     ]);
   });
   it("备料排除只共享泛词的日志，保留同型号现场记录与早期规范", () => {
@@ -163,6 +255,120 @@ describe("行动工作台", () => {
     expect(meta.day).toBeUndefined();
     expect(vi.mocked(invoke).mock.calls.map((call) => (call[1] as any)?.args?.action)).not.toContain("createTask");
   });
+  it("跨清单同名任务要求明确选择，选项标明清单", async () => {
+    const sameTitle = {
+      ...t,
+      id: "same-id",
+      sourceId: "same-source",
+      collectionId: "second",
+      collectionName: "第二清单",
+    };
+    await render(
+      <ActionHarvester
+        tasks={[t, sameTitle]}
+        journals={[journal]}
+        scope={null}
+        libraries={[dida]}
+        day={day}
+        onUpdate={async () => {}}
+        onRefresh={async () => {}}
+        onSelect={() => {}}
+        revision={0}
+      />,
+    );
+    await click(button("行动捕手"));
+    expect(button("关联并补充至已有任务")).toBeUndefined();
+    const select = host.querySelector<HTMLSelectElement>('select[aria-label="关联已有任务"]')!;
+    expect([...select.options].map((option) => option.textContent)).toEqual([
+      "选择已有任务",
+      t.title + " · T29 · 工作",
+      t.title + " · 第二清单 · 工作",
+    ]);
+    await act(async () => {
+      select.value = identity(sameTitle);
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(button("关联并补充至已有任务")).toBeDefined();
+  });
+  it("临时状态无法确认时用原请求恢复排期，不重复采纳", async () => {
+    const ids: string[] = [];
+    vi.mocked(invoke).mockImplementation(async (_command, params) => {
+      if (workbenchAction(params) === "createTask") {
+        ids.push((params as { args: { requestId: string } }).args.requestId);
+        return ids.length === 1 ? { state: "unknown" } : { state: "confirmed", task: t };
+      }
+      return [];
+    });
+    let meta = emptyMeta();
+    await render(
+      <ActionHarvester
+        tasks={[]}
+        journals={[journal]}
+        scope={null}
+        libraries={[dida]}
+        day={day}
+        onUpdate={async (_, update) => {
+          meta = update(meta);
+        }}
+        onRefresh={async () => {}}
+        onSelect={() => {}}
+        revision={0}
+      />,
+    );
+    await click(button("行动捕手"));
+    await click(button("采纳并排入今天"));
+    expect(button("采纳并排入今天")).toBeUndefined();
+    expect(button("关联并补充至已有任务")).toBeUndefined();
+    await click(button("核对采纳回执"));
+    expect(ids).toHaveLength(2);
+    expect(ids[1]).toBe(ids[0]);
+    expect(meta.day).toBe(day);
+    expect(meta.links).toHaveLength(1);
+  });
+  it("已知远端任务 ID 的核对抛错后，仍只允许采用同一个来源", async () => {
+    vi.mocked(invoke).mockImplementation(async (_command, params) => {
+      if (workbenchAction(params) === "createTask") return { state: "unknown", sourceId: "new" };
+      return [];
+    });
+    const props = {
+      journals: [journal],
+      scope: null,
+      libraries: [dida],
+      day,
+      onUpdate: async () => {},
+      onRefresh: async () => {},
+      onSelect: () => {},
+      revision: 0,
+    };
+    await render(<ActionHarvester {...props} tasks={[]} />);
+    await click(button("行动捕手"));
+    await click(button("＋ 采纳到待办"));
+    const matchingTitle = extractClues([{ id: "j", title: "日志", text: journal.body }])[0].title;
+    await render(
+      <ActionHarvester
+        {...props}
+        tasks={[
+          { ...t, title: matchingTitle, sourceId: "old" },
+          { ...t, id: "new-id", title: matchingTitle, sourceId: "new" },
+        ]}
+      />,
+    );
+    vi.mocked(invoke).mockRejectedValueOnce(new Error("网络中断"));
+    await click(button("核对采纳回执"));
+    const adopt = [...host.querySelectorAll("button")].filter((b) => b.textContent?.includes("采用已同步的任务"));
+    expect(adopt).toHaveLength(1);
+    expect(adopt[0].textContent).toMatch(/new$/);
+  });
+  it("临近编号不会误入备料，近期固定现场保留在近期分组", () => {
+    const recent = { id: "field", title: "现场记录", text: "T29 120mm", date: day, journalId: "record" };
+    const wrong = { id: "wrong", title: "其他图纸", text: "T290 1120mm", date: day };
+    const old = { id: "old", title: "旧日志", text: "原文", date: "2024-02-01", journalId: "old-record" };
+    const pack = assembleMaterials("T29 核对 120mm 安装间距", [], [wrong], [recent, old], day);
+    expect(pack.recent).toEqual([recent]);
+    expect(pack.long).toEqual([]);
+    expect(pack.related).toEqual([old]);
+  });
+
   it("PDF 引用读取指定原页，绕过通用文档打开入口", async () => {
     const result = { id: "attachment-p5", title: "图纸", pageNumber: 5, contentType: "pdf_page" } as SearchResult;
     const open = vi.fn();
@@ -188,6 +394,34 @@ describe("行动工作台", () => {
     await archiveAction("task-1", "已收到结构回复", day);
     expect(ids[0]).toBe(ids[1]);
     expect(ids[1]).not.toBe(ids[2]);
+  });
+  it("只有并行等待的任务仍显示在专题下一步行动", async () => {
+    dashboard.tasks = [t];
+    await write("task." + identity(t), { ...emptyMeta(), waits: [{ ...wait, resolved: day }, parallel] });
+    await render(<TaskWorkspace libraries={[dida]} desktopSidebarVisible />);
+    await click(button("T29"));
+    expect(host.querySelector('section[aria-label="下一步行动"]')?.textContent).toContain(t.title);
+    expect(host.querySelector('section[aria-label="当前外部阻塞"]')?.textContent).not.toContain(t.title);
+    expect(host.textContent).toContain("当前无阻塞项，仍有 1 项并行等回复");
+  });
+  it("旧催办草稿在对应等待未明时不能追加，标记收到时撤下", async () => {
+    let meta: ActionMeta = {
+      ...emptyMeta(),
+      waits: [wait, parallel],
+      draft: { mode: "followup", claims: [{ source: "w", text: "请回复", quote: "支架数模" }], sources: [] },
+    };
+    await render(
+      <ActionDetail
+        {...{ task: t, meta, journals: [], scope: null, day, onClose: () => {} }}
+        update={async (fn) => {
+          meta = fn(meta);
+        }}
+      />,
+    );
+    expect(button("复制草稿").disabled).toBe(true);
+    await click(button("标记已收到"));
+    expect(meta.draft).toBeUndefined();
+    expect(meta.waits[1].resolved).toBeUndefined();
   });
   it("两个交付独立收件，专题的阻塞与并行数立即变化", async () => {
     let meta: ActionMeta = { ...emptyMeta(), waits: [wait, parallel] };

@@ -9,7 +9,7 @@ import type { UnifiedTask } from "./TaskWorkspacePresentation";
 import type { QuickJournalItem } from "./JournalRecords";
 import type { SearchResult } from "./SearchTypes";
 import type { ActionMeta, Draft, Topic } from "./ActionState";
-import { generate, native, todayKey, type Material, type ModelMode } from "./ActionEvidence";
+import { generate, native, type Material, type ModelMode } from "./ActionEvidence";
 import { Materials, assembleMaterials, useRecall } from "./ActionMaterials";
 import { sourceNoteStatus, type TaskNoteAction } from "./TaskPlanningSource";
 
@@ -116,6 +116,7 @@ export function ActionDetail({
   topicClick,
   completion,
   waitInitially = false,
+  planFull = false,
   onClose,
   topics = [],
 }: {
@@ -130,6 +131,7 @@ export function ActionDetail({
   topicClick?: () => void;
   completion?: React.ReactNode;
   waitInitially?: boolean;
+  planFull?: boolean;
   onClose: () => void;
 }) {
   const agent = useContext(AgentPanelContext);
@@ -187,9 +189,10 @@ export function ActionDetail({
     const sources = [base, ...pack.all].slice(0, 32);
     const claims = await generate(mode, sources);
     if (!claims.length) throw Error("材料不足，尚无可核对的建议。");
-    await update((m) => ({ ...m, draft: { mode, claims, sources, revision: task.contentRevision } }));
+    await update((m) => ({ ...m, draft: { mode, claims, sources, revision: task.contentRevision, waitId } }));
   }
   const staleDraft = !!meta.draft?.revision && meta.draft.revision !== task.contentRevision;
+  const unboundFollowup = meta.draft?.mode === "followup" && !meta.draft.waitId;
   const draftText =
     meta.draft?.claims
       .map(
@@ -264,7 +267,8 @@ export function ActionDetail({
       </div>
       <div className="aw-tools">
         <button
-          disabled={!!busy || task.completed}
+          disabled={!!busy || task.completed || (planFull && meta.day !== day)}
+          title={planFull && meta.day !== day ? "今日计划已满" : undefined}
           aria-pressed={meta.day === day}
           onClick={() => change((m) => ({ ...m, day: m.day === day ? "" : day }))}
         >
@@ -297,7 +301,11 @@ export function ActionDetail({
                     onClick={() =>
                       change((m) => ({
                         ...m,
-                        waits: m.waits.map((row) => (row.id === w.id ? { ...row, resolved: todayKey() } : row)),
+                        waits: m.waits.map((row) => (row.id === w.id ? { ...row, resolved: day } : row)),
+                        draft:
+                          m.draft?.mode === "followup" && (!m.draft.waitId || m.draft.waitId === w.id)
+                            ? undefined
+                            : m.draft,
                       }))
                     }
                   >
@@ -418,7 +426,14 @@ export function ActionDetail({
             journals={journals}
             onOpen={onOpen}
             onPin={pin}
-            caption="长期规范与已确认图纸（跨时间窗）"
+            caption="长期规范与图纸（跨时间窗）"
+          />
+          <Materials
+            items={pack.related}
+            journals={journals}
+            onOpen={onOpen}
+            onPin={pin}
+            caption="已关联的其他来源"
           />
           <button disabled={!!busy} onClick={() => void act("起草评审", () => draft("draft"))}>
             起草评审要点
@@ -431,8 +446,10 @@ export function ActionDetail({
             {meta.draft.mode === "steps" ? "建议步骤" : meta.draft.mode === "followup" ? "催办消息" : "评审草稿"}
           </h3>
           {staleDraft && <p role="status">滴答原任务已更新，请按当前材料重新起草。</p>}
+          {unboundFollowup && <p role="status">旧草稿未关联到具体交付，请在对应的等待卡重新起草。</p>}
           <DraftView draft={meta.draft} journals={journals} onOpen={onOpen} />
           <button
+            disabled={unboundFollowup}
             onClick={() =>
               void act("复制", async () => {
                 await navigator.clipboard.writeText(draftText);
@@ -460,7 +477,7 @@ export function ActionDetail({
               采纳为执行步骤
             </button>
           )}
-          {!staleDraft && (
+          {!staleDraft && !unboundFollowup && (
             <SourceAppend key={draftText} task={task} text={draftText} workId={"workbench-" + task.sourceId} />
           )}
         </section>

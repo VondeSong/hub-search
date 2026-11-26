@@ -30,6 +30,7 @@ export function ActionHarvester({
   onSelect,
   onOpen,
   onCount,
+  planFull = false,
   revision,
 }: {
   tasks: UnifiedTask[];
@@ -42,6 +43,7 @@ export function ActionHarvester({
   onSelect: (t: UnifiedTask) => void;
   onOpen?: (r: SearchResult) => void;
   onCount?: (n: number) => void;
+  planFull?: boolean;
   revision: number;
 }) {
   const [docs, setDocs] = useState<SearchResult[]>([]),
@@ -145,8 +147,7 @@ export function ActionHarvester({
     onSelect(t);
   }
   async function link(t: UnifiedTask, c: Clue) {
-    const original = read<DecisionMap>("clues", {})[c.key];
-    await attach(t, c, original?.day || false, original?.wait, true);
+    await attach(t, c, false, undefined, true);
     try {
       const p = await native<TaskNoteAction>("prepareNote", {
         taskId: t.id,
@@ -170,10 +171,12 @@ export function ActionHarvester({
     const lib = old?.libraryId || destination;
     const title = old?.title || (edits[c.key] ?? titles[c.key] ?? c.title).trim();
     if (!lib || !title) throw Error("请选择滴答资料库并填写行动标题。");
+    if (!old?.requestId && kind === "today" && planFull) throw Error("今日计划已满，请先移出一项。");
     const requestId = old?.requestId || crypto.randomUUID();
     const intent = {
       clue: c,
       requestId,
+      sourceId: old?.sourceId,
       libraryId: lib,
       title,
       day: old?.requestId ? old.day : kind === "today" ? day : undefined,
@@ -191,7 +194,7 @@ export function ActionHarvester({
         delete remaining[c.key];
         await write("clues", remaining);
         setTick((v) => v + 1);
-      } else await decide(c.key, { ...intent, state: "unknown" });
+      } else await decide(c.key, { ...intent, state: "unknown", sourceId: receipt.sourceId || old?.sourceId });
       throw Error(receipt.error || "滴答写入尚未确认。核对原回执，或关联已出现的任务。");
     }
     await attach(receipt.task, c, intent.day || false, intent.wait);
@@ -248,7 +251,7 @@ export function ActionHarvester({
           {clues.slice(0, limit).map((c) => {
             const matches = possibleMatches.get(c.key) || [],
               selected = tasks.find(
-                (t) => identity(t) === (choices[c.key] || (matches[0] ? identity(matches[0]) : "")),
+                (t) => identity(t) === (choices[c.key] ?? (matches.length === 1 ? identity(matches[0]) : "")),
               );
             const saved = decisions[c.key];
             const pending = saved?.requestId;
@@ -274,6 +277,31 @@ export function ActionHarvester({
                 </article>
               );
             }
+            if (pending) {
+              const syncedMatches = tasks.filter(
+                (task) =>
+                  task.libraryId === saved.libraryId &&
+                  (saved.sourceId ? task.sourceId === saved.sourceId : task.title === saved.title),
+              );
+              return (
+                <article key={c.key}>
+                  <strong>{saved.title}</strong>
+                  <p>滴答采纳待确认。核对时会沿用原请求。</p>
+                  <button disabled={!!busy} onClick={() => void run(c.key, () => create(c, "backlog"))}>
+                    核对采纳回执
+                  </button>
+                  {syncedMatches.map((task) => (
+                    <button
+                      key={identity(task)}
+                      disabled={!!busy}
+                      onClick={() => void run(c.key, () => attach(task, c, saved.day || false, saved.wait))}
+                    >
+                      采用已同步的任务 · {task.collectionName || task.documentTitle} · {task.sourceId}
+                    </button>
+                  ))}
+                </article>
+              );
+            }
             return (
               <article key={c.key}>
                 <input
@@ -284,11 +312,17 @@ export function ActionHarvester({
                 />
                 <Materials items={[c.material]} journals={journals} onOpen={onOpen} />
                 <blockquote>{c.material.text}</blockquote>
-                {selected && (
+                {selected ? (
                   <div className="aw-match">
                     🔗 匹配已有任务：<strong>{selected.title}</strong>
+                    <small>
+                      {" "}
+                      · {selected.collectionName || selected.documentTitle} · {selected.libraryName}
+                    </small>
                   </div>
-                )}
+                ) : matches.length > 1 ? (
+                  <div className="aw-match">发现 {matches.length} 项相似任务，请选择要关联的任务。</div>
+                ) : null}
                 <div className="aw-tools">
                   <select
                     aria-label="关联已有任务"
@@ -306,7 +340,16 @@ export function ActionHarvester({
                         .slice(0, 40),
                     ].map((t) => (
                       <option key={identity(t)} value={identity(t)}>
-                        {t.title}
+                        {t.title} · {t.collectionName || t.documentTitle} · {t.libraryName}
+                        {tasks.some(
+                          (other) =>
+                            other.id !== t.id &&
+                            other.title === t.title &&
+                            other.libraryId === t.libraryId &&
+                            (other.collectionId || other.documentTitle) === (t.collectionId || t.documentTitle),
+                        )
+                          ? " · " + t.sourceId.slice(-6)
+                          : ""}
                       </option>
                     ))}
                   </select>
@@ -322,29 +365,32 @@ export function ActionHarvester({
                 </div>
                 <div className="aw-tools">
                   <button
-                    disabled={!!busy || (!destination && !pending)}
+                    disabled={!!busy || !destination}
                     onClick={() => void run(c.key, () => create(c, "backlog"))}
                   >
-                    {pending ? "核对采纳回执" : selected ? "仍新建待办" : "＋ 采纳到待办"}
+                    {matches.length || selected ? "仍新建待办" : "＋ 采纳到待办"}
                   </button>
                   <button
-                    disabled={!!busy || !destination || !!pending}
+                    disabled={!!busy || !destination || planFull}
+                    title={planFull ? "今日计划已满" : undefined}
                     onClick={() => void run(c.key, () => create(c, "today"))}
                   >
                     采纳并排入今天
                   </button>
                   <button
-                    disabled={!!busy || !destination || !!pending}
+                    disabled={!!busy || !destination}
                     onClick={() => {
                       setWaiting(c.key);
                       setWho("");
-                      setWhat(titles[c.key] || c.title);
+                      setWhat(edits[c.key] ?? titles[c.key] ?? c.title);
+                      setReview(day);
+                      setBlocking(false);
                     }}
                   >
                     设为等待
                   </button>
                   <button
-                    disabled={!!busy || !!pending}
+                    disabled={!!busy}
                     onClick={() => void run(c.key, () => decide(c.key, { state: "ignored" }))}
                   >
                     忽略

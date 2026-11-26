@@ -6,11 +6,13 @@ import type { UnifiedTask } from "./TaskWorkspacePresentation";
 export function ActionTodayPlan({
   tasks,
   day,
+  planFull = false,
   meta,
   onPlan,
 }: {
   tasks: UnifiedTask[];
   day: string;
+  planFull?: boolean;
   meta: (t: UnifiedTask) => ActionMeta;
   onPlan: (t: UnifiedTask) => Promise<void>;
 }) {
@@ -45,7 +47,8 @@ export function ActionTodayPlan({
     <div className="aw-today-plan">
       <button
         className="aw-ai"
-        disabled={busy}
+        disabled={busy || planFull}
+        title={planFull ? "今日计划已满" : undefined}
         onClick={() => {
           setShow(true);
           void suggest();
@@ -65,7 +68,7 @@ export function ActionTodayPlan({
                   <strong>{t.title}</strong>
                   <p>{item.text}</p>
                   <button
-                    disabled={meta(t).day === day}
+                    disabled={planFull || meta(t).day === day}
                     onClick={() => void onPlan(t).catch((e) => setError(String(e)))}
                   >
                     {meta(t).day === day ? "已排入今天" : "排入今天"}

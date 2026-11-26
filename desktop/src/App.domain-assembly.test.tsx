@@ -13,7 +13,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), save: vi.fn() }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openPath: vi.fn(), openUrl: vi.fn() }));
 vi.mock("./FlashcardsWorkspace", () => ({ FlashcardsWorkspace: () => <div data-testid="paused-review">暂停的复习</div> }));
 vi.mock("./CloudAgents", () => ({ default: ({ onClose }: { onClose: () => void }) => <div data-testid="cloud-agents">云端对话<button onClick={onClose} aria-label="关闭云端 Agents">关闭</button></div> }));
-vi.mock("./TaskWorkspace", () => ({ TaskWorkspace: () => <div data-testid="tasks">任务</div> }));
+vi.mock("./ActionWorkspace", () => ({ TaskWorkspace: () => <div data-testid="tasks">任务</div> }));
 vi.mock("./CollectionsWorkspace", () => ({ CollectionsWorkspace: ({ initialItemKey, onSearchTargetHandled }: { initialItemKey?: string; onSearchTargetHandled?: () => void }) => {
   const [target, setTarget] = useState(initialItemKey);
   useEffect(() => { if (initialItemKey) { setTarget(initialItemKey); onSearchTargetHandled?.(); } }, [initialItemKey, onSearchTargetHandled]);

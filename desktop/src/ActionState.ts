@@ -12,7 +12,7 @@ export type Wait = {
   resolved?: string;
 };
 export type Step = { id: string; text: string; done: boolean };
-export type Draft = { mode: string; claims: Claim[]; sources: Material[]; revision?: string };
+export type Draft = { mode: string; claims: Claim[]; sources: Material[]; revision?: string; waitId?: string };
 export type ActionMeta = {
   day?: string;
   waits: Wait[];
@@ -28,13 +28,16 @@ export type Decision = {
   clue?: { key: string; title: string; material: Material };
   taskKey?: string;
   requestId?: string;
+  sourceId?: string;
   libraryId?: string;
   title?: string;
   day?: string;
   wait?: Wait;
 };
+export const TODAY_PLAN_LIMIT = 5;
 export const identity = (task: UnifiedTask) => JSON.stringify([task.libraryId, task.sourceId]);
 export const emptyMeta = (): ActionMeta => ({ waits: [], links: [], steps: [] });
+export const hasBlockingWait = (meta: ActionMeta) => meta.waits.some((wait) => wait.blocking && !wait.resolved);
 const prefix = "hub.tasks.workbench.v1.";
 export function read<T>(key: string, fallback: T): T {
   const text = userProfileStorage.getItem(prefix + key);
