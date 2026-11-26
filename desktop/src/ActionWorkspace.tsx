@@ -18,7 +18,7 @@ import { TaskStatusControl, TaskStatusNotice } from "./TaskStatusControl";
 import type { UnifiedTask } from "./TaskWorkspacePresentation";
 import type { QuickJournalItem } from "./JournalRecords";
 import { QUICK_JOURNAL_UPDATED } from "./QuickJournalEvents";
-import { ActionTodayPlan } from "./ActionTodayPlan";
+import { ActionEodReview, ActionTodayPlan } from "./ActionTodayPlan";
 import { ActionHarvester } from "./ActionHarvester";
 import { ActionDetail } from "./ActionDetail";
 import { ActionTopic } from "./ActionTopic";
@@ -95,6 +95,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
   const recallCache = useMemo<RecallCache>(() => new Map(), [scopeKey, refreshKey]);
   const [detailPercent, setDetailPercent] = useState(44);
   const [clueCount, setClueCount] = useState(0);
+  const [closureTaskKey, setClosureTaskKey] = useState("");
   const bump = () => setRevision((v) => v + 1);
   useEffect(() => {
     const trigger = () => setRefreshKey((v) => v + 1),
@@ -333,6 +334,15 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
                   onChange={(task, done) =>
                     void store.setTaskCompleted(task, done).then((ok) => {
                       if (!ok) setNotice("完成状态尚待滴答核对");
+                      else if (done) {
+                        const m = meta(task);
+                        if (m.note?.trim() || m.steps.some((s) => s.done) || m.waits.some((w) => w.resolved)) {
+                          setClosureTaskKey(identity(task));
+                          setSelected(identity(task));
+                        }
+                      } else if (closureTaskKey === identity(task)) {
+                        setClosureTaskKey("");
+                      }
                     })
                   }
                 />
@@ -449,15 +459,15 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
     </form>
   );
   return (
-    <main
-      style={
-        {
-          "--aw-paper-width": detailPercent + "fr",
-          "--aw-list-width": 100 - detailPercent + "fr",
-        } as React.CSSProperties
-      }
-      className={"aw-shell" + (nav ? "" : " aw-nav-hidden") + (selectedTask ? " has-detail" : "")}
-    >
+      <main
+        style={
+          {
+            "--aw-paper-width": detailPercent + "fr",
+            "--aw-list-width": 100 - detailPercent + "fr",
+          } as React.CSSProperties
+        }
+        className={"aw-shell" + (nav ? "" : " aw-nav-hidden") + (selectedTask ? " has-detail" : "")}
+      >
       {nav && (
         <nav className="aw-nav">
           <h3>行动聚焦（按时间）</h3>
@@ -543,6 +553,16 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+            {search && (
+              <button
+                type="button"
+                className="aw-search-clear"
+                aria-label="清空搜索"
+                onClick={() => setSearch("")}
+              >
+                ×
+              </button>
+            )}
           </label>
           {!project && (
             <div className="aw-switch">
@@ -559,18 +579,31 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
               <Sparkles size={13} /> AI 专题复盘
             </button>
           ) : (
-            <ActionTodayPlan
-              tasks={scoped}
-              day={day}
-              planFull={planFull}
-              meta={meta}
-              onPlan={(t) => update(t, (m) => ({ ...m, day }))}
-            />
+            <>
+              <ActionEodReview
+                tasks={tasks}
+                day={day}
+                meta={meta}
+                onDeferTask={(t, nextDay) => update(t, (m) => ({ ...m, day: nextDay }))}
+              />
+              <ActionTodayPlan
+                tasks={scoped}
+                day={day}
+                planFull={planFull}
+                meta={meta}
+                onPlan={(t) => update(t, (m) => ({ ...m, day }))}
+              />
+            </>
           )}
         </header>
         <div className={"aw-scroll" + (board ? " aw-board" : "")}>
           {(store.error || journalError) && (
             <p role="alert">{[store.error, journalError].filter(Boolean).join(" · ")}</p>
+          )}
+          {notice && (
+            <p className="aw-notice" role="status">
+              {notice}
+            </p>
           )}
           {selectedLibraryIds && <button onClick={onClearLibraryScope}>清除资料库范围</button>}
           {store.loading && !tasks.length && <p>正在读取滴答任务…</p>}
@@ -670,7 +703,6 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
                   ))}
               </div>
             ))}
-          {notice && <p role="status">{notice}</p>}
         </div>
       </section>
       {selectedTask && (
@@ -705,11 +737,26 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
               <TaskStatusControl
                 task={selectedTask}
                 busy={store.taskBusyIds.has(selectedTask.id)}
-                onChange={(t, done) => void store.setTaskCompleted(t, done)}
+                pendingStatus={store.taskStatusTargets.get(selectedTask.id)}
+                onChange={(t, done) =>
+                  void store.setTaskCompleted(t, done).then((ok) => {
+                    if (!ok) setNotice("完成状态尚待滴答核对");
+                    else if (done) {
+                      const m = meta(t);
+                      if (m.note?.trim() || m.steps.some((s) => s.done) || m.waits.some((w) => w.resolved)) {
+                        setClosureTaskKey(identity(t));
+                      }
+                    } else if (closureTaskKey === identity(t)) {
+                      setClosureTaskKey("");
+                    }
+                  })
+                }
               />
             }
             topics={chosen}
             planFull={planFull}
+            justCompleted={closureTaskKey === identity(selectedTask)}
+            onDismissClosure={() => setClosureTaskKey("")}
             meta={meta(selectedTask)}
             update={(fn) => update(selectedTask, fn)}
             journals={journals}
@@ -720,6 +767,6 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
           />
         </>
       )}
-    </main>
+      </main>
   );
 }

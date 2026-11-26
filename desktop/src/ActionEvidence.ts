@@ -14,8 +14,17 @@ export type Material = {
   originId?: string;
   result?: SearchResult;
 };
-export type Claim = { text: string; source: string; quote: string; verify?: boolean };
+export type Citation = { source: string; quote: string };
+export type Claim = { text: string; source: string; quote: string; verify?: boolean; citations?: Citation[] };
 export type Clue = { key: string; title: string; material: Material };
+export type MeasurementConflict = {
+  unit: string;
+  spec: Material;
+  specValue: string;
+  field: Material;
+  fieldValue: string;
+};
+export type ParsedWaitDraft = { who: string; what: string; review: string; blocking: boolean };
 export type ModelMode = "harvest" | "steps" | "draft" | "report" | "followup" | "plan";
 export const native = <T>(action: string, args: object = {}) =>
   invoke<T>("task_planning_source", { args: { action, ...args } });
@@ -23,6 +32,62 @@ export const todayKey = (date = new Date()) =>
   [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join(
     "-",
   );
+export function shiftDay(day: string, deltaDays: number) {
+  const date = new Date(day + "T12:00:00");
+  if (!Number.isFinite(date.getTime())) return day;
+  date.setDate(date.getDate() + deltaDays);
+  return todayKey(date);
+}
+export function nextMonday(day: string) {
+  const date = new Date(day + "T12:00:00");
+  if (!Number.isFinite(date.getTime())) return day;
+  const diff = (8 - date.getDay()) % 7 || 7;
+  date.setDate(date.getDate() + diff);
+  return todayKey(date);
+}
+const weekdayMap: Record<string, number> = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 日: 0, 天: 0 };
+export function parseWaitFromText(text: string, day: string): ParsedWaitDraft {
+  const cleaned = text.trim();
+  let review = day;
+  const iso = cleaned.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  const cnDate = cleaned.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?/);
+  const weekday = cleaned.match(/(下)?(?:周|星期)([一二三四五六日天])/);
+  if (iso) {
+    review = iso[1];
+  } else if (cnDate) {
+    const year = day.slice(0, 4);
+    review = `${year}-${cnDate[1].padStart(2, "0")}-${cnDate[2].padStart(2, "0")}`;
+  } else if (/后天/.test(cleaned)) {
+    review = shiftDay(day, 2);
+  } else if (/明天/.test(cleaned)) {
+    review = shiftDay(day, 1);
+  } else if (weekday) {
+    const base = new Date(day + "T12:00:00");
+    if (Number.isFinite(base.getTime())) {
+      const target = weekdayMap[weekday[2]];
+      let diff = (target - base.getDay() + 7) % 7;
+      if (diff === 0 || weekday[1]) diff += 7;
+      review = shiftDay(day, diff);
+    }
+  }
+  const waitWho =
+    cleaned.match(
+      /(?:等|催|找|问|请)\s*([^\s，,。；;：:]{2,14}?)(?:下?(?:周|星期)[一二三四五六日天]|明天|后天|今天|月底|年底|前|回传|回复|发|给|补发|提供|确认|复核|核对|对接|沟通)/,
+    )?.[1] || "";
+  const blocking = /阻塞|卡住|卡在|否则(?:无法|卡)|前置|先等|待.{0,12}后再/.test(cleaned);
+  let what = cleaned
+    .replace(/^(?:[-*]\s*)?\[ \]\s*|^TODO[:：]?\s*/i, "")
+    .replace(/(?:，|,)?\s*(?:否则|不然).+$/, "")
+    .trim();
+  if (waitWho) {
+    const afterWho = what.split(waitWho).slice(1).join(waitWho);
+    const trimmed = afterWho
+      .replace(/^(?:下?(?:周|星期)[一二三四五六日天]|明天|后天|今天|月底|年底)?(?:前)?(?:回传|回复|补发|提供|发|给)?/, "")
+      .trim();
+    if (trimmed.length >= 2) what = trimmed;
+  }
+  return { who: waitWho, what: what || cleaned, review, blocking };
+}
 const actionWords =
   /(?:^\s*(?:[-*]\s*)?\[ \]|\bTODO\b|待确认|待办|待验证|回头.{0,18}(?:找|对|确认|看)|我来|我负责|我需要|我得|等.{1,15}回传|跟进|(?<!不)(?:得|要|记得)\s*(?:找|问|催|核对|复核|查一下|确认|对接|补发))/i;
 const stop = new Set(
@@ -181,6 +246,59 @@ const normalizeEvidence = (text: string) =>
 const evidenceMatches = (text: string, pattern: RegExp) =>
   (text.match(pattern) || []).map((value) => value.replace(/\s+/g, ""));
 
+const unitFromMeasurement = (token: string) => {
+  const m = token.match(/[a-zμµ°º%·⋅\u4e00-\u9fff]+$/i);
+  return m ? m[0].replace(/毫米/g, "mm").replace(/厘米/g, "cm").replace(/微米/g, "μm").replace(/摄氏度|℃|°c/gi, "°c") : "";
+};
+const numberFromMeasurement = (token: string) => {
+  const m = token.match(/[+-]?\d+(?:\.\d+)?/);
+  return m ? Number(m[0]) : NaN;
+};
+export function detectMeasurementConflicts(recent: Material[], long: Material[]): MeasurementConflict[] {
+  if (!recent.length || !long.length) return [];
+  const specByUnit = new Map<string, { material: Material; raw: string; value: number }[]>();
+  for (const spec of long) {
+    const normalized = normalizeEvidence(spec.text);
+    for (const token of evidenceMatches(normalized, engineeringMeasurements)) {
+      const unit = unitFromMeasurement(token);
+      const value = numberFromMeasurement(token);
+      if (!unit || !Number.isFinite(value)) continue;
+      const list = specByUnit.get(unit) || [];
+      if (!list.some((row) => row.value === value && row.material.id === spec.id)) {
+        list.push({ material: spec, raw: token, value });
+        specByUnit.set(unit, list);
+      }
+    }
+  }
+  const conflicts: MeasurementConflict[] = [];
+  const seen = new Set<string>();
+  for (const field of recent) {
+    const normalized = normalizeEvidence(field.text);
+    for (const token of evidenceMatches(normalized, engineeringMeasurements)) {
+      const unit = unitFromMeasurement(token);
+      const value = numberFromMeasurement(token);
+      if (!unit || !Number.isFinite(value)) continue;
+      const specs = specByUnit.get(unit);
+      if (!specs) continue;
+      for (const spec of specs) {
+        if (spec.value === value) continue;
+        const key = `${unit}:${spec.material.id}:${field.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        conflicts.push({
+          unit,
+          spec: spec.material,
+          specValue: spec.raw,
+          field,
+          fieldValue: token,
+        });
+        if (conflicts.length >= 3) return conflicts;
+      }
+    }
+  }
+  return conflicts;
+}
+
 export async function generate(mode: ModelMode, materials: Material[]): Promise<Claim[]> {
   const input = materials
     .slice(0, 48)
@@ -188,20 +306,36 @@ export async function generate(mode: ModelMode, materials: Material[]): Promise<
   const value = await native<{ items: Claim[] }>("workbenchModel", { mode, materials: input });
   const accepted: Claim[] = [];
   for (const item of value.items) {
-    const i = input.findIndex((m) => m.id === item.source);
-    if (i < 0 || !item.text.trim() || !item.quote.trim() || !input[i].text.includes(item.quote)) continue;
-    const quote = normalizeEvidence(item.quote);
+    if (!item.text.trim()) continue;
+    const rawCitations: Citation[] =
+      Array.isArray(item.citations) && item.citations.length
+        ? item.citations
+        : [{ source: item.source, quote: item.quote }];
+    const verifiedCitations: Citation[] = [];
+    for (const cite of rawCitations) {
+      const idx = input.findIndex((m) => m.id === cite.source);
+      if (idx < 0 || !cite.quote?.trim() || !input[idx].text.includes(cite.quote)) continue;
+      verifiedCitations.push({ source: materials[idx].id, quote: cite.quote });
+    }
+    if (!verifiedCitations.length) continue;
+    const quotes = verifiedCitations.map((c) => normalizeEvidence(c.quote));
     const claim = normalizeEvidence(item.text);
     const unsupported =
       [evidenceNumbers, engineeringMeasurements].some((pattern) => {
-        const quoted = new Set(evidenceMatches(quote, pattern));
+        const quoted = new Set(quotes.flatMap((quote) => evidenceMatches(quote, pattern)));
         return evidenceMatches(claim, pattern).some((token) => !quoted.has(token));
       }) ||
-      (/已达标|放行|符合标准|确认通过/.test(item.text) && !item.quote.includes(item.text));
-    const source = materials[i].id;
-    if (accepted.some((claim) => claim.source === source && (mode === "plan" || claim.text === item.text)))
-      continue;
-    accepted.push({ ...item, verify: item.verify || unsupported, source });
+      (/已达标|放行|符合标准|确认通过/.test(item.text) &&
+        !verifiedCitations.some((c) => c.quote.includes(item.text)));
+    const primary = verifiedCitations[0];
+    if (accepted.some((c) => c.source === primary.source && (mode === "plan" || c.text === item.text))) continue;
+    accepted.push({
+      ...item,
+      verify: item.verify || unsupported,
+      source: primary.source,
+      quote: primary.quote,
+      citations: verifiedCitations.length > 1 ? verifiedCitations : undefined,
+    });
   }
   if (value.items.length && !accepted.length) throw Error("生成内容未能对应原文，请重新选择材料。");
   return accepted;

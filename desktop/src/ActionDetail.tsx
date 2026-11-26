@@ -10,7 +10,15 @@ import type { UnifiedTask } from "./TaskWorkspacePresentation";
 import type { QuickJournalItem } from "./JournalRecords";
 import type { SearchResult } from "./SearchTypes";
 import type { ActionMeta, Draft, Topic } from "./ActionState";
-import { generate, native, type Material, type ModelMode } from "./ActionEvidence";
+import {
+  detectMeasurementConflicts,
+  generate,
+  native,
+  nextMonday,
+  shiftDay,
+  type Material,
+  type ModelMode,
+} from "./ActionEvidence";
 import { Materials, assembleMaterials, useRecall, type RecallCache } from "./ActionMaterials";
 import { sourceNoteStatus, type TaskNoteAction } from "./TaskPlanningSource";
 
@@ -88,18 +96,26 @@ export function DraftView({
   return (
     <ol className="aw-claims">
       {draft.claims.map((claim, i) => {
-        const source = draft.sources.find((m) => m.id === claim.source);
+        const citations =
+          claim.citations && claim.citations.length
+            ? claim.citations
+            : [{ source: claim.source, quote: claim.quote }];
         return (
           <li key={i}>
             {claim.verify && <strong className="aw-review">⚠ 待核实 · </strong>}
             {claim.text}
-            {source && (
-              <details>
-                <summary>依据 · {source.title}</summary>
-                <blockquote>{claim.quote}</blockquote>
-                <Materials items={[source]} journals={journals} onOpen={onOpen} />
-              </details>
-            )}
+            {citations.map((cite, j) => {
+              const source = draft.sources.find((m) => m.id === cite.source);
+              return (
+                source && (
+                  <details key={j}>
+                    <summary>依据 · {source.title}</summary>
+                    <blockquote>{cite.quote}</blockquote>
+                    <Materials items={[source]} journals={journals} onOpen={onOpen} />
+                  </details>
+                )
+              );
+            })}
           </li>
         );
       })}
@@ -119,6 +135,8 @@ export function ActionDetail({
   completion,
   waitInitially = false,
   planFull = false,
+  justCompleted = false,
+  onDismissClosure,
   onClose,
   topics = [],
 }: {
@@ -135,6 +153,8 @@ export function ActionDetail({
   completion?: React.ReactNode;
   waitInitially?: boolean;
   planFull?: boolean;
+  justCompleted?: boolean;
+  onDismissClosure?: () => void;
   onClose: () => void;
 }) {
   const agent = useContext(AgentPanelContext);
@@ -145,7 +165,12 @@ export function ActionDetail({
     () => assembleMaterials(task.title, journals, recall.items, meta.links, day),
     [task.title, journals, recall.items, meta.links, day],
   );
+  const conflicts = useMemo(
+    () => detectMeasurementConflicts(pack.recent, pack.long),
+    [pack.recent, pack.long],
+  );
   const [waitOpen, setWaitOpen] = useState(waitInitially),
+    [editingWaitId, setEditingWaitId] = useState<string | null>(null),
     [who, setWho] = useState(""),
     [what, setWhat] = useState(""),
     [review, setReview] = useState(day),
@@ -153,7 +178,8 @@ export function ActionDetail({
   const [step, setStep] = useState(""),
     [note, setNote] = useState(meta.note || ""),
     [busy, setBusy] = useState(""),
-    [status, setStatus] = useState("");
+    [status, setStatus] = useState(""),
+    [statusError, setStatusError] = useState(false);
   const live = useRef(true),
     lock = useRef(false),
     lastSavedNote = useRef(meta.note || "");
@@ -173,10 +199,14 @@ export function ActionDetail({
     lock.current = true;
     setBusy(label);
     setStatus("");
+    setStatusError(false);
     try {
       await fn();
     } catch (e) {
-      if (live.current) setStatus(String(e));
+      if (live.current) {
+        setStatus(e instanceof Error ? e.message : String(e));
+        setStatusError(true);
+      }
     } finally {
       lock.current = false;
       if (live.current) setBusy("");
@@ -287,6 +317,32 @@ export function ActionDetail({
         </button>
       </header>
       <div className="aw-detail-scroll">
+        {justCompleted && task.completed && (
+          <div className="aw-closure-banner" role="status">
+            <span>任务已闭环 · 是否将推进结论沉淀至今日日志？</span>
+            <div className="aw-wait-actions">
+              <button
+                disabled={!!busy}
+                onClick={() =>
+                  void act("记入日志", async () => {
+                    setStatus(
+                      await archiveAction(
+                        identity(task),
+                        [task.title, meta.note, ...meta.steps.filter((s) => s.done).map((s) => "✓ " + s.text)]
+                          .filter(Boolean)
+                          .join("\n"),
+                      ),
+                    );
+                    onDismissClosure?.();
+                  })
+                }
+              >
+                一键归档至今日日志
+              </button>
+              <button onClick={() => onDismissClosure?.()}>跳过</button>
+            </div>
+          </div>
+        )}
         <div className="aw-detail-content">
           <div className="aw-detail-title">
             {completion}
@@ -302,7 +358,21 @@ export function ActionDetail({
               <Target size={12} aria-hidden="true" />
               {meta.day === day ? "已在今日计划" : "＋ 加入今日计划"}
             </button>
-            <button disabled={task.completed} onClick={() => setWaitOpen((v) => !v)}>
+            <button
+              disabled={task.completed}
+              onClick={() => {
+                if (editingWaitId) {
+                  setEditingWaitId(null);
+                  setWho("");
+                  setWhat("");
+                  setReview(day);
+                  setBlocking(true);
+                  setWaitOpen(true);
+                } else {
+                  setWaitOpen((v) => !v);
+                }
+              }}
+            >
               <Clock3 size={12} aria-hidden="true" /> ＋ 新增等待项
             </button>
             <small>
@@ -328,11 +398,7 @@ export function ActionDetail({
                   <div className="aw-wait-deliverable">交付物：{w.what}</div>
                   {!task.completed && (
                     <div className="aw-wait-actions">
-                      {w.resolved ? (
-                        <button disabled={!!busy} onClick={() => resolveWait(w.id)}>
-                          恢复等待
-                        </button>
-                      ) : (
+                      {!w.resolved ? (
                         <>
                           <button
                             disabled={!!busy}
@@ -349,21 +415,95 @@ export function ActionDetail({
                           >
                             复制催办
                           </button>
-                          <button
-                            className="aw-wait-received"
-                            disabled={!!busy}
-                            onClick={() => resolveWait(w.id, day)}
-                          >
+                          <button className="aw-wait-received" disabled={!!busy} onClick={() => resolveWait(w.id, day)}>
                             标记已收到
                           </button>
+                          <button disabled={!!busy} onClick={() => void act("起草催办", () => draft("followup", w.id))}>
+                            起草催办
+                          </button>
                           <button
+                            className="aw-snooze"
                             disabled={!!busy}
-                            onClick={() => void act("起草催办", () => draft("followup", w.id))}
+                            onClick={() =>
+                              change((m) => ({
+                                ...m,
+                                waits: m.waits.map((row) =>
+                                  row.id === w.id ? { ...row, review: shiftDay(row.review || day, 1) } : row,
+                                ),
+                                draft: m.draft?.mode === "followup" && m.draft.waitId === w.id ? undefined : m.draft,
+                              }))
+                            }
                           >
-                            AI 起草催办
+                            +1天
+                          </button>
+                          <button
+                            className="aw-snooze"
+                            disabled={!!busy}
+                            onClick={() =>
+                              change((m) => ({
+                                ...m,
+                                waits: m.waits.map((row) =>
+                                  row.id === w.id ? { ...row, review: shiftDay(row.review || day, 3) } : row,
+                                ),
+                                draft: m.draft?.mode === "followup" && m.draft.waitId === w.id ? undefined : m.draft,
+                              }))
+                            }
+                          >
+                            +3天
+                          </button>
+                          <button
+                            className="aw-snooze"
+                            disabled={!!busy}
+                            onClick={() =>
+                              change((m) => ({
+                                ...m,
+                                waits: m.waits.map((row) =>
+                                  row.id === w.id ? { ...row, review: nextMonday(day) } : row,
+                                ),
+                                draft: m.draft?.mode === "followup" && m.draft.waitId === w.id ? undefined : m.draft,
+                              }))
+                            }
+                          >
+                            下周一
                           </button>
                         </>
+                      ) : (
+                        <button disabled={!!busy} onClick={() => resolveWait(w.id)}>
+                          恢复等待
+                        </button>
                       )}
+                      <button
+                        disabled={!!busy}
+                        onClick={() => {
+                          setEditingWaitId(w.id);
+                          setWho(w.who);
+                          setWhat(w.what);
+                          setReview(w.review || day);
+                          setBlocking(Boolean(w.blocking));
+                          setWaitOpen(true);
+                        }}
+                      >
+                        编辑
+                      </button>
+                      <button
+                        disabled={!!busy}
+                        onClick={() => {
+                          if (editingWaitId === w.id) {
+                            setEditingWaitId(null);
+                            setWaitOpen(false);
+                          }
+                          change((m) => ({
+                            ...m,
+                            waits: m.waits.filter((row) => row.id !== w.id),
+                            draft:
+                              m.draft?.mode === "followup" && (!m.draft.waitId || m.draft.waitId === w.id)
+                                ? undefined
+                                : m.draft,
+                          }));
+                        }}
+                      >
+                        删除
+                      </button>
                     </div>
                   )}
                 </div>
@@ -377,16 +517,30 @@ export function ActionDetail({
                 e.preventDefault();
                 if (!who.trim() || !what.trim()) return;
                 void act("保存", async () => {
+                  const targetId = editingWaitId;
                   await update((m) => ({
                     ...m,
-                    waits: [
-                      ...m.waits,
-                      { id: crypto.randomUUID(), who: who.trim(), what: what.trim(), review, blocking },
-                    ],
+                    waits: targetId
+                      ? m.waits.map((row) =>
+                          row.id === targetId
+                            ? { ...row, who: who.trim(), what: what.trim(), review, blocking }
+                            : row,
+                        )
+                      : [
+                          ...m.waits,
+                          { id: crypto.randomUUID(), who: who.trim(), what: what.trim(), review, blocking },
+                        ],
+                    draft:
+                      targetId && m.draft?.mode === "followup" && m.draft.waitId === targetId
+                        ? undefined
+                        : m.draft,
                   }));
+                  setEditingWaitId(null);
                   setWaitOpen(false);
                   setWho("");
                   setWhat("");
+                  setReview(day);
+                  setBlocking(true);
                 });
               }}
             >
@@ -403,10 +557,25 @@ export function ActionDetail({
                 <input required type="date" value={review} onChange={(e) => setReview(e.target.value)} />
               </label>
               <label>
-                <input type="checkbox" checked={blocking} onChange={(e) => setBlocking(e.target.checked)} />{" "}
-                阻塞下一步
+                <input type="checkbox" checked={blocking} onChange={(e) => setBlocking(e.target.checked)} /> 阻塞下一步
               </label>
-              <button disabled={!!busy}>保存等待项</button>
+              <div className="aw-wait-actions">
+                <button disabled={!!busy}>{editingWaitId ? "更新等待项" : "保存等待项"}</button>
+                <button
+                  type="button"
+                  disabled={!!busy}
+                  onClick={() => {
+                    setEditingWaitId(null);
+                    setWaitOpen(false);
+                    setWho("");
+                    setWhat("");
+                    setReview(day);
+                    setBlocking(true);
+                  }}
+                >
+                  取消
+                </button>
+              </div>
             </form>
           )}
           <section className="aw-detail-steps">
@@ -423,20 +592,38 @@ export function ActionDetail({
             </h3>
             <div className="aw-checklist">
               {meta.steps.map((s) => (
-                <label className="aw-step" key={s.id}>
-                  <input
-                    type="checkbox"
-                    disabled={!!busy || task.completed}
-                    checked={s.done}
-                    onChange={() =>
-                      change((m) => ({
-                        ...m,
-                        steps: m.steps.map((row) => (row.id === s.id ? { ...row, done: !row.done } : row)),
-                      }))
-                    }
-                  />
-                  <span>{s.text}</span>
-                </label>
+                <div className="aw-step-row" key={s.id}>
+                  <label className="aw-step">
+                    <input
+                      type="checkbox"
+                      disabled={!!busy || task.completed}
+                      checked={s.done}
+                      onChange={() =>
+                        change((m) => ({
+                          ...m,
+                          steps: m.steps.map((row) => (row.id === s.id ? { ...row, done: !row.done } : row)),
+                        }))
+                      }
+                    />
+                    <span className={s.done ? "is-done" : ""}>{s.text}</span>
+                  </label>
+                  {!task.completed && (
+                    <button
+                      type="button"
+                      className="aw-step-remove"
+                      aria-label={"删除步骤：" + s.text}
+                      disabled={!!busy}
+                      onClick={() =>
+                        change((m) => ({
+                          ...m,
+                          steps: m.steps.filter((row) => row.id !== s.id),
+                        }))
+                      }
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               ))}
               {!meta.steps.length && <p>暂无子步骤，回车添加或点右上角拆解</p>}
               {!task.completed && (
@@ -477,6 +664,16 @@ export function ActionDetail({
                 </div>
               )}
               <div className={hasMaterials ? "aw-brief-box" : undefined}>
+                {conflicts.length > 0 && (
+                  <div className="aw-conflict-card" role="status">
+                    <strong>⚡ 工程参数差异提示（{conflicts.length} 处）</strong>
+                    {conflicts.map((conflict, idx) => (
+                      <p key={idx}>
+                        {conflict.spec.title}（{conflict.specValue}）与 {conflict.field.title}（{conflict.fieldValue}）数值不同，请先核对是否指同一项参数。
+                      </p>
+                    ))}
+                  </div>
+                )}
                 <Materials
                   items={pack.recent}
                   journals={journals}
@@ -642,7 +839,7 @@ export function ActionDetail({
           )}
         </div>
       </div>
-      <p role="status">{busy ? busy + "中…" : status}</p>
+      <p role={statusError ? "alert" : "status"}>{busy ? busy + "中…" : status}</p>
     </aside>
   );
 }

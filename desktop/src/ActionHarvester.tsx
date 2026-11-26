@@ -11,14 +11,19 @@ import {
   journalMaterial,
   matchExisting,
   native,
+  nextMonday,
+  parseWaitFromText,
+  shiftDay,
   todayKey,
   type Clue,
+  type Material,
 } from "./ActionEvidence";
 import { read, write, identity, type ActionMeta, type Decision, type Wait } from "./ActionState";
 import { Materials } from "./ActionMaterials";
 import { sourceNoteStatus, type TaskNoteAction } from "./TaskPlanningSource";
 
-type DecisionMap = Record<string, Decision>;
+type AdoptionOptions = { projectId?: string; priority?: number };
+type DecisionMap = Record<string, Decision & AdoptionOptions>;
 type Receipt = { state: string; task?: UnifiedTask; error?: string; sourceId?: string };
 const CLUES_PER_PAGE = 3;
 export function ActionHarvester({
@@ -57,7 +62,11 @@ export function ActionHarvester({
     [opened, setOpen] = useState(false),
     [target, setTarget] = useState("");
   const [edits, setEdits] = useState<Record<string, string>>({}),
-    [waiting, setWaiting] = useState(""),
+    [panelKey, setPanelKey] = useState(""),
+    [panelMode, setPanelMode] = useState<"adopt" | "wait">("adopt"),
+    [adoptKind, setAdoptKind] = useState<"backlog" | "today">("backlog"),
+    [adoptProject, setAdoptProject] = useState(""),
+    [adoptPriority, setAdoptPriority] = useState<0 | 5>(0),
     [who, setWho] = useState(""),
     [what, setWhat] = useState(""),
     [review, setReview] = useState(day),
@@ -65,9 +74,16 @@ export function ActionHarvester({
   const [limit, setLimit] = useState(CLUES_PER_PAGE),
     [picker, setPicker] = useState(""),
     [matchSearch, setMatchSearch] = useState("");
-  const [choices, setChoices] = useState<Record<string, string>>({}),
-    [excluded, setExcluded] = useState<Set<string>>(new Set());
-  const [titles, setTitles] = useState<Record<string, string>>({});
+  const [choices, setChoices] = useState<Record<string, string>>({});
+  const initialRefined = useMemo(
+    () => read<{ titles: Record<string, string>; excluded: string[] }>("clues.refined", { titles: {}, excluded: [] }),
+    [],
+  );
+  const [excluded, setExcluded] = useState<Set<string>>(() => new Set(initialRefined.excluded));
+  const [titles, setTitles] = useState<Record<string, string>>(() => initialRefined.titles);
+  const [deepOpen, setDeepOpen] = useState(false);
+  const [deepPicked, setDeepPicked] = useState<string[]>([]);
+  const [deepClues, setDeepClues] = useState<Clue[]>([]);
   const lock = useRef(false);
   const scopeKey = JSON.stringify(scope);
   const lastScopeKey = useRef(scopeKey);
@@ -76,6 +92,9 @@ export function ActionHarvester({
     if (lastScopeKey.current !== scopeKey) {
       lastScopeKey.current = scopeKey;
       setDocs([]);
+      setDeepPicked([]);
+      setDeepClues([]);
+      setDeepOpen(false);
     }
     setReadError("");
     native<unknown>("workbenchPassages", { scope }).then(
@@ -117,15 +136,32 @@ export function ActionHarvester({
             (!scope || scope.includes(d.libraryId)))),
     )
     .map((d) => d.clue!);
-  const clues = [...new Map([...retryClues, ...candidates].map((c) => [c.key, c])).values()].filter(
-    (c) => !excluded.has(c.key) && !["linked", "ignored"].includes(decisions[c.key]?.state),
+  const clues = [...new Map([...retryClues, ...deepClues, ...candidates].map((c) => [c.key, c])).values()].filter(
+    (c) =>
+      !["linked", "ignored"].includes(decisions[c.key]?.state) &&
+      (!excluded.has(c.key) || retryClues.some((pending) => pending.key === c.key)),
   );
+  const deepSources = useMemo<Material[]>(() => {
+    const limitDate = new Date(day + "T12:00:00");
+    limitDate.setDate(limitDate.getDate() - 13);
+    const byOrigin = new Map<string, Material>();
+    for (const j of journals.filter((j) => j.record.date >= todayKey(limitDate))) {
+      const m = journalMaterial(j);
+      if (!byOrigin.has(m.id)) byOrigin.set(m.id, m);
+    }
+    for (const d of docs) {
+      const m = documentMaterial(d);
+      const docKey = d.documentId || m.id;
+      if (!byOrigin.has(docKey)) byOrigin.set(docKey, m);
+    }
+    return [...byOrigin.values()].slice(0, 8);
+  }, [day, journals, docs]);
   useEffect(() => {
     onCount?.(clues.length);
   }, [clues.length, onCount]);
   const possibleMatches = useMemo(
     () => new Map(clues.map((c) => [c.key, matchExisting(c, tasks)])),
-    [candidates, decisions, tasks, excluded],
+    [candidates, decisions, deepClues, tasks, excluded],
   );
   const matchCount = [...possibleMatches.values()].filter((matches) => matches.length).length;
   const duplicateTaskGroups = useMemo(() => {
@@ -138,12 +174,18 @@ export function ActionHarvester({
   }, [tasks]);
   const normalizedMatchSearch = matchSearch.trim().toLowerCase();
   const writable = libraries.filter((l) => l.provider === "dida365" && (!scope || scope.includes(l.id)));
-  const destination = writable.some((l) => l.id === target)
-    ? target
-    : writable.length === 1
-      ? writable[0].id
-      : "";
-  async function decide(key: string, d: Decision) {
+  const destination = writable.some((l) => l.id === target) ? target : writable.length === 1 ? writable[0].id : "";
+  const projectOptions = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const task of tasks) {
+      if (destination && task.libraryId !== destination) continue;
+      if (task.collectionId && !byId.has(task.collectionId)) {
+        byId.set(task.collectionId, task.collectionName || task.documentTitle || task.collectionId);
+      }
+    }
+    return [...byId.entries()].sort((a, b) => a[1].localeCompare(b[1], "zh-CN"));
+  }, [tasks, destination]);
+  async function decide(key: string, d: Decision & AdoptionOptions) {
     await write("clues", { ...read<DecisionMap>("clues", {}), [key]: d });
     setTick((v) => v + 1);
   }
@@ -198,7 +240,11 @@ export function ActionHarvester({
       setMsg("已保留来源及本地备注。滴答备注待处理：" + String(e));
     }
   }
-  async function create(c: Clue, kind: "backlog" | "today" | "wait") {
+  async function create(
+    c: Clue,
+    kind: "backlog" | "today" | "wait",
+    options?: AdoptionOptions,
+  ) {
     const old = read<DecisionMap>("clues", {})[c.key];
     const lib = old?.libraryId || destination;
     const title = old?.title || (edits[c.key] ?? titles[c.key] ?? c.title).trim();
@@ -211,6 +257,8 @@ export function ActionHarvester({
       sourceId: old?.sourceId,
       libraryId: lib,
       title,
+      projectId: old?.requestId ? old.projectId : options?.projectId,
+      priority: old?.requestId ? old.priority ?? 0 : options?.priority ?? 0,
       day: old?.requestId ? old.day : kind === "today" ? day : undefined,
       wait: old?.requestId
         ? old.wait
@@ -219,7 +267,13 @@ export function ActionHarvester({
           : undefined,
     };
     await decide(c.key, { ...intent, state: "creating" });
-    const receipt = await native<Receipt>("createTask", { requestId, libraryId: lib, title, priority: 0 });
+    const receipt = await native<Receipt>("createTask", {
+      requestId,
+      libraryId: lib,
+      title,
+      projectId: intent.projectId,
+      priority: intent.priority,
+    });
     if (receipt.state !== "confirmed" || !receipt.task) {
       if (receipt.state === "failed") {
         const remaining = read<DecisionMap>("clues", {});
@@ -231,17 +285,48 @@ export function ActionHarvester({
     }
     await attach(receipt.task, c, intent.day || false, intent.wait);
     await onRefresh();
-    setWaiting("");
+    setPanelKey("");
     setMsg(receipt.error || "滴答已回读确认，来源已保留。");
   }
   async function refine() {
-    const batch = clues.slice(0, 32);
+    const batch = clues.filter((clue) => !decisions[clue.key]).slice(0, 32);
+    if (!batch.length) throw Error("没有可提炼的新线索，请先处理尚未确认的采纳或关联。");
     const materials = batch.map((c, i) => ({ ...c.material, id: String(i) }));
     const claims = await generate("harvest", materials);
     const kept = new Set(claims.map((c) => c.source));
-    setTitles(Object.fromEntries(claims.map((c) => [batch[Number(c.source)].key, c.text])));
-    setExcluded(new Set(batch.filter((_, i) => !kept.has(String(i))).map((c) => c.key)));
-    setMsg(`助手从 ${batch.length} 条预筛线索中提炼出 ${claims.length} 条，尚待采纳。`);
+    const nextTitles = { ...titles, ...Object.fromEntries(claims.map((c) => [batch[Number(c.source)].key, c.text])) };
+    const nextExcluded = new Set([
+      ...excluded,
+      ...batch.filter((_, i) => !kept.has(String(i))).map((c) => c.key),
+    ]);
+    await write("clues.refined", { titles: nextTitles, excluded: [...nextExcluded] });
+    setTitles(nextTitles);
+    setExcluded(nextExcluded);
+    setMsg(`助手从 ${batch.length} 条预筛线索中提炼出 ${claims.length} 条，已缓存并尚待采纳。`);
+  }
+  async function deepScan() {
+    const picked = deepSources.filter((m) => deepPicked.includes(m.id)).slice(0, 3);
+    if (!picked.length) throw Error("请先勾选 1–3 篇近期日志或笔记。");
+    const claims = await generate("harvest", picked);
+    if (lastScopeKey.current !== scopeKey) return;
+    const extracted: Clue[] = [];
+    for (const claim of claims) {
+      const source = picked.find((m) => m.id === claim.source);
+      if (!source) continue;
+      const key = JSON.stringify([source.id, claim.quote]);
+      extracted.push({
+        key,
+        title: claim.text,
+        material: { ...source, originId: source.id, id: key, text: claim.quote },
+      });
+    }
+    setDeepClues((prev) => [...new Map([...extracted, ...prev].map((c) => [c.key, c])).values()]);
+    setDeepOpen(false);
+    setMsg(
+      extracted.length
+        ? `深度扫描从 ${picked.length} 篇材料中提取出 ${extracted.length} 条隐式行动线索。`
+        : "所选材料未发现额外待办线索。",
+    );
   }
   return (
     <section className="aw-harvester">
@@ -257,6 +342,11 @@ export function ActionHarvester({
       {readError && <p role="alert">笔记线索读取失败 · {readError}</p>}
       {opened && (
         <>
+          {clues.length >= 12 && !excluded.size && (
+            <p className="aw-harvester-hint">
+              当前为本地规则预筛（{clues.length} 条，可能含规范说明句），可点「用助手提炼线索」由 AI 过滤降噪。
+            </p>
+          )}
           {writable.length > 1 && (
             <div className="aw-clue-footer">
               <select
@@ -271,6 +361,37 @@ export function ActionHarvester({
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+          {deepOpen && (
+            <div className="aw-deep-scan">
+              <small>勾选 1–3 篇近期日志或笔记，直接用模型提取无 TODO 关键词的隐式行动：</small>
+              {deepSources.map((source) => (
+                <label className="aw-step" key={source.id}>
+                  <input
+                    type="checkbox"
+                    checked={deepPicked.includes(source.id)}
+                    onChange={(e) =>
+                      setDeepPicked((prev) =>
+                        e.target.checked
+                          ? prev.length < 3
+                            ? [...prev, source.id]
+                            : prev
+                          : prev.filter((id) => id !== source.id),
+                      )
+                    }
+                  />
+                  <span>
+                    {source.title} {source.date ? `· ${source.date}` : ""}
+                  </span>
+                </label>
+              ))}
+              <div className="aw-tools">
+                <button disabled={!!busy || !deepPicked.length} onClick={() => void run("deep-scan", deepScan)}>
+                  开始深度提取
+                </button>
+                <button onClick={() => setDeepOpen(false)}>取消</button>
+              </div>
             </div>
           )}
           <div className="aw-clue-list">
@@ -317,7 +438,9 @@ export function ActionHarvester({
                 const syncedMatches = tasks.filter(
                   (task) =>
                     task.libraryId === saved.libraryId &&
-                    (saved.sourceId ? task.sourceId === saved.sourceId : task.title === saved.title),
+                    (saved.sourceId
+                      ? task.sourceId === saved.sourceId
+                      : task.title === saved.title && (!saved.projectId || task.collectionId === saved.projectId)),
                 );
                 return (
                   <article key={c.key}>
@@ -421,8 +544,8 @@ export function ActionHarvester({
                       </select>
                     </div>
                   )}
-                  <div className="aw-clue-actions">
-                    <div className="aw-clue-actions-left">
+                  <div className="aw-clue-actions aw-clue-bar">
+                    <div className="aw-clue-actions-left aw-clue-primary-group">
                       {selected && (
                         <button
                           className="aw-primary"
@@ -433,51 +556,75 @@ export function ActionHarvester({
                         </button>
                       )}
                       <button
-                        className={selected ? "aw-clue-pill" : "aw-primary"}
+                        className={!matches.length && !selected ? "aw-primary" : "aw-clue-pill"}
                         disabled={!!busy || !destination}
                         onClick={() => void run(c.key, () => create(c, "backlog"))}
                       >
                         {matches.length || selected ? "仍新建待办" : "＋ 采纳到待办"}
                       </button>
-                      {!selected && (
-                        <>
-                          <button
-                            className="aw-clue-pill"
-                            disabled={!!busy || !destination || planFull}
-                            title={planFull ? "今日计划已满" : undefined}
-                            onClick={() => void run(c.key, () => create(c, "today"))}
-                          >
-                            采纳并排入今天
-                          </button>
-                          <button
-                            className="aw-clue-pill"
-                            disabled={!!busy || !destination}
-                            onClick={() => {
-                              setWaiting(c.key);
-                              setWho("");
-                              setWhat(edits[c.key] ?? titles[c.key] ?? c.title);
-                              setReview(day);
-                              setBlocking(false);
-                            }}
-                          >
-                            <Hourglass size={13} aria-hidden="true" /> 设为等待
-                          </button>
-                          {!matches.length && (
-                            <button
-                              className="aw-clue-dismiss"
-                              type="button"
-                              aria-label="关联已有任务"
-                              title="关联已有任务"
-                              aria-expanded={choosing}
-                              onClick={togglePicker}
-                            >
-                              <Link2 size={13} aria-hidden="true" />
-                            </button>
-                          )}
-                        </>
+                      <button
+                        className="aw-clue-pill"
+                        disabled={!!busy || !destination || planFull}
+                        title={planFull ? "今日计划已满" : undefined}
+                        onClick={() => void run(c.key, () => create(c, "today"))}
+                      >
+                        采纳并排入今天
+                      </button>
+                      <button
+                        className="aw-clue-pill"
+                        aria-expanded={panelKey === c.key && panelMode === "wait"}
+                        disabled={!!busy || !destination}
+                        onClick={() => {
+                          if (panelKey === c.key && panelMode === "wait") {
+                            setPanelKey("");
+                            return;
+                          }
+                          const parsed = parseWaitFromText(edits[c.key] ?? titles[c.key] ?? c.title, day);
+                          setPanelKey(c.key);
+                          setPanelMode("wait");
+                          setAdoptProject("");
+                          setWho(parsed.who);
+                          setWhat(parsed.what);
+                          setReview(parsed.review);
+                          setBlocking(parsed.blocking);
+                        }}
+                      >
+                        <Hourglass size={13} aria-hidden="true" /> 设为等待
+                      </button>
+                    </div>
+                    <div className="aw-clue-secondary-group">
+                      {!matches.length && !selected && (
+                        <button
+                          className="aw-clue-dismiss"
+                          type="button"
+                          aria-label="关联已有任务"
+                          title="关联已有任务"
+                          aria-expanded={choosing}
+                          onClick={togglePicker}
+                        >
+                          <Link2 size={13} aria-hidden="true" />
+                        </button>
                       )}
                       <button
-                        className="aw-clue-dismiss"
+                        className="aw-clue-ghost"
+                        aria-expanded={panelKey === c.key && panelMode === "adopt"}
+                        disabled={!!busy || !destination}
+                        onClick={() => {
+                          if (panelKey === c.key && panelMode === "adopt") {
+                            setPanelKey("");
+                            return;
+                          }
+                          setPanelKey(c.key);
+                          setPanelMode("adopt");
+                          setAdoptKind("backlog");
+                          setAdoptProject("");
+                          setAdoptPriority(0);
+                        }}
+                      >
+                        选清单/高优
+                      </button>
+                      <button
+                        className="aw-clue-ghost"
                         disabled={!!busy}
                         onClick={() => void run(c.key, () => decide(c.key, { state: "ignored" }))}
                       >
@@ -485,40 +632,123 @@ export function ActionHarvester({
                       </button>
                     </div>
                   </div>
-                  {waiting === c.key && (
+                  {panelKey === c.key && panelMode === "adopt" && (
                     <form
-                      className="aw-form"
+                      className="aw-form aw-clue-drawer"
                       onSubmit={(e) => {
                         e.preventDefault();
-                        if (who.trim() && what.trim()) void run(c.key, () => create(c, "wait"));
+                        void run(c.key, () =>
+                          create(c, adoptKind, { projectId: adoptProject || undefined, priority: adoptPriority }),
+                        );
                       }}
                     >
-                      <label>
-                        等谁
-                        <input required value={who} onChange={(e) => setWho(e.target.value)} />
-                      </label>
-                      <label>
-                        等什么交付
-                        <input required value={what} onChange={(e) => setWhat(e.target.value)} />
-                      </label>
-                      <label>
-                        回看日
-                        <input
-                          required
-                          type="date"
-                          value={review}
-                          onChange={(e) => setReview(e.target.value)}
-                        />
-                      </label>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={blocking}
-                          onChange={(e) => setBlocking(e.target.checked)}
-                        />
-                        阻塞下一步
-                      </label>
-                      <button disabled={!!busy}>采纳并保存等待项</button>
+                      <div className="aw-clue-drawer-grid">
+                        <label>
+                          目标清单
+                          <select value={adoptProject} onChange={(e) => setAdoptProject(e.target.value)}>
+                            <option value="">收件箱（默认）</option>
+                            {projectOptions.map(([id, name]) => (
+                              <option key={id} value={id}>
+                                {name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          优先级
+                          <select
+                            value={String(adoptPriority)}
+                            onChange={(e) => setAdoptPriority(e.target.value === "5" ? 5 : 0)}
+                          >
+                            <option value="0">普通</option>
+                            <option value="5">高优（!高）</option>
+                          </select>
+                        </label>
+                      </div>
+                      <div className="aw-clue-drawer-foot">
+                        <label>
+                          <input
+                            type="checkbox"
+                            disabled={planFull}
+                            checked={adoptKind === "today"}
+                            onChange={(e) => setAdoptKind(e.target.checked ? "today" : "backlog")}
+                          />
+                          同时排入今日计划{planFull ? "（已满）" : ""}
+                        </label>
+                        <div className="aw-tools">
+                          <button className="aw-primary" disabled={!!busy}>
+                            确认采纳到滴答
+                          </button>
+                          <button type="button" disabled={!!busy} onClick={() => setPanelKey("")}>
+                            取消
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  )}
+                  {panelKey === c.key && panelMode === "wait" && (
+                    <form
+                      className="aw-form aw-clue-drawer"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (who.trim() && what.trim())
+                          void run(c.key, () => create(c, "wait", { projectId: adoptProject || undefined }));
+                      }}
+                    >
+                      <div className="aw-clue-drawer-grid">
+                        <label>
+                          等谁
+                          <input required value={who} onChange={(e) => setWho(e.target.value)} />
+                        </label>
+                        <label>
+                          等什么交付
+                          <input required value={what} onChange={(e) => setWhat(e.target.value)} />
+                        </label>
+                        <label>
+                          回看日
+                          <input required type="date" value={review} onChange={(e) => setReview(e.target.value)} />
+                        </label>
+                        <label>
+                          目标清单
+                          <select value={adoptProject} onChange={(e) => setAdoptProject(e.target.value)}>
+                            <option value="">收件箱（默认）</option>
+                            {projectOptions.map(([id, name]) => (
+                              <option key={id} value={id}>
+                                {name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      <div className="aw-clue-drawer-foot">
+                        <div className="aw-tools">
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={blocking}
+                              onChange={(e) => setBlocking(e.target.checked)}
+                            />
+                            阻塞下一步
+                          </label>
+                          <button type="button" className="aw-snooze" onClick={() => setReview(shiftDay(day, 1))}>
+                            明天
+                          </button>
+                          <button type="button" className="aw-snooze" onClick={() => setReview(shiftDay(day, 3))}>
+                            +3天
+                          </button>
+                          <button type="button" className="aw-snooze" onClick={() => setReview(nextMonday(day))}>
+                            下周一
+                          </button>
+                        </div>
+                        <div className="aw-tools">
+                          <button className="aw-primary" disabled={!!busy}>
+                            采纳并保存等待项
+                          </button>
+                          <button type="button" disabled={!!busy} onClick={() => setPanelKey("")}>
+                            取消
+                          </button>
+                        </div>
+                      </div>
                     </form>
                   )}
                   {actionStatus}
@@ -533,7 +763,22 @@ export function ActionHarvester({
             <button disabled={!!busy || !clues.length} onClick={() => void run("model", refine)}>
               用助手提炼线索
             </button>
-            {!!excluded.size && <button onClick={() => setExcluded(new Set())}>查看本地预筛全部线索</button>}
+            {!!excluded.size && (
+              <button
+                onClick={() => {
+                  setExcluded(new Set());
+                  setTitles({});
+                  void write("clues.refined", { titles: {}, excluded: [] });
+                }}
+              >
+                查看本地预筛全部线索
+              </button>
+            )}
+            {deepSources.length > 0 && (
+              <button disabled={!!busy} onClick={() => setDeepOpen((v) => !v)}>
+                指定近期文档深度扫描
+              </button>
+            )}
           </div>
         </>
       )}
