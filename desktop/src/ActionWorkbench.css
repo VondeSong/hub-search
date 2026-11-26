@@ -912,17 +912,6 @@
   display: block;
   margin-top: 0;
 }
-@media (max-width: 1000px) {
-  html:not([data-runtime-platform="android"]) .unified-shell.module-tasks.sidebar-enabled > .workspace-rail {
-    display: flex;
-    grid-column: 1;
-    grid-row: 1;
-  }
-  html:not([data-runtime-platform="android"]) .unified-shell.module-tasks.sidebar-enabled > .desktop-main-layout {
-    grid-column: 2 / -1;
-    grid-row: 1;
-  }
-}
 @media (max-width: 1199px) {
   .aw-shell {
     position: relative;

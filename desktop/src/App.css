@@ -3753,7 +3753,6 @@ button:focus-visible, [role="button"]:focus-visible, select:focus-visible {
 
 @media (max-width: 1180px) {
   .desktop-app-shell.sidebar-enabled { grid-template-columns: 224px minmax(0, 1fr); }
-  .workspace-rail { display: none; }
   .desktop-app-shell.sidebar-enabled .sidebar-primary-nav { display: grid; }
   .search-header { padding-inline: 12px; }
   .workspace.with-preview { grid-template-columns: minmax(310px, calc(var(--results-pane-percent, 52%) - 3px)) 6px minmax(310px, 1fr); }

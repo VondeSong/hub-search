@@ -72,13 +72,9 @@ html:not([data-runtime-platform="android"]) .collections-workspace .task-workspa
 .reading-context-navigation .collection-nav-primary .collection-nav-item { font-size:13px; }
 .reading-context-navigation .collection-navigation-footer .collection-nav-item { color:#737373; font-size:12px; }
 
-@media (min-width: 1001px) {
-  html:not([data-runtime-platform="android"]) .unified-shell.module-collections.mode-standard:not(:has(> .desktop-sidebar)) { grid-template-columns:minmax(0,1fr); }
-  html:not([data-runtime-platform="android"]) .unified-shell.module-collections.mode-compact:not(:has(> .desktop-sidebar)) { grid-template-columns:56px minmax(0,1fr); }
-}
 @media (max-width: 1000px) {
   .reading-context-navigation {
-    position:fixed; z-index:60; inset:50px auto 8px 60px; width:260px; max-width:calc(100vw - 80px);
+    position:fixed; z-index:60; inset:50px auto 30px 8px; width:260px; max-width:calc(100vw - 16px);
     padding:8px; background:var(--reading-shell,#eceef2); border:1px solid var(--reading-hair);
     border-radius:12px; box-shadow:0 12px 36px #18212d25;
   }

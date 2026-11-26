@@ -15,26 +15,29 @@ async function mount(element: React.ReactNode) {
 }
 afterEach(async () => { await act(async () => root?.unmount()); container?.remove(); localStorage.clear(); });
 const props = {
-  mode: "compact" as const, view: "tasks" as const, onModeChange: vi.fn(),
+  panelExpanded: true, view: "tasks" as const, onTogglePanel: vi.fn(),
   spaces: [{ id: "main", name: "Main", provider: "craft", connected: true, documentCount: 10, excludedPaths: [] }] as const,
   selectedLibraryIds: null, onToggleLibrary: vi.fn(), onSelectAll: vi.fn(), onManage: vi.fn(),
 };
 describe("workspace navigation", () => {
   it("validates the saved layout mode", () => {
-    expect(loadSidebarMode()).toBe("compact");
+    expect(loadSidebarMode()).toBe("standard");
     localStorage.setItem("hub.sidebar.mode", "focus"); expect(loadSidebarMode()).toBe("focus");
-    localStorage.setItem("hub.sidebar.mode", "invalid"); expect(loadSidebarMode()).toBe("compact");
+    localStorage.setItem("hub.sidebar.mode", "compact"); expect(loadSidebarMode()).toBe("standard");
+    localStorage.setItem("hub.sidebar.mode", "invalid"); expect(loadSidebarMode()).toBe("standard");
   });
-  it("cycles compact to standard to focus to compact", async () => {
-    await mount(<WorkspaceChrome {...props} spaces={[{ ...props.spaces[0], excludedPaths: [] }]} />);
-    await act(async () => container.querySelector<HTMLButtonElement>('.workspace-mode-cycle')!.click());
-    expect(props.onModeChange).toHaveBeenCalledWith("standard");
-    await act(async () => root.render(<WorkspaceChrome {...props} spaces={[]} mode="standard" />));
-    await act(async () => container.querySelector<HTMLButtonElement>('.workspace-mode-cycle')!.click());
-    expect(props.onModeChange).toHaveBeenCalledWith("focus");
-    await act(async () => root.render(<WorkspaceChrome {...props} spaces={[]} mode="focus" />));
-    await act(async () => container.querySelector<HTMLButtonElement>('.workspace-mode-cycle')!.click());
-    expect(props.onModeChange).toHaveBeenCalledWith("compact");
+  it("uses one control to expand and collapse the global sidebar", async () => {
+    const onTogglePanel = vi.fn();
+    await mount(<WorkspaceChrome {...props} spaces={[]} onTogglePanel={onTogglePanel} />);
+    const control = () => container.querySelector<HTMLButtonElement>(".workspace-mode-cycle")!;
+    expect(control().getAttribute("aria-label")).toBe("收起全局侧边栏");
+    expect(control().getAttribute("aria-expanded")).toBe("true");
+    await act(async () => control().click());
+    await act(async () => root.render(<WorkspaceChrome {...props} spaces={[]} onTogglePanel={onTogglePanel} panelExpanded={false} />));
+    expect(control().getAttribute("aria-label")).toBe("展开全局侧边栏");
+    expect(control().getAttribute("aria-expanded")).toBe("false");
+    await act(async () => control().click());
+    expect(onTogglePanel).toHaveBeenCalledTimes(2);
   });
   it("removes duplicate view and scope breadcrumbs while retaining layout controls", async () => {
     await mount(<WorkspaceChrome {...props} spaces={[{ ...props.spaces[0], excludedPaths: [] }]} />);

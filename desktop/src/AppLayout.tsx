@@ -9,8 +9,7 @@ import { FooterStatus } from "./FooterStatus";
 import { MobileAppEntry } from "./MobileAppEntry";
 import { SearchHeader } from "./SearchHeader";
 import { activeDesktopTopicCatalog, DesktopWorkspace, MobileWorkspace, type WorkspaceProps } from "./Workspace";
-import { WorkspaceRail } from "./WorkspaceRail";
-import { WorkspaceChrome, WorkspaceHeaderContext, WorkspaceModeControl, workspaceLabels } from "./WorkspaceChrome";
+import { WorkspaceChrome, WorkspaceHeaderContext, WorkspaceModeControl } from "./WorkspaceChrome";
 import { useSidebarLayout } from "./useSidebarLayout";
 import { PanelRight } from "lucide-react";
 import "./SearchToolbar.css";
@@ -76,7 +75,8 @@ function AppLayoutContent({
 
 export function DesktopAppLayout(props: AppLayoutProps) {
   const {
-    mode: sidebarMode, changeMode, drawerOpen, togglePanel, panelExpanded, collapsePanel,
+    mode: sidebarMode, drawerOpen, togglePanel, panelExpanded, collapsePanel,
+    readingPanelExpanded, toggleReadingPanel,
     sidebarWidth, sidebarWidthMin, sidebarWidthMax, resizeSidebar, resizeSidebarWithKeyboard, resetSidebarWidth,
   } = useSidebarLayout(props.desktopSidebarProps?.activeView);
   if (props.desktopSidebarProps) {
@@ -90,28 +90,9 @@ export function DesktopAppLayout(props: AppLayoutProps) {
     const readingLayout = Boolean(mainContent) && desktopSidebarProps.activeView === "collections";
     const integratedHeader = Boolean(mainContent) && (readingLayout || insightsLayout || librariesLayout);
     return (
-      <DesktopAppEntry filtersOpen={filtersOpen} previewOpen={mobilePreviewOpen} style={{ ...style, "--context-sidebar-width": `${sidebarWidth}px` } as CSSProperties} sidebarEnabled sidebarMode={sidebarMode} workspaceView={desktopSidebarProps.activeView} sidebarDrawerOpen={drawerOpen}>
+      <DesktopAppEntry filtersOpen={filtersOpen} previewOpen={mobilePreviewOpen} style={{ ...style, "--context-sidebar-width": `${sidebarWidth}px` } as CSSProperties} sidebarEnabled sidebarMode={drawerOpen ? "standard" : sidebarMode} workspaceView={desktopSidebarProps.activeView} sidebarDrawerOpen={drawerOpen}>
         <div className="drag-strip" onMouseDown={startWindowDrag} />
-        <WorkspaceRail
-          onTogglePanel={librariesLayout ? undefined : togglePanel}
-          panelExpanded={panelExpanded}
-          activeView={desktopSidebarProps.activeView}
-          spaces={desktopSidebarProps.spaces}
-          selectedLibraryIds={desktopSidebarProps.selectedLibraryIds}
-          renderLibraryIcon={desktopSidebarProps.renderLibraryIcon}
-          favoriteCount={desktopSidebarProps.favoriteCount}
-          taskOpenCount={desktopSidebarProps.taskOpenCount}
-          journalCount={desktopSidebarProps.journalCount}
-          historyCount={desktopSidebarProps.historyCount}
-          tagCount={desktopSidebarProps.tags.length}
-          flashcardDueCount={desktopSidebarProps.flashcardDueCount}
-          onSelectView={desktopSidebarProps.onSelectView}
-          onSelectAllLibraries={desktopSidebarProps.onSelectAllLibrariesOnly ?? desktopSidebarProps.onToggleAllLibraries}
-          onSelectLibrary={desktopSidebarProps.onSelectLibraryOnly ?? desktopSidebarProps.onToggleLibrary}
-          onToggleLibrary={desktopSidebarProps.onToggleLibrary}
-          onManageLibraries={() => footerStatusProps.setShowConnection(true)}
-        />
-        {!insightsLayout && !librariesLayout && !readingLayout && <><DesktopSidebar {...desktopSidebarProps} hideJournalNavigation={journalLayout} hideTagNavigation={!mainContent && Boolean(activeDesktopTopicCatalog(workspaceProps))} contextualTitle={sidebarMode === "standard" ? undefined : workspaceLabels[desktopSidebarProps.activeView]} onCollapse={collapsePanel} />
+        <DesktopSidebar {...desktopSidebarProps} hideJournalNavigation={journalLayout} hideTagNavigation={!mainContent && Boolean(activeDesktopTopicCatalog(workspaceProps))} onCollapse={collapsePanel} />
         <div
           className="context-sidebar-resizer"
           role="separator"
@@ -125,17 +106,17 @@ export function DesktopAppLayout(props: AppLayoutProps) {
           onPointerDown={resizeSidebar}
           onDoubleClick={resetSidebarWidth}
           onKeyDown={resizeSidebarWithKeyboard}
-        /></>}
+        />
         <div className={`desktop-main-layout ${filtersOpen ? "filters-open" : ""}`}>
           <AgentCitationBody/>
-          {!integratedHeader && !journalLayout && <WorkspaceChrome search={!mainContent && <SearchHeader {...headerProps} hideLibrarySwitcher hidePreviewToggle />} actions={!mainContent && <button className={`workspace-preview-toggle ${headerProps.showPreviewPane ? "active" : ""}`} aria-label="显示预览窗格" title="显示预览窗格" aria-pressed={headerProps.showPreviewPane} onClick={() => headerProps.setPreviewOpen(value => !value)}><PanelRight size={17} /></button>} mode={sidebarMode} onModeChange={changeMode} onTogglePanel={togglePanel} panelExpanded={panelExpanded} view={desktopSidebarProps.activeView} spaces={desktopSidebarProps.spaces} selectedLibraryIds={desktopSidebarProps.selectedLibraryIds} onToggleLibrary={desktopSidebarProps.onToggleLibrary} onSelectAll={desktopSidebarProps.onSelectAllLibrariesOnly ?? desktopSidebarProps.onToggleAllLibraries} onManage={desktopSidebarProps.onManageLibraries} />}
+          {!integratedHeader && !journalLayout && <WorkspaceChrome search={!mainContent && <SearchHeader {...headerProps} hideLibrarySwitcher hidePreviewToggle />} actions={!mainContent && <button className={`workspace-preview-toggle ${headerProps.showPreviewPane ? "active" : ""}`} aria-label="显示预览窗格" title="显示预览窗格" aria-pressed={headerProps.showPreviewPane} onClick={() => headerProps.setPreviewOpen(value => !value)}><PanelRight size={17} /></button>} onTogglePanel={togglePanel} panelExpanded={panelExpanded} view={desktopSidebarProps.activeView} spaces={desktopSidebarProps.spaces} selectedLibraryIds={desktopSidebarProps.selectedLibraryIds} onToggleLibrary={desktopSidebarProps.onToggleLibrary} onSelectAll={desktopSidebarProps.onSelectAllLibrariesOnly ?? desktopSidebarProps.onToggleAllLibraries} onManage={desktopSidebarProps.onManageLibraries} />}
           {mainContent ? <><div className="main-content-override"><WorkspaceHeaderContext.Provider value={integratedHeader ? {
-            actions: librariesLayout ? null : <WorkspaceModeControl mode={sidebarMode} onModeChange={changeMode} />,
+            actions: <WorkspaceModeControl expanded={panelExpanded} onToggle={togglePanel} />,
             onMouseDown: startWindowDrag,
-            readingNavigation: readingLayout && panelExpanded ? <aside className="reading-context-navigation" id="reading-context-navigation"><CollectionNavigation libraries={desktopSidebarProps.spaces} /></aside> : undefined,
-            onToggleReadingNavigation: readingLayout ? togglePanel : undefined,
-            readingNavigationExpanded: readingLayout ? panelExpanded : undefined,
-            navigationResizer: librariesLayout || (readingLayout && panelExpanded && !drawerOpen) ? <div className="context-sidebar-resizer" role="separator"
+            readingNavigation: readingLayout && readingPanelExpanded ? <aside className="reading-context-navigation" id="reading-context-navigation"><CollectionNavigation libraries={desktopSidebarProps.spaces} /></aside> : undefined,
+            onToggleReadingNavigation: readingLayout ? toggleReadingPanel : undefined,
+            readingNavigationExpanded: readingLayout ? readingPanelExpanded : undefined,
+            navigationResizer: librariesLayout || (readingLayout && readingPanelExpanded && panelExpanded) ? <div className="context-sidebar-resizer" role="separator"
               aria-label={readingLayout ? "调整阅读导航宽度" : "调整资料库导航宽度"} aria-orientation="vertical" tabIndex={0}
               aria-valuemin={sidebarWidthMin} aria-valuemax={sidebarWidthMax} aria-valuenow={sidebarWidth}
               title={readingLayout ? "拖动调整阅读导航宽度；双击恢复默认" : "拖动调整资料库导航宽度；双击恢复默认"}
@@ -143,7 +124,7 @@ export function DesktopAppLayout(props: AppLayoutProps) {
           } : null}>{mainContent}</WorkspaceHeaderContext.Provider></div><FooterStatus {...footerStatusProps} /></> : <>
             {!journalLayout&&<SearchFilterReveal open={filtersOpen}><FilterBar {...filterBarProps} visible={filtersOpen} /></SearchFilterReveal>}
             {(!journalLayout&&(desktopSidebarProps.activeView === "home" || headerProps.query.trim())) && <SearchFilterSummary {...filterBarProps} />}
-            <WorkspaceHeaderContext.Provider value={journalLayout?{actions:<><WorkspaceModeControl mode={sidebarMode} onModeChange={changeMode}/><button className={`workspace-preview-toggle ${headerProps.showPreviewPane ? "active" : ""}`} aria-label="显示预览窗格" aria-pressed={headerProps.showPreviewPane} onClick={()=>headerProps.setPreviewOpen(value=>!value)}><PanelRight size={17}/></button></>,onMouseDown:startWindowDrag,
+            <WorkspaceHeaderContext.Provider value={journalLayout?{actions:<><WorkspaceModeControl expanded={panelExpanded} onToggle={togglePanel}/><button className={`workspace-preview-toggle ${headerProps.showPreviewPane ? "active" : ""}`} aria-label="显示预览窗格" aria-pressed={headerProps.showPreviewPane} onClick={()=>headerProps.setPreviewOpen(value=>!value)}><PanelRight size={17}/></button></>,onMouseDown:startWindowDrag,
               journalNavigation:{dates:desktopSidebarProps.journalDates,onSelectDate:desktopSidebarProps.onSelectJournalDate},
             }:null}><DesktopWorkspace {...workspaceProps}/></WorkspaceHeaderContext.Provider>
             <FooterStatus {...footerStatusProps} />

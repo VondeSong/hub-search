@@ -1,9 +1,3 @@
-html:not([data-runtime-platform="android"]) .desktop-app-shell.unified-shell.module-libraries {
-  grid-template-columns: 56px minmax(0, 1fr);
-}
-html:not([data-runtime-platform="android"]) .unified-shell.mode-standard.module-libraries .workspace-rail {
-  display: flex;
-}
 .library-browser {
   --library-line: var(--hub-separator, #e6e8e6);
   --library-muted: var(--hub-text-secondary, #6c7470);

@@ -6,7 +6,7 @@ import { useSidebarLayout } from "./useSidebarLayout";
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); });
 function Sample({view = "tasks"}: {view?: string}) {
   const layout = useSidebarLayout(view);
-  return <div className="unified-shell"><button className="workspace-panel-toggle" onClick={layout.togglePanel}>toggle</button><output>{layout.mode}:{String(layout.panelExpanded)}:{layout.sidebarWidth}</output><div className="context-sidebar-resizer" role="separator" tabIndex={0} onPointerDown={layout.resizeSidebar} onKeyDown={layout.resizeSidebarWithKeyboard} onDoubleClick={layout.resetSidebarWidth}/><aside className="task-module-sidebar"><button>view</button></aside></div>;
+  return <div className="unified-shell"><button className="workspace-panel-toggle workspace-mode-cycle" onClick={layout.togglePanel}>toggle</button><output>{layout.mode}:{String(layout.panelExpanded)}:{layout.sidebarWidth}</output><div className="context-sidebar-resizer" role="separator" tabIndex={0} onPointerDown={layout.resizeSidebar} onKeyDown={layout.resizeSidebarWithKeyboard} onDoubleClick={layout.resetSidebarWidth}/><aside className="desktop-sidebar"><button>view</button></aside></div>;
 }
 function pointerEvent(type: string, clientX: number) {
   const event = new Event(type, { bubbles: true, cancelable: true });

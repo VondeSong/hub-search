@@ -11,7 +11,6 @@ import type { Conversation, Progress, HistoricalDelivery } from "./AgentDelivery
 import type { ActivityRun } from "./AgentActivity";
 import type { Lifecycle } from "./AgentLifecycle";
 import reportEntryFixture from "./AgentReportContinuation.fixture.json";
-import { WorkspaceRail } from "./WorkspaceRail";
 import { SearchHeaderActions } from "./SearchHeaderActions";
 import { resetCodexAccountsForTests } from "./CodexAccounts";
 
@@ -1765,8 +1764,7 @@ it("binds explicit standalone save target selection to the displayed Work and au
 });
 
 it("standalone lazy navigation opens the assistant on the first click",async()=>{
-  const noop=vi.fn();
-  await act(async()=>root.render(<AgentPanelProvider><WorkspaceRail activeView="home" spaces={[]} selectedLibraryIds={null} renderLibraryIcon={()=>null} favoriteCount={0} taskOpenCount={0} journalCount={0} historyCount={0} tagCount={0} flashcardDueCount={0} onSelectView={noop} onSelectAllLibraries={noop} onSelectLibrary={noop} onManageLibraries={noop}/></AgentPanelProvider>));
+  await act(async()=>root.render(<AgentPanelProvider><StandaloneAgentLauncher/></AgentPanelProvider>));
   expect(document.body.querySelector('.agent-panel')).toBeNull();
   await click("Hub 助手");
   expect(document.body.querySelector<HTMLElement>('.agent-panel')?.hidden).toBe(false);

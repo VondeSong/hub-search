@@ -52,7 +52,7 @@ export function useSidebarLayout(view?: string) {
   const autoCollapsed = !dockOverride && agentDocked && (dockLayout === "narrow" || MULTI_COLUMN_VIEWS.has(view ?? ""));
   const mode = autoCollapsed ? "focus" : savedMode;
   const [narrow, setNarrow] = useState(() => window.matchMedia?.("(max-width: 1000px)").matches ?? false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawer, setDrawer] = useState<"global" | "reading" | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(() => loadSidebarWidth(widthKey));
   const sidebarWidthRef = useRef(sidebarWidth);
   useLayoutEffect(() => {
@@ -60,9 +60,8 @@ export function useSidebarLayout(view?: string) {
     sidebarWidthRef.current = width;
     setSidebarWidth(width);
   }, [widthKey]);
-  const expandedMode = useRef<SidebarMode>(savedMode === "focus" ? "compact" : savedMode);
   useEffect(() => { if (!agentDocked) setDockOverride(false); }, [agentDocked]);
-  useEffect(() => { if (autoCollapsed) setDrawerOpen(false); }, [autoCollapsed]);
+  useEffect(() => { if (autoCollapsed) setDrawer(null); }, [autoCollapsed]);
   useEffect(() => { sidebarWidthRef.current = sidebarWidth; }, [sidebarWidth]);
   const persistSidebarWidth = useCallback((next: number) => {
     const width = clampSidebarWidth(next);
@@ -107,49 +106,66 @@ export function useSidebarLayout(view?: string) {
   }, [persistSidebarWidth, widthKey]);
   const changeMode = useCallback((next: SidebarMode) => {
     if (agentDocked) setDockOverride(true);
-    setSavedMode(next); setDrawerOpen(false);
-    if (next !== "focus") expandedMode.current = next;
+    setSavedMode(next); setDrawer(null);
     try { userProfileStorage.setItem("hub.sidebar.mode", next); } catch { /* session only */ }
   }, [agentDocked]);
-  const togglePanel = () => {
+  const toggleNavigation = useCallback((target: "global" | "reading") => {
     if (narrow) {
       if (agentDocked) setDockOverride(true);
-      setDrawerOpen(open => !open);
-    } else changeMode(mode === "focus" ? expandedMode.current : "focus");
-  };
+      setDrawer(open => open === target ? null : target);
+    } else changeMode(mode === "focus" ? "standard" : "focus");
+  }, [agentDocked, changeMode, mode, narrow]);
+  const togglePanel = useCallback(() => toggleNavigation("global"), [toggleNavigation]);
+  const toggleReadingPanel = useCallback(() => toggleNavigation("reading"), [toggleNavigation]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key === "\\") {
+        const target = event.target instanceof HTMLElement ? event.target : null;
+        if (target?.closest(".shortcut-setting-control")) return;
+        event.preventDefault();
+        togglePanel();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [togglePanel]);
   useEffect(() => {
     const query = window.matchMedia?.("(max-width: 1000px)");
     if (!query) return;
-    const resize = () => { setNarrow(query.matches); setDrawerOpen(false); };
+    const resize = () => { setNarrow(query.matches); setDrawer(null); };
     query.addEventListener("change", resize);
     return () => query.removeEventListener("change", resize);
   }, []);
-  useEffect(() => setDrawerOpen(false), [view]);
+  useEffect(() => setDrawer(null), [view]);
   useEffect(() => {
-    if (!drawerOpen || !narrow) return;
-    const selector = view === "tasks" ? ".task-module-sidebar" : view === "flashcards" ? ".flashcards-decks" : view === "collections" ? ".reading-context-navigation, .unified-shell .desktop-sidebar" : ".desktop-sidebar";
-    const panel = document.querySelector<HTMLElement>(`.unified-shell ${selector}`);
-    const triggers = Array.from(document.querySelectorAll<HTMLElement>(".workspace-panel-toggle"));
-    const trigger = triggers.find(element => element.getClientRects().length > 0) ?? triggers[0];
+    if (!drawer || !narrow) return;
+    const selector = drawer === "global" ? ":scope > .desktop-sidebar" : ".reading-context-navigation";
+    const panel = document.querySelector(".unified-shell")?.querySelector<HTMLElement>(selector);
+    const active = document.activeElement;
+    const trigger = active instanceof HTMLElement && active !== document.body
+      ? active
+      : document.querySelector<HTMLElement>(drawer === "global" ? ".workspace-mode-cycle, .footer-restore-btn" : ".collection-header .workspace-panel-toggle");
     const frame = requestAnimationFrame(() => panel?.querySelector<HTMLElement>("button,input,select,[tabindex='0']")?.focus());
     const dismiss = (event: PointerEvent) => {
-      if (!panel?.contains(event.target as Node) && !trigger?.contains(event.target as Node)) setDrawerOpen(false);
+      if (!panel?.contains(event.target as Node) && !trigger?.contains(event.target as Node)) setDrawer(null);
     };
     const key = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { event.preventDefault(); event.stopImmediatePropagation(); setDrawerOpen(false); trigger?.focus(); }
+      if (event.key === "Escape") { event.preventDefault(); event.stopImmediatePropagation(); setDrawer(null); trigger?.focus(); }
     };
     const focus = (event: FocusEvent) => {
-      if (!panel?.contains(event.target as Node) && !trigger?.contains(event.target as Node)) setDrawerOpen(false);
+      if (!panel?.contains(event.target as Node) && !trigger?.contains(event.target as Node)) setDrawer(null);
     };
     document.addEventListener("pointerdown", dismiss);
     document.addEventListener("focusin", focus);
     window.addEventListener("keydown", key, true);
     return () => { cancelAnimationFrame(frame); document.removeEventListener("pointerdown", dismiss); document.removeEventListener("focusin", focus); window.removeEventListener("keydown", key, true); };
-  }, [drawerOpen, narrow, view]);
+  }, [drawer, narrow]);
   return {
-    mode, changeMode, drawerOpen, togglePanel,
-    panelExpanded: narrow ? drawerOpen : mode !== "focus",
-    collapsePanel: () => narrow ? setDrawerOpen(false) : changeMode("focus"),
+    mode, drawerOpen: drawer === "global", togglePanel,
+    panelExpanded: narrow ? drawer === "global" : mode !== "focus",
+    readingPanelExpanded: narrow ? drawer === "reading" : mode !== "focus",
+    toggleReadingPanel,
+    collapsePanel: () => narrow ? setDrawer(null) : changeMode("focus"),
     sidebarWidth,
     sidebarWidthMin: MIN_SIDEBAR_WIDTH,
     sidebarWidthMax: MAX_SIDEBAR_WIDTH,

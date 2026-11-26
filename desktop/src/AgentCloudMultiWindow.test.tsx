@@ -3,7 +3,6 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runtimeCapabilities } from "./RuntimePlatform";
-import { WorkspaceRail } from "./WorkspaceRail";
 import { SearchHeaderActions } from "./SearchHeaderActions";
 import { AgentPanelProvider, StandaloneAgentLauncher } from "./StandaloneAgentLauncher";
 import { StandaloneInvestigation } from "./AgentInvestigation";
@@ -218,26 +217,10 @@ afterEach(async () => {
 });
 
 describe("Phase 3 Agents: cloud history, phone handoff, and multi-window", () => {
-  it("retires the separate top-level desktop CloudAgentsLauncher from WorkspaceRail and SearchHeaderActions", async () => {
+  it("keeps a single assistant entry in SearchHeaderActions", async () => {
     const noop = vi.fn();
     await render(
       <AgentPanelProvider>
-        <WorkspaceRail
-          activeView="home"
-          spaces={[]}
-          selectedLibraryIds={null}
-          renderLibraryIcon={() => null}
-          favoriteCount={0}
-          taskOpenCount={0}
-          journalCount={0}
-          historyCount={0}
-          tagCount={0}
-          flashcardDueCount={0}
-          onSelectView={noop}
-          onSelectAllLibraries={noop}
-          onSelectLibrary={noop}
-          onManageLibraries={noop}
-        />
         <SearchHeaderActions
           showAgent
           activeFilterCount={0}
@@ -253,7 +236,7 @@ describe("Phase 3 Agents: cloud history, phone handoff, and multi-window", () =>
         />
       </AgentPanelProvider>,
     );
-    expect(document.querySelectorAll('button[aria-label="Hub 助手"]')).toHaveLength(2);
+    expect(document.querySelectorAll('button[aria-label="Hub 助手"]')).toHaveLength(1);
     expect(document.querySelector('button[aria-label="云端助手"]')).toBeNull();
   });
 

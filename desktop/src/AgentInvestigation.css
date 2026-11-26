@@ -511,8 +511,6 @@ body.resizing-agent-panel * { cursor: col-resize !important; user-select: none !
 .agent-composer .agent-note { font-size: 12px; line-height: 1.6; margin: 6px; }
 
 
-.workspace-rail-navigation > .agent-launcher { justify-content: center; width: 36px; height: 36px; margin: 0; padding: 0; font-size: 0; }
-.workspace-rail-navigation > .agent-launcher svg { width: 17px; height: 17px; flex-shrink: 0; }
 .search-header-actions > .agent-launcher { justify-content: center; width: 32px; height: 32px; margin: 0; padding: 0; font-size: 0; }
 
 .agent-native-input { margin-block:16px; padding-block:12px; border-block:1px solid var(--hub-separator); }

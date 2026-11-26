@@ -37,25 +37,9 @@ html:not([data-runtime-platform="android"]) .desktop-app-shell {
   box-shadow: 0 14px 40px -10px rgba(15, 23, 42, 0.14), 0 1px 4px rgba(15, 23, 42, 0.06);
 }
 
-html:not([data-runtime-platform="android"]) .workspace-rail {
-  background: #F6F7F9;
-  border-right: 0.5px solid var(--hub-hairline);
-}
 
-html:not([data-runtime-platform="android"]) .workspace-rail button {
-  color: var(--hub-text-secondary);
-}
 
-html:not([data-runtime-platform="android"]) .workspace-rail button:hover {
-  background: rgba(15, 23, 42, 0.055);
-  color: var(--hub-text-primary);
-}
 
-html:not([data-runtime-platform="android"]) .workspace-rail button.active {
-  background: var(--hub-paper);
-  color: var(--hub-accent);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.09), 0 0 0 0.5px rgba(15, 23, 42, 0.07);
-}
 
 html:not([data-runtime-platform="android"]) .desktop-sidebar {
   background: var(--hub-sidebar-material);
@@ -89,10 +73,6 @@ html:not([data-runtime-platform="android"]) .sidebar-primary-nav button.active s
 }
 
 /* 2. Global Optical Icon Calibration (desktop only) */
-html:not([data-runtime-platform="android"]) .workspace-rail button > svg {
-  width: 17px;
-  height: 17px;
-}
 
 html:not([data-runtime-platform="android"]) .sidebar-primary-nav button > svg {
   width: 16px;
