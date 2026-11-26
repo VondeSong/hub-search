@@ -76,8 +76,8 @@
     },
     {
       "path": "action-harvest/SKILL.md",
-      "bytes": 5444,
-      "sha256": "5e461c34916c823f0e9c95ddfb37d053995f608be05dd3ff10744ecba2aafaf5",
+      "bytes": 6672,
+      "sha256": "678ae91568a039dcf685b7c6d7a1aac11e6ff8b1cc452e6796deb364cb932454",
       "source": "Hub built-in action-harvest read-only extraction skill"
     }
   ]
