@@ -67,9 +67,13 @@ export function ActionHarvester({
   const [titles, setTitles] = useState<Record<string, string>>({});
   const lock = useRef(false);
   const scopeKey = JSON.stringify(scope);
+  const lastScopeKey = useRef(scopeKey);
   useEffect(() => {
     let live = true;
-    setDocs([]);
+    if (lastScopeKey.current !== scopeKey) {
+      lastScopeKey.current = scopeKey;
+      setDocs([]);
+    }
     setReadError("");
     native<unknown>("workbenchPassages", { scope }).then(
       (v) => {
@@ -119,6 +123,15 @@ export function ActionHarvester({
     [candidates, decisions, tasks, excluded],
   );
   const matchCount = [...possibleMatches.values()].filter((matches) => matches.length).length;
+  const duplicateTaskGroups = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const task of tasks) {
+      const groupKey = JSON.stringify([task.libraryId, task.collectionId || task.documentTitle, task.title]);
+      counts.set(groupKey, (counts.get(groupKey) || 0) + 1);
+    }
+    return counts;
+  }, [tasks]);
+  const normalizedMatchSearch = matchSearch.trim().toLowerCase();
   const writable = libraries.filter((l) => l.provider === "dida365" && (!scope || scope.includes(l.id)));
   const destination = writable.some((l) => l.id === target) ? target : writable.length === 1 ? writable[0].id : "";
   async function decide(key: string, d: Decision) {
@@ -350,19 +363,20 @@ export function ActionHarvester({
                       ...tasks
                         .filter(
                           (t) =>
-                            t.status === "open" && !matches.includes(t) && t.title.includes(matchSearch.trim()),
+                            t.status === "open" &&
+                            !matches.includes(t) &&
+                            (!normalizedMatchSearch ||
+                              (t.title + " " + (t.collectionName || t.documentTitle || ""))
+                                .toLowerCase()
+                                .includes(normalizedMatchSearch)),
                         )
                         .slice(0, 40),
                     ].map((t) => (
                       <option key={identity(t)} value={identity(t)}>
                         {t.title} · {t.collectionName || t.documentTitle} · {t.libraryName}
-                        {tasks.some(
-                          (other) =>
-                            other.id !== t.id &&
-                            other.title === t.title &&
-                            other.libraryId === t.libraryId &&
-                            (other.collectionId || other.documentTitle) === (t.collectionId || t.documentTitle),
-                        )
+                        {(duplicateTaskGroups.get(
+                          JSON.stringify([t.libraryId, t.collectionId || t.documentTitle, t.title]),
+                        ) || 0) > 1
                           ? " · " + t.sourceId.slice(-6)
                           : ""}
                       </option>

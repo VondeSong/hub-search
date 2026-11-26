@@ -224,7 +224,9 @@ describe("行动工作台", () => {
     });
     const tasks = Array.from({ length: 27 }, (_, index) => "QA" + index + " 安装复核");
     tasks.push("VX74 水密探头");
-    expect((await queryMaterials("BEV", null, tasks)).map((material) => material.title)).toEqual([late.title]);
+    expect((await queryMaterials("BEV", null, tasks)).items.map((material) => material.title)).toEqual([
+      late.title,
+    ]);
   });
   it("同一日志已关联的不同摘录分别保留，不额外显示自动召回的重复卡片", () => {
     const original = { id: JSON.stringify(["journal", journal.libraryId, journal.record.id]), text: journal.body };
@@ -249,6 +251,11 @@ describe("行动工作台", () => {
     const [clue] = extractClues([{ id: "log", title: "现场", text: "VX74 售后工位，周二得复核绝缘夹具" }]);
     const differentTask = { ...t, title: "VX74 防水接头耐温偏低，周一得找结构组复核报告" };
     expect(matchExisting(clue, [differentTask])).toEqual([]);
+    const [sameWeekday] = extractClues([{ id: "log2", title: "现场", text: "VX74 售后工位，周一得复核绝缘夹具" }]);
+    expect(matchExisting(sameWeekday, [differentTask])).toEqual([]);
+    const [sameVerb] = extractClues([{ id: "log3", title: "现场", text: "待确认：VX74 绝缘夹具需要明天提供" }]);
+    const differentDeliverable = { ...t, title: "VX74 耐温报告需要明天提供" };
+    expect(matchExisting(sameVerb, [differentDeliverable])).toEqual([]);
   });
   it("拒绝虚构引用，对原话未包含的数值标记待核实", async () => {
     const sources: Material[] = [{ id: "rec", title: "录音", text: "基本满足要求" }];
@@ -560,5 +567,145 @@ describe("行动工作台", () => {
     );
     expect(host.textContent).toContain("当前无阻塞项，仍有 1 项并行等回复（供应商 · 耐温报告）");
     expect(identity(t)).toBe(JSON.stringify(["lib", "a"]));
+  });
+  it("专题证据墙在部分跨库检索失败时，同时保留已找到材料并显示错误提示", async () => {
+    const lateSpec = {
+      id: "late-spec",
+      documentId: "late",
+      provider: "craft",
+      libraryId: "notes",
+      spaceId: "notes",
+      title: "VX74 水密探头规范",
+      snippet: "实测水密探头间距",
+      contentType: "document",
+    };
+    vi.mocked(invoke).mockImplementation(async (command, params) => {
+      if (command === "local_search") {
+        const query = (params as { query: string }).query;
+        if (query === "bev") throw new Error("本地检索暂不可用");
+        return query === "vx74" ? [lateSpec] : [];
+      }
+      return [];
+    });
+    const probeTask = { ...t, id: "vx", sourceId: "vx", title: "VX74 水密探头" };
+    await render(
+      <ActionTopic
+        topic={{ key: "bev", name: "BEV", libraryId: "lib", collection: "bev" }}
+        tasks={[probeTask]}
+        meta={() => emptyMeta()}
+        journals={[]}
+        scope={null}
+        day={day}
+      >
+        {null}
+      </ActionTopic>,
+    );
+    await click(button("专题素材与证据墙"));
+    const alert = host.querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain("部分跨库检索失败");
+    expect(alert?.textContent).toContain("本地检索暂不可用");
+    expect(host.textContent).toContain("VX74 水密探头规范");
+  });
+  it("已完成任务的旧等待项不触发等待催办红点，也不在已闭环列表显示今天回看", async () => {
+    const completedTask = { ...t, completed: true, status: "completed" as const };
+    dashboard.tasks = [completedTask];
+    const today = new Intl.DateTimeFormat("sv-SE").format(new Date());
+    await write("task." + identity(completedTask), {
+      ...emptyMeta(),
+      waits: [{ ...wait, review: today }],
+    });
+    await render(<TaskWorkspace libraries={[dida]} desktopSidebarVisible />);
+    const waitingNav = button("等待催办");
+    expect(waitingNav.querySelector(".aw-alert-dot")).toBeNull();
+    await click(button("已闭环"));
+    expect(host.textContent).toContain(completedTask.title);
+    expect(host.textContent).not.toContain("今天回看");
+  });
+  it("等待催办视图按最早回看日升序排列", async () => {
+    const laterTask = { ...t, id: "later", sourceId: "later", title: "Alpha 晚回看任务" };
+    const urgentTask = { ...t, id: "urgent", sourceId: "urgent", title: "Zeta 今天回看任务" };
+    dashboard.tasks = [laterTask, urgentTask];
+    const today = new Intl.DateTimeFormat("sv-SE").format(new Date());
+    await write("task." + identity(laterTask), {
+      ...emptyMeta(),
+      waits: [{ ...wait, id: "w-later", review: "2099-12-31" }],
+    });
+    await write("task." + identity(urgentTask), {
+      ...emptyMeta(),
+      waits: [{ ...wait, id: "w-urgent", review: today }],
+    });
+    await render(<TaskWorkspace libraries={[dida]} desktopSidebarVisible />);
+    await click(button("等待催办"));
+    const titles = Array.from(host.querySelectorAll('section[aria-label="等待催办"] .aw-row strong')).map(
+      (el) => el.textContent,
+    );
+    expect(titles).toEqual([urgentTask.title, laterTask.title]);
+  });
+  it("行动捕手在刷新时保留已有跨库笔记线索不闪烁，且关联筛选不区分大小写", async () => {
+    let calls = 0;
+    vi.mocked(invoke).mockImplementation(async (_command, params) => {
+      if (workbenchAction(params) === "workbenchPassages") {
+        calls += 1;
+        if (calls === 1) {
+          return [
+            {
+              id: "block-1",
+              spaceId: "craft",
+              provider: "craft",
+              title: "试装笔记",
+              snippet: "- [ ] 将图纸交给结构组",
+            },
+          ];
+        }
+        return new Promise(() => {});
+      }
+      return [];
+    });
+    const upperTask = { ...t, id: "bev-1", sourceId: "bev-1", title: "BEV 电池包支架复核" };
+    const props = {
+      tasks: [upperTask],
+      journals: [],
+      scope: null,
+      libraries: [dida],
+      day,
+      onUpdate: async () => {},
+      onRefresh: async () => {},
+      onSelect: () => {},
+    };
+    await render(<ActionHarvester {...props} revision={0} />);
+    await click(button("行动捕手 · 1 条"));
+    const filterInput = host.querySelector<HTMLInputElement>('input[aria-label="筛选可关联任务"]')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(filterInput, "bev");
+      filterInput.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const select = host.querySelector<HTMLSelectElement>('select[aria-label="关联已有任务"]')!;
+    expect([...select.options].some((option) => option.textContent?.includes("BEV 电池包支架复核"))).toBe(true);
+    await render(<ActionHarvester {...props} revision={1} />);
+    expect(host.textContent).toContain("- [ ] 将图纸交给结构组");
+  });
+  it("同一工作台会话内切回同一专题时复用跨库检索缓存，不重复查询 local_search", async () => {
+    let searchCalls = 0;
+    vi.mocked(invoke).mockImplementation(async (command) => {
+      if (command === "list_quick_journal") return { items: [], error: "" };
+      if (command === "get_quick_journal_settings") return { settings: { libraryId: "notes" } };
+      if (command === "local_search") {
+        searchCalls += 1;
+        return [];
+      }
+      return [];
+    });
+    dashboard.tasks = [t];
+    await render(<TaskWorkspace libraries={[dida]} desktopSidebarVisible />);
+    await click(button("T29"));
+    const afterFirstVisit = searchCalls;
+    expect(afterFirstVisit).toBeGreaterThan(0);
+    await click(button("← 今日聚焦"));
+    await click(button("T29"));
+    expect(searchCalls).toBe(afterFirstVisit);
+
+    // Refocusing invalidates the cache even when the topic stays on screen.
+    await act(async () => window.dispatchEvent(new Event("focus")));
+    expect(searchCalls).toBeGreaterThan(afterFirstVisit);
   });
 });

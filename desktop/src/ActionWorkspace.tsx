@@ -22,6 +22,7 @@ import { ActionTodayPlan } from "./ActionTodayPlan";
 import { ActionHarvester } from "./ActionHarvester";
 import { ActionDetail } from "./ActionDetail";
 import { ActionTopic } from "./ActionTopic";
+import type { RecallCache } from "./ActionMaterials";
 import { native, todayKey } from "./ActionEvidence";
 import {
   dueDay,
@@ -91,6 +92,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
     };
   }, []);
   const scopeKey = JSON.stringify(selectedLibraryIds);
+  const recallCache = useMemo<RecallCache>(() => new Map(), [scopeKey, refreshKey]);
   const [detailPercent, setDetailPercent] = useState(44);
   const [clueCount, setClueCount] = useState(0);
   const bump = () => setRevision((v) => v + 1);
@@ -317,7 +319,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
           {items.map((t) => {
             const key = identity(t),
               m = meta(t),
-              wait = m.waits.filter((w) => !w.resolved),
+              wait = t.completed ? [] : m.waits.filter((w) => !w.resolved),
               original = originals.get(t.id) || t;
             return (
               <div
@@ -466,9 +468,11 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
               <small className="aw-count">
                 {((id === "focus" && clueCount > 0) ||
                   (id === "waiting" &&
-                    tasks.some((t) => meta(t).waits.some((w) => !w.resolved && w.review && w.review <= day)))) && (
-                  <i className="aw-alert-dot" />
-                )}
+                    tasks.some(
+                      (t) =>
+                        t.status === "open" &&
+                        meta(t).waits.some((w) => !w.resolved && w.review && w.review <= day),
+                    ))) && <i className="aw-alert-dot" />}
                 {id === "focus"
                   ? focusCount
                   : id === "waiting"
@@ -575,6 +579,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
             <ActionTopic
               key={project.key}
               topic={project}
+              recallCache={recallCache}
               tasks={tasks.filter((t) => inTopic(t, project, meta(t)))}
               meta={meta}
               journals={journals}
@@ -629,7 +634,14 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
             rows(
               view === "waiting" ? "等待催办" : view === "done" ? "已闭环" : "全部行动",
               view === "waiting"
-                ? scoped.filter(activeWait)
+                ? scoped.filter(activeWait).sort((a, b) => {
+                    const nextReview = (task: UnifiedTask) =>
+                      meta(task)
+                        .waits.filter((w) => !w.resolved && w.review)
+                        .map((w) => w.review)
+                        .sort()[0] || "9999";
+                    return nextReview(a).localeCompare(nextReview(b)) || a.title.localeCompare(b.title, "zh-CN");
+                  })
                 : view === "done"
                   ? grouped.done
                   : scoped.filter((t) => !t.completed),
@@ -687,6 +699,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
           <ActionDetail
             key={identity(selectedTask)}
             task={selectedTask}
+            recallCache={recallCache}
             topicClick={() => navigate("all", topicOf(selectedTask), identity(selectedTask))}
             completion={
               <TaskStatusControl

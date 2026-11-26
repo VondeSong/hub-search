@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AgentPanelContext, AgentTextMaterialContext } from "./StandaloneAgentLauncher";
 import { resolveTaskResult } from "./TaskWorkspaceResult";
 import { TaskPlanningPanel } from "./TaskPlanningPanel";
@@ -10,7 +10,7 @@ import type { QuickJournalItem } from "./JournalRecords";
 import type { SearchResult } from "./SearchTypes";
 import type { ActionMeta, Draft, Topic } from "./ActionState";
 import { generate, native, type Material, type ModelMode } from "./ActionEvidence";
-import { Materials, assembleMaterials, useRecall } from "./ActionMaterials";
+import { Materials, assembleMaterials, useRecall, type RecallCache } from "./ActionMaterials";
 import { sourceNoteStatus, type TaskNoteAction } from "./TaskPlanningSource";
 
 export type UpdateMeta = (change: (m: ActionMeta) => ActionMeta) => Promise<void>;
@@ -107,6 +107,7 @@ export function DraftView({
 }
 export function ActionDetail({
   task,
+  recallCache,
   meta,
   update,
   journals,
@@ -122,6 +123,7 @@ export function ActionDetail({
 }: {
   task: UnifiedTask;
   topics?: Topic[];
+  recallCache?: RecallCache;
   meta: ActionMeta;
   update: UpdateMeta;
   journals: QuickJournalItem[];
@@ -136,9 +138,12 @@ export function ActionDetail({
 }) {
   const agent = useContext(AgentPanelContext);
   const materialContext = useContext(AgentTextMaterialContext);
-  const recall = useRecall(task.title, scope);
+  const recall = useRecall(task.title, scope, [], recallCache);
   const [planning, setPlanning] = useState("");
-  const pack = assembleMaterials(task.title, journals, recall.items, meta.links, day);
+  const pack = useMemo(
+    () => assembleMaterials(task.title, journals, recall.items, meta.links, day),
+    [task.title, journals, recall.items, meta.links, day],
+  );
   const [waitOpen, setWaitOpen] = useState(waitInitially),
     [who, setWho] = useState(""),
     [what, setWhat] = useState(""),

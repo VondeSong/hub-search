@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import type { QuickJournalItem } from "./JournalRecords";
 import { QuickJournalCard } from "./QuickJournal";
@@ -7,23 +7,40 @@ import { invoke } from "@tauri-apps/api/core";
 import { isPdfContent } from "./PdfPreviewModel";
 import { journalMaterial, matchingTerms, queryMaterials, terms, type Material } from "./ActionEvidence";
 
-export function useRecall(title: string, scope: string[] | null, taskTitles: string[] = []) {
+export type RecallCache = Map<string, { items: Material[]; error: string }>;
+export function useRecall(title: string, scope: string[] | null, taskTitles: string[] = [], cache?: RecallCache) {
   const key = JSON.stringify([title, scope, taskTitles]);
-  const [state, setState] = useState({ key: "", items: [] as Material[], error: "" });
+  const cached = title ? cache?.get(key) : undefined;
+  const [state, setState] = useState({ cache, key: "", items: [] as Material[], error: "" });
   useEffect(() => {
     const controller = new AbortController();
-    if (title)
-      void queryMaterials(title, scope, taskTitles, controller.signal).then(
-        (items) => {
-          if (!controller.signal.aborted) setState({ key, items, error: "" });
-        },
-        (e) => {
-          if (!controller.signal.aborted) setState({ key, items: [], error: String(e) });
-        },
-      );
+    if (!title) return () => controller.abort();
+    const hit = cache?.get(key);
+    if (hit) {
+      setState({ cache, key, items: hit.items, error: hit.error });
+      return () => controller.abort();
+    }
+    void queryMaterials(title, scope, taskTitles, controller.signal).then(
+      ({ items, partialError }) => {
+        if (controller.signal.aborted) return;
+        if (cache && !partialError) {
+          if (cache.size >= 64) cache.clear();
+          cache.set(key, { items, error: "" });
+        }
+        setState({ cache, key, items, error: partialError });
+      },
+      (e) => {
+        if (!controller.signal.aborted) setState({ cache, key, items: [], error: String(e) });
+      },
+    );
     return () => controller.abort();
-  }, [key]);
-  return state.key === key ? { ...state, loading: false } : { key, items: [], error: "", loading: Boolean(title) };
+  }, [key, cache]);
+  return useMemo(() => {
+    if (cached) return { key, items: cached.items, error: cached.error, loading: false };
+    if (state.key === key && state.cache === cache)
+      return { key, items: state.items, error: state.error, loading: false };
+    return { key, items: [], error: "", loading: Boolean(title) };
+  }, [cached, cache, state, key, title]);
 }
 export function assembleMaterials(
   title: string | string[],

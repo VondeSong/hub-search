@@ -5,11 +5,12 @@ import type { UnifiedTask } from "./TaskWorkspacePresentation";
 import { archiveAction } from "./ActionJournal";
 import { generate, type Material } from "./ActionEvidence";
 import { read, write, identity, hasBlockingWait, type ActionMeta, type Draft, type Topic } from "./ActionState";
-import { assembleMaterials, Materials, useRecall } from "./ActionMaterials";
+import { assembleMaterials, Materials, useRecall, type RecallCache } from "./ActionMaterials";
 import { DraftView } from "./ActionDetail";
 
 export function ActionTopic({
   topic,
+  recallCache,
   tasks,
   meta,
   journals,
@@ -19,6 +20,7 @@ export function ActionTopic({
   children,
 }: {
   topic: Topic;
+  recallCache?: RecallCache;
   tasks: UnifiedTask[];
   meta: (t: UnifiedTask) => ActionMeta;
   journals: QuickJournalItem[];
@@ -36,7 +38,7 @@ export function ActionTopic({
     [error, setError] = useState(""),
     [archived, setArchived] = useState("");
   const taskTitles = tasks.map((task) => task.title);
-  const recall = useRecall(topic.name, scope, taskTitles);
+  const recall = useRecall(topic.name, scope, taskTitles, recallCache);
   const wait = tasks.filter((t) => t.status === "open").flatMap((t) => meta(t).waits.filter((w) => !w.resolved));
   const blockers = wait.filter((w) => w.blocking),
     parallel = wait.filter((w) => !w.blocking);
@@ -55,9 +57,11 @@ export function ActionTopic({
     ].join("\n"),
   }));
   const links = tasks.flatMap((t) => meta(t).links);
+  const taskTitlesKey = JSON.stringify(taskTitles);
+  const linksKey = JSON.stringify(links);
   const pack = useMemo(
     () => assembleMaterials([topic.name, ...taskTitles], journals, recall.items, links, day),
-    [topic, tasks, journals, recall, links, day],
+    [topic.name, taskTitlesKey, journals, recall.items, linksKey, day],
   );
   const evidence: Material[] = [
     {

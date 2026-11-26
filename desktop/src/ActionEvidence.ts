@@ -30,6 +30,18 @@ const stop = new Set(
     " ",
   ),
 );
+const zhSegmenter = new Intl.Segmenter("zh", { granularity: "word" });
+const numericAnchorRegexCache = new Map<string, RegExp>();
+function numericAnchorRegex(anchor: string): RegExp {
+  let cached = numericAnchorRegexCache.get(anchor);
+  if (!cached) {
+    const escaped = anchor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    cached = new RegExp(`(?<![a-z0-9]|\\d\\.)${escaped}(?![a-z0-9]|\\.\\d)`);
+    if (numericAnchorRegexCache.size > 512) numericAnchorRegexCache.clear();
+    numericAnchorRegexCache.set(anchor, cached);
+  }
+  return cached;
+}
 export function terms(text: string): string[] {
   const tokens: string[] = [];
   let fragment = "";
@@ -37,7 +49,7 @@ export function terms(text: string): string[] {
     if (fragment.length >= 2 && !stop.has(fragment)) tokens.push(fragment);
     fragment = "";
   };
-  for (const part of new Intl.Segmenter("zh", { granularity: "word" }).segment(text.toLowerCase())) {
+  for (const part of zhSegmenter.segment(text.toLowerCase())) {
     if (part.isWordLike && /^\p{Script=Han}$/u.test(part.segment)) {
       fragment += part.segment;
       continue;
@@ -52,8 +64,7 @@ export function matchingTerms(anchors: string[], text: string) {
   const haystack = text.toLowerCase();
   return anchors.filter((anchor) => {
     if (!/\d/.test(anchor)) return haystack.includes(anchor);
-    const escaped = anchor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return new RegExp(`(?<![a-z0-9]|\\d\\.)${escaped}(?![a-z0-9]|\\.\\d)`).test(haystack);
+    return numericAnchorRegex(anchor).test(haystack);
   });
 }
 export function relevance(anchors: string[], text: string) {
@@ -96,13 +107,17 @@ export function extractClues(materials: Material[]): Clue[] {
   }
   return [...found.values()];
 }
+export type QueryMaterialsResult = {
+  items: Material[];
+  partialError: string;
+};
 export async function queryMaterials(
   title: string,
   scope: string[] | null,
   taskTitles: string[] = [],
   signal?: AbortSignal,
-): Promise<Material[]> {
-  if (scope?.length === 0) return [];
+): Promise<QueryMaterialsResult> {
+  if (scope?.length === 0) return { items: [], partialError: "" };
   const titleTerms = terms(title);
   const anchors = [
     ...new Set([...titleTerms.slice(0, 5), ...taskTitles.flatMap((task) => terms(task).slice(0, 2))]),
@@ -126,13 +141,15 @@ export async function queryMaterials(
     });
   const byId = new Map<string, Material>();
   let failure: unknown;
+  let failures = 0;
   let successes = 0;
   for (let offset = 0; offset < anchors.length; offset += 6) {
-    if (signal?.aborted) return [];
+    if (signal?.aborted) return { items: [], partialError: "" };
     const batch = await Promise.allSettled(anchors.slice(offset, offset + 6).map(search));
     for (const result of batch) {
       if (result.status === "rejected") {
-        failure = result.reason;
+        failure ??= result.reason;
+        failures += 1;
         continue;
       }
       successes += 1;
@@ -144,11 +161,17 @@ export async function queryMaterials(
     }
   }
   if (!successes && failure) throw failure;
+  const partialError = failures
+    ? `部分跨库检索失败（${failures}/${anchors.length} 项）：${failure instanceof Error ? failure.message : String(failure)}，已保留已找到的材料。`
+    : "";
   const materials = [...byId.values()];
-  if (taskTitles.length) return materials;
-  return materials
-    .sort((a, b) => relevance(anchors, b.title + " " + b.text) - relevance(anchors, a.title + " " + a.text))
-    .slice(0, 12);
+  if (taskTitles.length) return { items: materials, partialError };
+  return {
+    items: materials
+      .sort((a, b) => relevance(anchors, b.title + " " + b.text) - relevance(anchors, a.title + " " + a.text))
+      .slice(0, 12),
+    partialError,
+  };
 }
 const evidenceNumbers = /(?:[<>≤≥]\s*)?(?:[±+-]\s*)?\d+(?:[.,]\d+)?/g;
 const engineeringMeasurements =
@@ -183,7 +206,11 @@ export async function generate(mode: ModelMode, materials: Material[]): Promise<
   if (value.items.length && !accepted.length) throw Error("生成内容未能对应原文，请重新选择材料。");
   return accepted;
 }
-const genericMatchTerms = new Set("复核 核对 验收 验证 工位 试验 报告 结构组 供应商 检查".split(" "));
+const genericMatchTerms = new Set(
+  "复核 核对 验收 验证 工位 试验 报告 结构组 供应商 检查 明天 后天 昨天 本周 下周 上周 周一 周二 周三 周四 周五 周六 周日 星期一 星期二 星期三 星期四 星期五 星期六 星期日 上午 下午 晚上 月底 年底 尽快 回头 提供 提交 回传 回复 沟通 对接 联系 补发 安排 处理 修改 补充 反馈 负责 记得 待办 待确认 待验证 查一下".split(
+    " ",
+  ),
+);
 export function matchExisting(clue: Clue, tasks: UnifiedTask[]) {
   const anchors = terms(clue.title).filter((term) => !genericMatchTerms.has(term));
   return tasks
