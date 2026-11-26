@@ -18,6 +18,11 @@ const source={evidenceId:"e1",quote:"本周已完成原型验证",excerpt:{title
 function item(id="one"):Insight{return {id,workId:"work-a",headRevision:1,rowRevision:1,createdAt:Date.now(),updatedAt:Date.now(),processingState:"attention",snoozeUntil:null,followed:true,validity:"available",reasons:[],snapshot:{text:"本周已完成原型验证。",origin:{workId:"work-a",runId:"run-a",deliveryRecordId:"delivery-a",deliveryHash:"hash-a",generatedAt:Date.now()},sourceCitations:[source],contextDependencies:[],userContextRefs:[]},events:[]};}
 function button(text:string){const b=[...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent?.trim()===text);if(!b)throw new Error(`Missing button: ${text}`);return b;}
 async function click(text:string){await act(async()=>button(text).click());}
+async function clickDesktopMore(text:string){
+ const more=host.querySelector<HTMLElement>('summary[aria-label="洞察更多操作"]')!;
+ await act(async()=>more.click());
+ await click(text);
+}
 async function mount(){host=document.createElement("div");document.body.append(host);root=createRoot(host);await act(async()=>root.render(<AgentPanelContext.Provider value={openWork}><InsightsWorkspace/></AgentPanelContext.Provider>));}
 beforeEach(()=>{
  localStorage.clear();listeners.clear();invoke.mockReset();openWork.mockReset();store.items=[item()];store.lostReply=false;
@@ -174,14 +179,12 @@ it("resumes an already queued supplement without saving another user message",as
 });
 
 
-it("keeps prototype navigation honest and filters review findings without a model",async()=>{
+it("filters review findings from the desktop toolbar without rendering the old sidebar or running the model",async()=>{
  const second=item("two");second.validity="review";second.reasons=[{id:"changed",kind:"sourceChanged",active:true}];second.snapshot!.text="来源变化，需要重新核对。";store.items.push(second);
- await mount();expect(host.querySelector('aside[aria-label="洞察导航"]')).not.toBeNull();
- const navOpen=host.querySelector<HTMLButtonElement>('button[aria-label="展开洞察侧边栏"]')!;await act(async()=>navOpen.click());expect(document.activeElement?.getAttribute("aria-label")).toBe("收起洞察侧边栏");
- await act(async()=>document.activeElement!.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true})));expect(document.activeElement).toBe(navOpen);
+ await mount();expect(host.querySelector('aside[aria-label="洞察导航"]')).toBeNull();
+ expect(host.querySelector('button[aria-label="展开洞察侧边栏"]')).toBeNull();
  expect(button("阶段回顾").disabled).toBe(false);expect(host.querySelectorAll('.insights-card')).toHaveLength(2);
- await act(async()=>host.querySelector<HTMLButtonElement>('nav button[aria-current="page"]')!.click());
- const review=[...host.querySelectorAll<HTMLButtonElement>('nav button')].find(node=>node.textContent?.startsWith("待复核"))!;await act(async()=>review.click());
+ const review=[...host.querySelectorAll<HTMLButtonElement>('.insights-scope-pills button')].find(node=>node.textContent?.startsWith("待复核"))!;await act(async()=>review.click());
  expect(host.querySelectorAll('.insights-card')).toHaveLength(1);expect(host.querySelector('.insights-card')?.textContent).toContain("来源变化");
  expect(invoke.mock.calls.some(([,v])=>["respond","resume","run"].includes(v.args.action))).toBe(false);
 });
@@ -271,13 +274,13 @@ it("recall source errors and access refresh clear excerpts while retaining the q
 });
 
 it("opens the stage review with one current navigation item and no automatic model run",async()=>{
- await mount();await click("阶段回顾");expect(host.querySelectorAll('nav button[aria-current="page"]')).toHaveLength(1);expect(host.querySelector('nav button[aria-current="page"]')?.textContent).toContain("阶段回顾");expect(host.querySelector('[aria-label="回顾问题"]')).not.toBeNull();expect(invoke.mock.calls.some(([,v])=>["respond","resume","run"].includes(v.args.action))).toBe(false);
+ await mount();await click("阶段回顾");expect(host.querySelectorAll('.insights-mode-switch [aria-selected="true"]')).toHaveLength(1);expect(host.querySelector('.insights-mode-switch [aria-selected="true"]')?.textContent).toContain("阶段回顾");expect(host.querySelector('[aria-label="回顾问题"]')).not.toBeNull();expect(invoke.mock.calls.some(([,v])=>["respond","resume","run"].includes(v.args.action))).toBe(false);
 });
 
 it("persists stars separately and enables the real history and public cases",async()=>{
  await mount();const star=host.querySelector<HTMLButtonElement>('.insights-card button[aria-label="星标发现"]')!;await act(async()=>star.click());expect(store.items[0].starred).toBe(true);expect(store.items[0].followed).toBe(true);expect(store.items[0].processingState).toBe("attention");
- await click("处理记录");expect(host.textContent).toContain("更新了星标");await click("返回发现");expect(document.body.textContent).toContain("发现与依据");await click("返回列表");
- await act(async()=>[...host.querySelectorAll<HTMLButtonElement>("nav button")].find(b=>b.textContent?.startsWith("真实案例"))!.click());expect(host.textContent).toContain("五个由公开文档支持");expect(store.items).toHaveLength(1);expect(invoke.mock.calls.some(([,v])=>v.args.action==="run")).toBe(false);
+ await clickDesktopMore("处理记录");expect(host.textContent).toContain("更新了星标");await click("返回发现");expect(document.body.textContent).toContain("发现与依据");await click("返回列表");
+ await clickDesktopMore("真实案例");expect(host.textContent).toContain("五个由公开文档支持");expect(store.items).toHaveLength(1);expect(invoke.mock.calls.some(([,v])=>v.args.action==="run")).toBe(false);
 });
 it("preserves feedback while navigating adjacent findings and changing focus",async()=>{
  const second=item("two");second.updatedAt=store.items[0].updatedAt-1;second.snapshot!.text="第二条不同发现";store.items.push(second);await mount();await click("查看发现");const input=document.querySelector<HTMLTextAreaElement>('[aria-label="你的补充"]')!;await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value")!.set!.call(input,"还没保存的纠正");input.dispatchEvent(new Event("input",{bubbles:true}));});await click("下一条");await click("上一条");expect(document.querySelector<HTMLTextAreaElement>('[aria-label="你的补充"]')!.value).toBe("还没保存的纠正");await click("专注阅读");expect(document.body.textContent).toContain("退出专注");
@@ -388,7 +391,7 @@ it("aligns desktop single-row 3-mode topbar, list-header filters, stable split d
  });
  await mount();
  const workspace=host.querySelector<HTMLElement>(".insights-workspace")!;
- expect(workspace.classList.contains("insights-navigation-closed")).toBe(true);
+ expect(workspace.querySelector(".insights-navigation, .insights-nav-trigger")).toBeNull();
 
  // Single-row 3-mode switch switches between 全部发现 / 阶段回顾 / 关注主题
  const modeTabs=[...host.querySelectorAll<HTMLButtonElement>('.insights-mode-switch [role="tab"]')];
@@ -513,7 +516,7 @@ it("switches to discoveries when typing in topbar search from stageReview, topic
  // 3) From 处理记录 (legacy history entry): typing switches to discoveries and preserves focus
  await act(async()=>host.querySelector<HTMLButtonElement>('button[aria-label="清除搜索"]')!.click());
  expect(document.activeElement).toBe(searchInput);
- await click("处理记录");
+ await clickDesktopMore("处理记录");
  expect(host.textContent).toContain("更新了星标");
  await typeQuery("LiveSync");
  expect(modeTabs()[0].getAttribute("aria-selected")).toBe("true");
@@ -521,7 +524,7 @@ it("switches to discoveries when typing in topbar search from stageReview, topic
  expect(host.querySelectorAll(".insights-card")).toHaveLength(1);
  expect(host.querySelector(".insights-card")?.textContent).toContain("LiveSync 同步冲突");
  // Returning to 处理记录 still displays real history entries
- await click("处理记录");
+ await clickDesktopMore("处理记录");
  expect(host.textContent).toContain("更新了星标");
 
  // 4) Existing discovery filter is preserved when search switches from secondary mode back to discoveries

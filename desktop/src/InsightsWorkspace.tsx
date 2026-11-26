@@ -1,5 +1,5 @@
 import {useContext,useEffect,useMemo,useRef,useState,type CSSProperties,type ReactNode,type Ref} from "react";
-import {ArrowDownUp,ArrowUpRight,Bell,BellOff,BookOpen,CalendarDays,Check,CheckCircle2,ChevronDown,ChevronRight,Clock3,FileSearch,FileText,Globe2,History,Inbox,LayoutGrid,Layers3,MessageSquare,MoreHorizontal,PanelLeft,PanelRight,Plus,RefreshCw,Search,ShieldCheck,SlidersHorizontal,Sparkles,Star,Table2,TriangleAlert,X} from "lucide-react";
+import {ArrowDownUp,ArrowUpRight,Bell,BellOff,BookOpen,CalendarDays,Check,CheckCircle2,ChevronDown,ChevronRight,Clock3,FileSearch,FileText,Globe2,History,LayoutGrid,Layers3,MessageSquare,MoreHorizontal,PanelLeft,PanelRight,Plus,RefreshCw,Search,ShieldCheck,SlidersHorizontal,Sparkles,Star,Table2,TriangleAlert,X} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import {useInsights} from "./useInsights";
 import {InsightNotebookWorkspace} from "./InsightNotebookWorkspace";
@@ -254,7 +254,7 @@ export function InsightsWorkspace(){
  const [workFilter,setWorkFilter]=useState(""),[focus,setFocus]=useState(false);
  const detailDrafts=useRef<Record<string,string>>({});
  const navigationClose=useRef<HTMLButtonElement>(null),navigationTrigger=useRef<HTMLButtonElement>(null);
- const [scope,setScope]=useState<"all"|"review"|"starred"|"knowledge"|"life"|"decision">("all"),[perspectiveFilter,setPerspectiveFilter]=useState<""|"knowledge"|"life"|"decision">(""),[validity,setValidity]=useState("all"),[layout,setLayout]=useState<"cards"|"split"|"table">(desktop?"split":"cards"),[navigation,setNavigation]=useState<"auto"|"open"|"closed">(desktop?"closed":"auto");
+ const [scope,setScope]=useState<"all"|"review"|"starred"|"knowledge"|"life"|"decision">("all"),[perspectiveFilter,setPerspectiveFilter]=useState<""|"knowledge"|"life"|"decision">(""),[validity,setValidity]=useState("all"),[layout,setLayout]=useState<"cards"|"split"|"table">(desktop?"split":"cards"),[navigation,setNavigation]=useState<"auto"|"open"|"closed">("auto");
  const [sortOldest,setSortOldest]=useState(false),[listWidth,setListWidth]=useState(loadInsightsListWidth);
  const [checkedIds,setCheckedIds]=useState<string[]>([]),[batchBusy,setBatchBusy]=useState(false),[batchResult,setBatchResult]=useState("");
  const splitDrag=useRef<{pointerId:number;x:number;width:number;dragged:boolean}|null>(null), listPane=useRef<HTMLDivElement>(null),navPane=useRef<HTMLElement>(null);
@@ -263,7 +263,7 @@ export function InsightsWorkspace(){
  if(desktop)visitedSections.current.add(section);
  const searchInput=useRef<HTMLInputElement>(null),tableClose=useRef<HTMLButtonElement>(null),tableRowTrigger=useRef<HTMLButtonElement|null>(null);
 
- useEffect(()=>{if(navigation==="open")navigationClose.current?.focus();else if(navigation==="closed"&&navPane.current?.contains(document.activeElement))navigationTrigger.current?.focus();},[navigation]);
+ useEffect(()=>{if(desktop)return;if(navigation==="open")navigationClose.current?.focus();else if(navigation==="closed"&&navPane.current?.contains(document.activeElement))navigationTrigger.current?.focus();},[desktop,navigation]);
  useEffect(()=>{
   if(!desktop||!focus)return;
   const onWindowKeyDown=(event:KeyboardEvent)=>{
@@ -295,11 +295,11 @@ export function InsightsWorkspace(){
  },[desktop,section,layout,visible,data.detail,data.open]);
  const position=visible.findIndex(i=>i.id===data.detail?.id);
  const go=(delta:number)=>{const item=visible[position+delta];if(item)openFinding(item);};
- const navigate=(value:typeof section)=>{setSection(value);setCheckedIds([]);setFocus(false);data.closeDetail();if(desktop&&navigation==="open")setNavigation("closed");};
+ const navigate=(value:typeof section)=>{setSection(value);setCheckedIds([]);setFocus(false);data.closeDetail();};
  const selectedRows=visible.filter(item=>item.snapshot&&!item.checking&&checkedIds.includes(item.id));
  const canChoose=!data.busy&&!data.unresolved&&!batchBusy;
  const toggleRow=(id:string)=>setCheckedIds(previous=>previous.includes(id)?previous.filter(value=>value!==id):[...previous,id]);
- const chooseScope=(value:typeof scope)=>{setSection("discoveries");setScope(value);setPerspectiveFilter(value==="knowledge"||value==="life"||value==="decision"?value:"");setFilter(desktop?"all":value==="all"?"attention":"all");setCheckedIds([]);if(desktop&&navigation==="open")setNavigation("closed");};
+ const chooseScope=(value:typeof scope)=>{setSection("discoveries");setScope(value);setPerspectiveFilter(value==="knowledge"||value==="life"||value==="decision"?value:"");setFilter(value==="all"?"attention":"all");setCheckedIds([]);};
  const canBatch=selectedRows.length>0&&canChoose;
  const applyBatch=async(action:"done"|"later"|"unfollow")=>{
   if(!canBatch)return;
@@ -326,7 +326,6 @@ export function InsightsWorkspace(){
   if(desktop&&section!=="discoveries"&&value.trim()){
    setSection("discoveries");
    setFocus(false);
-   if(navigation==="open")setNavigation("closed");
   }
  };
  const clearSearch=()=>{
@@ -370,12 +369,12 @@ export function InsightsWorkspace(){
  </div>;
  const topbar=<div className="insights-topbar">
   <div className="insights-breadcrumb" onMouseDown={chrome?.onMouseDown}>
-   <button type="button" ref={navigationTrigger} className="insights-nav-trigger icon-button" aria-label="展开洞察侧边栏" title="展开洞察侧边栏" onClick={()=>setNavigation(navigation==="open"||(navigation==="auto"&&!!navPane.current?.offsetWidth)?"closed":"open")}><PanelLeft size={16}/></button>
+   {!desktop&&<button type="button" ref={navigationTrigger} className="insights-nav-trigger icon-button" aria-label="展开洞察侧边栏" title="展开洞察侧边栏" onClick={()=>setNavigation(navigation==="open"||(navigation==="auto"&&!!navPane.current?.offsetWidth)?"closed":"open")}><PanelLeft size={16}/></button>}
    {!desktop&&<><span>我的 Hub</span><ChevronRight size={14}/><span>洞察</span></>}
    {desktop&&modeSwitch}
    {desktop&&secondarySectionNames[section]&&<span className="insights-secondary-badge">{secondarySectionNames[section]}</span>}
   </div>
-  <label className="insights-search"><Search size={14}/><input ref={searchInput} aria-label="搜索发现与依据" value={query} onChange={e=>handleSearchChange(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&desktop&&section!=="discoveries"&&query.trim()){e.preventDefault();setSection("discoveries");setFocus(false);if(navigation==="open")setNavigation("closed");}}} placeholder="搜索发现、事项与依据…"/>{query?<button type="button" className="insights-search-clear" aria-label="清除搜索" onClick={clearSearch}><X size={12}/></button>:desktop?<span className="insights-search-kbd" aria-hidden="true">/</span>:null}</label>
+  <label className="insights-search"><Search size={14}/><input ref={searchInput} aria-label="搜索发现与依据" value={query} onChange={e=>handleSearchChange(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&desktop&&section!=="discoveries"&&query.trim()){e.preventDefault();setSection("discoveries");setFocus(false);}}} placeholder="搜索发现、事项与依据…"/>{query?<button type="button" className="insights-search-clear" aria-label="清除搜索" onClick={clearSearch}><X size={12}/></button>:desktop?<span className="insights-search-kbd" aria-hidden="true">/</span>:null}</label>
   {desktop&&mainActions}
   {chrome?.actions}
  </div>;
@@ -389,7 +388,7 @@ export function InsightsWorkspace(){
   </div>
  </div>;
 
- return <section className={`insights-workspace${desktop?" insights-v4":""}${focus?" insights-focus":""} insights-navigation-${navigation}`} aria-label="洞察发现工作区" data-hub-keyboard-scope="insights"
+ return <section className={`insights-workspace${desktop?" insights-v4":` insights-navigation-${navigation}`}${focus?" insights-focus":""}`} aria-label="洞察发现工作区" data-hub-keyboard-scope="insights"
   onKeyDown={e=>{
    if(!desktop||e.isDefaultPrevented()||e.ctrlKey||e.metaKey||e.altKey||e.nativeEvent.isComposing)return;
    if((e.target as HTMLElement).closest("input,textarea,select,[contenteditable],dialog"))return;
@@ -403,17 +402,17 @@ export function InsightsWorkspace(){
   }}>
   {desktop&&data.loading&&data.items.length>0&&<div className="insights-sweep-bar" aria-hidden="true"/>}
   {desktop&&topbar}
-  <aside ref={navPane} className="insights-navigation" aria-label="洞察导航" onKeyDown={e=>{if(e.key==="Escape"){e.preventDefault();e.stopPropagation();setNavigation("closed");}}}>
+  {!desktop&&<aside ref={navPane} className="insights-navigation" aria-label="洞察导航" onKeyDown={e=>{if(e.key==="Escape"){e.preventDefault();e.stopPropagation();setNavigation("closed");}}}>
    <header><strong>洞察</strong><button type="button" ref={navigationClose} className="icon-button" aria-label="收起洞察侧边栏" onClick={()=>setNavigation("closed")}><PanelLeft size={17}/></button></header>
-   <nav aria-label="我的洞察"><p>{desktop?"洞察集合":"我的洞察"}</p><button type="button" className={section==="discoveries"&&scope==="all"?"selected":""} aria-current={section==="discoveries"&&scope==="all"?"page":undefined} onClick={()=>chooseScope("all")}><Sparkles size={18}/><span>{desktop?"全部洞察":"发现"}</span><small>{data.items.length}{data.more?"+":""}</small></button>
+   <nav aria-label="我的洞察"><p>我的洞察</p><button type="button" className={section==="discoveries"&&scope==="all"?"selected":""} aria-current={section==="discoveries"&&scope==="all"?"page":undefined} onClick={()=>chooseScope("all")}><Sparkles size={18}/><span>发现</span><small>{data.items.length}{data.more?"+":""}</small></button>
     <button type="button" className={section==="cases"?"selected":""} aria-current={section==="cases"?"page":undefined} onClick={()=>navigate("cases")}><Globe2 size={18}/><span>真实案例</span><small>5</small></button>
     <button type="button" className={section==="stageReview"?"selected":""} aria-current={section==="stageReview"?"page":undefined} onClick={()=>navigate("stageReview")}><CalendarDays size={18}/><span>阶段回顾</span></button>
     {([["topic",SlidersHorizontal,"关注主题"],["draft",FileText,"工作草稿"],["history",History,"处理记录"]] as const).map(([value,Glyph,label])=><button type="button" key={value} className={section===value?"selected":""} aria-current={section===value?"page":undefined} onClick={()=>navigate(value)}><Glyph size={18}/><span>{label}</span></button>)}
-    <p>{desktop?"依据与收藏":"我的筛选"}</p><button type="button" className={section==="discoveries"&&scope==="review"?"selected":""} onClick={()=>chooseScope("review")}><History size={18}/><span>待复核</span><small>{reviewCount}</small></button><button type="button" className={scope==="starred"&&section==="discoveries"?"selected":""} onClick={()=>chooseScope("starred")}><Star size={18}/><span>星标发现</span><small>{data.items.filter(i=>i.starred).length}</small></button>
+    <p>我的筛选</p><button type="button" className={section==="discoveries"&&scope==="review"?"selected":""} onClick={()=>chooseScope("review")}><History size={18}/><span>待复核</span><small>{reviewCount}</small></button><button type="button" className={scope==="starred"&&section==="discoveries"?"selected":""} onClick={()=>chooseScope("starred")}><Star size={18}/><span>星标发现</span><small>{data.items.filter(i=>i.starred).length}</small></button>
     <p>发现视角</p>{([["knowledge",BookOpen,"知识与工作"],["life",CalendarDays,"生活与进展"],["decision",ArrowUpRight,"决定与变化"]] as const).map(([value,Glyph,label])=><button type="button" key={value} className={section==="discoveries"&&scope===value?"selected":""} onClick={()=>chooseScope(value)}><Glyph size={18}/><span>{label}</span><small>{data.items.filter(i=>i.perspective===value).length}</small></button>)}
-    {desktop?<><p>核对</p><button type="button" onClick={()=>setPicker({})}><Inbox size={17}/><span>核对已发布成果</span></button></>:<><p>探索示例</p><button type="button" onClick={()=>navigate("cases")}><Layers3 size={18}/><span>更多发现示例</span></button></>}
+    <p>探索示例</p><button type="button" onClick={()=>navigate("cases")}><Layers3 size={18}/><span>更多发现示例</span></button>
    </nav><footer><BookOpen size={16}/><p>每条发现都保留依据。<br/>先理解，再决定下一步。</p></footer>
-  </aside>
+  </aside>}
   <div className="insights-page">
    {!desktop&&topbar}
    {desktop?<>
