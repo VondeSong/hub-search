@@ -51,6 +51,7 @@ export function ActionHarvester({
     [tick, setTick] = useState(0);
   const [busy, setBusy] = useState(""),
     [msg, setMsg] = useState(""),
+    [messageKey, setMessageKey] = useState(""),
     [opened, setOpen] = useState(false),
     [target, setTarget] = useState("");
   const [edits, setEdits] = useState<Record<string, string>>({}),
@@ -72,7 +73,15 @@ export function ActionHarvester({
     setReadError("");
     native<unknown>("workbenchPassages", { scope }).then(
       (v) => {
-        if (live) setDocs(normalizeResults(v));
+        if (!live) return;
+        // Keep original paragraph boundaries and unchecked boxes for action detection and evidence.
+        const raw = new Map<string, string>();
+        for (const passage of Array.isArray(v) ? v : [])
+          if (typeof passage?.id === "string" && typeof passage.snippet === "string")
+            raw.set(passage.id, passage.snippet);
+        setDocs(
+          normalizeResults(v).map((result) => ({ ...result, snippet: raw.get(result.id) ?? result.snippet })),
+        );
       },
       (e) => {
         if (live) setReadError(String(e));
@@ -120,11 +129,12 @@ export function ActionHarvester({
     if (lock.current) return;
     lock.current = true;
     setBusy(key);
+    setMessageKey(key);
     setMsg("");
     try {
       await fn();
     } catch (e) {
-      setMsg(String(e));
+      setMsg(e instanceof Error ? e.message : String(e));
     } finally {
       lock.current = false;
       setBusy("");
@@ -249,6 +259,9 @@ export function ActionHarvester({
             onChange={(e) => setMatchSearch(e.target.value)}
           />
           {clues.slice(0, limit).map((c) => {
+            const actionStatus = messageKey === c.key && (busy || msg) && (
+              <p role="status">{busy ? "正在处理…" : msg}</p>
+            );
             const matches = possibleMatches.get(c.key) || [],
               selected = tasks.find(
                 (t) => identity(t) === (choices[c.key] ?? (matches.length === 1 ? identity(matches[0]) : "")),
@@ -274,6 +287,7 @@ export function ActionHarvester({
                   >
                     仅保留本地关联
                   </button>
+                  {actionStatus}
                 </article>
               );
             }
@@ -299,6 +313,7 @@ export function ActionHarvester({
                       采用已同步的任务 · {task.collectionName || task.documentTitle} · {task.sourceId}
                     </button>
                   ))}
+                  {actionStatus}
                 </article>
               );
             }
@@ -423,13 +438,16 @@ export function ActionHarvester({
                     <button disabled={!!busy}>采纳并保存等待项</button>
                   </form>
                 )}
+                {actionStatus}
               </article>
             );
           })}
           {limit < clues.length && <button onClick={() => setLimit(limit + 12)}>查看更多线索</button>}
         </>
       )}
-      {(msg || busy) && <p role="status">{busy ? "正在处理…" : msg}</p>}
+      {(msg || busy) && (!opened || !clues.slice(0, limit).some((clue) => clue.key === messageKey)) && (
+        <p role="status">{busy ? "正在处理…" : msg}</p>
+      )}
     </section>
   );
 }

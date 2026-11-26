@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import { archiveAction } from "./ActionJournal";
 import { groupsFor, emptyMeta, identity, write, read, type ActionMeta } from "./ActionState";
-import { extractClues, generate, matchExisting, type Material } from "./ActionEvidence";
+import { extractClues, generate, matchExisting, queryMaterials, type Material } from "./ActionEvidence";
 import { ActionHarvester } from "./ActionHarvester";
 import { ActionDetail } from "./ActionDetail";
 import { Materials, assembleMaterials } from "./ActionMaterials";
@@ -176,11 +176,79 @@ describe("行动工作台", () => {
     expect(g.done).toEqual([done]);
     expect(g.due).toEqual([]);
   });
+  it("不必在日志里打 TODO 就能捕捉口语里的后续承诺", () => {
+    const implicit = "VX74 防水接头耐温偏低，周一得找结构组复核报告";
+    const text =
+      "待确认：验证 VX74 水密探头安装间距。\n" +
+      implicit +
+      "。规范不得确认缺失信息。明天要问结构组验收时间。周五得催供应商。";
+    const clues = extractClues([{ id: "sample", title: "试装", text }]).map((clue) => clue.material.text);
+    expect(clues).toEqual([
+      "待确认：验证 VX74 水密探头安装间距",
+      implicit,
+      "明天要问结构组验收时间",
+      "周五得催供应商",
+    ]);
+  });
+  it("专题按每项行动检索，不遗漏靠后的任务，也不叠加不同标题的泛词", () => {
+    const late = { ...journal, body: "记录 VX74 水密探头的实测间距" };
+    const irrelevant = { ...journal, record: { ...journal.record, id: "other" }, body: "外观报告填写规则" };
+    const subjects = [
+      "BEV",
+      "左门检查外观",
+      "核对试验报告",
+      "电池接线",
+      "更新管路",
+      "检查支架",
+      "验收 VX74 水密探头",
+    ];
+    expect(assembleMaterials(subjects, [irrelevant, late], [], [], day).recent.map((item) => item.text)).toEqual([
+      late.body,
+    ]);
+  });
+  it("检索靠后行动的独有型号，其他检索失败时保留已取得的结果", async () => {
+    const late = {
+      id: "late-spec",
+      documentId: "late",
+      provider: "craft",
+      libraryId: "lib",
+      spaceId: "lib",
+      title: "VX74 水密探头规范",
+      snippet: "实测水密探头",
+      contentType: "document",
+    };
+    vi.mocked(invoke).mockImplementation(async (_, params) => {
+      const query = (params as { query: string }).query;
+      if (query === "bev") throw Error("本地检索暂不可用");
+      return query === "vx74" ? [late] : [];
+    });
+    const tasks = Array.from({ length: 27 }, (_, index) => "QA" + index + " 安装复核");
+    tasks.push("VX74 水密探头");
+    expect((await queryMaterials("BEV", null, tasks)).map((material) => material.title)).toEqual([late.title]);
+  });
+  it("同一日志已关联的不同摘录分别保留，不额外显示自动召回的重复卡片", () => {
+    const original = { id: JSON.stringify(["journal", journal.libraryId, journal.record.id]), text: journal.body };
+    const excerpts = ["待确认：验证 VX74 间距", "周一得找结构组提供耐温报告"].map((text, index) => ({
+      id: "quote-" + index,
+      originId: original.id,
+      journalId: journal.record.id,
+      title: "试装",
+      text,
+      date: day,
+    }));
+    const result = assembleMaterials("VX74", [{ ...journal, body: "VX74 试装" }], [], excerpts, day);
+    expect(result.recent.map((material) => material.text)).toEqual(excerpts.map((quote) => quote.text));
+  });
   it("原段落稳定去重，具体尺寸可匹配不同措辞的滴答任务", () => {
     const source = { id: "src", title: "试装", text: journal.body + "。\n- [x] 完成试装。" };
     const clues = extractClues([source, source]);
     expect(clues).toHaveLength(1);
     expect(matchExisting(clues[0], [t])).toEqual([t]);
+  });
+  it("同型号但交付对象不同的线索不推荐关联到同一任务", () => {
+    const [clue] = extractClues([{ id: "log", title: "现场", text: "VX74 售后工位，周二得复核绝缘夹具" }]);
+    const differentTask = { ...t, title: "VX74 防水接头耐温偏低，周一得找结构组复核报告" };
+    expect(matchExisting(clue, [differentTask])).toEqual([]);
   });
   it("拒绝虚构引用，对原话未包含的数值标记待核实", async () => {
     const sources: Material[] = [{ id: "rec", title: "录音", text: "基本满足要求" }];
@@ -212,7 +280,15 @@ describe("行动工作台", () => {
       ],
     });
     expect((await generate("draft", sources)).map((item) => item.verify)).toEqual([
-      true, false, true, true, false, true, true, true, false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
     ]);
   });
   it("备料排除只共享泛词的日志，保留同型号现场记录与早期规范", () => {
@@ -289,6 +365,36 @@ describe("行动工作台", () => {
       select.dispatchEvent(new Event("change", { bubbles: true }));
     });
     expect(button("关联并补充至已有任务")).toBeDefined();
+  });
+  it("从跨库笔记保留复选框和行边界，只有未完成原句进入候选", async () => {
+    vi.mocked(invoke).mockResolvedValue([
+      {
+        id: "block",
+        spaceId: "craft",
+        provider: "craft",
+        title: "试装笔记",
+        snippet: "- [ ] 将图纸交给结构组\n- [x] 提交扭矩表",
+      },
+    ]);
+    await render(
+      <ActionHarvester
+        tasks={[]}
+        journals={[]}
+        scope={null}
+        libraries={[dida]}
+        day={day}
+        onUpdate={async () => {}}
+        onRefresh={async () => {}}
+        onSelect={() => {}}
+        revision={0}
+      />,
+    );
+    expect(button("行动捕手 · 1 条")).toBeDefined();
+    await click(button("行动捕手"));
+    const title = host.querySelector<HTMLInputElement>('input[aria-label="候选行动标题"]');
+    expect(title?.value).toBe("将图纸交给结构组");
+    expect(host.textContent).toContain("- [ ] 将图纸交给结构组");
+    expect(host.textContent).not.toContain("提交扭矩表");
   });
   it("临时状态无法确认时用原请求恢复排期，不重复采纳", async () => {
     const ids: string[] = [];

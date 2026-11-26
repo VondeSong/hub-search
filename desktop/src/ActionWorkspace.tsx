@@ -64,7 +64,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
     [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string | null>(null),
     [nav, setNav] = useState(() => window.innerWidth >= 768),
-    [wide, setWide] = useState(() => window.innerWidth >= 1024),
+    [wide, setWide] = useState(() => window.innerWidth >= 1200),
     [board, setBoard] = useState(false),
     [revision, setRevision] = useState(0),
     [refreshKey, setRefreshKey] = useState(0),
@@ -80,7 +80,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
   useEffect(() => {
     if (!window.matchMedia) return;
     const navWidth = window.matchMedia("(min-width: 768px)");
-    const paperWidth = window.matchMedia("(min-width: 1024px)");
+    const paperWidth = window.matchMedia("(min-width: 1200px)");
     const resizeNav = (event: MediaQueryListEvent) => setNav(event.matches);
     const resizePaper = (event: MediaQueryListEvent) => setWide(event.matches);
     navWidth.addEventListener("change", resizeNav);

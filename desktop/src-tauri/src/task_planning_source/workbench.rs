@@ -4,6 +4,17 @@ use super::*;
 fn recent_passages(path: &PathBuf, scope: &Value) -> Result<Value, String> {
     let db = open_database(path)?;
     let scope = scope.as_array().map(|ids| json!(ids).to_string());
+    let mut patterns = [
+        "TODO", "[ ]", "待确认", "回头", "跟进", "回传", "我来", "我负责", "我需要", "我得", "待办",
+        "待验证",
+    ].iter().map(|word| format!("%{word}%")).collect::<Vec<_>>();
+    for prefix in ["得", "要", "记得"] {
+        for action in ["找", "问", "催", "核对", "复核", "查一下", "确认", "对接", "补发"] {
+            patterns.push(format!("%{prefix}{action}%"));
+            patterns.push(format!("%{prefix} {action}%"));
+        }
+    }
+    let patterns = serde_json::to_string(&patterns).map_err(|e| e.to_string())?;
     let mut stmt = db
         .prepare(
             "WITH recent AS (
@@ -15,14 +26,12 @@ fn recent_passages(path: &PathBuf, scope: &Value) -> Result<Value, String> {
          ) SELECT r.space_id,r.id,r.title,r.path,r.name,r.provider,r.modified_at,
             i.block_id,i.id,substr(i.body,1,2400)
          FROM recent r JOIN content_items i ON i.space_id=r.space_id AND i.document_id=r.id
-         WHERE length(trim(i.body))>0 AND (i.body LIKE '%TODO%' OR i.body LIKE '%[ ]%'
-            OR i.body LIKE '%待确认%' OR i.body LIKE '%回头%' OR i.body LIKE '%跟进%'
-            OR i.body LIKE '%回传%' OR i.body LIKE '%我来%' OR i.body LIKE '%我负责%'
-            OR i.body LIKE '%待办%' OR i.body LIKE '%待验证%')
+         WHERE length(trim(i.body))>0
+           AND EXISTS (SELECT 1 FROM json_each(?3) p WHERE i.body LIKE p.value)
          ORDER BY r.modified_at DESC,i.ordinal LIMIT 180",
         )
         .map_err(|e| e.to_string())?;
-    let rows = stmt.query_map(params![scope,now_timestamp()-14*86400], |r| {
+    let rows = stmt.query_map(params![scope,now_timestamp()-14*86400,patterns], |r| {
         Ok(json!({"spaceId":r.get::<_,String>(0)?,"documentId":r.get::<_,String>(1)?,
             "title":r.get::<_,String>(2)?,"path":r.get::<_,String>(3)?,"spaceName":r.get::<_,String>(4)?,
             "provider":r.get::<_,String>(5)?,"modifiedAt":r.get::<_,i64>(6)?,"blockId":r.get::<_,String>(7)?,

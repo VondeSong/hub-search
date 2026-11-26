@@ -24,7 +24,7 @@ export const todayKey = (date = new Date()) =>
     "-",
   );
 const actionWords =
-  /(?:^\s*(?:[-*]\s*)?\[ \]|\bTODO\b|待确认|待办|待验证|回头.{0,18}(?:找|对|确认|看)|(?:我来|我负责|我需要|我得|等.{1,15}回传|跟进))/i;
+  /(?:^\s*(?:[-*]\s*)?\[ \]|\bTODO\b|待确认|待办|待验证|回头.{0,18}(?:找|对|确认|看)|我来|我负责|我需要|我得|等.{1,15}回传|跟进|(?<!不)(?:得|要|记得)\s*(?:找|问|催|核对|复核|查一下|确认|对接|补发))/i;
 const stop = new Set(
   "流程 开发 经验 沉淀 相关内容 参考资料 供应商 相关工作 汇总 相关 关于 完成 进行 准备 跟进 需要 确认 整理 问题 更新 工作 今天 任务 以及 一下 这个 我的 然后 的 并 与 和 后 了".split(
     " ",
@@ -96,37 +96,57 @@ export function extractClues(materials: Material[]): Clue[] {
   }
   return [...found.values()];
 }
-export async function queryMaterials(title: string, scope: string[] | null): Promise<Material[]> {
+export async function queryMaterials(
+  title: string,
+  scope: string[] | null,
+  taskTitles: string[] = [],
+  signal?: AbortSignal,
+): Promise<Material[]> {
   if (scope?.length === 0) return [];
-  const anchors = terms(title).slice(0, 5);
-  const results = await Promise.all(
-    anchors.map((query) =>
-      invoke<unknown>("local_search", {
-        query,
-        limit: 10,
-        spaceIds: scope,
-        folderId: null,
-        updatedAfter: null,
-        includeCraftPages: true,
-        includeDidaTasks: false,
-        includeImageOcr: true,
-        includePdf: true,
-        includePdfOcr: true,
-        includeAttachments: true,
-        includeReading: false,
-        includeFlashcards: false,
-        searchScope: "all",
-      }),
-    ),
-  );
+  const titleTerms = terms(title);
+  const anchors = [
+    ...new Set([...titleTerms.slice(0, 5), ...taskTitles.flatMap((task) => terms(task).slice(0, 2))]),
+  ];
+  const search = (query: string) =>
+    invoke<unknown>("local_search", {
+      query,
+      limit: 10,
+      spaceIds: scope,
+      folderId: null,
+      updatedAfter: null,
+      includeCraftPages: true,
+      includeDidaTasks: false,
+      includeImageOcr: true,
+      includePdf: true,
+      includePdfOcr: true,
+      includeAttachments: true,
+      includeReading: false,
+      includeFlashcards: false,
+      searchScope: "all",
+    });
   const byId = new Map<string, Material>();
-  for (const group of results)
-    for (const result of normalizeResults(group)) {
-      if (result.provider === "dida365") continue;
-      const m = documentMaterial(result);
-      if (!byId.has(m.id)) byId.set(m.id, m);
+  let failure: unknown;
+  let successes = 0;
+  for (let offset = 0; offset < anchors.length; offset += 6) {
+    if (signal?.aborted) return [];
+    const batch = await Promise.allSettled(anchors.slice(offset, offset + 6).map(search));
+    for (const result of batch) {
+      if (result.status === "rejected") {
+        failure = result.reason;
+        continue;
+      }
+      successes += 1;
+      for (const row of normalizeResults(result.value)) {
+        if (row.provider === "dida365") continue;
+        const material = documentMaterial(row);
+        if (!byId.has(material.id)) byId.set(material.id, material);
+      }
     }
-  return [...byId.values()]
+  }
+  if (!successes && failure) throw failure;
+  const materials = [...byId.values()];
+  if (taskTitles.length) return materials;
+  return materials
     .sort((a, b) => relevance(anchors, b.title + " " + b.text) - relevance(anchors, a.title + " " + a.text))
     .slice(0, 12);
 }
@@ -163,8 +183,9 @@ export async function generate(mode: ModelMode, materials: Material[]): Promise<
   if (value.items.length && !accepted.length) throw Error("生成内容未能对应原文，请重新选择材料。");
   return accepted;
 }
+const genericMatchTerms = new Set("复核 核对 验收 验证 工位 试验 报告 结构组 供应商 检查".split(" "));
 export function matchExisting(clue: Clue, tasks: UnifiedTask[]) {
-  const anchors = terms(clue.title);
+  const anchors = terms(clue.title).filter((term) => !genericMatchTerms.has(term));
   return tasks
     .filter((t) => t.status === "open")
     .map((task) => ({ task, score: relevance(anchors, task.title) }))

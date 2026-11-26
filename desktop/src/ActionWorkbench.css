@@ -922,7 +922,7 @@
     grid-row: 1;
   }
 }
-@media (max-width: 1023px) {
+@media (max-width: 1199px) {
   .aw-shell {
     position: relative;
   }

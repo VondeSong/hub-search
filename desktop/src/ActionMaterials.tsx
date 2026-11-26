@@ -5,67 +5,64 @@ import { QuickJournalCard } from "./QuickJournal";
 import type { PdfPagePreview, SearchResult } from "./SearchTypes";
 import { invoke } from "@tauri-apps/api/core";
 import { isPdfContent } from "./PdfPreviewModel";
-import { journalMaterial, matchingTerms, queryMaterials, relevance, terms, type Material } from "./ActionEvidence";
+import { journalMaterial, matchingTerms, queryMaterials, terms, type Material } from "./ActionEvidence";
 
-export function useRecall(title: string, scope: string[] | null) {
-  const key = JSON.stringify([title, scope]);
+export function useRecall(title: string, scope: string[] | null, taskTitles: string[] = []) {
+  const key = JSON.stringify([title, scope, taskTitles]);
   const [state, setState] = useState({ key: "", items: [] as Material[], error: "" });
   useEffect(() => {
-    let live = true;
+    const controller = new AbortController();
     if (title)
-      void queryMaterials(title, scope).then(
+      void queryMaterials(title, scope, taskTitles, controller.signal).then(
         (items) => {
-          if (live) setState({ key, items, error: "" });
+          if (!controller.signal.aborted) setState({ key, items, error: "" });
         },
         (e) => {
-          if (live) setState({ key, items: [], error: String(e) });
+          if (!controller.signal.aborted) setState({ key, items: [], error: String(e) });
         },
       );
-    return () => {
-      live = false;
-    };
+    return () => controller.abort();
   }, [key]);
-  return state.key === key ? state : { key, items: [], error: "" };
+  return state.key === key ? { ...state, loading: false } : { key, items: [], error: "", loading: Boolean(title) };
 }
 export function assembleMaterials(
-  title: string,
+  title: string | string[],
   journals: QuickJournalItem[],
   docs: Material[],
   links: Material[],
   day: string,
 ) {
-  const anchors = terms(title);
-  const matchesSubject = (text: string) => {
-    const matches = matchingTerms(anchors, text);
-    return matches.some((term) => /\d/.test(term)) || matches.length >= Math.max(1, Math.min(2, anchors.length));
+  const subjects = (typeof title === "string" ? [title] : title).map(terms).filter((anchors) => anchors.length);
+  const scoreSubject = (text: string) => {
+    let best = 0;
+    for (const anchors of subjects) {
+      const matches = matchingTerms(anchors, text);
+      let score = matches.length;
+      if (matches.some((term) => /\d/.test(term))) score += 3;
+      else if (matches.length < Math.min(2, anchors.length)) continue;
+      best = Math.max(best, score);
+    }
+    return best;
   };
   const recentDate = new Date(day + "T12:00:00");
   recentDate.setDate(recentDate.getDate() - 13);
+  const sourceKey = (material: Material) => material.originId ?? material.id;
+  const linkedKeys = new Set(links.map(sourceKey));
   const byId = new Map(links.map((m) => [m.id, m]));
   const found = journals
+    .filter((j) => j.record.date <= day && new Date(j.record.date + "T12:00:00") >= recentDate)
     .map((j) => ({
       item: j,
-      score: relevance(
-        anchors,
-        (j.body || j.record.text) + " " + j.record.attachments.map((a) => a.name).join(" "),
-      ),
+      score: scoreSubject((j.body || j.record.text) + " " + j.record.attachments.map((a) => a.name).join(" ")),
     }))
-    .filter(
-      (v) =>
-        matchesSubject(
-          (v.item.body || v.item.record.text) + " " + v.item.record.attachments.map((a) => a.name).join(" "),
-        ) &&
-        v.score > 0 &&
-        v.item.record.date <= day &&
-        new Date(v.item.record.date + "T12:00:00") >= recentDate,
-    )
+    .filter((v) => v.score > 0)
     .sort((a, b) => b.score - a.score || b.item.record.date.localeCompare(a.item.record.date))
-    .slice(0, 12);
+    .slice(0, typeof title === "string" ? 12 : 30);
   for (const m of [
     ...found.map((v) => journalMaterial(v.item)),
-    ...docs.filter((d) => matchesSubject(d.title + " " + d.text)),
+    ...docs.filter((d) => scoreSubject(d.title + " " + d.text) > 0),
   ])
-    if (!byId.has(m.id)) byId.set(m.id, m);
+    if (!linkedKeys.has(sourceKey(m)) && !byId.has(m.id)) byId.set(m.id, m);
   const recent: Material[] = [],
     long: Material[] = [],
     related: Material[] = [];
@@ -73,7 +70,7 @@ export function assembleMaterials(
     const isReference = !m.journalId && /规范|标准|图纸|断面图|\.pdf\b|\.dwg\b|\.step\b/i.test(m.title);
     if (isReference) long.push(m);
     else if (m.date && m.date <= day && new Date(m.date + "T12:00:00") >= recentDate) recent.push(m);
-    else if (links.some((link) => link.id === m.id)) related.push(m);
+    else if (linkedKeys.has(sourceKey(m))) related.push(m);
   }
   return { recent, long, related, all: [...recent, ...long, ...related] };
 }
@@ -137,6 +134,7 @@ export function Materials({
   caption?: ReactNode;
 }) {
   if (!items.length) return null;
+  const renderedMedia = new Set<string>();
   return (
     <section className="aw-materials">
       {caption && <h4>{caption}</h4>}
@@ -144,9 +142,11 @@ export function Materials({
         const j = m.journalId
           ? journals.find((j) => j.record.id === m.journalId && journalMaterial(j).id === (m.originId || m.id))
           : undefined;
+        const showMedia = j && j.record.attachments.length > 0 && !renderedMedia.has(j.record.id);
+        if (showMedia) renderedMedia.add(j.record.id);
         return (
           <Fragment key={m.id}>
-            {!!j?.record.attachments.length && (
+            {showMedia && (
               <div className="aw-media-strip">
                 <QuickJournalCard item={j} timeline mobile={false} onPreview={onOpen} />
               </div>

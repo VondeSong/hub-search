@@ -28,13 +28,15 @@ export function ActionTopic({
   children: React.ReactNode;
 }) {
   const [wall, setWall] = useState(false),
+    [wallLimit, setWallLimit] = useState(30),
     [report, setReport] = useState(() =>
       read<{ version: string; draft: Draft } | null>("report." + topic.key, null),
     ),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [archived, setArchived] = useState("");
-  const recall = useRecall(topic.name, scope);
+  const taskTitles = tasks.map((task) => task.title);
+  const recall = useRecall(topic.name, scope, taskTitles);
   const wait = tasks.filter((t) => t.status === "open").flatMap((t) => meta(t).waits.filter((w) => !w.resolved));
   const blockers = wait.filter((w) => w.blocking),
     parallel = wait.filter((w) => !w.blocking);
@@ -54,20 +56,7 @@ export function ActionTopic({
   }));
   const links = tasks.flatMap((t) => meta(t).links);
   const pack = useMemo(
-    () =>
-      assembleMaterials(
-        [
-          topic.name,
-          ...tasks
-            .filter((t) => !t.completed)
-            .slice(0, 5)
-            .map((t) => t.title),
-        ].join(" "),
-        journals,
-        recall.items,
-        links,
-        day,
-      ),
+    () => assembleMaterials([topic.name, ...taskTitles], journals, recall.items, links, day),
     [topic, tasks, journals, recall, links, day],
   );
   const evidence: Material[] = [
@@ -135,8 +124,8 @@ export function ActionTopic({
           · {blockers.length} 项阻塞 · {parallel.length} 项等回复
         </small>
         <div className="aw-tools">
-          <button id="aw-report" disabled={busy || !tasks.length} onClick={() => void produce()}>
-            {busy ? "正在起草…" : "生成阶段通报"}
+          <button id="aw-report" disabled={busy || recall.loading || !tasks.length} onClick={() => void produce()}>
+            {busy ? "正在起草…" : recall.loading ? "正在查找资料…" : "生成阶段通报"}
           </button>
         </div>
         <div className="aw-progress">
@@ -201,8 +190,12 @@ export function ActionTopic({
       {wall ? (
         <>
           {recall.error && <p role="alert">{recall.error}</p>}
-          <Materials items={pack.all} journals={journals} onOpen={onOpen} />
-          {!pack.all.length && <p>当前专题暂无匹配材料。</p>}
+          <Materials items={pack.all.slice(0, wallLimit)} journals={journals} onOpen={onOpen} />
+          {recall.loading && <p role="status">正在跨库查找专题资料…</p>}
+          {!recall.loading && !pack.all.length && <p>当前专题暂无匹配材料。</p>}
+          {pack.all.length > wallLimit && (
+            <button onClick={() => setWallLimit((limit) => limit + 30)}>查看更多专题资料</button>
+          )}
         </>
       ) : (
         children
