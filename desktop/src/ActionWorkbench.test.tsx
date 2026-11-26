@@ -8,7 +8,7 @@ import { groupsFor, emptyMeta, identity, type ActionMeta } from "./ActionState";
 import { extractClues, generate, matchExisting, type Material } from "./ActionEvidence";
 import { ActionHarvester } from "./ActionHarvester";
 import { ActionDetail } from "./ActionDetail";
-import { Materials } from "./ActionMaterials";
+import { Materials, assembleMaterials } from "./ActionMaterials";
 import type { SearchResult } from "./SearchTypes";
 import { ActionTopic } from "./ActionTopic";
 import type { UnifiedTask } from "./TaskWorkspacePresentation";
@@ -123,6 +123,16 @@ describe("行动工作台", () => {
       { source: "rec", text: "实测 210mm", quote: "基本满足要求", verify: true },
     ]);
   });
+  it("备料排除只共享泛词的日志，保留同型号现场记录与早期规范", () => {
+    const docs = [
+      { id: "bios", title: "BIOS 更新", text: "整理开发流程经验", date: day },
+      { id: "field", title: "T29 尾盖检查", text: "T29 现场", date: day },
+      { id: "spec", title: "T29 尾盖设计标准", text: "T29 线束", date: "2024-01-01" },
+    ];
+    const pack = assembleMaterials("T29 加速度传感器尾盖供应商开发流程沉淀", [], docs, [], day);
+    expect(pack.recent.map((m) => m.id)).toEqual(["field"]);
+    expect(pack.long.map((m) => m.id)).toEqual(["spec"]);
+  });
   it("默认收合线索，关联已有任务只追加来源，不创建任务或改变排期", async () => {
     vi.mocked(invoke)
       .mockResolvedValueOnce([])
@@ -144,7 +154,7 @@ describe("行动工作台", () => {
         revision={0}
       />,
     );
-    const toggle = button("发现 1 条");
+    const toggle = button("行动捕手 · 1 条");
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     await click(toggle);
     await click(button("关联并补充至已有任务"));

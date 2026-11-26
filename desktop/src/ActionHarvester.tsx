@@ -29,6 +29,7 @@ export function ActionHarvester({
   onRefresh,
   onSelect,
   onOpen,
+  onCount,
   revision,
 }: {
   tasks: UnifiedTask[];
@@ -40,6 +41,7 @@ export function ActionHarvester({
   onRefresh: () => Promise<unknown>;
   onSelect: (t: UnifiedTask) => void;
   onOpen?: (r: SearchResult) => void;
+  onCount?: (n: number) => void;
   revision: number;
 }) {
   const [docs, setDocs] = useState<SearchResult[]>([]),
@@ -98,6 +100,14 @@ export function ActionHarvester({
   const clues = [...new Map([...retryClues, ...candidates].map((c) => [c.key, c])).values()].filter(
     (c) => !excluded.has(c.key) && !["linked", "ignored"].includes(decisions[c.key]?.state),
   );
+  useEffect(() => {
+    onCount?.(clues.length);
+  }, [clues.length, onCount]);
+  const possibleMatches = useMemo(
+    () => new Map(clues.map((c) => [c.key, matchExisting(c, tasks)])),
+    [candidates, decisions, tasks, excluded],
+  );
+  const matchCount = [...possibleMatches.values()].filter((matches) => matches.length).length;
   const writable = libraries.filter((l) => l.provider === "dida365" && (!scope || scope.includes(l.id)));
   const destination = writable.some((l) => l.id === target) ? target : writable.length === 1 ? writable[0].id : "";
   async function decide(key: string, d: Decision) {
@@ -201,7 +211,10 @@ export function ActionHarvester({
   return (
     <section className="aw-harvester">
       <button className="aw-capture-toggle" aria-expanded={opened} onClick={() => setOpen(!opened)}>
-        ✦ 发现 {clues.length} 条新行动线索 <small>来自近期语音与笔记</small> {opened ? "▴" : "▾"}
+        <strong>
+          ✦ 行动捕手 · {clues.length} 条新线索{matchCount > 0 && `（${matchCount} 条可关联已有任务）`}
+        </strong>
+        <small>{opened ? "收起 ▴" : "展开处理 ▾"}</small>
       </button>
       {readError && <p role="alert">笔记线索读取失败 · {readError}</p>}
       {opened && (
@@ -233,7 +246,7 @@ export function ActionHarvester({
             onChange={(e) => setMatchSearch(e.target.value)}
           />
           {clues.slice(0, limit).map((c) => {
-            const matches = matchExisting(c, tasks),
+            const matches = possibleMatches.get(c.key) || [],
               selected = tasks.find(
                 (t) => identity(t) === (choices[c.key] || (matches[0] ? identity(matches[0]) : "")),
               );
@@ -270,7 +283,12 @@ export function ActionHarvester({
                   onChange={(e) => setEdits((v) => ({ ...v, [c.key]: e.target.value }))}
                 />
                 <Materials items={[c.material]} journals={journals} onOpen={onOpen} />
-                {selected && <small>可能是同一行动 · {selected.title}</small>}
+                <blockquote>{c.material.text}</blockquote>
+                {selected && (
+                  <div className="aw-match">
+                    🔗 匹配已有任务：<strong>{selected.title}</strong>
+                  </div>
+                )}
                 <div className="aw-tools">
                   <select
                     aria-label="关联已有任务"
@@ -307,7 +325,7 @@ export function ActionHarvester({
                     disabled={!!busy || (!destination && !pending)}
                     onClick={() => void run(c.key, () => create(c, "backlog"))}
                   >
-                    {pending ? "核对采纳回执" : "＋ 采纳到待办"}
+                    {pending ? "核对采纳回执" : selected ? "仍新建待办" : "＋ 采纳到待办"}
                   </button>
                   <button
                     disabled={!!busy || !destination || !!pending}

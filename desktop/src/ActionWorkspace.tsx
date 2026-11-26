@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useMemo, useState, type ComponentProps } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { CalendarCheck, CheckCheck, Clock3, Layers, List, PanelLeft, Search } from "lucide-react";
+import {
+  CalendarCheck,
+  CheckCheck,
+  Clock3,
+  Columns3,
+  List,
+  PanelLeft,
+  Plus,
+  Search,
+  Sparkles,
+} from "lucide-react";
 import { TaskWorkspace as SourceTasks } from "./TaskWorkspace";
 import { runtimeCapabilities } from "./RuntimePlatform";
 import { useUnifiedTasks } from "./UnifiedTaskData";
@@ -31,25 +41,28 @@ import "./ActionWorkbench.css";
 type Props = ComponentProps<typeof SourceTasks> & {
   sourceDocumentFilter?: { provider: string; libraryId: string; documentId: string; title: string } | null;
 };
-type QuickRequest = { id: string; title: string; lib: string; project?: string; topicKey?: string };
+type QuickRequest = {
+  id: string;
+  title: string;
+  lib: string;
+  project?: string;
+  topicKey?: string;
+  day?: string;
+  priority?: number;
+};
 type View = "focus" | "waiting" | "all" | "done";
 export function TaskWorkspace(props: Props) {
   if (runtimeCapabilities.mobile || props.sourceDocumentFilter) return <SourceTasks {...props} />;
   return <DesktopActions key={JSON.stringify(props.selectedLibraryIds ?? null)} {...props} />;
 }
-function DesktopActions({
-  libraries = [],
-  selectedLibraryIds = null,
-  onClearLibraryScope,
-  onToggleDesktopSidebar,
-  onOpenResult,
-}: Props) {
+function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibraryScope, onOpenResult }: Props) {
   const store = useUnifiedTasks();
   const [view, setView] = useState<View>("focus"),
     [project, setProject] = useState<Topic | null>(null),
     [search, setSearch] = useState("");
-  const [selected, setSelected] = useState(""),
-    [nav, setNav] = useState(true),
+  const [selected, setSelected] = useState<string | null>(null),
+    [nav, setNav] = useState(() => window.innerWidth >= 768),
+    [wide, setWide] = useState(() => window.innerWidth >= 1024),
     [board, setBoard] = useState(false),
     [revision, setRevision] = useState(0),
     [refreshKey, setRefreshKey] = useState(0),
@@ -62,7 +75,22 @@ function DesktopActions({
     [notice, setNotice] = useState("");
   const [pins, setPins] = useState<string[]>(() => read("pins", [])),
     [manage, setManage] = useState(false);
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const navWidth = window.matchMedia("(min-width: 768px)");
+    const paperWidth = window.matchMedia("(min-width: 1024px)");
+    const resizeNav = (event: MediaQueryListEvent) => setNav(event.matches);
+    const resizePaper = (event: MediaQueryListEvent) => setWide(event.matches);
+    navWidth.addEventListener("change", resizeNav);
+    paperWidth.addEventListener("change", resizePaper);
+    return () => {
+      navWidth.removeEventListener("change", resizeNav);
+      paperWidth.removeEventListener("change", resizePaper);
+    };
+  }, []);
   const scopeKey = JSON.stringify(selectedLibraryIds);
+  const [detailPercent, setDetailPercent] = useState(44);
+  const [clueCount, setClueCount] = useState(0);
   const bump = () => setRevision((v) => v + 1);
   useEffect(() => {
     const trigger = () => setRefreshKey((v) => v + 1),
@@ -141,7 +169,26 @@ function DesktopActions({
     }
     return [...all.values()].sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
   }, [tasks]);
-  const chosen = topics.filter((t) => pins.includes(t.key));
+  const topicCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const t of tasks) {
+      if (t.status !== "open") continue;
+      const keys = new Set([
+        topicOf(t).key,
+        ...(t.tags || []).map((tag) => JSON.stringify([t.libraryId, "tag", tag])),
+        ...(allMeta.get(identity(t))?.topics || []),
+      ]);
+      for (const key of keys) counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return counts;
+  }, [tasks, allMeta]);
+  const chosen =
+    read<string[] | null>("pins", null) === null
+      ? topics
+          .filter((t) => !t.tag && topicCounts.has(t.key))
+          .sort((a, b) => (topicCounts.get(b.key) || 0) - (topicCounts.get(a.key) || 0))
+          .slice(0, 4)
+      : topics.filter((t) => pins.includes(t.key));
   const matches = (t: UnifiedTask) =>
     [t.title, t.collectionName, ...(t.tags || []), ...meta(t).waits.flatMap((w) => [w.who, w.what])]
       .join(" ")
@@ -155,11 +202,23 @@ function DesktopActions({
     (l) => l.provider === "dida365" && (!selectedLibraryIds || selectedLibraryIds.includes(l.id)),
   );
   const lib = project?.libraryId || destination || (writable.length === 1 ? writable[0].id : "");
-  const selectedTask = tasks.find((t) => identity(t) === selected);
+  const initialTask =
+    view === "done"
+      ? grouped.done[0]
+      : view === "waiting"
+        ? scoped.find(activeWait)
+        : grouped.due[0] || grouped.plan[0] || scoped.find((t) => !t.completed) || scoped[0];
+  const selectedTask =
+    selected === null
+      ? wide
+        ? initialTask
+        : undefined
+      : scoped.find((t) => identity(t) === selected);
   const pendingRequests = read<Record<string, QuickRequest>>("quick.requests", {});
   async function useSyncedTask(request: QuickRequest, task: UnifiedTask) {
     setPosting(true);
     try {
+      if (request.day) await update(task, (m) => ({ ...m, day: request.day }));
       if (request.topicKey)
         await update(task, (m) => ({ ...m, topics: [...new Set([...(m.topics || []), request.topicKey!])] }));
       const key = JSON.stringify([request.lib, request.project || "", request.title]);
@@ -184,11 +243,14 @@ function DesktopActions({
       const collection = project?.collection;
       const input = resume || {
         id: crypto.randomUUID(),
-        title: title.trim(),
+        title: title.replace(/\s*!高\s*$/, "").trim(),
+        priority: /!高\s*$/.test(title) ? 5 : 0,
+        day: !project && view === "focus" ? day : undefined,
         lib,
         project: collection,
         topicKey: project?.tag ? project.key : undefined,
       };
+      if (!input.title) throw Error("请输入行动标题。");
       const key = JSON.stringify([input.lib, input.project || "", input.title]);
       const pending = read<Record<string, QuickRequest>>("quick.requests", {});
       const request = pending[key] || input;
@@ -198,7 +260,7 @@ function DesktopActions({
         title: request.title,
         libraryId: request.lib,
         projectId: request.project,
-        priority: 0,
+        priority: request.priority || 0,
       });
       if (["failed", "confirmed"].includes(result.state)) {
         const latest = read<Record<string, QuickRequest>>("quick.requests", {});
@@ -210,6 +272,7 @@ function DesktopActions({
       setNotice(result.error || "已采纳到滴答待办");
       await store.refresh();
       if (result.task) {
+        if (request.day) await update(result.task, (m) => ({ ...m, day: request.day }));
         if (request.topicKey)
           await update(result.task, (m) => ({
             ...m,
@@ -223,10 +286,11 @@ function DesktopActions({
       setPosting(false);
     }
   }
-  const navigate = (v: View, t: Topic | null = null) => {
+  const navigate = (v: View, t: Topic | null = null, taskKey: string | null = null) => {
     setView(v);
     setProject(t);
-    setSelected("");
+    setSelected(taskKey);
+    if (window.innerWidth < 768) setNav(false);
     setSearch("");
   };
   const views = [
@@ -239,58 +303,83 @@ function DesktopActions({
     return (
       <section className="aw-list" aria-label={label}>
         <h3>
-          {label} <small>{items.length}</small>
+          {label} <small>{items.length} 项</small>
         </h3>
-        {!items.length && empty && <p>{empty}</p>}
-        {items.map((t) => {
-          const key = identity(t),
-            m = meta(t),
-            wait = m.waits.filter((w) => !w.resolved),
-            original = originals.get(t.id) || t;
-          return (
-            <div className={"aw-row" + (key === selected ? " is-selected" : "")} key={key}>
-              <TaskStatusControl
-                task={original}
-                busy={store.taskBusyIds.has(t.id)}
-                pendingStatus={store.taskStatusTargets.get(t.id)}
-                onChange={(task, done) =>
-                  void store.setTaskCompleted(task, done).then((ok) => {
-                    if (!ok) setNotice("完成状态尚待滴答核对");
-                  })
-                }
-              />
-              <button className="aw-pick" onClick={() => setSelected(key)}>
-                <strong>{t.title}</strong>
-                <small>
-                  {t.dueAt && (
-                    <span>
-                      {new Date(t.dueAt).toLocaleString("zh-CN", {
-                        month: "numeric",
-                        day: "numeric",
-                        ...(t.isAllDay ? {} : { hour: "2-digit", minute: "2-digit" }),
-                      })}
-                    </span>
-                  )}
-                  {m.day === day && <span>今日计划</span>}
-                  {wait.some((w) => w.review && w.review <= day) && <span className="aw-review">今天回看</span>}
-                  {wait.length > 0 && <span>等 {wait.map((w) => w.who).join("、")}</span>}
-                  {m.steps.length > 0 && (
-                    <span>
-                      {m.steps.filter((s) => s.done).length}/{m.steps.length} 步骤
-                    </span>
-                  )}
-                  {m.links.length > 0 && <span>已关联材料</span>}
-                </small>
-              </button>
-              <TaskStatusNotice
-                task={original}
-                onRetry={() =>
-                  void store.setTaskCompleted(original, original.statusMutation?.targetStatus === "completed")
-                }
-              />
-            </div>
-          );
-        })}
+        <div className="aw-group">
+          {!items.length && <p>{empty || "当前分组暂无行动项"}</p>}
+          {items.map((t) => {
+            const key = identity(t),
+              m = meta(t),
+              wait = m.waits.filter((w) => !w.resolved),
+              original = originals.get(t.id) || t;
+            return (
+              <div
+                className={"aw-row" + (key === (selectedTask && identity(selectedTask)) ? " is-selected" : "")}
+                key={key}
+              >
+                <TaskStatusControl
+                  task={original}
+                  busy={store.taskBusyIds.has(t.id)}
+                  pendingStatus={store.taskStatusTargets.get(t.id)}
+                  onChange={(task, done) =>
+                    void store.setTaskCompleted(task, done).then((ok) => {
+                      if (!ok) setNotice("完成状态尚待滴答核对");
+                    })
+                  }
+                />
+                <button className="aw-pick" onClick={() => setSelected(key)}>
+                  <div className="aw-row-head">
+                    <strong>{t.title}</strong>
+                    {t.dueAt && (
+                      <time className={dueDay(t) < day ? "late" : ""}>
+                        {new Date(t.dueAt).toLocaleString("zh-CN", {
+                          month: "numeric",
+                          day: "numeric",
+                          ...(t.isAllDay ? {} : { hour: "2-digit", minute: "2-digit" }),
+                        })}
+                      </time>
+                    )}
+                  </div>
+                  {wait.map((w) => (
+                    <div className="aw-delivery" key={w.id}>
+                      {w.blocking ? "🔴 阻塞" : "⏳ 等"} {w.who} · {w.what} · {w.review}
+                    </div>
+                  ))}
+                  <small>
+                    {!project && <span>● {t.collectionName || t.documentTitle}</span>}
+                    {m.day === day && <span className="aw-chip">今日计划</span>}
+                    {wait.some((w) => w.review && w.review <= day) && <span className="aw-review">今天回看</span>}
+
+                    {m.steps.length > 0 && (
+                      <span>
+                        {m.steps.filter((s) => s.done).length}/{m.steps.length} 步骤
+                      </span>
+                    )}
+                    {m.links.length > 0 && <span className="aw-chip">已备料</span>}
+                  </small>
+                </button>
+                {!t.completed && (
+                  <button
+                    className="aw-row-plan"
+                    onClick={() =>
+                      void update(t, (m) => ({ ...m, day: m.day === day ? "" : day })).catch((e) =>
+                        setNotice(String(e)),
+                      )
+                    }
+                  >
+                    {m.day === day ? "移出今日" : "＋今日计划"}
+                  </button>
+                )}
+                <TaskStatusNotice
+                  task={original}
+                  onRetry={() =>
+                    void store.setTaskCompleted(original, original.statusMutation?.targetStatus === "completed")
+                  }
+                />
+              </div>
+            );
+          })}
+        </div>
       </section>
     );
   }
@@ -299,38 +388,98 @@ function DesktopActions({
   );
   const dueIds = new Set(dueToday.map(identity));
   const overdue = grouped.due.filter((t) => !dueIds.has(identity(t)));
-  const focus = (
-    <>
-      {rows("今日到期与到点催办", dueToday, "今天没有到期或到点催办。")}
-      {overdue.length > 0 && (
-        <details className="aw-overdue">
-          <summary>逾期未完成 · {overdue.length}</summary>
-          {rows("逾期行动", overdue)}
-        </details>
+  const counts = groupsFor(tasks, meta, day);
+  const focusCount = counts.due.length + counts.plan.length + counts.waiting.length;
+  const focus = rows("今日到期与到点催办", [...dueToday, ...overdue], "今日无到期承诺或到点催办项");
+  const boardColumns = (
+    <div className="aw-columns">
+      {rows(
+        "今日到期与计划",
+        [...grouped.due, ...grouped.plan].filter((t) => !activeWait(t)),
       )}
-    </>
+      {rows("等待催办雷达", scoped.filter(activeWait))}
+      {rows("后续待排期", grouped.next)}
+    </div>
+  );
+  const quickEntry = (
+    <form
+      className="aw-add"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void create();
+      }}
+    >
+      <Plus size={16} />
+      {writable.length > 1 && !project && (
+        <select aria-label="新建目标资料库" value={lib} onChange={(e) => setDestination(e.target.value)}>
+          <option value="">选择滴答资料库</option>
+          {writable.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+            </option>
+          ))}
+        </select>
+      )}
+      <input
+        aria-label="新建行动"
+        value={title}
+        maxLength={500}
+        placeholder={
+          project
+            ? "在「" + project.name + "」下新建行动，回车同步滴答…"
+            : view === "focus"
+              ? "随手记一条行动，回车加入今日计划并同步滴答（加 !高 标记高优）…"
+              : "随手记一条行动，回车同步滴答…"
+        }
+        onChange={(e) => setTitle(e.target.value)}
+      />
+      <button disabled={posting || !lib || !title.trim()} aria-label="添加待办">
+        Enter
+      </button>
+    </form>
   );
   return (
-    <main className={"aw-shell" + (nav ? "" : " aw-nav-hidden") + (selectedTask ? " has-detail" : "")}>
+    <main
+      style={
+        {
+          "--aw-paper-width": detailPercent + "fr",
+          "--aw-list-width": 100 - detailPercent + "fr",
+        } as React.CSSProperties
+      }
+      className={"aw-shell" + (nav ? "" : " aw-nav-hidden") + (selectedTask ? " has-detail" : "")}
+    >
       {nav && (
         <nav className="aw-nav">
-          <h3>行动聚焦</h3>
+          <h3>行动聚焦（按时间）</h3>
           {views.map(([id, label, Icon]) => (
             <button key={id} aria-pressed={!project && id === view} onClick={() => navigate(id)}>
-              <Icon size={16} />
+              <Icon size={14} />
               {label}
+              <small className="aw-count">
+                {((id === "focus" && clueCount > 0) ||
+                  (id === "waiting" &&
+                    tasks.some((t) => meta(t).waits.some((w) => !w.resolved && w.review && w.review <= day)))) && (
+                  <i className="aw-alert-dot" />
+                )}
+                {id === "focus"
+                  ? focusCount
+                  : id === "waiting"
+                    ? tasks.filter(activeWait).length
+                    : tasks.filter((t) => (id === "done" ? t.completed : !t.completed)).length}
+              </small>
             </button>
           ))}
           <header>
-            <h3>重点专题</h3>
+            <h3>重点专题作战室</h3>
             <button aria-label="管理重点专题" onClick={() => setManage(!manage)}>
               ＋
             </button>
           </header>
           {chosen.map((t) => (
             <button key={t.key} aria-pressed={project?.key === t.key} onClick={() => navigate("all", t)}>
-              <Layers size={15} />
+              <i className="aw-topic-dot" />
               {t.name}
+              <small className="aw-count">{topicCounts.get(t.key) || 0}</small>
             </button>
           ))}
           {(!chosen.length || manage) && (
@@ -340,9 +489,12 @@ function DesktopActions({
                 <label key={t.key}>
                   <input
                     type="checkbox"
-                    checked={pins.includes(t.key)}
+                    checked={chosen.some((topic) => topic.key === t.key)}
                     onChange={() => {
-                      const prev = read<string[]>("pins", []);
+                      const prev = read<string[]>(
+                        "pins",
+                        chosen.map((topic) => topic.key),
+                      );
                       const next = prev.includes(t.key) ? prev.filter((k) => k !== t.key) : [...prev, t.key];
                       void write("pins", next).then(
                         () => setPins(next),
@@ -355,6 +507,7 @@ function DesktopActions({
               ))}
             </details>
           )}
+          <footer>{clueCount ? "✦ 捕手有 " + clueCount + " 条待核对线索" : "滴答主档与本地检索已就绪"}</footer>
         </nav>
       )}
       <section className="aw-center">
@@ -363,14 +516,13 @@ function DesktopActions({
             <PanelLeft size={17} />
           </button>
           <h2>{project?.name || views.find((v) => v[0] === view)?.[1]}</h2>
-          {onToggleDesktopSidebar && (
-            <button onClick={onToggleDesktopSidebar} title="切换主导航">
-              主导航
-            </button>
+          {project ? (
+            <button onClick={() => navigate("focus")}>← 今日聚焦</button>
+          ) : (
+            <small className="aw-total">
+              今日共 {focusCount} 项 · 计划 {tasks.filter((t) => !t.completed && meta(t).day === day).length}/5
+            </small>
           )}
-          <button aria-pressed={board} onClick={() => setBoard(!board)}>
-            {board ? "返回列表" : "看板视图"}
-          </button>
           <label>
             <Search size={15} />
             <input
@@ -380,6 +532,28 @@ function DesktopActions({
               onChange={(e) => setSearch(e.target.value)}
             />
           </label>
+          {!project && (
+            <div className="aw-switch">
+              <button aria-label="列表视图" aria-pressed={!board} onClick={() => setBoard(false)}>
+                <List size={14} />
+              </button>
+              <button aria-label="看板视图" aria-pressed={board} onClick={() => setBoard(true)}>
+                <Columns3 size={14} />
+              </button>
+            </div>
+          )}
+          {project ? (
+            <button className="aw-ai" onClick={() => document.getElementById("aw-report")?.click()}>
+              <Sparkles size={13} /> AI 专题复盘
+            </button>
+          ) : (
+            <ActionTodayPlan
+              tasks={scoped}
+              day={day}
+              meta={meta}
+              onPlan={(t) => update(t, (m) => ({ ...m, day }))}
+            />
+          )}
         </header>
         <div className={"aw-scroll" + (board ? " aw-board" : "")}>
           {(store.error || journalError) && (
@@ -387,6 +561,7 @@ function DesktopActions({
           )}
           {selectedLibraryIds && <button onClick={onClearLibraryScope}>清除资料库范围</button>}
           {store.loading && !tasks.length && <p>正在读取滴答任务…</p>}
+          {!project && view !== "done" && quickEntry}
           {project ? (
             <ActionTopic
               key={project.key}
@@ -398,7 +573,8 @@ function DesktopActions({
               day={day}
               onOpen={onOpenResult}
             >
-              {rows("外部等待", scoped.filter(activeWait))}
+              {quickEntry}
+              {rows("当前外部阻塞 / 等待催办", scoped.filter(activeWait))}
               {rows(
                 "下一步行动",
                 scoped.filter((t) => !t.completed && !activeWait(t)),
@@ -407,13 +583,6 @@ function DesktopActions({
             </ActionTopic>
           ) : view === "focus" ? (
             <>
-              {focus}
-              <ActionTodayPlan
-                tasks={scoped}
-                day={day}
-                meta={meta}
-                onPlan={(t) => update(t, (m) => ({ ...m, day }))}
-              />
               <ActionHarvester
                 tasks={tasks}
                 journals={journals}
@@ -424,15 +593,25 @@ function DesktopActions({
                 onRefresh={store.refresh}
                 onSelect={(t) => setSelected(identity(t))}
                 onOpen={onOpenResult}
+                onCount={setClueCount}
                 revision={refreshKey}
               />
-              {rows(
-                "今日计划",
-                grouped.plan,
-                `今天已排入 ${tasks.filter((t) => !t.completed && meta(t).day === day).length} 项，建议最多 5 项。`,
+              {board ? (
+                boardColumns
+              ) : (
+                <>
+                  {focus}
+                  {rows(
+                    "今日计划（额外自选）",
+                    grouped.plan,
+                    `今天已排入 ${tasks.filter((t) => !t.completed && meta(t).day === day).length} 项，建议最多 5 项。`,
+                  )}
+                  {grouped.waiting.length > 0 && rows("等待他人", grouped.waiting)}
+                </>
               )}
-              {grouped.waiting.length > 0 && rows("等待他人", grouped.waiting)}
             </>
+          ) : board && view === "all" ? (
+            boardColumns
           ) : (
             rows(
               view === "waiting" ? "等待催办" : view === "done" ? "已闭环" : "全部行动",
@@ -443,34 +622,6 @@ function DesktopActions({
                   : scoped.filter((t) => !t.completed),
               "当前范围内没有行动。",
             )
-          )}
-          {view !== "done" && (
-            <form
-              className="aw-add"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void create();
-              }}
-            >
-              {writable.length > 1 && !project && (
-                <select aria-label="新建目标资料库" value={lib} onChange={(e) => setDestination(e.target.value)}>
-                  <option value="">选择滴答资料库</option>
-                  {writable.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <input
-                aria-label="新建行动"
-                value={title}
-                maxLength={500}
-                placeholder="记一条滴答待办"
-                onChange={(e) => setTitle(e.target.value)}
-              />
-              <button disabled={posting || !lib || !title.trim()}>添加待办</button>
-            </form>
           )}
           {Object.values(pendingRequests)
             .filter((r) => writable.some((l) => l.id === r.lib))
@@ -498,18 +649,49 @@ function DesktopActions({
         </div>
       </section>
       {selectedTask && (
-        <ActionDetail
-          key={identity(selectedTask)}
-          task={selectedTask}
-          topics={chosen}
-          meta={meta(selectedTask)}
-          update={(fn) => update(selectedTask, fn)}
-          journals={journals}
-          scope={selectedLibraryIds}
-          day={day}
-          onOpen={onOpenResult}
-          onClose={() => setSelected("")}
-        />
+        <>
+          <div
+            className="aw-divider"
+            role="separator"
+            aria-label="调整推进台宽度"
+            tabIndex={0}
+            aria-valuenow={detailPercent}
+            onDoubleClick={() => setDetailPercent(44)}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                e.preventDefault();
+                setDetailPercent((v) => Math.min(62, Math.max(30, v + (e.key === "ArrowLeft" ? 1 : -1))));
+              }
+            }}
+            onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
+            onPointerMove={(e) => {
+              if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+              const rect = e.currentTarget.parentElement!.getBoundingClientRect();
+              const width = rect.width - (nav ? 224 : 0);
+              setDetailPercent(Math.min(62, Math.max(30, ((rect.right - e.clientX) / width) * 100)));
+            }}
+          />
+          <ActionDetail
+            key={identity(selectedTask)}
+            task={selectedTask}
+            topicClick={() => navigate("all", topicOf(selectedTask), identity(selectedTask))}
+            completion={
+              <TaskStatusControl
+                task={selectedTask}
+                busy={store.taskBusyIds.has(selectedTask.id)}
+                onChange={(t, done) => void store.setTaskCompleted(t, done)}
+              />
+            }
+            topics={chosen}
+            meta={meta(selectedTask)}
+            update={(fn) => update(selectedTask, fn)}
+            journals={journals}
+            scope={selectedLibraryIds}
+            day={day}
+            onOpen={onOpenResult}
+            onClose={() => setSelected("")}
+          />
+        </>
       )}
     </main>
   );

@@ -17,7 +17,7 @@ export function ActionTodayPlan({
   const [items, setItems] = useState<Claim[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  const count = tasks.filter((t) => t.status === "open" && meta(t).day === day).length;
+  const [show, setShow] = useState(false);
   async function suggest() {
     setBusy(true);
     setError("");
@@ -43,29 +43,40 @@ export function ActionTodayPlan({
   }
   return (
     <div className="aw-today-plan">
-      <small>今日计划 {count} / 5</small>
-      <button disabled={busy} onClick={() => void suggest()}>
-        {busy ? "正在安排…" : "AI 安排今天"}
+      <button
+        className="aw-ai"
+        disabled={busy}
+        onClick={() => {
+          setShow(true);
+          void suggest();
+        }}
+      >
+        ✦{busy ? "正在安排…" : "AI 安排今天"}
       </button>
-      {items.map((item, i) => {
-        const t = tasks.find((t) => identity(t) === item.source);
-        return (
-          t &&
-          t.status === "open" && (
-            <div key={i}>
-              <strong>{t.title}</strong>
-              <p>{item.text}</p>
-              <button
-                disabled={meta(t).day === day}
-                onClick={() => void onPlan(t).catch((e) => setError(String(e)))}
-              >
-                {meta(t).day === day ? "已排入今天" : "排入今天"}
-              </button>
-            </div>
-          )
-        );
-      })}
-      {error && <p role="alert">{error}</p>}
+      {show && (items.length > 0 || error) && (
+        <div className="aw-suggestions">
+          <button onClick={() => setShow(false)}>关闭</button>
+          {items.map((item, i) => {
+            const t = tasks.find((t) => identity(t) === item.source);
+            return (
+              t &&
+              t.status === "open" && (
+                <div key={i}>
+                  <strong>{t.title}</strong>
+                  <p>{item.text}</p>
+                  <button
+                    disabled={meta(t).day === day}
+                    onClick={() => void onPlan(t).catch((e) => setError(String(e)))}
+                  >
+                    {meta(t).day === day ? "已排入今天" : "排入今天"}
+                  </button>
+                </div>
+              )
+            );
+          })}
+          {error && <p role="alert">{error}</p>}
+        </div>
+      )}
     </div>
   );
 }

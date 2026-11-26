@@ -118,17 +118,26 @@ export function ActionTopic({
   return (
     <>
       <section className="aw-topic">
-        <small>重点专题</small>
-        <h2>{topic.name}</h2>
-        <p>{summary}</p>
+        <h2><i className="aw-topic-dot" /> {topic.name}</h2>
         <small>
-          {tasks.filter((t) => t.status === "open").length} 待办 · {tasks.filter((t) => t.completed).length} 已闭环
-          · {pack.all.length} 份材料
+          <span className="aw-stage">{blockers.length?"等待外部交付":tasks.some(t=>!t.completed)?"进行中":tasks.length?"已闭环":"暂无行动"}</span> {tasks.filter((t) => t.status === "open").length} 待办 · {tasks.filter((t) => t.completed).length} 已闭环
+          · {blockers.length} 项阻塞 · {parallel.length} 项等回复
         </small>
         <div className="aw-tools">
-          <button disabled={busy || !tasks.length} onClick={() => void produce()}>
+          <button id="aw-report" disabled={busy || !tasks.length} onClick={() => void produce()}>
             {busy ? "正在起草…" : "生成阶段通报"}
           </button>
+        </div>
+        <div className="aw-progress">
+          <i
+            style={{
+              width: (tasks.length ? (tasks.filter((t) => t.completed).length / tasks.length) * 100 : 0) + "%",
+            }}
+          />
+        </div>
+        <div className="aw-summary">
+          <small>✦ 实时专题汇总（随等待回复动态刷新）</small>
+          <p>{summary}</p>
         </div>
         {current && (
           <>
@@ -175,7 +184,7 @@ export function ActionTopic({
           行动与卡点
         </button>
         <button aria-pressed={wall} onClick={() => setWall(true)}>
-          素材与证据
+          专题素材与证据墙
         </button>
       </div>
       {wall ? (

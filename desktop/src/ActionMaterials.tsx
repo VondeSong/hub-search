@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import type { QuickJournalItem } from "./JournalRecords";
 import { QuickJournalCard } from "./QuickJournal";
@@ -35,6 +35,10 @@ export function assembleMaterials(
   day: string,
 ) {
   const anchors = terms(title);
+  const specific = anchors.filter((t) => /\d/.test(t));
+  const matchesSubject = (text: string) =>
+    specific.some((t) => text.toLowerCase().includes(t)) ||
+    relevance(anchors, text) >= Math.min(2, anchors.length);
   const recentDate = new Date(day + "T12:00:00");
   recentDate.setDate(recentDate.getDate() - 13);
   const byId = new Map(links.map((m) => [m.id, m]));
@@ -47,11 +51,21 @@ export function assembleMaterials(
       ),
     }))
     .filter(
-      (v) => v.score > 0 && v.item.record.date <= day && new Date(v.item.record.date + "T12:00:00") >= recentDate,
+      (v) =>
+        matchesSubject(
+          (v.item.body || v.item.record.text) + " " + v.item.record.attachments.map((a) => a.name).join(" "),
+        ) &&
+        v.score > 0 &&
+        v.item.record.date <= day &&
+        new Date(v.item.record.date + "T12:00:00") >= recentDate,
     )
     .sort((a, b) => b.score - a.score || b.item.record.date.localeCompare(a.item.record.date))
     .slice(0, 12);
-  for (const m of [...found.map((v) => journalMaterial(v.item)), ...docs]) if (!byId.has(m.id)) byId.set(m.id, m);
+  for (const m of [
+    ...found.map((v) => journalMaterial(v.item)),
+    ...docs.filter((d) => matchesSubject(d.title + " " + d.text)),
+  ])
+    if (!byId.has(m.id)) byId.set(m.id, m);
   const recent: Material[] = [],
     long: Material[] = [];
   for (const m of byId.values()) {
@@ -130,27 +144,37 @@ export function Materials({
           ? journals.find((j) => j.record.id === m.journalId && journalMaterial(j).id === (m.originId || m.id))
           : undefined;
         return (
-          <details key={m.id}>
-            <summary>
-              {m.title} <small>{m.result?.libraryName || m.date}</small>
-            </summary>
-            <blockquote>{m.text}</blockquote>
-            {j && <QuickJournalCard item={j} mobile={false} onPreview={onOpen} />}
-            {m.result && (isPdfContent(m.result.contentType) || m.result.pageNumber) ? (
-              <PdfSource
-                key={JSON.stringify([m.result.id, m.result.pageNumber, m.result.modifiedAt])}
-                result={m.result}
-              />
-            ) : (
-              m.result &&
-              onOpen && (
-                <button onClick={() => onOpen(m.result!)}>
-                  打开来源{m.result.pageNumber ? ` · 第 ${m.result.pageNumber} 页` : ""}
-                </button>
-              )
+          <Fragment key={m.id}>
+            {!!j?.record.attachments.length && (
+              <div className="aw-media-strip">
+                <QuickJournalCard item={j} timeline mobile={false} onPreview={onOpen} />
+              </div>
             )}
-            {onPin && <button onClick={() => onPin(m)}>固定到任务备料</button>}
-          </details>
+            <details>
+              <summary>
+                <i className="aw-file-icon">
+                  {j ? "日志" : m.result?.pageNumber ? "PDF" : (m.result?.provider || "文档").toUpperCase()}
+                </i>{" "}
+                {m.title} <small>{m.result?.libraryName || m.date}</small>
+              </summary>
+              <blockquote>{m.text}</blockquote>
+
+              {m.result && (isPdfContent(m.result.contentType) || m.result.pageNumber) ? (
+                <PdfSource
+                  key={JSON.stringify([m.result.id, m.result.pageNumber, m.result.modifiedAt])}
+                  result={m.result}
+                />
+              ) : (
+                m.result &&
+                onOpen && (
+                  <button onClick={() => onOpen(m.result!)}>
+                    打开来源{m.result.pageNumber ? ` · 第 ${m.result.pageNumber} 页` : ""}
+                  </button>
+                )
+              )}
+              {onPin && <button onClick={() => onPin(m)}>固定到任务备料</button>}
+            </details>
+          </Fragment>
         );
       })}
     </section>

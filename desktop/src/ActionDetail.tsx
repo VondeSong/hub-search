@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
+import { AgentPanelContext, AgentTextMaterialContext } from "./StandaloneAgentLauncher";
 import { resolveTaskResult } from "./TaskWorkspaceResult";
 import { TaskPlanningPanel } from "./TaskPlanningPanel";
 import { ActionSourceFields } from "./ActionSourceFields";
@@ -112,6 +113,8 @@ export function ActionDetail({
   scope,
   day,
   onOpen,
+  topicClick,
+  completion,
   waitInitially = false,
   onClose,
   topics = [],
@@ -124,9 +127,13 @@ export function ActionDetail({
   scope: string[] | null;
   day: string;
   onOpen?: (r: SearchResult) => void;
+  topicClick?: () => void;
+  completion?: React.ReactNode;
   waitInitially?: boolean;
   onClose: () => void;
 }) {
+  const agent = useContext(AgentPanelContext);
+  const materialContext = useContext(AgentTextMaterialContext);
   const recall = useRecall(task.title, scope);
   const [planning, setPlanning] = useState("");
   const pack = assembleMaterials(task.title, journals, recall.items, meta.links, day);
@@ -201,40 +208,60 @@ export function ActionDetail({
   return (
     <aside className="aw-detail" aria-label="任务推进台">
       <header>
-        <small>{task.collectionName || task.documentTitle}</small>
+        <button className="aw-origin" onClick={topicClick}>
+          <i className="aw-topic-dot" />
+          {task.collectionName || task.documentTitle}
+        </button>{" "}
+        <button
+          disabled={!!busy}
+          onClick={() =>
+            void act("记入日志", async () => {
+              setStatus(
+                await archiveAction(
+                  identity(task),
+                  [task.title, meta.note, ...meta.steps.filter((s) => s.done).map((s) => "✓ " + s.text)]
+                    .filter(Boolean)
+                    .join("\n"),
+                ),
+              );
+            })
+          }
+        >
+          记入今日日志
+        </button>
+        <button
+          className="aw-ask"
+          onClick={() => {
+            if (!agent || !materialContext) {
+              setPlanning(crypto.randomUUID());
+              return;
+            }
+            materialContext.setPending({
+              kind: "text",
+              title: task.title,
+              text: [
+                task.title,
+                meta.note,
+                ...meta.waits.map((w) => [w.who, w.what, w.resolved ? "已收到" : w.review].join(" · ")),
+                ...pack.all.map((m) => m.title + " · " + m.text),
+              ]
+                .filter(Boolean)
+                .join("\n")
+                .slice(0, 2450),
+            });
+            agent(null);
+          }}
+        >
+          ✦ 问助手
+        </button>
         <button aria-label="关闭详情" onClick={onClose}>
           ×
         </button>
       </header>
-      <h2>{task.title}</h2>
-      <ActionSourceFields key={task.contentRevision} task={task} />
-      {onOpen && (
-        <button onClick={() => void act("打开原任务", async () => onOpen(await resolveTaskResult(task)))}>
-          查看滴答原任务
-        </button>
-      )}
-      {!!topics.length && (
-        <details>
-          <summary>关联重点专题</summary>
-          {topics.map((topic) => (
-            <label className="aw-step" key={topic.key}>
-              <input
-                type="checkbox"
-                checked={meta.topics?.includes(topic.key) || false}
-                onChange={() =>
-                  change((m) => ({
-                    ...m,
-                    topics: m.topics?.includes(topic.key)
-                      ? m.topics.filter((k) => k !== topic.key)
-                      : [...(m.topics || []), topic.key],
-                  }))
-                }
-              />
-              {topic.name}
-            </label>
-          ))}
-        </details>
-      )}
+      <div className="aw-detail-title">
+        {completion}
+        <h2>{task.title}</h2>
+      </div>
       <div className="aw-tools">
         <button
           disabled={!!busy || task.completed}
@@ -252,7 +279,10 @@ export function ActionDetail({
         <section>
           <h3>等待交付</h3>
           {meta.waits.map((w) => (
-            <div className="aw-wait" key={w.id}>
+            <div
+              className={"aw-wait " + (w.resolved ? "received" : w.blocking ? "blocking" : "parallel")}
+              key={w.id}
+            >
               <strong>
                 {w.who} · {w.what}
               </strong>
@@ -326,54 +356,56 @@ export function ActionDetail({
           <small>
             {meta.steps.filter((s) => s.done).length}/{meta.steps.length}
           </small>
+          <button disabled={!!busy || task.completed} onClick={() => void act("拆解步骤", () => draft("steps"))}>
+            AI 拆解步骤
+          </button>
         </h3>
-        {meta.steps.map((s) => (
-          <label className="aw-step" key={s.id}>
-            <input
-              type="checkbox"
-              disabled={!!busy || task.completed}
-              checked={s.done}
-              onChange={() =>
-                change((m) => ({
-                  ...m,
-                  steps: m.steps.map((row) => (row.id === s.id ? { ...row, done: !row.done } : row)),
-                }))
-              }
-            />
-            {s.text}
-          </label>
-        ))}
-        {!task.completed && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!step.trim()) return;
-              const text = step.trim();
-              void act("保存", async () => {
-                await update((m) => ({
-                  ...m,
-                  steps: [...m.steps, { id: crypto.randomUUID(), text, done: false }],
-                }));
-                setStep("");
-              });
-            }}
-          >
-            <input
-              aria-label="新步骤"
-              placeholder="添加执行步骤，回车保存"
-              value={step}
-              onChange={(e) => setStep(e.target.value)}
-            />
-          </form>
-        )}
-        <button disabled={!!busy || task.completed} onClick={() => void act("拆解步骤", () => draft("steps"))}>
-          AI 拆解步骤
-        </button>
+        <div className="aw-checklist">
+          {meta.steps.map((s) => (
+            <label className="aw-step" key={s.id}>
+              <input
+                type="checkbox"
+                disabled={!!busy || task.completed}
+                checked={s.done}
+                onChange={() =>
+                  change((m) => ({
+                    ...m,
+                    steps: m.steps.map((row) => (row.id === s.id ? { ...row, done: !row.done } : row)),
+                  }))
+                }
+              />
+              {s.text}
+            </label>
+          ))}
+          {!task.completed && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!step.trim()) return;
+                const text = step.trim();
+                void act("保存", async () => {
+                  await update((m) => ({
+                    ...m,
+                    steps: [...m.steps, { id: crypto.randomUUID(), text, done: false }],
+                  }));
+                  setStep("");
+                });
+              }}
+            >
+              <input
+                aria-label="新步骤"
+                placeholder="＋ 添加具体步骤，回车保存…"
+                value={step}
+                onChange={(e) => setStep(e.target.value)}
+              />
+            </form>
+          )}
+        </div>
       </section>
       {recall.error && <p role="alert">资料检索失败 · {recall.error}</p>}
       {!!pack.all.length && (
         <section>
-          <h3>任务备料</h3>
+          <h3>▧ 关联现场与规范备料包</h3>
           <Materials
             items={pack.recent}
             journals={journals}
@@ -435,7 +467,12 @@ export function ActionDetail({
       )}
       <section>
         <h3>推进备注</h3>
-        <textarea aria-label="推进备注" value={note} onChange={(e) => setNote(e.target.value)} />
+        <textarea
+          placeholder="记录推进备注、沟通结论或关键参数…"
+          aria-label="推进备注"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
         <button disabled={!!busy || note === (meta.note || "")} onClick={() => change((m) => ({ ...m, note }))}>
           保存备注
         </button>
@@ -443,23 +480,34 @@ export function ActionDetail({
           <SourceAppend key={note} task={task} text={note} workId={"workbench-note-" + task.sourceId} />
         )}
       </section>
-      <button
-        disabled={!!busy}
-        onClick={() =>
-          void act("记入日志", async () => {
-            setStatus(
-              await archiveAction(
-                identity(task),
-                [task.title, meta.note, ...meta.steps.filter((s) => s.done).map((s) => "✓ " + s.text)]
-                  .filter(Boolean)
-                  .join("\n"),
-              ),
-            );
-          })
-        }
-      >
-        记入今日日志
-      </button>
+      <ActionSourceFields key={task.contentRevision} task={task} />
+      {onOpen && (
+        <button onClick={() => void act("打开原任务", async () => onOpen(await resolveTaskResult(task)))}>
+          查看滴答原任务
+        </button>
+      )}
+      {!!topics.length && (
+        <details>
+          <summary>关联重点专题</summary>
+          {topics.map((topic) => (
+            <label className="aw-step" key={topic.key}>
+              <input
+                type="checkbox"
+                checked={meta.topics?.includes(topic.key) || false}
+                onChange={() =>
+                  change((m) => ({
+                    ...m,
+                    topics: m.topics?.includes(topic.key)
+                      ? m.topics.filter((k) => k !== topic.key)
+                      : [...(m.topics || []), topic.key],
+                  }))
+                }
+              />
+              {topic.name}
+            </label>
+          ))}
+        </details>
+      )}
       <button onClick={() => setPlanning((v) => (v ? "" : crypto.randomUUID()))}>分析与来源操作记录</button>
       {planning && (
         <TaskPlanningPanel
