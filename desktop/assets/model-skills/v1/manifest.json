@@ -73,6 +73,12 @@
       "bytes": 5222,
       "sha256": "8660425da6f6a0d9e98a86947abbecffa213e8d26f489d4a7f4f6db77ee46009",
       "source": "user-managed skill; adopted under HBM-01B authorization"
+    },
+    {
+      "path": "action-harvest/SKILL.md",
+      "bytes": 5444,
+      "sha256": "5e461c34916c823f0e9c95ddfb37d053995f608be05dd3ff10744ecba2aafaf5",
+      "source": "Hub built-in action-harvest read-only extraction skill"
     }
   ]
 }
