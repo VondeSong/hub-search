@@ -859,6 +859,16 @@ html, body {
   font-weight: 600;
 }
 
+.reader-resume {
+  display:grid; gap:5px; width:100%; padding:13px 14px; margin:4px 0 12px;
+  text-align:left; color:var(--m-ink); background:var(--m-surface);
+  border:1px solid var(--m-hairline-strong); border-radius:12px; cursor:pointer;
+}
+.reader-resume strong { font-size:14px; color:var(--m-accent-ink); }
+.reader-resume span { font-size:14px; line-height:1.5; }
+.reader-resume small { color:var(--m-ink-2); }
+.m-doc-prose .reader-anchor { background:var(--m-accent-soft); border-radius:5px; outline:3px solid var(--m-accent-soft); }
+
 .m-truncate {
   overflow: hidden;
   text-overflow: ellipsis;

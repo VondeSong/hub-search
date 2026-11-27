@@ -558,6 +558,7 @@
       pushStack: [], // Array of { type: 'library-detail' | 'doc-detail' | 'journals' | 'reading' | 'insights' | 'favorites' | 'tags', payload: any }
       collectionQuery: "",
       readingFilter: "all", // 'all' | 'unread' | 'offline'
+      insightBucket: "attention",
       selectedTagFilter: null,
       expandedJournals: {},
       readingLargeFont: false,
@@ -641,7 +642,7 @@
        ======================================================================== */
     const storeKey = "hub.mobile.prototype.v5";
     const draftKeys = ["captureDraft", "captureQuote", "captureTags", "captureSegments", "captureFiles", "captureDate"];
-    const durableKeys = [...draftKeys, "recentDocs", "reviewRatings", "inboxCards", "agentSessions", "activeSessionId", "agentOfflineMode"];
+    const durableKeys = [...draftKeys, "recentDocs", "readingLargeFont", "reviewRatings", "inboxCards", "agentSessions", "activeSessionId", "agentOfflineMode"];
     const sessionKeys = ["agentMessages", "attachedMaterialIds", "attachedPhotos", "activeSkill", "agentContextMode", "savedNoteMsgIds", "convertedTaskMsgIds", "cotExpandedMap", "handoffExpanded", "handoffCached", "promptDraft"];
     state.promptDraft = "";
     const emptySession = { agentMessages: [], attachedMaterialIds: [], attachedPhotos: [], activeSkill: null,
@@ -710,7 +711,8 @@
       const safe = escapeHtml(text);
       if (!query || !query.trim()) return safe;
       const q = query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      return safe.replace(new RegExp(`(${q})`, "gi"), '<mark class="m-highlight">$1</mark>');
+      return String(text).split(new RegExp(`(${q})`, "gi")).map((part, i) =>
+        i % 2 ? `<mark class="m-highlight">${escapeHtml(part)}</mark>` : escapeHtml(part)).join("");
     }
 
     let toastTimer = null;
@@ -764,6 +766,7 @@
        ======================================================================== */
     function renderAll() {
       persist();
+      scheduleInsightReview();
       scheduleRoute();
       renderHeader();
       renderMainTab();
@@ -862,6 +865,30 @@
     /* ========================================================================
        TAB 1: SEARCH (统一搜索 + 资料库范围半屏抽屉 + 今日脉搏)
        ======================================================================== */
+    function isReadingItem(doc) {
+      return doc?.type === "reading" || doc?.type === "pdf";
+    }
+
+    function searchPassages(item, query) {
+      const q = query.trim().toLowerCase();
+      if (!q) return [item];
+      const hits = [];
+      (item.paragraphs || []).forEach((paragraph, passage) => {
+        const match = paragraph.toLowerCase().indexOf(q);
+        if (match < 0) return;
+        const start = Math.max(0, match - 12), end = match + q.length + 55;
+        const snippet = (start ? "…" : "") + paragraph.slice(start, end) + (end < paragraph.length ? "…" : "");
+        hits.push({ ...item, passage, snippet });
+      });
+      if (hits.length) return hits;
+      return [item.title, item.snippet, item.sourceLine, ...item.tags].some(value => value?.toLowerCase().includes(q)) ? [item] : [];
+    }
+
+    function openSearchDocument(id, passage, query) {
+      const reader = query.trim() ? { query: query.trim(), paragraph: passage === "" ? -1 : Number(passage) } : null;
+      openPushView("doc-detail", id, false, reader);
+    }
+
     function getUnifiedSearchItems() {
       // Build a typed unified index across documents, journals, tasks, flashcards, and sessions
       const sourceDoc = id => DOCUMENTS.find(d => d.id === id);
@@ -875,6 +902,7 @@
         sourceLine: `${d.libraryName} · ${d.folderPath}`,
         title: d.title,
         snippet: d.snippet,
+        paragraphs: d.content,
         date: d.date,
         tags: d.tags
       }));
@@ -926,7 +954,7 @@
         return docItems;
       }
       if (state.searchType === "craft") return docItems.filter(i => i.kind === "craft");
-      if (state.searchType === "reading") return docItems.filter(i => i.kind === "reading");
+      if (state.searchType === "reading") return docItems.filter(i => isReadingItem(sourceDoc(i.rawId)));
       if (state.searchType === "journal") return [...docItems.filter(i => i.kind === "journal"), ...journalItems];
       if (state.searchType === "task") return taskItems;
       if (state.searchType === "flashcard") return cardItems;
@@ -939,23 +967,19 @@
         { key: "craft", label: "资料", count: DOCUMENTS.filter(d => d.type === "craft" || d.type === "pdf").length },
         { key: "journal", label: "日志", count: JOURNALS.length + 1 },
         { key: "task", label: "任务", count: TASKS.length },
-        { key: "reading", label: "阅读", count: DOCUMENTS.filter(d => d.type === "reading").length },
+        { key: "reading", label: "阅读", count: DOCUMENTS.filter(isReadingItem).length },
         { key: "flashcard", label: "闪卡", count: FLASHCARDS.length }
       ];
 
-      const filteredDocs = getUnifiedSearchItems().filter(item => {
+      const scopedItems = getUnifiedSearchItems().filter(item => {
         if (state.selectedFolder) {
           if (item.libraryId !== state.selectedFolder.libId || item.folderId !== state.selectedFolder.folderId) return false;
         } else if (state.selectedLibIds !== null) {
           if (!state.selectedLibIds.includes(item.libraryId)) return false;
         }
-        if (state.searchQuery.trim()) {
-          const q = state.searchQuery.trim().toLowerCase();
-          const hay = `${item.title} ${item.snippet} ${item.sourceLine} ${item.tags.join(" ")}`.toLowerCase();
-          return hay.includes(q);
-        }
         return true;
       });
+      const filteredDocs = scopedItems.flatMap(item => searchPassages(item, state.searchQuery));
 
       const dueRemaining = dueCards().length;
       const todoCount = TASKS.filter(t => !t.done).length;
@@ -1017,8 +1041,8 @@
               <span class="m-pulse-label"><i data-lucide="check-square" style="width:12px;height:12px;"></i>待办任务</span>
             </button>
             <button type="button" class="m-pulse-card" id="pulse-go-insights">
-              <span class="m-pulse-num" style="color:var(--m-green);">2</span>
-              <span class="m-pulse-label"><i data-lucide="sparkles" style="width:12px;height:12px;"></i>新洞察发现</span>
+              <span class="m-pulse-num" data-insight-count style="color:var(--m-green);">${attentionCount()}</span>
+              <span class="m-pulse-label"><i data-lucide="sparkles" style="width:12px;height:12px;"></i>待关注洞察</span>
             </button>
           </div>
 
@@ -1053,7 +1077,7 @@
               <button type="button" class="m-scope-trigger is-filtered" id="btn-empty-reset-scope" style="margin:0 auto;">恢复全部 6 个资料库</button>
             </div>
           ` : filteredDocs.map(item => `
-            <article class="m-result-card" role="button" tabindex="0" data-open-unified="${item.uid}">
+            <article class="m-result-card" role="button" tabindex="0" data-open-unified="${item.uid}" data-passage="${item.passage ?? ""}">
               <div class="m-result-top">
                 <span class="m-source-badge">
                   <span style="width:6px;height:6px;border-radius:50%;background:var(--m-accent);"></span>
@@ -1068,7 +1092,7 @@
                   ${item.tags.map(tag => `<span style="font-size:10.5px;color:var(--m-accent-ink);background:var(--m-accent-soft);padding:1px 6px;border-radius:5px;">${escapeHtml(tag)}</span>`).join("")}
                 </div>
                 <span style="font-size:11px;color:var(--m-ink-3);display:inline-flex;align-items:center;gap:3px;">
-                  详情与操作 <i data-lucide="chevron-right" style="width:12px;height:12px;"></i>
+                  ${item.passage == null ? "详情与操作" : "定位第 " + (item.passage + 1) + " 段"} <i data-lucide="chevron-right" style="width:12px;height:12px;"></i>
                 </span>
               </div>
             </article>
@@ -1078,8 +1102,13 @@
 
       // Bind events
       const input = document.getElementById("m-search-input");
+      input.addEventListener("compositionend", () => {
+        if (state.searchQuery !== input.value) input.dispatchEvent(new Event("input"));
+      });
       input.oninput = (e) => {
+        if (e.isComposing) return;
         state.searchQuery = e.target.value;
+        rememberRoute();
         const pos = e.target.selectionStart;
         renderMainTab();
         if (window.lucide) window.lucide.createIcons();
@@ -1139,7 +1168,8 @@
           const [kind, id] = card.getAttribute("data-open-unified").split(":");
 
           const target = { doc: "doc-detail", task: "task-detail", card: "card-detail", journal: "journal-detail" }[kind];
-          if (target) openPushView(target, id);
+          if (target === "doc-detail") openSearchDocument(id, card.dataset.passage, state.searchQuery);
+          else if (target) openPushView(target, id);
         };
       });
     }
@@ -1291,7 +1321,7 @@
                 </span>
                 <div>
                   <div style="font-size:14px;font-weight:600;color:var(--m-ink);">洞察 · 发现与阶段回顾</div>
-                  <div style="font-size:11.5px;color:var(--m-ink-3);margin-top:1px;">2 条新跨库发现 · 可查看原文依据并一键转任务</div>
+                  <div style="font-size:11.5px;color:var(--m-ink-3);margin-top:1px;"><span data-insight-count>${attentionCount()}</span> 条待关注 · 查看依据与关联任务</div>
                 </div>
               </div>
               <i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--m-ink-3);"></i>
@@ -2144,10 +2174,50 @@
        FULL-SCREEN PUSH VIEWS (True Library Folder Drill-Down, Doc Reader + Context Dock, Journals, Reading, Insights)
        ======================================================================== */
     // Each browser entry owns its filters and scroll positions. Mutations stay in the data store.
+    const readingKey = storeKey + ".reading-position";
+    let lastReading = null, trackedReaderY = null;
+    try { lastReading = JSON.parse(localStorage.getItem(readingKey)); } catch { /* Use session memory when storage is unavailable. */ }
+
+    function saveReading(id, point) {
+      lastReading = { id, ...point };
+      try { localStorage.setItem(readingKey, JSON.stringify(lastReading)); } catch { /* Still available until this page closes. */ }
+    }
+
+    function rememberVisibleReading() {
+      const body = document.getElementById("m-push-body");
+      const article = body.querySelector("[data-reading-id]");
+      if (!article || trackedReaderY == null || trackedReaderY === body.scrollTop) return;
+      trackedReaderY = body.scrollTop;
+      const top = body.getBoundingClientRect().top + 12;
+      const paragraph = [...article.querySelectorAll("[data-paragraph]")].reverse().find(p => p.getBoundingClientRect().top <= top + 1);
+      if (paragraph) {
+        const rect = paragraph.getBoundingClientRect();
+        saveReading(article.dataset.readingId, { paragraph:Number(paragraph.dataset.paragraph), fraction:Math.min(1, Math.max(0, (top - rect.top) / rect.height)) });
+      } else saveReading(article.dataset.readingId, { paragraph:-1, top:body.scrollTop });
+    }
+
+    function positionReader(view, historyY, anchor = view?.reader) {
+      if (view?.type !== "doc-detail") return;
+      const body = document.getElementById("m-push-body");
+      const paragraphs = body.querySelectorAll("[data-paragraph]");
+      const paragraph = paragraphs[anchor?.paragraph];
+      const fraction = Math.min(1, Math.max(0, Number(anchor?.fraction) || 0));
+      if (paragraph) {
+        const rect = paragraph.getBoundingClientRect();
+        body.scrollTop += rect.top - body.getBoundingClientRect().top - 12 + fraction * rect.height;
+      } else body.scrollTop = anchor?.top || 0;
+      const anchorY = body.scrollTop;
+      if (Number.isFinite(historyY)) body.scrollTop = historyY;
+      if (!body.querySelector("[data-reading-id]")) return;
+      trackedReaderY = anchorY;
+      if (body.scrollTop !== anchorY) rememberVisibleReading();
+      else saveReading(view.payload, paragraph ? { paragraph:anchor.paragraph, fraction } : { paragraph:-1, top:anchorY });
+    }
+    document.getElementById("m-push-body").addEventListener("scroll", rememberVisibleReading, { passive:true });
     let sheetId = null, routeQueued = false, restoring = false;
     const sheets = new Map();
     const routeFields = ["activeTab","pushStack","collectionQuery","searchType","searchQuery","selectedLibIds","selectedFolder",
-      "taskFilterStatus","taskFilterSource","taskListFilter","selectedTagFilter","reviewDeck","reviewSubTab","cardFlipped"];
+      "taskFilterStatus","taskFilterSource","taskListFilter","selectedTagFilter","reviewDeck","reviewSubTab","cardFlipped","insightBucket"];
     function snapshot() {
       const route = Object.fromEntries(routeFields.map(k => [k,state[k]]));
       return { ...route, hubMobile: 5, sheetId, mainY: document.querySelector("#m-main").scrollTop,
@@ -2172,7 +2242,12 @@
         if (changed) {
           const sameTab = old.activeTab === now.activeTab;
           if (!sameTab) document.querySelector("#m-main").scrollTop = now.mainY = 0;
-          if (now.pushStack.length) document.querySelector("#m-push-body").scrollTop = now.detailY = 0;
+          if (now.pushStack.length) {
+            const body = document.querySelector("#m-push-body");
+            body.scrollTop = 0;
+            positionReader(getActivePushView());
+            now.detailY = body.scrollTop;
+          }
         }
         if (old.sheetId && !now.sheetId && !changed) { history.back(); return; }
         if (old.sheetId && changed) history.replaceState(now,"");
@@ -2192,23 +2267,103 @@
       else if (reload && route.sheetId?.startsWith("capture-")) openQuickCaptureSheet();
       document.querySelector("#m-main").scrollTop = route.mainY;
       document.querySelector("#m-push-body").scrollTop = route.detailY;
+      const view = getActivePushView();
+      if (reload && view?.type === "doc-detail" && lastReading?.id === view.payload) positionReader(view, undefined, lastReading);
+      else positionReader(view, route.detailY);
       restoring = false;
       history.replaceState(snapshot(),"");
     }
     window.addEventListener("popstate", e => restoreRoute(e.state));
     document.addEventListener("click", rememberRoute, true);
-    window.addEventListener("pagehide", () => { endCaptureSegment(); rememberRoute(); });
-    function openPushView(type, payload, replaceTop = false) {
+    window.addEventListener("pagehide", () => { rememberVisibleReading(); endCaptureSegment(); rememberRoute(); });
+    function openPushView(type, payload, replaceTop = false, reader = null) {
       rememberRoute();
       state.collectionQuery = "";
+      if (type === "insights") state.insightBucket = "attention";
       if (type === "doc-detail" && DOCUMENTS.some(d => d.id === payload))
         state.recentDocs = [payload, ...state.recentDocs.filter(id => id !== payload)].slice(0,100);
       if (replaceTop && state.pushStack.length) state.pushStack.pop();
-      state.pushStack.push({type,payload});
+      state.pushStack.push(reader ? {type,payload,reader} : {type,payload});
       renderAll();
     }
     function closePushView() {
       if (state.pushStack.length) history.back();
+    }
+
+    const isSnoozed = (insight, now = Date.now()) => insight.snoozeUntil > now;
+    const attentionCount = () => INSIGHTS.filter(insight => !isSnoozed(insight)).length;
+    let insightTimer;
+    function scheduleInsightReview() {
+      clearTimeout(insightTimer);
+      const now = Date.now();
+      const next = Math.min(...INSIGHTS.filter(i => isSnoozed(i, now)).map(i => i.snoozeUntil));
+      if (Number.isFinite(next)) insightTimer = setTimeout(refreshInsightReview, Math.min(next - now, 2147483647));
+    }
+    function refreshInsightReview() {
+      document.querySelectorAll("[data-insight-count]").forEach(el => { el.textContent = attentionCount(); });
+      if (getActivePushView()?.type === "insights") renderPushLayer();
+      scheduleInsightReview();
+    }
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshInsightReview(); });
+
+    function setInsightReview(id, until) {
+      restoreData();
+      const ins = INSIGHTS.find(i => i.id === id);
+      if (!ins) return false;
+      const previous = ins.snoozeUntil;
+      ins.snoozeUntil = until;
+      if (persist()) return true;
+      ins.snoozeUntil = previous;
+      return false;
+    }
+    function chooseReviewTime(ins) {
+      openSheet(box => {
+        box.innerHTML = `<form class="flow-form"><h2>什么时候再看？</h2><p>${escapeHtml(ins.title)}</p>
+          <div class="flow-actions"><button type="button" class="flow-btn" data-hours="2">两小时后</button>
+          <button type="button" class="flow-btn" data-hours="24">明天此时</button>
+          <button type="button" class="flow-btn" data-hours="168">一周后</button></div>
+          <label>指定时间<input name="when" type="datetime-local" required></label><small>到时自动回到「待关注」</small>
+          <div class="flow-actions"><button class="flow-btn" type="button" data-cancel>取消</button>
+          <button class="flow-btn primary">保存时间</button></div></form>`;
+        const form = box.querySelector("form"), input = form.elements.when;
+        const save = until => {
+          if (!Number.isFinite(until) || until <= Date.now()) {
+            input.setCustomValidity("请选择将来的时间"); input.reportValidity(); return;
+          }
+          if (!setInsightReview(ins.id, until)) return;
+          closeSheet(); renderAll(); showToast("已安排稍后再看");
+        };
+        if (isSnoozed(ins)) {
+          const date = new Date(ins.snoozeUntil);
+          input.value = (new Date(date.getTime() - date.getTimezoneOffset()*60000)).toISOString().slice(0,16);
+        }
+        form.querySelectorAll("[data-hours]").forEach(b => b.onclick = () => save(Date.now() + Number(b.dataset.hours)*3600000));
+        form.querySelector("[data-cancel]").onclick = closeSheet;
+        input.oninput = () => input.setCustomValidity("");
+        form.onsubmit = e => { e.preventDefault(); save(input.value ? new Date(input.value).getTime() : NaN); };
+      });
+    }
+
+    function insightTask(ins) {
+      return TASKS.find(t => t.id === ins.convertedTask || t.originKey === "insight:" + ins.id) ||
+        TASKS.find(t => t.sourceType === "insight" && t.title === ins.title && t.docId === ins.evidenceDocs[0]);
+    }
+    function resolveInsightTask(id) {
+      restoreData();
+      const ins = INSIGHTS.find(i => i.id === id);
+      if (!ins) return null;
+      const existing = insightTask(ins);
+      if (existing) return existing.id;
+      const previous = ins.convertedTask;
+      const task = { id:crypto.randomUUID(), originKey:"insight:" + id, title:ins.title, done:false,
+        due:"无截止日", priority:"中优", sourceType:"insight", sourceLabel:"来自：洞察发现",
+        docId:ins.evidenceDocs[0], isLocal:true };
+      TASKS.unshift(task);
+      ins.convertedTask = task.id;
+      if (persist()) return task.id;
+      TASKS.shift();
+      ins.convertedTask = previous;
+      return null;
     }
 
     function renderPushLayer() {
@@ -2217,6 +2372,8 @@
       const body = document.getElementById("m-push-body");
       const footer = document.getElementById("m-push-footer");
       const currentView = getActivePushView();
+      rememberVisibleReading();
+      if (currentView?.type !== "doc-detail" || currentView.payload !== body.querySelector("[data-reading-id]")?.dataset.readingId) trackedReaderY = null;
 
       if (!currentView) {
         layer.classList.remove("is-open");
@@ -2401,6 +2558,8 @@
       if (type === "doc-detail") {
         const doc = DOCUMENTS.find(d => d.id === payload);
         if (!doc) { detailHeader(header, "资料详情"); body.textContent = "原文已不可用"; return; }
+        const anchor = currentView.reader;
+        const query = anchor?.query || "";
         header.innerHTML = `
           <div class="m-header-left">
             <button type="button" class="m-icon-btn" id="btn-push-back" aria-label="返回">
@@ -2422,17 +2581,17 @@
         `;
 
         body.innerHTML = `
-          <article class="m-card m-card-padded" style="padding:18px 16px;">
+          <article class="m-card m-card-padded" ${isReadingItem(doc) ? `data-reading-id="${doc.id}"` : ""} style="padding:18px 16px;">
             <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
               <span class="m-source-badge">${escapeHtml(doc.typeLabel)}</span>
               ${doc.tags.map(t => `<span style="font-size:11px;color:var(--m-accent-ink);background:var(--m-accent-soft);padding:2px 7px;border-radius:6px;">${escapeHtml(t)}</span>`).join("")}
             </div>
-            <h1 style="font-size:18px;font-weight:700;line-height:1.45;color:var(--m-ink);margin:0 0 12px;">${escapeHtml(doc.title)}</h1>
+            <h1 style="font-size:18px;font-weight:700;line-height:1.45;color:var(--m-ink);margin:0 0 12px;">${highlightText(doc.title, query)}</h1>
             <div style="padding:10px 12px;border-radius:10px;background:var(--m-surface-subtle);border-left:3px solid var(--m-accent);font-size:13px;line-height:1.6;color:var(--m-ink-2);margin-bottom:14px;">
-              <strong>核心摘要：</strong>${escapeHtml(doc.snippet)}
+              <strong>核心摘要：</strong>${highlightText(doc.snippet, query)}
             </div>
             <div class="m-doc-prose" style="display:flex;flex-direction:column;gap:12px;font-size:${state.readingLargeFont ? "18px" : "15.5px"};line-height:1.78;color:var(--m-ink);">
-              ${doc.content.map(p => `<p style="margin:0;">${escapeHtml(p)}</p>`).join("")}
+              ${doc.content.map((p,i) => `<p data-paragraph="${i}" class="${anchor?.paragraph === i ? "reader-anchor" : ""}" style="margin:0;">${highlightText(p, query)}</p>`).join("")}
             </div>
           </article>
         `;
@@ -2461,6 +2620,7 @@
         document.getElementById("btn-push-back").onclick = () => closePushView();
         document.getElementById("btn-doc-fontsize").onclick = () => {
           state.readingLargeFont = !state.readingLargeFont;
+          persist();
           renderPushLayer();
           if (window.lucide) window.lucide.createIcons();
         };
@@ -2599,6 +2759,9 @@
 
       // 4. INSIGHTS (洞察 · 依据文档与一键转任务)
       if (type === "insights") {
+        const later = state.insightBucket === "later", now = Date.now();
+        const waiting = INSIGHTS.filter(i => isSnoozed(i, now)).sort((a,b) => a.snoozeUntil - b.snoozeUntil);
+        const visible = later ? waiting : INSIGHTS.filter(i => !isSnoozed(i, now));
         header.innerHTML = `
           <div class="m-header-left">
             <button type="button" class="m-icon-btn" id="btn-push-back"><i data-lucide="arrow-left" style="width:18px;height:18px;"></i></button>
@@ -2610,13 +2773,18 @@
         `;
 
         body.innerHTML = `
-          ${INSIGHTS.map(ins => `
-            <article class="m-result-card">
+          <nav class="task-switch" aria-label="洞察视图">
+            <button data-bucket="attention" aria-pressed="${!later}">待关注 (${INSIGHTS.length - waiting.length})</button>
+            <button data-bucket="later" aria-pressed="${later}">稍后再看 (${waiting.length})</button></nav>
+          ${visible.length ? "" : `<p class="flow-empty">${later ? "暂无安排回看的洞察" : "暂无待关注洞察"}</p>`}
+          ${visible.map(ins => `
+            <article class="m-result-card" data-insight="${ins.id}">
               <div class="m-result-top">
                 <span class="m-source-badge" style="color:#7C3AED;">✦ ${escapeHtml(ins.category)}</span>
                 <span style="font-size:11px;color:var(--m-ink-3);">${escapeHtml(ins.date)}</span>
               </div>
               <div class="m-result-title">${escapeHtml(ins.title)}</div>
+              ${later ? `<small>回看时间 · <time datetime="${new Date(ins.snoozeUntil).toISOString()}">${new Date(ins.snoozeUntil).toLocaleString("zh-CN", {month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}</time></small>` : ""}
               <div style="font-size:12.5px;line-height:1.6;color:var(--m-ink-2);margin:6px 0 10px;">${escapeHtml(ins.summary)}</div>
               <div style="padding-top:8px;border-top:0.5px solid var(--m-hairline);display:flex;flex-direction:column;gap:6px;">
                 <span style="font-size:11px;font-weight:600;color:var(--m-ink-3);">原文依据 (${ins.evidenceDocs.length})：</span>
@@ -2631,9 +2799,11 @@
                   `;
                 }).join("")}
               </div>
-              <div style="margin-top:10px;display:flex;justify-content:flex-end;">
-                <button type="button" class="m-scope-trigger is-filtered" data-ins-to-task="${ins.id}">
-                  ${ins.convertedTask ? "✓ 已建立关联任务（点击查看）" : "+ 转化为待办任务"}
+              <div class="flow-actions" style="margin-top:10px;">
+                <button type="button" class="flow-btn" data-snooze="${ins.id}">${later ? "修改回看时间" : "稍后再看"}</button>
+                ${later ? `<button type="button" class="flow-btn" data-wake="${ins.id}">移回待关注</button>` : ""}
+                <button type="button" class="flow-btn" data-ins-to-task="${ins.id}">
+                  ${insightTask(ins) ? "打开关联任务" : "转为任务并打开"}
                 </button>
               </div>
             </article>
@@ -2641,30 +2811,22 @@
         `;
 
         document.getElementById("btn-push-back").onclick = () => closePushView();
+        body.querySelectorAll("[data-bucket]").forEach(b => b.onclick = () => { state.insightBucket = b.dataset.bucket; renderAll(); });
+        body.querySelectorAll("[data-snooze]").forEach(b => b.onclick = () => chooseReviewTime(INSIGHTS.find(i => i.id === b.dataset.snooze)));
+        body.querySelectorAll("[data-wake]").forEach(b => b.onclick = () => {
+          if (setInsightReview(b.dataset.wake, null)) { renderAll(); showToast("已移回待关注"); }
+        });
         body.querySelectorAll("[data-ins-doc]").forEach(btn => {
           btn.onclick = () => openPushView("doc-detail", btn.getAttribute("data-ins-doc"));
         });
         body.querySelectorAll("[data-ins-to-task]").forEach(btn => {
-          btn.onclick = () => {
-            const ins = INSIGHTS.find(i => i.id === btn.getAttribute("data-ins-to-task"));
-            if (ins && !ins.convertedTask) {
-              ins.convertedTask = crypto.randomUUID();
-              TASKS.unshift({
-                id: ins.convertedTask,
-                title: ins.title,
-                done: false,
-                due: "本周",
-                priority: "中优",
-                sourceType: "insight",
-                sourceLabel: "来自：洞察发现",
-                docId: ins.evidenceDocs[0],
-                isLocal: true
-              });
-              showToast("已从洞察创建关联任务（幂等防重）");
-              renderAll();
-            } else {
-              openPushView("task-detail", ins.convertedTask);
-            }
+          btn.onclick = async () => {
+            btn.disabled = true;
+            const resolve = () => resolveInsightTask(btn.dataset.insToTask);
+            try {
+              const id = navigator.locks ? await navigator.locks.request(storeKey + ".insights", resolve) : resolve();
+              if (id && getActivePushView() === currentView) openPushView("task-detail", id);
+            } finally { btn.disabled = false; }
           };
         });
         return;
@@ -2692,12 +2854,13 @@
       const browsingHistory = type === "favorites" && payload?.mode === "history";
       const candidates = browsingHistory ? state.recentDocs.map(id => DOCUMENTS.find(d => d.id === id)).filter(Boolean) : DOCUMENTS;
       const listDocs = candidates.filter(d => {
-        if (type === "reading" && d.type !== "reading" && d.type !== "pdf") return false;
+        if (type === "reading" && !isReadingItem(d)) return false;
         if (type === "favorites" && !browsingHistory && !d.favorite) return false;
         if (type === "tags" && state.selectedTagFilter && !d.tags.includes(state.selectedTagFilter)) return false;
-        if (q && !`${d.title} ${d.snippet} ${d.tags.join(" ")}`.toLowerCase().includes(q)) return false;
+        if (type !== "reading" && q && !`${d.title} ${d.snippet} ${d.tags.join(" ")}`.toLowerCase().includes(q)) return false;
         return true;
-      });
+      }).flatMap(d => type === "reading" ? searchPassages({ ...d, paragraphs:d.content, sourceLine:d.libraryName }, q) : [d]);
+      const resumeDoc = type === "reading" && !q && DOCUMENTS.find(d => d.id === lastReading?.id && isReadingItem(d));
 
       body.innerHTML = `
         <div class="m-search-box" style="height:38px;margin-bottom:8px;">
@@ -2705,6 +2868,10 @@
           <input type="search" id="push-collection-search" class="m-search-input" style="font-size:13px;" placeholder="在${titleMap[type] || "当前集合"}内搜索..." value="${escapeHtml(state.collectionQuery)}" />
         </div>
 
+        ${resumeDoc ? `<button type="button" class="reader-resume" id="resume-reading">
+          <strong>继续上次阅读</strong><span>${escapeHtml(resumeDoc.title)}</span>
+          <small>${resumeDoc.content[lastReading.paragraph] ? "正文第 " + (lastReading.paragraph + 1) + " 段" : "文章开头"} ›</small>
+        </button>` : ""}
         ${type === "tags" ? `
           <div class="m-chip-rail" style="margin-bottom:8px;">
             <button type="button" class="m-chip ${!state.selectedTagFilter ? "is-active" : ""}" data-pick-tag="">全部标签 (${allTags.length})</button>
@@ -2716,21 +2883,27 @@
 
         ${listDocs.length ? "" : '<p class="flow-empty">暂无符合条件的内容</p>'}
         ${listDocs.map(doc => `
-          <article class="m-result-card" data-push-open-doc="${doc.id}">
+          <article class="m-result-card" role="button" tabindex="0" data-push-open-doc="${doc.id}" data-passage="${doc.passage ?? ""}">
             <div class="m-result-top">
               <span class="m-source-badge">${escapeHtml(doc.libraryName)}</span>
               <span style="font-size:11px;color:var(--m-ink-3);">${escapeHtml(doc.date)}</span>
             </div>
             <div class="m-result-title">${highlightText(doc.title, state.collectionQuery)}</div>
             <div class="m-result-snippet">${highlightText(doc.snippet, state.collectionQuery)}</div>
+            ${doc.passage == null ? "" : `<small>定位第 ${doc.passage + 1} 段</small>`}
           </article>
         `).join("")}
       `;
 
       document.getElementById("btn-push-back").onclick = () => closePushView();
       const colInput = document.getElementById("push-collection-search");
+      colInput.addEventListener("compositionend", () => {
+        if (state.collectionQuery !== colInput.value) colInput.dispatchEvent(new Event("input"));
+      });
       colInput.oninput = (e) => {
+        if (e.isComposing) return;
         state.collectionQuery = e.target.value;
+        rememberRoute();
         const pos = e.target.selectionStart;
         renderPushLayer();
         if (window.lucide) window.lucide.createIcons();
@@ -2743,8 +2916,11 @@
           renderPushLayer();
         };
       });
+      const resume = body.querySelector("#resume-reading");
+      if (resume) resume.onclick = () => openPushView("doc-detail", resumeDoc.id, false, { ...lastReading });
       body.querySelectorAll("[data-push-open-doc]").forEach(card => {
-        card.onclick = () => openPushView("doc-detail", card.getAttribute("data-push-open-doc"));
+        card.onkeydown = e => { if (["Enter"," "].includes(e.key)) { e.preventDefault(); card.click(); } };
+        card.onclick = () => openSearchDocument(card.dataset.pushOpenDoc, card.dataset.passage, type === "reading" ? state.collectionQuery : "");
       });
     }
 
