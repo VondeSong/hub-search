@@ -153,8 +153,13 @@ it.each([
   const todayNavigation = android ? container.querySelector<HTMLElement>(".mobile-flashcard-tabs")! : container;
   await act(async () => button(todayNavigation, "今日").click());
   await settle();
-  expect(container.querySelector(android ? ".mobile-flashcard-today" : ".flashcards-overview-due")).not.toBeNull();
-  if (android) expect(container.querySelector(".flashcards-workspace")?.classList.contains("mobile-page-review")).toBe(true);
+  if (android) {
+    expect(container.querySelector(".mobile-page-review .flashcards-review-card h2")?.textContent).toBe(dueCard.question);
+    expect(container.querySelector(".flashcards-review-card.revealed")).toBeNull();
+    expect(invokeMock.mock.calls.some(([command]) => command === "review_flashcard")).toBe(false);
+  } else {
+    expect(container.querySelector(".flashcards-overview-due")).not.toBeNull();
+  }
   expect(container.querySelector(".flashcards-main")?.textContent).not.toContain(target.question);
 });
 
