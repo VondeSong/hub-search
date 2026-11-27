@@ -65,13 +65,27 @@ export function useMobileReadingPosition(
         hits[0];
       if (match) {
         const walker = document.createTreeWalker(match, NodeFilter.SHOW_TEXT);
+        // Build ranges against the whole paragraph so emphasis and links can split a hit.
+        const nodes: { node: Node; start: number; end: number }[] = [];
+        let offset = 0;
         for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-          const text = node.textContent?.toLowerCase() || "";
-          const index = text.indexOf(needle);
-          if (index < 0) continue;
+          const end = offset + (node.textContent?.length ?? 0);
+          if (end > offset) nodes.push({ node, start: offset, end });
+          offset = end;
+        }
+        const literal = anchor.query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        let cursor = 0;
+        for (const hit of (match.textContent ?? "").matchAll(new RegExp(literal, "giu"))) {
+          const start = hit.index!;
+          const end = start + hit[0].length;
+          while (cursor < nodes.length && nodes[cursor].end <= start) cursor++;
+          const first = nodes[cursor];
+          while (cursor < nodes.length && nodes[cursor].end < end) cursor++;
+          const last = nodes[cursor];
+          if (!first || !last) continue;
           const range = document.createRange();
-          range.setStart(node, index);
-          range.setEnd(node, index + needle.length);
+          range.setStart(first.node, start - first.start);
+          range.setEnd(last.node, end - last.start);
           ranges.push(range);
         }
         match.classList.add("mobile-reading-hit");

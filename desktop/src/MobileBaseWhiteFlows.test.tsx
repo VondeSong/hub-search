@@ -145,12 +145,34 @@ it("schedules a future review and can return the same insight early", async () =
     );
   await click("稍后再看");
   await click("一周后");
-  await click("确认回看时间");
+  expect(change).toHaveBeenCalledWith(item, "insightStatus", expect.objectContaining({ state: "later" }));
   await act(async () => new Promise<void>((r) => setTimeout(r, 25)));
   expect(item.snoozeUntil).toBeGreaterThan(Date.now() + 6 * 86400000);
   await click("稍后再看 (1)");
   expect(host.textContent).toContain("修改回看时间");
+  await click("修改回看时间");
+  expect(host.querySelector<HTMLInputElement>("input[type=datetime-local]")!.valueAsNumber).toBeGreaterThan(Date.now() + 5 * 86400000);
+  await click("取消");
+  await act(async () => new Promise<void>((r) => setTimeout(r, 25)));
   await click("移回待关注");
   expect(item.processingState).toBe("attention");
   window.history.replaceState({}, "");
+});
+
+it("highlights repeated literal hits across inline formatting, including punctuation", async () => {
+  const highlights = new Map<string, Range[]>();
+  vi.stubGlobal("CSS", { highlights });
+  vi.stubGlobal("Highlight", class { constructor(...ranges: Range[]) { return ranges; } });
+  function Reader() {
+    const ref = useRef<HTMLDivElement>(null);
+    const reading = useMobileReadingPosition(ref, "inline", "文章");
+    reading.pending.current = { query: "A+B" };
+    return <div ref={ref}><div className="collection-post-text"><p>A<strong>+B</strong> A+B</p></div></div>;
+  }
+  try {
+    await act(async () => root.render(<Reader/>));
+    expect(highlights.get("mobile-reading-match")?.map(range => range.toString())).toEqual(["A+B", "A+B"]);
+    await act(async () => root.render(null));
+    expect(highlights.has("mobile-reading-match")).toBe(false);
+  } finally { vi.unstubAllGlobals(); }
 });

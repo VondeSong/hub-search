@@ -1,4 +1,4 @@
-import { MobileHarvestDecision, localHarvestReceipts } from "./MobileHarvestDecision";
+import { MobileHarvestDecision, localHarvestReceipts, type HarvestDraft } from "./MobileHarvestDecision";
 import { mobileTasks } from "./MobileInsightTasks";
 import { createPortal } from "react-dom";
 import { runtimeCapabilities } from "./RuntimePlatform";
@@ -60,6 +60,7 @@ export function ActionHarvester({
   planFull?: boolean;
   revision: number;
 }) {
+  const harvestDrafts = useRef(new Map<string, HarvestDraft>());
   const [docs, setDocs] = useState<SearchResult[]>([]),
     [readError, setReadError] = useState(""),
     [tick, setTick] = useState(0);
@@ -441,7 +442,7 @@ export function ActionHarvester({
         <button type="button" onClick={() => onSelect(mobileReceipt.task)}>打开对应任务</button>
       </section>}
       {readError && <p role="alert">笔记线索读取失败 · {readError}</p>}
-      {localDecision && <MobileHarvestDecision key={mobileClue} clue={visibleClues[0]} receipt={localReceipt} onSaved={()=>setTick(n=>n+1)} onOpen={onOpenLocalTask!}/>}
+      {localDecision && <MobileHarvestDecision drafts={harvestDrafts.current} key={mobileClue} clue={visibleClues[0]} receipt={localReceipt} onSaved={()=>setTick(n=>n+1)} onOpen={onOpenLocalTask!}/>}
       {opened && !localDecision && (
         <>
           {clues.length >= 12 && !excluded.size && (

@@ -289,6 +289,7 @@ export function MobileInsightList({
     };
   }, [editing]);
   const laterItems = data.items.filter((i) => i.processingState === "later");
+  laterItems.sort((a, b) => (a.snoozeUntil ?? 0) - (b.snoozeUntil ?? 0));
   const dates = laterItems
     .map((i) => i.snoozeUntil || 0)
     .filter((t) => t > Date.now());
@@ -301,8 +302,24 @@ export function MobileInsightList({
     );
     return () => clearTimeout(timer);
   }, [next, data.refresh]);
-  function choose(hours: number) {
-    const d = new Date(Date.now() + hours * 3600000);
+  const snoozeRequest = useRef(false);
+  async function saveReview(until: number) {
+    if (!editing || !(until > Date.now()) || snoozeRequest.current) return;
+    const activeDialog = dialog.current;
+    snoozeRequest.current = true;
+    try {
+      await data.change(editing, "insightStatus", { state: "later", snoozeUntil: until });
+      if (activeDialog?.open && dialog.current === activeDialog && window.history.state?.hubMobileSnooze) closeSnooze();
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      snoozeRequest.current = false;
+    }
+  }
+  function showReview(item: Insight) {
+    setEditing(item);
+    if (!item.snoozeUntil || item.snoozeUntil <= Date.now()) { setAt(""); return; }
+    const d = new Date(item.snoozeUntil);
     setAt(
       new Date(d.getTime() - d.getTimezoneOffset() * 60000)
         .toISOString()
@@ -361,8 +378,7 @@ export function MobileInsightList({
         <button onClick={advanced}>更多洞察</button>
       </nav>
       {(error || data.error) && <p role="alert">{error || data.error}</p>}
-      {data.items
-        .filter((i) => i.processingState === (later ? "later" : "attention"))
+      {(later ? laterItems : data.items.filter(i => i.processingState === "attention"))
         .map((item) => (
           <article className="bw-insight" key={item.id}>
             <small>✦ 洞察发现</small>
@@ -381,10 +397,7 @@ export function MobileInsightList({
             ))}
             <div className="bw-buttons">
               <button
-                onClick={() => {
-                  setEditing(item);
-                  choose(2);
-                }}
+                onClick={() => showReview(item)}
               >
                 {later ? "修改回看时间" : "稍后再看"}
               </button>
@@ -429,14 +442,15 @@ export function MobileInsightList({
             closeSnooze();
           }}
         >
-          <h3>稍后再看</h3>
+          <h3>什么时候再看？</h3>
+          <p>{editing.workTitle}</p>
           <div className="bw-buttons">
             {[
               [2, "两小时后"],
               [24, "明天此时"],
               [168, "一周后"],
             ].map(([h, n]) => (
-              <button key={h} onClick={() => choose(Number(h))}>
+              <button key={h} disabled={data.busy} onClick={() => void saveReview(Date.now() + Number(h) * 3600000)}>
                 {n}
               </button>
             ))}
@@ -453,17 +467,9 @@ export function MobileInsightList({
             <button onClick={closeSnooze}>取消</button>
             <button
               disabled={data.busy || !(Date.parse(at) > Date.now())}
-              onClick={() =>
-                void data
-                  .change(editing, "insightStatus", {
-                    state: "later",
-                    snoozeUntil: Date.parse(at),
-                  })
-                  .then(closeSnooze)
-                  .catch(() => {})
-              }
+              onClick={() => void saveReview(Date.parse(at))}
             >
-              确认回看时间
+              保存时间
             </button>
           </div>
         </dialog>

@@ -85,3 +85,18 @@ it("restores the progress draft and retries a failed save without appending it t
   expect(host.querySelector("textarea")!.value).toBe("");
   expect(host.querySelector("[role=alert]")).toBeNull();
 });
+
+it("keeps a candidate's draft across back navigation without applying it to a different candidate", async () => {
+  const drafts = new Map();
+  const show = async (clue: Clue) => act(async () => root.render(
+    <MobileHarvestDecision key={clue.key} clue={clue} drafts={drafts} onOpen={open} onSaved={saved}/>
+  ));
+  await show(first);
+  await click("补充已有任务");
+  await show(second);
+  expect(host.querySelector("[aria-pressed=true]")?.textContent).toBe("新建任务");
+  await show(first);
+  expect(host.querySelector("[aria-pressed=true]")?.textContent).toBe("补充已有任务");
+  await click("新建任务"); await click("确认清单并新建");
+  expect(drafts.has(first.key)).toBe(false);
+});
