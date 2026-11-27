@@ -2,7 +2,7 @@ import { useState, type ComponentProps } from "react";
 import { ChevronDown, ListFilter } from "lucide-react";
 import type { FilterBar } from "./FilterBar";
 import { WorkspaceFilterSummary } from "./WorkspaceFilterSummary";
-import type { LibrarySummary } from "./SearchTypes";
+import type { LibrarySummary, SearchResult } from "./SearchTypes";
 import type { SourceFilters } from "./useLocalSearch";
 import { normalizeSourceFilters } from "./SearchSourceFilters";
 
@@ -10,16 +10,27 @@ type Filters = ComponentProps<typeof FilterBar>;
 const types = [["craft", "资料"], ["task", "任务"], ["pdf", "PDF"], ["media", "媒体"], ["attachment", "附件"], ["reading", "阅读"], ["flashcard", "闪卡"]] as const;
 const allTypes: SourceFilters = { craft: true, task: true, pdf: true, media: true, attachment: true, reading: true, flashcard: true };
 
-export function MobileSearchControls({ filters, onSelectLibraries, onOpenFilters }: { filters: Filters; onSelectLibraries?: (ids: string[] | null) => void;onOpenFilters?:()=>void }) {
+export function MobileSearchControls({ filters, results, onSelectLibraries, onOpenFilters }: { filters: Filters; results?: SearchResult[]; onSelectLibraries?: (ids: string[] | null) => void;onOpenFilters?:()=>void }) {
   const resolvedSources=normalizeSourceFilters(filters.sourceFilters);
   const all = Object.values(resolvedSources).every(Boolean);
   const selectedType = all ? "all" : types.find(([id]) => resolvedSources[id] && Object.values(resolvedSources).filter(Boolean).length === 1)?.[0] ?? "custom";
+  // The native library facets exclude reading and flashcards. Count the current result set.
+  const counts = { all: 0, craft: 0, task: 0, pdf: 0, media: 0, attachment: 0, reading: 0, flashcard: 0 };
+  for (const hit of results ?? []) {
+    const type = hit.contentType;
+    const kind = type === "reading" || type === "flashcard" ? type
+      : type === "dida_task" ? "task" : type.startsWith("pdf_") ? "pdf"
+      : type === "image_ocr" || type === "media_attachment" ? "media"
+      : type === "file_attachment" ? "attachment" : "craft";
+    counts[kind]++;
+    counts.all++;
+  }
   return <div className="mobile-search-facets">
     <div className="mobile-search-compact-filters"><button type="button" onClick={onOpenFilters} aria-label="选择搜索资料范围">{filters.selectedLibraryIds===null?"全部资料库":`${filters.activeSpaces.length} 个资料库`}<ChevronDown size={13}/></button>
     <select className="mobile-search-type-select" aria-label="内容类型" value={selectedType} onChange={event => filters.setSourceFilters(event.target.value === "all" ? { ...allTypes } : Object.fromEntries(types.map(([id]) => [id, id === event.target.value])) as SourceFilters)}>
       <option value="all">全部类型</option>{selectedType === "custom" && <option value="custom">自定义类型</option>}{types.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
     </select><button type="button" aria-label="更多搜索筛选" onClick={onOpenFilters}><ListFilter size={18}/></button></div>
-    <nav className="bw-tabs bw-search-types" aria-label="搜索内容类型">{([["all","全部"],...types] as const).map(([id,label])=><button key={id} type="button" aria-pressed={selectedType===id} onClick={()=>filters.setSourceFilters(id==="all"?{...allTypes}:Object.fromEntries(types.map(([key])=>[key,key===id])) as SourceFilters)}>{label}{filters.sourceFacetCounts&&<small>{id==="all"?filters.facetTotal:filters.sourceFacetCounts[id]??0}</small>}</button>)}</nav>
+    <nav className="bw-tabs bw-search-types" aria-label="搜索内容类型">{([["all","全部"],...types] as const).map(([id,label])=><button key={id} type="button" aria-pressed={selectedType===id} onClick={()=>filters.setSourceFilters(id==="all"?{...allTypes}:Object.fromEntries(types.map(([key])=>[key,key===id])) as SourceFilters)}>{label}{results && filters.sourceFacetCounts && (id==="all"?all:resolvedSources[id]) && <small title="当前搜索结果中的条数">{counts[id]}</small>}</button>)}</nav>
     <div className="mobile-applied-scope" aria-label="当前搜索范围与筛选">
       {filters.selectedLibraryIds !== null && <button onClick={() => { onSelectLibraries?.(null); filters.setFolderId(""); }}>清除资料范围</button>}
     </div>

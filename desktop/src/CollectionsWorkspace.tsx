@@ -361,11 +361,11 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
     if(detailOpen&&!previewHistoryPushed.current){
       window.history.pushState({...window.history.state,hubReadingPreview:true},"");
       previewHistoryPushed.current=true;
-    }else if(!detailOpen&&previewHistoryPushed.current){
+    }else if(!previewEnabled&&previewHistoryPushed.current){
       previewHistoryPushed.current=false;
       if(window.history.state?.hubReadingPreview)window.history.back();
     }
-  },[detailOpen]);
+  },[detailOpen,previewEnabled]);
   const wasDetailOpen=useRef(false);
   useEffect(()=>{
     // Scroll events persist position; only a detail transition may restore it.
@@ -608,7 +608,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
   const sourceCount = view.source === "all" ? activeTotal : sources.find(source => source.id === view.source)?.count ?? activeTotal;
   const toggleReadingNavigation = shellHeader?.onToggleReadingNavigation ?? onToggleDesktopSidebar;
   return <section onKeyDown={readingKeys} className={`collections-workspace task-workspace${compactControls?" collection-compact-layout":""}${detailOpen?" collection-detail-open":""}`} aria-label="阅读">
-    {runtimeCapabilities.mobile && reading.bookmark && !query.trim() && !detailOpen && <button className="bw-resume" onClick={()=>{const mark=reading.bookmark!;reading.pending.current={bookmark:mark};setSearchItemKey(mark.key);openItem(mark.key);}}><strong>继续上次阅读</strong><span>{reading.bookmark.title}</span><small>{reading.bookmark.paragraph < 0 ? "文章开头" : `正文第 ${reading.bookmark.paragraph + 1} 段`} ›</small></button>}
+    {runtimeCapabilities.mobile && reading.bookmark && !query.trim() && !detailOpen && <button className="bw-resume" onClick={()=>{const mark=reading.bookmark!;reading.pending.current={bookmark:mark};if (!shownItems.some(item=>item.key===mark.key)) setSearchItemKey(mark.key);openItem(mark.key);}}><strong>继续上次阅读</strong><span>{reading.bookmark.title}</span><small>{reading.bookmark.paragraph < 0 ? "文章开头" : `正文第 ${reading.bookmark.paragraph + 1} 段`} ›</small></button>}
     {searchItemKey&&(!runtimeCapabilities.mobile || (page && !page.items.length))&&<div role="status" className="collection-notice">从搜索打开的阅读条目<button type="button" onClick={()=>setSelectedKey(null)}>返回阅读列表</button>{page&&!page.items.length&&<span>条目已变更或移除，请重新搜索。</span>}</div>}
     <div className="collection-browse-controls" hidden={detailOpen&&(compactPreview||runtimeCapabilities.mobile)}>
     {runtimeCapabilities.mobile?<MobileReadingControls view={view} onChange={changeView} count={page?.matched} tags={page?.availableTags||[]} onSync={openCloudSyncSettings}><CollectionViewTabs onChange={changeView} compact={true} onNotice={setNotice}/><CollectionSort key={`${view.id}:${view.layout}`} rules={sorts} onChange={changeSorts}/></MobileReadingControls>:<>
@@ -638,7 +638,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
         {!runtimeCapabilities.mobile&&<button aria-label="切换预览侧栏" title="预览侧栏" aria-pressed={previewEnabled} onClick={()=>{if(detailOpen)closeReading();else setPreviewEnabled(!previewEnabled);}}><PanelRight size={18}/></button>}
       </div>}
     </header>
-    {compactControls&&searchOpen&&<label className="collection-mobile-search"><Search size={16}/><input ref={searchInputRef} aria-label="搜索阅读内容" placeholder="搜索标题、正文或作者…" value={query} onChange={event=>setQuery(event.target.value)}/><button aria-label="关闭搜索" onClick={dismissSearch}><X size={17}/></button></label>}
+    {(runtimeCapabilities.mobile ? !detailOpen : compactControls&&searchOpen)&&<label className="collection-mobile-search"><Search size={16}/><input ref={searchInputRef} aria-label="搜索阅读内容" placeholder="搜索标题、正文或作者…" value={query} onChange={event=>setQuery(event.target.value)}/>{(!runtimeCapabilities.mobile || query) && <button aria-label={runtimeCapabilities.mobile ? "清空阅读搜索" : "关闭搜索"} onClick={dismissSearch}><X size={17}/></button>}</label>}
     </>}
     </div>
     {detailOpen&&compactPreview&&!runtimeCapabilities.mobile&&(toggleReadingNavigation||shellHeader?.actions)&&<header className="collection-detail-desktop-header" onMouseDown={event=>{if(!(event.target as HTMLElement).closest("button, input, select, textarea, a, summary, details, [role=button]"))shellHeader?.onMouseDown(event);}}>{toggleReadingNavigation&&<button className="workspace-panel-toggle" aria-label="切换侧边栏" aria-expanded={shellHeader?.readingNavigationExpanded} onClick={toggleReadingNavigation}><PanelLeft size={18}/></button>}<span>阅读</span><div className="collection-header-tools">{shellHeader?.actions}</div></header>}

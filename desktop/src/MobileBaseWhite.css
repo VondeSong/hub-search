@@ -998,3 +998,16 @@ html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open .pre
 html[data-runtime-platform="android"] .app-shell .aw-shell .bw-filter-form header { margin: 0; }
 html[data-runtime-platform="android"] .app-shell .aw-shell .bw-filter-form header h2 { margin-right: auto; }
 html[data-runtime-platform="android"] .app-shell .aw-shell .bw-task-head .bw-filter-form header button { min-height: 32px; padding-inline: 4px; font-size: 12px; }
+
+.bw-harvest-decision { display: grid; gap: 12px; padding: 16px; background: var(--mobile-surface); color: var(--mobile-ink); }
+.bw-harvest-decision h2,.bw-harvest-receipt h2 { margin: 0; font-size: 21px; line-height: 1.35; }
+.bw-harvest-receipt:has(dl) { display: grid; gap: 12px; padding: 16px; border-radius: 14px; line-height: 1.55; }
+.bw-harvest-receipt dl { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 7px 12px; font-size: 14px; }
+.bw-harvest-receipt :is(dl,dd) { margin: 0; }
+.bw-harvest-receipt :is(dt,small) { color: var(--mobile-secondary); }
+html[data-runtime-platform="android"] .aw-shell .bw-harvest-receipt:has(dl) button { min-height: 44px; background: var(--mobile-ink); color: var(--mobile-surface); border-radius: 10px; }
+.bw-harvest-decision label { display: grid; gap: 5px; font-size: 13px; font-weight: 600; }
+.bw-harvest-decision :is(select,input,textarea) { box-sizing: border-box; width: 100%; min-height: 44px; padding: 8px; border: 1px solid var(--mobile-separator); border-radius: 9px; background: var(--mobile-surface); color: inherit; }
+.bw-harvest-decision blockquote,.bw-harvest-receipt blockquote { margin: 0; padding: 12px; background: var(--mobile-canvas); border-radius: 10px; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.bw-harvest-decision cite,.bw-harvest-receipt cite,.bw-local-detail cite { display: block; font-style: normal; margin-top: 6px; font-size: 12px; color: var(--mobile-secondary); }
+html[data-runtime-platform="android"] .aw-shell .bw-harvest-decision button[type="submit"] { min-height: 44px; border-radius: 10px; background: var(--mobile-ink); color: var(--mobile-surface); }

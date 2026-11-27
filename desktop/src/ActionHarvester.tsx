@@ -1,3 +1,5 @@
+import { MobileHarvestDecision, localHarvestReceipts } from "./MobileHarvestDecision";
+import { mobileTasks } from "./MobileInsightTasks";
 import { createPortal } from "react-dom";
 import { runtimeCapabilities } from "./RuntimePlatform";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -38,6 +40,7 @@ export function ActionHarvester({
   onUpdate,
   onRefresh,
   onSelect,
+  onOpenLocalTask,
   onOpen,
   onCount,
   planFull = false,
@@ -51,6 +54,7 @@ export function ActionHarvester({
   onUpdate: (task: UnifiedTask, change: (m: ActionMeta) => ActionMeta) => Promise<void>;
   onRefresh: () => Promise<unknown>;
   onSelect: (t: UnifiedTask) => void;
+  onOpenLocalTask?: (id:string)=>void;
   onOpen?: (r: SearchResult) => void;
   onCount?: (n: number) => void;
   planFull?: boolean;
@@ -63,9 +67,9 @@ export function ActionHarvester({
     [msg, setMsg] = useState(""),
     [messageKey, setMessageKey] = useState(""),
     [mobileReceipt, setMobileReceipt] = useState<{task: UnifiedTask; linked: boolean} | null>(null),
-    [mobileClue, setMobileClue] = useState(""),
+    [mobileClue, setMobileClue] = useState<string>(()=>runtimeCapabilities.mobile ? window.history.state?.hubHarvestClue || "" : ""),
     [showScanOptions, setShowScanOptions] = useState(false),
-    [opened, setOpen] = useState(false),
+    [opened, setOpen] = useState(()=>runtimeCapabilities.mobile && !!window.history.state?.hubMobileHarvest),
     [target, setTarget] = useState("");
   const [edits, setEdits] = useState<Record<string, string>>({}),
     [panelKey, setPanelKey] = useState(""),
@@ -162,9 +166,13 @@ export function ActionHarvester({
     }
     return [...byOrigin.values()].slice(0, 8);
   }, [day, journals, docs]);
+  const hasLocalTasks = runtimeCapabilities.mobile && !!onOpenLocalTask;
+  const savedLocal = useMemo(() => hasLocalTasks ? localHarvestReceipts(mobileTasks()) : [], [hasLocalTasks, tick, revision]);
+  const handledKeys = new Set(savedLocal.map(row => row.entry.key));
+  const pendingClues = savedLocal.length ? clues.filter(c=>!handledKeys.has(c.key)) : clues;
   useEffect(() => {
-    onCount?.(clues.length);
-  }, [clues.length, onCount]);
+    onCount?.(pendingClues.length);
+  }, [pendingClues.length, onCount]);
   const possibleMatches = useMemo(
     () => new Map(clues.map((c) => [c.key, matchExisting(c, tasks)])),
     [candidates, decisions, deepClues, tasks, excluded],
@@ -392,30 +400,36 @@ export function ActionHarvester({
     const task = tasks.find(t => identity(t) === decision.taskKey);
     return task ? [{key,task}] : [];
   }) : [];
+  const localReceipt = savedLocal.find(r=>r.entry.key===mobileClue);
+  const localDecision = mobileInbox && !!mobileClue && !!onOpenLocalTask && (!writable.length || !!localReceipt);
   const visibleClues = mobileInbox ? clues.filter(c => c.key === mobileClue) : clues.slice(0,limit);
   return (
     <section className={"aw-harvester" + (mobileInbox ? " bw-harvest-open" : "")}
       data-scan-options={showScanOptions}>
       {header && createPortal(<div className="bw-task-subhead">
         <button type="button" aria-label={mobileClue ? "返回候选列表" : "返回任务"} onClick={() => window.history.back()}>‹ 返回</button>
-        <strong>{mobileClue ? "候选详情" : "行动捕手"}</strong>
+        <strong>{mobileClue ? (localReceipt || mobileReceipt ? "采纳回执" : "判断候选") : "行动捕手"}</strong>
       </div>,header)}
       <button className="aw-capture-toggle" aria-expanded={opened} onClick={() => opened && runtimeCapabilities.mobile && window.history.state?.hubMobileHarvest ? window.history.back() : setOpen(!opened)}>
         <strong>
           <Sparkles size={14} aria-hidden="true" />
           <span>
-            行动捕手 · {clues.length} {runtimeCapabilities.mobile && !opened ? "待判断" : "条新线索"}{(!runtimeCapabilities.mobile || opened) && matchCount > 0 && <>（{matchCount} 条可关联已有任务）</>}
+            行动捕手 · {pendingClues.length} {runtimeCapabilities.mobile && !opened ? "待判断" : "条新线索"}{(!runtimeCapabilities.mobile || opened) && matchCount > 0 && <>（{matchCount} 条可关联已有任务）</>}
           </span>
         </strong>
         <small>{opened ? "收起 ▴" : "展开处理 ▾"}</small>
       </button>
       {mobileInbox && !mobileClue && <div className="bw-harvest-index">
-        <h3>待判断 <small>{clues.length}</small></h3>
-        {clues.length === 0 && <p>{receipts.length ? "候选已全部处理" : "暂无待判断的候选"}</p>}
-        {clues.slice(0,limit).map(c => <button key={c.key} type="button" className="bw-clue-row" onClick={() => {
+        <h3>待判断 <small>{pendingClues.length}</small></h3>
+        {pendingClues.length === 0 && <p>{(receipts.length || savedLocal.length) ? "候选已全部处理" : "暂无待判断的候选"}</p>}
+        {pendingClues.slice(0,limit).map(c => <button key={c.key} type="button" className="bw-clue-row" onClick={() => {
           window.history.pushState({...window.history.state,hubHarvestClue:c.key},"");
           setMobileClue(c.key);setMobileReceipt(null);
         }}><strong>{c.title}</strong><span>{c.material.text}</span><small>{c.material.title} ›</small></button>)}
+        {pendingClues.length>limit && <button onClick={()=>setLimit(limit+CLUES_PER_PAGE)}>查看更多候选</button>}
+        {savedLocal.length>0 && <><h3>本机采纳回执 <small>{savedLocal.length}</small></h3>{savedLocal.map(({entry,task})=><button type="button" key={entry.key} className="bw-clue-row" onClick={()=>{
+          window.history.pushState({...window.history.state,hubHarvestClue:entry.key},"");setMobileClue(entry.key);
+        }}><strong>{task.title}</strong><small>{entry.mode==="new"?"新建":"补充"} · {entry.list}</small></button>)}</>}
         {receipts.length > 0 && <><h3>采纳回执 <small>{receipts.length}</small></h3>{receipts.map(({key,task}) =>
           <button type="button" className="bw-clue-row" key={key} onClick={() => onSelect(task)}><strong>{task.title}</strong><small>{task.collectionName || "收件箱"} · 打开任务 ›</small></button>)}</>}
         <button type="button" className="bw-harvest-options" aria-expanded={showScanOptions} onClick={() => setShowScanOptions(!showScanOptions)}>扫描与来源设置</button>
@@ -427,7 +441,8 @@ export function ActionHarvester({
         <button type="button" onClick={() => onSelect(mobileReceipt.task)}>打开对应任务</button>
       </section>}
       {readError && <p role="alert">笔记线索读取失败 · {readError}</p>}
-      {opened && (
+      {localDecision && <MobileHarvestDecision key={mobileClue} clue={visibleClues[0]} receipt={localReceipt} onSaved={()=>setTick(n=>n+1)} onOpen={onOpenLocalTask!}/>}
+      {opened && !localDecision && (
         <>
           {clues.length >= 12 && !excluded.size && (
             <p className="aw-harvester-hint">

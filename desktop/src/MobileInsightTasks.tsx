@@ -5,7 +5,10 @@ import { read, write } from "./ActionState";
 import { useInsights } from "./useInsights";
 import type { Insight } from "./InsightTypes";
 
+import type { HarvestEntry } from "./MobileHarvestDecision";
+
 export type LocalTask = {
+  harvestEntries?: HarvestEntry[];
   list?: string;
   plannedDay?: string;
   waiting?: { who: string; date: string };
@@ -70,6 +73,7 @@ export function MobileLocalTaskDetail({
       <h3>来源与依据</h3>
       <p>{task.source}</p>
       {task.note && <blockquote>{task.note}</blockquote>}
+      {task.harvestEntries?.map(entry=><section key={entry.key}><h3>行动捕手 · {entry.mode==="new"?"新建任务":"补充任务"}</h3>{entry.note && <p>{entry.note}</p>}<blockquote>{entry.quote}<cite>{entry.source}</cite></blockquote></section>)}
       <h3>等待跟进</h3>
       <p>
         {task.waiting
@@ -377,7 +381,7 @@ export function MobileInsightList({
       {!data.loading &&
         !data.items.some(
           (i) => i.processingState === (later ? "later" : "attention"),
-        ) && <p>{later ? "暂无稍后再看的洞察" : "暂无待关注的洞察"}</p>}
+        ) && <p>{later ? "暂无稍后再看的洞察" : data.items.length ? "暂无待关注的洞察" : "本机暂无洞察。可在「更多洞察」中选择已接入的资料，开始发现。"}</p>}
       {data.more && (
         <button onClick={() => void data.refresh(true)}>加载更多</button>
       )}

@@ -517,6 +517,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
     day={day}
     onUpdate={update}
     onRefresh={store.refresh}
+    onOpenLocalTask={mobile ? setLocalId : undefined}
     onSelect={(t) => { if (mobile) setReceiptTask(t); setSelected(identity(t)); }}
     onOpen={onOpenResult}
     onCount={setClueCount}

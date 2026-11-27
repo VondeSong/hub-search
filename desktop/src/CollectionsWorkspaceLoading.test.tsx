@@ -9,6 +9,7 @@ import { clearOperationStatus } from "./useOperationStatus";
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
+vi.mock("./AgentInvestigation", () => ({ ReadingInvestigation: () => <button type="button">询问助手</button> }));
 
 const item = { key: "x:loading-test", collectedAt: 1791763200000, read: false, status: "unread", lifecycle: "active", tags: [], post: { id: "loading-test", text: "读取完成的本地正文", authorName: "本地作者", authorHandle: "fixture", publishedAt: "2026-10-12", url: "https://x.com/fixture/status/loading-test", links: [], media: [], quotedText: "", source: "bookmarks" } };
 const page = { items: [item], total: 814, unread: 814, matched: 814, connected: true, running: false, canResume: false, status: "", sources: [{ id: "bookmarks", count: 753, connected: true, canResume: false, status: "" }, { id: "likes", count: 19, connected: true, canResume: false, status: "" }, { id: "telegram", count: 2, connected: true, canResume: false, status: "" }, { id: "dida", count: 40, connected: true, canResume: false, status: "" }] };
