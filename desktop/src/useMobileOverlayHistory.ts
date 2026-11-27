@@ -63,7 +63,7 @@ export function useMobileOverlayHistory(options: Options) {
       if (state.capture && !event.state?.hubQuickCapture) { state.capture = false; current.setCaptureOpen?.(false); return; }
       if (state.settings && !event.state?.hubSettings) { state.settings = false; current.setSettingsOpen(false); return; }
       if (state.flashcards && !event.state?.hubFlashcards) { state.flashcards = false; current.setFlashcardsOpen(false); return; }
-      if (state.preview && !event.state?.hubMobilePreview) { state.preview = false; current.setPreviewOpen(false); return; }
+      if (state.preview && !event.state?.hubMobilePreview) { state.preview = false; current.setPreviewOpen(false); if(event.state?.hubMobileRoute==="browse") route.current("browse"); return; }
       if (state.filters && !event.state?.hubMobileFilter) { state.filters = false; current.setFiltersOpen(false); return; }
       if (current.consumeSearchBack()) return;
       route.current(event.state?.hubMobileRoute ?? "search");

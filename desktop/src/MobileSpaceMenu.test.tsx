@@ -48,7 +48,7 @@ it.each(["Escape", "hub:native-back", "cancel"])("dismisses the space menu with 
   expect(settings).not.toHaveBeenCalled();
 });
 
-it.each([["资料库", "libraries"], ["连接总览", "connections"], ["外观与阅读", "appearance"], ["设置", "settings"]] as const)("routes %s once and closes the menu", async (label, action) => {
+it.each([["🎯 资料库搜索范围", "libraries"], ["☁️ 双链路连接总览", "connections"], ["外观与阅读", "appearance"], ["设置", "settings"]] as const)("routes %s once and closes the menu", async (label, action) => {
   const callbacks = await open();
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>('.mobile-space-menu nav button')].find(b => b.textContent === label)!.click());
   expect(callbacks[action]).toHaveBeenCalledOnce();
@@ -59,7 +59,7 @@ it("opens the existing quick-capture draft flow without saving a record", async 
   const capture = vi.fn(); window.addEventListener(OPEN_QUICK_JOURNAL, capture);
   try {
     await open();
-    await act(async () => [...document.querySelectorAll<HTMLButtonElement>('.mobile-space-menu nav button')].find(b => b.textContent === "快速速记")!.click());
+    await act(async () => [...document.querySelectorAll<HTMLButtonElement>('.mobile-space-menu nav button')].find(b => b.textContent === "✍️ 记一条速记")!.click());
     expect(capture).toHaveBeenCalledOnce();
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   } finally { window.removeEventListener(OPEN_QUICK_JOURNAL, capture); }

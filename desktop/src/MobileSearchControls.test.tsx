@@ -25,7 +25,7 @@ it("keeps filter changes and reset as drafts, discards them on cancel, then appl
   const props = filters(), scope = vi.fn(), applied = vi.fn();
   function Harness() { const [open, setOpen] = useState(true); return <><button onClick={() => setOpen(!open)}>切换</button>{open && <MobileSearchFilterForm filters={props} onSelectLibraries={scope} onApply={applied}/>}</>; }
   await act(async () => root.render(<Harness/>));
-  await select("日期范围", "30"); await click("重置");
+  await select("日期范围", "30"); await click("重置全库");
   expect(props.setDateFilter).not.toHaveBeenCalled(); expect(scope).not.toHaveBeenCalled();
   await click("切换"); await click("切换");
   expect(host.querySelector<HTMLSelectElement>("select[aria-label='日期范围']")!.value).toBe("7");
@@ -39,7 +39,7 @@ it("keeps filter changes and reset as drafts, discards them on cancel, then appl
 it("retains an explicitly empty library range instead of broadening to all", async () => {
   const props = filters(), scope = vi.fn();
   await act(async () => root.render(<MobileSearchFilterForm filters={props} onSelectLibraries={scope} onApply={vi.fn()}/>));
-  await click("全不选");
+  await click("清空");
   await act(async () => host.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
   expect(scope).toHaveBeenCalledWith([]); expect(props.setFolderId).toHaveBeenCalledWith("");
 });
@@ -84,3 +84,12 @@ it("keeps content synchronization and Agents as distinct connection actions", as
   expect(props.setSourceFilters).toHaveBeenCalledWith(Object.fromEntries(['craft','task','pdf','media','attachment','reading','flashcard'].map(id=>[id,id===key])));
   expect(scope).not.toHaveBeenCalled();expect(props.setDateFilter).not.toHaveBeenCalled();
  });
+
+it("inverts only the selected libraries and keeps advanced filters when restoring the full scope", async () => {
+  const props=filters(), scope=vi.fn(); props.spaces=[...libraries,{...libraries[0],id:"second",name:"第二库"}];props.selectedLibraryIds=["os"];
+  await act(async()=>root.render(<MobileSearchFilterForm filters={props} onSelectLibraries={scope} onApply={vi.fn()}/>));
+  const apply=()=>act(async()=>{host.querySelector("form")!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));});
+  await click("反选");await apply();expect(scope).toHaveBeenLastCalledWith(["second"]);
+  await click("重置全库");await apply();expect(scope).toHaveBeenLastCalledWith(null);
+  expect(props.setDateFilter).toHaveBeenLastCalledWith("7");expect(props.setSearchScope).toHaveBeenLastCalledWith("title");
+});

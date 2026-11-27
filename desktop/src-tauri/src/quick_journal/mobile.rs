@@ -1,15 +1,21 @@
 use super::*;
 #[tauri::command]
-pub(crate) async fn focus_quick_journal_editor(app: AppHandle) -> Result<(), String> {
+pub(crate) async fn focus_quick_journal_editor(
+    app: AppHandle,
+    visible: Option<bool>,
+) -> Result<(), String> {
     #[cfg(target_os = "android")]
     return app
         .state::<AndroidSourceOpener>()
         .0
-        .run_mobile_plugin("focusJournalEditor", json!({}))
+        .run_mobile_plugin(
+            "focusJournalEditor",
+            json!({ "visible": visible.unwrap_or(true) }),
+        )
         .map_err(|e| e.to_string());
     #[cfg(not(target_os = "android"))]
     {
-        let _ = app;
+        let _ = (app, visible);
         Ok(())
     }
 }

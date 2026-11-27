@@ -774,6 +774,7 @@ html[data-runtime-platform="android"] .app-shell .mobile-top-area:has(.bw-search
 }
 html[data-runtime-platform="android"] .app-shell .mobile-top-area:has(.bw-search-types) .mobile-search-compact-filters {
   position: absolute;
+  z-index: 27;
   top: 63px;
   right: 24px;
   height: 32px;
@@ -857,3 +858,143 @@ html[data-runtime-platform="android"] .app-shell .aw-shell .bw-filter-form butto
 }
 .bw-chat-tools button span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .bw-chat-tools svg { flex-shrink: 0; color: var(--mobile-accent); }
+
+/* Phone sheets share the prototype's surface, labels, and action spacing. */
+html[data-runtime-platform="android"] {
+  --bw-muted: #94a3b8;
+  --bw-reader-size: 17px;
+}
+html[data-runtime-platform="android"][data-mobile-reading-size="large"] { --bw-reader-size: 19px; }
+html[data-runtime-platform="android"][data-mobile-theme="paper"] { --bw-muted: #a8a29e; }
+html[data-runtime-platform="android"][data-mobile-theme="black"] { --bw-muted: #94a3b8; }
+html[data-runtime-platform="android"] .collections-workspace.collection-detail-open .collection-detail .preview-content,
+html[data-runtime-platform="android"] .mobile-preview-open .preview-pane .preview-content {
+  font-size: max(var(--bw-reader-size), var(--preview-font-size, 0px));
+  line-height: 1.75;
+}
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.flashcards-android) .mobile-tab-bar button:not([aria-current="page"]) {
+  color: var(--bw-muted);
+}
+html[data-runtime-platform="android"] .mobile-space-menu {
+  padding: 0 0 env(safe-area-inset-bottom,0px);
+  border-radius: 24px 24px 0 0;
+  background: var(--mobile-surface);
+}
+html[data-runtime-platform="android"] .mobile-space-menu::before {
+  content: ""; display: block; margin: 8px auto 0; width: 36px; height: 4px;
+  border-radius: 4px; background: var(--mobile-separator);
+}
+html[data-runtime-platform="android"] .mobile-space-menu header {
+  padding: 10px 16px; border-bottom: 1px solid var(--mobile-separator);
+}
+html[data-runtime-platform="android"] .mobile-space-menu header h2 { font-size: 15px; }
+html[data-runtime-platform="android"] .mobile-space-menu header button {
+  min-height: 30px; color: var(--mobile-secondary); font-size: 13px; font-weight: 600;
+}
+html[data-runtime-platform="android"] .mobile-space-menu nav { display: grid; gap: 6px; padding: 14px 16px; }
+html[data-runtime-platform="android"] .mobile-space-menu h3 {
+  font-size: 11.5px; font-weight: 600; margin: 6px 0 0; color: var(--mobile-secondary);
+}
+.bw-menu-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.bw-menu-grid.three { grid-template-columns: repeat(3,minmax(0,1fr)); }
+html[data-runtime-platform="android"] .mobile-space-menu .bw-menu-grid button {
+  display: block; min-height: 36px; padding: 4px 10px;
+  border: 1px solid var(--mobile-separator); border-radius: 10px; background: var(--mobile-fill);
+  color: var(--mobile-ink); font-size: 12px; line-height: 1.4;
+}
+html[data-runtime-platform="android"] .mobile-space-menu .three button { text-align: center; }
+html[data-runtime-platform="android"] .mobile-space-menu .three button[aria-pressed="true"] {
+  border-color: var(--mobile-accent); background: var(--mobile-selected);
+}
+.mobile-space-menu details { margin-top: 4px; color: var(--mobile-secondary); font-size: 12px; }
+.mobile-space-menu details summary { padding: 5px 0; }
+html[data-runtime-platform="android"] .mobile-quick-capture .mobile-capture-heading {
+  position: static; display: flex; align-items: center; justify-content: space-between; margin: 0 0 8px;
+}
+.mobile-capture-heading h2 { margin: 0; font-size: 21px; color: var(--mobile-ink); }
+html[data-runtime-platform="android"] .mobile-quick-capture .mobile-capture-heading button {
+  position: static; width: auto; min-width: 50px; min-height: 44px; padding-inline: 10px;
+  color: var(--mobile-ink); background: var(--mobile-surface); border: 1px solid var(--mobile-separator); border-radius: 11px;
+}
+.bw-capture-fields, .bw-capture-fields label { display: grid; gap: 6px; }
+.bw-capture-fields { gap: 12px; margin-block: 10px; color: var(--mobile-ink); font-size: 13px; }
+.bw-capture-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.bw-capture-tags button, .bw-capture-fields input {
+  min-height: 44px; border: 1px solid var(--mobile-separator); border-radius: 11px;
+  background: var(--mobile-surface); color: var(--mobile-ink); padding: 6px 10px;
+}
+.bw-capture-tags button[aria-pressed="true"] { background: var(--mobile-ink); color: var(--mobile-surface); }
+.bw-scope-libraries header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.bw-scope-libraries header div { display: flex; flex-wrap: wrap; }
+.bw-scope-libraries header strong { font-size: 12px; }
+.bw-scope-libraries header button { border: 0; background: transparent; color: var(--mobile-accent); min-height: 36px; padding-inline: 7px; }
+.bw-scope-libraries > label { display: flex; align-items: center; gap: 10px; min-height: 44px; border-bottom: 1px solid var(--mobile-separator); }
+.bw-scope-libraries input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--mobile-accent); }
+.bw-scope-more summary { padding: 10px 0; font-size: 13px; color: var(--mobile-secondary); }
+.mobile-search-filter-form footer > div { width: 100%; }
+.mobile-search-filter-form footer button { flex: 1; }
+.mobile-search-filter-form footer button[type="submit"] { flex: 2; }
+html[data-runtime-platform="android"] .bw-compose h3 { margin: 0; font-size: 21px; }
+html[data-runtime-platform="android"] .bw-compose :is(input:not([type="checkbox"]), button) { min-height: 44px; }
+html[data-runtime-platform="android"] .bw-compose button:last-child { background: var(--mobile-ink); color: var(--mobile-surface); }
+
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell { overflow: clip; }
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell > .mobile-navigation-footer,.flashcards-workspace.flashcards-android > .flashcards-mobile-nav) {
+  height: calc(68px + env(safe-area-inset-bottom)); padding: 5px 8px calc(16px + env(safe-area-inset-bottom)); box-sizing: border-box;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .bw-fab { bottom: calc(76px + env(safe-area-inset-bottom)); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:not(.mobile-keyboard-open) .main-content-override:has(.cloud-agents.is-mobile) { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-task-head h2 { margin: 0; }
+html[data-runtime-platform="android"] .mobile-quick-capture .bw-capture-fields { order: 2; }
+html[data-runtime-platform="android"] .mobile-quick-capture .journal-rich-editor {
+  padding: 10px 12px; min-height: 112px; max-height: min(35dvh,232px);
+  background: var(--mobile-fill); border: 1px solid var(--mobile-separator); border-radius: 10px; font-size: 15px;
+}
+html[data-runtime-platform="android"] .mobile-quick-capture .bw-capture-fields label { display: grid; }
+html[data-runtime-platform="android"] .mobile-quick-capture .bw-capture-fields input { width: 100%; }
+.bw-task-sheet[open]::before {
+  content: ""; display: block; margin: -6px auto 12px; width: 36px; height: 4px; border-radius: 4px; background: var(--mobile-separator);
+}
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-filter-form label select { width: 100%; min-width: 0; }
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-task-head .bw-filter-form header button { background: transparent; color: var(--mobile-secondary); border: 0; }
+html[data-runtime-platform="android"] .mobile-hub-header:has(.bw-task-subhead) > :not(.bw-task-subhead) { display: none; }
+.bw-task-subhead { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; width: 100%; }
+html[data-runtime-platform="android"] .app-shell .mobile-hub-header .bw-task-subhead button {
+  justify-self: start; background: transparent; border: 0; color: var(--mobile-accent); font-weight: 600; min-height: 44px;
+}
+.bw-task-subhead strong { font-size: 16px; }
+html[data-runtime-platform="android"] .app-shell:has(.bw-task-subhead) .bw-harvest-open > .aw-capture-toggle,
+html[data-runtime-platform="android"] .bw-harvest-open[data-scan-options="false"] > :is(.aw-harvester-hint,.aw-harvester-sources,.aw-harvester-source-panel),
+html[data-runtime-platform="android"] .bw-harvest-open[data-scan-options="false"]:has(.bw-harvest-index) > .aw-clue-footer,
+html[data-runtime-platform="android"] .bw-harvest-open:has(.bw-harvest-index) .aw-clue-list:empty { display:none; }
+.bw-harvest-index h3 { font-size: 15px; margin: 10px 0 7px; }
+.bw-harvest-index small,.bw-harvest-index p { font-size: 12px; color: var(--mobile-secondary); }
+html[data-runtime-platform="android"] .aw-shell .bw-clue-row {
+  display: grid; width: 100%; text-align: left; gap: 6px; padding: 12px 14px; margin: 0 0 6px; border: 1px solid var(--mobile-separator);
+  background: var(--mobile-surface); color: var(--mobile-ink); border-radius: 13px; white-space: normal;
+}
+.bw-clue-row span { font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; font-weight: 400; }
+
+.bw-doc-actions { flex: 0 0 auto; padding: 9px 12px max(20px,env(safe-area-inset-bottom)); border-top: 1px solid var(--mobile-separator); background: var(--mobile-surface); }
+.bw-doc-actions nav { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 6px; }
+.bw-doc-actions nav button { display: flex; align-items: center; justify-content: center; gap: 4px; height: 36px; border: 1px solid var(--mobile-separator); border-radius: 10px; color: var(--mobile-ink); background: var(--mobile-surface); font: inherit; font-size: 11.5px; font-weight: 600; }
+.bw-doc-actions nav svg { width: 13px; height: 13px; color: var(--mobile-accent); }
+.bw-doc-actions nav button:nth-child(2) svg { color: #059669; }
+.bw-doc-actions nav button:nth-child(3) svg { color: #d97706; }
+.bw-doc-actions nav button:nth-child(4) svg { color: #7c3aed; }
+.bw-doc-actions p { font-size: 12px; margin: 0 0 5px; }
+
+.bw-connections-sheet header small,.bw-connection-cards small { color: var(--mobile-secondary); font-size: 12px; }
+.bw-connection-cards { padding: 14px 16px; display: grid; gap: 12px; }
+html[data-runtime-platform="android"] .bw-connection-cards button { display: grid; grid-template-columns: 1fr auto; text-align: left; align-items: center; padding: 14px 12px; border: 1px solid var(--mobile-separator); border-radius: 14px; color: var(--mobile-ink); background: var(--mobile-surface); font-size: 13px; gap: 8px 4px; }
+.bw-connection-cards b { color: var(--mobile-accent); font-size: 11px; }
+.bw-connection-cards small { grid-column: 1/-1; }
+html[data-runtime-platform="android"] .bw-connection i[data-ready="true"]:first-child { background: #49af86; }
+html[data-runtime-platform="android"] .bw-connection i[data-ready="true"]:nth-child(2) { background: var(--mobile-accent); }
+
+html[data-runtime-platform="android"] .app-shell .bw-filter-form label { grid-template-columns: minmax(0,1fr); justify-content: stretch; }
+html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open .preview-actions > :is(.bw-reader-font,.preview-favorite-btn) { display: inline-flex !important; align-items: center; justify-content: center; min-width: 40px; height: 44px; }
+
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-filter-form header { margin: 0; }
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-filter-form header h2 { margin-right: auto; }
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-task-head .bw-filter-form header button { min-height: 32px; padding-inline: 4px; font-size: 12px; }

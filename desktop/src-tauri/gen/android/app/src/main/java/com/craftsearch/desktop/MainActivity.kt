@@ -17,6 +17,7 @@ class MainActivity : TauriActivity() {
   private external fun activityLifecycle(instance: Int, stage: Int)
   private var hubWebView: WebView? = null
   private var pendingJournalKeyboard = false
+  private var journalKeyboardGeneration = 0
 
   override fun onWebViewCreate(webView: WebView) {
     super.onWebViewCreate(webView)
@@ -86,7 +87,14 @@ class MainActivity : TauriActivity() {
     }
   }
 
+  internal fun dismissJournalKeyboard() {
+    pendingJournalKeyboard = false
+    journalKeyboardGeneration++
+    hubWebView?.let { WindowInsetsControllerCompat(window, it).hide(WindowInsetsCompat.Type.ime()) }
+  }
+
   internal fun requestJournalKeyboard(done: () -> Unit) {
+    val generation = ++journalKeyboardGeneration
     val web = hubWebView
     if (web == null || !hasWindowFocus()) { pendingJournalKeyboard = true; done(); return }
     pendingJournalKeyboard = false
@@ -101,7 +109,7 @@ class MainActivity : TauriActivity() {
           return document.activeElement === editor;
         })()
       """.trimIndent()) { editing ->
-        if (editing == "true" && hasWindowFocus()) {
+        if (generation == journalKeyboardGeneration && editing == "true" && hasWindowFocus()) {
           val manager = getSystemService(android.view.inputmethod.InputMethodManager::class.java)
           if (!manager.isActive(web)) manager.restartInput(web)
           WindowInsetsControllerCompat(window, web).show(WindowInsetsCompat.Type.ime())

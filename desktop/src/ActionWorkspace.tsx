@@ -220,7 +220,8 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
       : topics.filter((t) => pins.includes(t.key));
   const [mobileList,setMobileList]=useState("");
   const [mobileSource, setMobileSource] = useState("");
-  const localListRows = localRows.filter(t => (!mobileList || mobileList === (t.list || "本机任务")) && (!mobileSource || mobileSource === t.source));
+  const localSource = (task: typeof localRows[number]) => task.id.startsWith("document:") ? "原文转化" : task.source;
+  const localListRows = localRows.filter(t => (!mobileList || mobileList === (t.list || "本机任务")) && (!mobileSource || mobileSource === localSource(t)));
   const scoped = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query && !project && !mobileList && !mobileSource) return tasks;
@@ -605,7 +606,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
           <div className="bw-task-tools">
             <MobileTaskFilter source={mobileSource} list={mobileList}
               options={[...tasks.map(t => ({source: providerName(t.provider), list: topicOf(t).name})),
-                ...localRows.map(t => ({source: t.source, list: t.list || "本机任务"}))]}
+                ...localRows.map(t => ({source: localSource(t), list: t.list || "本机任务"}))]}
               onApply={(source, list) => {setMobileSource(source); setMobileList(list);}}
               onSources={onSources}/>
             {harvester}
@@ -685,7 +686,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
           )}
           {selectedLibraryIds && <button onClick={onClearLibraryScope}>清除资料库范围</button>}
           {store.loading && !tasks.length && <p>正在读取滴答任务…</p>}
-          {mobile && compose && <MobileTaskForm onCancel={closeDetail} onSave={task=>{setCompose(false);setLocalId(task.id);bump();}}/>}
+          {mobile && compose && <MobileTaskForm initialList={mobileList} onCancel={closeDetail} onSave={task=>{setCompose(false);setLocalId(task.id);bump();}}/>}
           {!mobile && !project && view !== "done" && quickEntry}
           {project ? (
             <ActionTopic

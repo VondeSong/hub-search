@@ -127,6 +127,7 @@ describe("行动工作台", () => {
       await render(<ActionHarvester tasks={[]} journals={[journal]} scope={null} libraries={[dida]} day={day}
         onUpdate={async () => {}} onRefresh={async () => {}} onSelect={selected} revision={0}/>);
       await click(button("行动捕手"));
+      await click(host.querySelector<HTMLButtonElement>(".bw-clue-row")!);
       await click(button("＋ 采纳到待办"));
       await click(button("确认采纳到待办"));
       const receipt = host.querySelector('[aria-label="处理回执"]');

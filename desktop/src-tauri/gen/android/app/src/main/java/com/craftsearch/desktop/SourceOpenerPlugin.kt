@@ -22,6 +22,9 @@ import app.tauri.PermissionState
 class JournalVoiceArgs { lateinit var action: String; var token: String = ""; var offset: Long = 0 }
 
 @InvokeArg
+class JournalKeyboardArgs { var visible: Boolean = true }
+
+@InvokeArg
 class SourceOpenArgs { lateinit var url: String }
 
 @InvokeArg
@@ -165,8 +168,14 @@ class SourceOpenerPlugin(initialActivity: Activity) : Plugin(initialActivity) {
     }
     @Command
     fun focusJournalEditor(invoke: Invoke) {
+        val visible = invoke.parseArgs(JournalKeyboardArgs::class.java).visible
         activity.runOnUiThread {
-            (activity as? MainActivity)?.requestJournalKeyboard { invoke.resolve() } ?: invoke.resolve()
+            val main = activity as? MainActivity
+            if (visible && main != null) main.requestJournalKeyboard { invoke.resolve() }
+            else {
+                main?.dismissJournalKeyboard()
+                invoke.resolve()
+            }
         }
     }
     @Command

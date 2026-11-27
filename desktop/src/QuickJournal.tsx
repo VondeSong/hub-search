@@ -98,12 +98,13 @@ export function QuickJournalCard({ item, mobile, onTag, onPreview, timeline = fa
   </article>;
 }
 export type QuickJournalSaved = { id: string; date: string; notice: string };
-export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all", captureDate, inlineCapture, desktopComposer, onCancelCapture, onDraftEdited, onSaved, onSyncSettings, onViewChange }: {
+export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all", captureDate, inlineCapture, desktopComposer, citation, onCancelCapture, onDraftEdited, onSaved, onSyncSettings, onViewChange }: {
   libraries: LibrarySummary[]; scope: string[] | null; view: JournalViewConfig; dataVersion: string;
   mode?: "all" | "compose" | "feed" | "settings" | "calendar";
   captureDate?:string;
   inlineCapture?: "top" | "day";
   desktopComposer?: boolean;
+  citation?: string;
   onCancelCapture?: () => void;
   onDraftEdited?: () => void;
   onSaved?: (record: QuickJournalSaved) => void;
@@ -136,6 +137,14 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
     draftWrites = draftWrites.catch(() => {}).then(() => invoke<void>("save_quick_journal_draft", { draft: JSON.stringify(value), ...(slot?{slot}:{}) }));
     void draftWrites.then(() => { if (mounted.current && sequence === draftSequence.current) setDraftStatus("草稿已保存"); }).catch(e => { if (mounted.current) setError(`草稿保存失败：${message(e)}`); });
   };
+  const insertedCitation = useRef("");
+  const addedTags = useRef(new Map<string,{before:string;after:string}>());
+  useEffect(() => {
+    if (!ready || !citation || insertedCitation.current === citation) return;
+    insertedCitation.current = citation;
+    const current = draftLatest.current;
+    persist({...current, text:[current.text,citation].filter(Boolean).join("\n\n")});
+  },[ready,citation]);
   async function refresh() {
     const result = await invoke<{ items: Item[]; error: string }>("list_quick_journal");
     if (mounted.current) { setItems(result.items); setListError(result.error || ""); }
@@ -287,6 +296,24 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
       <button type="button" onClick={recording.cancel}>取消</button>
       {recording.state==="recording"&&<button type="button" onClick={recording.finish}>完成录音</button>}
     </div>}
+    {mobile && mode === "compose" && <div className="bw-capture-fields">
+      <div className="bw-capture-tags" aria-label="速记标签">{["#架构思考", "#闪念", "#阅读摘录", "#待验证"].map(tag => {
+        const pattern = new RegExp("(^|\\s)" + tag + "(?=\\s|$)", "gu");
+        const selected = pattern.test(draft.text);
+        return <button key={tag} type="button" aria-pressed={selected} disabled={!ready || saving} onClick={() => {
+          const current = draftLatest.current;
+          const added = addedTags.current.get(tag);
+          const text = selected
+            ? added?.after === current.text ? added.before : current.text.replace(pattern, "$1")
+            : current.text + (current.text && !/\s$/.test(current.text) ? " " : "") + tag;
+          if (selected) addedTags.current.delete(tag);
+          else addedTags.current.set(tag,{before:current.text,after:text});
+          persist({...current, text});
+        }}>{tag}</button>;
+      })}</div>
+      <label>归属日期<input type="date" aria-label="归属日期" required value={draft.date} disabled={!ready || saving}
+        onChange={e => {if(e.target.value) persist({...draftLatest.current, date:e.target.value});}}/></label>
+    </div>}
     <footer>
       {desktopComposer?desktopTools:mode==="calendar"?<div className="quick-journal-compose-tools">{([["tag",Hash,"插入标签"],["attach",ImagePlus,"照片 / 附件"],["list",List,"插入项目符号"],["number",ListOrdered,"插入编号列表"],["quote",Quote,"插入引用"],["task",SquareCheck,"插入任务"]] as const).map(([kind,Icon,label])=><button key={kind} type="button" aria-label={label} disabled={!ready||saving||uploading} onClick={()=>kind==="attach"?fileInput.current?.click():insert(kind)}><Icon size={18}/></button>)}</div>:mobile ? <div className="quick-journal-compose-tools"><button type="button" aria-label="插入标签" disabled={!ready || saving} onClick={() => insert("tag")}><Hash size={22} /></button><button type="button" aria-label="添加照片" disabled={!ready || saving || uploading} onClick={() => photoInput.current?.click()}><ImagePlus size={22} /></button><button type="button" aria-label="更多记录选项" aria-expanded={moreOpen} onClick={() => setMoreOpen(!moreOpen)}><MoreHorizontal size={22} /></button></div> : <label>日期<input type="date" value={draft.date} disabled={!ready || saving} onChange={e => persist({ ...draftLatest.current, date: e.target.value })} /></label>}
       <input ref={fileInput} className="sr-only" type="file" multiple tabIndex={-1} onChange={e => { void attach(e.target.files); }} />
@@ -296,7 +323,7 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
       {desktopComposer&&<span className="journal-compose-count" aria-label="正文字数">{draft.text.length}</span>}
       <button type="submit" disabled={!ready || saving || uploading || recording.state !== "idle" || (!draft.text.trim() && !draft.attachments.length) || (mode==="calendar"&&!capture.text.trim()&&!capture.tasks.length&&!draft.attachments.length)}><Send size={desktopComposer ? 13 : 17} />{saving ? "保存中…" : inlineCapture === "day" ? "写入当日" : inlineCapture === "top" ? "记录" : mode==="calendar"?"创建":"记下"}</button>
     </footer>
-    {mobile && moreOpen && <div className="quick-journal-more"><label>记录日期<input type="date" aria-label="记录日期" value={draft.date} disabled={!ready || saving} onChange={e => persist({ ...draftLatest.current, date: e.target.value })} /></label><div><button type="button" disabled={!ready || saving || uploading} onClick={() => fileInput.current?.click()}><Paperclip size={17} />添加文件</button>{mode!=="compose"&&<><button type="button" disabled={!ready || saving} onClick={() => insert("bold")}><Bold size={17} />加粗</button><button type="button" disabled={!ready || saving} onClick={() => insert("list")}><List size={17} />列表</button></>}</div><small>每条最多 9 个附件，单个 20 MB。</small></div>}
+    {mobile && moreOpen && <div className="quick-journal-more">{mode!=="compose" && <label>记录日期<input type="date" aria-label="记录日期" value={draft.date} disabled={!ready || saving} onChange={e => persist({ ...draftLatest.current, date: e.target.value })} /></label>}<div><button type="button" disabled={!ready || saving || uploading} onClick={() => fileInput.current?.click()}><Paperclip size={17} />添加文件</button>{mode!=="compose"&&<><button type="button" disabled={!ready || saving} onClick={() => insert("bold")}><Bold size={17} />加粗</button><button type="button" disabled={!ready || saving} onClick={() => insert("list")}><List size={17} />列表</button></>}</div><small>每条最多 9 个附件，单个 20 MB。</small></div>}
     {mobile && <div className="quick-journal-draft-status"><span role="status">{uploading ? "正在保存附件…" : draftStatus}</span><button type="button" onClick={() => setMoreOpen(!moreOpen)}><CalendarDays size={13} />{draft.date === localJournalDate() ? "今天" : draft.date}</button></div>}
   </form>;
   return <section className={`quick-journal quick-journal-${mode}`} aria-label={mode === "compose" ? "速记录入" : mode === "settings" ? "速记同步" : "速记卡片流"}>

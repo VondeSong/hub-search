@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { runtimeCapabilities } from "./RuntimePlatform";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Hourglass, Link2, Sparkles } from "lucide-react";
@@ -62,6 +63,8 @@ export function ActionHarvester({
     [msg, setMsg] = useState(""),
     [messageKey, setMessageKey] = useState(""),
     [mobileReceipt, setMobileReceipt] = useState<{task: UnifiedTask; linked: boolean} | null>(null),
+    [mobileClue, setMobileClue] = useState(""),
+    [showScanOptions, setShowScanOptions] = useState(false),
     [opened, setOpen] = useState(false),
     [target, setTarget] = useState("");
   const [edits, setEdits] = useState<Record<string, string>>({}),
@@ -376,13 +379,27 @@ export function ActionHarvester({
     if (!runtimeCapabilities.mobile || !opened) return;
     if (!window.history.state?.hubMobileHarvest) window.history.pushState({...window.history.state,hubMobileHarvest:true},"");
     const pop=(event:PopStateEvent)=>{
-      if(!event.state?.hubMobileHarvest){event.stopImmediatePropagation();setOpen(false);}
+      if(!event.state?.hubMobileHarvest){event.stopImmediatePropagation();setOpen(false);setMobileClue("");setMobileReceipt(null);setShowScanOptions(false);}
+      else if(mobileClue && !event.state?.hubHarvestClue){event.stopImmediatePropagation();setMobileClue("");setMobileReceipt(null);}
     };
     window.addEventListener("popstate",pop,true);
     return ()=>window.removeEventListener("popstate",pop,true);
-  },[opened]);
+  },[opened,mobileClue]);
+  const mobileInbox = runtimeCapabilities.mobile && opened;
+  const header = mobileInbox ? document.querySelector(".mobile-hub-header") : null;
+  const receipts = mobileInbox && !mobileClue ? Object.entries(decisions).flatMap(([key, decision]) => {
+    if (decision.state !== "linked" || !decision.taskKey) return [];
+    const task = tasks.find(t => identity(t) === decision.taskKey);
+    return task ? [{key,task}] : [];
+  }) : [];
+  const visibleClues = mobileInbox ? clues.filter(c => c.key === mobileClue) : clues.slice(0,limit);
   return (
-    <section className="aw-harvester">
+    <section className={"aw-harvester" + (mobileInbox ? " bw-harvest-open" : "")}
+      data-scan-options={showScanOptions}>
+      {header && createPortal(<div className="bw-task-subhead">
+        <button type="button" aria-label={mobileClue ? "返回候选列表" : "返回任务"} onClick={() => window.history.back()}>‹ 返回</button>
+        <strong>{mobileClue ? "候选详情" : "行动捕手"}</strong>
+      </div>,header)}
       <button className="aw-capture-toggle" aria-expanded={opened} onClick={() => opened && runtimeCapabilities.mobile && window.history.state?.hubMobileHarvest ? window.history.back() : setOpen(!opened)}>
         <strong>
           <Sparkles size={14} aria-hidden="true" />
@@ -392,6 +409,17 @@ export function ActionHarvester({
         </strong>
         <small>{opened ? "收起 ▴" : "展开处理 ▾"}</small>
       </button>
+      {mobileInbox && !mobileClue && <div className="bw-harvest-index">
+        <h3>待判断 <small>{clues.length}</small></h3>
+        {clues.length === 0 && <p>{receipts.length ? "候选已全部处理" : "暂无待判断的候选"}</p>}
+        {clues.slice(0,limit).map(c => <button key={c.key} type="button" className="bw-clue-row" onClick={() => {
+          window.history.pushState({...window.history.state,hubHarvestClue:c.key},"");
+          setMobileClue(c.key);setMobileReceipt(null);
+        }}><strong>{c.title}</strong><span>{c.material.text}</span><small>{c.material.title} ›</small></button>)}
+        {receipts.length > 0 && <><h3>采纳回执 <small>{receipts.length}</small></h3>{receipts.map(({key,task}) =>
+          <button type="button" className="bw-clue-row" key={key} onClick={() => onSelect(task)}><strong>{task.title}</strong><small>{task.collectionName || "收件箱"} · 打开任务 ›</small></button>)}</>}
+        <button type="button" className="bw-harvest-options" aria-expanded={showScanOptions} onClick={() => setShowScanOptions(!showScanOptions)}>扫描与来源设置</button>
+      </div>}
       {opened && mobileReceipt && !busy && <section className="bw-harvest-receipt" aria-label="处理回执" aria-live="polite">
         <strong>{mobileReceipt.linked ? "补充任务回执" : "新建任务回执"}</strong>
         <p>{mobileReceipt.task.title} · {mobileReceipt.task.collectionName || "收件箱"}</p>
@@ -457,7 +485,7 @@ export function ActionHarvester({
             </div>
           )}
           <div className="aw-clue-list">
-            {clues.slice(0, limit).map((c) => {
+            {visibleClues.map((c) => {
               const actionStatus = messageKey === c.key && (busy || msg) && (
                 <p role="status">{busy ? "正在处理…" : msg}</p>
               );

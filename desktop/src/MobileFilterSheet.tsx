@@ -84,7 +84,7 @@ export function MobileFilterSheet({ open, onClose, children, draft = false }: { 
         }}
         onPointerCancel={() => { motion.current.dragging = false; settle(openRef.current ? 0 : motion.current.height); }}
       ><span /></div>
-      <header className="mobile-filter-heading"><h2 id="mobile-filter-title">搜索筛选</h2><button type="button" data-modal-initial-focus onClick={onClose}>{draft ? "取消" : "完成"}</button></header>
+      <header className="mobile-filter-heading"><h2 id="mobile-filter-title">{draft ? "选择搜索资料范围" : "搜索筛选"}</h2><button type="button" data-modal-initial-focus onClick={onClose}>{draft ? "取消" : "完成"}</button></header>
       {!draft && <p className="mobile-filter-description">选择后即生效</p>}
       {children}
     </section>

@@ -56,6 +56,17 @@ export function MobileSearchFilterForm({ filters, onSelectLibraries, onApply }: 
   }}>
     <div className="mobile-filter-body">
       <p>仅筛选本机已建立索引的内容，不会向 Agents 授权资料。</p>
+      <section className="bw-scope-libraries" aria-label="资料范围">
+        <header><strong>已选 {libraries?.length ?? filters.spaces.length} / {filters.spaces.length} 个资料库</strong>
+          <div><button type="button" onClick={() => {setLibraries(null); setFolder("");}}>全选</button>
+          <button type="button" onClick={() => {setLibraries(filters.spaces.filter(lib => libraries !== null && !libraries.includes(lib.id)).map(lib => lib.id)); setFolder("");}}>反选</button>
+          <button type="button" onClick={() => {setLibraries([]); setFolder("");}}>清空</button></div>
+        </header>
+        {!filters.spaces.length && <p>暂无已接入的资料库</p>}
+        {filters.spaces.map(library => <label key={library.id}><input type="checkbox" checked={libraries === null || libraries.includes(library.id)} onChange={() => toggleLibrary(library)}/><span>{library.name}</span></label>)}
+        {!!filters.folders.length && <label>文件夹<select aria-label="文件夹范围" value={folder} onChange={event => setFolder(event.target.value)}><option value="">全部文件夹</option>{filters.folders.filter(item => libraries === null || libraries.includes(item.spaceId)).map(item => <option key={`${item.spaceId}\u0000${item.id}`} value={`${item.spaceId}\u0000${item.id}`}>{item.libraryName} / {item.path}</option>)}</select></label>}
+      </section>
+      <details className="bw-scope-more"><summary>更多搜索筛选</summary>
       <label>内容类型<select aria-label="内容类型" value={selectedType} onChange={event => setSources(event.target.value === "all" ? { ...allTypes } : Object.fromEntries(types.map(([key]) => [key, key === event.target.value])) as SourceFilters)}>
         <option value="all">全部类型</option>{selectedType === "custom" && <option value="custom">自定义类型（保留原筛选）</option>}{types.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
       </select></label>
@@ -63,13 +74,8 @@ export function MobileSearchFilterForm({ filters, onSelectLibraries, onApply }: 
         <label>日期范围<select aria-label="日期范围" value={date} onChange={event => setDate(event.target.value as typeof date)}><option value="any">不限日期</option><option value="7">近 7 天</option><option value="30">近 30 天</option><option value="90">近 90 天</option></select></label>
         <label>匹配位置<select aria-label="匹配位置" value={scope} onChange={event => setScope(event.target.value as typeof scope)}><option value="all">全部字段</option><option value="title">仅名称</option><option value="title_heading">名称与章节</option></select></label>
       </div>
-      <details className="mobile-filter-libraries"><summary><strong>资料范围</strong><span>{libraries === null ? "全部资料库" : libraries.length ? `已选 ${libraries.length} 个资料库` : "未选择资料库"}</span></summary>
-        <div className="mobile-filter-library-actions"><button type="button" onClick={() => { setLibraries(null); setFolder(""); }}>全选</button><button type="button" onClick={() => { setLibraries([]); setFolder(""); }}>全不选</button></div>
-        {!filters.spaces.length && <p>暂无已接入的资料库，可从浏览页添加。</p>}
-        {filters.spaces.map(library => <label key={library.id}><input type="checkbox" checked={libraries === null || libraries.includes(library.id)} onChange={() => toggleLibrary(library)} /><span>{library.name}</span></label>)}
-        {!!filters.folders.length && <label>文件夹<select aria-label="文件夹范围" value={folder} onChange={event => setFolder(event.target.value)}><option value="">全部文件夹</option>{filters.folders.filter(item => libraries === null || libraries.includes(item.spaceId)).map(item => <option key={`${item.spaceId}\u0000${item.id}`} value={`${item.spaceId}\u0000${item.id}`}>{item.libraryName} / {item.path}</option>)}</select></label>}
       </details>
     </div>
-    <footer><span>{libraries === null ? "全部资料库" : `已选 ${libraries.length} 个资料库`} · 应用后生效</span><div><button type="button" onClick={() => { setDate("any"); setScope("all"); setSources({ ...allTypes }); setLibraries(null); setFolder(""); }}>重置</button><button type="submit">应用筛选</button></div></footer>
+    <footer><div><button type="button" onClick={() => { setLibraries(null); setFolder(""); }}>重置全库</button><button type="submit">应用范围 ({libraries?.length ?? filters.spaces.length}/{filters.spaces.length} 库)</button></div></footer>
   </form>;
 }

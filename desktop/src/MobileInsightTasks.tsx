@@ -122,14 +122,17 @@ export function MobileLocalTaskDetail({
   );
 }
 export function MobileTaskForm({
+  initialList = "本机任务", origin,
   onSave,
   onCancel,
 }: {
+  initialList?: string;
+  origin?: Pick<LocalTask,"id"|"title"|"source"|"note">;
   onSave: (task: LocalTask) => void;
   onCancel: () => void;
 }) {
-  const [title, setTitle] = useState(""),
-    [list, setList] = useState("本机任务"),
+  const [title, setTitle] = useState(origin ? "跟进《"+origin.title+"》" : ""),
+    [list, setList] = useState(initialList || "本机任务"),
     [planned, setPlanned] = useState(true),
     [error, setError] = useState("");
   const request = useRef(crypto.randomUUID()),
@@ -142,7 +145,7 @@ export function MobileTaskForm({
   return (
     <dialog
       ref={dialog}
-      aria-label="新建本机任务"
+      aria-label={origin ? "从原文创建任务" : "新建本机任务"}
       className="bw-task-sheet"
       onCancel={(e) => {
         e.preventDefault();
@@ -155,12 +158,12 @@ export function MobileTaskForm({
           e.preventDefault();
           if (!title.trim() || !list.trim()) return;
           const task = {
-            id: request.current,
+            id: origin?.id || request.current,
             title: title.trim(),
-            note: "",
+            note: origin?.note || "",
             list: list.trim(),
             plannedDay: planned ? todayKey() : "",
-            source: "本机新建",
+            source: origin?.source || "本机新建",
             created: Date.now(),
             done: false,
           };
@@ -172,11 +175,11 @@ export function MobileTaskForm({
           }
         }}
       >
-        <h3>新建本机任务</h3>
+        <h3 tabIndex={-1} autoFocus>{origin ? "从原文创建任务" : "新建本机任务"}</h3>
+        {origin && <p>来源 · {origin.title}</p>}
         <label>
           任务名称
           <input
-            autoFocus
             required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -449,7 +452,7 @@ export function MobileTaskFilter({ source, list, options, onApply, onSources }: 
     }}>{[source, list].filter(Boolean).join(" · ") || "全部来源与清单"} ▾</button>
     <dialog ref={dialog} className="bw-task-sheet" aria-label="筛选任务">
       <form method="dialog" className="bw-filter-form" onSubmit={() => onApply(draftSource, draftList)}>
-        <header><h2>筛选任务</h2><button type="button" onClick={() => dialog.current?.close()}>取消</button></header>
+        <header><h2>筛选任务</h2><button type="button" onClick={() => {dialog.current?.close(); onSources();}}>查看来源任务</button><button type="button" onClick={() => dialog.current?.close()}>取消</button></header>
         <label>来源<select value={draftSource} onChange={event => {setSource(event.target.value); setList("");}}>
           <option value="">全部来源</option>{sources.map(s => <option key={s}>{s}</option>)}
         </select></label>
@@ -457,7 +460,6 @@ export function MobileTaskFilter({ source, list, options, onApply, onSources }: 
           <option value="">全部清单</option>{lists.map(l => <option key={l}>{l}</option>)}
         </select></label>
         <button type="submit">应用筛选</button>
-        <button type="button" onClick={() => {dialog.current?.close(); onSources();}}>查看来源任务</button>
       </form>
     </dialog>
   </>;

@@ -27,6 +27,7 @@ import { userProfileStorage } from "./UserProfileStorage";
 import { SharedTaskPreviewStatus } from "./SharedTaskPreviewStatus";
 import { isTaskPreviewResult } from "./TaskResultIdentity";
 import type { SearchProvider } from "./ProviderLabels";
+import { MobileReaderFontButton } from "./MobileAppearance";
 import { runtimeCapabilities } from "./RuntimePlatform";
 import { PreviewThemePicker, usePreviewTheme } from "./PreviewTheme";
 import { PdfPreviewPanel } from "./PdfPreviewPanel";
@@ -77,6 +78,7 @@ export type PreviewPaneProps = {
   ocrImagePreview: OcrImagePreview | null;
   previewLoading: boolean;
   previewMarkdown?: string | null;
+  mobileDock?: ReactNode;
   renderedPreviewMarkdown: ReactNode;
   onOpenLink: (href?: string) => void;
   previewCard: RefObject<HTMLElement | null>;
@@ -126,6 +128,7 @@ export const PreviewPane = memo(function PreviewPane({
   previewLoading,
   previewMarkdown,
   renderedPreviewMarkdown,
+  mobileDock,
   onOpenLink,
   previewCard,
   startWindowDrag,
@@ -206,6 +209,7 @@ export const PreviewPane = memo(function PreviewPane({
               openDisabled={!canOpenSource} onOpen={() => openSelectedResult(selected, "preview")}
             >
                   <button className="mobile-preview-back" title="返回结果列表" onClick={onCloseMobilePreview}><ChevronLeft size={20} /><span>返回</span></button>
+                  {runtimeCapabilities.mobile && mobileDock && <MobileReaderFontButton/>}
                   {previewMatchCount > 0 && <>
                     <span className="match-counter" aria-label={`第 ${previewMatchIndex + 1} 个命中，共 ${previewMatchCount} 个`}>{previewMatchIndex + 1}/{previewMatchCount}</span>
                     <button title="上一个命中" aria-label="上一个命中" onClick={() => navigatePreviewMatch(-1)}><ChevronUp size={16} /></button>
@@ -229,7 +233,7 @@ export const PreviewPane = memo(function PreviewPane({
                       {previewFocusMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
                     </button>
                   )}
-                  {runtimeCapabilities.platform !== "android" && supportsFavorites && onToggleFavorite && (
+                  {supportsFavorites && onToggleFavorite && (
                     <button
                       type="button"
                       className={`preview-favorite-btn${isFavorite ? " active" : ""}`}
@@ -319,6 +323,7 @@ export const PreviewPane = memo(function PreviewPane({
               const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
               contentRef.current?.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
             }}><ArrowUp size={18} aria-hidden="true" /></button>}
+            {runtimeCapabilities.mobile && !previewLoading && !citation && mobileDock}
             <PreviewSelectionActions
               scrollRef={contentRef}
               contentKey={selected.id}

@@ -1,6 +1,8 @@
 import { JournalVoiceHost } from "./JournalVoice";
 import { MobileJournal } from "./MobileJournal";
 import { MobileSearchOverview } from "./MobileSearchOverview";
+import { MobileConnectionSheet } from "./MobileConnectionSheet";
+import { MobileDocumentDock } from "./MobileDocumentDock";
 import { MobileHeader } from "./MobileHeader";
 import { filterMobileFavorites, matchesMobileCollection } from "./MobileCollectionSearch";
 import { invoke } from "@tauri-apps/api/core";
@@ -171,6 +173,8 @@ function AppContent() {
   const { position: libraryPosition, setPosition: setLibraryPosition, preview: libraryPreview, setPreview: setLibraryPreview } = useLibraryBrowseNavigation();
   const [mobileBrowseOpen, setMobileBrowseOpen] = useState(false);
   const [mobileAgentsOpen, setMobileAgentsOpen] = useState(false);
+  const [showConnectionSheet,setShowConnectionSheet]=useState(false);
+  const [linkStatus,setLinkStatus]=useState({oss:false,vps:false});
   const [mobileConnectionsOpen, setMobileConnectionsOpen] = useState(false);
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
   const [journalTarget,setJournalTarget]=useState("");
@@ -1002,6 +1006,8 @@ useEffect(() => {
     selectDesktopSidebarView("libraries");
   };
 
+  const [captureCitation,setCaptureCitation]=useState("");
+  useEffect(() => { if (!quickCaptureOpen) setCaptureCitation(""); },[quickCaptureOpen]);
   const [mobileTaskTarget,setMobileTaskTarget]=useState("");
   const [advancedInsights,setAdvancedInsights]=useState(false);
   const applyMobileRoute = useCallback((route: string) => {
@@ -1330,11 +1336,18 @@ useEffect(() => {
       onNavigateJournalDate: navigatePreviewJournalDate,
       isFavorite: previewSelected ? favoriteIds.has(pageFavoriteKey(previewSelected)) : false,
       snippetFavoriteIds: !isMobileLayout ? snippetFavoriteIds : undefined,
-      onToggleFavorite: !isMobileLayout ? toggleFavorite : undefined,
+      onToggleFavorite: toggleFavorite,
       onToggleSnippetFavorite: !isMobileLayout ? toggleSnippetFavorite : undefined,
       previewFocusMode,
       onTogglePreviewFocus: !isMobileLayout ? togglePreviewFocus : undefined,
       onNotify: notifyPreviewAction,
+      mobileDock: isMobileLayout && previewSelected && previewSelected.provider !== "hub" ? <MobileDocumentDock key={previewSelected.id} document={previewSelected} body={preview || ""}
+        onAgents={() => {if (!openRouteFromPreview("agents")) navigateMobile("agents");}}
+        onCapture={citation => {setCaptureCitation(citation);setQuickCaptureOpen(true);}}
+        onTask={id => {
+          if (!openRouteFromPreview("tasks")) navigateMobile("tasks");
+          window.history.replaceState({...window.history.state,hubInsightTask:id},"");setMobileTaskTarget(id);
+        }}/> : undefined,
     },
   };
   const settingsContentProps: SettingsContentProps = {
@@ -1483,9 +1496,9 @@ useEffect(() => {
       onChange: (value: string) => setMobileCollectionQueries(current => ({ ...current, [desktopSidebarView]: value })),
     } : undefined,
     mobileOverview: isMobileLayout && desktopSidebarView==="home" && !query.trim() && !searchFocused ? <MobileSearchOverview due={flashcardDueCount} tasks={taskOpenCount} topics={sidebarTags.slice(0,6).map(t=>t.name)} onSearch={setQuery} onGo={dest=>dest==="insights"?pushMobileRoute(dest):navigateMobile(dest)}/> : undefined,
-    mobileHeader: isMobileLayout && !mobilePreviewOpen && !mobileAgentsOpen && desktopSidebarView!=="journals" ? <MobileHeader title={flashcardsActive?"复习":mobileConnectionsOpen?"连接总览":mobileBrowseOpen?"浏览":({home:"搜索",tasks:"任务",collections:"阅读",favorites:"收藏",history:"最近浏览",tags:"标签",insights:"洞察"} as {[key:string]:string})[desktopSidebarView]} onBack={!flashcardsActive && ((!["home", "tasks"].includes(desktopSidebarView) && !mobileBrowseOpen) || mobileConnectionsOpen) ? () => window.history.state?.hubMobileRoute ? window.history.back() : navigateMobile("browse") : undefined} onSettings={() => setShowConnection(true)} spaceActions={{
-      onLibraries: () => { navigateMobile("search"); setSpaceMenuOpen(true); },
-      onConnections: () => pushMobileRoute("connections"),
+    mobileHeader: isMobileLayout && !mobilePreviewOpen && !mobileAgentsOpen && desktopSidebarView!=="journals" ? <MobileHeader connection={linkStatus} title={flashcardsActive?"复习":mobileConnectionsOpen?"连接总览":mobileBrowseOpen?"浏览":({home:"搜索",tasks:"任务",collections:"阅读",favorites:"收藏",history:"最近浏览",tags:"标签",insights:"洞察"} as {[key:string]:string})[desktopSidebarView]} onBack={!flashcardsActive && ((!["home", "tasks"].includes(desktopSidebarView) && !mobileBrowseOpen) || mobileConnectionsOpen) ? () => window.history.state?.hubMobileRoute ? window.history.back() : navigateMobile("browse") : undefined} onSettings={() => setShowConnection(true)} spaceActions={{
+      onLibraries: () => { pushMobileRoute("search"); setFiltersOpen(true); },
+      onConnections: () => setShowConnectionSheet(true),
       onAppearance: () => { setSettingsCategory("display"); setShowConnection(true); },
     }} /> : undefined,
     style: shellStyle,
@@ -1496,11 +1509,11 @@ useEffect(() => {
       journalCount={journalDates.length}
       tagCount={sidebarTags.length}
       onOpen={openMobileCollection}
-      libraries={spaces} onDocument={result=>{pushMobileRoute("search");previewInlinePage(result);openMobilePreview();}} onScope={(id,folder)=>{pushMobileRoute("search");selectLibraries([id]);setFolderId(folder ? id+"\u0000"+folder : "");}}
+      libraries={spaces} onDocument={result=>{applyMobileRoute("search");previewInlinePage(result);openMobilePreview();}} onScope={(id,folder)=>{pushMobileRoute("search");selectLibraries([id]);setFolderId(folder ? id+"\u0000"+folder : "");}}
       onOpenInsights={() => pushMobileRoute("insights")}
       onOpenLibraries={() => { pushMobileRoute("search"); setFiltersOpen(true); }}
       onOpenSettings={() => setShowConnection(true)}
-      onOpenSyncHealth={() => pushMobileRoute("connections")}
+      onOpenSyncHealth={() => setShowConnectionSheet(true)}
       syncNeedsAttention={Boolean(indexStatus?.failedJobs)}
     /> : isMobileLayout && desktopSidebarView==="journals" ? <MobileJournal onBack={()=>navigateMobile("browse")} onInsights={()=>pushMobileRoute("insights")} targetId={journalTarget} onTargetHandled={()=>setJournalTarget("")}/> : librariesActive ? <LibraryBrowse
       libraries={browseLibraries}
@@ -1655,7 +1668,10 @@ useEffect(() => {
     },
     settingsDialog: <>
       {isMobileLayout && <JournalVoiceHost onOpen={() => setQuickCaptureOpen(false)} />}
-      {isMobileLayout && quickCaptureOpen && <Suspense fallback={null}><LazyMobileQuickCapture onClose={() => setQuickCaptureOpen(false)} onSaved={savedMobileCapture} onSyncSettings={openCaptureSyncSettings} /></Suspense>}
+      {isMobileLayout && showConnectionSheet && <MobileConnectionSheet onClose={() => setShowConnectionSheet(false)} onStatus={setLinkStatus}
+        onContent={() => {setShowConnectionSheet(false);setSettingsCategory("cloud");setShowConnection(true);}}
+        onAgents={() => {setShowConnectionSheet(false);navigateMobile("agents");}}/>}
+      {isMobileLayout && quickCaptureOpen && <Suspense fallback={null}><LazyMobileQuickCapture citation={captureCitation} onClose={() => {setQuickCaptureOpen(false);setCaptureCitation("");}} onSaved={savedMobileCapture} onSyncSettings={openCaptureSyncSettings} /></Suspense>}
       {showConnection ? (
       <Suspense fallback={<div className="connection-overlay"><div className="settings-lazy-loading">正在打开设置…</div></div>}>
         <LazySettingsDialog

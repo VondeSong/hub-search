@@ -46,7 +46,12 @@ type MobileBrowseProps = {
 };
 
 export function MobileBrowse({favoriteCount,historyCount,journalCount,tagCount,onOpen,onOpenInsights,onOpenLibraries,onOpenSyncHealth,syncNeedsAttention,libraries=[],onScope,onDocument}: MobileBrowseProps) {
-  const [location,setLocation]=useState({id:"",folder:""});
+  const readLocation = () => {
+    const state=window.history.state;
+    const saved=state?.hubMobileRoute==="browse" && state.hubBrowseLocation;
+    return saved && typeof saved.id==="string" && typeof saved.folder==="string" ? {id:saved.id as string,folder:saved.folder as string} : {id:"",folder:""};
+  };
+  const [location,setLocation]=useState(readLocation);
   const [data,setData]=useState<{id:string;tree?:ReturnType<typeof groupBrowseContents>;error?:string}>({id:""});
   const [limit,setLimit]=useState(40);
   const [todayRecords,setTodayRecords]=useState<number | null>(null);
@@ -67,7 +72,18 @@ export function MobileBrowse({favoriteCount,historyCount,journalCount,tagCount,o
     return ()=>{live=false;};
   },[location.id,library?.lastSync]);
   const tree=data.id===location.id?data.tree:undefined;
-  function drill(id:string,folder="") {setLocation({id,folder});setLimit(40);}
+  useEffect(()=>{
+    const restore=()=>{setLocation(readLocation());setLimit(40);};
+    window.addEventListener("popstate",restore);return ()=>window.removeEventListener("popstate",restore);
+  },[]);
+  function drill(id:string,folder="") {
+    const next={id,folder};
+    if(window.history.state?.hubMobileRoute==="browse"){
+      if(id && (folder || !location.id)) window.history.pushState({...window.history.state,hubBrowseLocation:next},"");
+      else window.history.replaceState({...window.history.state,hubBrowseLocation:next},"");
+    }
+    setLocation(next);setLimit(40);
+  }
   const docs=tree?.pages.get(location.folder)||[];
   return <section className="bw-browse" aria-label="浏览">
     <header><h2>创作与个人收集</h2><button onClick={openQuickJournalCapture}>＋ 记一条</button></header>
@@ -76,7 +92,7 @@ export function MobileBrowse({favoriteCount,historyCount,journalCount,tagCount,o
     <div className="bw-three">{([[Star,"收藏",favoriteCount,"favorites"],[Clock3,"最近",historyCount,"history"],[Tags,"标签",tagCount,"tags"]] as const).map(([Icon,label,count,key])=><button key={key} onClick={()=>onOpen(key)}><Icon size={14}/> {label}<small>{count} 项</small></button>)}</div></div>
     <header><h2>我的资料库 · 结构浏览与范围 ({libraries.length})</h2><button onClick={onOpenLibraries}>选范围</button></header>
     <div className="bw-card">{!libraries.length&&<p>暂无已接入的资料库</p>}{libraries.map(lib=><div key={lib.id}><button className="bw-row" aria-expanded={lib.id===location.id} onClick={()=>drill(lib.id===location.id?"":lib.id)}><FolderOpen/><span><b>{lib.name}</b><small>{lib.documentCount} 篇文档</small></span><ChevronRight/></button>
-    {lib.id===location.id&&<div className="bw-tree">{location.folder&&<button onClick={()=>drill(lib.id,tree?.parents.get(location.folder)||"")}>‹ 上一级 · {tree?.nodes.get(location.folder)?.name}</button>}
+    {lib.id===location.id&&<div className="bw-tree">{location.folder&&<button onClick={()=>window.history.state?.hubBrowseLocation?.folder ? window.history.back() : drill(lib.id,tree?.parents.get(location.folder)||"")}>‹ 上一级 · {tree?.nodes.get(location.folder)?.name}</button>}
     <button onClick={()=>onScope?.(lib.id,location.folder)}>在此范围搜索</button>{data.id===lib.id&&data.error?<p role="alert">{data.error}</p>:!tree?<p>正在读取目录…</p>:<>{(tree.children.get(location.folder)||[]).map(folder=><button key={folder.id} onClick={()=>drill(lib.id,folder.id)}>📁 {folder.name} ›</button>)}{docs.slice(0,limit).map(doc=><button key={doc.nodeId||doc.id} onClick={()=>onDocument?.(rootResult(lib,doc))}>{doc.title}</button>)}{docs.length>limit&&<button onClick={()=>setLimit(n=>n+40)}>显示更多文档</button>}{!docs.length&&!tree.children.get(location.folder)?.length&&<small>此层暂无内容</small>}</>}</div>}</div>)}</div>
     <header><h2>发现与连接</h2></header><div className="bw-card"><button className="bw-row" onClick={onOpenInsights}><Sparkles/><span><b>洞察</b><small>发现与稍后再看</small></span><ChevronRight/></button><button className="bw-row" onClick={onOpenSyncHealth}><Cloud/><span><b>连接总览</b><small>{syncNeedsAttention?"有事项需要查看":"内容同步与云端助手"}</small></span><ChevronRight/></button></div>
   </section>;

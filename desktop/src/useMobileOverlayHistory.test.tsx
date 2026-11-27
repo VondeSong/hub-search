@@ -95,3 +95,12 @@ it("hands capture to sync settings without creating another entry", async()=>{
   await act(async()=>window.dispatchEvent(new PopStateEvent("popstate",{state:window.history.state})));
   expect(setters.setSettingsOpen).toHaveBeenLastCalledWith(false);
 });
+
+it("returns from a document preview to the folder that opened it",async()=>{
+  const route=vi.fn();await act(async()=>root.render(<Harness/>));owner.bindRoute(route);
+  const folder={hubMobileRoute:"browse",hubBrowseLocation:{id:"library",folder:"nested"}};
+  window.history.replaceState(folder,"");await act(async()=>owner.openPreview());
+  await act(async()=>{owner.closePreview();await new Promise(resolve=>setTimeout(resolve,30));});
+  expect(setters.setPreviewOpen).toHaveBeenLastCalledWith(false);
+  expect(window.history.state).toEqual(folder);expect(route).toHaveBeenLastCalledWith("browse");
+});

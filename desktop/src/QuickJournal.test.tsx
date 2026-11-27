@@ -241,3 +241,20 @@ it("waits for in-flight attachment staging when reopening the composer",async()=
  await act(async()=>root.render(null));await renderComposer();expect((node.querySelector<HTMLElement>('[role="textbox"]')!.getAttribute("contenteditable")==="false")).toBe(true);
  await act(async()=>finish(attachment));expect((node.querySelector<HTMLElement>('[role="textbox"]')!.getAttribute("contenteditable")==="false")).toBe(false);expect(node.textContent).toContain(attachment.name);
 });
+
+it("appends a document citation once and preserves existing text, date and whitespace when toggling a tag", async () => {
+  const original=invoke.getMockImplementation()!, text="原草稿  ";
+  invoke.mockImplementation(async(cmd:string,args:unknown)=>{
+    if(cmd==="get_quick_journal_draft")return JSON.stringify({...record,text});
+    if(cmd==="get_quick_journal_settings") return {...await original(cmd,args),mobile:true};
+    return original(cmd,args);
+  });
+  const compose=(citation?:string)=><QuickJournal libraries={[]} scope={null} view={defaultJournalView()} dataVersion="capture" mode="compose" citation={citation}/>;
+  await act(async()=>root.render(compose()));
+  await act(async()=>button("#闪念").click());await act(async()=>button("#闪念").click());
+  const writes=()=>invoke.mock.calls.filter(c=>c[0]==="save_quick_journal_draft").map(c=>JSON.parse(c[1].draft));
+  expect(writes().slice(-1)[0]).toMatchObject({text,date:record.date});
+  await act(async()=>root.render(compose("文档原句")));await act(async()=>root.render(compose("文档原句")));
+  expect(writes().filter(d=>d.text.includes("文档原句"))).toHaveLength(1);
+  expect(writes().slice(-1)[0].text).toBe(text+"\n\n文档原句");
+});
