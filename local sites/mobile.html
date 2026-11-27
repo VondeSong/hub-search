@@ -1871,6 +1871,134 @@
       return task.planned ? "planned" : "later";
     }
     function taskList(task) { return task.list || task.sourceLabel.split(" / ").at(-1); }
+
+    // Source snapshots from the desktop demo and the mobile prototype's own document.
+    const archiveReceiptDoc = DOCUMENTS.find(doc => doc.id === "doc-3");
+    const harvestClues = [
+      { id: "craft-hub-memory", title: "核对手机端基础对话里的共享记忆显示",
+        source: "Craft · Hub 迭代周记", quote: "移动端近期重点先收口基础对话，周五前核对手机端共享记忆的显示效果。",
+        reason: "周记给出了独立的核对动作和完成时间。", due: "周五前", preferredList: "Agents 与工作流" },
+      { id: "archive-desktop-receipt", title: "核验桌面写入后返回的归档回执",
+        source: archiveReceiptDoc.libraryName + " · " + archiveReceiptDoc.title,
+        quote: archiveReceiptDoc.content[2], docId: archiveReceiptDoc.id, related: "t-3",
+        reason: "已有速记同步验收任务，这句补充了桌面落盘后应检查的回执。", preferredList: "Hub 客户端冲刺" }
+    ];
+    const harvestDrafts = new Map();
+
+    function harvestResult(clueId) {
+      for (const task of TASKS) {
+        const receipt = task.harvestEntries?.find(entry => entry.clueId === clueId);
+        if (receipt) return { task, receipt };
+      }
+      return null;
+    }
+
+    function renderHarvestInbox(header, body) {
+      detailHeader(header, "行动捕手");
+      const pending = harvestClues.filter(clue => !harvestResult(clue.id));
+      const handled = harvestClues.filter(clue => harvestResult(clue.id));
+      const row = clue => {
+        const result = harvestResult(clue.id);
+        return `<button class="harvest-row" data-clue="${clue.id}">
+          <strong>${escapeHtml(clue.title)}</strong>
+          <span>${escapeHtml(clue.quote)}</span>
+          <small>${escapeHtml(result ? "已存本机 · " + result.receipt.list : clue.source)} ›</small>
+        </button>`;
+      };
+      body.innerHTML = `<section class="task-group harvest-inbox"><h3>待判断 <span>${pending.length}</span></h3>
+        ${pending.map(row).join("") || '<p class="flow-empty">候选已全部处理</p>'}</section>
+        ${handled.length ? `<section class="task-group harvest-inbox"><h3>采纳回执 <span>${handled.length}</span></h3>${handled.map(row).join("")}</section>` : ""}`;
+      body.querySelectorAll("[data-clue]").forEach(button => {
+        button.onclick = () => openPushView("harvest-clue", button.dataset.clue);
+      });
+    }
+
+    function renderHarvestClue(clue, header, body) {
+      const result = harvestResult(clue.id);
+      if (result) {
+        const { task, receipt } = result;
+        detailHeader(header, "采纳回执");
+        body.innerHTML = `<article class="flow-detail"><small>已保存到本机 · ${escapeHtml(new Date(receipt.at).toLocaleString("zh-CN"))}</small>
+          <h2>${receipt.mode === "new" ? "已新建任务" : "已补充已有任务"}</h2>
+          <dl class="harvest-summary"><dt>对应任务</dt><dd>${escapeHtml(receipt.title)}</dd><dt>目标清单</dt><dd>${escapeHtml(receipt.list)}</dd></dl>
+          ${receipt.note ? `<p class="task-note">已追加备注 · ${escapeHtml(receipt.note)}</p>` : ""}
+          <blockquote class="harvest-quote">${escapeHtml(receipt.quote)}<cite>${escapeHtml(receipt.source)}</cite></blockquote>
+          <button class="flow-btn primary" id="harvest-open-task">打开对应任务</button></article>`;
+        body.querySelector("#harvest-open-task").onclick = () => openPushView("task-detail", task.id);
+        return;
+      }
+
+      detailHeader(header, "判断候选");
+      const related = TASKS.find(task => task.id === clue.related);
+      const draft = harvestDrafts.get(clue.id) || { mode: related ? "append" : "new",
+        title: clue.title, list: state.taskListFilter || clue.preferredList, taskId: related?.id || "", note: clue.title };
+      harvestDrafts.set(clue.id, draft);
+      const lists = [...new Set(["本机任务", clue.preferredList, ...TASKS.filter(t => t.list || t.sourceLabel.includes(" / ")).map(taskList)])];
+      const selected = TASKS.find(task => task.id === draft.taskId);
+      const append = draft.mode === "append";
+      body.innerHTML = `<form class="flow-form harvest-form"><h2>${escapeHtml(clue.title)}</h2>
+        <blockquote class="harvest-quote">${escapeHtml(clue.quote)}<cite>原句 · ${escapeHtml(clue.source)}</cite></blockquote>
+        <p class="harvest-reason">${escapeHtml(clue.reason)}</p>
+        <div class="task-switch" role="group" aria-label="采纳方式">
+          <button type="button" data-mode="new" aria-pressed="${!append}">新建任务</button>
+          <button type="button" data-mode="append" aria-pressed="${append}">补充已有任务</button></div>
+        ${append ? `<label>对应任务<span class="harvest-picker"><span aria-hidden="true">${escapeHtml(selected?.title || "请选择已有任务")}</span>
+          <select name="taskId" aria-label="对应任务" required>${options([["","请选择已有任务"],
+          ...TASKS.map(t => [t.id,(t.done ? "已完成 · " : "") + t.title + " · " + taskList(t)])], draft.taskId)}</select></span></label>
+          <label>补充备注<textarea name="note" rows="2" required>${escapeHtml(draft.note)}</textarea></label>
+          <div class="harvest-list">目标清单 <strong>${escapeHtml(selected ? taskList(selected) : "选择任务后显示")}</strong></div>` :
+          `<label>任务名称<input name="title" value="${escapeHtml(draft.title)}" required></label>
+          <label>目标清单<select name="list" required>${options(lists.map(list => [list,list]), draft.list)}</select></label>`}
+        <button class="flow-btn primary" type="submit" ${append && !selected ? "disabled" : ""}>${append ? "确认清单并补充" : "确认清单并新建"}</button>
+        <small>采纳结果保存在本机原型</small></form>`;
+      const form = body.querySelector("form");
+      form.querySelectorAll("[data-mode]").forEach(button => {
+        button.onclick = () => { draft.mode = button.dataset.mode; renderHarvestClue(clue,header,body); };
+      });
+      form.oninput = e => { if (e.target.name) draft[e.target.name] = e.target.value; };
+      form.onchange = e => {
+        if (e.target.name === "taskId") { draft.taskId = e.target.value; renderHarvestClue(clue,header,body); }
+      };
+      form.onsubmit = async e => {
+        e.preventDefault();
+        const button = form.querySelector("[type=submit]");
+        if (button.disabled) return;
+        const choice = { ...draft, list: append ? taskList(selected) : form.elements.list.value };
+        if (!(append ? choice.note : choice.title).trim()) { showToast(append ? "请填写补充备注" : "请填写任务名称"); return; }
+        button.disabled = true;
+        try {
+          const save = () => adoptHarvestClue(clue, choice);
+          const ok = navigator.locks ? await navigator.locks.request(storeKey + ".harvest", save) : save();
+          if (ok) harvestDrafts.delete(clue.id);
+          renderAll();
+          if (ok && getActivePushView()?.payload === clue.id) body.scrollTop = 0;
+        } finally { button.disabled = false; }
+      };
+    }
+
+    function adoptHarvestClue(clue, choice) {
+      // Read the latest task and receipt together before appending to the shared snapshot.
+      restoreData();
+      if (harvestResult(clue.id)) return true;
+      const append = choice.mode === "append";
+      let task = TASKS.find(t => t.id === choice.taskId);
+      if (append && (!task || taskList(task) !== choice.list)) {
+        showToast("目标任务或清单已变化，请重新确认"); return false;
+      }
+      if (!append) {
+        task = { id: crypto.randomUUID(), title: choice.title.trim(), list: choice.list, done: false, due: clue.due || "无截止日",
+          priority: "普通", sourceType: "local", sourceLabel: clue.source, docId: clue.docId || null, isLocal: true };
+        TASKS.unshift(task);
+      }
+      const previous = task.harvestEntries;
+      task.harvestEntries = [...(previous || []), { clueId: clue.id, mode: choice.mode, title: task.title,
+        list: taskList(task), source: clue.source, quote: clue.quote, note: append ? choice.note.trim() : "", at: Date.now() }];
+      if (persist()) return true;
+      if (!append) TASKS.shift();
+      else if (previous) task.harvestEntries = previous;
+      else delete task.harvestEntries;
+      return false;
+    }
     function taskRow(task) {
       const meta = task.waiting ? `等 ${task.waiting.who} · ${task.waiting.followUp || "未定回看日"}` :
         [task.priority, task.due, taskList(task)].filter(Boolean).join(" · ");
@@ -1896,7 +2024,8 @@
       container.innerHTML = `<div class="task-toolbar"><h2>${taskViews[view]}</h2><button class="flow-btn primary" id="btn-new-local-task">＋ 新建任务</button></div>
         <nav class="task-switch" aria-label="任务视图">${Object.entries(taskViews).map(([key,label]) =>
           `<button data-task-status="${key}" aria-pressed="${view === key}">${label}</button>`).join("")}</nav>
-        <button class="task-filter" id="task-filter">${hasFilter ? escapeHtml([sourceNames[state.taskFilterSource], state.taskListFilter].filter(Boolean).join(" · ")) : "全部来源与清单"} ▾</button>
+        <div class="harvest-tools"><button class="task-filter" id="task-filter">${hasFilter ? escapeHtml([sourceNames[state.taskFilterSource], state.taskListFilter].filter(Boolean).join(" · ")) : "全部来源与清单"} ▾</button>
+          <button class="flow-btn" id="open-harvester">行动捕手 · ${harvestClues.filter(clue => !harvestResult(clue.id)).length} 待判断</button></div>
         ${groups.map(([key,label]) => {
           const rows = filtered.filter(t => key === "all" || taskGroup(t) === key);
           return `<section class="task-group"><h3>${label}<span>${rows.length}</span></h3>${rows.length ? rows.map(taskRow).join("") :
@@ -1904,6 +2033,7 @@
         }).join("")}`;
       container.querySelector("#btn-new-local-task").onclick = () => openNewTaskSheet();
       container.querySelector("#task-filter").onclick = openTaskFilter;
+      container.querySelector("#open-harvester").onclick = () => openPushView("harvest-inbox", null);
       container.querySelectorAll("[data-task-status]").forEach(b => b.onclick = () => { state.taskFilterStatus = b.dataset.taskStatus; renderAll(); });
       container.querySelectorAll("[data-task-detail]").forEach(b => b.onclick = () => openPushView("task-detail", b.dataset.taskDetail));
       container.querySelectorAll("[data-toggle-task]").forEach(b => b.onclick = () => toggleTask(TASKS.find(t => t.id === b.dataset.toggleTask)));
@@ -1932,14 +2062,19 @@
     function renderTaskDetail(task, header, body) {
       detailHeader(header, "任务详情");
       const doc = DOCUMENTS.find(d => d.id === task.docId);
+      const evidence = mode => (task.harvestEntries || []).filter(entry => entry.mode === mode).map(entry => `<div class="harvest-evidence">
+        ${entry.note ? `<p class="task-note">${escapeHtml(entry.note)}</p>` : ""}
+        <blockquote class="harvest-quote">${escapeHtml(entry.quote)}<cite>行动捕手 · ${escapeHtml(entry.source)}</cite></blockquote></div>`).join("");
       body.innerHTML = `<div class="flow-detail"><h2>${escapeHtml(task.title)}</h2>
         <p>${escapeHtml(taskList(task))} · ${escapeHtml(task.priority)} · ${escapeHtml(task.due)}</p>
         <div class="flow-actions"><button class="flow-btn" id="detail-done">${task.done ? "恢复待办" : "标记完成"}</button>
         <button class="flow-btn" id="detail-plan" ${task.done ? "disabled" : ""}>${task.planned ? "移出今日计划" : "加入今日计划"}</button></div>
         <h3>来源与依据</h3><p>${escapeHtml(task.sourceLabel)}</p>${doc ? `<button class="flow-btn" id="detail-source">查看原文 · ${escapeHtml(doc.title)}</button>` : ""}
+        ${evidence("new")}
         <h3>等待跟进</h3><p>${task.waiting ? escapeHtml(task.waiting.who + " · " + (task.waiting.followUp || "未定回看日")) : "当前无需等待"}</p>
         <div class="flow-actions"><button class="flow-btn" id="detail-wait">${task.waiting ? "修改等待" : "设置等待"}</button>${task.waiting ? '<button class="flow-btn" id="clear-wait">结束等待</button>' : ""}</div>
         <h3>续办备注</h3>${(task.notes || []).map(note => `<p class="task-note">${escapeHtml(note)}</p>`).join("")}
+        ${evidence("append")}
         <form class="flow-form inline-form"><label>补充进展<textarea name="note" rows="2" placeholder="下次接着做什么？">${escapeHtml(task.noteDraft || "")}</textarea></label>
         <button class="flow-btn primary">保存备注</button></form><small>任务变更保存在本机原型中</small></div>`;
       body.querySelector("#detail-done").onclick = () => toggleTask(task);
@@ -2099,6 +2234,13 @@
 
       const { type, payload } = currentView;
 
+      if (type === "harvest-inbox") { renderHarvestInbox(header, body); return; }
+      if (type === "harvest-clue") {
+        const clue = harvestClues.find(item => item.id === payload);
+        if (clue) renderHarvestClue(clue, header, body);
+        else { detailHeader(header, "行动捕手"); body.textContent = "候选已不可用"; }
+        return;
+      }
       if (type === "task-detail") {
         const task = TASKS.find(t => t.id === payload);
         if (task) renderTaskDetail(task, header, body);

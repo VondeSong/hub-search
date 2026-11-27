@@ -1420,4 +1420,24 @@ html, body {
 .file-label input { position:absolute; inset:0; width:100%; opacity:0; cursor:pointer; }
 .capture-item img,.journal-photo { width:44px; height:44px; object-fit:cover; border-radius:6px; }
 .capture-item span { flex:1; min-width:0; }
+.harvest-tools { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+.harvest-tools #open-harvester { color:var(--m-accent-ink); background:var(--m-accent-soft); }
+.harvest-row { display:grid; gap:7px; width:100%; margin:6px 0; padding:14px; text-align:left; cursor:pointer;
+  border:1px solid var(--m-hairline); border-radius:12px; background:var(--m-surface); color:var(--m-ink); overflow-wrap:anywhere; }
+.harvest-row strong { font-size:15px; }
+.harvest-row span,.harvest-reason { color:var(--m-ink-2); font-size:13px; line-height:1.55; }
+.harvest-row small,.harvest-quote cite { font-size:12px; color:var(--m-ink-2); }
+.harvest-form { background:var(--m-surface); border-radius:14px; }
+.harvest-form .task-switch { margin:0; }
+.harvest-quote { margin:0; padding:12px; background:var(--m-surface-subtle); border-radius:10px; line-height:1.6; font-size:14px; }
+.harvest-quote cite { display:block; margin-top:6px; font-style:normal; }
+.harvest-summary { display:grid; grid-template-columns:auto minmax(0,1fr); gap:7px 12px; font-size:14px; }
+.harvest-summary dt,.harvest-list { color:var(--m-ink-2); }
+.harvest-list strong { display:block; color:var(--m-ink); }
+.harvest-picker { position:relative; display:flex; align-items:center; justify-content:space-between; gap:8px;
+  min-height:44px; padding:9px; border:1px solid var(--m-hairline-strong); border-radius:10px; background:var(--m-surface-subtle); font-size:15px; }
+.harvest-picker::after { content:"▾"; color:var(--m-ink-2); }
+.harvest-picker select { position:absolute; inset:0; height:100%; opacity:0; cursor:pointer; }
+.harvest-picker:focus-within { outline:2px solid var(--m-accent); outline-offset:1px; }
+.harvest-evidence .task-note { margin-bottom:6px; }
 :where(.flow-btn,.task-switch button,.task-check,.task-open,.deck-row,.flow-back,.text-btn):focus-visible { outline:2px solid var(--m-accent); outline-offset:1px; }
