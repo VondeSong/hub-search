@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { MobileHarvestDecision, localHarvestReceipts } from "./MobileHarvestDecision";
+import { MobileHarvestDecision, localHarvestKey, localHarvestReceipts } from "./MobileHarvestDecision";
 import { MobileLocalTaskDetail, mobileTasks } from "./MobileInsightTasks";
 import type { Clue } from "./ActionEvidence";
 
@@ -33,6 +33,20 @@ async function click(label: string) {
   expect(button).toBeDefined();
   await act(async () => button!.click());
 }
+
+it("recognizes the same whole-note receipt across scanners and preserves other evidence identities", () => {
+  const key = (library: string, doc: string, block: string, quote = "quote", ...action: string[]) =>
+    JSON.stringify([JSON.stringify([library, doc, block]), quote, ...action]);
+  const library = "obsidian:os";
+  const old = key(library, "a", "notes/a.md");
+  const current = key(library, "a", "doc:obsidian:os:a");
+  expect(localHarvestKey(old)).toBe(current);
+  for (const other of [key(library, "b", "notes/a.md"), key("obsidian:other", "a", "notes/a.md"),
+    key(library, "a", "notes/a.md#block"), key(library, "a", "notes/a.md", "other"),
+    key(library, "a", "notes/a.md", "quote", "another action")]) {
+    expect(localHarvestKey(other)).not.toBe(current);
+  }
+});
 
 it("opens both receipts on the same task and preserves independent quotes and their destination", async () => {
   await render(first);

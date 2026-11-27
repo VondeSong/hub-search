@@ -14,6 +14,22 @@ export type HarvestEntry = {
   list: string;
 };
 
+// Whole-file Obsidian passages used the note path before document scans used a document ID.
+export function localHarvestKey(key: string): string {
+  try {
+    const parts = JSON.parse(key);
+    if (!Array.isArray(parts) || parts.length !== 2 || typeof parts[0] !== "string") return key;
+    const origin = JSON.parse(parts[0]);
+    if (!Array.isArray(origin) || origin.length !== 3) return key;
+    const [library, document, block] = origin;
+    if (typeof library !== "string" || !library.startsWith("obsidian:") || !document ||
+        typeof block !== "string" || !/\.md$/i.test(block)) return key;
+    return JSON.stringify([JSON.stringify([library, document, `doc:${library}:${document}`]), parts[1]]);
+  } catch {
+    return key;
+  }
+}
+
 export function localHarvestReceipts(tasks: LocalTask[]) {
   return tasks.flatMap(task => (task.harvestEntries ?? []).map(entry => ({ task, entry })));
 }
@@ -66,7 +82,7 @@ export function MobileHarvestDecision({ clue, receipt, drafts, onSaved, onOpen }
     setError("");
     try {
       const latest = mobileTasks();
-      if (localHarvestReceipts(latest).some(({ entry }) => entry.key === candidate.key)) {
+      if (localHarvestReceipts(latest).some(({ entry }) => localHarvestKey(entry.key) === localHarvestKey(candidate.key))) {
         // A failed write stays in the profile cache until its transaction is retried.
         await flushUserProfileStorage();
       } else {

@@ -1,4 +1,4 @@
-import { MobileHarvestDecision, localHarvestReceipts, type HarvestDraft } from "./MobileHarvestDecision";
+import { MobileHarvestDecision, localHarvestKey, localHarvestReceipts, type HarvestDraft } from "./MobileHarvestDecision";
 import { mobileTasks } from "./MobileInsightTasks";
 import { createPortal } from "react-dom";
 import { runtimeCapabilities } from "./RuntimePlatform";
@@ -169,8 +169,8 @@ export function ActionHarvester({
   }, [day, journals, docs]);
   const hasLocalTasks = runtimeCapabilities.mobile && !!onOpenLocalTask;
   const savedLocal = useMemo(() => hasLocalTasks ? localHarvestReceipts(mobileTasks()) : [], [hasLocalTasks, tick, revision]);
-  const handledKeys = new Set(savedLocal.map(row => row.entry.key));
-  const pendingClues = savedLocal.length ? clues.filter(c=>!handledKeys.has(c.key)) : clues;
+  const handledKeys = new Set(savedLocal.map(row => localHarvestKey(row.entry.key)));
+  const pendingClues = savedLocal.length ? clues.filter(c=>!handledKeys.has(localHarvestKey(c.key))) : clues;
   useEffect(() => {
     onCount?.(pendingClues.length);
   }, [pendingClues.length, onCount]);
@@ -401,7 +401,8 @@ export function ActionHarvester({
     const task = tasks.find(t => identity(t) === decision.taskKey);
     return task ? [{key,task}] : [];
   }) : [];
-  const localReceipt = savedLocal.find(r=>r.entry.key===mobileClue);
+  const localReceipt = savedLocal.find(r => r.entry.key === mobileClue)
+    ?? (mobileClue ? savedLocal.find(r => localHarvestKey(r.entry.key) === localHarvestKey(mobileClue)) : undefined);
   const localDecision = mobileInbox && !!mobileClue && !!onOpenLocalTask && (!writable.length || !!localReceipt);
   const visibleClues = mobileInbox ? clues.filter(c => c.key === mobileClue) : clues.slice(0,limit);
   return (
