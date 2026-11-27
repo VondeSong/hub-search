@@ -15,12 +15,16 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}) }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
-vi.mock("./CloudAgentMedia", () => ({
-  outbox: vi.fn(async () => undefined),
-  uploadSize: () => 0,
-  imageUpload: vi.fn(),
-  videoUploads: vi.fn(),
-}));
+vi.mock("./CloudAgentMedia", async importOriginal => {
+  const actual = await importOriginal<typeof import("./CloudAgentMedia")>();
+  return {
+    ...actual,
+    outbox: vi.fn(async () => undefined),
+    uploadSize: () => 0,
+    imageUpload: vi.fn(),
+    videoUploads: vi.fn(),
+  };
+});
 vi.mock("./CloudAgentDrafts", () => ({
   loadComposerDrafts: vi.fn(async () => new Map()),
   saveComposerDraft: vi.fn(async () => {}),

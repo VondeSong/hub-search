@@ -10,7 +10,10 @@ import { loadComposerDrafts, saveComposerDraft } from "./CloudAgentDrafts";
 const invoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...args: unknown[]) => invoke(...args) }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
-vi.mock("./CloudAgentMedia", () => ({ outbox: vi.fn(async () => undefined), uploadSize: () => 0, imageUpload: vi.fn(), videoUploads: vi.fn() }));
+vi.mock("./CloudAgentMedia", async importOriginal => {
+  const actual = await importOriginal<typeof import("./CloudAgentMedia")>();
+  return { ...actual, outbox: vi.fn(async () => undefined), uploadSize: () => 0, imageUpload: vi.fn(), videoUploads: vi.fn() };
+});
 vi.mock("./RuntimePlatform", () => ({ runtimeCapabilities: { mobile: false } }));
 vi.mock("./CloudAgentDrafts", () => ({ loadComposerDrafts: vi.fn(async () => new Map()), saveComposerDraft: vi.fn(async () => {}) }));
 
@@ -47,6 +50,8 @@ beforeEach(() => {
   invoke.mockReset().mockImplementation(async (_cmd, { action }) => {
     if (action.op === "config") return { endpoint: "https://example.test", binding: "device" };
     if (action.op === "list") return { threads: entries.map(item => ({ ...item, matches: !action.query || item.title.includes(action.query) || (item.id === "one" && action.query === "正文独有词") })), threadManagement: true, account: { state: "ready", model: "model", plan: "plan" } };
+    if (action.op === "materials") return { items: [], more: false };
+    if (action.op === "recallMaterials") return { items: [], bundle: null, totalBytes: 0, elapsedMs: 5 };
     const summary = entries.find(item => item.id === action.thread)!;
     const thread = () => ({ ...summary, before: null, turns: [{ id: "turn", seq: 1, text: "原问题", answer: "原回答", attachments: [], status: running ? "running" : "completed" }] });
     if (action.op === "read") return { thread: thread(), account: { state: "ready" } };
@@ -172,7 +177,9 @@ it("keeps the mobile chat-close action separate from leaving the Agents page", a
   await act(async () => root.render(<CloudAgents onClose={onClose} />));
   const returnToList = async () => {
     const popped = new Promise<void>(resolve => window.addEventListener("popstate", () => resolve(), { once: true }));
-    await act(async () => { node.querySelector<HTMLButtonElement>('button[aria-label="返回会话列表"]')!.click(); await popped; });
+    await click("会话选项");
+    await click("会话列表");
+    await act(async () => { await popped; });
   };
   await act(async () => node.querySelector<HTMLButtonElement>(".cloud-agents-thread")!.click());
   await type(node.querySelector("textarea")!, "保留这条尚未发送的草稿");
@@ -253,7 +260,7 @@ it("keeps the photo visible and reconciles a lost upload receipt even before the
   expect(outbox).toHaveBeenCalledWith("device", null, submitted?.turn);
 });
 
-it("shows real cloud materials, completed results and the public process in the mobile views", async () => {
+it("shows inline collapsible process, single model trigger, and secondary materials/results views on mobile", async () => {
   runtimeCapabilities.mobile = true;
   const handler = invoke.getMockImplementation()!;
   invoke.mockImplementation((cmd, args) => args.action.op === "read" ? Promise.resolve({ thread: {
@@ -265,21 +272,26 @@ it("shows real cloud materials, completed results and the public process in the 
   } }) : handler(cmd, args));
   await render();
   await act(async () => node.querySelector<HTMLButtonElement>(".cloud-agents-thread")!.click());
+  // Only one model trigger exists in the mobile chat view (no duplicate in composer).
+  expect(node.querySelectorAll('button[aria-label="选择模型"]')).toHaveLength(1);
+  // Collapsible process expands in place without a modal dialog.
   await click("查看运行过程");
-  const dialog = node.querySelector('[role="dialog"]')!;
-  expect(dialog.textContent).toContain("已读取用户选定的图片。");
-  expect(dialog.textContent).toContain("模型公开摘要");
-  expect(dialog.textContent).toContain("核对图片中的日期。");
-  expect(dialog.textContent).toContain("3 秒");
-  const back = new Promise<void>(resolve => window.addEventListener("popstate", () => resolve(), { once: true, capture: true }));
-  await click("关闭");
-  await act(async () => back);
-  await click("材料");
+  expect(node.querySelector('[role="dialog"]')).toBeNull();
+  expect(node.textContent).toContain("已读取用户选定的图片。");
+  expect(node.textContent).toContain("模型公开摘要");
+  expect(node.textContent).toContain("核对图片中的日期。");
+  expect(node.textContent).toContain("3 秒");
+  await click("查看运行过程");
+  expect(node.textContent).not.toContain("已读取用户选定的图片。");
+  // Secondary materials/results views remain reachable from the session menu.
+  await click("会话选项");
+  await click("查看会话材料");
   expect(node.querySelector('[aria-label="会话材料"]')?.textContent).toContain("截图.jpg");
   expect(node.querySelector(".cloud-agents-compose")).toBeNull();
-  await click("成果");
+  await click("会话选项");
+  await click("查看会话成果");
   expect(node.querySelector('[aria-label="会话成果"]')?.textContent).toContain("从照片得出的回答");
-  await click("对话");
+  await click("返回对话");
   expect(node.querySelector(".cloud-agents-compose")).not.toBeNull();
   expect(invoke.mock.calls.some(([, args]) => args.action.op === "send")).toBe(false);
 });
@@ -329,7 +341,8 @@ it("returns to the list on the first attempt when another visit left stale chat 
   await render();
   await act(async()=>node.querySelector<HTMLButtonElement>(".cloud-agents-thread")!.click());
   expect(node.querySelector("textarea")).not.toBeNull();
-  await click("返回会话列表");
+  await click("会话选项");
+  await click("会话列表");
   await act(async()=>{await new Promise(resolve=>setTimeout(resolve,30));});
   expect(node.querySelector(".cloud-agents-home")).not.toBeNull();
   expect(node.querySelector("textarea")).toBeNull();
@@ -348,17 +361,195 @@ it("places mobile connection status in the assistant header and opens real setti
   expect(node.querySelector(".cloud-agents-home")).not.toBeNull();
 });
 
-it("restores the last mobile report view from disk and labels cached results without starting a model",async()=>{
+it("restores the last mobile report view from disk as an expanded inline handoff without starting a model",async()=>{
  runtimeCapabilities.mobile=true;
  localStorage.setItem("hub-cloud-last:device",JSON.stringify({thread:"one",view:"results"}));
  const handler=invoke.getMockImplementation()!;
  const handoff={id:"one",thread:"one",state:"published",createdAt:1000,publishedAt:2000,manifest:{version:1,title:"桌面两版比较",origin:{workId:"work-one",artifactId:"artifact-one",executionId:"analysis-one",revision:2,generatedAt:"2026-11-18T01:00:00Z",inputs:[{title:"原表.xlsx",sha256:"a".repeat(64)}]},files:[],report:{name:"报告.md",sha256:"b".repeat(64),text:"桌面报告：新增7项，需核对备注。"}}};
  invoke.mockImplementation(async(cmd,args)=>args.action.op==="read"?{thread:{...entries[0],turns:[],before:null,handoff},cached:true,cachedAt:1794963600000,account:{state:"ready"}}:handler(cmd,args));
  await render();
- expect(node.querySelector('.cloud-agents-views button[aria-pressed="true"]')?.textContent).toBe("成果");
+ expect(node.querySelector('.bw-handoff-toggle')?.getAttribute("aria-expanded")).toBe("true");
  expect(node.textContent).toContain("桌面报告：新增7项");expect(node.textContent).toContain("显示本机缓存");
  expect(node.textContent).not.toContain("正在读取对话");expect(JSON.parse(localStorage.getItem("hub-cloud-last:device")!).view).toBe("results");
  expect(invoke.mock.calls.some(([,a])=>a.action.op==="send")).toBe(false);
+});
+
+it("supports auto-rag recall, aborts safely on recall failure, and reuses frozen bundle on retry", async () => {
+  runtimeCapabilities.mobile = true;
+  const previous = invoke.getMockImplementation()!;
+  let failRecall = true;
+  const bundle = {
+    id: "bundle-rag-1",
+    title: "自动关联 1 份资料：混合检索方案",
+    source: "本机自动召回 · 1 份 · 0.1 KB",
+    text: "【本机自动召回 · 1 份资料】\n\n### [资料1] 混合检索方案（Car）\nP99 延迟 14ms",
+    sha256: "sha-rag-1",
+  };
+  invoke.mockImplementation(async (cmd, args) => {
+    const { action } = args;
+    if (action.op === "recallMaterials") {
+      if (failRecall) throw new Error("索引正忙");
+      return { items: [bundle], bundle, totalBytes: 80, elapsedMs: 11 };
+    }
+    if (action.op === "read") return { thread: null };
+    if (action.op === "send") return { delivery: "unknown" };
+    return previous(cmd, args);
+  });
+  await render();
+  await click("新对话");
+  await type(node.querySelector("textarea")!, "延迟是多少？");
+  await click("发送");
+  expect(node.textContent).toContain("本机资料检索失败");
+  expect(node.querySelector("textarea")?.value).toBe("延迟是多少？");
+  expect(invoke.mock.calls.some(([, a]) => a.action.op === "send")).toBe(false);
+
+  failRecall = false;
+  await click("发送");
+  const sends1 = invoke.mock.calls.filter(([, a]) => a.action.op === "send").map(([, a]) => a.action);
+  expect(sends1).toHaveLength(1);
+  expect(sends1[0].message.material).toEqual(bundle);
+  expect(node.textContent).toContain("本机自动召回 1 篇");
+
+  // Retry must reuse frozen bundle without re-running recallMaterials.
+  const recallCountBeforeRetry = invoke.mock.calls.filter(([, a]) => a.action.op === "recallMaterials").length;
+  await click("用原编号重试");
+  expect(invoke.mock.calls.filter(([, a]) => a.action.op === "recallMaterials")).toHaveLength(recallCountBeforeRetry);
+  const sends2 = invoke.mock.calls.filter(([, a]) => a.action.op === "send").map(([, a]) => a.action);
+  expect(sends2).toHaveLength(2);
+  expect(sends2[1]).toEqual(sends2[0]);
+});
+
+it("supports manual multi-material selection with hash verification, cloud-only mode, and rejected draft recovery", async () => {
+  runtimeCapabilities.mobile = true;
+  const previous = invoke.getMockImplementation()!;
+  const docA = { id: "id-a", title: "方案A", source: "Car", text: "内容A", sha256: "sha-a" };
+  const docB = { id: "id-b", title: "方案B", source: "Car", text: "内容B", sha256: "sha-b" };
+  const packed = {
+    id: "bundle-ab",
+    title: "已选 2 份资料：方案A、方案B",
+    source: "手动指定 · 2 份 · 0.1 KB",
+    text: "【手动指定 · 2 份资料】\n\n### [资料1] 方案A（Car）\n内容A\n\n---\n\n### [资料2] 方案B（Car）\n内容B",
+    sha256: "sha-ab",
+  };
+  let rejectNextSend = true;
+  invoke.mockImplementation(async (cmd, args) => {
+    const { action } = args;
+    if (action.op === "materials") {
+      return {
+        items: [
+          { key: { kind: "document", id: "a", libraryId: "car" }, title: "方案A", source: "Car", chars: 3, bytes: 9, preview: "内容A" },
+          { key: { kind: "document", id: "b", libraryId: "car" }, title: "方案B", source: "Car", chars: 3, bytes: 9, preview: "内容B" },
+        ],
+        more: false,
+      };
+    }
+    if (action.op === "material") return action.selection.id === "a" ? docA : docB;
+    if (action.op === "prepareMaterials") return { bundle: packed, items: [docA, docB], totalBytes: 120 };
+    if (action.op === "read") return { thread: null };
+    if (action.op === "send") {
+      if (rejectNextSend) { rejectNextSend = false; return { delivery: "rejected", error: "服务端暂时拒绝" }; }
+      return { delivery: "accepted", id: action.turn };
+    }
+    return previous(cmd, args);
+  });
+  await render();
+  await click("新对话");
+  await act(async () => {
+    [...node.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(b => b.textContent?.includes("手动指定"))!.click();
+  });
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 260)); });
+  const checkboxes = [...node.querySelectorAll<HTMLInputElement>('.bw-multi-material-row input[type="checkbox"]')];
+  expect(checkboxes).toHaveLength(2);
+  await act(async () => checkboxes[0].click());
+  await act(async () => checkboxes[1].click());
+  expect(node.textContent).toContain("完成 (2)");
+  await click("完成 (2)");
+  // Material-only send with empty text and no photo must be disabled (matches server.py).
+  expect(node.querySelector<HTMLButtonElement>('button[aria-label="发送"]')?.disabled).toBe(true);
+  await type(node.querySelector("textarea")!, "对比这两篇");
+  await click("发送");
+  const prepareCall = invoke.mock.calls.find(([, a]) => a.action.op === "prepareMaterials")![1].action;
+  expect(prepareCall.expectedSha256).toEqual(["sha-a", "sha-b"]);
+  const sentManual = invoke.mock.calls.find(([, a]) => a.action.op === "send")![1].action;
+  expect(sentManual.message.material).toEqual(packed);
+  expect(sentManual.message.sourceMaterials).toBeUndefined();
+
+  // Rejected multi-material turn restores individual editable materials with keys.
+  await click("放回输入框");
+  expect(node.querySelector("textarea")?.value).toBe("对比这两篇");
+  expect(node.querySelectorAll(".bw-draft-chip")).toHaveLength(2);
+
+  // Switching to cloud-only sends without calling recallMaterials and without attaching material.
+  const recallBeforeCloudOnly = invoke.mock.calls.filter(([, a]) => a.action.op === "recallMaterials").length;
+  await act(async () => {
+    [...node.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(b => b.textContent?.includes("纯云端"))!.click();
+  });
+  await click("发送");
+  expect(invoke.mock.calls.filter(([, a]) => a.action.op === "recallMaterials")).toHaveLength(recallBeforeCloudOnly);
+  const cloudOnlySend = invoke.mock.calls.filter(([, a]) => a.action.op === "send")[1][1].action;
+  expect(cloudOnlySend.message.material).toBeUndefined();
+});
+
+it("exits cleanly to list from session sheet, preserves draft on handoff follow-up, and shows each turn's own model", async () => {
+  runtimeCapabilities.mobile = true;
+  const previous = invoke.getMockImplementation()!;
+  const handoff = { id: "one", thread: "one", state: "published", createdAt: 1000, publishedAt: 2000, manifest: { version: 1, title: "桌面压测报告", origin: { workId: "w", artifactId: "a", executionId: "e", revision: 1, generatedAt: "2026-11-27T00:00:00Z", inputs: [] }, files: [], report: { name: "报告.md", sha256: "b".repeat(64), text: "报告正文" } } };
+  invoke.mockImplementation(async (cmd, args) => {
+    if (args.action.op === "read") {
+      return {
+        thread: {
+          ...entries[0], before: null, handoff,
+          turns: [{ id: "t1", seq: 1, text: "旧问题", answer: "旧回答", status: "completed", attachments: [], selection: { model: "gpt-old-sol", effort: "low" } }],
+        },
+        account: { state: "ready" },
+      };
+    }
+    return previous(cmd, args);
+  });
+  await render();
+  await act(async () => node.querySelector<HTMLButtonElement>(".cloud-agents-thread")!.click());
+  expect(node.querySelector(".bw-answer-brand")?.textContent).toContain("GPT-old Sol");
+
+  // Handoff quick follow-up must NOT overwrite existing unsent user draft.
+  await type(node.querySelector("textarea")!, "我自己的问题草稿");
+  await click("展开报告 ↓");
+  await click("针对此报告追问");
+  expect(node.querySelector("textarea")?.value).toBe("我自己的问题草稿");
+
+  // Session sheet -> "全部会话与搜索" cleanly pops both sheet and chat back to list.
+  await click("切换或管理会话");
+  expect(node.querySelector('[role="dialog"]')).not.toBeNull();
+  await click("返回会话列表");
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 60)); });
+  expect(node.querySelector(".cloud-agents-home")).not.toBeNull();
+  expect(node.querySelector("textarea")).toBeNull();
+});
+
+it("prevents late material picker toggle and in-flight outbox write from polluting another session", async () => {
+  runtimeCapabilities.mobile = true;
+  const previous = invoke.getMockImplementation()!;
+  let releaseMaterial!: (value: unknown) => void;
+  invoke.mockImplementation(async (cmd, args) => {
+    const { action } = args;
+    if (action.op === "materials") {
+      return { items: [{ key: { kind: "document", id: "slow", libraryId: "car" }, title: "慢资料", source: "Car", chars: 4, bytes: 12, preview: "慢内容" }], more: false };
+    }
+    if (action.op === "material") return new Promise(resolve => { releaseMaterial = resolve; });
+    return previous(cmd, args);
+  });
+  await render();
+  await act(async () => node.querySelector<HTMLButtonElement>(".cloud-agents-thread")!.click());
+  await act(async () => {
+    [...node.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(b => b.textContent?.includes("手动指定"))!.click();
+  });
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 260)); });
+  await act(async () => node.querySelector<HTMLInputElement>('.bw-multi-material-row input[type="checkbox"]')!.click());
+  // Close picker and switch to a fresh thread before the slow material response arrives.
+  await click("完成 (0)");
+  await click("会话选项");
+  await click("新对话");
+  await act(async () => releaseMaterial({ id: "slow-id", title: "慢资料", source: "Car", text: "慢内容", sha256: "sha-slow" }));
+  expect(node.querySelectorAll(".bw-draft-chip")).toHaveLength(0);
 });
 
 it("clears already visible cloud content when device access is rejected",async()=>{

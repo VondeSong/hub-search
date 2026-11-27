@@ -3,8 +3,137 @@ import { composerDraftKey, flushComposerDrafts } from "./CloudAgentDrafts";
 
 export type Upload = { name: string; mime: string; data: string; seconds?: number };
 export type CloudSkillPayload = { name: string; version: string; manifestSha256: string; files: Record<string, { text: string; sha256: string }> };
-export type MaterialSnapshot={id:string;title:string;source:string;text:string;sha256:string};
-export type DraftTurn = { thread: string; turn: string; text: string; attachments: Upload[]; created?: number; skill?: CloudSkillPayload; material?:MaterialSnapshot; selection?: import("./CloudAgentPreferences").ModelSelection };
+export type MaterialSelectionKey = { kind: "document" | "journal" | string; id: string; libraryId: string | null };
+export type MaterialSnapshot = { id: string; title: string; source: string; text: string; sha256: string; key?: MaterialSelectionKey };
+export type AgentContextMode = "auto-rag" | "manual" | "cloud-only";
+export type RecallMaterialsResult = { items: MaterialSnapshot[]; bundle: MaterialSnapshot | null; totalBytes: number; elapsedMs: number };
+export type PrepareMaterialsResult = { bundle: MaterialSnapshot; items: MaterialSnapshot[]; totalBytes: number };
+export type DraftTurn = {
+  thread: string;
+  turn: string;
+  text: string;
+  attachments: Upload[];
+  created?: number;
+  skill?: CloudSkillPayload;
+  material?: MaterialSnapshot;
+  sourceMaterials?: MaterialSnapshot[];
+  selection?: import("./CloudAgentPreferences").ModelSelection;
+  contextMode?: AgentContextMode;
+};
+
+export const MAX_MATERIAL_BYTES = 48_000;
+
+const utf8Encoder = new TextEncoder();
+
+export function utf8ByteLength(value: string): number {
+  return utf8Encoder.encode(value).length;
+}
+
+export function formatMaterialKb(bytes: number): string {
+  return (bytes / 1000).toFixed(1);
+}
+
+function sanitizeInlineMeta(input: string): string {
+  return input.replace(/[\r\n]/g, " ").trim().split(/\s+/).filter(Boolean).join(" ");
+}
+
+function clipUtf8WithEllipsis(input: string, maxBytes: number): string {
+  const trimmed = input.trim();
+  if (utf8ByteLength(trimmed) <= maxBytes) return trimmed;
+  const suffix = "…";
+  const suffixBytes = utf8ByteLength(suffix);
+  if (maxBytes <= suffixBytes) return "";
+  let used = 0;
+  let result = "";
+  for (const ch of trimmed) {
+    const len = utf8ByteLength(ch);
+    if (used + len > maxBytes - suffixBytes) break;
+    result += ch;
+    used += len;
+  }
+  return result.trimEnd() + suffix;
+}
+
+/**
+ * Exact byte length matching Rust `materials::pack_bundle` serialization so the
+ * picker budget bar and server 48,000-byte limit never disagree.
+ */
+export function exactPackedMaterialBytes(
+  items: { title: string; source: string; text: string }[],
+  mode: "manual" | "auto-rag" = "manual",
+): number {
+  if (items.length === 0) return 0;
+  if (items.length === 1 && mode === "manual") return utf8ByteLength(items[0].text);
+  const headerTag = mode === "auto-rag"
+    ? `【本机自动召回 · ${items.length} 份资料】\n\n`
+    : `【手动指定 · ${items.length} 份资料】\n\n`;
+  const sections = items.map((item, idx) => {
+    const cleanTitle = clipUtf8WithEllipsis(sanitizeInlineMeta(item.title), 120) || "未命名资料";
+    const cleanSource = clipUtf8WithEllipsis(sanitizeInlineMeta(item.source), 80) || "本机资料";
+    return `### [资料${idx + 1}] ${cleanTitle}（${cleanSource}）\n${item.text.trim()}`;
+  });
+  return utf8ByteLength(`${headerTag}${sections.join("\n\n---\n\n")}`);
+}
+
+export function stripMaterialKey(item: MaterialSnapshot): MaterialSnapshot {
+  return { id: item.id, title: item.title, source: item.source, text: item.text, sha256: item.sha256 };
+}
+
+export type ParsedMaterialBundle = {
+  mode: "auto-rag" | "manual";
+  items: { title: string; source: string; text: string }[];
+  totalBytes: number;
+};
+
+export function parseMaterialBundle(material?: MaterialSnapshot): ParsedMaterialBundle | null {
+  if (!material) return null;
+  const totalBytes = utf8ByteLength(material.text);
+  // Require matching bundle source metadata AND header banner so ordinary single
+  // Markdown notes containing `---` or `### [资料2]` are never misparsed as bundles.
+  const sourceMeta = /^(本机自动召回|手动指定)\s*·\s*(\d+)\s*份\s*·\s*/.exec(material.source);
+  if (!sourceMeta) {
+    return {
+      mode: "manual",
+      items: [{ title: material.title, source: material.source, text: material.text }],
+      totalBytes,
+    };
+  }
+  const mode: "auto-rag" | "manual" = sourceMeta[1] === "本机自动召回" ? "auto-rag" : "manual";
+  const expectedCount = Number(sourceMeta[2]);
+  const expectedBanner = mode === "auto-rag"
+    ? `【本机自动召回 · ${expectedCount} 份资料】`
+    : `【手动指定 · ${expectedCount} 份资料】`;
+  if (!material.text.startsWith(expectedBanner)) {
+    return {
+      mode,
+      items: [{ title: material.title, source: material.source, text: material.text }],
+      totalBytes,
+    };
+  }
+  const rest = material.text.slice(expectedBanner.length).replace(/^\n+/, "");
+  const items: { title: string; source: string; text: string }[] = [];
+  let cursor = 0;
+  for (let i = 1; i <= expectedCount; i++) {
+    const startMarker = `### [资料${i}] `;
+    if (!rest.startsWith(startMarker, cursor)) break;
+    const nextMarker = i < expectedCount ? `\n\n---\n\n### [资料${i + 1}] ` : "";
+    const nextPos = nextMarker ? rest.indexOf(nextMarker, cursor + startMarker.length) : -1;
+    const chunk = nextPos === -1 ? rest.slice(cursor) : rest.slice(cursor, nextPos);
+    const firstBreak = chunk.indexOf("\n");
+    const heading = (firstBreak === -1 ? chunk : chunk.slice(0, firstBreak)).trim();
+    const body = firstBreak === -1 ? "" : chunk.slice(firstBreak + 1).trim();
+    const match = /^### \[资料\d+\]\s+(.+)（([^）]+)）$/.exec(heading);
+    if (match) items.push({ title: match[1].trim(), source: match[2].trim(), text: body });
+    else items.push({ title: heading.replace(/^###\s*/, "") || material.title, source: material.source, text: body || chunk });
+    if (nextPos === -1) break;
+    cursor = nextPos + "\n\n---\n\n".length;
+  }
+  return {
+    mode,
+    items: items.length === expectedCount ? items : [{ title: material.title, source: material.source, text: material.text }],
+    totalBytes,
+  };
+}
 
 function encode(blob: Blob, name: string, seconds?: number): Promise<Upload> {
   return new Promise((resolve, reject) => {

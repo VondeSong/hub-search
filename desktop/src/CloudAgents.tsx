@@ -1,13 +1,61 @@
-import { invoke } from "@tauri-apps/api/core";
+import {
+  invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Archive, ArrowLeft, ArrowUp, Camera, ChevronRight, Clock3, Cloud, Download, FileText, Image, LoaderCircle, MessageSquare, MoreHorizontal, PanelLeft, Plus, Search, Settings2, Sparkles, Square, Video, X } from "lucide-react";
+import { Archive,
+  ArrowLeft,
+  ArrowUp,
+  Camera,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Clock3,
+  Cloud,
+  Cpu,
+  Download,
+  Globe,
+  Image,
+  LoaderCircle,
+  MessageSquare,
+  MoreHorizontal,
+  PanelLeft,
+  Paperclip,
+  Plus,
+  Search,
+  Settings2,
+  SlidersHorizontal,
+  Sparkles,
+  Square,
+  SquareCheck,
+  Video,
+  X,
+} from "lucide-react";
+import { CustomPageIcon as FileText } from "./CustomPageIcon";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CloudMarkdownTable } from "./CloudMarkdownTable";
 import { loadComposerDrafts, saveComposerDraft, type ComposerDraft } from "./CloudAgentDrafts";
-import { imageUpload, outbox, uploadSize, videoUploads, type CloudSkillPayload, type DraftTurn, type Upload, type MaterialSnapshot } from "./CloudAgentMedia";
+import {
+  exactPackedMaterialBytes,
+  formatMaterialKb,
+  imageUpload,
+  MAX_MATERIAL_BYTES,
+  outbox,
+  parseMaterialBundle,
+  stripMaterialKey,
+  uploadSize,
+  videoUploads,
+  type AgentContextMode,
+  type CloudSkillPayload,
+  type DraftTurn,
+  type MaterialSnapshot,
+  type PrepareMaterialsResult,
+  type RecallMaterialsResult,
+  type Upload,
+} from "./CloudAgentMedia";
 import "./CloudAgents.css";
+import { mobileTasks, saveMobileTask } from "./MobileInsightTasks";
 import { CloudAgentSheet, CloudAnswerNote, CloudMaterialPicker } from "./CloudAgentMaterials";
 import { AgentAnswerActions } from "./AgentAnswerActions";
 import { runtimeCapabilities } from "./RuntimePlatform";
@@ -22,7 +70,7 @@ export type CloudContinuationPayload = { threadId: string; title: string; text: 
 export type CloudEmbedRequest = { token: number; mode: "thread" | "new" | "settings" | "list"; threadId?: string };
 type Attachment = { id: string; name: string; seconds?: number | null };
 type Progress = { startedAt?: number; finishedAt?: number; summary?: string[]; updates?: string[] };
-type Turn = { id: string; seq: number; created?: number; text: string; answer: string; error?: string; status: "queued" | "running" | "stopping" | "completed" | "failed" | "stopped"; attachments: Attachment[]; material?: MaterialSnapshot; progress?: Progress };
+type Turn = { id: string; seq: number; created?: number; text: string; answer: string; error?: string; status: "queued" | "running" | "stopping" | "completed" | "failed" | "stopped"; attachments: Attachment[]; material?: MaterialSnapshot; progress?: Progress; selection?: ModelSelection | null };
 type Thread = Summary & { turns: Turn[]; before: number | null; handoff?:CloudHandoff|null; skill?: { name: string; version: string; paths: string[] } | null; selection?: ModelSelection | null };
 type CacheState = {cached?:boolean;cachedAt?:number;cacheWarning?:string;accessDenied?:boolean;error?:string};
 type Snapshot = CacheState & { thread: Thread | null; account?: Account };
@@ -99,6 +147,79 @@ function AttachmentPreview({ file, local, onAttachToLocal }: { file: Attachment;
   </div>;
 }
 
+function InlineRunProgress({
+  turn,
+  waitingToStop,
+  expanded,
+  onToggle,
+}: {
+  turn: Turn;
+  waitingToStop: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const { progress } = turn;
+  const summary = progress?.summary ?? [];
+  const updates = progress?.updates ?? [];
+  const parsedMaterial = parseMaterialBundle(turn.material);
+  const state = waitingToStop ? statusText.stopping : statusText[turn.status];
+  const durationSec = progress?.startedAt && progress.finishedAt
+    ? Math.max(1, Math.round((progress.finishedAt - progress.startedAt) / 1000))
+    : undefined;
+  const steps: { kind: "local" | "update" | "summary"; text: string }[] = [];
+  if (parsedMaterial) {
+    const kb = formatMaterialKb(parsedMaterial.totalBytes);
+    const names = parsedMaterial.items.slice(0, 2).map(item => `《${item.title.slice(0, 14)}》`).join("、");
+    steps.push({
+      kind: "local",
+      text: parsedMaterial.mode === "auto-rag"
+        ? `本机自动检索命中 ${parsedMaterial.items.length} 份资料 (${kb} KB)：${names}`
+        : `附带手动指定 ${parsedMaterial.items.length} 份资料 (${kb} KB)：${names}`,
+    });
+  }
+  for (const item of updates) {
+    if (item.trim()) steps.push({ kind: "update", text: item.trim() });
+  }
+  for (const item of summary) {
+    if (item.trim()) steps.push({ kind: "summary", text: item.trim() });
+  }
+  const latest = (summary[summary.length - 1] ?? updates[updates.length - 1] ?? steps[0]?.text)
+    ?.trim().split(/\r?\n/, 1)[0].replace(/^#+\s+/, "").replace(/\*\*/g, "");
+  const collapsedCopy = latest
+    ? `${latest}${durationSec ? ` (${durationSec} 秒)` : ""}`
+    : active(turn) ? state : `运行过程${durationSec ? ` (${durationSec} 秒)` : ""}`;
+  return <div className={`bw-cot-card${expanded ? " is-open" : ""}`}>
+    <button
+      type="button"
+      className="bw-cot-header"
+      aria-label="查看运行过程"
+      aria-expanded={expanded}
+      onClick={onToggle}
+    >
+      <span className="bw-cot-header-main">
+        {active(turn) ? <LoaderCircle size={13} className="cloud-agents-spinner"/> : <Cpu size={13}/>}
+        <span>{expanded ? `检索与推理过程明细（${Math.max(1, steps.length)} 步${durationSec ? ` · ${durationSec} 秒` : ""}）` : collapsedCopy}</span>
+      </span>
+      {expanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+    </button>
+    {expanded && <div className="bw-cot-steps">
+      {steps.length > 0 ? <ol className="bw-cot-list" aria-label="Codex 进度">
+        {steps.map((step, index) => <li key={index} className={`is-${step.kind}`}>
+          <span className="bw-cot-index">{index + 1}.</span>
+          <span className="bw-cot-text">
+            {step.kind === "summary" && <strong className="bw-cot-tag">模型公开摘要</strong>}
+            {step.text}
+          </span>
+        </li>)}
+      </ol> : <p className="bw-cot-empty">{active(turn) ? "等待 Codex 返回可显示的摘要。" : "本轮没有可显示的模型摘要。"}</p>}
+      <p className="bw-cot-state" role="status">
+        {active(turn) && <LoaderCircle size={13} className="cloud-agents-spinner"/>}
+        <span>个人云端 · {state}{durationSec ? ` · ${durationSec} 秒` : ""}</span>
+      </p>
+    </div>}
+  </div>;
+}
+
 function RunProgress({ turn, waitingToStop }: { turn: Turn; waitingToStop: boolean }) {
   const [open, setOpen] = useState(false);
   const { progress } = turn;
@@ -130,6 +251,7 @@ export type CloudCatalogUpdate = { threads: CloudThreadSummary[]; account?: Acco
 
 export default function CloudAgents({
   onClose,
+  onOpenTask,
   initialSettings = false,
   openRecentOnEntry = false,
   embedded = false,
@@ -141,6 +263,7 @@ export default function CloudAgents({
   onHandoffStateChange,
 }: {
   onClose?: () => void;
+  onOpenTask?: (id: string) => void;
   initialSettings?: boolean;
   openRecentOnEntry?: boolean;
   embedded?: boolean;
@@ -151,6 +274,7 @@ export default function CloudAgents({
   onCatalogUpdated?: (update: CloudCatalogUpdate) => void;
   onHandoffStateChange?: (handoff: CloudHandoff, meta: { cached: boolean }) => void;
 }) {
+  const [convertedTasks, setConvertedTasks] = useState<Record<string, string>>({});
   const mobile = runtimeCapabilities.mobile;
   const desktopEmbedded = embedded && !mobile;
   const [connection, setConnection] = useState<Connection | null>();
@@ -159,7 +283,7 @@ export default function CloudAgents({
   const [settings, setSettings] = useState(initialSettings || request?.mode === "settings");
   const [chatOpen, setChatOpen] = useState(!initialSettings && (request?.mode === "thread" || request?.mode === "new"));
   const [view, setView] = useState<ChatView>("chat");
-  const [sheet, setSheet] = useState<"attachments" | "model" | "effort" | "usage" | "skills">();
+  const [sheet, setSheet] = useState<"attachments" | "model" | "effort" | "usage" | "skills" | "sessions">();
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [catalogQuery, setCatalogQuery] = useState<string>();
@@ -185,9 +309,14 @@ export default function CloudAgents({
   const [notice, setNotice] = useState("");
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<Upload[]>([]);
-  const [material,setMaterial]=useState<MaterialSnapshot>();
-  const [materialPicker,setMaterialPicker]=useState(false);
-  const [checkedAt,setCheckedAt]=useState<number>();
+  const [material, setMaterial] = useState<MaterialSnapshot>();
+  const [materials, setMaterials] = useState<MaterialSnapshot[]>([]);
+  const [contextMode, setContextMode] = useState<AgentContextMode>("auto-rag");
+  const [recalling, setRecalling] = useState(false);
+  const [cotExpanded, setCotExpanded] = useState<Record<string, boolean>>({});
+  const [handoffExpanded, setHandoffExpanded] = useState(false);
+  const [materialPicker, setMaterialPicker] = useState(false);
+  const [checkedAt, setCheckedAt] = useState<number>();
   const [skills, setSkills] = useState<SkillChoice[]>();
   const [skillVersion, setSkillVersion] = useState("");
   const [skillPaths, setSkillPaths] = useState<string[]>([]);
@@ -195,7 +324,7 @@ export default function CloudAgents({
   const [delivery, setDelivery] = useState<Delivery>();
   const [confirmedUpload, setConfirmedUpload] = useState<DraftTurn>();
   const [waitingToStop, setWaitingToStop] = useState<string>();
-  const [preview, setPreview] = useState<Upload | MaterialSnapshot>();
+  const [preview, setPreview] = useState<Upload | MaterialSnapshot | { title: string; source: string; text: string }>();
   const [busy, setBusy] = useState(false);
   const [preparing, setPreparing] = useState(false);
   const [syncVersion, refresh] = useState(0);
@@ -203,16 +332,25 @@ export default function CloudAgents({
   const scroll = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
   const sending = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const listScroll = useRef(0);
   const list = useRef<HTMLDivElement>(null);
   const historyOwner = useRef(crypto.randomUUID());
+  const leaveChatAfterSheet = useRef(false);
+  const bindingRef = useRef<string | undefined>(undefined);
   const drafts = useRef(new Map<string, ComposerDraft>());
   const draftOwner = useRef<string | undefined>(undefined);
   const [draftsReady, setDraftsReady] = useState(false);
+  const normalizeDraftMaterials = (draft?: ComposerDraft): MaterialSnapshot[] =>
+    draft?.materials?.length ? draft.materials : draft?.material ? [draft.material] : [];
+  const normalizeDraftMode = (draft?: ComposerDraft, mats: MaterialSnapshot[] = []): AgentContextMode =>
+    draft?.contextMode ?? (mats.length > 0 ? "manual" : "auto-rag");
   const current = snapshot?.id === selected ? snapshot : undefined;
   const last = current?.turns[current.turns.length - 1];
   const binding = connection?.binding;
+  bindingRef.current = binding;
   const autoOpenedFor = useRef<string | undefined>(undefined);
   const known = Boolean(current || selected && catalog.some(item => item.id === selected));
   const localPending = pending?.thread === selected ? pending : undefined;
@@ -234,6 +372,12 @@ export default function CloudAgents({
     if (!mobile) return;
     const pop = () => {
       const own = window.history.state?.hubCloudAgentOwner === historyOwner.current;
+      if (leaveChatAfterSheet.current && own && window.history.state?.hubCloudAgentChat && !window.history.state?.hubCloudDialog) {
+        leaveChatAfterSheet.current = false;
+        showList();
+        return;
+      }
+      leaveChatAfterSheet.current = false;
       setChatOpen(own && Boolean(window.history.state?.hubCloudAgentChat));
       if (!own || !window.history.state?.hubCloudAgentChat) setView("chat");
       setSettings(own && Boolean(window.history.state?.hubCloudAgentSettings));
@@ -272,7 +416,7 @@ export default function CloudAgents({
       if (!live) return;
       drafts.current=stored;draftOwner.current=binding;setDraftsReady(true);
       if (saved) { setPending(saved); if (!desktopEmbedded || !request) select(saved.thread,false,true); }
-      else if(mobile){try{const previous=JSON.parse(localStorage.getItem("hub-cloud-last:"+binding)||"null");if(previous?.thread){select(previous.thread,false,true);if(["chat","results","materials"].includes(previous.view)){setView(previous.view);remember(previous.thread,previous.view);}}else if(stored.has("new"))select(undefined,false,true);}catch{}}
+      else if(mobile){try{const previous=JSON.parse(localStorage.getItem("hub-cloud-last:"+binding)||"null");if(previous?.thread){select(previous.thread,false,true);if(previous.view==="results"){setHandoffExpanded(true);remember(previous.thread,"results");}else if(previous.view==="materials"){setView("materials");remember(previous.thread,"materials");}else if(previous.view==="chat"){setView("chat");remember(previous.thread,"chat");}}else if(stored.has("new"))select(undefined,false,true);}catch{}}
     }).catch(() => { if (live) setNotice("无法读取本机草稿或待重试的消息。原数据已保留，请重新打开后重试。"); });
     return () => { live = false; };
   }, [binding]);
@@ -296,12 +440,23 @@ export default function CloudAgents({
   }, [desktopEmbedded, request]);
 
   useEffect(() => {
-    if (!mobile || !binding || !chatOpen || pending || draftOwner.current!==binding) return;
-    const id=selected??"new";
-    const draft={text,attachments,material,skillVersion,skillPaths,selection:modelSelection};
-    drafts.current.set(id,draft);
-    void saveComposerDraft(binding,id,draft).catch(()=>{if(draftOwner.current===binding)setNotice("草稿尚未保存，请保留应用并重试。原内容仍在输入框中。");});
-  },[mobile,binding,draftsReady,chatOpen,selected,pending,text,attachments,material,skillVersion,skillPaths,modelSelection]);
+    if (!mobile || !binding || !chatOpen || pending || draftOwner.current !== binding) return;
+    const id = selected ?? "new";
+    const draft: ComposerDraft = {
+      text,
+      attachments,
+      material: materials[0],
+      materials: materials.length ? materials : undefined,
+      contextMode,
+      skillVersion,
+      skillPaths,
+      selection: modelSelection,
+    };
+    drafts.current.set(id, draft);
+    void saveComposerDraft(binding, id, draft).catch(() => {
+      if (draftOwner.current === binding) setNotice("草稿尚未保存，请保留应用并重试。原内容仍在输入框中。");
+    });
+  }, [mobile, binding, draftsReady, chatOpen, selected, pending, text, attachments, materials, contextMode, skillVersion, skillPaths, modelSelection]);
 
   useEffect(() => {
     if (!binding || settings) return;
@@ -385,14 +540,28 @@ export default function CloudAgents({
 
   function select(id?: string, sent = false, restoring = false) {
     if (mobile && !restoring && draftOwner.current !== binding) return;
-    if(!restoring)drafts.current.set(selected ?? "new", sent ? { text: "", attachments: [], skillVersion: "", skillPaths: [] } : { text, attachments, material, skillVersion, skillPaths, selection: modelSelection });
+    if (!restoring) {
+      drafts.current.set(
+        selected ?? "new",
+        sent
+          ? { text: "", attachments: [], materials: undefined, contextMode, skillVersion: "", skillPaths: [] }
+          : { text, attachments, material: mobile ? materials[0] : material, materials: mobile && materials.length ? materials : undefined, contextMode, skillVersion, skillPaths, selection: modelSelection },
+      );
+    }
     const draft = sent ? undefined : drafts.current.get(id ?? "new");
-    setText(draft?.text ?? ""); setAttachments(draft?.attachments ?? []); setMaterial(draft?.material); setMaterialPicker(false);
+    const restoredMaterials = normalizeDraftMaterials(draft);
+    setText(draft?.text ?? "");
+    setAttachments(draft?.attachments ?? []);
+    setMaterial(draft?.material);
+    setMaterials(restoredMaterials);
+    setContextMode(sent ? contextMode : normalizeDraftMode(draft, restoredMaterials));
+    setMaterialPicker(false);
+    setHandoffExpanded(false);
     setSkillVersion(draft?.skillVersion ?? ""); setSkillPaths(draft?.skillPaths ?? []);
     setModelSelection(draft?.selection);
     follow.current = true;
     setSelected(id);
-    remember(id,"chat");
+    remember(id, "chat");
     setEarlier([]);
     setBefore(undefined);
     setChatOpen(true); setView("chat"); setSettings(false); setRename(undefined);
@@ -462,7 +631,7 @@ export default function CloudAgents({
       const value = await call<Connection>("connect", { endpoint, token });
       if (value.binding !== binding) {
         setCatalog([]); setCatalogQuery(undefined); setSnapshot(undefined); setAccount(undefined); setPending(undefined); setDelivery(undefined); setConfirmedUpload(undefined);
-        setText(""); setAttachments([]); setMaterial(undefined); setSelected(undefined); drafts.current.clear();
+        setText(""); setAttachments([]); setMaterial(undefined); setMaterials([]); setContextMode("auto-rag"); setSelected(undefined); drafts.current.clear();
         setModelCatalog(undefined); setModelSelection(undefined); setSkills(undefined); setSkillVersion(""); setSkillPaths([]);
         if (mobile && window.history.state?.hubCloudAgentOwner === historyOwner.current && window.history.state?.hubCloudAgentSettings && window.history.state?.hubCloudAgentChat) {
           setChatOpen(false); setView("chat"); setSettings(false); window.history.go(-2);
@@ -480,7 +649,14 @@ export default function CloudAgents({
   async function send(event?: FormEvent) {
     event?.preventDefault();
     if (!binding || mobile && !draftsReady || sending.current || preparing || archived || handoffWithdrawn || (deliveryPhase === "accepted" && pending) ||
-      (pending && pending.thread !== selected) || (!pending && (!text.trim() && !attachments.length && !material || active(last)))) return;
+      (pending && pending.thread !== selected) || (!pending && (!text.trim() && !attachments.length || active(last)))) return;
+    const originThread = selected;
+    const originBinding = binding;
+    const originDraftKey = originThread ?? "new";
+    const sendText = text.trim();
+    const sendAttachments = attachments;
+    const sendMaterials = materials;
+    const sendMode = contextMode;
     sending.current = true;
     setBusy(true);
     setNotice("");
@@ -489,6 +665,7 @@ export default function CloudAgents({
       const skill = !pending && chosenSkill && !boundSkill
         ? await call<CloudSkillPayload>("prepareSkill", { version: chosenSkill.methodVersion, paths: skillPaths })
         : undefined;
+      if (!mounted.current || selectedRef.current !== originThread || bindingRef.current !== originBinding) return;
       if (!pending && modelCatalog?.state !== "ready" && (modelCatalog || effectiveSelection)) {
         setNotice("暂时无法核对所选模型，请重新读取模型目录后发送。草稿已保留。"); return;
       }
@@ -498,23 +675,91 @@ export default function CloudAgents({
       const selection = pending?.selection ?? effectiveSelection;
       if (selection) {
         const capabilities = await call<{ modelSelection?: boolean }>("list", { query: "" });
+        if (!mounted.current || selectedRef.current !== originThread || bindingRef.current !== originBinding) return;
         if (!capabilities.modelSelection) { setNotice("当前云端不支持模型切换，请更新服务后重试。消息尚未执行。"); return; }
       }
-      const draft = pending ?? { thread: selected ?? crypto.randomUUID(), turn: crypto.randomUUID(), text: text.trim(), attachments, skill, material, ...(selection && { selection }), created: Date.now() };
+      let resolvedMaterial: MaterialSnapshot | undefined = pending?.material;
       if (!pending) {
-        await outbox(binding, draft, undefined, selected??"new");
-        setPending(draft);
-        setText(""); setAttachments([]); setMaterial(undefined);
+        if (!mobile) {
+          resolvedMaterial = material ? stripMaterialKey(material) : undefined;
+        } else if (sendMode === "cloud-only") {
+          resolvedMaterial = undefined;
+        } else if (sendMode === "manual") {
+          if (sendMaterials.length === 0) {
+            resolvedMaterial = undefined;
+          } else if (sendMaterials.length === 1) {
+            resolvedMaterial = stripMaterialKey(sendMaterials[0]);
+          } else {
+            const keys = sendMaterials.map(item => item.key);
+            if (keys.some(k => !k)) {
+              setNotice("多份草稿资料需要重新确认定位，请在资料选择器中重新勾选后发送。草稿已保留。");
+              return;
+            }
+            const packed = await call<PrepareMaterialsResult>("prepareMaterials", {
+              selections: keys,
+              expectedSha256: sendMaterials.map(item => item.sha256),
+              mode: "manual",
+            });
+            if (!mounted.current || selectedRef.current !== originThread || bindingRef.current !== originBinding) return;
+            resolvedMaterial = stripMaterialKey(packed.bundle);
+          }
+        } else if (sendMode === "auto-rag" && sendText) {
+          setRecalling(true);
+          try {
+            const recallQuery = Array.from(sendText).slice(0, 1800).join("");
+            const recalled = await call<RecallMaterialsResult>("recallMaterials", {
+              query: recallQuery,
+              limit: 3,
+              maxBytes: MAX_MATERIAL_BYTES,
+            });
+            if (!mounted.current || selectedRef.current !== originThread || bindingRef.current !== originBinding) return;
+            resolvedMaterial = recalled?.bundle ? stripMaterialKey(recalled.bundle) : undefined;
+          } catch (recallError) {
+            if (mounted.current && selectedRef.current === originThread && bindingRef.current === originBinding) {
+              setNotice(`本机资料检索失败（${errorText(recallError)}）。草稿已保留，可重试或切至「纯云端」直接发送。`);
+            }
+            return;
+          } finally {
+            if (mounted.current) setRecalling(false);
+          }
+        }
       }
-      if (selected !== draft.thread) select(draft.thread, true);
-      setModelSelection(draft.selection);
-      drafts.current.delete(draft.thread);
-      follow.current = true;
+      if (!mounted.current || selectedRef.current !== originThread || bindingRef.current !== originBinding) return;
+      const draft: DraftTurn = pending ?? {
+        thread: originThread ?? crypto.randomUUID(),
+        turn: crypto.randomUUID(),
+        text: sendText,
+        attachments: sendAttachments,
+        skill,
+        material: resolvedMaterial,
+        ...(mobile && sendMode === "manual" && sendMaterials.length > 0 && { sourceMaterials: sendMaterials }),
+        ...(selection && { selection }),
+        ...(mobile && { contextMode: sendMode }),
+        created: Date.now(),
+      };
+      if (!pending) {
+        await outbox(originBinding, draft, undefined, originDraftKey);
+        if (!mounted.current || bindingRef.current !== originBinding) return;
+        setPending(draft);
+        drafts.current.delete(originDraftKey);
+        drafts.current.delete(draft.thread);
+        if (selectedRef.current === originThread) {
+          setText(""); setAttachments([]); setMaterial(undefined); setMaterials([]);
+          if (originThread !== draft.thread) select(draft.thread, true);
+          setModelSelection(draft.selection);
+          follow.current = true;
+        }
+      } else {
+        if (selected !== draft.thread) select(draft.thread, true);
+        setModelSelection(draft.selection);
+        drafts.current.delete(draft.thread);
+        follow.current = true;
+      }
       sendingTurn = draft.turn;
       setDelivery({ turn: draft.turn, phase: "sending" });
       const receipt = await call<{ id?: string; delivery?: "accepted" | "rejected" | "unknown"; error?: string }>("send", {
         thread: draft.thread, turn: draft.turn,
-        message: { text: draft.text, attachments: draft.attachments, ...(draft.skill && { skill: draft.skill }), ...(draft.material && { material: draft.material }), ...(draft.selection && { selection: draft.selection }) },
+        message: { text: draft.text, attachments: draft.attachments, ...(draft.skill && { skill: draft.skill }), ...(draft.material && { material: stripMaterialKey(draft.material) }), ...(draft.selection && { selection: draft.selection }) },
       });
       setDelivery(receipt?.delivery === "rejected" ?
         { turn: draft.turn, phase: "rejected", error: receipt.error } :
@@ -525,6 +770,7 @@ export default function CloudAgents({
     } finally {
       refresh(v => v + 1);
       sending.current = false;
+      setRecalling(false);
       setBusy(false);
     }
   }
@@ -549,7 +795,25 @@ export default function CloudAgents({
       if (deliveryPhase === "rejected") {
         setText(displayedPending.text);
         setAttachments(displayedPending.attachments);
-        setMaterial(displayedPending.material);
+        if (displayedPending.sourceMaterials?.length) {
+          setMaterials(displayedPending.sourceMaterials);
+          setMaterial(displayedPending.sourceMaterials[0]);
+          setContextMode("manual");
+        } else if (displayedPending.material) {
+          const inferredMode: AgentContextMode = displayedPending.contextMode ?? "manual";
+          setContextMode(inferredMode);
+          if (inferredMode === "auto-rag") {
+            setMaterials([]);
+            setMaterial(undefined);
+          } else {
+            setMaterials([displayedPending.material]);
+            setMaterial(displayedPending.material);
+          }
+        } else {
+          setMaterials([]);
+          setMaterial(undefined);
+          if (displayedPending.contextMode) setContextMode(displayedPending.contextMode);
+        }
         setSkillVersion(displayedPending.skill?.version ?? "");
         setSkillPaths(Object.keys(displayedPending.skill?.files ?? {}).filter(path => path !== "SKILL.md"));
         setView("chat");
@@ -642,11 +906,52 @@ export default function CloudAgents({
     else requestAnimationFrame(() => textarea.current?.focus());
   };
 
-  const answerActions = (turn: Turn) => <div className="cloud-agents-answer-actions">
-    {(mobile || desktopEmbedded) && <AgentAnswerActions showLabel={desktopEmbedded} text={turn.answer}/>}
-    {turn.status === "completed" && selected && <CloudAnswerNote key={(binding || "") + turn.id} thread={selected} turn={turn.id}/>}
-    {mobile && !archived && turn.status === "completed" && <button type="button" onClick={followUp} disabled={Boolean(pending)}>继续追问</button>}
-  </div>;
+  async function convertTurnToTask(turn: Turn) {
+    const taskId = `agent:${selected || "new"}:${turn.id}`;
+    const existing = convertedTasks[turn.id] || mobileTasks().find(item => item.id === taskId)?.id;
+    if (existing) {
+      onOpenTask?.(existing);
+      return;
+    }
+    try {
+      const cleanLine = turn.answer.replace(/[*#>`]/g, "").split("\n").find(line => line.trim())?.trim() || title;
+      await saveMobileTask({
+        id: taskId,
+        title: `跟进：${cleanLine.slice(0, 52)}`,
+        note: turn.answer.slice(0, 1200),
+        list: "本机任务",
+        plannedDay: new Date().toISOString().slice(0, 10),
+        source: `云端助手 · ${title}`,
+        created: Date.now(),
+        done: false,
+      });
+      setConvertedTasks(current => ({ ...current, [turn.id]: taskId }));
+      setNotice("已一键转为今日任务（再次点击直达查看）");
+    } catch (error) {
+      setNotice(errorText(error));
+    }
+  }
+
+  const answerActions = (turn: Turn) => {
+    const taskId = convertedTasks[turn.id] || (mobile && turn.status === "completed" ? mobileTasks().find(item => item.id === `agent:${selected || "new"}:${turn.id}`)?.id : undefined);
+    if (mobile) {
+      return <div className="bw-answer-receipt-bar">
+        {turn.status === "completed" && selected && <CloudAnswerNote compact key={(binding || "") + turn.id} thread={selected} turn={turn.id}/>}
+        {turn.status === "completed" && (
+          <button type="button" className={`bw-inline-receipt-btn${taskId ? " is-done" : ""}`} onClick={() => void convertTurnToTask(turn)}>
+            {taskId ? <CheckCircle2 size={13} aria-hidden="true"/> : <SquareCheck size={13} aria-hidden="true"/>}
+            <span>{taskId ? "已转任务 · 查看" : "转为任务"}</span>
+          </button>
+        )}
+        <AgentAnswerActions showLabel text={turn.answer}/>
+        {!archived && turn.status === "completed" && <button type="button" className="bw-inline-receipt-btn" onClick={followUp} disabled={Boolean(pending)}>继续追问</button>}
+      </div>;
+    }
+    return <div className="cloud-agents-answer-actions">
+      {desktopEmbedded && <AgentAnswerActions showLabel text={turn.answer}/>}
+      {turn.status === "completed" && selected && <CloudAnswerNote key={(binding || "") + turn.id} thread={selected} turn={turn.id}/>}
+    </div>;
+  };
 
   const canContinueInLocal = Boolean(desktopEmbedded && onContinueInLocal && chatOpen && !settings && selected && (turns.length > 0 || current?.handoff?.state === "published"));
 
@@ -668,6 +973,59 @@ export default function CloudAgents({
     {describe && <button type="button" onClick={openSkills}><Sparkles size={20}/><span>技能<small>查看方法，添加到消息</small></span><ChevronRight size={16}/></button>}
   </>;
 
+  const mobileMediaQuickControls = <>
+    <label title="拍照"><Camera size={14}/><span>拍照</span>
+      <input type="file" aria-label="拍照" accept="image/*" capture="environment" disabled={attachDisabled} onChange={event => { void add(event.currentTarget.files); event.currentTarget.value = ""; }}/>
+    </label>
+    <label title="选择图片"><Image size={14}/><span>相册</span>
+      <input type="file" aria-label="选择图片" accept="image/jpeg,image/png,image/webp" multiple disabled={attachDisabled} onChange={event => { void add(event.currentTarget.files); event.currentTarget.value = ""; }}/>
+    </label>
+    <label title="选择短视频"><Video size={14}/><span>短视频</span>
+      <input type="file" aria-label="选择短视频" accept="video/*" disabled={attachDisabled} onChange={event => { void add(event.currentTarget.files, true); event.currentTarget.value = ""; }}/>
+    </label>
+    <button type="button" onClick={openSkills}><Sparkles size={14}/><span>{selectedSkill ? `/${selectedSkill}` : "挂载 /技能"}</span></button>
+  </>;
+
+  const manualKb = mobile ? formatMaterialKb(exactPackedMaterialBytes(materials, "manual")) : "0.0";
+  const canSendNow = Boolean(text.trim() || attachments.length > 0);
+  const closeSheetAndShowList = () => {
+    if (mobile && window.history.state?.hubCloudDialog) {
+      leaveChatAfterSheet.current = true;
+      setSheet(undefined);
+    } else {
+      setSheet(undefined);
+      showList();
+    }
+  };
+  const pickerThreadOwner = selected;
+  const pickerBindingOwner = binding;
+
+  const renderTurnContextStrip = (turnMaterial?: MaterialSnapshot, modeHint?: AgentContextMode) => {
+    const parsed = parseMaterialBundle(turnMaterial);
+    if (!parsed) {
+      if (modeHint === "cloud-only") {
+        return <div className="bw-turn-context-strip"><span className="bw-turn-context-pill is-badge"><Globe size={11}/>纯云端提问</span></div>;
+      }
+      return null;
+    }
+    const kb = formatMaterialKb(parsed.totalBytes);
+    return <div className="bw-turn-context-strip">
+      <span className="bw-turn-context-pill is-badge">
+        {parsed.mode === "auto-rag" ? `本机自动召回 ${parsed.items.length} 篇 (${kb} KB)` : `手动指定 ${parsed.items.length} 篇 (${kb} KB)`}
+      </span>
+      {parsed.items.map((item, idx) => <button
+        type="button"
+        key={`${item.title}-${idx}`}
+        className="bw-turn-context-pill"
+        onClick={() => setPreview(item)}
+        title="点击查看本轮发送的资料快照"
+      >
+        <FileText size={11}/>
+        <span>{item.title.length > 12 ? `${item.title.slice(0, 12)}…` : item.title}</span>
+      </button>)}
+    </div>;
+  };
+
   return <section className={`cloud-agents${mobile ? " is-mobile" : ""}${desktopEmbedded ? " is-desktop-embedded" : ""}`} aria-label="云端助手">
     {desktopEmbedded && <div className="cloud-agents-context-strip" role="region" aria-label="个人云端会话">
       <div className="cloud-agents-context-copy">
@@ -681,10 +1039,49 @@ export default function CloudAgents({
       </div>
     </div>}
     {mobile && (sheet === "attachments" || materialPicker) && <CloudAgentSheet
-      title={materialPicker ? "选择已下载资料" : "添加材料"}
-      compact={!materialPicker} onClose={() => { setSheet(undefined); setMaterialPicker(false); }}>
-      {materialPicker ? <CloudMaterialPicker embedded onClose={() => setMaterialPicker(false)} onConfirm={value => { setMaterial(value); setMaterialPicker(false); }}/> :
-        <div className="cloud-agents-picker-rows">{attachmentControls(true)}</div>}
+      title="添加本机资料、照片或技能"
+      compact expanded onClose={() => { setSheet(undefined); setMaterialPicker(false); }}>
+      <CloudMaterialPicker
+        embedded
+        multiSelect
+        selectedMaterials={materials}
+        onChangeMaterials={next => {
+          if (selectedRef.current !== pickerThreadOwner || bindingRef.current !== pickerBindingOwner) return;
+          setMaterials(next);
+          setMaterial(next[0]);
+          if (next.length > 0) setContextMode("manual");
+        }}
+        mediaControls={mobileMediaQuickControls}
+        onClose={() => { setSheet(undefined); setMaterialPicker(false); }}
+      />
+    </CloudAgentSheet>}
+    {mobile && sheet === "sessions" && <CloudAgentSheet title={`云端助手会话 (${catalog.length})`} compact expanded onClose={() => setSheet(undefined)}>
+      <div className="bw-multi-picker-footer">
+        <button type="button" className="cloud-agents-primary" disabled={busy || preparing} onClick={() => { setSheet(undefined); select(); }}><Plus size={15}/>新会话</button>
+        <button type="button" aria-label="返回会话列表" onClick={closeSheetAndShowList}>全部会话与搜索</button>
+      </div>
+      <div className="bw-session-sheet-list">
+        {catalog.length ? catalog.map(item => <div key={item.id} className={`bw-session-sheet-card${item.id === selected ? " is-active" : ""}`}>
+          <button type="button" className="bw-session-sheet-pick" onClick={() => { setSheet(undefined); select(item.id); }}>
+            <strong>{item.title}{item.archived ? "（已归档）" : ""}</strong>
+            <small>{item.status && active({ status: item.status }) ? statusText[item.status] : stamp(item.updated)}</small>
+          </button>
+          {management && <button
+            type="button"
+            className="bw-session-sheet-archive"
+            disabled={updating || (item.id === selected && (Boolean(active(last)) || Boolean(localPending)))}
+            onClick={async () => {
+              if (updating) return;
+              setUpdating(true); setNotice("");
+              try {
+                await call<{ thread: Thread }>("update", { thread: item.id, archived: !item.archived });
+                refresh(v => v + 1);
+              } catch (error) { setNotice(errorText(error)); }
+              finally { setUpdating(false); }
+            }}
+          >{item.archived ? "恢复" : "归档"}</button>}
+        </div>) : <p className="cloud-preferences-note">还没有保存的云端会话。</p>}
+      </div>
     </CloudAgentSheet>}
     {(sheet === "model" || sheet === "effort" || sheet === "usage") && <CloudAgentSheet title={sheet === "model" ? "选择模型" : sheet === "effort" ? "推理强度" : "订阅用量"} compact onClose={() => setSheet(undefined)} onBack={sheet !== "model" ? () => setSheet("model") : undefined}>
       <CloudModelPanel page={sheet} catalog={modelCatalog} account={account} selection={effectiveSelection} disabled={Boolean(pending) || busy}
@@ -700,7 +1097,7 @@ export default function CloudAgents({
       {mobile && settings ? <>
         <button type="button" onClick={closeSettings} aria-label="返回"><ArrowLeft size={21}/></button><div><h1>连接与设备</h1></div>
       </> : <>
-        {connection && !mobile && <button type="button" onClick={showList} aria-label={mobile ? "返回会话列表" : "对话列表"}>{mobile ? <ArrowLeft size={21}/> : <PanelLeft size={20}/>}</button>}
+        {connection && !mobile && <button type="button" onClick={showList} aria-label="对话列表"><PanelLeft size={20}/></button>}
         {mobile && chatOpen ? <button type="button" className="cloud-agents-header-title" onClick={showSettings} aria-label="查看云端连接与设备">
           <strong>云端助手</strong><span>{connectionLabel}</span>
         </button> : mobile && connection ? <button type="button" className="cloud-agents-header-title cloud-agents-home-connection" onClick={showSettings} aria-label={`查看连接与设备：${warning || connectionLabel}`}>
@@ -710,18 +1107,30 @@ export default function CloudAgents({
         {connection && (!mobile || !chatOpen) && <button type="button" onClick={settings ? closeSettings : showSettings} disabled={busy || preparing} aria-label="VPS 连接设置"><Settings2 size={20}/></button>}
         {chatOpen && (mobile || known && management) && <details className="cloud-agents-menu"><summary aria-label="会话选项"><MoreHorizontal size={20}/></summary><div>
           {mobile && <button type="button" disabled={busy || preparing} onClick={event => { event.currentTarget.closest("details")!.open = false; select(); }}>新对话</button>}
+          {mobile && <button type="button" onClick={event => { event.currentTarget.closest("details")!.open = false; showList(); }}>会话列表</button>}
           {known && management && <>
             <button type="button" disabled={updating} onClick={event => { event.currentTarget.closest("details")!.open = false; setRename(title); }}>重命名</button>
             <button type="button" disabled={updating || Boolean(active(last)) || Boolean(localPending)} onClick={event => { event.currentTarget.closest("details")!.open = false; void updateThread({ archived: !archived }); }}>{archived ? "恢复会话" : "归档会话"}</button>
           </>}
+          {mobile && <button type="button" onClick={event => { event.currentTarget.closest("details")!.open = false; changeView(view === "materials" ? "chat" : "materials"); }}>{view === "materials" ? "返回对话" : "查看会话材料"}</button>}
+          {mobile && <button type="button" onClick={event => { event.currentTarget.closest("details")!.open = false; changeView(view === "results" ? "chat" : "results"); }}>{view === "results" ? "返回对话" : "查看会话成果"}</button>}
           {mobile && <button type="button" onClick={event => { event.currentTarget.closest("details")!.open = false; showSettings(); }}>连接与设备</button>}
         </div></details>}
         {onClose && (!mobile || !chatOpen) && <button type="button" onClick={onClose} aria-label="关闭云端助手"><X size={21}/></button>}
       </>}
     </header>
     {mobile && connection && chatOpen && !settings && <div className="bw-chat-tools">
-      <button type="button" aria-label="返回会话列表" onClick={showList}><MessageSquare size={14}/><span>{title}</span><ChevronRight size={13}/></button>
-      <button type="button" aria-label="配置会话模型" onClick={() => setSheet("model")}><span>{model}{effectiveSelection?.effort ? " · " + effortLabel(effectiveSelection.effort) : ""}</span><Settings2 size={13}/></button>
+      <button type="button" aria-label="切换或管理会话" aria-haspopup="dialog" onClick={() => setSheet("sessions")}>
+        <MessageSquare size={14}/>
+        <span>{title}</span>
+        {current?.handoff?.state === "published" && <em className="bw-handoff-tag">桌面接力</em>}
+        <ChevronDown size={13}/>
+      </button>
+      <button type="button" aria-label="选择模型" aria-haspopup="dialog" onClick={() => setSheet("model")}>
+        <span className={`bw-status-dot${warning ? " is-warn" : ""}`} aria-hidden="true"/>
+        <span>{network ? "离线暂存中" : `${model}${effectiveSelection?.effort ? ` · ${effortLabel(effectiveSelection.effort)}` : ""}`}</span>
+        <SlidersHorizontal size={12}/>
+      </button>
     </div>}
     {connection === undefined ? <p className="cloud-agents-empty" role="status">正在读取连接…</p> : !connection || settings ? <form className="cloud-agents-connect" onSubmit={event => void connect(event)}>
       <h2><Cloud size={22} /> 连接与设备</h2>
@@ -746,9 +1155,9 @@ export default function CloudAgents({
       </button>)}</div> : <div className="cloud-agents-home-empty"><MessageSquare size={28}/><h3>{query ? "没有找到这段对话" : scope === "archived" ? "还没有归档会话" : "从一个问题开始"}</h3><p>{query ? "换一个词，或切换会话范围再试。" : scope === "archived" ? "归档只收起会话，消息和附件都会保留。" : "点击新对话，写下你的问题。"}</p></div>}
     </div> : <div className="cloud-agents-body">
       <div className="cloud-agents-chat">
-        {mobile && <div className="cloud-agents-views" aria-label="会话视图">
-          {([["chat", "对话"], ["materials", "材料"], ["results", "成果"]] as const).map(([id, label]) =>
-            <button type="button" key={id} aria-pressed={view === id} onClick={() => changeView(id)}>{label}</button>)}
+        {mobile && view !== "chat" && <div className="bw-subview-bar">
+          <button type="button" onClick={() => changeView("chat")}><ArrowLeft size={14}/>返回对话</button>
+          <strong>{view === "materials" ? "会话材料" : "会话成果"}</strong>
         </div>}
         {rename !== undefined && <form className="cloud-agents-rename" aria-label="重命名会话" onSubmit={event => { event.preventDefault(); void updateThread({ title: rename.trim() }); }}><label>会话名称<input autoFocus maxLength={80} value={rename} onChange={event => setRename(event.target.value)}/></label><button type="submit" disabled={updating || !rename.trim()}>保存名称</button><button type="button" disabled={updating} onClick={() => setRename(undefined)}>取消</button></form>}
         {archived && <div className="cloud-agents-archived"><span>这段会话已归档，消息和附件均保留。</span><button type="button" disabled={updating} onClick={() => void updateThread({ archived: false })}>恢复会话</button></div>}
@@ -761,53 +1170,112 @@ export default function CloudAgents({
           follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
         }}>
           {(before === undefined ? current?.before : before) && <button type="button" disabled={loadingEarlier} onClick={() => void loadEarlier()}>查看更早消息</button>}
-          {current?.handoff&&<CloudHandoffPanel handoff={current.handoff} compact={mobile} onOpen={()=>changeView("results")} onWithdraw={()=>{if(current.handoff)onHandoffStateChangeRef.current?.({...current.handoff,state:"withdrawn"},{cached:false});refresh(v=>v+1);}}/>}
+          {current?.handoff && (mobile ? <section className="bw-handoff-banner" aria-label="桌面交接报告">
+            <div className="bw-handoff-banner-head">
+              <div className="bw-handoff-banner-title">
+                <span className="bw-handoff-pill">桌面接力</span>
+                <strong>{current.handoff.manifest.title}</strong>
+              </div>
+              <button type="button" className="bw-handoff-toggle" aria-expanded={handoffExpanded} onClick={() => setHandoffExpanded(v => !v)}>
+                {handoffExpanded ? "收起 ↑" : "展开报告 ↓"}
+              </button>
+            </div>
+            <p className="bw-handoff-banner-sub">
+              {current.handoff.state === "withdrawn"
+                ? "云端交接副本已撤回，历史回答保留。"
+                : `第 ${current.handoff.manifest.origin.revision} 版固定副本 · ${current.handoff.manifest.files.length} 个文件，可直接展开阅读或继续追问。`}
+            </p>
+            {handoffExpanded && <div className="bw-handoff-banner-body">
+              <CloudHandoffPanel
+                handoff={current.handoff}
+                onWithdraw={() => {
+                  if (current.handoff) onHandoffStateChangeRef.current?.({ ...current.handoff, state: "withdrawn" }, { cached: false });
+                  refresh(v => v + 1);
+                }}
+              />
+              {current.handoff.state === "published" && !archived && <button
+                type="button"
+                className="bw-handoff-ask"
+                onClick={() => {
+                  if (!text.trim()) setText(`基于桌面交接报告《${current.handoff!.manifest.title}》，请帮我继续分析：`);
+                  followUp();
+                }}
+              >针对此报告追问</button>}
+            </div>}
+          </section> : <CloudHandoffPanel handoff={current.handoff} onWithdraw={() => {
+            if (current.handoff) onHandoffStateChangeRef.current?.({ ...current.handoff, state: "withdrawn" }, { cached: false });
+            refresh(v => v + 1);
+          }}/>)}
           {turns.length === 0 && !displayedPending && !current?.handoff && (selected && known ? <p className="cloud-agents-empty" role="status">正在读取对话…</p> :
             <div className="cloud-agents-empty">
               {mobile && <span className="cloud-agents-empty-icon"><Sparkles size={27}/></span>}
               <h2>{mobile ? "从一个问题开始" : "新对话"}</h2>
-              {mobile && <p>{material || attachments.length ? "材料已放好。想从哪里开始看？" : "写下想法，或带上一张照片、几条资料。"}</p>}
-              {mobile && !archived && <button type="button" onClick={() => setSheet("attachments")} disabled={attachDisabled}><Image size={17}/>试试图片提问</button>}
+              {mobile && <p>{materials.length || attachments.length ? "材料已放好。想从哪里开始看？" : "直接提问即可自动关联本机笔记，也可手动多选资料或附带照片。"}</p>}
+              {mobile && !archived && <button type="button" onClick={() => setSheet("attachments")} disabled={attachDisabled}><Image size={17}/>添加资料或图片</button>}
             </div>)}
-          {turns.map(turn => <article key={turn.id} className="cloud-agents-turn">
-            <div className="cloud-agents-user-message">
-              {(mobile || desktopEmbedded) && turn.created && <div className="cloud-agents-metadata"><span>你</span><time dateTime={new Date(turn.created).toISOString()}>{stamp(turn.created)}</time></div>}
-              <div className="cloud-agents-user">
-                {turn.text && <div>{turn.text}</div>}
-                {turn.material && materialButton(turn.material)}
-                {turn.attachments.map((file, index) => <AttachmentPreview key={file.id} file={file} local={confirmedUpload?.turn === turn.id ? confirmedUpload.attachments[index] : undefined} onAttachToLocal={desktopEmbedded ? onAttachImageToLocal : undefined}/>)}
+          {turns.map(turn => {
+            const parsedTurnMaterials = mobile ? parseMaterialBundle(turn.material) : null;
+            const turnDuration = turn.progress?.startedAt && turn.progress?.finishedAt
+              ? `${Math.max(1, Math.round((turn.progress.finishedAt - turn.progress.startedAt) / 1000))}s`
+              : "";
+            const turnModelLabel = turn.selection?.model ? `VPS Codex · ${modelLabel(turn.selection.model)}` : "VPS Codex";
+            return <article key={turn.id} className="cloud-agents-turn">
+              <div className="cloud-agents-user-message">
+                {(!mobile && desktopEmbedded) && turn.created && <div className="cloud-agents-metadata"><span>你</span><time dateTime={new Date(turn.created).toISOString()}>{stamp(turn.created)}</time></div>}
+                {mobile && renderTurnContextStrip(turn.material)}
+                <div className={`cloud-agents-user${mobile ? " bw-chat-bubble-user" : ""}`}>
+                  {turn.text && <div>{turn.text}</div>}
+                  {!mobile && turn.material && materialButton(turn.material)}
+                  {turn.attachments.map((file, index) => <AttachmentPreview key={file.id} file={file} local={confirmedUpload?.turn === turn.id ? confirmedUpload.attachments[index] : undefined} onAttachToLocal={desktopEmbedded ? onAttachImageToLocal : undefined}/>)}
+                </div>
               </div>
-            </div>
-            <div className="cloud-agents-answer">
-              {mobile && <div className="cloud-agents-metadata"><Sparkles size={15}/><strong>Hub</strong></div>}
-              {(mobile || (desktopEmbedded && (active(turn) || (turn.progress?.summary?.length ?? 0) > 0 || (turn.progress?.updates?.length ?? 0) > 0))) && <RunProgress turn={turn} waitingToStop={waitingToStop === turn.id && Boolean(active(turn))}/>}
-              {turn.answer ? markdown(turn.answer) : !mobile && !desktopEmbedded && active(turn) && <p className="cloud-agents-answer-state" role="status">{waitingToStop === turn.id ? statusText.stopping : statusText[turn.status]}</p>}
-              {mobile && turn.material && turn.answer.includes("[资料1]") && <div className="cloud-agents-citation">{materialButton(turn.material)}</div>}
-              {!active(turn) && turn.status !== "completed" && <p className="cloud-agents-answer-state" role="status">{turn.error || statusText[turn.status]}</p>}
-              {turn.answer && !active(turn) && answerActions(turn)}
-            </div>
-          </article>)}
+              <div className={`cloud-agents-answer${mobile ? " bw-answer-card" : ""}`}>
+                {mobile && <div className="bw-answer-head">
+                  <span className="bw-answer-brand"><span className="bw-answer-mark"><Sparkles size={12}/></span><span>{turnModelLabel}</span></span>
+                  <span className="bw-answer-meta">
+                    {parsedTurnMaterials ? (parsedTurnMaterials.mode === "auto-rag" ? `自动召回 ${parsedTurnMaterials.items.length} 篇` : `手动指定 ${parsedTurnMaterials.items.length} 篇`) : "个人云端"}
+                    {turnDuration ? ` · ${turnDuration}` : ""}
+                  </span>
+                </div>}
+                {mobile ? <InlineRunProgress
+                  turn={turn}
+                  waitingToStop={waitingToStop === turn.id && Boolean(active(turn))}
+                  expanded={Boolean(cotExpanded[turn.id])}
+                  onToggle={() => setCotExpanded(prev => ({ ...prev, [turn.id]: !prev[turn.id] }))}
+                /> : (desktopEmbedded && (active(turn) || (turn.progress?.summary?.length ?? 0) > 0 || (turn.progress?.updates?.length ?? 0) > 0)) && <RunProgress turn={turn} waitingToStop={waitingToStop === turn.id && Boolean(active(turn))}/>}
+                {turn.answer ? markdown(turn.answer) : !mobile && !desktopEmbedded && active(turn) && <p className="cloud-agents-answer-state" role="status">{waitingToStop === turn.id ? statusText.stopping : statusText[turn.status]}</p>}
+                {mobile && parsedTurnMaterials && turn.answer && <div className="bw-citation-row">
+                  {parsedTurnMaterials.items.map((item, idx) => <button type="button" key={`${item.title}-${idx}`} className="bw-citation-pill" onClick={() => setPreview(item)}>
+                    <b>[{idx + 1}]</b> {item.source} · {item.title.length > 14 ? `${item.title.slice(0, 14)}…` : item.title}
+                  </button>)}
+                </div>}
+                {!active(turn) && turn.status !== "completed" && <p className="cloud-agents-answer-state" role="status">{turn.error || statusText[turn.status]}</p>}
+                {turn.answer && !active(turn) && answerActions(turn)}
+              </div>
+            </article>;
+          })}
           {displayedPending && <article className="cloud-agents-turn is-pending">
             <div className="cloud-agents-user-message">
-              <div className="cloud-agents-metadata"><span>你</span>{displayedPending.created && <time dateTime={new Date(displayedPending.created).toISOString()}>{stamp(displayedPending.created)}</time>}</div>
-              <div className="cloud-agents-user">
+              {!mobile && <div className="cloud-agents-metadata"><span>你</span>{displayedPending.created && <time dateTime={new Date(displayedPending.created).toISOString()}>{stamp(displayedPending.created)}</time>}</div>}
+              {mobile && renderTurnContextStrip(displayedPending.material, displayedPending.contextMode)}
+              <div className={`cloud-agents-user${mobile ? " bw-chat-bubble-user" : ""}`}>
                 {displayedPending.text && <div>{displayedPending.text}</div>}
-                {displayedPending.material && materialButton(displayedPending.material)}
+                {!mobile && displayedPending.material && materialButton(displayedPending.material)}
                 {draftFiles(displayedPending.attachments)}
               </div>
             </div>
-            <div className="cloud-agents-delivery">
-              <p role="status">
-                {(deliveryPhase === "sending" || deliveryPhase === "accepted") && <LoaderCircle size={15} className="cloud-agents-spinner"/>}
+            <div className={mobile ? "bw-outbox-strip" : "cloud-agents-delivery"}>
+              <p className={mobile ? `bw-outbox-status${deliveryPhase === "rejected" ? " is-rejected" : ""}` : undefined} role="status">
+                {(deliveryPhase === "sending" || deliveryPhase === "accepted") && <LoaderCircle size={14} className="cloud-agents-spinner"/>}
                 {deliveryPhase === "sending" ? displayedPending.attachments.length ? "正在上传附件…" : "正在发送…" :
                   deliveryPhase === "accepted" ? statusText.queued :
                   deliveryPhase === "rejected" ? delivery?.error || "个人云端未接收这条消息。" :
-                  network ? "连接不稳定 · 恢复后继续查询原请求" : "正在确认是否送达 · 消息已保存在此设备"}
+                  network ? "暂存本机发件箱 · 联网后将自动核对" : "正在确认是否送达 · 消息已保存在此设备"}
               </p>
-              {(deliveryPhase === "rejected" || deliveryPhase === "checking") && !busy && <div className="cloud-agents-pending">
+              {(deliveryPhase === "rejected" || deliveryPhase === "checking") && !busy && <div className={mobile ? "bw-outbox-actions" : "cloud-agents-pending"}>
                 {deliveryPhase === "checking" && <button type="button" onClick={() => refresh(value => value + 1)}>查询原结果</button>}
                 <button type="button" onClick={() => void send()}>用原编号重试</button>
-                <button type="button" onClick={() => {
+                <button type="button" className={mobile && deliveryPhase !== "rejected" ? "is-danger" : undefined} onClick={() => {
                   if (deliveryPhase === "rejected" || window.confirm("移除本机的重试记录？云端可能已接收这条消息。")) void releasePending();
                 }}>{deliveryPhase === "rejected" ? "放回输入框" : "移除本机重试"}</button>
               </div>}
@@ -815,7 +1283,7 @@ export default function CloudAgents({
           </article>}
         </div>
         {mobile && view === "materials" && <div className="cloud-agents-panel" aria-label="会话材料">
-          {(attachments.length > 0 || material) && <section className="cloud-agents-panel-card"><h2>待发送</h2>{material && materialButton(material)}{draftFiles(attachments)}</section>}
+          {(attachments.length > 0 || materials.length > 0) && <section className="cloud-agents-panel-card"><h2>待发送</h2>{materials.map(item => <div key={item.id}>{materialButton(item)}</div>)}{draftFiles(attachments)}</section>}
           {displayedPending && (displayedPending.attachments.length > 0 || displayedPending.material) &&
             <section className="cloud-agents-panel-card"><h2>{deliveryPhase === "accepted" ? "云端已接收" : "待确认"}</h2>{displayedPending.material && materialButton(displayedPending.material)}{draftFiles(displayedPending.attachments)}</section>}
           {turns.filter(turn => turn.material || turn.attachments.length).map(turn => <section className="cloud-agents-panel-card" key={turn.id}>
@@ -823,7 +1291,7 @@ export default function CloudAgents({
             {turn.material && materialButton(turn.material)}
             {turn.attachments.map((file, index) => <AttachmentPreview key={file.id} file={file} local={confirmedUpload?.turn === turn.id ? confirmedUpload.attachments[index] : undefined}/>)}
           </section>)}
-          {!(attachments.length || material || displayedPending?.attachments.length || displayedPending?.material || turns.some(turn => turn.material || turn.attachments.length)) &&
+          {!(attachments.length || materials.length || displayedPending?.attachments.length || displayedPending?.material || turns.some(turn => turn.material || turn.attachments.length)) &&
             <div className="cloud-agents-empty"><FileText size={27}/><h2>还没有附上材料</h2><p>已选资料、图片和视频关键帧会显示在这里。</p></div>}
           {!archived && <button className="cloud-agents-add-material" type="button" disabled={attachDisabled} onClick={() => setSheet("attachments")}><Plus size={17}/>添加材料</button>}
           {(before === undefined ? current?.before : before) && <button type="button" disabled={loadingEarlier} onClick={() => void loadEarlier()}>查看更早材料</button>}
@@ -836,27 +1304,61 @@ export default function CloudAgents({
           {!current?.handoff&&!turns.some(turn => turn.status === "completed" && turn.answer) && <div className="cloud-agents-empty"><FileText size={27}/><h2>完成的回答会留在这里</h2><button type="button" onClick={() => changeView("chat")}>回到对话</button></div>}
           {(before === undefined ? current?.before : before) && <button type="button" disabled={loadingEarlier} onClick={() => void loadEarlier()}>查看更早成果</button>}
         </div>}
-        {view === "chat" && (!mobile || !archived) && <form className="cloud-agents-compose" onSubmit={event => void send(event)}>
+        {view === "chat" && (!mobile || !archived) && <form className={`cloud-agents-compose${mobile ? " bw-composer-dock" : ""}`} onSubmit={event => void send(event)}>
           {!mobile && skillControls}
+          {mobile && <div className="bw-rag-mode-bar" role="tablist" aria-label="上下文协同模式">
+            <button type="button" role="tab" className="bw-rag-mode-btn" aria-selected={contextMode === "auto-rag"} disabled={attachDisabled} onClick={() => setContextMode("auto-rag")}>
+              <Search size={12}/><span>自动关联</span>
+            </button>
+            <button type="button" role="tab" className="bw-rag-mode-btn" aria-selected={contextMode === "manual"} disabled={attachDisabled} onClick={() => {
+              setContextMode("manual");
+              if (materials.length === 0) setSheet("attachments");
+            }}>
+              <Paperclip size={12}/><span>手动指定 ({materials.length})</span>
+            </button>
+            <button type="button" role="tab" className="bw-rag-mode-btn" aria-selected={contextMode === "cloud-only"} disabled={attachDisabled} onClick={() => setContextMode("cloud-only")}>
+              <Globe size={12}/><span>纯云端</span>
+            </button>
+          </div>}
+          {mobile && <div className="bw-composer-meta">
+            {contextMode === "auto-rag" ? <>
+              <span className="bw-composer-meta-copy">提问时自动检索本机资料片段发往云端（≤48 KB）</span>
+              <button type="button" className="bw-composer-add-btn" aria-label="添加照片或资料" aria-haspopup="dialog" disabled={attachDisabled} onClick={() => setSheet("attachments")}>+ 照片/技能</button>
+            </> : contextMode === "manual" ? <div className="bw-composer-chips">
+              <button type="button" className="bw-composer-add-btn is-accent" aria-label="添加照片或资料" aria-haspopup="dialog" disabled={attachDisabled} onClick={() => setSheet("attachments")}>+ 选资料/照片 ({manualKb}/48 KB)</button>
+              {materials.map(item => <span key={item.id} className="bw-draft-chip">
+                <button type="button" className="bw-draft-chip-open" onClick={() => setPreview(item)}>{item.title.length > 9 ? `${item.title.slice(0, 9)}…` : item.title}</button>
+                <button type="button" className="bw-draft-chip-remove" aria-label={`移除资料 ${item.title}`} onClick={() => {
+                  const next = materials.filter(m => m.id !== item.id);
+                  setMaterials(next);
+                  setMaterial(next[0]);
+                }}><X size={12}/></button>
+              </span>)}
+            </div> : <>
+              <span className="bw-composer-meta-copy">不检索本机资料库，直连个人云端纯对话</span>
+              <button type="button" className="bw-composer-add-btn" aria-label="添加照片或资料" aria-haspopup="dialog" disabled={attachDisabled} onClick={() => setSheet("attachments")}>+ 照片/技能</button>
+            </>}
+          </div>}
           {selectedSkill && <div className="cloud-agents-skill-chip"><button type="button" onClick={openSkills}><Sparkles size={15}/><span>{selectedSkill}</span><small>{boundSkill ? "本对话" : skillPaths.length ? `${skillPaths.length} 份参考` : ""}</small></button>{!boundSkill && !localPending && <button type="button" aria-label="移除待发送技能" onClick={() => { setSkillVersion(""); setSkillPaths([]); }}><X size={15}/></button>}</div>}
           {pending && pending.thread !== selected && <button type="button" className="cloud-agents-resume" onClick={() => select(pending.thread)}>返回待确认消息</button>}
-          {material && <div className="cloud-agents-draft-material">{materialButton(material)}<button type="button" className="cloud-agents-remove" aria-label="移除本次资料" onClick={() => setMaterial(undefined)}><X size={14}/></button></div>}
-          {mobile && (attachments.length>0||material) && <small className="cloud-agents-pending-count">待发送材料 {attachments.length+Number(Boolean(material))} 份</small>}
+          {!mobile && material && <div className="cloud-agents-draft-material">{materialButton(material)}<button type="button" className="cloud-agents-remove" aria-label="移除本次资料" onClick={() => setMaterial(undefined)}><X size={14}/></button></div>}
           {draftFiles(attachments, true)}
           {attachments.some(file => file.seconds != null) && <small>将发送带时间戳的关键帧，短暂变化可能漏掉。</small>}
-          <textarea ref={textarea} value={text} onChange={event => setText(event.target.value)} disabled={attachDisabled} maxLength={20000} placeholder={handoffWithdrawn?"交接已撤回，可新建其他对话":archived ? "恢复会话后可继续提问" : "问一个问题，或接着聊…"} aria-label="消息" rows={mobile ? 1 : 2}/>
-          <div className="cloud-agents-tools">
-            {mobile ? <>
-              <button type="button" aria-label="添加照片或资料" aria-haspopup="dialog" disabled={attachDisabled} onClick={() => setSheet("attachments")}><Plus size={22}/></button>
-              <button type="button" aria-label="选择模型" aria-haspopup="dialog" className="cloud-agents-model" onClick={() => setSheet("model")}><span>{model}{effectiveSelection?.effort ? ` · ${effortLabel(effectiveSelection.effort)}` : ""}</span><ChevronRight size={14}/></button>
-            </> : <>
+          {recalling && <small role="status">正在本机检索相关资料…</small>}
+          {mobile ? <div className="bw-composer-row">
+            <textarea ref={textarea} value={text} onChange={event => setText(event.target.value)} disabled={attachDisabled || recalling} maxLength={20000} placeholder={handoffWithdrawn ? "交接已撤回，可新建其他对话" : contextMode === "auto-rag" ? "直接问关于你笔记的问题，自动检索发往云端…" : contextMode === "manual" ? "结合已选资料或照片提问…" : "输入问题发往个人云端…"} aria-label="消息" rows={1}/>
+            {activeTurn ? <button type="button" className="cloud-agents-primary" aria-label="停止生成" disabled={stopPending} onClick={() => void stop(activeTurn)}><Square size={16}/></button> :
+              <button type="submit" className="cloud-agents-primary" aria-label="发送" disabled={attachDisabled || recalling || !canSendNow}><ArrowUp size={19}/></button>}
+          </div> : <>
+            <textarea ref={textarea} value={text} onChange={event => setText(event.target.value)} disabled={attachDisabled} maxLength={20000} placeholder={handoffWithdrawn?"交接已撤回，可新建其他对话":archived ? "恢复会话后可继续提问" : "问一个问题，或接着聊…"} aria-label="消息" rows={2}/>
+            <div className="cloud-agents-tools">
               {attachmentControls(false)}
               {desktopEmbedded && modelCatalog && <button type="button" aria-label="选择云端模型" aria-haspopup="dialog" className="cloud-agents-model" onClick={() => setSheet("model")}><span>{model}{effectiveSelection?.effort ? ` · ${effortLabel(effectiveSelection.effort)}` : ""}</span><ChevronRight size={14}/></button>}
-            </>}
-            {preparing && <small role="status">正在处理附件…</small>}
-            {activeTurn ? <button type="button" className="cloud-agents-primary" aria-label="停止生成" disabled={stopPending} onClick={() => void stop(activeTurn)}><Square size={17}/></button> :
-              <button type="submit" className="cloud-agents-primary" aria-label="发送" disabled={attachDisabled || (!text.trim() && !attachments.length && !material)}><ArrowUp size={21}/></button>}
-          </div>
+              {preparing && <small role="status">正在处理附件…</small>}
+              {activeTurn ? <button type="button" className="cloud-agents-primary" aria-label="停止生成" disabled={stopPending} onClick={() => void stop(activeTurn)}><Square size={17}/></button> :
+                <button type="submit" className="cloud-agents-primary" aria-label="发送" disabled={attachDisabled || !canSendNow}><ArrowUp size={21}/></button>}
+            </div>
+          </>}
         </form>}
       </div>
     </div>}

@@ -36,6 +36,22 @@ pub(crate) enum Action {
     Material {
         selection: Value,
     },
+    PrepareMaterials {
+        selections: Vec<Value>,
+        #[serde(default)]
+        mode: Option<String>,
+        #[serde(default, rename = "expectedSha256")]
+        expected_sha256: Option<Vec<String>>,
+    },
+    RecallMaterials {
+        query: String,
+        #[serde(default)]
+        limit: Option<u32>,
+        #[serde(default, rename = "maxBytes")]
+        max_bytes: Option<u32>,
+        #[serde(default, rename = "spaceIds")]
+        space_ids: Option<Vec<String>>,
+    },
     AnswerNote {
         thread: String,
         turn: String,
@@ -262,6 +278,28 @@ pub(crate) async fn cloud_agents(app: AppHandle, action: Action) -> Result<Value
         Action::Material { selection } => {
             materials::prepare(&crate::active_data_root(&app)?, selection)
         }
+        Action::PrepareMaterials {
+            selections,
+            mode,
+            expected_sha256,
+        } => materials::prepare_bundle(
+            &crate::active_data_root(&app)?,
+            selections,
+            mode,
+            expected_sha256,
+        ),
+        Action::RecallMaterials {
+            query,
+            limit,
+            max_bytes,
+            space_ids,
+        } => materials::recall(
+            &crate::active_data_root(&app)?,
+            &query,
+            limit,
+            max_bytes,
+            space_ids,
+        ),
         Action::Config => Ok(current()?.as_ref().map(config_view).unwrap_or(Value::Null)),
         Action::SkillVersions => {
             crate::agent_work::skills::cloud_skill_versions(&crate::active_data_root(&app)?)

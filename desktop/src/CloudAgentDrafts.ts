@@ -1,8 +1,17 @@
 import { openCloudAgentLocalStorage } from "./CloudAgentLocalStorage";
-import type { Upload, MaterialSnapshot } from "./CloudAgentMedia";
+import type { AgentContextMode, Upload, MaterialSnapshot } from "./CloudAgentMedia";
 import type { ModelSelection } from "./CloudAgentPreferences";
 
-export type ComposerDraft = { text: string; attachments: Upload[]; material?: MaterialSnapshot; skillVersion: string; skillPaths: string[]; selection?: ModelSelection };
+export type ComposerDraft = {
+  text: string;
+  attachments: Upload[];
+  material?: MaterialSnapshot;
+  materials?: MaterialSnapshot[];
+  contextMode?: AgentContextMode;
+  skillVersion: string;
+  skillPaths: string[];
+  selection?: ModelSelection;
+};
 const prefix = (binding: string) => `composer-v1:${binding}:`;
 export const composerDraftKey = (binding: string, thread: string) => prefix(binding) + thread;
 let writes: Promise<void> = Promise.resolve();
@@ -39,7 +48,7 @@ export function saveComposerDraft(binding: string, thread: string, draft: Compos
       await new Promise<void>((resolve, reject) => {
         const tx = db.transaction("pending", "readwrite");
         const store = tx.objectStore("pending");
-        if (draft.text || draft.attachments.length || draft.material || draft.skillVersion || draft.selection) store.put(draft, composerDraftKey(binding, thread));
+        if (draft.text || draft.attachments.length || draft.material || (draft.materials && draft.materials.length > 0) || draft.skillVersion || draft.selection || (draft.contextMode && draft.contextMode !== "auto-rag")) store.put(draft, composerDraftKey(binding, thread));
         else store.delete(composerDraftKey(binding, thread));
         tx.oncomplete = () => resolve();
         tx.onerror = tx.onabort = () => reject(tx.error || new Error("本机草稿尚未保存。"));

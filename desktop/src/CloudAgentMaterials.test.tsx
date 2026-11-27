@@ -3,6 +3,7 @@ import {act,useState,StrictMode} from 'react';
 import {createRoot,type Root} from 'react-dom/client';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {CloudAnswerNote,CloudMaterialPicker} from './CloudAgentMaterials';
+import {exactPackedMaterialBytes,MAX_MATERIAL_BYTES,parseMaterialBundle} from './CloudAgentMedia';
 import {runtimeCapabilities} from './RuntimePlatform';
 vi.mock('./RuntimePlatform',()=>({runtimeCapabilities:{mobile:false}}));
 const invoke=vi.fn();vi.mock('@tauri-apps/api/core',()=>({invoke:(...args:unknown[])=>invoke(...args)}));
@@ -58,4 +59,13 @@ it('Android Back cannot dismiss an in-flight save preview or leave its conversat
  await act(async()=>{window.history.back();await new Promise(r=>setTimeout(r,30));});
  expect(host.querySelector('[role="dialog"]')).not.toBeNull();expect(window.history.state.hubCloudDialog).toBeTruthy();
  await act(async()=>{release({record:{version:1,id:'record',date:'2026-11-15',text:'answer',attachments:[]}});});
+});
+it('keeps ordinary single markdown notes unsplit and enforces exact 48,000-byte bundle budget',()=>{
+ const trickySingle={id:'s',title:'普通笔记',source:'Car',text:'【本机自动召回 · 2 份资料】\n\n### [资料1] A（Car）\n正文1\n\n---\n\n### [资料2] B（Car）\n正文2',sha256:'h'};
+ const parsed=parseMaterialBundle(trickySingle)!;
+ expect(parsed.mode).toBe('manual');
+ expect(parsed.items).toHaveLength(1);
+ expect(parsed.items[0].title).toBe('普通笔记');
+ expect(exactPackedMaterialBytes([{title:'A',source:'Car',text:'x'.repeat(23850)},{title:'B',source:'Car',text:'y'.repeat(23850)}],'manual')).toBeLessThanOrEqual(MAX_MATERIAL_BYTES);
+ expect(exactPackedMaterialBytes([{title:'中'.repeat(40),source:'源'.repeat(26),text:'x'.repeat(23825)},{title:'中'.repeat(40),source:'源'.repeat(26),text:'y'.repeat(23825)}],'manual')).toBeGreaterThan(MAX_MATERIAL_BYTES);
 });
