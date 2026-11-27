@@ -164,31 +164,82 @@ export function CloudMaterialPicker({
  return embedded?content:<CloudAgentSheet title={preview?'预览本次正文':'选择已下载资料'} onClose={onClose}>{content}</CloudAgentSheet>;
 }
 type JournalRecord={version:1;id:string;date:string;text:string;attachments:unknown[]};
-type Receipt={uploaded:boolean;applied:boolean;sourceError?:string};
-export function CloudAnswerNote({thread,turn,compact=false}:{thread:string;turn:string;compact?:boolean}){
+type Receipt={uploaded:boolean;applied:boolean;deleted?:boolean;sourceError?:string};
+const answerNoteCacheKey=(thread:string,turn:string)=>`hub-cloud-answer-note:${thread}:${turn}`;
+function readCachedAnswerNote(thread:string,turn:string):{id:string;date?:string}|null{
+ try{
+  const raw=localStorage.getItem(answerNoteCacheKey(thread,turn));
+  if(!raw)return null;
+  const parsed=JSON.parse(raw) as {id?:unknown;date?:unknown};
+  return typeof parsed?.id==='string'&&parsed.id?{id:parsed.id,date:typeof parsed.date==='string'?parsed.date:undefined}:null;
+ }catch{return null;}
+}
+function writeCachedAnswerNote(thread:string,turn:string,record:JournalRecord){
+ try{localStorage.setItem(answerNoteCacheKey(thread,turn),JSON.stringify({id:record.id,date:record.date}));}catch{}
+}
+function clearCachedAnswerNote(thread:string,turn:string){
+ try{localStorage.removeItem(answerNoteCacheKey(thread,turn));}catch{}
+}
+export function CloudAnswerNote({thread,turn,compact=false,onOpenJournal}:{thread:string;turn:string;compact?:boolean;onOpenJournal?:(recordId:string)=>void}){
  const [open,setOpen]=useState(false),[date,setDate]=useState(localJournalDate),[record,setRecord]=useState<JournalRecord>(),[receipt,setReceipt]=useState<Receipt>(),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const epoch=useRef(0);useEffect(()=>()=>{epoch.current++;},[]);
- async function readReceipt(value:JournalRecord){const result=await invoke<{items:({record:JournalRecord}&Receipt)[]}>('list_quick_journal');return result.items.find(item=>item.record.id===value.id);}
- async function preview(){const ticket=++epoch.current;setBusy(true);setError('');try{const value=await call<{record:JournalRecord}>('answerNote',{thread,turn,date});const saved=await readReceipt(value.record);if(epoch.current===ticket){setRecord(value.record);setReceipt(saved);}}catch(e){if(epoch.current===ticket)setError(String(e));}finally{if(epoch.current===ticket)setBusy(false);}}
- async function save(targetRecord?:JournalRecord){const currentRecord=targetRecord??record;if(!currentRecord)return;setBusy(true);setError('');try{const result=await invoke<{warning:string|null}>('capture_quick_journal',{record:currentRecord});window.dispatchEvent(new CustomEvent(QUICK_JOURNAL_UPDATED));setReceipt({uploaded:false,applied:false});if(result.warning)setError(result.warning);const saved=await readReceipt(currentRecord);if(saved)setReceipt(saved);}catch(e){setError(String(e));}finally{setBusy(false);}}
+ async function readReceiptById(recordId:string){
+  const result=await invoke<{items:({record:JournalRecord}&Receipt)[]}>('list_quick_journal');
+  return result.items.find(item=>!item.deleted&&item.record.id===recordId);
+ }
+ async function readReceipt(value:JournalRecord){return readReceiptById(value.id);}
+ useEffect(()=>{
+  if(!compact)return;
+  const cached=readCachedAnswerNote(thread,turn);
+  if(!cached)return;
+  let live=true;
+  void readReceiptById(cached.id).then(saved=>{
+   if(!live)return;
+   if(saved){
+    setRecord(saved.record);
+    setReceipt({uploaded:saved.uploaded,applied:saved.applied,sourceError:saved.sourceError});
+   }else{
+    clearCachedAnswerNote(thread,turn);
+   }
+  }).catch(()=>{});
+  return()=>{live=false;};
+ },[compact,thread,turn]);
+ async function preview(){const ticket=++epoch.current;setBusy(true);setError('');try{const value=await call<{record:JournalRecord}>('answerNote',{thread,turn,date});const saved=await readReceipt(value.record);if(epoch.current===ticket){setRecord(value.record);setReceipt(saved);if(saved)writeCachedAnswerNote(thread,turn,saved.record);}}catch(e){if(epoch.current===ticket)setError(String(e));}finally{if(epoch.current===ticket)setBusy(false);}}
+ async function save(targetRecord?:JournalRecord){const currentRecord=targetRecord??record;if(!currentRecord)return;setBusy(true);setError('');try{const result=await invoke<{warning:string|null}>('capture_quick_journal',{record:currentRecord});window.dispatchEvent(new CustomEvent(QUICK_JOURNAL_UPDATED));writeCachedAnswerNote(thread,turn,currentRecord);setReceipt({uploaded:false,applied:false});if(result.warning)setError(result.warning);const saved=await readReceipt(currentRecord);if(saved)setReceipt(saved);}catch(e){setError(String(e));}finally{setBusy(false);}}
  async function quickSaveOrInspect(){
-  if(receipt){setOpen(true);return;}
+  if(receipt){
+   if(onOpenJournal&&record?.id){onOpenJournal(record.id);return;}
+   setOpen(true);return;
+  }
   if(busy)return;
   const today=localJournalDate();
   setDate(today);
   const ticket=++epoch.current;setBusy(true);setError('');
   try{
+   const cached=readCachedAnswerNote(thread,turn);
+   if(cached){
+    const localSaved=await readReceiptById(cached.id).catch(()=>undefined);
+    if(epoch.current!==ticket)return;
+    if(localSaved){
+     setRecord(localSaved.record);
+     setReceipt({uploaded:localSaved.uploaded,applied:localSaved.applied,sourceError:localSaved.sourceError});
+     if(onOpenJournal){onOpenJournal(localSaved.record.id);return;}
+     setOpen(true);
+     return;
+    }
+   }
    const value=await call<{record:JournalRecord}>('answerNote',{thread,turn,date:today});
    if(epoch.current!==ticket)return;
    setRecord(value.record);
    const existing=await readReceipt(value.record);
    if(epoch.current!==ticket)return;
-   if(existing){setReceipt(existing);return;}
+   if(existing){writeCachedAnswerNote(thread,turn,existing.record);setReceipt(existing);return;}
    const result=await invoke<{warning:string|null}>('capture_quick_journal',{record:value.record});
    if(epoch.current!==ticket)return;
    window.dispatchEvent(new CustomEvent(QUICK_JOURNAL_UPDATED));
+   writeCachedAnswerNote(thread,turn,value.record);
    setReceipt({uploaded:false,applied:false});
-   if(result.warning){setError(result.warning);setOpen(true);}
+   if(result.warning)setError(result.warning);
    const saved=await readReceipt(value.record);
    if(epoch.current===ticket&&saved)setReceipt(saved);
   }catch(e){

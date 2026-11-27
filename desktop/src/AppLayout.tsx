@@ -32,6 +32,7 @@ export type AppLayoutProps = {
   mobileHeader?: ReactNode;
   mobileOverview?: ReactNode;
   mobileCollectionSearch?: MobileCollectionSearchProps;
+  mobileFilterLibraryOnly?: boolean;
   onSelectMobileLibraries?: (ids: string[] | null) => void;
   desktopSidebarProps?: ComponentProps<typeof DesktopSidebar>;
 };
@@ -56,6 +57,7 @@ function AppLayoutContent({
   mobileHeader,
   mobileOverview,
   mobileCollectionSearch,
+  mobileFilterLibraryOnly = false,
   onSelectMobileLibraries,
   AppEntry,
   Workspace,
@@ -66,10 +68,11 @@ function AppLayoutContent({
       <div className="drag-strip" onMouseDown={startWindowDrag} />
       {mainContent ? <>{mobile && mobileHeader}<div className="main-content-override">{mainContent}</div><FooterStatus {...footerStatusProps} /></> : <>
         {mobile ? <div className="mobile-top-area">{mobileHeader}{mobileCollectionSearch ? <MobileCollectionSearch {...mobileCollectionSearch}/> : <SearchHeader {...headerProps} />}{!workspaceProps.resultsPaneProps.collectionView && <MobileSearchControls results={headerProps.query.trim() && workspaceProps.resultsPaneProps.contextReady ? workspaceProps.resultsPaneProps.results : undefined} filters={filterBarProps} onSelectLibraries={onSelectMobileLibraries} onOpenFilters={()=>headerProps.setFiltersOpen(true)} />}{mobileOverview}</div> : <SearchHeader {...headerProps} />}
-        {mobile ? <MobileFilterSheet open={filtersOpen} onClose={() => headerProps.setFiltersOpen(false)} draft>{filtersOpen && <MobileSearchFilterForm filters={filterBarProps} onSelectLibraries={onSelectMobileLibraries} onApply={() => headerProps.setFiltersOpen(false)} />}</MobileFilterSheet> : filtersOpen && <FilterBar {...filterBarProps} />}
+        {!mobile && filtersOpen && <FilterBar {...filterBarProps} />}
         <Workspace {...workspaceProps} />
         <FooterStatus {...footerStatusProps} />
       </>}
+      {mobile && <MobileFilterSheet open={filtersOpen} onClose={() => headerProps.setFiltersOpen(false)} draft title={mobileFilterLibraryOnly ? "选择助手自动关联资料库" : undefined}>{filtersOpen && <MobileSearchFilterForm filters={filterBarProps} libraryOnly={mobileFilterLibraryOnly} onSelectLibraries={onSelectMobileLibraries} onApply={() => headerProps.setFiltersOpen(false)} />}</MobileFilterSheet>}
       {settingsDialog}
     </AppEntry>
   );

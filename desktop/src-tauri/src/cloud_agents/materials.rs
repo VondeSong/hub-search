@@ -469,9 +469,15 @@ pub(super) fn recall(
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
-    let filter_set: Option<HashSet<String>> = space_ids
-        .filter(|ids| !ids.is_empty())
-        .map(|ids| ids.into_iter().collect());
+    if matches!(space_ids.as_ref(), Some(ids) if ids.is_empty()) {
+        return Ok(json!({
+            "items": [],
+            "bundle": Value::Null,
+            "totalBytes": 0,
+            "elapsedMs": started.elapsed().as_millis() as u64,
+        }));
+    }
+    let filter_set: Option<HashSet<String>> = space_ids.map(|ids| ids.into_iter().collect());
     let allowed_spaces: Vec<String> = enabled_ids
         .into_iter()
         .filter(|id| filter_set.as_ref().is_none_or(|set| set.contains(id)))
@@ -925,5 +931,17 @@ mod tests {
         .unwrap();
         assert!(disabled["items"].as_array().unwrap().is_empty());
         assert!(disabled["bundle"].is_null());
+
+        // Explicit empty space_ids ([]) must never fall back to all libraries or journals.
+        let empty_scope = recall(
+            &f.root,
+            "needle_marker_42",
+            Some(3),
+            Some(4096),
+            Some(vec![]),
+        )
+        .unwrap();
+        assert!(empty_scope["items"].as_array().unwrap().is_empty());
+        assert!(empty_scope["bundle"].is_null());
     }
 }

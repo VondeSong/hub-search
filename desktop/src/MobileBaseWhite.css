@@ -1640,6 +1640,243 @@ html[data-runtime-platform="android"] .cloud-agents.is-mobile .cloud-agents-head
   font-weight: 600;
 }
 
+/* Full Base White Mobile Prototype visual parity across Header, Search, Browse, Agents & Sheets */
+html[data-runtime-platform="android"] .mobile-app-shell {
+  --bw-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.03), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+  --bw-green: #10b981;
+  --bw-green-soft: rgba(16, 185, 129, 0.12);
+  --bw-amber: #f59e0b;
+  --bw-amber-soft: rgba(245, 158, 11, 0.14);
+}
+html[data-runtime-platform="android"][data-mobile-theme="black"] .mobile-app-shell {
+  --bw-shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+html[data-runtime-platform="android"] .bw-card,
+html[data-runtime-platform="android"] .bw-pulse button,
+html[data-runtime-platform="android"] .bw-insight,
+html[data-runtime-platform="android"] .bw-reading-row,
+html[data-runtime-platform="android"] .bw-resume {
+  border-radius: 15px;
+  box-shadow: var(--bw-shadow-card);
+}
+html[data-runtime-platform="android"] .bw-pulse button:nth-child(3) b {
+  color: var(--bw-green, #10b981);
+}
+html[data-runtime-platform="android"] .bw-pulse b {
+  font-variant-numeric: tabular-nums;
+}
+html[data-runtime-platform="android"] .bw-connection i[data-state="ok"]:first-child {
+  background: var(--bw-green, #10b981);
+  box-shadow: 0 0 0 2px var(--bw-green-soft, rgba(16, 185, 129, 0.14));
+}
+html[data-runtime-platform="android"] .bw-connection i[data-state="ok"]:nth-child(2) {
+  background: var(--mobile-accent, #2563eb);
+  box-shadow: 0 0 0 2px var(--mobile-selected, rgba(37, 99, 235, 0.14));
+}
+html[data-runtime-platform="android"] .bw-connection i[data-state="warn"] {
+  background: var(--bw-amber, #f59e0b);
+  box-shadow: 0 0 0 2px var(--bw-amber-soft, rgba(245, 158, 11, 0.16));
+}
+.bw-agent-header-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+html[data-runtime-platform="android"] .cloud-agents.is-mobile .bw-agent-header-controls .bw-connection {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid var(--mobile-separator);
+  background: var(--mobile-surface);
+  color: var(--mobile-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+html[data-runtime-platform="android"] .cloud-agents.is-mobile .bw-agent-header-controls .bw-space-trigger {
+  min-width: 34px;
+  width: 34px;
+  min-height: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--mobile-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.bw-composer-meta-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  flex: 1;
+}
+.bw-composer-meta-group > .bw-composer-meta-copy {
+  flex: 0 1 auto;
+}
+.bw-composer-scope-btn {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 2px 8px;
+  min-height: 24px;
+  border-radius: 999px;
+  border: 1px solid var(--mobile-separator, #e2e8f0);
+  background: var(--mobile-fill, #f8fafc);
+  color: var(--mobile-secondary, #475569);
+  font-size: 11px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bw-composer-scope-btn.is-filtered {
+  background: var(--mobile-selected, rgba(37, 99, 235, 0.11));
+  color: var(--mobile-accent, #2563eb);
+  border-color: rgba(37, 99, 235, 0.28);
+}
+.bw-subhead-actions {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.bw-applied-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px 11px;
+  border-radius: 11px;
+  background: var(--mobile-selected, rgba(37, 99, 235, 0.1));
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  color: var(--mobile-accent, #1d4ed8);
+  font-size: 11.5px;
+  line-height: 1.45;
+  box-sizing: border-box;
+}
+.bw-applied-strip span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.bw-applied-strip button {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 4px 2px;
+  min-height: 30px;
+  white-space: nowrap;
+}
+html[data-runtime-platform="android"] .app-shell .mobile-search-compact-filters button[aria-label="选择搜索资料范围"].is-filtered {
+  background: var(--mobile-selected, rgba(37, 99, 235, 0.11));
+  color: var(--mobile-accent, #1d4ed8);
+  border-color: rgba(37, 99, 235, 0.28);
+}
+.bw-scope-doc-count {
+  margin-left: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--mobile-secondary, #64748b);
+  font-weight: 500;
+}
+.bw-receipt-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.bw-receipt-pill.is-os {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--bw-receipt-os-fg, #047857);
+}
+.bw-receipt-pill.is-cloud {
+  background: var(--mobile-selected, rgba(37, 99, 235, 0.11));
+  color: var(--mobile-accent, #1d4ed8);
+}
+.bw-receipt-pill.is-local {
+  background: rgba(245, 158, 11, 0.14);
+  color: var(--bw-receipt-local-fg, #b45309);
+}
+.bw-row-title-line {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bw-scope-tag {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--mobile-selected, rgba(37, 99, 235, 0.11));
+  color: var(--mobile-accent, #1d4ed8);
+}
+.bw-row > svg.bw-row-icon.is-journal { background: rgba(16, 185, 129, 0.12); color: #059669; }
+.bw-row > svg.bw-row-icon.is-reading { background: rgba(37, 99, 235, 0.12); color: #2563eb; }
+.bw-row > svg.bw-row-icon.is-insights { background: rgba(139, 92, 246, 0.12); color: #7c3aed; }
+.bw-row > svg.bw-row-icon.is-sync { background: rgba(14, 165, 233, 0.12); color: #0284c7; }
+.bw-lib-badge {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  background: var(--mobile-selected, rgba(37, 99, 235, 0.11));
+  color: var(--mobile-accent, #2563eb);
+}
+.bw-lib-badge.is-craft { background: rgba(245, 158, 11, 0.14); color: #d97706; }
+.bw-lib-badge.is-obsidian { background: rgba(124, 58, 237, 0.14); color: #7c3aed; }
+.bw-lib-badge.is-feishu { background: rgba(13, 148, 136, 0.14); color: #0d9488; }
+.bw-lib-badge.is-dida { background: rgba(37, 99, 235, 0.14); color: #2563eb; }
+.bw-lib-badge.is-x { background: var(--bw-lib-x-bg, rgba(15, 23, 42, 0.1)); color: var(--bw-lib-x-fg, #0f172a); }
+.bw-lib-badge.is-telegram { background: rgba(2, 132, 199, 0.14); color: #0284c7; }
+.bw-lib-count {
+  flex: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--mobile-secondary, #64748b);
+  padding-right: 4px;
+}
+html[data-runtime-platform="android"] .bw-lib-expand {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  margin-right: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--mobile-separator);
+  background: var(--mobile-fill);
+}
+html[data-runtime-platform="android"] .bw-lib-expand.is-open {
+  background: var(--mobile-selected);
+  color: var(--mobile-accent);
+  border-color: rgba(37, 99, 235, 0.28);
+}
+
 /* Phone sheets share the prototype's surface, labels, and action spacing. */
 html[data-runtime-platform="android"] {
   --bw-muted: #94a3b8;
@@ -1768,10 +2005,8 @@ html[data-runtime-platform="android"] .aw-shell .bw-clue-row {
 .bw-connections-sheet header small,.bw-connection-cards small { color: var(--mobile-secondary); font-size: 12px; }
 .bw-connection-cards { padding: 14px 16px; display: grid; gap: 12px; }
 html[data-runtime-platform="android"] .bw-connection-cards button { display: grid; grid-template-columns: 1fr auto; text-align: left; align-items: center; padding: 14px 12px; border: 1px solid var(--mobile-separator); border-radius: 14px; color: var(--mobile-ink); background: var(--mobile-surface); font-size: 13px; gap: 8px 4px; }
-.bw-connection-cards b { color: var(--mobile-accent); font-size: 11px; }
+.bw-connection-cards b { font-size: 11px; }
 .bw-connection-cards small { grid-column: 1/-1; }
-html[data-runtime-platform="android"] .bw-connection i[data-ready="true"]:first-child { background: #49af86; }
-html[data-runtime-platform="android"] .bw-connection i[data-ready="true"]:nth-child(2) { background: var(--mobile-accent); }
 
 html[data-runtime-platform="android"] .app-shell .bw-filter-form label { grid-template-columns: minmax(0,1fr); justify-content: stretch; }
 html[data-runtime-platform="android"] .mobile-app-shell.mobile-preview-open .preview-actions > :is(.bw-reader-font,.preview-favorite-btn) { display: inline-flex !important; align-items: center; justify-content: center; min-width: 40px; height: 44px; }

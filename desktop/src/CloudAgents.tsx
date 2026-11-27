@@ -31,9 +31,10 @@ import { Archive,
   X,
 } from "lucide-react";
 import { CustomPageIcon as FileText } from "./CustomPageIcon";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { todayKey } from "./ActionEvidence";
 import { CloudMarkdownTable } from "./CloudMarkdownTable";
 import { loadComposerDrafts, saveComposerDraft, type ComposerDraft } from "./CloudAgentDrafts";
 import {
@@ -252,6 +253,11 @@ export type CloudCatalogUpdate = { threads: CloudThreadSummary[]; account?: Acco
 export default function CloudAgents({
   onClose,
   onOpenTask,
+  onOpenJournal,
+  selectedLibraryIds = null,
+  scopeLabel,
+  onOpenScope,
+  headerActions,
   initialSettings = false,
   openRecentOnEntry = false,
   embedded = false,
@@ -264,6 +270,11 @@ export default function CloudAgents({
 }: {
   onClose?: () => void;
   onOpenTask?: (id: string) => void;
+  onOpenJournal?: (recordId: string) => void;
+  selectedLibraryIds?: string[] | null;
+  scopeLabel?: string;
+  onOpenScope?: () => void;
+  headerActions?: ReactNode;
   initialSettings?: boolean;
   openRecentOnEntry?: boolean;
   embedded?: boolean;
@@ -337,9 +348,18 @@ export default function CloudAgents({
   const textarea = useRef<HTMLTextAreaElement>(null);
   const listScroll = useRef(0);
   const list = useRef<HTMLDivElement>(null);
-  const historyOwner = useRef(crypto.randomUUID());
+  const historyOwner = useRef(
+    mobile && window.history.state?.hubCloudAgentChat && typeof window.history.state?.hubCloudAgentOwner === "string"
+      ? window.history.state.hubCloudAgentOwner as string
+      : crypto.randomUUID(),
+  );
   const leaveChatAfterSheet = useRef(false);
   const bindingRef = useRef<string | undefined>(undefined);
+  const selectedLibraryIdsRef = useRef<string[] | null>(selectedLibraryIds);
+  selectedLibraryIdsRef.current = selectedLibraryIds;
+  const scopeSignature = selectedLibraryIds === null ? "*" : selectedLibraryIds.join("\u0000");
+  const scopeSignatureRef = useRef(scopeSignature);
+  scopeSignatureRef.current = scopeSignature;
   const drafts = useRef(new Map<string, ComposerDraft>());
   const draftOwner = useRef<string | undefined>(undefined);
   const [draftsReady, setDraftsReady] = useState(false);
@@ -416,7 +436,7 @@ export default function CloudAgents({
       if (!live) return;
       drafts.current=stored;draftOwner.current=binding;setDraftsReady(true);
       if (saved) { setPending(saved); if (!desktopEmbedded || !request) select(saved.thread,false,true); }
-      else if(mobile){try{const previous=JSON.parse(localStorage.getItem("hub-cloud-last:"+binding)||"null");if(previous?.thread){select(previous.thread,false,true);if(previous.view==="results"){setHandoffExpanded(true);remember(previous.thread,"results");}else if(previous.view==="materials"){setView("materials");remember(previous.thread,"materials");}else if(previous.view==="chat"){setView("chat");remember(previous.thread,"chat");}}else if(stored.has("new"))select(undefined,false,true);}catch{}}
+      else if(mobile){try{const historyThread=window.history.state?.hubCloudAgentOwner===historyOwner.current&&window.history.state?.hubCloudAgentChat?window.history.state?.hubCloudAgentThread:undefined;const historyView=window.history.state?.hubCloudAgentOwner===historyOwner.current&&window.history.state?.hubCloudAgentChat?window.history.state?.hubCloudAgentView:undefined;if(typeof historyThread==="string"){const targetId=historyThread==="new"?undefined:historyThread;select(targetId,false,true);if(historyView==="results"){setHandoffExpanded(true);remember(targetId,"results");}else if(historyView==="materials"){setView("materials");remember(targetId,"materials");}else if(historyView==="chat"){setView("chat");remember(targetId,"chat");}}else{const previous=JSON.parse(localStorage.getItem("hub-cloud-last:"+binding)||"null");if(previous?.thread){select(previous.thread,false,true);if(previous.view==="results"){setHandoffExpanded(true);remember(previous.thread,"results");}else if(previous.view==="materials"){setView("materials");remember(previous.thread,"materials");}else if(previous.view==="chat"){setView("chat");remember(previous.thread,"chat");}}else if(stored.has("new"))select(undefined,false,true);}}catch{}}
     }).catch(() => { if (live) setNotice("无法读取本机草稿或待重试的消息。原数据已保留，请重新打开后重试。"); });
     return () => { live = false; };
   }, [binding]);
@@ -566,8 +586,20 @@ export default function CloudAgents({
     setBefore(undefined);
     setChatOpen(true); setView("chat"); setSettings(false); setRename(undefined);
     setSheet(undefined); setPreview(undefined);
-    if (mobile && (window.history.state?.hubCloudAgentOwner !== historyOwner.current || !window.history.state?.hubCloudAgentChat)) {
-      window.history.pushState({ ...(window.history.state ?? {}), hubCloudAgentOwner: historyOwner.current, hubCloudAgentChat: true, hubCloudAgentSettings: false }, "");
+    if (mobile) {
+      const nextHistoryState = {
+        ...(window.history.state ?? {}),
+        hubCloudAgentOwner: historyOwner.current,
+        hubCloudAgentChat: true,
+        hubCloudAgentSettings: false,
+        hubCloudAgentThread: id ?? "new",
+        hubCloudAgentView: "chat",
+      };
+      if (window.history.state?.hubCloudAgentOwner !== historyOwner.current || !window.history.state?.hubCloudAgentChat) {
+        window.history.pushState(nextHistoryState, "");
+      } else {
+        window.history.replaceState(nextHistoryState, "");
+      }
     }
     setNotice("");
   }
@@ -591,7 +623,13 @@ export default function CloudAgents({
   }
 
   function remember(id:string|undefined,next:ChatView){if(!mobile||!binding)return;try{if(id)localStorage.setItem("hub-cloud-last:"+binding,JSON.stringify({thread:id,view:next}));else localStorage.setItem("hub-cloud-last:"+binding,JSON.stringify({view:"list"}));}catch{}}
-  function changeView(next:ChatView){setView(next);remember(selected,next);}
+  function changeView(next:ChatView){
+    setView(next);
+    remember(selected,next);
+    if(mobile&&window.history.state?.hubCloudAgentOwner===historyOwner.current&&window.history.state?.hubCloudAgentChat){
+      window.history.replaceState({...window.history.state,hubCloudAgentView:next},"");
+    }
+  }
 
   function showSettings() {
     setNotice("");
@@ -653,6 +691,7 @@ export default function CloudAgents({
     const originThread = selected;
     const originBinding = binding;
     const originDraftKey = originThread ?? "new";
+    const originScopeSignature = scopeSignatureRef.current;
     const sendText = text.trim();
     const sendAttachments = attachments;
     const sendMaterials = materials;
@@ -704,6 +743,15 @@ export default function CloudAgents({
             resolvedMaterial = stripMaterialKey(packed.bundle);
           }
         } else if (sendMode === "auto-rag" && sendText) {
+          if (scopeSignatureRef.current !== originScopeSignature) {
+            setNotice("资料库范围已变更，已取消本轮自动检索发送；请确认新范围后再发送。草稿已保留。");
+            return;
+          }
+          const liveScopeIds = selectedLibraryIdsRef.current;
+          if (liveScopeIds !== null && liveScopeIds.length === 0) {
+            setNotice("当前搜索范围选择了 0 个资料库，未自动检索本机资料；请调整范围或切换为「纯云端」。草稿已保留。");
+            return;
+          }
           setRecalling(true);
           try {
             const recallQuery = Array.from(sendText).slice(0, 1800).join("");
@@ -711,8 +759,13 @@ export default function CloudAgents({
               query: recallQuery,
               limit: 3,
               maxBytes: MAX_MATERIAL_BYTES,
+              ...(liveScopeIds && liveScopeIds.length > 0 ? { spaceIds: liveScopeIds } : {}),
             });
             if (!mounted.current || selectedRef.current !== originThread || bindingRef.current !== originBinding) return;
+            if (scopeSignatureRef.current !== originScopeSignature) {
+              setNotice("资料库范围已变更，已取消本轮自动检索发送；请确认新范围后再发送。草稿已保留。");
+              return;
+            }
             resolvedMaterial = recalled?.bundle ? stripMaterialKey(recalled.bundle) : undefined;
           } catch (recallError) {
             if (mounted.current && selectedRef.current === originThread && bindingRef.current === originBinding) {
@@ -725,6 +778,10 @@ export default function CloudAgents({
         }
       }
       if (!mounted.current || selectedRef.current !== originThread || bindingRef.current !== originBinding) return;
+      if (!pending && mobile && sendMode === "auto-rag" && scopeSignatureRef.current !== originScopeSignature) {
+        setNotice("资料库范围已变更，已取消本轮自动检索发送；请确认新范围后再发送。草稿已保留。");
+        return;
+      }
       const draft: DraftTurn = pending ?? {
         thread: originThread ?? crypto.randomUUID(),
         turn: crypto.randomUUID(),
@@ -920,7 +977,7 @@ export default function CloudAgents({
         title: `跟进：${cleanLine.slice(0, 52)}`,
         note: turn.answer.slice(0, 1200),
         list: "本机任务",
-        plannedDay: new Date().toISOString().slice(0, 10),
+        plannedDay: todayKey(),
         source: `云端助手 · ${title}`,
         created: Date.now(),
         done: false,
@@ -936,7 +993,7 @@ export default function CloudAgents({
     const taskId = convertedTasks[turn.id] || (mobile && turn.status === "completed" ? mobileTasks().find(item => item.id === `agent:${selected || "new"}:${turn.id}`)?.id : undefined);
     if (mobile) {
       return <div className="bw-answer-receipt-bar">
-        {turn.status === "completed" && selected && <CloudAnswerNote compact key={(binding || "") + turn.id} thread={selected} turn={turn.id}/>}
+        {turn.status === "completed" && selected && <CloudAnswerNote compact key={(binding || "") + turn.id} thread={selected} turn={turn.id} onOpenJournal={onOpenJournal}/>}
         {turn.status === "completed" && (
           <button type="button" className={`bw-inline-receipt-btn${taskId ? " is-done" : ""}`} onClick={() => void convertTurnToTask(turn)}>
             {taskId ? <CheckCircle2 size={13} aria-hidden="true"/> : <SquareCheck size={13} aria-hidden="true"/>}
@@ -1105,6 +1162,7 @@ export default function CloudAgents({
         </button> : <div><h1>{chatOpen ? title : mobile ? "云端助手" : "助手"}</h1><span>{connectionLabel}</span></div>}
         {connection && (!mobile || !chatOpen) && <button type="button" onClick={() => select()} disabled={busy || preparing} aria-label="新对话"><Plus size={22}/></button>}
         {connection && (!mobile || !chatOpen) && <button type="button" onClick={settings ? closeSettings : showSettings} disabled={busy || preparing} aria-label="VPS 连接设置"><Settings2 size={20}/></button>}
+        {mobile && !settings && headerActions && <div className="bw-agent-header-controls">{headerActions}</div>}
         {chatOpen && (mobile || known && management) && <details className="cloud-agents-menu"><summary aria-label="会话选项"><MoreHorizontal size={20}/></summary><div>
           {mobile && <button type="button" disabled={busy || preparing} onClick={event => { event.currentTarget.closest("details")!.open = false; select(); }}>新对话</button>}
           {mobile && <button type="button" onClick={event => { event.currentTarget.closest("details")!.open = false; showList(); }}>会话列表</button>}
@@ -1322,7 +1380,20 @@ export default function CloudAgents({
           </div>}
           {mobile && <div className="bw-composer-meta">
             {contextMode === "auto-rag" ? <>
-              <span className="bw-composer-meta-copy">提问时自动检索本机资料片段发往云端（≤48 KB）</span>
+              <div className="bw-composer-meta-group">
+                <span className="bw-composer-meta-copy">自动检索本机片段（≤48 KB）</span>
+                {onOpenScope ? (
+                  <button
+                    type="button"
+                    className={`bw-composer-scope-btn${selectedLibraryIds !== null ? " is-filtered" : ""}`}
+                    disabled={attachDisabled || recalling}
+                    onClick={onOpenScope}
+                    aria-label={`调整自动关联资料库范围：${scopeLabel || "全部资料库"}`}
+                  >
+                    范围：{scopeLabel || "全部资料库"}
+                  </button>
+                ) : scopeLabel ? <span className="bw-composer-scope-label">{scopeLabel}</span> : null}
+              </div>
               <button type="button" className="bw-composer-add-btn" aria-label="添加照片或资料" aria-haspopup="dialog" disabled={attachDisabled} onClick={() => setSheet("attachments")}>+ 照片/技能</button>
             </> : contextMode === "manual" ? <div className="bw-composer-chips">
               <button type="button" className="bw-composer-add-btn is-accent" aria-label="添加照片或资料" aria-haspopup="dialog" disabled={attachDisabled} onClick={() => setSheet("attachments")}>+ 选资料/照片 ({manualKb}/48 KB)</button>

@@ -93,3 +93,52 @@ it("inverts only the selected libraries and keeps advanced filters when restorin
   await click("重置全库");await apply();expect(scope).toHaveBeenLastCalledWith(null);
   expect(props.setDateFilter).toHaveBeenLastCalledWith("7");expect(props.setSearchScope).toHaveBeenLastCalledWith("title");
 });
+
+it("supports one-tap library-only selection and folder chips in scope filter form", async () => {
+  const props = filters(), scope = vi.fn();
+  props.spaces = [...libraries, { ...libraries[0], id: "craft-1", name: "Craft" }];
+  props.folders = [{ id: "f1", spaceId: "craft-1", libraryName: "Craft", name: "架构", path: "工作/架构" }];
+  await act(async () => root.render(<MobileSearchFilterForm filters={props} onSelectLibraries={scope} onApply={vi.fn()} />));
+  await click("工作/架构");
+  await act(async () => host.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  expect(scope).toHaveBeenLastCalledWith(["craft-1"]);
+  expect(props.setFolderId).toHaveBeenLastCalledWith("craft-1\u0000f1");
+});
+
+it("normalizes manually checking all libraries to null and preserves unrelated folder on library toggle", async () => {
+  const props = filters(), scope = vi.fn();
+  props.spaces = [...libraries, { ...libraries[0], id: "craft-1", name: "Craft", provider: "craft" as const }];
+  props.selectedLibraryIds = ["craft-1"];
+  props.folders = [{ id: "f1", spaceId: "craft-1", libraryName: "Craft", name: "架构", path: "工作/架构" }];
+  props.folderId = "craft-1\u0000f1";
+  await act(async () => root.render(<MobileSearchFilterForm filters={props} onSelectLibraries={scope} onApply={vi.fn()} />));
+  const osCheckbox = host.querySelectorAll<HTMLInputElement>("input[type='checkbox']")[0];
+  await act(async () => { osCheckbox.click(); });
+  await act(async () => host.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  expect(scope).toHaveBeenLastCalledWith(null);
+  expect(props.setFolderId).toHaveBeenLastCalledWith("craft-1\u0000f1");
+});
+
+it("renders zero-selected applied scope warning and clears scope on reset", async () => {
+  const props = filters(), scope = vi.fn();
+  props.selectedLibraryIds = [];
+  props.activeSpaces = [];
+  await act(async () => root.render(<MobileSearchControls filters={props} onSelectLibraries={scope} />));
+  expect(host.textContent).toContain("零选中不回退整库");
+  await act(async () => host.querySelector<HTMLButtonElement>("[aria-label='清除资料范围']")!.click());
+  expect(scope).toHaveBeenCalledWith(null);
+  expect(props.setFolderId).toHaveBeenCalledWith("");
+});
+
+it("hides folder and advanced filters in libraryOnly mode and prunes stale library IDs on submit", async () => {
+  const props = filters(), scope = vi.fn();
+  props.spaces = [...libraries];
+  props.selectedLibraryIds = ["removed-lib"];
+  props.folders = [{ id: "f1", spaceId: "os", libraryName: "OS", name: "日志", path: "日志" }];
+  await act(async () => root.render(<MobileSearchFilterForm filters={props} libraryOnly onSelectLibraries={scope} onApply={vi.fn()} />));
+  expect(host.querySelector("[aria-label='文件夹范围']")).toBeNull();
+  expect(host.querySelector("[aria-label='日期范围']")).toBeNull();
+  await act(async () => host.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  expect(scope).toHaveBeenCalledWith([]);
+  expect(props.setDateFilter).not.toHaveBeenCalled();
+});

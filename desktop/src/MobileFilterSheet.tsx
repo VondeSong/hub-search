@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useModalFocus } from "./useModalFocus";
 
 /** One live spring owns both drag and disclosure, so reversals never restart the sheet. */
-export function MobileFilterSheet({ open, onClose, children, draft = false }: { open: boolean; onClose: () => void; children: ReactNode; draft?: boolean }) {
+export function MobileFilterSheet({ open, onClose, children, draft = false, title }: { open: boolean; onClose: () => void; children: ReactNode; draft?: boolean; title?: string }) {
+  const layer = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLElement>(null);
   const backdrop = useRef<HTMLButtonElement>(null);
   const motion = useRef({ y: 0, velocity: 0, target: 0, frame: 0, last: 0, height: 600, dragging: false });
@@ -10,7 +11,7 @@ export function MobileFilterSheet({ open, onClose, children, draft = false }: { 
   const openRef = useRef(open);
   openRef.current = open;
   const [present, setPresent] = useState(open);
-  useModalFocus({ active: open, containerRef: panel, onDismiss: onClose });
+  useModalFocus({ active: open, containerRef: layer, onDismiss: onClose });
 
   function paint() {
     const m = motion.current;
@@ -53,7 +54,7 @@ export function MobileFilterSheet({ open, onClose, children, draft = false }: { 
     // Disclosure owns the target; gesture handlers retarget the same spring.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-  return <div className="mobile-filter-layer" hidden={!present && !open} inert={!open} aria-hidden={!open}>
+  return <div ref={layer} className="mobile-filter-layer" hidden={!present && !open} inert={!open} aria-hidden={!open}>
     <button ref={backdrop} type="button" className="mobile-filter-scrim" aria-label="关闭筛选面板" tabIndex={-1} onClick={onClose} />
     <section ref={panel} className={`mobile-filter-sheet${draft ? " mobile-draft-sheet" : ""}`} role="dialog" aria-modal="true" aria-labelledby="mobile-filter-title" tabIndex={-1}>
       <div className="mobile-filter-grabber" aria-hidden="true"
@@ -84,7 +85,7 @@ export function MobileFilterSheet({ open, onClose, children, draft = false }: { 
         }}
         onPointerCancel={() => { motion.current.dragging = false; settle(openRef.current ? 0 : motion.current.height); }}
       ><span /></div>
-      <header className="mobile-filter-heading"><h2 id="mobile-filter-title">{draft ? "选择搜索资料范围" : "搜索筛选"}</h2><button type="button" data-modal-initial-focus onClick={onClose}>{draft ? "取消" : "完成"}</button></header>
+      <header className="mobile-filter-heading"><h2 id="mobile-filter-title">{title || (draft ? "选择搜索资料范围" : "搜索筛选")}</h2><button type="button" data-modal-initial-focus onClick={onClose}>{draft ? "取消" : "完成"}</button></header>
       {!draft && <p className="mobile-filter-description">选择后即生效</p>}
       {children}
     </section>

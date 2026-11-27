@@ -552,6 +552,88 @@ it("prevents late material picker toggle and in-flight outbox write from polluti
   expect(node.querySelectorAll(".bw-draft-chip")).toHaveLength(0);
 });
 
+it("respects selectedLibraryIds in auto-rag, blocks zero-library recall without falling back, and opens scope selector", async () => {
+  runtimeCapabilities.mobile = true;
+  const previous = invoke.getMockImplementation()!;
+  const recallCalls: Record<string, unknown>[] = [];
+  invoke.mockImplementation(async (cmd, args) => {
+    const { action } = args;
+    if (action.op === "recallMaterials") {
+      recallCalls.push(action);
+      return { bundle: null, items: [], totalBytes: 0, elapsedMs: 5 };
+    }
+    return previous(cmd, args);
+  });
+  const openScope = vi.fn();
+  // 1) Explicit empty library scope ([]) must block recall rather than searching all libraries.
+  await act(async () => root.render(
+    <CloudAgents selectedLibraryIds={[]} scopeLabel="未选资料库 (0/2)" onOpenScope={openScope} />,
+  ));
+  await act(async () => node.querySelector<HTMLButtonElement>(".cloud-agents-thread")!.click());
+  const scopeBtn = node.querySelector<HTMLButtonElement>(".bw-composer-scope-btn")!;
+  expect(scopeBtn.textContent).toContain("未选资料库 (0/2)");
+  await act(async () => scopeBtn.click());
+  expect(openScope).toHaveBeenCalledOnce();
+  await type(node.querySelector("textarea")!, "请查一下架构笔记");
+  await click("发送");
+  expect(recallCalls).toHaveLength(0);
+  expect(node.textContent).toContain("0 个资料库");
+  expect(node.querySelector("textarea")?.value).toBe("请查一下架构笔记");
+
+  // 2) Subset scope passes spaceIds to recallMaterials.
+  await act(async () => root.render(
+    <CloudAgents selectedLibraryIds={["craft-1"]} scopeLabel="Craft" onOpenScope={openScope} />,
+  ));
+  await click("发送");
+  expect(recallCalls).toHaveLength(1);
+  expect(recallCalls[0].spaceIds).toEqual(["craft-1"]);
+});
+
+it("aborts auto-rag send if library scope changes mid-recall and avoids duplicate history entry on return from tasks", async () => {
+  runtimeCapabilities.mobile = true;
+  const previous = invoke.getMockImplementation()!;
+  let releaseRecall!: (value: unknown) => void;
+  invoke.mockImplementation(async (cmd, args) => {
+    const { action } = args;
+    if (action.op === "recallMaterials") {
+      return new Promise(resolve => { releaseRecall = resolve; });
+    }
+    return previous(cmd, args);
+  });
+  await act(async () => root.render(<CloudAgents selectedLibraryIds={null} scopeLabel="全部资料库" />));
+  await act(async () => node.querySelector<HTMLButtonElement>(".cloud-agents-thread")!.click());
+  await type(node.querySelector("textarea")!, "范围变更边界测试");
+  await act(async () => {
+    [...node.querySelectorAll<HTMLButtonElement>("button")].find(b => b.getAttribute("aria-label") === "发送")!.click();
+  });
+  await act(async () => { await Promise.resolve(); });
+  // Narrow scope while recallMaterials is still in flight.
+  await act(async () => root.render(<CloudAgents selectedLibraryIds={["craft-1"]} scopeLabel="Craft" />));
+  await act(async () => releaseRecall({
+    items: [{ id: "old", title: "旧库笔记", source: "Other", text: "旧内容", sha256: "h" }],
+    bundle: { id: "old", title: "旧库笔记", source: "本机自动召回 · 1 份 · 0.1 KB", text: "旧内容", sha256: "h" },
+    totalBytes: 12,
+    elapsedMs: 4,
+  }));
+  expect(invoke.mock.calls.some(([, a]) => a.action.op === "send")).toBe(false);
+  expect(node.textContent).toContain("资料库范围已变更");
+  expect(node.querySelector("textarea")?.value).toBe("范围变更边界测试");
+
+  // Returning to an already-owned chat history entry must NOT push a duplicate chat entry.
+  const owner = window.history.state?.hubCloudAgentOwner;
+  expect(typeof owner).toBe("string");
+  const pushSpy = vi.spyOn(window.history, "pushState");
+  try {
+    await act(async () => root.render(<CloudAgents key="remount-return" selectedLibraryIds={["craft-1"]} scopeLabel="Craft" />));
+    await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+    expect(pushSpy).not.toHaveBeenCalled();
+    expect(node.querySelector("textarea")).not.toBeNull();
+  } finally {
+    pushSpy.mockRestore();
+    window.history.replaceState({}, "");
+  }
+});
+
 it("clears already visible cloud content when device access is rejected",async()=>{
  await render();await act(async()=>node.querySelector<HTMLButtonElement>(".cloud-agents-thread")!.click());expect(node.textContent).toContain("原回答");
  const handler=invoke.getMockImplementation()!;invoke.mockImplementation(async(cmd,args)=>args.action.op==="read"?{thread:null,accessDenied:true,error:"设备密钥已被撤销"}:handler(cmd,args));

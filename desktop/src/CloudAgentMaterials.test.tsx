@@ -60,6 +60,40 @@ it('Android Back cannot dismiss an in-flight save preview or leave its conversat
  expect(host.querySelector('[role="dialog"]')).not.toBeNull();expect(window.history.state.hubCloudDialog).toBeTruthy();
  await act(async()=>{release({record:{version:1,id:'record',date:'2026-11-15',text:'answer',attachments:[]}});});
 });
+it('compact CloudAnswerNote saves on first tap, restores local receipt offline on remount, and opens journal even after sync warning',async()=>{
+ localStorage.clear();
+ const openJournal=vi.fn();
+ let saved=false;
+ const record={version:1,id:'a'.repeat(32),date:'2026-11-28',text:'Compact answer',attachments:[]};
+ invoke.mockImplementation(async(command)=>{
+  if(command==='cloud_agents')return {record};
+  if(command==='capture_quick_journal'){saved=true;return {warning:'暂时未连接云端，已存本机'};}
+  if(command==='list_quick_journal')return {items:saved?[{record,uploaded:false,applied:false}]:[]};
+  throw Error(command);
+ });
+ await act(async()=>root.render(<CloudAnswerNote compact thread="thread-offline" turn="turn-1" onOpenJournal={openJournal}/>));
+ await click('存为日志');
+ expect(saved).toBe(true);
+ expect(openJournal).not.toHaveBeenCalled();
+ const savedBtn=[...host.querySelectorAll('button')].find(b=>b.classList.contains('is-done'))!;
+ expect(savedBtn).toBeTruthy();
+ await act(async()=>savedBtn.click());
+ expect(openJournal).toHaveBeenCalledWith(record.id);
+
+ // Remount with VPS offline: must restore local receipt from list_quick_journal without calling VPS.
+ openJournal.mockClear();
+ invoke.mockImplementation(async(command)=>{
+  if(command==='list_quick_journal')return {items:[{record,uploaded:false,applied:false}]};
+  throw Error('VPS offline');
+ });
+ await act(async()=>root.unmount());
+ root=createRoot(host);
+ await act(async()=>root.render(<CloudAnswerNote compact thread="thread-offline" turn="turn-1" onOpenJournal={openJournal}/>));
+ const restoredBtn=[...host.querySelectorAll('button')].find(b=>b.classList.contains('is-done'))!;
+ expect(restoredBtn).toBeTruthy();
+ await act(async()=>restoredBtn.click());
+ expect(openJournal).toHaveBeenCalledWith(record.id);
+});
 it('keeps ordinary single markdown notes unsplit and enforces exact 48,000-byte bundle budget',()=>{
  const trickySingle={id:'s',title:'普通笔记',source:'Car',text:'【本机自动召回 · 2 份资料】\n\n### [资料1] A（Car）\n正文1\n\n---\n\n### [资料2] B（Car）\n正文2',sha256:'h'};
  const parsed=parseMaterialBundle(trickySingle)!;
