@@ -65,7 +65,7 @@ it("opens the real insights workspace from browse without duplicating Agents", a
   const insights = vi.fn();
   await act(async () => root.render(<MobileBrowse favoriteCount={0} historyCount={0} journalCount={0} tagCount={0} onOpen={vi.fn()} onOpenInsights={insights} onOpenLibraries={vi.fn()} onOpenSettings={vi.fn()} onOpenSyncHealth={vi.fn()} syncNeedsAttention={false}/>));
   await act(async () => [...host.querySelectorAll("button")].find(button => button.textContent?.startsWith("洞察"))!.click());
-  expect(insights).toHaveBeenCalledOnce(); expect(host.textContent).toContain("发现与回看");
+  expect(insights).toHaveBeenCalledOnce(); expect(host.textContent).toContain("发现与连接");
 });
 
 it("keeps content synchronization and Agents as distinct connection actions", async () => {

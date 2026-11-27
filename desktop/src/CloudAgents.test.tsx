@@ -338,7 +338,7 @@ it("returns to the list on the first attempt when another visit left stale chat 
 it("places mobile connection status in the assistant header and opens real settings", async () => {
   runtimeCapabilities.mobile = true;
   await render();
-  expect(node.querySelector(".cloud-agents-header h1")?.textContent).toBe("助手");
+  expect(node.querySelector(".cloud-agents-header h1")?.textContent).toBe("云端助手");
   expect(node.querySelector(".cloud-agents-connection-card")).toBeNull();
   const connection=node.querySelector<HTMLButtonElement>(".cloud-agents-home-connection")!;
   expect(connection.textContent).toContain("个人云端");

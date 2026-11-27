@@ -119,7 +119,7 @@ export function browseFolderScope(tree: BrowseTree, folderId: string, includeDes
   return [...ids];
 }
 
-function rootResult(library: LibrarySummary, document: DocumentNode): SearchResult {
+export function rootResult(library: LibrarySummary, document: DocumentNode): SearchResult {
   const contentType = document.contentType ?? {
     craft: "document", obsidian: "obsidian_markdown", feishu: "feishu_document", dida365: "dida_task",
   }[library.provider];

@@ -1,3 +1,4 @@
+import { useMobileReadingPosition } from "./MobileReadingPosition";
 import { MobileReadingControls } from "./MobileReadingControls";
 import { cleanSearchSnippet } from "./ResultExcerpt";
 import { userProfileStorage } from "./UserProfileStorage";
@@ -90,7 +91,7 @@ function loadPreviewWidth() {
   } catch { return 0; }
 }
 
-export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, onSearchTargetHandled, onOpenLibrarySettings }: { onToggleDesktopSidebar?: () => void; initialItemKey?: string; onSearchTargetHandled?: () => void; onOpenLibrarySettings?: () => void }) {
+export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, initialQuery, initialContext, onSearchTargetHandled, onOpenLibrarySettings }: { onToggleDesktopSidebar?: () => void; initialItemKey?: string; initialQuery?: string; initialContext?:string; onSearchTargetHandled?: () => void; onOpenLibrarySettings?: () => void }) {
   const shellHeader = useContext(WorkspaceHeaderContext);
   const {view, updateView, activeEntry, isModified, selectView, updateSavedView, setNavigationCounts, settingsRevision, session, updateSession, pageSnapshot, dataRevision} = useCollectionViews();
   const [searchItemKey,setSearchItemKey]=useState<string|null>(null);
@@ -101,7 +102,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const setOffset=(offset:number)=>updateSession({offset});
   const selectedKey=session.selectedKey;
   const setSelectedKey=(selectedKey:string|null)=>{if(!selectedKey)setSearchItemKey(null);updateSession({selectedKey});};
-  useEffect(()=>{if(initialItemKey){setSearchItemKey(initialItemKey);updateSession({selectedKey:initialItemKey,previewEnabled:true,offset:0});onSearchTargetHandled?.();}},[initialItemKey]);
+  useEffect(()=>{if(initialItemKey){reading.pending.current={query:initialQuery || "",context:initialContext};setSearchItemKey(initialItemKey);updateSession({selectedKey:initialItemKey,previewEnabled:true,offset:0});onSearchTargetHandled?.();}},[initialItemKey]);
   const [openReadingKey,setOpenReadingKey]=useState<string|null>(null);
   const [checkedKeys,setCheckedKeys]=useState<Set<string>>(()=>new Set());
   const [articleMenu,setArticleMenu]=useState(false);
@@ -309,14 +310,18 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const detailOpen=!!selected&&previewEnabled&&!useSplitReading&&(runtimeCapabilities.mobile||openReadingKey===selected.key||searchItemKey===selected.key);
   const showReading=!!selected&&previewEnabled&&(useSplitReading||detailOpen);
   useEffect(()=>{if(!showReading)setReadingFocusMode(false);},[showReading]);
+  const reading = useMobileReadingPosition(readingContentRef, runtimeCapabilities.mobile && showReading ? selected?.key : undefined, selected ? fullTitle(selected) : "");
   const openItem=(key:string)=>{
+    if (runtimeCapabilities.mobile && !reading.pending.current) reading.pending.current={query};
     setArticleMenu(false);
     setOpenReadingKey(key);
     updateSession({previewEnabled:true,selectedKey:key});
   };
   const closeReading=()=>{
+    if(runtimeCapabilities.mobile && window.history.state?.hubExternalReading){window.history.back();return;}
     setArticleMenu(false);
     setOpenReadingKey(null);
+    if(runtimeCapabilities.mobile && searchItemKey) setSearchItemKey(null);
     if(searchItemKey||runtimeCapabilities.mobile||useSplitReading)setPreviewEnabled(false);
   };
   const changeLayout=(layout:View["layout"])=>{
@@ -340,6 +345,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
     const closeAfterBack=(event:PopStateEvent)=>{
       if(previewHistoryPushed.current&&!event.state?.hubReadingPreview){
         previewHistoryPushed.current=false;
+        setSearchItemKey(null);
         updateSession({previewEnabled:false});
       }
     };
@@ -351,6 +357,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   },[updateSession]);
   useEffect(()=>{
     if(!runtimeCapabilities.mobile)return;
+    if(window.history.state?.hubExternalReading) return;
     if(detailOpen&&!previewHistoryPushed.current){
       window.history.pushState({...window.history.state,hubReadingPreview:true},"");
       previewHistoryPushed.current=true;
@@ -601,7 +608,8 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
   const sourceCount = view.source === "all" ? activeTotal : sources.find(source => source.id === view.source)?.count ?? activeTotal;
   const toggleReadingNavigation = shellHeader?.onToggleReadingNavigation ?? onToggleDesktopSidebar;
   return <section onKeyDown={readingKeys} className={`collections-workspace task-workspace${compactControls?" collection-compact-layout":""}${detailOpen?" collection-detail-open":""}`} aria-label="阅读">
-    {searchItemKey&&<div role="status" className="collection-notice">从搜索打开的阅读条目<button type="button" onClick={()=>setSelectedKey(null)}>返回阅读列表</button>{page&&!page.items.length&&<span>条目已变更或移除，请重新搜索。</span>}</div>}
+    {runtimeCapabilities.mobile && reading.bookmark && !query.trim() && !detailOpen && <button className="bw-resume" onClick={()=>{const mark=reading.bookmark!;reading.pending.current={bookmark:mark};setSearchItemKey(mark.key);openItem(mark.key);}}><strong>继续上次阅读</strong><span>{reading.bookmark.title}</span><small>{reading.bookmark.paragraph < 0 ? "文章开头" : `正文第 ${reading.bookmark.paragraph + 1} 段`} ›</small></button>}
+    {searchItemKey&&(!runtimeCapabilities.mobile || (page && !page.items.length))&&<div role="status" className="collection-notice">从搜索打开的阅读条目<button type="button" onClick={()=>setSelectedKey(null)}>返回阅读列表</button>{page&&!page.items.length&&<span>条目已变更或移除，请重新搜索。</span>}</div>}
     <div className="collection-browse-controls" hidden={detailOpen&&(compactPreview||runtimeCapabilities.mobile)}>
     {runtimeCapabilities.mobile?<MobileReadingControls view={view} onChange={changeView} count={page?.matched} tags={page?.availableTags||[]} onSync={openCloudSyncSettings}><CollectionViewTabs onChange={changeView} compact={true} onNotice={setNotice}/><CollectionSort key={`${view.id}:${view.layout}`} rules={sorts} onChange={changeSorts}/></MobileReadingControls>:<>
     <header className="task-workspace-header collection-header" onMouseDown={e=>{if(!(e.target as HTMLElement).closest("button, input, select, textarea, a, summary, details, [role=button]"))shellHeader?.onMouseDown(e);}}>
@@ -682,7 +690,13 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, o
           })}
         </div>}
         {(!view.attentionOnly||!attentionRows.length)&&<>
-        {view.layout==="list"&&page?.items.map(item=><article key={item.key} role="button" tabIndex={0} aria-label={`阅读：${title(item)}`} data-reading-state={readingStatus(item)} className={`collection-row ${selected?.key===item.key?"selected":""}`} style={cardStyle(item)} draggable onDragStart={event=>{event.dataTransfer.effectAllowed="copy";event.dataTransfer.setData("application/x-hub-agent-source",JSON.stringify({itemKey:item.key,title:title(item)}));}} onClick={()=>openItem(item.key)} onKeyDown={e=>{if(e.target===e.currentTarget&&(e.key==="Enter"||e.key===" ")){e.preventDefault();openItem(item.key);}}}>
+        {runtimeCapabilities.mobile && view.layout==="list" && page?.items.map(item=>{
+          const term=query.trim().toLowerCase();
+          const lines=item.post.text.split(/\n+/).map(line=>line.trim()).filter(Boolean);
+          const hits=term?lines.filter(line=>line.toLowerCase().includes(term)):[];
+          return (hits.length?hits:[null]).map((hit,index)=><button type="button" key={JSON.stringify([item.key,index])} className={`collection-row bw-reading-row${selected?.key===item.key?" selected":""}`} aria-label={`阅读：${title(item)}`} onClick={()=>{reading.pending.current={query,context:hit||undefined,occurrence:index};openItem(item.key);}}><small>{badge(item)} · {item.post.authorName}</small><strong>{title(item)}</strong><span>{hit || lines.slice(1).join(" ") || lines[0]}</span>{hit&&<em>定位命中段落 ›</em>}</button>);
+        })}
+        {!runtimeCapabilities.mobile&&view.layout==="list"&&page?.items.map(item=><article key={item.key} role="button" tabIndex={0} aria-label={`阅读：${title(item)}`} data-reading-state={readingStatus(item)} className={`collection-row ${selected?.key===item.key?"selected":""}`} style={cardStyle(item)} draggable onDragStart={event=>{event.dataTransfer.effectAllowed="copy";event.dataTransfer.setData("application/x-hub-agent-source",JSON.stringify({itemKey:item.key,title:title(item)}));}} onClick={()=>openItem(item.key)} onKeyDown={e=>{if(e.target===e.currentTarget&&(e.key==="Enter"||e.key===" ")){e.preventDefault();openItem(item.key);}}}>
           {!runtimeCapabilities.mobile&&checkItem(item)}
           {readControl(item)}<div className="collection-row-title"><strong>{title(item)}{!runtimeCapabilities.mobile&&(issues(item).length>0||Boolean(item.attentionIssues?.length))&&<i className="reading-list-warning" title="有待处理项"/>}</strong>{!runtimeCapabilities.mobile&&<p className="reading-row-excerpt">{cleanSearchSnippet(item.post.text).slice(0,200)}</p>}{runtimeCapabilities.mobile&&view.density!=="compact"&&(view.columns.author||view.columns.media)&&<small>{view.columns.author&&<span data-reading-property="author">{item.post.authorName} {item.post.authorHandle&&`@${item.post.authorHandle}`}</span>}{view.columns.media&&collectionAttachments(item.post).length>0&&<span data-reading-property="media">{view.columns.author?" · ":""}{collectionAttachments(item.post).length} 个附件</span>}</small>}{runtimeCapabilities.mobile&&<p className="mobile-reading-excerpt">{cleanSearchSnippet(item.post.text).slice(0,160)}</p>}{renderIssues(item)}</div><div className="collection-row-meta">
           {!runtimeCapabilities.mobile&&view.density!=="compact"&&view.columns.author&&<span className="reading-row-author" data-reading-property="author" title={item.post.authorName||item.post.authorHandle}>{item.post.authorName||item.post.authorHandle}</span>}

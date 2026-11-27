@@ -12,6 +12,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { TaskWorkspace as SourceTasks } from "./TaskWorkspace";
+import { providerName } from "./ProviderLabels";
 import { runtimeCapabilities } from "./RuntimePlatform";
 import { useUnifiedTasks } from "./UnifiedTaskData";
 import { TaskStatusControl, TaskStatusNotice } from "./TaskStatusControl";
@@ -19,6 +20,7 @@ import type { UnifiedTask } from "./TaskWorkspacePresentation";
 import type { QuickJournalItem } from "./JournalRecords";
 import { QUICK_JOURNAL_UPDATED } from "./QuickJournalEvents";
 import { ActionEodReview, ActionTodayPlan } from "./ActionTodayPlan";
+import { MobileLocalTaskDetail, mobileTasks, MobileTaskForm, MobileTaskFilter } from "./MobileInsightTasks";
 import { ActionHarvester } from "./ActionHarvester";
 import { ActionDetail } from "./ActionDetail";
 import { ActionTopic } from "./ActionTopic";
@@ -42,6 +44,8 @@ import {
 import "./ActionWorkbench.css";
 
 type Props = ComponentProps<typeof SourceTasks> & {
+  mobileTarget?:string;
+  onBackToInsight?:()=>void;
   sourceDocumentFilter?: { provider: string; libraryId: string; documentId: string; title: string } | null;
 };
 type QuickRequest = {
@@ -55,11 +59,18 @@ type QuickRequest = {
 };
 type View = "focus" | "waiting" | "all" | "done";
 export function TaskWorkspace(props: Props) {
-  if (runtimeCapabilities.mobile || props.sourceDocumentFilter) return <SourceTasks {...props} />;
-  return <DesktopActions key={JSON.stringify(props.selectedLibraryIds ?? null)} {...props} />;
+  const [sources,setSources]=useState(false);
+  if(runtimeCapabilities.mobile && sources) return <div className="bw-source-tasks"><button onClick={()=>setSources(false)}>‹ 今日聚焦</button><SourceTasks {...props}/></div>;
+  if (props.sourceDocumentFilter) return <SourceTasks {...props} />;
+  return <DesktopActions key={JSON.stringify(props.selectedLibraryIds ?? null)} {...props} onSources={()=>setSources(true)} />;
 }
-function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibraryScope, onOpenResult }: Props) {
+function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibraryScope, onOpenResult, mobileTarget, onBackToInsight, onSources }: Props & {onSources:()=>void}) {
   const store = useUnifiedTasks();
+  const mobile=runtimeCapabilities.mobile;
+  const [receiptTask,setReceiptTask]=useState<UnifiedTask | null>(null);
+  const [compose,setCompose]=useState(false),[localId,setLocalId]=useState("");
+  const localRows=mobile ? mobileTasks() : [];
+  const localTask=localRows.find(t=>t.id===(mobileTarget || localId));
   const [view, setView] = useState<View>("focus"),
     [project, setProject] = useState<Topic | null>(null),
     [search, setSearch] = useState("");
@@ -136,7 +147,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
       store.dashboard.tasks
         .filter(
           (t) =>
-            t.provider === "dida365" &&
+            (mobile || t.provider === "dida365") &&
             !t.isProject &&
             t.status !== "abandoned" &&
             (!selectedLibraryIds || selectedLibraryIds.includes(t.libraryId)),
@@ -145,8 +156,9 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
           (a, b) =>
             (a.dueAt || "9999").localeCompare(b.dueAt || "9999") || a.title.localeCompare(b.title, "zh-CN"),
         ),
-    [store.dashboard.tasks, scopeKey],
+    [store.dashboard.tasks, scopeKey, mobile],
   );
+  const harvestTasks = useMemo(() => mobile ? tasks.filter(t => t.provider === "dida365") : tasks, [tasks, mobile]);
   const originals = useMemo(() => new Map(store.dashboard.tasks.map((t) => [t.id, t])), [store.dashboard.tasks]);
   const legacy = useMemo(legacyRecords, [revision, store.dashboard.tasks]);
   const allMeta = useMemo(
@@ -206,16 +218,21 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
           .sort((a, b) => (topicCounts.get(b.key) || 0) - (topicCounts.get(a.key) || 0))
           .slice(0, 4)
       : topics.filter((t) => pins.includes(t.key));
+  const [mobileList,setMobileList]=useState("");
+  const [mobileSource, setMobileSource] = useState("");
+  const localListRows = localRows.filter(t => (!mobileList || mobileList === (t.list || "本机任务")) && (!mobileSource || mobileSource === t.source));
   const scoped = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query && !project) return tasks;
+    if (!query && !project && !mobileList && !mobileSource) return tasks;
     return tasks.filter((task) => {
+      if (mobileSource && providerName(task.provider) !== mobileSource) return false;
+      if (mobileList && topicOf(task).name !== mobileList) return false;
       if (project && !inTopic(task, project, meta(task))) return false;
       if (!query) return true;
       return [task.title, task.collectionName, ...(task.tags || []), ...meta(task).waits.flatMap((w) => [w.who, w.what])]
         .join(" ").toLowerCase().includes(query);
     });
-  }, [tasks, project, meta, search]);
+  }, [tasks, project, meta, search, mobileList, mobileSource]);
   const counts = useMemo(() => groupsFor(tasks, meta, day), [tasks, meta, day]);
   const grouped = useMemo(() => scoped === tasks ? counts : groupsFor(scoped, meta, day), [scoped, tasks, counts, meta, day]);
   const activeWait = (t: UnifiedTask) => t.status === "open" && meta(t).waits.some((w) => !w.resolved);
@@ -232,7 +249,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
         ? scoped.find(activeWait)
         : grouped.due[0] || grouped.plan[0] || scoped.find((t) => !t.completed) || scoped[0];
   const selectedTask =
-    selected === null ? (wide ? initialTask : undefined) : scoped.find((t) => identity(t) === selected);
+    selected === null ? (wide ? initialTask : undefined) : (mobile ? tasks : scoped).find((t) => identity(t) === selected) || (mobile && receiptTask && identity(receiptTask) === selected ? receiptTask : undefined);
   const pendingRequests = read<Record<string, QuickRequest>>("quick.requests", {});
   async function clearQuickRequest(request: QuickRequest) {
     const key = JSON.stringify([request.lib, request.project || "", request.title]);
@@ -320,13 +337,21 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
   function rows(label: string, items: UnifiedTask[], empty?: string) {
     const listKey = JSON.stringify([scopeKey, view, project?.key, label]);
     const limit = rowLimits[listKey] || 60;
+    const localGroup = !mobile ? [] : localListRows.filter(task => {
+      if (view === "all") return true;
+      if (view === "done") return task.done;
+      if (task.done) return false;
+      if (view === "waiting" || label === "等待跟进") return !!task.waiting;
+      return label === "今日计划" && task.plannedDay === day && !task.waiting;
+    });
     return (
       <section className="aw-list" aria-label={label}>
         <h3>
-          {label} <small>{items.length} 项</small>
+          {label} <small>{items.length+localGroup.length}{mobile ? "" : " 项"}</small>
         </h3>
         <div className="aw-group">
-          {!items.length && <p>{empty || "当前分组暂无行动项"}</p>}
+          {localGroup.map(localRow)}
+          {!items.length && !localGroup.length && <p>{mobile ? (mobileList || mobileSource ? "当前筛选下没有任务" : "暂无" + label) : empty || "当前分组暂无行动项"}</p>}
           {items.slice(0, limit).map((t) => {
             const key = identity(t),
               m = meta(t),
@@ -424,7 +449,8 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
   const dueIds = new Set(dueToday.map(identity));
   const overdue = grouped.due.filter((t) => !dueIds.has(identity(t)));
   const focusCount = counts.due.length + counts.plan.length + counts.waiting.length;
-  const focus = rows("今日到期与到点催办", [...dueToday, ...overdue], "今日无到期承诺或到点催办项");
+  const localRow=(task:(typeof localRows)[number])=><button className="bw-reading-row" key={task.id} onClick={()=>setLocalId(task.id)}><strong>{task.title}</strong><small>{task.source} · {task.list || "本机任务"}</small></button>;
+  const focus = rows(mobile?"到期承诺":"今日到期与到点催办", [...dueToday, ...overdue], "今日无到期承诺或到点催办项");
   const boardColumns = (
     <div className="aw-columns">
       {rows(
@@ -435,6 +461,14 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
       {rows("后续待排期", grouped.next)}
     </div>
   );
+  useEffect(()=>{
+    if (!mobile || mobileTarget || !(selected || localId || compose)) return;
+    if(!window.history.state?.hubActionDetail) window.history.pushState({...window.history.state,hubActionDetail:true},"");
+    const pop=(event:PopStateEvent)=>{if(!event.state?.hubActionDetail){event.stopImmediatePropagation();setSelected("");setLocalId("");setCompose(false);}};
+    window.addEventListener("popstate",pop,true);return ()=>window.removeEventListener("popstate",pop,true);
+  },[mobile,selected,localId,compose,mobileTarget]);
+  const closeDetail=()=>{if(mobile&&window.history.state?.hubActionDetail) window.history.back();else setSelected("");};
+  if(mobile && localTask) return <MobileLocalTaskDetail task={localTask} onChange={bump} back={()=>mobileTarget?onBackToInsight?.():closeDetail()}/>;
   const quickEntry = (
     <form
       className="aw-add"
@@ -472,6 +506,23 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
       </button>
     </form>
   );
+  const mobileViews = {focus: "今日聚焦", waiting: "等待跟进", all: "全部任务", done: "已完成"};
+  const harvester = (
+    <ActionHarvester
+    tasks={harvestTasks}
+    journals={journals}
+    scope={selectedLibraryIds}
+    libraries={libraries}
+    day={day}
+    onUpdate={update}
+    onRefresh={store.refresh}
+    onSelect={(t) => { if (mobile) setReceiptTask(t); setSelected(identity(t)); }}
+    onOpen={onOpenResult}
+    onCount={setClueCount}
+    planFull={planFull}
+    revision={refreshKey}
+  />
+  );
   return (
       <main
         style={
@@ -482,7 +533,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
         }
         className={"aw-shell" + (nav ? "" : " aw-nav-hidden") + (selectedTask ? " has-detail" : "")}
       >
-      {nav && (
+      {!mobile && nav && (
         <nav className="aw-nav">
           <h3>行动聚焦（按时间）</h3>
           {views.map(([id, label, Icon]) => (
@@ -547,7 +598,20 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
         </nav>
       )}
       <section className="aw-center">
-        <header className="aw-bar">
+        {mobile && <section className="bw-task-head">
+          <header><h2>{mobileViews[view]}</h2><button onClick={() => setCompose(true)}>＋ 新建任务</button></header>
+          <nav className="bw-tabs" aria-label="任务视图">{views.map(([id]) =>
+            <button key={id} aria-pressed={view === id} onClick={() => navigate(id)}>{mobileViews[id]}</button>)}</nav>
+          <div className="bw-task-tools">
+            <MobileTaskFilter source={mobileSource} list={mobileList}
+              options={[...tasks.map(t => ({source: providerName(t.provider), list: topicOf(t).name})),
+                ...localRows.map(t => ({source: t.source, list: t.list || "本机任务"}))]}
+              onApply={(source, list) => {setMobileSource(source); setMobileList(list);}}
+              onSources={onSources}/>
+            {harvester}
+          </div>
+        </section>}
+        {!mobile && <header className="aw-bar">
           <button aria-label="切换任务导航" onClick={() => setNav(!nav)}>
             <PanelLeft size={17} />
           </button>
@@ -609,7 +673,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
               />
             </>
           )}
-        </header>
+        </header>}
         <div className={"aw-scroll" + (board ? " aw-board" : "")}>
           {(store.error || journalError) && (
             <p role="alert">{[store.error, journalError].filter(Boolean).join(" · ")}</p>
@@ -621,7 +685,8 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
           )}
           {selectedLibraryIds && <button onClick={onClearLibraryScope}>清除资料库范围</button>}
           {store.loading && !tasks.length && <p>正在读取滴答任务…</p>}
-          {!project && view !== "done" && quickEntry}
+          {mobile && compose && <MobileTaskForm onCancel={closeDetail} onSave={task=>{setCompose(false);setLocalId(task.id);bump();}}/>}
+          {!mobile && !project && view !== "done" && quickEntry}
           {project ? (
             <ActionTopic
               key={project.key}
@@ -647,31 +712,18 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
             </ActionTopic>
           ) : view === "focus" ? (
             <>
-              <ActionHarvester
-                tasks={tasks}
-                journals={journals}
-                scope={selectedLibraryIds}
-                libraries={libraries}
-                day={day}
-                onUpdate={update}
-                onRefresh={store.refresh}
-                onSelect={(t) => setSelected(identity(t))}
-                onOpen={onOpenResult}
-                onCount={setClueCount}
-                planFull={planFull}
-                revision={refreshKey}
-              />
+              {!mobile && harvester}
               {board ? (
                 boardColumns
               ) : (
                 <>
                   {focus}
                   {rows(
-                    "今日计划（额外自选）",
+                    mobile?"今日计划":"今日计划（额外自选）",
                     grouped.plan,
                     `今天已排入 ${plannedCount} 项，最多 ${TODAY_PLAN_LIMIT} 项。`,
                   )}
-                  {grouped.waiting.length > 0 && rows("等待他人", grouped.waiting)}
+                  {(mobile || grouped.waiting.length > 0) && rows(mobile?"等待跟进":"等待他人", grouped.waiting)}
                 </>
               )}
             </>
@@ -679,7 +731,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
             boardColumns
           ) : (
             rows(
-              view === "waiting" ? "等待催办" : view === "done" ? "已闭环" : "全部行动",
+              mobile ? mobileViews[view] : view === "waiting" ? "等待催办" : view === "done" ? "已闭环" : "全部行动",
               view === "waiting"
                 ? scoped.filter(activeWait).sort((a, b) => {
                     const nextReview = (task: UnifiedTask) =>
@@ -691,7 +743,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
                   })
                 : view === "done"
                   ? grouped.done
-                  : scoped.filter((t) => !t.completed),
+                  : mobile ? scoped : scoped.filter((t) => !t.completed),
               "当前范围内没有行动。",
             )
           )}
@@ -777,7 +829,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
             scope={selectedLibraryIds}
             day={day}
             onOpen={onOpenResult}
-            onClose={() => setSelected("")}
+            onClose={closeDetail}
           />
         </>
       )}

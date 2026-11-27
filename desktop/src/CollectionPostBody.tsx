@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { runtimeCapabilities } from "./RuntimePlatform";
 import { invoke } from "@tauri-apps/api/core";
 import type { Root } from "mdast";
 import type { ReadingAttachmentState } from "./ReadingAttachments";
@@ -56,7 +57,7 @@ function Body({post,itemKey,open,depth=0,inline}:{post:CollectionPost;itemKey:st
  });
  const flowAttachments = inline && post.source !== "web";
  return <>{post.origin&&<p className="collection-origin">转发自 {post.origin.url?<a className="preview-text-link" href={post.origin.url} onClick={e=>{e.preventDefault();void open(post.origin!.url);}}>{post.origin.name||"原始消息"}</a>:post.origin.name||"原始消息"}</p>}
- {post.source==="web"?<pre className="collection-public-snapshot">{post.text}</pre>:<Text text={post.text} open={open} attachments={flowAttachments?attachments:undefined}/>}
+ {post.source==="web"?<pre className="collection-public-snapshot">{runtimeCapabilities.mobile ? post.text.split(/(\r?\n)/).map((part,i)=>i%2 ? part : <span data-reading-line key={i}>{part}</span>) : post.text}</pre>:<Text text={post.text} open={open} attachments={flowAttachments?attachments:undefined}/>}
  {!flowAttachments&&attachments.length>0&&<div className="collection-own-media">{post.quote&&<small className="collection-media-source">本帖附件</small>}<div className="collection-media">{attachments}</div></div>}
  {!!post.links.length&&<div className="collection-detail-links">{post.links.filter(url=>!post.text.includes(url)).map(url=><a className="preview-text-link" key={url} href={url} onClick={event=>{event.preventDefault();void open(url);}}>{url}</a>)}</div>}
  {post.quote&&depth<5?<blockquote className="collection-quote" aria-label="引用原帖"><header><a className="preview-text-link" href={post.quote.url} onClick={event=>{event.preventDefault();void open(post.quote!.url);}}>引用原帖 · {post.quote.authorName} @{post.quote.authorHandle}</a><time dateTime={post.quote.publishedAt}>{timestamp(post.quote.publishedAt)}</time></header><Body post={post.quote} itemKey={itemKey} open={open} depth={depth+1} inline={inline}/></blockquote>:post.quotedText?<blockquote><Text text={post.quotedText} open={open}/></blockquote>:post.quoteId?<p className="collections-note"><a className="preview-text-link" href={`https://x.com/i/status/${post.quoteId}`} onClick={event=>{event.preventDefault();void open(`https://x.com/i/status/${post.quoteId}`);}}>引用原帖</a> · 引用内容暂不可用</p>:null}

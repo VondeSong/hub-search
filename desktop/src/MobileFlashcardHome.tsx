@@ -4,14 +4,14 @@ import type { FlashcardDeckSummary } from "./FlashcardTypes";
 
 export type MobileFlashcardTab = "review" | "library" | "inbox";
 
-export function MobileFlashcardIntro({ active, inboxCount, onSelect }: {
-  active: MobileFlashcardTab; inboxCount: number; onSelect: (tab: MobileFlashcardTab) => void;
+export function MobileFlashcardIntro({ active, inboxCount, dueCount, deckCount, onSelect }: {
+  active: MobileFlashcardTab; inboxCount: number; dueCount?:number; deckCount?:number; onSelect: (tab: MobileFlashcardTab) => void;
 }) {
   return <header className="mobile-flashcard-intro">
     <h1>复习</h1><p>翻卡评分，也能回到牌库与收件箱。</p>
     <nav className="mobile-flashcard-tabs" aria-label="闪卡导航">
-      {([["review", "今日"], ["library", "牌库"], ["inbox", `收件箱${inboxCount ? ` ${inboxCount}` : ""}`]] as const).map(([key, label]) =>
-        <button type="button" key={key} aria-pressed={active === key} onClick={() => onSelect(key)}>{label}</button>)}
+      {([["review", `今日复习${dueCount==null?"":` (${dueCount})`}`], ["library", `牌库${deckCount==null?"":` (${deckCount})`}`], ["inbox", `AI 收件箱 (${inboxCount})`]] as const).map(([key, label]) =>
+        <button type="button" key={key} aria-label={key==="library"?"牌库":key==="inbox"?"AI 收件箱":"今日复习"} aria-pressed={active === key} onClick={() => onSelect(key)}>{label}</button>)}
     </nav>
   </header>;
 }

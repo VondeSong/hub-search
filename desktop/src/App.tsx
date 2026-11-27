@@ -1,5 +1,6 @@
 import { JournalVoiceHost } from "./JournalVoice";
 import { MobileJournal } from "./MobileJournal";
+import { MobileSearchOverview } from "./MobileSearchOverview";
 import { MobileHeader } from "./MobileHeader";
 import { filterMobileFavorites, matchesMobileCollection } from "./MobileCollectionSearch";
 import { invoke } from "@tauri-apps/api/core";
@@ -42,6 +43,7 @@ import "./MobileGlass.css";
 import "./MobileNavigationDesign.css";
 import "./MobilePrototype.css";
 import "./MobileV13.css";
+import "./MobileBaseWhite.css";
 import { GlobalExclusionReviewProvider } from "./GlobalExclusionReviewReminder";
 import { CollectionViewsProvider } from "./CollectionViews";
 import { JournalRecordsProvider } from "./JournalRecords";
@@ -89,6 +91,7 @@ const LazyPreviewRenderer = lazy(() => import("./PreviewRenderer").then((module)
 const LazyMobileQuickCapture = lazy(() => import("./MobileQuickCapture").then(m => ({ default: m.MobileQuickCapture })));
 const LazySettingsDialog = lazy(() => import("./SettingsDialog").then((module) => ({ default: module.SettingsDialog })));
 const LazySettingsContent = lazy(() => import("./SettingsContent").then((module) => ({ default: module.SettingsContent })));
+const LazyMobileInsights = lazy(() => import("./MobileInsightTasks").then(m=>({default:m.MobileInsightList})));
 const LazyInsightsWorkspace = lazy(() => import("./InsightsWorkspace").then((module) => ({ default: module.InsightsWorkspace })));
 const LazyTaskWorkspace = lazy(() => import("./ActionWorkspace").then((module) => ({ default: module.TaskWorkspace })));
 const LazyCollectionsWorkspace = lazy(() => import("./CollectionsWorkspace").then((module) => ({ default: module.CollectionsWorkspace })));
@@ -523,7 +526,7 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
     setSpaceMenuOpen(false);
   }, [isMobileLayout, openMobilePreview, previewPinned, pushPreviewHistory, rememberViewedResult, visibleResults]);
 
-  const [moduleTarget,setModuleTarget]=useState<{kind:"reading"|"flashcard";id:string}>();
+  const [moduleTarget,setModuleTarget]=useState<{kind:"reading"|"flashcard";id:string;query?:string;context?:string}>();
   const moduleOpenSequence=useRef(0);
   const clearModuleTarget=useCallback(()=>setModuleTarget(undefined),[]);
   const openResult = useResultOpener({
@@ -535,12 +538,12 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
     if(result?.provider==="hub"&&(result.contentType==="reading"||result.contentType==="flashcard")){
       const kind=result.contentType,id=result.documentId;
       void invoke<string>("module_search_document",{kind,id}).then(()=>{
-        if(moduleOpenSequence.current===ticket)setModuleTarget({kind,id});
+        if(moduleOpenSequence.current===ticket)setModuleTarget({kind,id,query:query.trim(),context:result.snippet});
       }).catch(e=>showOperationStatus(String(e),"error"));return;
     }
     if (result) rememberViewedResult(result);
     openResult(result, source);
-  }, [openResult, rememberViewedResult,showOperationStatus]);
+  }, [openResult, rememberViewedResult,showOperationStatus,query]);
 
   const {
     preview,
@@ -999,13 +1002,19 @@ useEffect(() => {
     selectDesktopSidebarView("libraries");
   };
 
+  const [mobileTaskTarget,setMobileTaskTarget]=useState("");
+  const [advancedInsights,setAdvancedInsights]=useState(false);
   const applyMobileRoute = useCallback((route: string) => {
     setFiltersOpen(false);
     setSpaceMenuOpen(false);
     setMobileBrowseOpen(route === "browse");
     setMobileAgentsOpen(route === "agents");
     setMobileConnectionsOpen(route === "connections");
+    if (route==="search" && typeof window.history.state?.hubSearchQuery==="string") setQuery(window.history.state.hubSearchQuery);
+    setMobileTaskTarget(route === "tasks" ? window.history.state?.hubInsightTask || "" : "");
+    setAdvancedInsights(route === "insight-tools");
     if (route === "search" || route === "browse" || route === "agents" || route === "connections") selectDesktopSidebarView("home");
+    else if (route === "insight-tools") selectDesktopSidebarView("insights");
     else if (route === "tasks" || route === "favorites" || route === "history" || route === "journals" || route === "tags" || route === "collections" || route === "insights") {
       selectDesktopSidebarView(route);
       if (route !== "tasks") setQuery("");
@@ -1049,12 +1058,17 @@ useEffect(() => {
       return;
     }
     pushMobileRoute(destination);
-    if (destination === "search") mobileSearch.open();
-  }, [openStandaloneFlashcards, pushMobileRoute, mobileSearch.open]);
+  }, [openStandaloneFlashcards, pushMobileRoute]);
   useEffect(()=>{
     if(!moduleTarget)return;
     if(moduleTarget.kind==="reading"){
-      if(isMobileLayout){if(!openRouteFromPreview("collections"))pushMobileRoute("collections");}
+      if(isMobileLayout){
+        if (!openRouteFromPreview("collections")) {
+          window.history.replaceState({...window.history.state,hubSearchQuery:moduleTarget.query||""},"");
+          pushMobileRoute("collections");
+        }
+        window.history.replaceState({...window.history.state,hubExternalReading:true},"");
+      }
       else selectDesktopSidebarView("collections");
     }else openStandaloneFlashcards();
   },[moduleTarget,isMobileLayout,openRouteFromPreview,pushMobileRoute,selectDesktopSidebarView,openStandaloneFlashcards]);
@@ -1186,7 +1200,11 @@ useEffect(() => {
       isMobileLayout,
       semanticRecentDates: appSettings.semanticRecentDates,
       onHoverResult: hoverResult,
-      onSelectResult: selectResultForPreview,
+      onSelectResult: (index) => {
+        const result = visibleResults[index];
+        if (isMobileLayout && result?.provider === "hub" && result.contentType === "reading") openSelectedResult(result);
+        else selectResultForPreview(index);
+      },
       onOpenResult: openSelectedResult,
       onPreviewEvidence: (result) => {
         rememberViewedResult(result);
@@ -1464,21 +1482,23 @@ useEffect(() => {
       value: mobileCollectionQueries[desktopSidebarView as "favorites" | "tags"],
       onChange: (value: string) => setMobileCollectionQueries(current => ({ ...current, [desktopSidebarView]: value })),
     } : undefined,
-    mobileHeader: isMobileLayout && !mobilePreviewOpen && !mobileAgentsOpen && desktopSidebarView!=="journals" ? <MobileHeader title={flashcardsActive?"复习":mobileConnectionsOpen?"连接总览":mobileBrowseOpen?"浏览":({home:"搜索",tasks:"任务",collections:"阅读",favorites:"收藏",history:"最近浏览",tags:"标签",insights:"洞察"} as {[key:string]:string})[desktopSidebarView]} onBack={!flashcardsActive && ((!["home", "tasks"].includes(desktopSidebarView) && !mobileBrowseOpen) || mobileConnectionsOpen) ? () => navigateMobile("browse") : undefined} onSettings={() => setShowConnection(true)} spaceActions={{
+    mobileOverview: isMobileLayout && desktopSidebarView==="home" && !query.trim() && !searchFocused ? <MobileSearchOverview due={flashcardDueCount} tasks={taskOpenCount} topics={sidebarTags.slice(0,6).map(t=>t.name)} onSearch={setQuery} onGo={dest=>dest==="insights"?pushMobileRoute(dest):navigateMobile(dest)}/> : undefined,
+    mobileHeader: isMobileLayout && !mobilePreviewOpen && !mobileAgentsOpen && desktopSidebarView!=="journals" ? <MobileHeader title={flashcardsActive?"复习":mobileConnectionsOpen?"连接总览":mobileBrowseOpen?"浏览":({home:"搜索",tasks:"任务",collections:"阅读",favorites:"收藏",history:"最近浏览",tags:"标签",insights:"洞察"} as {[key:string]:string})[desktopSidebarView]} onBack={!flashcardsActive && ((!["home", "tasks"].includes(desktopSidebarView) && !mobileBrowseOpen) || mobileConnectionsOpen) ? () => window.history.state?.hubMobileRoute ? window.history.back() : navigateMobile("browse") : undefined} onSettings={() => setShowConnection(true)} spaceActions={{
       onLibraries: () => { navigateMobile("search"); setSpaceMenuOpen(true); },
       onConnections: () => pushMobileRoute("connections"),
       onAppearance: () => { setSettingsCategory("display"); setShowConnection(true); },
     }} /> : undefined,
     style: shellStyle,
     startWindowDrag,
-    mainContent: isMobileLayout && mobileAgentsOpen && !flashcardsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开助手…</div>}><LazyCloudAgents onClose={closeMobileAgents} /></Suspense> : isMobileLayout && mobileConnectionsOpen && !flashcardsActive ? <MobileConnections onContent={() => { setSettingsCategory("cloud"); setShowConnection(true); }} onAgents={() => navigateMobile("agents")} /> : isMobileLayout && mobileBrowseOpen && !flashcardsActive ? <MobileBrowse
+    mainContent: isMobileLayout && mobileAgentsOpen && !flashcardsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开助手…</div>}><LazyCloudAgents openRecentOnEntry onClose={closeMobileAgents} /></Suspense> : isMobileLayout && mobileConnectionsOpen && !flashcardsActive ? <MobileConnections onContent={() => { setSettingsCategory("cloud"); setShowConnection(true); }} onAgents={() => navigateMobile("agents")} /> : isMobileLayout && mobileBrowseOpen && !flashcardsActive ? <MobileBrowse
       favoriteCount={favoriteResults.length}
       historyCount={viewHistory.length}
       journalCount={journalDates.length}
       tagCount={sidebarTags.length}
       onOpen={openMobileCollection}
+      libraries={spaces} onDocument={result=>{pushMobileRoute("search");previewInlinePage(result);openMobilePreview();}} onScope={(id,folder)=>{pushMobileRoute("search");selectLibraries([id]);setFolderId(folder ? id+"\u0000"+folder : "");}}
       onOpenInsights={() => pushMobileRoute("insights")}
-      onOpenLibraries={() => { navigateMobile("search"); setSpaceMenuOpen(true); }}
+      onOpenLibraries={() => { pushMobileRoute("search"); setFiltersOpen(true); }}
       onOpenSettings={() => setShowConnection(true)}
       onOpenSyncHealth={() => pushMobileRoute("connections")}
       syncNeedsAttention={Boolean(indexStatus?.failedJobs)}
@@ -1495,12 +1515,14 @@ useEffect(() => {
       focusMode={previewFocusMode}
       onExitFocusMode={() => setPreviewFocusMode(false)}
       preview={browsingPreview && <PreviewPane {...workspaceProps.previewPaneProps} label="文档预览" onClose={() => setLibraryPreview(undefined)} />}
-    /> : insightsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开洞察…</div>}><LazyInsightsWorkspace/></Suspense> : collectionsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开阅读…</div>}><LazyCollectionsWorkspace
+    /> : insightsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开洞察…</div>}>{isMobileLayout && !advancedInsights ? <LazyMobileInsights advanced={()=>pushMobileRoute("insight-tools")} openTask={id=>{window.history.pushState({hubMobileRoute:"tasks",hubInsightTask:id},"");applyMobileRoute("tasks");}}/> : <LazyInsightsWorkspace/>}</Suspense> : collectionsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开阅读…</div>}><LazyCollectionsWorkspace
       initialItemKey={moduleTarget?.kind==="reading"?moduleTarget.id:undefined}
+      initialQuery={moduleTarget?.query} initialContext={moduleTarget?.context}
       onSearchTargetHandled={clearModuleTarget}
       onOpenLibrarySettings={() => { setSettingsCategory("libraries"); setShowConnection(true); }}
       onToggleDesktopSidebar={!isMobileLayout ? () => changeDesktopSidebarSetting(!desktopSidebarEnabled) : undefined}
     /></Suspense> : tasksActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开任务…</div>}><LazyTaskWorkspace
+      mobileTarget={mobileTaskTarget} onBackToInsight={()=>window.history.back()}
       libraries={spaces}
       selectedLibraryIds={selectedLibraryIds}
       onClearLibraryScope={selectAllLibraries}

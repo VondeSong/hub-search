@@ -1,3 +1,4 @@
+import { runtimeCapabilities } from "./RuntimePlatform";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Hourglass, Link2, Sparkles } from "lucide-react";
 import type { QuickJournalItem } from "./JournalRecords";
@@ -60,6 +61,7 @@ export function ActionHarvester({
   const [busy, setBusy] = useState(""),
     [msg, setMsg] = useState(""),
     [messageKey, setMessageKey] = useState(""),
+    [mobileReceipt, setMobileReceipt] = useState<{task: UnifiedTask; linked: boolean} | null>(null),
     [opened, setOpen] = useState(false),
     [target, setTarget] = useState("");
   const [edits, setEdits] = useState<Record<string, string>>({}),
@@ -195,6 +197,7 @@ export function ActionHarvester({
     lock.current = true;
     setBusy(key);
     setMessageKey(key);
+    setMobileReceipt(null);
     setMsg("");
     try {
       await fn();
@@ -220,7 +223,8 @@ export function ActionHarvester({
       clue: linking ? c : undefined,
       ...(linking ? { noteText: evidence } : {}),
     });
-    onSelect(t);
+    if (runtimeCapabilities.mobile) setMobileReceipt({task: t, linked: linking});
+    else onSelect(t);
   }
   async function writeClueNote(t: UnifiedTask, c: Clue, text: string, pending?: Decision) {
     let noteId = pending?.noteId;
@@ -255,6 +259,7 @@ export function ActionHarvester({
   async function link(t: UnifiedTask, c: Clue, pending?: Decision) {
     const noteText = pending?.noteText ?? (c.material.title + "\n" + c.material.text);
     if (!pending) await attach(t, c, false, undefined, true);
+    else if (runtimeCapabilities.mobile) setMobileReceipt({task: t, linked: true});
     try {
       const result = await writeClueNote(t, c, noteText, pending);
       setMsg("已关联到备料与推进备注。" + sourceNoteStatus(result));
@@ -367,17 +372,32 @@ export function ActionHarvester({
         : "所选材料未发现额外待办线索。",
     );
   }
+  useEffect(()=>{
+    if (!runtimeCapabilities.mobile || !opened) return;
+    if (!window.history.state?.hubMobileHarvest) window.history.pushState({...window.history.state,hubMobileHarvest:true},"");
+    const pop=(event:PopStateEvent)=>{
+      if(!event.state?.hubMobileHarvest){event.stopImmediatePropagation();setOpen(false);}
+    };
+    window.addEventListener("popstate",pop,true);
+    return ()=>window.removeEventListener("popstate",pop,true);
+  },[opened]);
   return (
     <section className="aw-harvester">
-      <button className="aw-capture-toggle" aria-expanded={opened} onClick={() => setOpen(!opened)}>
+      <button className="aw-capture-toggle" aria-expanded={opened} onClick={() => opened && runtimeCapabilities.mobile && window.history.state?.hubMobileHarvest ? window.history.back() : setOpen(!opened)}>
         <strong>
           <Sparkles size={14} aria-hidden="true" />
           <span>
-            行动捕手 · {clues.length} 条新线索{matchCount > 0 && <>（{matchCount} 条可关联已有任务）</>}
+            行动捕手 · {clues.length} {runtimeCapabilities.mobile && !opened ? "待判断" : "条新线索"}{(!runtimeCapabilities.mobile || opened) && matchCount > 0 && <>（{matchCount} 条可关联已有任务）</>}
           </span>
         </strong>
         <small>{opened ? "收起 ▴" : "展开处理 ▾"}</small>
       </button>
+      {opened && mobileReceipt && !busy && <section className="bw-harvest-receipt" aria-label="处理回执" aria-live="polite">
+        <strong>{mobileReceipt.linked ? "补充任务回执" : "新建任务回执"}</strong>
+        <p>{mobileReceipt.task.title} · {mobileReceipt.task.collectionName || "收件箱"}</p>
+        {msg && <p>{msg}</p>}
+        <button type="button" onClick={() => onSelect(mobileReceipt.task)}>打开对应任务</button>
+      </section>}
       {readError && <p role="alert">笔记线索读取失败 · {readError}</p>}
       {opened && (
         <>

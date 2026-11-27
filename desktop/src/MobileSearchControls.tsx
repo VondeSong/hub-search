@@ -19,6 +19,7 @@ export function MobileSearchControls({ filters, onSelectLibraries, onOpenFilters
     <select className="mobile-search-type-select" aria-label="内容类型" value={selectedType} onChange={event => filters.setSourceFilters(event.target.value === "all" ? { ...allTypes } : Object.fromEntries(types.map(([id]) => [id, id === event.target.value])) as SourceFilters)}>
       <option value="all">全部类型</option>{selectedType === "custom" && <option value="custom">自定义类型</option>}{types.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
     </select><button type="button" aria-label="更多搜索筛选" onClick={onOpenFilters}><ListFilter size={18}/></button></div>
+    <nav className="bw-tabs bw-search-types" aria-label="搜索内容类型">{([["all","全部"],...types] as const).map(([id,label])=><button key={id} type="button" aria-pressed={selectedType===id} onClick={()=>filters.setSourceFilters(id==="all"?{...allTypes}:Object.fromEntries(types.map(([key])=>[key,key===id])) as SourceFilters)}>{label}{filters.sourceFacetCounts&&<small>{id==="all"?filters.facetTotal:filters.sourceFacetCounts[id]??0}</small>}</button>)}</nav>
     <div className="mobile-applied-scope" aria-label="当前搜索范围与筛选">
       {filters.selectedLibraryIds !== null && <button onClick={() => { onSelectLibraries?.(null); filters.setFolderId(""); }}>清除资料范围</button>}
     </div>

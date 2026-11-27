@@ -14,6 +14,7 @@ import {
   queryMaterials,
   type Material,
 } from "./ActionEvidence";
+import { runtimeCapabilities } from "./RuntimePlatform";
 import { ActionHarvester } from "./ActionHarvester";
 import { ActionDetail } from "./ActionDetail";
 import { ActionEodReview, ActionTodayPlan } from "./ActionTodayPlan";
@@ -115,6 +116,29 @@ const dida = { id: "lib", name: "滴答清单", provider: "dida365" } as Library
 const workbenchAction = (params: unknown) => (params as { args?: { action?: string } } | undefined)?.args?.action;
 
 describe("行动工作台", () => {
+  it("手机采纳后先显示确认清单和回执，点击后打开回读的任务", async () => {
+    const previousMobile = runtimeCapabilities.mobile;
+    runtimeCapabilities.mobile = true;
+    try {
+      const selected = vi.fn();
+      const created = {...t, id: "receipt-target", sourceId: "receipt-target", collectionName: "工作清单"};
+      vi.mocked(invoke).mockImplementation(async (_, params) =>
+        workbenchAction(params) === "createTask" ? {state: "confirmed", task: created} : []);
+      await render(<ActionHarvester tasks={[]} journals={[journal]} scope={null} libraries={[dida]} day={day}
+        onUpdate={async () => {}} onRefresh={async () => {}} onSelect={selected} revision={0}/>);
+      await click(button("行动捕手"));
+      await click(button("＋ 采纳到待办"));
+      await click(button("确认采纳到待办"));
+      const receipt = host.querySelector('[aria-label="处理回执"]');
+      expect(receipt?.textContent).toContain(created.collectionName);
+      expect(selected).not.toHaveBeenCalled();
+      await click(button("打开对应任务"));
+      expect(selected).toHaveBeenCalledWith(created);
+    } finally {
+      runtimeCapabilities.mobile = previousMobile;
+    }
+  });
+
   it("周五记录的下周一回看是三天后，未写日期保留空白", () => {
     expect(parseWaitFromText("下周一回看报价", "2026-11-27").review).toBe("2026-11-30");
     expect(parseWaitFromText("本周五回看报价", "2026-11-27").review).toBe("2026-11-27");

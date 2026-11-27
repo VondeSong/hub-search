@@ -155,7 +155,7 @@ export function SearchHeader({
       <SearchInputArea
         onCancelSearch={onCancelMobileSearch}
         scopeLabel={currentSpaceName}
-        hasSpaces={spaces.length > 0}
+        hasSpaces={spaces.length > 0 || (isMobileLayout && selectedLibraryIds === null)}
         isMobileLayout={isMobileLayout}
         isComposing={isComposing}
         query={query}

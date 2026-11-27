@@ -131,6 +131,7 @@ export type CloudCatalogUpdate = { threads: CloudThreadSummary[]; account?: Acco
 export default function CloudAgents({
   onClose,
   initialSettings = false,
+  openRecentOnEntry = false,
   embedded = false,
   request,
   onBackToLocal,
@@ -141,6 +142,7 @@ export default function CloudAgents({
 }: {
   onClose?: () => void;
   initialSettings?: boolean;
+  openRecentOnEntry?: boolean;
   embedded?: boolean;
   request?: CloudEmbedRequest;
   onBackToLocal?: () => void;
@@ -211,6 +213,7 @@ export default function CloudAgents({
   const current = snapshot?.id === selected ? snapshot : undefined;
   const last = current?.turns[current.turns.length - 1];
   const binding = connection?.binding;
+  const autoOpenedFor = useRef<string | undefined>(undefined);
   const known = Boolean(current || selected && catalog.some(item => item.id === selected));
   const localPending = pending?.thread === selected ? pending : undefined;
   const displayedPending = localPending && !current?.turns.some(turn => turn.id === localPending.turn) ? localPending : undefined;
@@ -400,13 +403,25 @@ export default function CloudAgents({
     setNotice("");
   }
 
+  useEffect(() => {
+    if (!openRecentOnEntry || !mobile || !binding || !draftsReady || draftOwner.current !== binding || settings || query || autoOpenedFor.current === binding) return;
+    if (chatOpen) { autoOpenedFor.current = binding; return; }
+    const recent = catalog.find(thread => !thread.archived);
+    if (!recent) return;
+    autoOpenedFor.current = binding;
+    try {
+      if (JSON.parse(localStorage.getItem("hub-cloud-last:" + binding) || "null")?.view === "list") return;
+    } catch { /* Start with the most recent active conversation. */ }
+    select(recent.id, false, true);
+  }, [openRecentOnEntry, mobile, binding, draftsReady, settings, query, chatOpen, catalog]);
+
   function showList() {
     remember(undefined,"chat");
     setSettings(false); setRename(undefined); setChatOpen(false); setView("chat");
     if (mobile && window.history.state?.hubCloudAgentOwner === historyOwner.current && window.history.state?.hubCloudAgentChat) window.history.back();
   }
 
-  function remember(id:string|undefined,next:ChatView){if(!mobile||!binding)return;try{if(id)localStorage.setItem("hub-cloud-last:"+binding,JSON.stringify({thread:id,view:next}));else localStorage.removeItem("hub-cloud-last:"+binding);}catch{}}
+  function remember(id:string|undefined,next:ChatView){if(!mobile||!binding)return;try{if(id)localStorage.setItem("hub-cloud-last:"+binding,JSON.stringify({thread:id,view:next}));else localStorage.setItem("hub-cloud-last:"+binding,JSON.stringify({view:"list"}));}catch{}}
   function changeView(next:ChatView){setView(next);remember(selected,next);}
 
   function showSettings() {
@@ -685,12 +700,12 @@ export default function CloudAgents({
       {mobile && settings ? <>
         <button type="button" onClick={closeSettings} aria-label="返回"><ArrowLeft size={21}/></button><div><h1>连接与设备</h1></div>
       </> : <>
-        {connection && (!mobile || chatOpen) && <button type="button" onClick={showList} aria-label={mobile ? "返回会话列表" : "对话列表"}>{mobile ? <ArrowLeft size={21}/> : <PanelLeft size={20}/>}</button>}
+        {connection && !mobile && <button type="button" onClick={showList} aria-label={mobile ? "返回会话列表" : "对话列表"}>{mobile ? <ArrowLeft size={21}/> : <PanelLeft size={20}/>}</button>}
         {mobile && chatOpen ? <button type="button" className="cloud-agents-header-title" onClick={showSettings} aria-label="查看云端连接与设备">
-          <strong>{title}</strong><span>{connectionLabel}</span>
+          <strong>云端助手</strong><span>{connectionLabel}</span>
         </button> : mobile && connection ? <button type="button" className="cloud-agents-header-title cloud-agents-home-connection" onClick={showSettings} aria-label={`查看连接与设备：${warning || connectionLabel}`}>
-          <h1>助手</h1><span><Cloud size={13}/>{warning || connectionLabel}<ChevronRight size={13}/></span>
-        </button> : <div><h1>{chatOpen ? title : "助手"}</h1><span>{connectionLabel}</span></div>}
+          <h1>云端助手</h1><span><Cloud size={13}/>{warning || connectionLabel}<ChevronRight size={13}/></span>
+        </button> : <div><h1>{chatOpen ? title : mobile ? "云端助手" : "助手"}</h1><span>{connectionLabel}</span></div>}
         {connection && (!mobile || !chatOpen) && <button type="button" onClick={() => select()} disabled={busy || preparing} aria-label="新对话"><Plus size={22}/></button>}
         {connection && (!mobile || !chatOpen) && <button type="button" onClick={settings ? closeSettings : showSettings} disabled={busy || preparing} aria-label="VPS 连接设置"><Settings2 size={20}/></button>}
         {chatOpen && (mobile || known && management) && <details className="cloud-agents-menu"><summary aria-label="会话选项"><MoreHorizontal size={20}/></summary><div>
@@ -704,6 +719,10 @@ export default function CloudAgents({
         {onClose && (!mobile || !chatOpen) && <button type="button" onClick={onClose} aria-label="关闭云端助手"><X size={21}/></button>}
       </>}
     </header>
+    {mobile && connection && chatOpen && !settings && <div className="bw-chat-tools">
+      <button type="button" aria-label="返回会话列表" onClick={showList}><MessageSquare size={14}/><span>{title}</span><ChevronRight size={13}/></button>
+      <button type="button" aria-label="配置会话模型" onClick={() => setSheet("model")}><span>{model}{effectiveSelection?.effort ? " · " + effortLabel(effectiveSelection.effort) : ""}</span><Settings2 size={13}/></button>
+    </div>}
     {connection === undefined ? <p className="cloud-agents-empty" role="status">正在读取连接…</p> : !connection || settings ? <form className="cloud-agents-connect" onSubmit={event => void connect(event)}>
       <h2><Cloud size={22} /> 连接与设备</h2>
       {connection && <><p role="status">{connectionLabel}</p><p>{connection.endpoint}</p>{network && <p role="alert">{network}</p>}<small>{checkedAt ? `最近成功读取 ${new Date(checkedAt).toLocaleString()}` : "尚未取得本次连接状态"}</small>

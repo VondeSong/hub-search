@@ -168,7 +168,7 @@ export function SearchInputArea<TSelected>({
           onFocus={() => setSearchFocused(true)}
           onBlur={() => window.setTimeout(() => setSearchFocused(false), 120)}
           onKeyDown={onInputKeyDown}
-          placeholder={`搜索${scopeLabel}…`}
+          placeholder={isMobileLayout ? "搜索资料、日志、任务、阅读或闪卡…" : `搜索${scopeLabel}…`}
           disabled={!hasSpaces}
           aria-label={`搜索${scopeLabel}`}
         />

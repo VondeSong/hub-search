@@ -1,0 +1,859 @@
+html[data-runtime-platform="android"][data-mobile-theme="white"] {
+  --mobile-canvas: #f5f6f9;
+  --mobile-surface: #ffffff;
+  --mobile-fill: #f8fafc;
+  --mobile-ink: #0f172a;
+  --mobile-secondary: #475569;
+  --mobile-separator: rgba(15, 23, 42, 0.075);
+}
+html[data-runtime-platform="android"][data-mobile-theme="paper"] {
+  --mobile-canvas: #f3efe6;
+  --mobile-surface: #fcfbf7;
+  --mobile-fill: #f7f4ec;
+  --mobile-ink: #1c1917;
+  --mobile-secondary: #57534e;
+  --mobile-separator: rgba(28, 25, 23, 0.085);
+}
+html[data-runtime-platform="android"][data-mobile-theme="black"] {
+  --mobile-canvas: #0b0d11;
+  --mobile-surface: #131720;
+  --mobile-fill: #181d28;
+  --mobile-ink: #f1f5f9;
+  --mobile-secondary: #94a3b8;
+  --mobile-separator: rgba(255, 255, 255, 0.08);
+}
+@media (prefers-color-scheme: light) {
+  html[data-runtime-platform="android"][data-mobile-theme="system"] {
+    --mobile-canvas: #f5f6f9;
+    --mobile-surface: #ffffff;
+    --mobile-fill: #f8fafc;
+    --mobile-ink: #0f172a;
+    --mobile-secondary: #475569;
+    --mobile-separator: rgba(15, 23, 42, 0.075);
+  }
+}
+@media (prefers-color-scheme: dark) {
+  html[data-runtime-platform="android"][data-mobile-theme="system"] {
+    --mobile-canvas: #0b0d11;
+    --mobile-surface: #131720;
+    --mobile-fill: #181d28;
+    --mobile-ink: #f1f5f9;
+    --mobile-secondary: #94a3b8;
+    --mobile-separator: rgba(255, 255, 255, 0.08);
+  }
+}
+html[data-runtime-platform="android"][data-mobile-accent="blue"] {
+  --mobile-accent: #2563eb;
+  --mobile-selected: rgba(37, 99, 235, 0.11);
+}
+html[data-runtime-platform="android"][data-mobile-accent="sage"] {
+  --mobile-accent: #0d9488;
+  --mobile-selected: rgba(13, 148, 136, 0.12);
+}
+html[data-runtime-platform="android"][data-mobile-accent="iris"] {
+  --mobile-accent: #6366f1;
+  --mobile-selected: rgba(99, 102, 241, 0.12);
+}
+/* Android chrome and content geometry from the local Base White mobile prototype. */
+html[data-runtime-platform="android"] .mobile-app-shell {
+  --bw-bg: var(--mobile-canvas, #f5f6f9);
+  --bw-card: var(--mobile-surface, white);
+  --bw-line: var(--mobile-separator, #dde1e7);
+  --bw-ink: var(--mobile-ink, #0f172a);
+  --bw-accent: var(--mobile-accent, #365fff);
+  background: var(--bw-bg);
+  color: var(--bw-ink);
+}
+html[data-runtime-platform="android"]
+  .app-shell.mobile-app-shell
+  .mobile-hub-header {
+  position: relative;
+  inset: auto;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  border-bottom: 1px solid var(--bw-line);
+  border-radius: 0;
+  background: var(--bw-card);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+html[data-runtime-platform="android"]
+  .app-shell.mobile-app-shell
+  .mobile-hub-page-title {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+html[data-runtime-platform="android"]
+  .app-shell.mobile-app-shell
+  .mobile-hub-actions {
+  position: static;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+html[data-runtime-platform="android"]
+  .app-shell.mobile-app-shell
+  .mobile-hub-actions
+  > button {
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  min-width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: var(--bw-ink);
+}
+html[data-runtime-platform="android"]
+  .app-shell.mobile-app-shell
+  .mobile-hub-actions
+  .bw-connection {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  min-height: 28px;
+  height: 28px;
+  border: 1px solid var(--bw-line);
+  border-radius: 20px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+.bw-connection i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mobile-secondary);
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .bw-fab {
+  position: fixed;
+  right: 14px;
+  bottom: calc(70px + env(safe-area-inset-bottom));
+  z-index: 24;
+}
+html[data-runtime-platform="android"]
+  .app-shell.mobile-app-shell
+  .bw-fab
+  button {
+  min-width: 76px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--bw-ink);
+  color: var(--bw-card);
+  border: 0;
+  border-radius: 22px;
+  box-shadow: 0 4px 16px #0f172a25;
+}
+.bw-fab button::after {
+  content: "速记";
+  font-size: 13px;
+  font-weight: 600;
+}
+html[data-runtime-platform="android"]
+  .app-shell.mobile-app-shell:is(
+    .mobile-keyboard-open,
+    .mobile-preview-open,
+    :has(
+      .aw-detail,
+      .bw-local-detail,
+      .bw-compose,
+      .bw-snooze,
+      .mobile-filter-layer[aria-hidden="false"] .mobile-draft-sheet
+    )
+  )
+  .bw-fab {
+  display: none;
+}
+html[data-runtime-platform="android"]
+  :is(
+    .app-shell.mobile-app-shell > .mobile-navigation-footer,
+    .flashcards-workspace.flashcards-android > .flashcards-mobile-nav
+  ) {
+  inset-inline: 0;
+  bottom: 0;
+  height: calc(50px + env(safe-area-inset-bottom));
+  min-height: 50px;
+  padding: 1px 0 env(safe-area-inset-bottom);
+  border: 0;
+  border-top: 1px solid var(--bw-line);
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--mobile-surface);
+  backdrop-filter: none;
+}
+html[data-runtime-platform="android"]
+  :is(.app-shell.mobile-app-shell, .flashcards-workspace.flashcards-android)
+  .mobile-tab-bar
+  button {
+  height: 46px;
+  min-height: 46px;
+  border-radius: 0;
+  gap: 3px;
+  font-size: 10.5px;
+}
+html[data-runtime-platform="android"]
+  :is(.app-shell.mobile-app-shell, .flashcards-workspace.flashcards-android)
+  .mobile-tab-bar
+  button[aria-current="page"] {
+  background: transparent;
+  color: var(--mobile-accent);
+  box-shadow: none;
+}
+html[data-runtime-platform="android"]
+  .app-shell.mobile-app-shell
+  .main-content-override:has(
+    .bw-browse,
+    .aw-shell,
+    .bw-insights,
+    .bw-local-detail,
+    .bw-source-tasks
+  ) {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.bw-browse,
+.bw-insights,
+.bw-local-detail,
+.bw-source-tasks {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 14px 80px;
+  background: var(--bw-bg);
+  font-size: 14px;
+  color: var(--bw-ink);
+}
+.bw-browse header,
+.bw-task-head > div,
+.bw-task-head label,
+.bw-buttons,
+.bw-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bw-browse header,
+.bw-task-head > div,
+.bw-task-head label {
+  justify-content: space-between;
+}
+.bw-browse header h2,
+.bw-task-head h2 {
+  font-size: 14px;
+  margin: 8px 0;
+}
+.bw-browse header button,
+.bw-tree button {
+  background: transparent;
+  color: var(--bw-accent);
+  border: 0;
+  padding: 7px 2px;
+}
+.bw-card,
+.bw-reading-row,
+.bw-resume,
+.bw-insight,
+.bw-compose,
+.bw-snooze {
+  border: 1px solid var(--bw-line);
+  border-radius: 14px;
+  background: var(--bw-card);
+  color: var(--bw-ink);
+  overflow: hidden;
+}
+.bw-card {
+  margin-bottom: 14px;
+}
+.bw-card p,
+.bw-tree {
+  padding: 8px 12px;
+}
+.bw-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 54px;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--bw-line);
+  background: transparent;
+  text-align: left;
+  color: inherit;
+}
+.bw-row > svg:first-child {
+  box-sizing: border-box;
+  width: 32px;
+  height: 32px;
+  padding: 7px;
+  border-radius: 9px;
+  background: var(--mobile-selected);
+  color: var(--bw-accent);
+}
+.bw-row > svg:last-child {
+  width: 16px;
+  margin-left: auto;
+  color: var(--mobile-secondary);
+}
+.bw-row small,
+.bw-three small,
+.bw-reading-row span,
+.bw-reading-row small,
+.bw-resume small {
+  display: block;
+  font-size: 12px;
+  color: var(--mobile-secondary);
+}
+.bw-three {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+.bw-three button,
+.bw-tree button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 10px;
+}
+.bw-tree button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.bw-task-head {
+  padding: 12px 14px 4px;
+  flex: none;
+}
+.bw-task-head h2 {
+  font-size: 19px;
+}
+.bw-task-head button,
+.bw-tabs button,
+.bw-task-head select,
+.bw-buttons button,
+.bw-compose button,
+.bw-local-detail button,
+.bw-snooze button {
+  border: 1px solid var(--bw-line);
+  border-radius: 9px;
+  background: var(--bw-card);
+  color: var(--bw-ink);
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 13px;
+}
+.bw-task-head > div button {
+  color: var(--bw-accent);
+  font-weight: 600;
+}
+.bw-tabs {
+  overflow-x: auto;
+  padding: 5px 0 10px;
+  flex-shrink: 0;
+}
+.bw-tabs button {
+  white-space: nowrap;
+  border-radius: 20px;
+}
+.bw-tabs button[aria-pressed="true"] {
+  background: var(--bw-ink);
+  color: var(--bw-card);
+}
+html[data-runtime-platform="android"] .app-shell .aw-shell {
+  position: relative;
+  display: block;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bw-bg);
+}
+html[data-runtime-platform="android"] .app-shell .aw-center {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bw-bg);
+}
+html[data-runtime-platform="android"] .app-shell .aw-scroll {
+  padding: 8px 14px 88px;
+  min-width: 0;
+  overflow: auto;
+}
+html[data-runtime-platform="android"] .app-shell .aw-divider {
+  display: none;
+}
+html[data-runtime-platform="android"]
+  .app-shell
+  .aw-shell.has-detail
+  > .aw-detail {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  border: 0;
+  background: var(--bw-card);
+}
+html[data-runtime-platform="android"] .app-shell .aw-detail-scroll {
+  overflow: auto;
+  padding-bottom: 65px;
+}
+html[data-runtime-platform="android"] .app-shell .aw-harvester {
+  width: 100%;
+  min-width: 0;
+}
+html[data-runtime-platform="android"]
+  .app-shell
+  .aw-harvester
+  :is(input, textarea, select, article, section) {
+  max-width: 100%;
+  min-width: 0;
+}
+html[data-runtime-platform="android"] .app-shell .aw-harvester {
+  overflow-wrap: anywhere;
+}
+.bw-reading-row,
+.bw-resume {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  padding: 12px 14px;
+  width: 100%;
+  margin: 0 0 8px;
+  box-sizing: border-box;
+}
+.bw-reading-row span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.bw-reading-row em,
+.bw-resume strong,
+.bw-insight > small {
+  font-size: 12px;
+  color: var(--bw-accent);
+  font-style: normal;
+}
+.bw-reading-row strong,
+.bw-resume span {
+  font-size: 14px;
+}
+.bw-insight,
+.bw-compose,
+.bw-snooze,
+.bw-local-detail {
+  padding: 14px;
+}
+.bw-insight {
+  margin: 8px 0;
+}
+.bw-insight p,
+.bw-local-detail p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bw-insight h3 {
+  margin: 6px 0;
+}
+.bw-buttons {
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.bw-compose input,
+.bw-snooze input {
+  display: block;
+  width: 100%;
+  padding: 9px;
+  box-sizing: border-box;
+  margin: 8px 0;
+}
+.bw-snooze {
+  position: fixed;
+  inset: auto 10px calc(54px + env(safe-area-inset-bottom));
+  margin: 0;
+  width: auto;
+  z-index: 40;
+}
+.bw-compose small {
+  display: block;
+  margin-bottom: 8px;
+}
+.mobile-reading-hit {
+  background: var(--mobile-selected);
+  border-inline-start: 3px solid var(--mobile-accent);
+  padding-inline-start: 6px;
+}
+::highlight(mobile-reading-match) {
+  background: #ffdf86;
+  color: #282316;
+}
+
+.bw-overview {
+  background: var(--bw-bg);
+  padding: 4px 14px 8px;
+}
+.bw-pulse {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.bw-pulse button {
+  text-align: left;
+  background: var(--bw-card);
+  border: 1px solid var(--bw-line);
+  border-radius: 12px;
+  padding: 10px;
+}
+.bw-pulse b {
+  font-size: 21px;
+  color: var(--bw-ink);
+}
+.bw-pulse button:first-child b {
+  color: var(--bw-accent);
+}
+.bw-pulse small {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  color: var(--mobile-secondary);
+  font-size: 11px;
+}
+.bw-overview header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 12px 0 3px;
+  font-size: 13px;
+}
+.bw-overview header button {
+  background: none;
+  border: 0;
+  color: var(--bw-accent);
+  padding: 4px;
+}
+html[data-runtime-platform="android"]
+  .app-shell
+  .mobile-search-facets
+  .bw-search-types {
+  display: flex;
+  max-width: 100%;
+  padding: 2px 0 5px;
+}
+.bw-search-types small {
+  margin-left: 4px;
+  opacity: 0.75;
+}
+html[data-runtime-platform="android"]
+  .app-shell
+  .mobile-search-compact-filters
+  .mobile-search-type-select {
+  display: none;
+}
+html[data-runtime-platform="android"]
+  .app-shell.mobile-app-shell
+  .mobile-top-area
+  .search-header {
+  padding: 10px 14px 5px;
+}
+html[data-runtime-platform="android"]
+  .app-shell.mobile-app-shell
+  .mobile-top-area
+  .search-header
+  .search-box {
+  height: 40px;
+  min-height: 40px;
+  border-radius: 12px;
+}
+html[data-runtime-platform="android"]
+  .app-shell.mobile-app-shell
+  .mobile-top-area:has(.bw-overview) {
+  max-height: 55dvh;
+  overflow: auto;
+}
+html[data-runtime-platform="android"]
+  .app-shell.mobile-app-shell
+  .main-content-override:has(
+    .bw-browse,
+    .aw-shell,
+    .bw-insights,
+    .bw-local-detail
+  ) {
+  padding-bottom: 0;
+}
+html[data-runtime-platform="android"]
+  .cloud-agents.is-mobile
+  .cloud-agents-header {
+  min-height: 48px;
+  background: var(--mobile-surface);
+  border-bottom: 1px solid var(--mobile-separator);
+}
+html[data-runtime-platform="android"] .mobile-flashcard-intro > p {
+  display: none;
+}
+html[data-runtime-platform="android"] .app-shell .mobile-flashcard-tabs {
+  display: flex;
+  gap: 6px;
+}
+html[data-runtime-platform="android"] .mobile-flashcard-tabs button {
+  border-radius: 20px;
+  padding: 7px 12px;
+}
+html[data-runtime-platform="android"]
+  .mobile-flashcard-tabs
+  button[aria-pressed="true"] {
+  color: var(--mobile-surface);
+  background: var(--mobile-ink);
+}
+
+html[data-runtime-platform="android"]
+  .aw-shell
+  .aw-harvester:has(.aw-capture-toggle[aria-expanded="true"]) {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: auto;
+  margin: 0;
+  padding: 12px 14px 70px;
+  background: var(--bw-bg);
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 0;
+}
+html[data-runtime-platform="android"]
+  .aw-shell.has-detail
+  .aw-harvester:has(.aw-capture-toggle[aria-expanded="true"]) {
+  visibility: hidden;
+}
+html[data-runtime-platform="android"] .aw-harvester .aw-capture-toggle {
+  min-height: 36px;
+  white-space: normal;
+}
+html[data-runtime-platform="android"] .aw-shell .aw-row {
+  margin: 0 0 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--bw-line);
+  border-radius: 12px;
+  background: var(--bw-card);
+}
+html[data-runtime-platform="android"] .aw-shell .aw-group {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+html[data-runtime-platform="android"] .aw-shell .aw-row-head strong {
+  font-size: 14px;
+  line-height: 1.4;
+}
+html[data-runtime-platform="android"] .aw-shell .aw-group .aw-row-plan {
+  display: none;
+}
+html[data-runtime-platform="android"]
+  .app-shell:has(.aw-capture-toggle[aria-expanded="true"])
+  .bw-fab {
+  display: none;
+}
+
+.bw-task-sheet[open],
+.bw-snooze[open] {
+  position: fixed;
+  inset: auto 0 0;
+  margin: 0;
+  width: 100%;
+  max-width: none;
+  max-height: 85dvh;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 20px 20px 0 0;
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+  background: var(--mobile-surface);
+  color: var(--mobile-ink);
+}
+.bw-task-sheet::backdrop,
+.bw-snooze::backdrop {
+  background: rgb(15 23 42 / 36%);
+}
+.bw-task-sheet .bw-compose {
+  border: 0;
+  padding: 0;
+}
+.bw-compose input[type="checkbox"] {
+  display: inline;
+  width: auto;
+  margin-inline-end: 6px;
+}
+
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-task-head header,
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-task-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-task-head header {
+  margin-bottom: 12px;
+}
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-task-head h2 {
+  font-size: 21px;
+}
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-task-head :is(button,select) {
+  min-height: 44px;
+  border: 1px solid var(--bw-line);
+  border-radius: 11px;
+  background: var(--bw-card);
+  color: var(--bw-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-task-head .bw-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 8px;
+  padding: 3px;
+  background: var(--bw-card);
+  border: 1px solid var(--bw-line);
+  border-radius: 13px;
+}
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-task-head .bw-tabs button {
+  flex: 1;
+  padding-inline: 2px;
+  border: 0;
+  border-radius: 10px;
+}
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-task-head header button,
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-task-head .bw-tabs button[aria-pressed="true"] {
+  color: var(--bw-card);
+  background: var(--bw-ink);
+}
+html[data-runtime-platform="android"] .app-shell .bw-task-tools select {
+  max-width: 52%;
+}
+html[data-runtime-platform="android"] .app-shell .bw-task-tools .aw-harvester:has([aria-expanded="false"].aw-capture-toggle) {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  width: auto;
+  background: transparent;
+}
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-task-tools .aw-capture-toggle[aria-expanded="false"] {
+  padding-inline: 12px;
+  background: var(--mobile-selected);
+  color: var(--bw-accent);
+}
+html[data-runtime-platform="android"] .app-shell .bw-task-tools .aw-capture-toggle[aria-expanded="false"] :is(svg,small) {
+  display: none;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:not(.mobile-keyboard-open):has(.cloud-agents.is-mobile) > .mobile-navigation-footer {
+  display: block;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:not(.mobile-keyboard-open) .main-content-override:has(.cloud-agents.is-mobile) {
+  box-sizing: border-box;
+  padding-bottom: calc(50px + env(safe-area-inset-bottom));
+}
+
+html[data-runtime-platform="android"] .app-shell .mobile-top-area:has(.bw-search-types) {
+  position: relative;
+}
+html[data-runtime-platform="android"] .app-shell .mobile-top-area:has(.bw-search-types) .search-box {
+  padding-right: 90px;
+}
+html[data-runtime-platform="android"] .app-shell .mobile-top-area:has(.bw-search-types) .mobile-search-compact-filters {
+  position: absolute;
+  top: 63px;
+  right: 24px;
+  height: 32px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+html[data-runtime-platform="android"] .app-shell .mobile-search-compact-filters button[aria-label="选择搜索资料范围"] {
+  height: 30px;
+  min-height: 30px;
+  padding: 0 8px;
+  border-radius: 9px;
+  font-size: 12px;
+}
+html[data-runtime-platform="android"] .app-shell .mobile-search-compact-filters button[aria-label="更多搜索筛选"],
+html[data-runtime-platform="android"] .app-shell .mobile-top-area:has(.mobile-search-cancel) .mobile-search-compact-filters {
+  display: none;
+}
+html[data-runtime-platform="android"] .app-shell .mobile-top-area:has(.mobile-search-cancel) .search-box {
+  padding-right: 8px;
+}
+
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-task-head .bw-tabs button {
+  justify-content: center;
+  text-align: center;
+}
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-task-tools .aw-capture-toggle[aria-expanded="false"] strong {
+  color: inherit;
+}
+html[data-runtime-platform="android"] .app-shell .aw-shell .aw-list > h3 {
+  justify-content: flex-start;
+  gap: 8px;
+  margin: 0 0 7px 3px;
+  color: var(--bw-ink);
+  font-size: 15px;
+  font-weight: 650;
+}
+html[data-runtime-platform="android"] .app-shell .aw-shell .aw-list > h3::before {
+  display: none;
+}
+html[data-runtime-platform="android"] .app-shell .aw-shell .aw-list > h3 small {
+  margin: 0;
+  color: var(--mobile-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+html[data-runtime-platform="android"] .app-shell .aw-shell .aw-group > p {
+  color: var(--mobile-secondary);
+}
+
+.bw-harvest-receipt {
+  margin-block: 12px;
+  padding: 14px;
+  border: 1px solid var(--bw-line);
+  border-radius: 12px;
+  background: var(--bw-card);
+  color: var(--bw-ink);
+}
+.bw-harvest-receipt p {
+  margin-block: 7px;
+}
+
+.bw-filter-form, .bw-filter-form label { display: grid; gap: 8px; }
+.bw-filter-form { gap: 12px; }
+.bw-filter-form label { font-size: 13px; font-weight: 600; }
+html[data-runtime-platform="android"] .app-shell .bw-task-tools .bw-filter-form select { max-width: 100%; }
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-filter-form button[type="submit"] {
+  color: var(--bw-card); background: var(--bw-ink);
+}
+
+.bw-chat-tools {
+  display: flex; justify-content: space-between; gap: 8px; flex: none;
+  padding: 10px 14px; background: var(--mobile-canvas);
+}
+.bw-chat-tools button {
+  display: flex; align-items: center; gap: 5px; min-width: 0; max-width: 56%;
+  min-height: 36px; padding: 4px 9px; border: 1px solid var(--mobile-separator);
+  border-radius: 9px; background: var(--mobile-surface); color: var(--mobile-ink); font-size: 12px;
+}
+.bw-chat-tools button span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.bw-chat-tools svg { flex-shrink: 0; color: var(--mobile-accent); }

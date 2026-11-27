@@ -733,6 +733,15 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
   const plannedMinutes = dashboardStats ? estimatedStudyMinutes(dashboardStats, plannedSessionCount) : null;
   const studyScope = JSON.stringify([activeView, selectedDeckId, reviewing, mobilePage]);
   const studyScopeRef = useRef(studyScope); studyScopeRef.current = studyScope;
+  const autoMobileRound = useRef(!initialCardId);
+  useEffect(()=>{
+    if(!isAndroid || mobilePage!=="review" || activeView!=="due" || !autoMobileRound.current || loading || !dailyLimitReady || !reviewRecoveryChecked || startingReview) return;
+    if(reviewing) {autoMobileRound.current=false;return;}
+    if(!reviewQueue.length && reviewPlan.revision==="0") return;
+    autoMobileRound.current=false;
+    if(reviewQueue.length) void reviewSession.resume(()=>loadFlashcardsByIds(reviewQueue.map(card=>card.id)));
+    else if(plannedSessionCount>0) void beginPlannedReview();
+  },[isAndroid,mobilePage,activeView,loading,dailyLimitReady,reviewRecoveryChecked,startingReview,reviewing,reviewQueue,reviewPlan.revision,reviewSession,plannedSessionCount,beginPlannedReview]);
   const currentCard = reviewQueue[0];
   const schedulePreview = useFlashcardSchedulePreview(currentCard, reviewing && answerVisible);
 
@@ -1057,7 +1066,7 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
     onClick={() => { setSelectedDeckId(deck.id); if (isAndroid) setMobilePage("deck"); void openView("deck", deck.id); }}
   >
     <Layers3 size={15} /><span>{deck.name}</span><span className="flashcards-mobile-deck-meta">{deck.cardCount} 张卡片{deck.dueCount > 0 ? ` · ${deck.dueCount} 张待复习` : " · 今日已完成"}</span><small>{deck.dueCount > 0 ? deck.dueCount : deck.cardCount}</small>
-  </button>; return isAndroid ? <div key={deck.id} className="flashcards-mobile-deck-row">{item}{(deck.dueCount > 0 || reviewQueue.length > 0) && <button type="button" className="flashcard-deck-start" disabled={startingReview || reviewingCard} aria-label={reviewQueue.length ? "继续当前一轮" : `开始复习 ${deck.name}`} onClick={() => void startMobileDeck(deck)}>{reviewQueue.length ? "继续当前一轮" : "开始"}</button>}</div> : item; };
+  </button>; return isAndroid ? <div key={deck.id} className="flashcards-mobile-deck-row">{item}{(deck.dueCount > 0 || reviewQueue.length > 0) && <button type="button" className="flashcard-deck-start" disabled={startingReview || reviewingCard} aria-label={`开始复习 ${deck.name}`} onClick={() => void startMobileDeck(deck)}>{reviewQueue.length ? "继续当前一轮" : "开始"}</button>}</div> : item; };
 
   const startReview = async () => {
     if (startingReview || savingExtraNew) return;
@@ -1114,7 +1123,8 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
 
   const startMobileDeck = async (deck: FlashcardDeckSummary) => {
     if (reviewingCard || startingReview || savingExtraNew) return;
-    if (reviewQueue.length) await reviewSession.resume(() => loadFlashcardsByIds(reviewQueue.map(card => card.id)));
+    const sameDeck = reviewLabel === deck.name && reviewQueue.every(card => card.deckId === deck.id);
+    if (reviewQueue.length && sameDeck) await reviewSession.resume(() => loadFlashcardsByIds(reviewQueue.map(card => card.id)));
     else await beginPlannedReview({deckId:deck.id,scopeName:deck.name,includeSubdecks:false});
     if (reviewSession.getSnapshot().reviewing) { setMobilePage("review"); setActiveView("due"); }
   };
@@ -2402,11 +2412,12 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
   const mobileReviewProgress = reviewSessionTotal > 0 ? `${reviewSessionTotal - reviewQueue.length + 1}/${reviewSessionTotal}` : "0/0";
 
   const changeMobileTab = (tab: MobileFlashcardTab) => {
-    if (tab === "review") { setMobilePage("review"); void openView("due"); }
+    if(tab!=="review"){autoMobileRound.current=false;if(reviewing)reviewSession.pause();}
+    if (tab === "review") { autoMobileRound.current=true;setMobilePage("review"); void openView("due"); }
     else if (tab === "library") setMobilePage("library");
     else { setMobilePage("inbox"); void openView("inbox"); }
   };
-  const mobileIntro = () => <MobileFlashcardIntro active={mobilePage === "library" ? "library" : mobilePage === "inbox" ? "inbox" : "review"} inboxCount={drafts.length} onSelect={changeMobileTab} />;
+  const mobileIntro = () => <MobileFlashcardIntro active={mobilePage === "library" ? "library" : mobilePage === "inbox" ? "inbox" : "review"} inboxCount={drafts.length} dueCount={totalDueCount} deckCount={decks.length} onSelect={changeMobileTab} />;
   const mobileManagement = () => <MobileFlashcardManagement onBackup={() => setBackupOpen(true)} onSync={openCloudSyncSettings} />;
   const deckSidebarContents = <>
         {!isAndroid && <div className="flashcards-sidebar-toolbar">
@@ -2539,7 +2550,7 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
       />
 
       <main className={`flashcards-main${!reviewing && activeView === "inbox" ? " flashcards-main-inbox" : ""}`} ref={mainScrollRef} onScroll={rememberMainScroll} inert={Boolean(gridModalCardId || creatingCard)}>
-        {isAndroid && !reviewing && (mobilePage === "review" || mobilePage === "inbox") && mobileIntro()}
+        {isAndroid && (mobilePage === "review" || mobilePage === "inbox") && mobileIntro()}
         {reviewError && <p role="alert">{reviewError}</p>}
         {!reviewing && workspaceDraft && !gridModalCardId && !creatingCard && <section className="flashcards-editor-recovery" aria-label="未保存的闪卡草稿">
           <Pencil size={18} /><span><strong>有一份未保存的闪卡草稿</strong><small>{workspaceDraft.values.question || "新建卡片"} · 仅保存在本机</small></span>

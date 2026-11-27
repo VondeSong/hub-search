@@ -19,7 +19,7 @@ it("keeps the three review tabs in the page and navigates without starting a rev
   expect(tabs[0].getAttribute("aria-pressed")).toBe("true");
   await act(async () => tabs[1].click());
   expect(select).toHaveBeenCalledWith("library");
-  expect(tabs[2].textContent).toBe("收件箱 77");
+  expect(tabs[2].textContent).toBe("AI 收件箱 (77)");
 });
 
 it("distinguishes the real daily total from the existing round and resumes once", async () => {
