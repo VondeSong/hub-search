@@ -1,0 +1,3405 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light" data-accent="blue" data-frame="phone">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Hub 移动端原型 · Base White Mobile</title>
+  <link rel="stylesheet" href="tailwind-local.css" />
+  <script>
+    const iconScript = document.createElement("script");
+    iconScript.src = location.protocol === "file:" ? "../sites/hub-workspace/public/reading-workspace/lucide.min.js"
+      : "https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js";
+    iconScript.onload = () => window.lucide.createIcons();
+    document.head.append(iconScript);
+  </script>
+  <link rel="stylesheet" href="mobile.css" />
+</head>
+<body>
+
+  <div class="studio-stage">
+    <!-- Top Studio Bar (Visible on Desktop Browser for Dual-Prototype Navigation) -->
+    <button type="button" id="exit-fullscreen" class="studio-link-btn">退出满屏</button>
+    <header class="studio-topbar">
+      <div class="studio-brand">
+        <span style="display:inline-flex;width:24px;height:24px;border-radius:7px;background:#0F172A;color:#FFF;align-items:center;justify-content:center;font-size:12px;font-weight:700;">H</span>
+        <span>Hub 移动端交互原型</span>
+        <span class="studio-badge">Base White Mobile v5 · 跨端续办</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button id="btn-toggle-frame" class="studio-link-btn" title="在手机外壳画布与 1:1 满屏真机视口之间切换">
+          <i data-lucide="maximize-2" style="width:13px;height:13px;"></i>
+          <span id="frame-toggle-label">切换 1:1 真机满屏</span>
+        </button>
+        <a href="index.html" class="studio-link-btn" title="返回桌面端三栏工作台原型">
+          <i data-lucide="monitor" style="width:13px;height:13px;"></i>
+          <span>切换至桌面端原型</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Main Studio Workspace: Center Phone Bezel + Right Inspector -->
+    <div class="studio-workspace">
+
+      <!-- ====================================================================
+           393 × 852 Mobile Viewport Shell
+           ==================================================================== -->
+      <div class="phone-device" id="phone-device">
+        <div class="phone-screen" id="phone-screen">
+
+          <!-- iOS / Android Simulated Status Bar -->
+          <div class="phone-statusbar">
+            <span id="status-clock">09:41</span>
+            <div class="dynamic-island" title="灵动岛：点击查看后台语音速记与同步状态">
+              <div class="dynamic-island-lens"></div>
+            </div>
+            <div class="status-icons">
+              <span>5G</span>
+              <span>100%</span>
+            </div>
+          </div>
+
+          <!-- Top App Navigation Header -->
+          <header class="m-header" id="m-header">
+            <div class="m-header-left" id="m-header-left">
+              <!-- Populated dynamically per tab / subview -->
+            </div>
+            <div class="m-header-actions" id="m-header-actions">
+              <!-- Connection dual-pill + space menu -->
+            </div>
+          </header>
+
+          <!-- Main Scrollable Tab Viewport -->
+          <main class="m-main" id="m-main" tabindex="-1"></main>
+
+          <!-- Full-Screen Push Layer (For Library Folder Browser, Doc Reader, Journal Studio, Insights) -->
+          <section class="m-push-layer" id="m-push-layer" aria-hidden="true">
+            <header class="m-header" id="m-push-header"></header>
+            <div class="m-main" id="m-push-body" style="padding-bottom:84px;"></div>
+            <div id="m-push-footer"></div>
+          </section>
+
+          <!-- Floating Quick Capture Pill (+ 速记) -->
+          <button type="button" class="m-fab-capture" id="btn-fab-capture" aria-label="快速记一条">
+            <i data-lucide="plus" style="width:16px;height:16px;"></i>
+            <span>速记</span>
+          </button>
+
+          <!-- Fixed 5-Tab Bottom Navigation Bar -->
+          <div class="m-tabbar-wrap" id="m-tabbar-wrap">
+            <nav class="m-tabbar" aria-label="主要导航" id="m-tabbar"></nav>
+          </div>
+
+          <!-- Spring Bottom Sheet (Scope Filter / Quick Capture / Connections / Materials / Space Menu) -->
+          <div class="m-sheet-layer" id="m-sheet-layer" aria-hidden="true">
+            <div class="m-sheet-scrim" id="m-sheet-scrim"></div>
+            <section class="m-sheet-panel" id="m-sheet-panel" role="dialog" aria-modal="true">
+              <div class="m-sheet-grabber"></div>
+              <div id="m-sheet-content" style="display:flex;flex-direction:column;max-height:78vh;overflow:hidden;"></div>
+            </section>
+          </div>
+
+          <!-- Toast Feedback Banner -->
+          <div class="m-toast" id="m-toast" role="status" aria-live="polite">
+            <span id="m-toast-text">已保存</span>
+            <button type="button" id="m-toast-action" style="background:none;border:none;color:#60A5FA;font-weight:600;font-size:12px;cursor:pointer;display:none;">撤销</button>
+          </div>
+
+          <div class="phone-home-indicator"></div>
+        </div>
+      </div>
+
+      <!-- ====================================================================
+           Right Studio Inspector (Desktop Preview Control Deck)
+           ==================================================================== -->
+      <aside class="studio-inspector" aria-label="移动端原型交互控制台">
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:14px;font-weight:700;color:#0F172A;">移动端设计验证台</span>
+            <span style="font-size:11px;color:#64748B;font-family:var(--m-font-mono);">393 × 852 pt</span>
+          </div>
+          <p style="font-size:12px;color:#475569;margin:0;line-height:1.5;">
+            与桌面端共用 6 大真实感资料库与 Base White 视觉语义，针对单手拇指热区、文件夹钻取与底部弹簧抽屉专门重构。
+          </p>
+        </div>
+
+        <!-- Theme & Accent Switcher -->
+        <div>
+          <div class="inspector-group-title">1. 语义主题与强调色</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px;">
+            <button type="button" class="inspector-scenario-btn" data-set-theme="light" style="justify-content:center;margin:0;">☀️ 纯净白</button>
+            <button type="button" class="inspector-scenario-btn" data-set-theme="warm" style="justify-content:center;margin:0;">📜 暖纸护眼</button>
+            <button type="button" class="inspector-scenario-btn" data-set-theme="dark" style="justify-content:center;margin:0;">🌙 深色夜读</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+            <button type="button" class="inspector-scenario-btn" data-set-accent="blue" style="justify-content:center;margin:0;">🔵 湖蓝</button>
+            <button type="button" class="inspector-scenario-btn" data-set-accent="sage" style="justify-content:center;margin:0;">🌿 鼠尾草</button>
+            <button type="button" class="inspector-scenario-btn" data-set-accent="iris" style="justify-content:center;margin:0;">🟣 鸢尾紫</button>
+          </div>
+        </div>
+
+        <!-- Key Redesigned Scenarios Quick Jump -->
+        <div>
+          <div class="inspector-group-title">2. 核心交互场景一键体验</div>
+          <button type="button" class="inspector-scenario-btn" data-scenario="browse-libs">
+            <span>📂 浏览 → 「我的资料库」原位展开与钻取</span>
+            <span style="font-size:11px;color:#1D4ED8;">重点升级</span>
+          </button>
+          <button type="button" class="inspector-scenario-btn" data-scenario="folder-drill">
+            <span>🗂️ 资料库内层文件夹浏览 (`Car · Craft`)</span>
+            <span style="font-size:11px;color:#1D4ED8;">真目录树</span>
+          </button>
+          <button type="button" class="inspector-scenario-btn" data-scenario="scope-sheet">
+            <span>🎯 搜索范围多选抽屉（全部 / 仅选 / 文件夹）</span>
+            <span style="font-size:11px;color:#64748B;">半屏抽屉</span>
+          </button>
+          <button type="button" class="inspector-scenario-btn" data-scenario="quick-capture">
+            <span>🎙️ Flomo 语音/图文速记 + 三阶段同步回执</span>
+            <span style="font-size:11px;color:#64748B;">随时捕捉</span>
+          </button>
+          <button type="button" class="inspector-scenario-btn" data-scenario="agents-cot">
+            <span>🤖 云端助手对话 + 可折叠思维链时间线</span>
+            <span style="font-size:11px;color:#1D4ED8;">VPS 在线</span>
+          </button>
+          <button type="button" class="inspector-scenario-btn" data-scenario="doc-context">
+            <span>📄 文档阅读详情 + 底部四合一上下文动作坞</span>
+            <span style="font-size:11px;color:#64748B;">跨模块闭环</span>
+          </button>
+          <button type="button" class="inspector-scenario-btn" data-scenario="review-study">
+            <span>🃏 闪卡专注复习（单手翻面 + 四档评分）</span>
+            <span style="font-size:11px;color:#64748B;">按牌组选卡</span>
+          </button>
+        </div>
+
+        <!-- Live Link Status Simulator -->
+        <div>
+          <div class="inspector-group-title">3. 双链路连接状态模拟（OSS + VPS）</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            <button type="button" class="inspector-scenario-btn" id="sim-oss-btn" style="margin:0;">
+              <span>☁️ OSS：已写入 OS</span>
+            </button>
+            <button type="button" class="inspector-scenario-btn" id="sim-vps-btn" style="margin:0;">
+              <span>⚡ VPS：在线可用</span>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </div>
+
+  <script>
+    /* ========================================================================
+       Hub Mobile Prototype · Unified Data & Interactive State Engine
+       ======================================================================== */
+
+    const LIBRARIES = [
+      {
+        id: "craft",
+        name: "Car · Craft",
+        shortName: "Craft",
+        badge: "C",
+        color: "#D97706",
+        bg: "rgba(245, 158, 11, 0.14)",
+        count: 486,
+        syncText: "双向索引 · 刚刚更新",
+        folders: [
+          { id: "craft-arch", name: "产品架构与检索", path: "产品架构与检索", count: 142, children: ["混合检索 v4 方案", "移动端交互规范"] },
+          { id: "craft-ai", name: "Agents 与工作流", path: "Agents 与工作流", count: 118, children: ["VPS Codex 部署", "思维链展示方案"] },
+          { id: "craft-daily", name: "每日研发笔记", path: "每日研发笔记", count: 226, children: ["2026-11 冲刺记录"] }
+        ]
+      },
+      {
+        id: "obsidian",
+        name: "OS · Obsidian",
+        shortName: "Obsidian",
+        badge: "O",
+        color: "#7C3AED",
+        bg: "rgba(124, 58, 237, 0.14)",
+        count: 1248,
+        syncText: "OSS 归档目标库 · 已挂载",
+        folders: [
+          { id: "os-daily", name: "01_DailyNotes (速记归档)", path: "01_DailyNotes", count: 612, children: ["2026-11", "2026-10"] },
+          { id: "os-cards", name: "02_Zettelkasten 永久笔记", path: "02_Zettelkasten", count: 430, children: ["知识图谱", "认知科学"] },
+          { id: "os-clip", name: "03_Clippings 网页剪藏", path: "03_Clippings", count: 206, children: [] }
+        ]
+      },
+      {
+        id: "feishu",
+        name: "工程知识库 · 飞书",
+        shortName: "飞书知识库",
+        badge: "飞",
+        color: "#0D9488",
+        bg: "rgba(13, 148, 136, 0.14)",
+        count: 215,
+        syncText: "云端增量同步 · 10 分钟前",
+        folders: [
+          { id: "fs-spec", name: "技术方案评审 (RFC)", path: "技术方案评审", count: 84, children: [] },
+          { id: "fs-post", name: "线上复盘与稳定性", path: "线上复盘与稳定性", count: 67, children: [] },
+          { id: "fs-roadmap", name: "2026 季度路线图", path: "2026 季度路线图", count: 64, children: [] }
+        ]
+      },
+      {
+        id: "dida",
+        name: "工作清单 · 滴答",
+        shortName: "滴答清单",
+        badge: "✓",
+        color: "#2563EB",
+        bg: "rgba(37, 99, 235, 0.14)",
+        count: 64,
+        syncText: "任务快照镜像 · 只读保护",
+        folders: [
+          { id: "dd-sprint", name: "Hub 客户端冲刺", path: "Hub 客户端冲刺", count: 28, children: [] },
+          { id: "dd-inbox", name: "收集箱 Inbox", path: "收集箱 Inbox", count: 36, children: [] }
+        ]
+      },
+      {
+        id: "x-bookmarks",
+        name: "X 书签与点赞",
+        shortName: "X 书签",
+        badge: "X",
+        color: "#0F172A",
+        bg: "rgba(15, 23, 42, 0.1)",
+        count: 892,
+        syncText: "自动归档 · 今日 +12",
+        folders: [
+          { id: "x-ai", name: "AI Agents & LLM 进展", path: "AI Agents & LLM", count: 510, children: [] },
+          { id: "x-ui", name: "Apple & Craft 设计细节", path: "设计细节", count: 382, children: [] }
+        ]
+      },
+      {
+        id: "telegram",
+        name: "Telegram 收藏",
+        shortName: "Telegram",
+        badge: "TG",
+        color: "#0284C7",
+        bg: "rgba(2, 132, 199, 0.14)",
+        count: 318,
+        syncText: "Saved Messages · 已同步",
+        folders: [
+          { id: "tg-links", name: "精选长文与论文 PDF", path: "精选长文与论文", count: 194, children: [] },
+          { id: "tg-tools", name: "开源工具速递", path: "开源工具速递", count: 124, children: [] }
+        ]
+      }
+    ];
+
+    const DOCUMENTS = [
+      {
+        id: "doc-1",
+        title: "Hub 混合检索架构 v4：BM25 + 向量重排与移动端范围隔离",
+        libraryId: "craft",
+        libraryName: "Car · Craft",
+        folderId: "craft-arch",
+        folderPath: "产品架构与检索",
+        type: "craft",
+        typeLabel: "资料",
+        date: "今天 08:40",
+        tags: ["#架构思考", "#检索性能"],
+        favorite: true,
+        snippet: "在桌面端与移动端统一采用双轨资料库模型：默认点击直接进入文件夹层级浏览，显式开启范围筛选时才过滤全局搜索结果，且搜索范围绝不自动等同于向云端 Agents 授权上传整库。",
+        content: [
+          "1. 为什么要将「目录结构浏览」与「搜索范围过滤」解耦？",
+          "早期版本在列表中常驻复选框，或在手机端点击资料库时直接跳回搜索页弹窗，导致用户既无法沉浸浏览文件夹层级，又容易误触缩小全局检索范围。",
+          "2. 移动端双轨方案：",
+          "• 在「浏览」Tab 下直接呈现 6 大资料库，点按右侧 ▸ 原位展开子文件夹树，点按行主体推入该资料库的完整文件夹与文档视图。",
+          "• 在「搜索」Tab 或点击「筛选范围」时，通过带有物理弹簧手感的半屏抽屉（Bottom Sheet）进行多库或单文件夹限定，选定后在搜索框下方以醒目胶囊展示并支持一键重置。"
+        ]
+      },
+      {
+        id: "doc-2",
+        title: "VPS 云端 Agents 接入规范：Windows 关机不阻塞手机会话",
+        libraryId: "craft",
+        libraryName: "Car · Craft",
+        folderId: "craft-ai",
+        folderPath: "Agents 与工作流",
+        type: "craft",
+        typeLabel: "资料",
+        date: "昨天 21:15",
+        tags: ["#Agents", "#VPS"],
+        favorite: true,
+        snippet: "手机通过 Hub 服务直连个人 Linux VPS 上的官方 Codex app-server。电脑离线仅影响需要写回桌面 OS 日记的任务，不阻塞手机发起新云端助手对话。",
+        content: [
+          "• 连接总览严格区分「阿里云 OSS 内容同步」与「Linux VPS 助手会话」两条独立链路。",
+          "• 移动端对话默认折叠思维链（Reasoning Timeline），仅展示当前执行步骤与耗时，点击可展开查看检索词、命中文档及工具调用明细。",
+          "• 媒体约束：源码服务支持最多 6 张图片/关键帧（单张 4 MiB），回答可一键存为本机日志或带来源快照的任务。"
+        ]
+      },
+      {
+        id: "doc-3",
+        title: "Flomo 风格跨端速记与三阶段 OS 归档回执机制",
+        libraryId: "obsidian",
+        libraryName: "OS · Obsidian",
+        folderId: "os-daily",
+        folderPath: "01_DailyNotes",
+        type: "journal",
+        typeLabel: "日志",
+        date: "昨天 18:20",
+        tags: ["#速记", "#跨端同步"],
+        favorite: false,
+        snippet: "手机端速记直接进入无标题输入框，支持多段语音补录与最多 9 个附件。每条记录清晰展示：已存本机 → 已上传 OSS → 电脑已写入 Obsidian Daily Note。",
+        content: [
+          "阶段一（本机持久化）：离线或弱网下立即写入本机 SQLite / IndexedDB，零丢失。",
+          "阶段二（OSS 中转队列）：网络可用时加密上传至个人阿里云 OSS 队列。",
+          "阶段三（桌面端落盘回执）：当桌面端 Hub 在线时，自动拉取并写入 Obsidian 对应日期的 Markdown 文件，回写「已写入 OS」绿色回执。"
+        ]
+      },
+      {
+        id: "doc-4",
+        title: "2026 Q4 检索延迟压测报告：12 万块本地索引 P99 < 38ms",
+        libraryId: "feishu",
+        libraryName: "工程知识库 · 飞书",
+        folderId: "fs-spec",
+        folderPath: "技术方案评审",
+        type: "pdf",
+        typeLabel: "资料",
+        date: "11-22",
+        tags: ["#性能压测", "#SQLite"],
+        favorite: false,
+        snippet: "通过 FTS5 前缀索引与分库位图过滤，在 6 个资料库全选状态下关键词毫秒级响应；单选某文件夹时通过 path_prefix 索引直接裁剪 92% 扫描开销。",
+        content: [
+          "压测环境：6 大资料库合计 3,223 篇文档、124,800 个语义块。",
+          "结论：在移动端 WebView 内通过防抖与增量分片渲染，首屏 20 条结果渲染耗时稳定在 12ms 以内。"
+        ]
+      },
+      {
+        id: "doc-5",
+        title: "Apple Liquid Glass 与 Craft 文档秩序在移动端的克制应用",
+        libraryId: "x-bookmarks",
+        libraryName: "X 书签与点赞",
+        folderId: "x-ui",
+        folderPath: "设计细节",
+        type: "reading",
+        typeLabel: "阅读",
+        date: "11-20",
+        tags: ["#UI设计", "#阅读摘录"],
+        favorite: true,
+        snippet: "内容区坚持高对比度实体纯白/暖纸表面，仅在顶部轻导航、底部 5 Tab 与浮动动作坞使用少量高透毛玻璃，不在列表每一行叠加模糊。",
+        content: [
+          "许多移动应用滥用 backdrop-filter 导致长列表滚动掉帧且文字发灰。",
+          "Base White Mobile 的核心铁律：正文与卡片永远干净利落，毛玻璃只属于悬浮在内容之上的操控层（Chrome）。"
+        ]
+      },
+      {
+        id: "doc-6",
+        title: "LongMemEval：个人长期记忆系统的检索召回与冲突消解论文精读",
+        libraryId: "telegram",
+        libraryName: "Telegram 收藏",
+        folderId: "tg-links",
+        folderPath: "精选长文与论文",
+        type: "reading",
+        typeLabel: "阅读",
+        date: "11-18",
+        tags: ["#论文笔记", "#Memory"],
+        favorite: false,
+        snippet: "探讨当个人笔记跨越 3 年以上时，如何通过时间戳衰减与显式版本链避免大模型引用已废弃的旧方案。",
+        content: [
+          "核心启发：Hub 的洞察模块（Insights）在合并相似卡片时，必须保留原始时间戳与依据文档链接，允许用户一键回溯原文。"
+        ]
+      }
+    ];
+
+    const JOURNALS = [
+      {
+        id: "j-1",
+        date: "2026-11-25 · 今天",
+        time: "09:12",
+        receipt: "os",
+        receiptText: "已写入 OS · 01_DailyNotes/2026-11-25.md",
+        tags: ["#架构思考", "#移动端设计"],
+        text: "把桌面端备受好评的「我的资料库」静默双轨设计移植到手机端了：在「浏览」页点击 ▸ 直接原位展开子文件夹，点击资料库名称进入完整文件夹树；而搜索范围筛选放进独立的弹簧半屏抽屉，彻底告别以前点资料库会跳回搜索页的割裂感。",
+        voice: { duration: "00:28", transcript: "语音转写：同时保留底部四合一上下文动作坞，看任何文档都能直接问助手或记想法。" },
+        attachments: ["mobile-library-sketch.png"]
+      },
+      {
+        id: "j-2",
+        date: "2026-11-25 · 今天",
+        time: "08:05",
+        receipt: "cloud",
+        receiptText: "已上传 OSS · 等待桌面写入",
+        tags: ["#闪念", "#Agents"],
+        text: "通勤路上用手机连 VPS 跑了一次近三天飞书 RFC 与 Craft 架构笔记的差异对比，思维链折叠卡在窄屏上非常清爽，耗时 2.4 秒直接生成了 3 条待办。",
+        voice: null,
+        attachments: []
+      },
+      {
+        id: "j-3",
+        date: "2026-11-24 · 昨天",
+        time: "22:40",
+        receipt: "os",
+        receiptText: "已写入 OS · 01_DailyNotes/2026-11-24.md",
+        tags: ["#阅读摘录"],
+        text: "睡前读完 Liquid Glass 的交互复盘，记下一条准则：移动端单手大拇指热区在屏幕下半部 45%，所以全局「+ 速记」和资料范围确认按钮都必须落在拇指自然触达的位置。",
+        voice: null,
+        attachments: []
+      }
+    ];
+
+    const TASKS = [
+      {
+        id: "t-1",
+        title: "完成移动端「我的资料库」真层级目录浏览与范围筛选抽屉验收",
+        done: false,
+        due: "今天 18:00",
+        priority: "高优",
+        sourceType: "craft",
+        sourceLabel: "Car · Craft / 产品架构与检索",
+        docId: "doc-1",
+        isLocal: false
+      },
+      {
+        id: "t-2",
+        title: "核对 VPS 助手在电脑关机状态下的断线重连与停止回执文案",
+        done: false,
+        due: "今天 20:00",
+        priority: "中优",
+        sourceType: "craft",
+        sourceLabel: "Car · Craft / Agents 与工作流",
+        docId: "doc-2",
+        isLocal: false
+      },
+      {
+        id: "t-3",
+        title: "在安卓模拟器验证速记多段语音补录与 OSS 三阶段同步状态条",
+        done: false,
+        due: "明天",
+        priority: "高优",
+        sourceType: "dida",
+        sourceLabel: "工作清单 · 滴答 / Hub 客户端冲刺",
+        docId: "doc-3",
+        isLocal: false
+      },
+      {
+        id: "t-4",
+        title: "根据洞察 #2 合并《混合检索 v4》与《飞书压测报告》的重复缓存指标",
+        done: false,
+        due: "本周五",
+        priority: "中优",
+        sourceType: "insight",
+        sourceLabel: "洞察发现 #2 · 跨库指标对齐",
+        docId: "doc-4",
+        isLocal: true
+      },
+      {
+        id: "t-5",
+        title: "优化桌面端「我的资料库」悬停胶囊坞与选中范围卡片",
+        done: true,
+        due: "已完成",
+        priority: "高优",
+        sourceType: "local",
+        sourceLabel: "本机任务 · 已同步桌面",
+        docId: "doc-1",
+        isLocal: true
+      }
+    ];
+
+    // 与当前演示任务对应的本机计划，等待项只出现在一个分组中。
+    TASKS[1].waiting = { who: "VPS 执行端", followUp: "今天 20:00" };
+    TASKS[2].planned = true;
+
+    const FLASHCARDS = [
+      {
+        id: "fc-1",
+        deck: "Hub 核心架构与规范",
+        front: "在 Hub 移动端与桌面端中，「选择搜索资料范围」是否等同于授权向云端 Agents 上传整个资料库？",
+        back: "绝对不等同。\n\n1. 搜索范围（Scope Filter）仅在本地 SQLite 索引上过滤检索结果；\n2. 向云端 Agents 发送上下文必须由用户在会话「材料选择器」或文档底部「问助手」中显式勾选确认。",
+        source: "Car · Craft / 混合检索架构 v4",
+        docId: "doc-1"
+      },
+      {
+        id: "fc-2",
+        deck: "跨端同步与容灾",
+        front: "手机端速记保存后，经历哪三个同步回执阶段最终落盘到桌面 Obsidian？",
+        back: "1. 已存本机 · 待上传（立即写入本机存储，防断网丢失）\n2. 已上传 OSS · 等待电脑（加密同步至阿里云 OSS 队列）\n3. 已写入 OS（桌面端拉取并写入 Obsidian Daily Note 后回写确认）",
+        source: "OS · Obsidian / 01_DailyNotes",
+        docId: "doc-3"
+      },
+      {
+        id: "fc-3",
+        deck: "VPS 云端助手架构",
+        front: "当用户的 Windows 桌面电脑关机时，手机端能否正常发起新的云端 Agents 对话？",
+        back: "可以正常发起。\n\n因为手机端直接通过 Hub 服务连接个人 Linux VPS 上的官方 Codex app-server；电脑关机仅使「桌面本地私有未同步文件」与「OS 日记落盘」暂不可用，不影响云端对话。",
+        source: "Car · Craft / VPS 云端 Agents 接入规范",
+        docId: "doc-2"
+      }
+    ];
+
+    const INSIGHTS = [
+      {
+        id: "ins-1",
+        title: "跨库架构共识：桌面与移动端「资料库浏览 vs 搜索范围」已形成统一双轨规范",
+        category: "架构演进发现",
+        date: "今天 09:00",
+        summary: "系统对比了近 7 天你在 Car · Craft 与 Obsidian 中的 5 篇笔记，发现「默认零复选框静默浏览 + 显式触发范围抽屉」显著降低了认知负担。",
+        evidenceDocs: ["doc-1", "doc-5"],
+        convertedTask: false
+      },
+      {
+        id: "ins-2",
+        title: "潜在待办提炼：飞书压测报告中的 path_prefix 裁剪可复用到移动端文件夹内搜索",
+        category: "性能优化线索",
+        date: "昨天 19:30",
+        summary: "飞书 RFC《2026 Q4 检索延迟压测报告》指出单文件夹过滤可裁剪 92% 扫描开销，建议在移动端「进入文件夹浏览」时自动绑定该 folderId。",
+        evidenceDocs: ["doc-4", "doc-1"],
+        convertedTask: "t-4"
+      }
+    ];
+
+    /* ========================================================================
+       Reactive Prototype State
+       ======================================================================== */
+    const state = {
+      activeTab: "search", // 'search' | 'browse' | 'agents' | 'tasks' | 'review'
+      searchQuery: "",
+      searchType: "all",   // 'all' | 'craft' | 'journal' | 'task' | 'reading' | 'flashcard'
+      selectedLibIds: null, // null = all 6 libraries; array = subset of library IDs
+      selectedFolder: null, // { libId, folderId, name, libName }
+      expandedBrowseLibs: { craft: true }, // inline folder tree disclosure in Browse tab
+
+      // Push Layer Navigation Stack (Supports Multi-Level Drill-Down & Back)
+      pushStack: [], // Array of { type: 'library-detail' | 'doc-detail' | 'journals' | 'reading' | 'insights' | 'favorites' | 'tags', payload: any }
+      collectionQuery: "",
+      readingFilter: "all", // 'all' | 'unread' | 'offline'
+      selectedTagFilter: null,
+      expandedJournals: {},
+      readingLargeFont: false,
+
+      // Agents State (Local RAG + Single-Stream VPS Codex Architecture)
+      agentContextMode: "auto-rag", // 'auto-rag' | 'manual' | 'cloud-only'
+      activeSessionId: "sess-1",
+      agentSessions: [
+        { id: "sess-1", title: "多模态检索架构复盘", updated: "刚刚", archived: false, hasHandoff: true },
+        { id: "sess-2", title: "飞书 Q4 检索延迟压测对比", updated: "昨天 21:10", archived: false, hasHandoff: false },
+        { id: "sess-3", title: "LongMemEval 长期记忆冲突消解", updated: "11-20", archived: true, hasHandoff: false }
+      ],
+      handoffExpanded: false,
+      handoffCached: false,
+      cotExpandedMap: { "m-2": false },
+      attachedMaterialIds: ["doc-1", "doc-2"],
+      attachedPhotos: [],
+      activeSkill: null, // e.g. { name: "arch-review", title: "架构一致性审查", files: 2 }
+      agentModel: "GPT-5.4 Sol",
+      agentEffort: "高 (High)",
+      agentOfflineMode: false,
+      savedNoteMsgIds: {},
+      convertedTaskMsgIds: {},
+      agentMessages: [
+        {
+          id: "m-1",
+          role: "user",
+          contextMode: "auto-rag",
+          recalledDocIds: ["doc-1", "doc-2"],
+          recalledKb: "14.2 KB",
+          text: "结合我最近在 Craft 里记的混合检索方案和 VPS 规范，总结一下移动端资料库和云端助手是怎么协同的？"
+        },
+        {
+          id: "m-2",
+          role: "assistant",
+          localRagSummary: "本机 SQLite 召回 2 篇 (12ms)",
+          cotSteps: [
+            { time: "12ms", text: "📱 手机本机 FTS5 索引自动检索命中《混合检索架构 v4》《VPS 云端 Agents 规范》Top-2 片段 (14.2 KB)" },
+            { time: "0.6s", text: "☁️ 仅将命中片段随单次加密请求发往个人 Linux VPS Codex（未上传整库）" },
+            { time: "1.2s", text: "✦ VPS Codex (GPT-5.4 Sol · 高推理) 交叉核对双轨边界与离线容灾机制，生成结论" }
+          ],
+          cotDuration: "1.8s",
+          text: "通过 **「手机本机检索召回 (Local RAG) + 个人 VPS Codex 云端推理」** 协同，移动端实现了零繁琐操作的全库问答：\n\n1. **检索在本机、推理在 VPS**：您直接提问时，手机先在本地已同步的 SQLite 索引中毫秒级召回最相关的 Top-K 笔记片段（≤32KB）随请求发给 VPS；**既无需手动翻找单选文档，也无需将私人整库存储在 VPS 硬盘上**。\n2. **Windows 电脑关机仍可全库问答**：因为检索依赖手机本机索引，推理依赖 24 小时在线的 Linux VPS Codex，电脑关机完全不阻塞。\n3. **纯粹单流对话与一键沉淀**：砍掉了割裂的「对话/材料/成果」三栏切换，材料胶囊、思维链与一键存日志/转任务回执全部在同一条对话流内原地完成。",
+          citations: ["doc-1", "doc-2"]
+        }
+      ],
+
+      // Tasks State
+      taskFilterStatus: "focus", // 'todo' | 'done' | 'all'
+      taskFilterSource: "all",  // 'all' | 'craft' | 'dida' | 'insight' | 'local'
+
+      // Review Flashcards State
+      reviewSubTab: "today", // 'today' | 'decks' | 'inbox'
+      reviewDeck: "",
+      recentDocs: [],
+      reviewRatings: {},
+      cardFlipped: false,
+
+      inboxCards: [
+        { id: "ib-1", front: "为什么 Base White Mobile 不在列表每一行使用毛玻璃？", back: "避免长列表滚动掉帧与文字对比度下降；毛玻璃仅用于顶部栏、底栏与悬浮操作坞。", source: "X 书签 / Apple Liquid Glass 复盘" },
+        { id: "ib-2", front: "单文件夹检索时 SQLite 如何裁剪 92% 扫描开销？", back: "利用 path_prefix 索引结合分库位图直接跳过非目标文件夹块。", source: "飞书知识库 / Q4 检索延迟压测报告" },
+        { id: "ib-3", front: "LongMemEval 论文中如何防止大模型引用已废弃的旧笔记？", back: "通过时间戳衰减权重与显式版本演化链（Supersedes）标记最新结论。", source: "Telegram 收藏 / LongMemEval 论文精读" }
+      ],
+
+      // Quick Capture Draft & Voice Simulation
+      captureDraft: "",
+      captureQuote: null, // optional linked quote from doc/reading
+      captureTags: ["#架构思考"],
+      captureRecording: false,
+      captureSegments: [],
+      captureFiles: [],
+      captureDate: "",
+
+      // Connection Status Simulator
+      ossStatus: "os",   // 'os' (已写入 OS) | 'pending' (待上传 2 条)
+      vpsStatus: "online" // 'online' (VPS 在线) | 'busy' (执行端推理中)
+    };
+
+    /* ========================================================================
+       Utility Helpers
+       ======================================================================== */
+    const storeKey = "hub.mobile.prototype.v5";
+    const draftKeys = ["captureDraft", "captureQuote", "captureTags", "captureSegments", "captureFiles", "captureDate"];
+    const durableKeys = [...draftKeys, "recentDocs", "reviewRatings", "inboxCards", "agentSessions", "activeSessionId", "agentOfflineMode"];
+    const sessionKeys = ["agentMessages", "attachedMaterialIds", "attachedPhotos", "activeSkill", "agentContextMode", "savedNoteMsgIds", "convertedTaskMsgIds", "cotExpandedMap", "handoffExpanded", "handoffCached", "promptDraft"];
+    state.promptDraft = "";
+    const emptySession = { agentMessages: [], attachedMaterialIds: [], attachedPhotos: [], activeSkill: null,
+      agentContextMode: "auto-rag", savedNoteMsgIds: {}, convertedTaskMsgIds: {}, cotExpandedMap: {},
+      handoffExpanded: false, handoffCached: false, promptDraft: "" };
+    state.agentSessions[0].data = Object.fromEntries(sessionKeys.map(key => [key, state[key]]));
+    function sessionData(session) {
+      return session.data || (session.data = structuredClone(emptySession));
+    }
+    function activeSession() {
+      return state.agentSessions.find(s => s.id === state.activeSessionId) || state.agentSessions[0];
+    }
+    for (const key of sessionKeys) {
+      Object.defineProperty(state, key, {
+        get: () => sessionData(activeSession())[key],
+        set: value => { sessionData(activeSession())[key] = value; }
+      });
+    }
+
+    let lastSaved = "";
+    function persist() {
+      const data = Object.fromEntries(durableKeys.map(key => [key, state[key]]));
+      Object.assign(data, { tasks: TASKS, journals: JOURNALS, cards: FLASHCARDS,
+        insights: INSIGHTS, favorites: DOCUMENTS.filter(doc => doc.favorite).map(doc => doc.id) });
+      const json = JSON.stringify(data);
+      try {
+        if (json !== lastSaved) localStorage.setItem(storeKey, json);
+        lastSaved = json;
+        return true;
+      } catch {
+        showToast("浏览器本机保存失败，请释放空间或保留当前页面");
+        return false;
+      }
+    }
+
+    function restoreData() {
+      try {
+        const stored = JSON.parse(localStorage.getItem(storeKey));
+        if (!stored) return;
+        for (const key of durableKeys) if (stored[key] !== undefined) state[key] = stored[key];
+        for (const [items, key] of [[TASKS,"tasks"], [JOURNALS,"journals"], [FLASHCARDS,"cards"], [INSIGHTS,"insights"]]) {
+          if (Array.isArray(stored[key])) items.splice(0, items.length, ...stored[key]);
+        }
+        if (Array.isArray(stored.favorites)) DOCUMENTS.forEach(d => { d.favorite = stored.favorites.includes(d.id); });
+      } catch { showToast("无法读取上次本机记录"); }
+    }
+
+    function localDay(date = new Date()) {
+      return [date.getFullYear(), String(date.getMonth()+1).padStart(2,"0"), String(date.getDate()).padStart(2,"0")].join("-");
+    }
+
+    function dueCards(deck = "") {
+      const now = Date.now();
+      return FLASHCARDS.filter(c => (!deck || c.deck === deck) && (!state.reviewRatings[c.id] || state.reviewRatings[c.id].next <= now));
+    }
+
+    function escapeHtml(str = "") {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function highlightText(text, query) {
+      const safe = escapeHtml(text);
+      if (!query || !query.trim()) return safe;
+      const q = query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return safe.replace(new RegExp(`(${q})`, "gi"), '<mark class="m-highlight">$1</mark>');
+    }
+
+    let toastTimer = null;
+    function showToast(message, undoCallback = null) {
+      const toast = document.getElementById("m-toast");
+      const textEl = document.getElementById("m-toast-text");
+      const actionEl = document.getElementById("m-toast-action");
+      textEl.textContent = message;
+      if (undoCallback) {
+        actionEl.style.display = "inline-block";
+        actionEl.onclick = () => {
+          undoCallback();
+          toast.classList.remove("is-visible");
+        };
+      } else {
+        actionEl.style.display = "none";
+        actionEl.onclick = null;
+      }
+      toast.classList.add("is-visible");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove("is-visible"), 3200);
+    }
+
+    function getScopeSummaryLabel() {
+      if (state.selectedFolder) {
+        return `${state.selectedFolder.libName} / ${state.selectedFolder.name}`;
+      }
+      if (state.selectedLibIds === null) {
+        return "全部资料库";
+      }
+      if (state.selectedLibIds.length === 0) {
+        return "未选资料库 (0/6)";
+      }
+      if (state.selectedLibIds.length === 1) {
+        const lib = LIBRARIES.find(l => l.id === state.selectedLibIds[0]);
+        return lib ? lib.shortName : "1/6 资料库";
+      }
+      return `已选 ${state.selectedLibIds.length}/6 库`;
+    }
+
+    function getActivePushView() {
+      return state.pushStack.length > 0 ? state.pushStack[state.pushStack.length - 1] : null;
+    }
+
+    function isScopeFiltered() {
+      return state.selectedLibIds !== null || state.selectedFolder !== null;
+    }
+
+    /* ========================================================================
+       Core Renderers: Top Header, Bottom TabBar & Active Tab View
+       ======================================================================== */
+    function renderAll() {
+      persist();
+      scheduleRoute();
+      renderHeader();
+      renderMainTab();
+      renderTabBar();
+      renderPushLayer();
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    function renderHeader() {
+      const left = document.getElementById("m-header-left");
+      const actions = document.getElementById("m-header-actions");
+
+      const titles = {
+        search: { title: "搜索", sub: "6 大资料库 · 3,223 篇本地索引" },
+        browse: { title: "浏览", sub: "日志 · 资料库目录树 · 阅读 · 洞察" },
+        agents: { title: "云端助手", sub: "Linux VPS · Codex 执行端" },
+        tasks: { title: "任务", sub: "跨来源行动与本机待办" },
+        review: { title: "复习", sub: `今日待复习 ${ dueCards().length } 张` }
+      };
+      const current = titles[state.activeTab] || titles.search;
+
+      left.innerHTML = `
+        <div>
+          <div class="m-header-title">${current.title}</div>
+        </div>
+      `;
+
+      const ossDot = state.ossStatus === "os" ? "m-dot-green" : "m-dot-amber";
+      const vpsDot = state.vpsStatus === "online" ? "m-dot-blue" : "m-dot-amber";
+      const connLabel = state.agentOfflineMode ? "助手离线" : state.ossStatus === "pending" ? "待上传" : state.vpsStatus === "busy" ? "助手运行中" : "连接";
+
+      actions.innerHTML = `
+        <button type="button" class="m-conn-pill" id="btn-open-conn-sheet" title="查看阿里云 OSS 内容同步与 VPS 助手独立连接状态">
+          <span class="m-dot ${ossDot}"></span>
+          <span class="m-dot ${vpsDot}"></span>
+          <span>${connLabel}</span>
+        </button>
+        <button type="button" class="m-icon-btn" id="btn-open-space-menu" aria-label="快捷空间菜单" title="打开快捷菜单与外观设置">
+          <i data-lucide="sliders-horizontal" style="width:17px;height:17px;"></i>
+        </button>
+      `;
+
+      document.getElementById("btn-open-conn-sheet").onclick = () => openConnectionSheet();
+      document.getElementById("btn-open-space-menu").onclick = () => openSpaceMenuSheet();
+
+      // Hide FAB on Agents chat or Review study to avoid blocking composer / rating buttons
+      const fab = document.getElementById("btn-fab-capture");
+      if (state.activeTab === "agents" || (state.activeTab === "review" && state.reviewSubTab === "today") || getActivePushView()) {
+        fab.style.opacity = "0";
+        fab.style.pointerEvents = "none";
+      } else {
+        fab.style.opacity = "1";
+        fab.style.pointerEvents = "auto";
+      }
+    }
+
+    function renderTabBar() {
+      const nav = document.getElementById("m-tabbar");
+      const dueRemaining = dueCards().length;
+      const tabs = [
+        { key: "search", label: "搜索", icon: "search" },
+        { key: "browse", label: "浏览", icon: "compass" },
+        { key: "agents", label: "助手", icon: "sparkles" },
+        { key: "tasks", label: "任务", icon: "check-square" },
+        { key: "review", label: "复习", icon: "layers", badge: dueRemaining }
+      ];
+
+      const hasPush = Boolean(getActivePushView());
+      nav.innerHTML = tabs.map(t => `
+        <button type="button" class="m-tab-btn ${state.activeTab === t.key && !hasPush ? "is-active" : ""}" data-tab="${t.key}">
+          ${t.badge ? `<span class="m-tab-badge">${t.badge}</span>` : ""}
+          <i data-lucide="${t.icon}" style="width:20px;height:20px;"></i>
+          <span>${t.label}</span>
+        </button>
+      `).join("");
+
+      nav.querySelectorAll("[data-tab]").forEach(btn => {
+        btn.onclick = () => {
+          state.pushStack = [];
+          state.collectionQuery = "";
+          state.activeTab = btn.getAttribute("data-tab");
+          renderAll();
+        };
+      });
+    }
+
+    function renderMainTab() {
+      const main = document.getElementById("m-main");
+      if (state.activeTab === "search") renderSearchTab(main);
+      else if (state.activeTab === "browse") renderBrowseTab(main);
+      else if (state.activeTab === "agents") renderAgentsTab(main);
+      else if (state.activeTab === "tasks") renderTasksTab(main);
+      else if (state.activeTab === "review") renderReviewTab(main);
+    }
+
+    /* ========================================================================
+       TAB 1: SEARCH (统一搜索 + 资料库范围半屏抽屉 + 今日脉搏)
+       ======================================================================== */
+    function getUnifiedSearchItems() {
+      // Build a typed unified index across documents, journals, tasks, flashcards, and sessions
+      const sourceDoc = id => DOCUMENTS.find(d => d.id === id);
+      const docItems = DOCUMENTS.map(d => ({
+        uid: `doc:${d.id}`,
+        rawId: d.id,
+        kind: d.type === "reading" ? "reading" : d.type === "journal" ? "journal" : "craft",
+        typeBadge: d.typeLabel,
+        libraryId: d.libraryId,
+        folderId: d.folderId,
+        sourceLine: `${d.libraryName} · ${d.folderPath}`,
+        title: d.title,
+        snippet: d.snippet,
+        date: d.date,
+        tags: d.tags
+      }));
+
+      const journalItems = JOURNALS.map(j => ({
+        uid: `journal:${j.id}`,
+        rawId: j.id,
+        kind: "journal",
+        typeBadge: "日志",
+        libraryId: "obsidian",
+        folderId: "os-daily",
+        sourceLine: `日志 · ${j.receiptText}`,
+        title: `${j.date} 速记 (${j.time})`,
+        snippet: j.text,
+        date: j.time,
+        tags: j.tags
+      }));
+
+      const taskItems = TASKS.map(t => ({
+        uid: `task:${t.id}`,
+        rawId: t.id,
+        kind: "task",
+        typeBadge: t.done ? "任务 · 已完成" : `任务 · ${t.priority}`,
+        libraryId: t.sourceType === "dida" ? "dida" : sourceDoc(t.docId)?.libraryId,
+        folderId: t.sourceType === "dida" ? "dd-sprint" : sourceDoc(t.docId)?.folderId,
+        sourceLine: t.sourceLabel,
+        title: t.title,
+        snippet: `截止：${t.due} · 来源快照关联文档可回跳`,
+        date: t.due,
+        tags: ["#任务闭环"]
+      }));
+
+      const cardItems = FLASHCARDS.map(c => ({
+        uid: `card:${c.id}`,
+        rawId: c.id,
+        kind: "flashcard",
+        typeBadge: "闪卡",
+        libraryId: sourceDoc(c.docId)?.libraryId,
+        folderId: sourceDoc(c.docId)?.folderId,
+        sourceLine: `牌组：${c.deck}`,
+        title: c.front,
+        snippet: c.back.replace(/\n+/g, " "),
+        date: "FSRS 待复习",
+        tags: ["#闪卡复习"]
+      }));
+
+      if (state.searchType === "all" && !state.searchQuery.trim()) {
+        // Default calm feed shows the 6 core indexed documents
+        return docItems;
+      }
+      if (state.searchType === "craft") return docItems.filter(i => i.kind === "craft");
+      if (state.searchType === "reading") return docItems.filter(i => i.kind === "reading");
+      if (state.searchType === "journal") return [...docItems.filter(i => i.kind === "journal"), ...journalItems];
+      if (state.searchType === "task") return taskItems;
+      if (state.searchType === "flashcard") return cardItems;
+      return [...docItems, ...journalItems, ...taskItems, ...cardItems];
+    }
+
+    function renderSearchTab(container) {
+      const types = [
+        { key: "all", label: "全部", count: DOCUMENTS.length + JOURNALS.length + TASKS.length + FLASHCARDS.length },
+        { key: "craft", label: "资料", count: DOCUMENTS.filter(d => d.type === "craft" || d.type === "pdf").length },
+        { key: "journal", label: "日志", count: JOURNALS.length + 1 },
+        { key: "task", label: "任务", count: TASKS.length },
+        { key: "reading", label: "阅读", count: DOCUMENTS.filter(d => d.type === "reading").length },
+        { key: "flashcard", label: "闪卡", count: FLASHCARDS.length }
+      ];
+
+      const filteredDocs = getUnifiedSearchItems().filter(item => {
+        if (state.selectedFolder) {
+          if (item.libraryId !== state.selectedFolder.libId || item.folderId !== state.selectedFolder.folderId) return false;
+        } else if (state.selectedLibIds !== null) {
+          if (!state.selectedLibIds.includes(item.libraryId)) return false;
+        }
+        if (state.searchQuery.trim()) {
+          const q = state.searchQuery.trim().toLowerCase();
+          const hay = `${item.title} ${item.snippet} ${item.sourceLine} ${item.tags.join(" ")}`.toLowerCase();
+          return hay.includes(q);
+        }
+        return true;
+      });
+
+      const dueRemaining = dueCards().length;
+      const todoCount = TASKS.filter(t => !t.done).length;
+
+      container.innerHTML = `
+        <!-- Top Search Box + Scope Sheet Trigger -->
+        <div class="m-search-box">
+          <i data-lucide="search" style="width:16px;height:16px;color:var(--m-ink-3);flex-shrink:0;"></i>
+          <input
+            type="search"
+            id="m-search-input"
+            class="m-search-input"
+            placeholder="搜索资料、日志、任务、阅读或闪卡..."
+            value="${escapeHtml(state.searchQuery)}"
+          />
+          ${state.searchQuery ? `
+            <button type="button" id="btn-clear-search" style="background:none;border:none;color:var(--m-ink-3);padding:2px;cursor:pointer;" aria-label="清除关键词">
+              <i data-lucide="x-circle" style="width:15px;height:15px;"></i>
+            </button>
+          ` : ""}
+          <button type="button" id="btn-open-scope-sheet" class="m-scope-trigger ${isScopeFiltered() ? "is-filtered" : ""}" title="选择搜索资料库或文件夹范围">
+            <i data-lucide="sliders-horizontal" style="width:12px;height:12px;"></i>
+            <span>${escapeHtml(getScopeSummaryLabel())}</span>
+          </button>
+        </div>
+
+        <!-- Horizontal Content Type Chips -->
+        <div class="m-chip-rail" role="tablist" aria-label="搜索内容类型">
+          ${types.map(t => `
+            <button type="button" class="m-chip ${state.searchType === t.key ? "is-active" : ""}" data-search-type="${t.key}">
+              <span>${t.label}</span>
+              <span class="m-chip-count">${t.count}</span>
+            </button>
+          `).join("")}
+        </div>
+
+        <!-- Active Scope Banner (When Filtered) -->
+        ${isScopeFiltered() ? `
+          <div class="m-applied-strip">
+            <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+              <i data-lucide="filter" style="width:13px;height:13px;flex-shrink:0;"></i>
+              <span class="m-truncate">范围：<strong>${escapeHtml(getScopeSummaryLabel())}</strong>（仅限本地检索，不向 AI 上传整库）</span>
+            </div>
+            <button type="button" id="btn-reset-scope" style="background:none;border:none;color:var(--m-accent-ink);font-weight:700;font-size:11.5px;cursor:pointer;white-space:nowrap;">
+              恢复全库 ×
+            </button>
+          </div>
+        ` : ""}
+
+        <!-- Daily Pulse Bento (Shown when no search query) -->
+        ${!state.searchQuery.trim() ? `
+          <div class="m-pulse-grid">
+            <button type="button" class="m-pulse-card" id="pulse-go-review">
+              <span class="m-pulse-num" style="color:var(--m-accent);">${dueRemaining}</span>
+              <span class="m-pulse-label"><i data-lucide="layers" style="width:12px;height:12px;"></i>今日待复习</span>
+            </button>
+            <button type="button" class="m-pulse-card" id="pulse-go-tasks">
+              <span class="m-pulse-num">${todoCount}</span>
+              <span class="m-pulse-label"><i data-lucide="check-square" style="width:12px;height:12px;"></i>待办任务</span>
+            </button>
+            <button type="button" class="m-pulse-card" id="pulse-go-insights">
+              <span class="m-pulse-num" style="color:var(--m-green);">2</span>
+              <span class="m-pulse-label"><i data-lucide="sparkles" style="width:12px;height:12px;"></i>新洞察发现</span>
+            </button>
+          </div>
+
+          <!-- Suggested Search Keywords -->
+          <div class="m-section" style="margin-top:14px;">
+            <div class="m-section-header">
+              <span class="m-section-title">试试搜索 · 跨库高频主题</span>
+              <button type="button" class="m-section-action" id="btn-search-go-libs">浏览资料库目录 →</button>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+              ${["混合检索", "VPS", "三阶段", "Liquid Glass", "P99", "LongMemEval"].map(kw => `
+                <button type="button" class="m-chip" data-suggest-kw="${kw}" style="height:27px;font-size:11.5px;">
+                  <i data-lucide="trending-up" style="width:11px;height:11px;color:var(--m-ink-3);"></i>
+                  <span>${kw}</span>
+                </button>
+              `).join("")}
+            </div>
+          </div>
+        ` : ""}
+
+        <!-- Search Results Stream -->
+        <div class="m-section" style="margin-top:12px;">
+          <div class="m-section-header">
+            <span class="m-section-title">${state.searchQuery.trim() ? `检索结果 (${filteredDocs.length})` : `最近更新与命中 (${filteredDocs.length})`}</span>
+            <span style="font-size:11px;color:var(--m-ink-3);font-family:var(--m-font-mono);">FTS5 · 14ms</span>
+          </div>
+
+          ${filteredDocs.length === 0 ? `
+            <div class="m-card m-card-padded" style="text-align:center;padding:28px 16px;">
+              <div style="font-size:14px;font-weight:600;color:var(--m-ink);margin-bottom:4px;">当前范围内未找到匹配内容</div>
+              <div style="font-size:12px;color:var(--m-ink-3);margin-bottom:12px;">${state.selectedLibIds && state.selectedLibIds.length === 0 ? "您当前选择了 0 个资料库，遵循零选中不回退整库原则。" : "可尝试放宽资料库范围或切换内容类型。"}</div>
+              <button type="button" class="m-scope-trigger is-filtered" id="btn-empty-reset-scope" style="margin:0 auto;">恢复全部 6 个资料库</button>
+            </div>
+          ` : filteredDocs.map(item => `
+            <article class="m-result-card" role="button" tabindex="0" data-open-unified="${item.uid}">
+              <div class="m-result-top">
+                <span class="m-source-badge">
+                  <span style="width:6px;height:6px;border-radius:50%;background:var(--m-accent);"></span>
+                  <span>${escapeHtml(item.typeBadge)} · ${escapeHtml(item.sourceLine)}</span>
+                </span>
+                <span style="font-size:11px;color:var(--m-ink-3);">${escapeHtml(item.date)}</span>
+              </div>
+              <div class="m-result-title">${highlightText(item.title, state.searchQuery)}</div>
+              <div class="m-result-snippet">${highlightText(item.snippet, state.searchQuery)}</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">
+                <div style="display:flex;gap:5px;">
+                  ${item.tags.map(tag => `<span style="font-size:10.5px;color:var(--m-accent-ink);background:var(--m-accent-soft);padding:1px 6px;border-radius:5px;">${escapeHtml(tag)}</span>`).join("")}
+                </div>
+                <span style="font-size:11px;color:var(--m-ink-3);display:inline-flex;align-items:center;gap:3px;">
+                  详情与操作 <i data-lucide="chevron-right" style="width:12px;height:12px;"></i>
+                </span>
+              </div>
+            </article>
+          `).join("")}
+        </div>
+      `;
+
+      // Bind events
+      const input = document.getElementById("m-search-input");
+      input.oninput = (e) => {
+        state.searchQuery = e.target.value;
+        const pos = e.target.selectionStart;
+        renderMainTab();
+        if (window.lucide) window.lucide.createIcons();
+        const nextInput = document.getElementById("m-search-input");
+        if (nextInput) {
+          nextInput.focus();
+          nextInput.setSelectionRange(pos, pos);
+        }
+      };
+
+      const clearBtn = document.getElementById("btn-clear-search");
+      if (clearBtn) {
+        clearBtn.onclick = () => {
+          state.searchQuery = "";
+          renderAll();
+        };
+      }
+
+      document.getElementById("btn-open-scope-sheet").onclick = () => openScopeFilterSheet();
+
+      const resetBtn = document.getElementById("btn-reset-scope") || document.getElementById("btn-empty-reset-scope");
+      if (resetBtn) {
+        resetBtn.onclick = () => {
+          state.selectedLibIds = null;
+          state.selectedFolder = null;
+          showToast("已恢复全部 6 个资料库检索范围");
+          renderAll();
+        };
+      }
+
+      container.querySelectorAll("[data-search-type]").forEach(btn => {
+        btn.onclick = () => {
+          state.searchType = btn.getAttribute("data-search-type");
+          renderAll();
+        };
+      });
+
+      container.querySelectorAll("[data-suggest-kw]").forEach(btn => {
+        btn.onclick = () => {
+          state.searchQuery = btn.getAttribute("data-suggest-kw");
+          renderAll();
+        };
+      });
+
+      const pulseReview = document.getElementById("pulse-go-review");
+      if (pulseReview) pulseReview.onclick = () => { state.activeTab = "review"; state.reviewDeck = ""; state.cardFlipped = false; state.reviewSubTab = "today"; renderAll(); };
+      const pulseTasks = document.getElementById("pulse-go-tasks");
+      if (pulseTasks) pulseTasks.onclick = () => { state.activeTab = "tasks"; renderAll(); };
+      const pulseInsights = document.getElementById("pulse-go-insights");
+      if (pulseInsights) pulseInsights.onclick = () => { openPushView("insights", null); };
+      const goLibs = document.getElementById("btn-search-go-libs");
+      if (goLibs) goLibs.onclick = () => { state.activeTab = "browse"; renderAll(); };
+
+      container.querySelectorAll("[data-open-unified]").forEach(card => {
+        card.onkeydown = event => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); card.click(); } };
+        card.onclick = () => {
+          const [kind, id] = card.getAttribute("data-open-unified").split(":");
+
+          const target = { doc: "doc-detail", task: "task-detail", card: "card-detail", journal: "journal-detail" }[kind];
+          if (target) openPushView(target, id);
+        };
+      });
+    }
+
+    /* ========================================================================
+       TAB 2: BROWSE (浏览目录 + 双轨「我的资料库」原位文件夹树与真层级钻取)
+       ======================================================================== */
+    function renderBrowseTab(container) {
+      const ossBadge = state.ossStatus === "os"
+        ? `<span class="m-receipt-pill m-receipt-os">已写入 OS</span>`
+        : `<span class="m-receipt-pill m-receipt-local">待上传 2 条</span>`;
+
+      container.innerHTML = `
+        <!-- Section 1: High-Frequency Creation & Personal Collections -->
+        <div class="m-section">
+          <div class="m-section-header">
+            <span class="m-section-title">创作与个人收集</span>
+            <button type="button" class="m-section-action" id="browse-quick-note">+ 记一条</button>
+          </div>
+          <div class="m-card">
+            <button type="button" class="m-list-row" id="browse-open-journals">
+              <div style="display:flex;align-items:center;gap:11px;">
+                <span style="width:32px;height:32px;border-radius:9px;background:rgba(16,185,129,0.12);color:#059669;display:flex;align-items:center;justify-content:center;">
+                  <i data-lucide="book-open" style="width:17px;height:17px;"></i>
+                </span>
+                <div>
+                  <div style="font-size:14px;font-weight:600;color:var(--m-ink);display:flex;align-items:center;gap:7px;">
+                    <span>日志 · 按天</span>
+                    ${ossBadge}
+                  </div>
+                  <div style="font-size:11.5px;color:var(--m-ink-3);margin-top:1px;">今日已记 2 条 · 支持多段语音补录与 OS 归档回执</div>
+                </div>
+              </div>
+              <i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--m-ink-3);"></i>
+            </button>
+
+            <button type="button" class="m-list-row" id="browse-open-reading">
+              <div style="display:flex;align-items:center;gap:11px;">
+                <span style="width:32px;height:32px;border-radius:9px;background:rgba(37,99,235,0.12);color:#2563EB;display:flex;align-items:center;justify-content:center;">
+                  <i data-lucide="bookmark" style="width:17px;height:17px;"></i>
+                </span>
+                <div>
+                  <div style="font-size:14px;font-weight:600;color:var(--m-ink);">阅读 · 稍后读</div>
+                  <div style="font-size:11.5px;color:var(--m-ink-3);margin-top:1px;">${DOCUMENTS.filter(d => d.type === "reading" || d.type === "pdf").length} 篇阅读资料</div>
+                </div>
+              </div>
+              <i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--m-ink-3);"></i>
+            </button>
+
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);border-top:0.5px solid var(--m-hairline);">
+              <button type="button" class="m-list-row" id="browse-open-favorites" style="border-bottom:none;border-right:0.5px solid var(--m-hairline);justify-content:center;padding:11px 8px;">
+                <div style="text-align:center;">
+                  <div style="font-size:13px;font-weight:600;color:var(--m-ink);">⭐ 收藏</div>
+                  <div style="font-size:11px;color:var(--m-ink-3);">${DOCUMENTS.filter(d => d.favorite).length} 项</div>
+                </div>
+              </button>
+              <button type="button" class="m-list-row" id="browse-open-history" style="border-bottom:none;border-right:0.5px solid var(--m-hairline);justify-content:center;padding:11px 8px;">
+                <div style="text-align:center;">
+                  <div style="font-size:13px;font-weight:600;color:var(--m-ink);">🕘 最近</div>
+                  <div style="font-size:11px;color:var(--m-ink-3);">${state.recentDocs.length} 项</div>
+                </div>
+              </button>
+              <button type="button" class="m-list-row" id="browse-open-tags" style="border-bottom:none;justify-content:center;padding:11px 8px;">
+                <div style="text-align:center;">
+                  <div style="font-size:13px;font-weight:600;color:var(--m-ink);">🏷️ 标签</div>
+                  <div style="font-size:11px;color:var(--m-ink-3);">36 个</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Redesigned Dual-Track "我的资料库" (True Folder Drill-Down + Scope Filter) -->
+        <div class="m-section">
+          <div class="m-section-header">
+            <span class="m-section-title">我的资料库 · 结构浏览与范围 (6)</span>
+            <button type="button" class="m-section-action" id="browse-open-scope-sheet">
+              ${isScopeFiltered() ? `已筛: ${escapeHtml(getScopeSummaryLabel())}` : "筛选搜索范围"}
+            </button>
+          </div>
+          <div class="m-card">
+            ${LIBRARIES.map(lib => {
+              const isExpanded = Boolean(state.expandedBrowseLibs[lib.id]);
+              const isInScope = state.selectedLibIds === null || state.selectedLibIds.includes(lib.id);
+              return `
+                <div>
+                  <div class="m-lib-row">
+                    <button type="button" class="m-lib-main" data-enter-lib="${lib.id}" title="点击进入 ${escapeHtml(lib.name)} 文件夹与文档目录">
+                      <span class="m-lib-icon" style="background:${lib.bg};color:${lib.color};">${escapeHtml(lib.badge)}</span>
+                      <div class="m-lib-info">
+                        <div class="m-lib-name">
+                          <span>${escapeHtml(lib.name)}</span>
+                          ${state.selectedLibIds !== null && isInScope ? `<span style="font-size:10px;padding:1px 5px;border-radius:4px;background:var(--m-accent-soft);color:var(--m-accent-ink);">已选范围</span>` : ""}
+                        </div>
+                        <div class="m-lib-meta">${escapeHtml(lib.syncText)} · ${lib.folders.length} 个一级文件夹</div>
+                      </div>
+                    </button>
+                    <div class="m-lib-right">
+                      <span class="m-lib-count">${lib.count}</span>
+                      <button
+                        type="button"
+                        class="m-lib-expand-btn ${isExpanded ? "is-open" : ""}"
+                        data-toggle-lib-tree="${lib.id}"
+                        aria-label="展开或收起 ${escapeHtml(lib.name)} 文件夹树"
+                        title="原位展开子文件夹快速直达"
+                      >
+                        <i data-lucide="${isExpanded ? "chevron-down" : "chevron-right"}" style="width:15px;height:15px;"></i>
+                      </button>
+                    </div>
+                  </div>
+                  ${isExpanded ? `
+                    <div class="m-folder-tree">
+                      <div style="display:flex;align-items:center;justify-content:space-between;padding:2px 8px 6px;font-size:11px;color:var(--m-ink-3);">
+                        <span>点按文件夹直接进入浏览</span>
+                        <button type="button" data-only-search-lib="${lib.id}" style="background:none;border:none;color:var(--m-accent-ink);font-weight:600;font-size:11px;cursor:pointer;">
+                          仅搜此库 →
+                        </button>
+                      </div>
+                      ${lib.folders.map(f => `
+                        <div class="m-folder-item" data-enter-folder="${lib.id}::${f.id}">
+                          <div style="display:flex;align-items:center;gap:7px;min-width:0;">
+                            <i data-lucide="folder" style="width:14px;height:14px;color:${lib.color};flex-shrink:0;"></i>
+                            <span class="m-truncate">${escapeHtml(f.name)}</span>
+                          </div>
+                          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+                            <span style="font-family:var(--m-font-mono);font-size:11px;color:var(--m-ink-3);">${f.count}</span>
+                            <i data-lucide="arrow-up-right" style="width:13px;height:13px;color:var(--m-ink-3);"></i>
+                          </div>
+                        </div>
+                      `).join("")}
+                    </div>
+                  ` : ""}
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </div>
+
+        <!-- Section 3: Discovery & Dual-Link Connections -->
+        <div class="m-section">
+          <div class="m-section-header">
+            <span class="m-section-title">发现与连接</span>
+          </div>
+          <div class="m-card">
+            <button type="button" class="m-list-row" id="browse-open-insights">
+              <div style="display:flex;align-items:center;gap:11px;">
+                <span style="width:32px;height:32px;border-radius:9px;background:rgba(139,92,246,0.12);color:#7C3AED;display:flex;align-items:center;justify-content:center;">
+                  <i data-lucide="sparkles" style="width:17px;height:17px;"></i>
+                </span>
+                <div>
+                  <div style="font-size:14px;font-weight:600;color:var(--m-ink);">洞察 · 发现与阶段回顾</div>
+                  <div style="font-size:11.5px;color:var(--m-ink-3);margin-top:1px;">2 条新跨库发现 · 可查看原文依据并一键转任务</div>
+                </div>
+              </div>
+              <i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--m-ink-3);"></i>
+            </button>
+
+            <button type="button" class="m-list-row" id="browse-open-connections">
+              <div style="display:flex;align-items:center;gap:11px;">
+                <span style="width:32px;height:32px;border-radius:9px;background:rgba(14,165,233,0.12);color:#0284C7;display:flex;align-items:center;justify-content:center;">
+                  <i data-lucide="activity" style="width:17px;height:17px;"></i>
+                </span>
+                <div>
+                  <div style="font-size:14px;font-weight:600;color:var(--m-ink);">连接总览 · 内容同步与云端助手</div>
+                  <div style="font-size:11.5px;color:var(--m-ink-3);margin-top:1px;">阿里云 OSS（${state.ossStatus === "os" ? "已写入 OS" : "待上传 2 条"}）· Linux VPS（${state.agentOfflineMode ? "离线" : state.vpsStatus === "busy" ? "运行中" : "在线"}）</div>
+                </div>
+              </div>
+              <i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--m-ink-3);"></i>
+            </button>
+          </div>
+        </div>
+      `;
+
+      // Bind Browse events
+      document.getElementById("browse-quick-note").onclick = () => openQuickCaptureSheet();
+      document.getElementById("browse-open-journals").onclick = () => openPushView("journals", null);
+      document.getElementById("browse-open-reading").onclick = () => openPushView("reading", null);
+      document.getElementById("browse-open-favorites").onclick = () => openPushView("favorites", null);
+      document.getElementById("browse-open-history").onclick = () => openPushView("favorites", { mode: "history" });
+      document.getElementById("browse-open-tags").onclick = () => openPushView("tags", null);
+      document.getElementById("browse-open-scope-sheet").onclick = () => openScopeFilterSheet();
+      document.getElementById("browse-open-insights").onclick = () => openPushView("insights", null);
+      document.getElementById("browse-open-connections").onclick = () => openConnectionSheet();
+
+      container.querySelectorAll("[data-toggle-lib-tree]").forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const libId = btn.getAttribute("data-toggle-lib-tree");
+          state.expandedBrowseLibs[libId] = !state.expandedBrowseLibs[libId];
+          renderAll();
+        };
+      });
+
+      container.querySelectorAll("[data-enter-lib]").forEach(btn => {
+        btn.onclick = () => {
+          const libId = btn.getAttribute("data-enter-lib");
+          openPushView("library-detail", { libId, folderId: null });
+        };
+      });
+
+      container.querySelectorAll("[data-enter-folder]").forEach(row => {
+        row.onclick = () => {
+          const [libId, folderId] = row.getAttribute("data-enter-folder").split("::");
+          openPushView("library-detail", { libId, folderId });
+        };
+      });
+
+      container.querySelectorAll("[data-only-search-lib]").forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const libId = btn.getAttribute("data-only-search-lib");
+          const lib = LIBRARIES.find(l => l.id === libId);
+          state.selectedLibIds = [libId];
+          state.selectedFolder = null;
+          state.activeTab = "search";
+          showToast(`已限定仅在「${lib ? lib.name : libId}」中搜索`);
+          renderAll();
+        };
+      });
+    }
+
+    /* ========================================================================
+       TAB 3: AGENTS (Local RAG 本机检索协同 + VPS Codex 单流对话 + 一键内联回执)
+       ======================================================================== */
+    function getDocKb(doc) {
+      return ((doc.title.length + doc.snippet.length + doc.content.join("").length) * 0.032 + 4.8).toFixed(1);
+    }
+
+    function autoRecallDocsForPrompt(promptText) {
+      const q = (promptText || "").toLowerCase();
+      const scored = DOCUMENTS.map(d => {
+        let s = 0;
+        const hay = `${d.title} ${d.snippet} ${d.libraryName} ${d.tags.join(" ")}`.toLowerCase();
+        if (q.includes("检索") && hay.includes("检索")) s += 5;
+        if (q.includes("vps") && hay.includes("vps")) s += 5;
+        if (q.includes("速记") || q.includes("同步")) { if (d.id === "doc-3") s += 5; }
+        if (q.includes("压测") || q.includes("飞书") || q.includes("p99")) { if (d.id === "doc-4") s += 6; }
+        if (q.includes("记忆") || q.includes("论文")) { if (d.id === "doc-6") s += 6; }
+        for (const ch of q.split(/\s+/)) {
+          if (ch.length >= 2 && hay.includes(ch)) s += 2;
+        }
+        return { doc: d, score: s };
+      }).sort((a, b) => b.score - a.score);
+      const top = scored.filter(x => x.score > 0).slice(0, 2).map(x => x.doc);
+      return top.length ? top : [DOCUMENTS[0], DOCUMENTS[3]];
+    }
+
+    function renderAgentsTab(container) {
+      const attachedDocs = DOCUMENTS.filter(d => state.attachedMaterialIds.includes(d.id));
+      const totalManualKb = attachedDocs.reduce((sum, d) => sum + parseFloat(getDocKb(d)), 0).toFixed(1);
+      const activeSess = state.agentSessions.find(s => s.id === state.activeSessionId) || state.agentSessions[0];
+
+      container.innerHTML = `
+        <!-- Top Bar: Session Switcher Pill + Right VPS Model/Quota Status Trigger -->
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:10px;">
+          <button type="button" id="btn-agent-session-sheet" class="m-scope-trigger" style="height:32px;padding:0 10px;font-size:12.5px;max-width:58%;">
+            <i data-lucide="message-square" style="width:13px;height:13px;color:var(--m-accent);flex-shrink:0;"></i>
+            <span class="m-truncate">${escapeHtml(activeSess.title)}</span>
+            ${activeSess.hasHandoff ? `<span style="font-size:10px;padding:1px 5px;border-radius:4px;background:var(--m-accent-soft);color:var(--m-accent-ink);flex-shrink:0;">桌面接力</span>` : ""}
+            <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
+          </button>
+
+          <div style="display:flex;align-items:center;gap:5px;">
+            <button type="button" id="btn-open-vps-model-sheet" class="m-scope-trigger" style="height:32px;padding:0 9px;font-size:11px;" title="配置 VPS 模型、推理强度、ChatGPT 订阅用量与弱网模拟">
+              <span class="m-dot ${state.agentOfflineMode ? "m-dot-amber" : "m-dot-green"}"></span>
+              <span>${state.agentOfflineMode ? "离线暂存中" : `${escapeHtml(state.agentModel)} · ${escapeHtml(state.agentEffort.split(" ")[0])}`}</span>
+              <i data-lucide="sliders-horizontal" style="width:11px;height:11px;"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- archived banner if archived -->
+        ${activeSess.archived ? `
+          <div class="m-applied-strip" style="margin-bottom:10px;">
+            <span>📁 此会话已归档（只读保护，消息与成果完整保留）</span>
+            <button type="button" id="btn-restore-archived-sess" style="background:none;border:none;color:var(--m-accent-ink);font-weight:700;font-size:11.5px;cursor:pointer;">恢复对话</button>
+          </div>
+        ` : ""}
+
+        <!-- Desktop Handoff Inline Pinned Card (桌面接力置顶成果卡，无需切换独立的成果 Tab!) -->
+        ${activeSess.hasHandoff ? `
+          <div class="m-handoff-banner">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <div style="display:flex;align-items:center;gap:7px;min-width:0;">
+                <span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--m-accent);color:#FFF;flex-shrink:0;">💻 桌面接力</span>
+                <span class="m-truncate" style="font-size:12.5px;font-weight:700;color:var(--m-ink);">《2026 Q4 检索压测与架构演进报告》</span>
+              </div>
+              <button type="button" id="btn-toggle-handoff" style="background:none;border:none;color:var(--m-accent-ink);font-size:11.5px;font-weight:600;cursor:pointer;white-space:nowrap;">
+                ${state.handoffExpanded ? "收起 ↑" : "展开报告 ↓"}
+              </button>
+            </div>
+            <div style="font-size:11.5px;color:var(--m-ink-2);margin-top:4px;">
+              桌面端推送的固定成果快照（含 1 份 18.4 KB Markdown 报告 + 1 张压测图表），手机端可直接阅读并针对报告继续向 VPS 追问。
+            </div>
+            ${state.handoffExpanded ? `
+              <div style="margin-top:9px;padding:9px 11px;border-radius:10px;background:var(--m-surface);border:0.5px solid var(--m-hairline-strong);font-size:12px;line-height:1.6;color:var(--m-ink);">
+                <div><strong>报告结论摘要：</strong>12.4 万块本地 FTS5 索引下，启用分库位图 + <code>path_prefix</code> 文件夹裁剪后，P99 延迟从 142ms 降至 <strong>14ms</strong>；手机端 Local RAG 自动召回 Top-3 片段耗时仅 11~15ms。</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">
+                  <button type="button" id="btn-handoff-cache" class="m-scope-trigger is-filtered" style="height:26px;font-size:11px;">
+                    <i data-lucide="download" style="width:11px;height:11px;"></i>
+                    <span>${state.handoffCached ? "✓ 附件已缓存本机 (SHA-256 已核对)" : "缓存报告与图表附件 (438 KB)"}</span>
+                  </button>
+                  <button type="button" id="btn-handoff-ask" class="m-scope-trigger" style="height:26px;font-size:11px;">
+                    💬 针对此报告追问
+                  </button>
+                </div>
+              </div>
+            ` : ""}
+          </div>
+        ` : ""}
+
+        <!-- Single-Stream Conversation Messages (材料胶囊 + 提问气泡 + 思维链 + 回答 + 一键原地成果回执) -->
+        <div style="display:flex;flex-direction:column;gap:14px;padding-bottom:16px;">
+          ${state.agentMessages.length ? "" : '<p class="flow-empty">此会话暂无消息</p>'}
+          ${state.agentMessages.map(msg => {
+            if (msg.role === "user") {
+              const turnDocs = (msg.recalledDocIds || []).map(id => DOCUMENTS.find(d => d.id === id)).filter(Boolean);
+              const modeBadge = msg.contextMode === "auto-rag"
+                ? `🔍 本机自动召回 ${turnDocs.length} 篇 (${msg.recalledKb || "14.2 KB"})`
+                : msg.contextMode === "manual"
+                ? `📎 手动指定 ${turnDocs.length} 篇 (${msg.recalledKb || "14.2 KB"})`
+                : `🌐 纯云端提问 (未附本机资料)`;
+              return `
+                <div style="display:flex;flex-direction:column;align-items:flex-end;">
+                  <!-- Compact Context / Material Pills attached to this turn -->
+                  <div class="m-turn-context-strip">
+                    <span class="m-turn-context-pill" style="color:var(--m-accent-ink);background:var(--m-accent-soft);border-color:var(--m-accent-border);">
+                      ${escapeHtml(modeBadge)}
+                    </span>
+                    ${turnDocs.map(d => `
+                      <button type="button" class="m-turn-context-pill" data-cite-doc="${d.id}" title="点击查看本轮发送的文档快照">
+                        <i data-lucide="file-text" style="width:10px;height:10px;color:var(--m-accent);"></i>
+                        <span>${escapeHtml(d.title.slice(0, 12))}...</span>
+                      </button>
+                    `).join("")}
+                  </div>
+                  <div class="m-chat-bubble-user">${escapeHtml(msg.text)}</div>
+                  ${msg.pendingOffline ? `
+                    <div style="display:flex;align-items:center;gap:8px;margin-top:5px;font-size:11px;color:#D97706;">
+                      <span>⏳ 离线暂存本机发件箱 (UUID 已锁定) · 联网后自动送达</span>
+                      <button type="button" data-withdraw-offline="${msg.id}" style="background:none;border:none;color:var(--m-red);font-weight:700;font-size:11px;cursor:pointer;">撤回</button>
+                    </div>
+                  ` : ""}
+                </div>
+              `;
+            }
+
+            const isCotOpen = Boolean(state.cotExpandedMap[msg.id]);
+            const isSavedNote = Boolean(state.savedNoteMsgIds[msg.id]);
+            const isConvertedTask = Boolean(state.convertedTaskMsgIds[msg.id]);
+
+            return `
+              <div class="m-card m-card-padded">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                  <span style="font-size:12px;font-weight:700;color:var(--m-ink);display:flex;align-items:center;gap:6px;">
+                    <span style="width:20px;height:20px;border-radius:6px;background:var(--m-accent-soft);color:var(--m-accent-ink);display:inline-flex;align-items:center;justify-content:center;font-size:11px;">✦</span>
+                    <span>VPS Codex · ${escapeHtml(state.agentModel)}</span>
+                  </span>
+                  <span style="font-size:10.5px;color:var(--m-ink-3);font-family:var(--m-font-mono);">${escapeHtml(msg.localRagSummary || "本机协同")} · ${msg.cotDuration || "1.8s"}</span>
+                </div>
+
+                <!-- Compact 1-Line Collapsible Local RAG + VPS Reasoning Timeline -->
+                ${msg.cotSteps ? `
+                  <div class="m-cot-card">
+                    <button type="button" class="m-cot-header" data-toggle-cot="${msg.id}">
+                      <span style="display:flex;align-items:center;gap:6px;min-width:0;">
+                        <i data-lucide="cpu" style="width:13px;height:13px;color:var(--m-accent);flex-shrink:0;"></i>
+                        <span class="m-truncate">${isCotOpen ? `检索与推理过程明细（${msg.cotSteps.length} 步 · ${msg.cotDuration}）` : `${escapeHtml(msg.cotSteps[0].text.slice(0, 28))}... (${msg.cotDuration})`}</span>
+                      </span>
+                      <i data-lucide="${isCotOpen ? "chevron-up" : "chevron-down"}" style="width:14px;height:14px;flex-shrink:0;"></i>
+                    </button>
+                    ${isCotOpen ? `
+                      <div class="m-cot-steps">
+                        ${msg.cotSteps.map((step, idx) => `
+                          <div class="m-cot-step">
+                            <span style="font-family:var(--m-font-mono);font-size:10.5px;color:var(--m-accent-ink);min-width:20px;">${idx + 1}.</span>
+                            <span style="flex:1;">${escapeHtml(step.text)}</span>
+                            <span style="font-family:var(--m-font-mono);font-size:10px;color:var(--m-ink-3);">${step.time}</span>
+                          </div>
+                        `).join("")}
+                      </div>
+                    ` : ""}
+                  </div>
+                ` : ""}
+
+                <!-- Assistant Formatted Markdown Body -->
+                <div style="font-size:13.5px;line-height:1.64;color:var(--m-ink);white-space:pre-line;margin-top:8px;">${escapeHtml(msg.text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")}</div>
+
+                <!-- Cited Local Documents Pills -->
+                ${msg.citations && msg.citations.length ? `
+                  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:9px;border-top:0.5px solid var(--m-hairline);">
+                    ${msg.citations.map((docId, idx) => {
+                      const d = DOCUMENTS.find(item => item.id === docId);
+                      if (!d) return "";
+                      return `
+                        <button type="button" data-cite-doc="${d.id}" style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:7px;background:var(--m-surface-subtle);border:0.5px solid var(--m-hairline-strong);font-size:11px;color:var(--m-ink-2);cursor:pointer;">
+                          <span style="font-weight:700;color:var(--m-accent);">[${idx + 1}]</span>
+                          <span>${escapeHtml(d.libraryName)} · ${escapeHtml(d.title.slice(0, 14))}...</span>
+                        </button>
+                      `;
+                    }).join("")}
+                  </div>
+                ` : ""}
+
+                <!-- 1-Tap Inline Outcome Receipt Bar (一键即存 + 原地变绿回执，无需切去独立的成果 Tab!) -->
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px;padding-top:9px;border-top:0.5px solid var(--m-hairline);">
+                  <button type="button" class="m-inline-receipt-btn ${isSavedNote ? "is-done" : ""}" data-agent-save-note="${msg.id}">
+                    <i data-lucide="${isSavedNote ? "check-circle-2" : "pen-line"}" style="width:12px;height:12px;"></i>
+                    <span>${isSavedNote ? "已存今日日志 · 查看 →" : "存为日志"}</span>
+                  </button>
+                  <button type="button" class="m-inline-receipt-btn ${isConvertedTask ? "is-done" : ""}" data-agent-to-task="${msg.id}">
+                    <i data-lucide="${isConvertedTask ? "check-circle-2" : "check-square"}" style="width:12px;height:12px;"></i>
+                    <span>${isConvertedTask ? "已转待办任务 · 查看 →" : "转为任务"}</span>
+                  </button>
+                  <button type="button" class="m-inline-receipt-btn" data-agent-copy="${msg.id}">
+                    <i data-lucide="copy" style="width:11px;height:11px;"></i>
+                    <span>复制</span>
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+
+        <!-- Sticky Bottom Composer Dock: 3-Mode Context Switcher (自动本机检索 / 手动指定 / 纯云端) -->
+        <div style="position:sticky;bottom:0;background:var(--m-glass-heavy);backdrop-filter:blur(18px);padding:9px 10px;border-radius:16px;border:0.5px solid var(--m-hairline-strong);box-shadow:var(--m-shadow-float);">
+          <!-- 3-Mode Context Bar -->
+          <div class="m-rag-mode-bar" role="tablist" aria-label="上下文协同模式">
+            <button type="button" class="m-rag-mode-btn ${state.agentContextMode === "auto-rag" ? "is-active" : ""}" data-rag-mode="auto-rag">
+              <span>🔍 自动关联本机资料</span>
+            </button>
+            <button type="button" class="m-rag-mode-btn ${state.agentContextMode === "manual" ? "is-active" : ""}" data-rag-mode="manual">
+              <span>📎 手动指定 (${attachedDocs.length})</span>
+            </button>
+            <button type="button" class="m-rag-mode-btn ${state.agentContextMode === "cloud-only" ? "is-active" : ""}" data-rag-mode="cloud-only">
+              <span>🌐 纯云端对话</span>
+            </button>
+          </div>
+
+          <!-- Context Mode Status & Quick Attachment Strip -->
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:7px;font-size:11px;color:var(--m-ink-2);">
+            ${state.agentContextMode === "auto-rag" ? `
+              <span class="m-truncate" style="color:var(--m-ink-2);">
+                ⚡ 提问时自动在手机本机检索 Top-K 片段发给 VPS（当前范围：<strong>${escapeHtml(getScopeSummaryLabel())}</strong>）
+              </span>
+              <button type="button" id="btn-open-material-picker" class="m-scope-trigger" style="height:23px;font-size:10.5px;padding:0 7px;">
+                + 照片/技能
+              </button>
+            ` : state.agentContextMode === "manual" ? `
+              <div style="display:flex;align-items:center;gap:5px;overflow-x:auto;flex:1;">
+                <button type="button" id="btn-open-material-picker" class="m-scope-trigger is-filtered" style="height:24px;font-size:11px;">
+                  + 选资料/照片 (${totalManualKb}/48 KB)
+                </button>
+                ${attachedDocs.map(d => `
+                  <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:6px;background:var(--m-surface-subtle);border:0.5px solid var(--m-hairline-strong);white-space:nowrap;font-size:10.5px;">
+                    <span>${escapeHtml(d.title.slice(0, 8))}..</span>
+                    <button type="button" data-remove-mat="${d.id}" style="background:none;border:none;color:var(--m-ink-3);cursor:pointer;padding:0;">×</button>
+                  </span>
+                `).join("")}
+              </div>
+            ` : `
+              <span class="m-truncate" style="color:var(--m-ink-3);">
+                🌐 不检索本机资料库，直接与个人 VPS Codex 纯云端对话
+              </span>
+              <button type="button" id="btn-open-material-picker" class="m-scope-trigger" style="height:23px;font-size:10.5px;padding:0 7px;">
+                + 照片/技能
+              </button>
+            `}
+          </div>
+
+          ${state.activeSkill ? `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px;margin-bottom:6px;border-radius:8px;background:var(--m-accent-soft);color:var(--m-accent-ink);font-size:11px;">
+              <span>✨ 已挂载技能：<strong>/${escapeHtml(state.activeSkill.name)}</strong>（${escapeHtml(state.activeSkill.title)} · 首次发送锁定版本）</span>
+              <button type="button" id="btn-clear-skill" style="background:none;border:none;color:var(--m-accent-ink);font-weight:700;cursor:pointer;">×</button>
+            </div>
+          ` : ""}
+
+          <form id="form-agent-send" style="display:flex;align-items:center;gap:7px;">
+            <input
+              type="text"
+              id="input-agent-prompt" value="${escapeHtml(state.promptDraft)}"
+              class="m-search-input"
+              placeholder="${activeSess.archived ? "已归档只读会话，点击上方恢复后可继续提问..." : state.agentContextMode === "auto-rag" ? "直接问任何关于你笔记的问题，手机自动检索喂给 VPS..." : "输入问题发往 VPS Codex..."}"
+              ${activeSess.archived ? "disabled" : ""}
+              style="background:var(--m-surface-subtle);padding:8px 11px;border-radius:11px;font-size:13px;"
+            />
+            <button type="submit" ${activeSess.archived ? "disabled" : ""} style="width:36px;height:36px;border-radius:11px;border:none;background:var(--m-accent);color:#FFF;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;" aria-label="发送消息">
+              <i data-lucide="arrow-up" style="width:16px;height:16px;"></i>
+            </button>
+          </form>
+        </div>
+      `;
+
+      // Bind Context Mode Switcher
+      container.querySelectorAll("[data-rag-mode]").forEach(btn => {
+        btn.onclick = () => {
+          const mode = btn.getAttribute("data-rag-mode");
+          state.agentContextMode = mode;
+          if (mode === "manual" && state.attachedMaterialIds.length === 0) {
+            openMaterialPickerSheet();
+          }
+          renderAll();
+        };
+      });
+
+      const restoreBtn = document.getElementById("btn-restore-archived-sess");
+      if (restoreBtn) {
+        restoreBtn.onclick = () => {
+          activeSess.archived = false;
+          showToast("已恢复云端会话，可继续提问");
+          renderAll();
+        };
+      }
+
+      const toggleHandoff = document.getElementById("btn-toggle-handoff");
+      if (toggleHandoff) {
+        toggleHandoff.onclick = () => {
+          state.handoffExpanded = !state.handoffExpanded;
+          renderAll();
+        };
+      }
+
+      const handoffCacheBtn = document.getElementById("btn-handoff-cache");
+      if (handoffCacheBtn) {
+        handoffCacheBtn.onclick = () => {
+          state.handoffCached = true;
+          showToast("已缓存桌面接力报告与图表副本（SHA-256 校验通过）");
+          renderAll();
+        };
+      }
+
+      const handoffAskBtn = document.getElementById("btn-handoff-ask");
+      if (handoffAskBtn) {
+        handoffAskBtn.onclick = () => {
+          const input = document.getElementById("input-agent-prompt");
+          if (input) {
+            state.promptDraft = input.value = "基于桌面接力的《Q4 检索压测报告》，移动端单文件夹裁剪还能怎么优化？";
+            input.focus();
+          }
+        };
+      }
+
+      const clearSkillBtn = document.getElementById("btn-clear-skill");
+      if (clearSkillBtn) {
+        clearSkillBtn.onclick = () => {
+          state.activeSkill = null;
+          renderAll();
+        };
+      }
+
+      container.querySelectorAll("[data-toggle-cot]").forEach(btn => {
+        btn.onclick = () => {
+          const msgId = btn.getAttribute("data-toggle-cot");
+          state.cotExpandedMap[msgId] = !state.cotExpandedMap[msgId];
+          renderAll();
+        };
+      });
+
+      container.querySelectorAll("[data-cite-doc]").forEach(btn => {
+        btn.onclick = () => openPushView("doc-detail", btn.getAttribute("data-cite-doc"));
+      });
+
+      // 1-Tap Inline Save to Journal Receipt (First click saves immediately and turns green; second click opens Journal view)
+      container.querySelectorAll("[data-agent-save-note]").forEach(btn => {
+        btn.onclick = () => {
+          const msgId = btn.getAttribute("data-agent-save-note");
+          if (state.savedNoteMsgIds[msgId]) {
+            openPushView("journal-detail", state.savedNoteMsgIds[msgId]);
+            return;
+          }
+          const msg = state.agentMessages.find(m => m.id === msgId);
+          state.savedNoteMsgIds[msgId] = crypto.randomUUID();
+          JOURNALS.unshift({
+            id: state.savedNoteMsgIds[msgId],
+            date: localDay(),
+            time: "刚刚",
+            receipt: "local",
+            receiptText: "已存本机 · 待上传",
+            tags: ["#VPS助手成果", "#架构思考"],
+            text: `【VPS Codex 归纳】${msg ? msg.text.replace(/\*\*/g, "") : ""}`,
+            voice: null,
+            attachments: []
+          });
+          showToast("✓ 已一键存至今日日志并入列 OSS（再次点击可直达查看）");
+          renderAll();
+        };
+      });
+
+      // 1-Tap Inline Convert to Task Receipt (First click creates task and turns green; second click jumps to Tasks tab)
+      container.querySelectorAll("[data-agent-to-task]").forEach(btn => {
+        btn.onclick = () => {
+          const msgId = btn.getAttribute("data-agent-to-task");
+          if (state.convertedTaskMsgIds[msgId]) {
+            openPushView("task-detail", state.convertedTaskMsgIds[msgId]);
+            return;
+          }
+          state.convertedTaskMsgIds[msgId] = crypto.randomUUID();
+          const message = state.agentMessages.find(m => m.id === msgId);
+          TASKS.unshift({
+            id: state.convertedTaskMsgIds[msgId],
+            title: "跟进：" + (message?.text || activeSess.title).replace(/\*/g, "").slice(0, 54),
+            done: false,
+            due: "今天",
+            priority: "高优",
+            sourceType: "agent",
+            sourceLabel: `来自：VPS 会话《${activeSess.title}》`,
+            docId: message?.citations?.[0] || null,
+            isLocal: true
+          });
+          showToast("✓ 已一键转为待办任务（再次点击可直达任务面板）");
+          renderAll();
+        };
+      });
+
+      container.querySelectorAll("[data-agent-copy]").forEach(btn => {
+        btn.onclick = () => showToast("已复制回答正文与引用出处");
+      });
+
+      container.querySelectorAll("[data-withdraw-offline]").forEach(btn => {
+        btn.onclick = () => {
+          const id = btn.getAttribute("data-withdraw-offline");
+          const target = state.agentMessages.find(m => m.id === id);
+          state.agentMessages = state.agentMessages.filter(m => m.id !== id);
+          renderAll();
+          if (target) {
+            const input = document.getElementById("input-agent-prompt");
+            if (input) { state.promptDraft = input.value = target.text; persist(); }
+          }
+          showToast("已从本机发件箱撤回，文字已放回输入框");
+        };
+      });
+
+      const matPickerBtn = document.getElementById("btn-open-material-picker");
+      if (matPickerBtn) matPickerBtn.onclick = () => openMaterialPickerSheet();
+
+      const vpsModelBtn = document.getElementById("btn-open-vps-model-sheet");
+      if (vpsModelBtn) vpsModelBtn.onclick = () => openVpsModelAndQuotaSheet();
+
+      const sessionBtn = document.getElementById("btn-agent-session-sheet");
+      if (sessionBtn) sessionBtn.onclick = () => openAgentSessionSheet();
+
+      const sendForm = document.getElementById("form-agent-send");
+      if (sendForm) {
+        sendForm.querySelector("input").oninput = e => { state.promptDraft = e.target.value; persist(); };
+        sendForm.onsubmit = (e) => {
+          e.preventDefault();
+          const input = document.getElementById("input-agent-prompt");
+          const val = input.value.trim();
+          if (!val || activeSess.archived) return;
+          state.promptDraft = "";
+          if (activeSess.title === "新会话") activeSess.title = val.slice(0, 24);
+          activeSess.updated = "刚刚";
+
+          let turnDocs = [];
+          if (state.agentContextMode === "auto-rag") {
+            turnDocs = autoRecallDocsForPrompt(val);
+          } else if (state.agentContextMode === "manual") {
+            turnDocs = [...attachedDocs];
+          }
+          const kbTotal = turnDocs.reduce((s, d) => s + parseFloat(getDocKb(d)), 0).toFixed(1);
+          const userMsgId = "u-" + Date.now();
+
+          if (state.agentOfflineMode) {
+            state.agentMessages.push({
+              id: userMsgId,
+              role: "user",
+              contextMode: state.agentContextMode,
+              recalledDocIds: turnDocs.map(d => d.id),
+              recalledKb: `${kbTotal} KB`,
+              text: val,
+              pendingOffline: true
+            });
+            showToast("当前处于弱网离线模拟：消息已存入本机发件箱，恢复网络后自动送达");
+            renderAll();
+            return;
+          }
+
+          const replyId = "a-" + Date.now();
+          state.cotExpandedMap[replyId] = false;
+          state.agentMessages.push({
+            id: userMsgId,
+            role: "user",
+            contextMode: state.agentContextMode,
+            recalledDocIds: turnDocs.map(d => d.id),
+            recalledKb: `${kbTotal} KB`,
+            text: val
+          });
+
+          const step1Text = state.agentContextMode === "auto-rag"
+            ? `📱 手机本机 FTS5 自动检索命中 ${turnDocs.length} 篇相关笔记 (${kbTotal} KB)：${turnDocs.map(d => `《${d.title.slice(0, 10)}..》`).join("、")}`
+            : state.agentContextMode === "manual"
+            ? `📎 附带用户手动勾选的 ${turnDocs.length} 篇资料快照 (${kbTotal} KB)`
+            : `🌐 纯云端模式：未附带本机资料片段，直接发往个人 Linux VPS`;
+
+          state.agentMessages.push({
+            id: replyId,
+            role: "assistant",
+            localRagSummary: state.agentContextMode === "auto-rag" ? `本机自动召回 ${turnDocs.length} 篇 (11ms)` : state.agentContextMode === "manual" ? `手动指定 ${turnDocs.length} 篇` : "纯云端推理",
+            cotSteps: [
+              { time: "11ms", text: step1Text },
+              { time: "0.9s", text: `☁️ VPS Codex (${state.agentModel} · ${state.agentEffort}) 结合上下文完成推理` }
+            ],
+            cotDuration: "1.1s",
+            text: `针对您的提问「**${val}**」：\n${turnDocs.length ? `手机端已通过 **${state.agentContextMode === "auto-rag" ? "本机 SQLite 自动检索" : "手动多选"}** 提取了 ${turnDocs.length} 篇相关片段（合计 ${kbTotal} KB）发往 VPS Codex。` : "已由个人 VPS Codex 直接完成云端推理。"}\n\n您可以直接点击下方 **[存为日志]** 或 **[转为任务]**，一键原地生成绿色回执，无需经过繁琐的多步确认弹窗。`,
+            citations: turnDocs.map(d => d.id)
+          });
+          renderAll();
+        };
+      }
+
+      container.querySelectorAll("[data-remove-mat]").forEach(btn => {
+        btn.onclick = () => {
+          const id = btn.getAttribute("data-remove-mat");
+          state.attachedMaterialIds = state.attachedMaterialIds.filter(item => item !== id);
+          renderAll();
+        };
+      });
+    }
+
+    /* ========================================================================
+       TAB 4: TASKS (任务闭环 · 来源快照回跳 · 完成与撤销)
+       ======================================================================== */
+    const taskViews = { focus: "今日聚焦", waiting: "等待跟进", all: "全部任务", done: "已完成" };
+    const sourceNames = { craft: "Craft", dida: "滴答清单", insight: "洞察", agent: "助手", local: "本机" };
+    function taskGroup(task) {
+      if (task.done) return "done";
+      if (task.waiting) return "waiting";
+      if (task.due.startsWith("今天") || task.due.startsWith("逾期")) return "due";
+      return task.planned ? "planned" : "later";
+    }
+    function taskList(task) { return task.list || task.sourceLabel.split(" / ").at(-1); }
+    function taskRow(task) {
+      const meta = task.waiting ? `等 ${task.waiting.who} · ${task.waiting.followUp || "未定回看日"}` :
+        [task.priority, task.due, taskList(task)].filter(Boolean).join(" · ");
+      return `<article class="task-row">
+        <button class="task-check" data-toggle-task="${task.id}" aria-label="${task.done ? "恢复待办" : "完成任务"}：${escapeHtml(task.title)}" aria-pressed="${task.done}"><span>${task.done ? "✓" : ""}</span></button>
+        <button class="task-open" data-task-detail="${task.id}"><strong>${escapeHtml(task.title)}</strong><small>${escapeHtml(meta)}</small></button>
+      </article>`;
+    }
+    function toggleTask(task) {
+      const before = task.done;
+      task.done = !before;
+      renderAll();
+      showToast(task.done ? "已在本机标记完成" : "已恢复为待办", () => { task.done = before; renderAll(); });
+    }
+
+    function renderTasksTab(container) {
+      const view = state.taskFilterStatus;
+      const filtered = TASKS.filter(t => (state.taskFilterSource === "all" || t.sourceType === state.taskFilterSource)
+        && (!state.taskListFilter || taskList(t) === state.taskListFilter));
+      const groups = view === "focus" ? [["due","到期承诺"], ["planned","今日计划"], ["waiting","等待跟进"]] :
+        [[view, taskViews[view]]];
+      const hasFilter = state.taskFilterSource !== "all" || state.taskListFilter;
+      container.innerHTML = `<div class="task-toolbar"><h2>${taskViews[view]}</h2><button class="flow-btn primary" id="btn-new-local-task">＋ 新建任务</button></div>
+        <nav class="task-switch" aria-label="任务视图">${Object.entries(taskViews).map(([key,label]) =>
+          `<button data-task-status="${key}" aria-pressed="${view === key}">${label}</button>`).join("")}</nav>
+        <button class="task-filter" id="task-filter">${hasFilter ? escapeHtml([sourceNames[state.taskFilterSource], state.taskListFilter].filter(Boolean).join(" · ")) : "全部来源与清单"} ▾</button>
+        ${groups.map(([key,label]) => {
+          const rows = filtered.filter(t => key === "all" || taskGroup(t) === key);
+          return `<section class="task-group"><h3>${label}<span>${rows.length}</span></h3>${rows.length ? rows.map(taskRow).join("") :
+            `<p class="flow-empty">${hasFilter ? "当前筛选下没有任务" : "暂无" + label}${hasFilter ? '<button class="text-btn" data-reset-task>清除筛选</button>' : ""}</p>`}</section>`;
+        }).join("")}`;
+      container.querySelector("#btn-new-local-task").onclick = () => openNewTaskSheet();
+      container.querySelector("#task-filter").onclick = openTaskFilter;
+      container.querySelectorAll("[data-task-status]").forEach(b => b.onclick = () => { state.taskFilterStatus = b.dataset.taskStatus; renderAll(); });
+      container.querySelectorAll("[data-task-detail]").forEach(b => b.onclick = () => openPushView("task-detail", b.dataset.taskDetail));
+      container.querySelectorAll("[data-toggle-task]").forEach(b => b.onclick = () => toggleTask(TASKS.find(t => t.id === b.dataset.toggleTask)));
+      container.querySelectorAll("[data-reset-task]").forEach(b => b.onclick = () => { state.taskFilterSource = "all"; state.taskListFilter = ""; renderAll(); });
+    }
+
+    function options(values, current) {
+      return values.map(([key,label]) => `<option value="${escapeHtml(key)}" ${key === current ? "selected" : ""}>${escapeHtml(label)}</option>`).join("");
+    }
+    function openTaskFilter() {
+      openSheet(box => {
+        const lists = [...new Set(TASKS.map(taskList))];
+        box.innerHTML = `<form class="flow-form"><h2>筛选任务</h2>
+          <label>来源<select name="source">${options([["all","全部来源"], ...Object.entries(sourceNames)], state.taskFilterSource)}</select></label>
+          <label>项目与清单<select name="list">${options([["","全部清单"], ...lists.map(l => [l,l])], state.taskListFilter || "")}</select></label>
+          <button class="flow-btn primary">应用筛选</button></form>`;
+        box.querySelector("form").onsubmit = e => { e.preventDefault(); const form = e.target.elements;
+          state.taskFilterSource = form.source.value; state.taskListFilter = form.list.value; closeSheet(); renderAll(); };
+      });
+    }
+
+    function detailHeader(header, title) {
+      header.innerHTML = `<button class="flow-back" aria-label="返回">‹ 返回</button><strong>${escapeHtml(title)}</strong><span></span>`;
+      header.querySelector("button").onclick = closePushView;
+    }
+    function renderTaskDetail(task, header, body) {
+      detailHeader(header, "任务详情");
+      const doc = DOCUMENTS.find(d => d.id === task.docId);
+      body.innerHTML = `<div class="flow-detail"><h2>${escapeHtml(task.title)}</h2>
+        <p>${escapeHtml(taskList(task))} · ${escapeHtml(task.priority)} · ${escapeHtml(task.due)}</p>
+        <div class="flow-actions"><button class="flow-btn" id="detail-done">${task.done ? "恢复待办" : "标记完成"}</button>
+        <button class="flow-btn" id="detail-plan" ${task.done ? "disabled" : ""}>${task.planned ? "移出今日计划" : "加入今日计划"}</button></div>
+        <h3>来源与依据</h3><p>${escapeHtml(task.sourceLabel)}</p>${doc ? `<button class="flow-btn" id="detail-source">查看原文 · ${escapeHtml(doc.title)}</button>` : ""}
+        <h3>等待跟进</h3><p>${task.waiting ? escapeHtml(task.waiting.who + " · " + (task.waiting.followUp || "未定回看日")) : "当前无需等待"}</p>
+        <div class="flow-actions"><button class="flow-btn" id="detail-wait">${task.waiting ? "修改等待" : "设置等待"}</button>${task.waiting ? '<button class="flow-btn" id="clear-wait">结束等待</button>' : ""}</div>
+        <h3>续办备注</h3>${(task.notes || []).map(note => `<p class="task-note">${escapeHtml(note)}</p>`).join("")}
+        <form class="flow-form inline-form"><label>补充进展<textarea name="note" rows="2" placeholder="下次接着做什么？">${escapeHtml(task.noteDraft || "")}</textarea></label>
+        <button class="flow-btn primary">保存备注</button></form><small>任务变更保存在本机原型中</small></div>`;
+      body.querySelector("#detail-done").onclick = () => toggleTask(task);
+      body.querySelector("#detail-plan").onclick = () => { task.planned = !task.planned; renderAll(); };
+      if (doc) body.querySelector("#detail-source").onclick = () => openPushView("doc-detail", doc.id);
+      const clear = body.querySelector("#clear-wait");
+      if (clear) clear.onclick = () => { task.waiting = null; renderAll(); };
+      body.querySelector("#detail-wait").onclick = () => openSheet(box => {
+        box.innerHTML = `<form class="flow-form"><h2>等待跟进</h2><label>等待谁或什么条件<input required name="who" value="${escapeHtml(task.waiting?.who || "")}"></label>
+          <label>何时回看（选填）<input name="followUp" value="${escapeHtml(task.waiting?.followUp || "")}"></label><button class="flow-btn primary">保存等待</button></form>`;
+        box.querySelector("form").onsubmit = e => { e.preventDefault(); const f = e.target.elements;
+          if (!f.who.value.trim()) return; task.waiting = { who: f.who.value.trim(), followUp: f.followUp.value.trim() }; closeSheet(); renderAll(); };
+      });
+      const form = body.querySelector("form");
+      form.elements.note.oninput = e => { task.noteDraft = e.target.value; persist(); };
+      form.onsubmit = e => { e.preventDefault(); const note = form.elements.note.value.trim(); if (!note) return;
+        (task.notes ||= []).push(note); task.noteDraft = ""; renderAll(); showToast("备注已存本机"); };
+    }
+
+    /* ========================================================================
+       TAB 5: REVIEW (闪卡专注复习 · 单手翻面 + 底部四列评分 · 牌库 · AI 收件箱)
+       ======================================================================== */
+    const intervals = [["重来","10 分钟",10], ["困难","1 天",1440], ["良好","4 天",5760], ["简单","9 天",12960]];
+    function cardSource(card) {
+      return card.docId ? `<button class="flow-btn" data-card-source="${escapeHtml(card.docId)}">查看出处 · ${escapeHtml(card.source)}</button>` : `<p>来源 · ${escapeHtml(card.source)}</p>`;
+    }
+    function renderReviewTab(container) {
+      const queue = dueCards(state.reviewDeck);
+      const card = queue[0];
+      const decks = [...new Set([...FLASHCARDS.map(c => c.deck), "UI 视觉与 Craft 交互细节"])];
+      const names = { today: "今日复习", decks: "牌库", inbox: "AI 收件箱" };
+      const counts = { today: dueCards().length, decks: decks.length, inbox: state.inboxCards.length };
+      container.innerHTML = `<nav class="task-switch" aria-label="复习视图">${Object.entries(names).map(([key,name]) =>
+        `<button data-review-subtab="${key}" aria-pressed="${state.reviewSubTab === key}">${name} (${counts[key]})</button>`).join("")}</nav>
+        ${state.reviewSubTab === "today" ? `<div class="task-toolbar"><h3>${escapeHtml(state.reviewDeck || "全部牌组")}</h3><small>剩余 ${queue.length} 张</small></div>
+          ${card ? `<section class="study-card"><small>${escapeHtml(card.deck)}</small>
+            <button id="flashcard-surface" aria-expanded="${state.cardFlipped}"><strong>${escapeHtml(card.front)}</strong>
+            <span>${state.cardFlipped ? escapeHtml(card.back) : "轻触查看答案"}</span></button>${cardSource(card)}</section>
+            ${state.cardFlipped ? `<div class="rate-row">${intervals.map(([name,time]) => `<button data-rate-card="${name}">${name}<small>${time}</small></button>`).join("")}</div>` : ""}` :
+            `<section class="flow-empty"><h3>${state.reviewDeck ? "本牌组已完成" : "今日复习已完成"}</h3><p>当前没有到期卡片</p><button class="flow-btn" data-review-subtab="decks">返回牌库</button></section>`}
+          ${state.reviewDeck ? '<button class="text-btn" data-start-deck="">查看全部到期卡</button>' : ""}` :
+          state.reviewSubTab === "decks" ? `<div class="task-group">${decks.map(deck => `<button class="deck-row" data-start-deck="${escapeHtml(deck)}"><strong>${escapeHtml(deck)}</strong><small>${dueCards(deck).length ? "待复习 " + dueCards(deck).length : "已完成"} ›</small></button>`).join("")}</div>` :
+          state.inboxCards.length ? state.inboxCards.map(c => `<article class="study-card"><small>${escapeHtml(c.source)}</small><h3>${escapeHtml(c.front)}</h3><p>${escapeHtml(c.back)}</p>
+            <div class="flow-actions"><button class="flow-btn primary" data-adopt-card="${c.id}">采用入库</button><button class="flow-btn" data-dismiss-card="${c.id}">跳过</button></div></article>`).join("") : '<p class="flow-empty">没有待确认的候选闪卡</p>'}`;
+      container.querySelectorAll("[data-review-subtab]").forEach(b => b.onclick = () => { state.reviewSubTab = b.dataset.reviewSubtab; state.cardFlipped = false; renderAll(); });
+      container.querySelectorAll("[data-start-deck]").forEach(b => b.onclick = () => { state.reviewDeck = b.dataset.startDeck; state.reviewSubTab = "today"; state.cardFlipped = false; renderAll(); });
+      const surface = container.querySelector("#flashcard-surface");
+      if (surface) surface.onclick = () => { state.cardFlipped = !state.cardFlipped; renderAll(); };
+      const source = container.querySelector("[data-card-source]");
+      if (source) source.onclick = () => openPushView("doc-detail", source.dataset.cardSource);
+      container.querySelectorAll("[data-rate-card]").forEach(b => b.onclick = () => {
+        if (!state.cardFlipped || dueCards(state.reviewDeck)[0]?.id !== card.id) return;
+        const [label,,minutes] = intervals.find(([name]) => name === b.dataset.rateCard);
+        state.reviewRatings[card.id] = { label, next: Date.now() + minutes * 60000 };
+        state.cardFlipped = false; renderAll(); showToast("已记录：" + label);
+      });
+      container.querySelectorAll("[data-adopt-card],[data-dismiss-card]").forEach(b => b.onclick = () => {
+        const item = state.inboxCards.find(c => c.id === (b.dataset.adoptCard || b.dataset.dismissCard));
+        if (!item) return;
+        state.inboxCards = state.inboxCards.filter(c => c.id !== item.id);
+        if (b.dataset.adoptCard && !FLASHCARDS.some(c => c.id === item.id)) FLASHCARDS.push({ ...item, deck: "从资料提炼" });
+        renderAll(); showToast(b.dataset.adoptCard ? "已加入牌库与今日队列" : "已跳过此候选");
+      });
+    }
+
+    /* ========================================================================
+       FULL-SCREEN PUSH VIEWS (True Library Folder Drill-Down, Doc Reader + Context Dock, Journals, Reading, Insights)
+       ======================================================================== */
+    // Each browser entry owns its filters and scroll positions. Mutations stay in the data store.
+    let sheetId = null, routeQueued = false, restoring = false;
+    const sheets = new Map();
+    const routeFields = ["activeTab","pushStack","collectionQuery","searchType","searchQuery","selectedLibIds","selectedFolder",
+      "taskFilterStatus","taskFilterSource","taskListFilter","selectedTagFilter","reviewDeck","reviewSubTab","cardFlipped"];
+    function snapshot() {
+      const route = Object.fromEntries(routeFields.map(k => [k,state[k]]));
+      return { ...route, hubMobile: 5, sheetId, mainY: document.querySelector("#m-main").scrollTop,
+        detailY: document.querySelector("#m-push-body").scrollTop };
+    }
+    function screenKey(route) {
+      return JSON.stringify([route.activeTab, route.pushStack, route.activeTab === "review" ? [route.reviewSubTab,route.reviewDeck] : null]);
+    }
+    function rememberRoute() {
+      const old = history.state, now = snapshot();
+      if (!restoring && old?.hubMobile && screenKey(old) === screenKey(now) && old.sheetId === now.sheetId)
+        history.replaceState(now,"");
+    }
+    function scheduleRoute() {
+      if (restoring || routeQueued) return;
+      routeQueued = true;
+      queueMicrotask(() => {
+        routeQueued = false;
+        const now = snapshot(), old = history.state;
+        if (old?.hubMobile !== 5) { history.replaceState(now,""); return; }
+        const changed = screenKey(old) !== screenKey(now);
+        if (changed) {
+          const sameTab = old.activeTab === now.activeTab;
+          if (!sameTab) document.querySelector("#m-main").scrollTop = now.mainY = 0;
+          if (now.pushStack.length) document.querySelector("#m-push-body").scrollTop = now.detailY = 0;
+        }
+        if (old.sheetId && !now.sheetId && !changed) { history.back(); return; }
+        if (old.sheetId && changed) history.replaceState(now,"");
+        else if (changed || old.sheetId !== now.sheetId) history.pushState(now,"");
+        else history.replaceState(now,"");
+      });
+    }
+    function restoreRoute(route, reload = false) {
+      if (route?.hubMobile !== 5) return;
+      restoring = true;
+      const sameScreen = screenKey(snapshot()) === screenKey(route);
+      hideSheet();
+      // A sheet may have just applied new filters to the same screen.
+      if (!sameScreen || reload) for (const k of routeFields) state[k] = structuredClone(route[k]);
+      renderAll();
+      if (route.sheetId && sheets.has(route.sheetId)) mountSheet(route.sheetId, sheets.get(route.sheetId));
+      else if (reload && route.sheetId?.startsWith("capture-")) openQuickCaptureSheet();
+      document.querySelector("#m-main").scrollTop = route.mainY;
+      document.querySelector("#m-push-body").scrollTop = route.detailY;
+      restoring = false;
+      history.replaceState(snapshot(),"");
+    }
+    window.addEventListener("popstate", e => restoreRoute(e.state));
+    document.addEventListener("click", rememberRoute, true);
+    window.addEventListener("pagehide", () => { endCaptureSegment(); rememberRoute(); });
+    function openPushView(type, payload, replaceTop = false) {
+      rememberRoute();
+      state.collectionQuery = "";
+      if (type === "doc-detail" && DOCUMENTS.some(d => d.id === payload))
+        state.recentDocs = [payload, ...state.recentDocs.filter(id => id !== payload)].slice(0,100);
+      if (replaceTop && state.pushStack.length) state.pushStack.pop();
+      state.pushStack.push({type,payload});
+      renderAll();
+    }
+    function closePushView() {
+      if (state.pushStack.length) history.back();
+    }
+
+    function renderPushLayer() {
+      const layer = document.getElementById("m-push-layer");
+      const header = document.getElementById("m-push-header");
+      const body = document.getElementById("m-push-body");
+      const footer = document.getElementById("m-push-footer");
+      const currentView = getActivePushView();
+
+      if (!currentView) {
+        layer.classList.remove("is-open");
+        layer.inert = true;
+        body.replaceChildren(); header.replaceChildren();
+        layer.setAttribute("aria-hidden", "true");
+        footer.innerHTML = "";
+        return;
+      }
+
+      layer.classList.add("is-open");
+      layer.inert = false;
+      layer.setAttribute("aria-hidden", "false");
+      footer.innerHTML = "";
+
+      const { type, payload } = currentView;
+
+      if (type === "task-detail") {
+        const task = TASKS.find(t => t.id === payload);
+        if (task) renderTaskDetail(task, header, body);
+        else { detailHeader(header, "任务详情"); body.textContent = "此任务已不可用"; }
+        return;
+      }
+
+      if (type === "card-detail") {
+        detailHeader(header, "闪卡详情");
+        const card = FLASHCARDS.find(c => c.id === payload);
+        body.innerHTML = card ? `<article class="flow-detail"><small>${escapeHtml(card.deck)}</small><h2>${escapeHtml(card.front)}</h2>
+          <p class="task-note">${escapeHtml(card.back)}</p>${cardSource(card)}</article>` : "此卡片已不可用";
+        const link = body.querySelector("[data-card-source]");
+        if (link) link.onclick = () => openPushView("doc-detail", card.docId);
+        return;
+      }
+      // 1. TRUE LIBRARY & FOLDER DRILL-DOWN BROWSER
+      if (type === "library-detail") {
+        const lib = LIBRARIES.find(l => l.id === payload.libId) || LIBRARIES[0];
+        const activeFolder = payload.folderId ? lib.folders.find(f => f.id === payload.folderId) : null;
+        const q = state.collectionQuery.trim().toLowerCase();
+        const docsInView = DOCUMENTS.filter(d => {
+          if (d.libraryId !== lib.id) return false;
+          if (activeFolder && d.folderId !== activeFolder.id) return false;
+          if (q && !`${d.title} ${d.snippet} ${d.folderPath}`.toLowerCase().includes(q)) return false;
+          return true;
+        });
+
+        header.innerHTML = `
+          <div class="m-header-left">
+            <button type="button" class="m-icon-btn" id="btn-push-back" aria-label="返回上一级">
+              <i data-lucide="arrow-left" style="width:18px;height:18px;"></i>
+            </button>
+            <div>
+              <div class="m-header-title" style="font-size:15.5px;">${escapeHtml(lib.name)}</div>
+              <div class="m-header-subtitle">${activeFolder ? `文件夹：${escapeHtml(activeFolder.name)}` : `全部 ${lib.folders.length} 个文件夹 · ${lib.count} 篇文档`}</div>
+            </div>
+          </div>
+          <div class="m-header-actions">
+            <button type="button" class="m-scope-trigger is-filtered" id="btn-search-this-scope">
+              <i data-lucide="search" style="width:12px;height:12px;"></i>
+              <span>${activeFolder ? "仅搜此夹" : "仅搜此库"}</span>
+            </button>
+          </div>
+        `;
+
+        body.innerHTML = `
+          <!-- In-Library / In-Folder Local Filter Box -->
+          <div class="m-search-box" style="height:38px;margin-bottom:8px;">
+            <i data-lucide="search" style="width:14px;height:14px;color:var(--m-ink-3);"></i>
+            <input type="search" id="push-collection-search" class="m-search-input" style="font-size:13px;" placeholder="在 ${escapeHtml(activeFolder ? activeFolder.name : lib.shortName)} 内过滤文档..." value="${escapeHtml(state.collectionQuery)}" />
+          </div>
+
+          <!-- Folder Breadcrumb Bar -->
+          <div class="m-chip-rail" style="padding-top:2px;margin-bottom:10px;">
+            <button type="button" class="m-chip ${!activeFolder ? "is-active" : ""}" data-switch-folder="">
+              <span>全部目录 (${lib.count})</span>
+            </button>
+            ${lib.folders.map(f => `
+              <button type="button" class="m-chip ${activeFolder && activeFolder.id === f.id ? "is-active" : ""}" data-switch-folder="${f.id}">
+                <i data-lucide="folder" style="width:12px;height:12px;"></i>
+                <span>${escapeHtml(f.name)}</span>
+                <span class="m-chip-count">${f.count}</span>
+              </button>
+            `).join("")}
+          </div>
+
+          <!-- Subfolders Card (When at Root of Library) -->
+          ${!activeFolder && !q ? `
+            <div class="m-section">
+              <div class="m-section-header">
+                <span class="m-section-title">文件夹层级 (${lib.folders.length})</span>
+              </div>
+              <div class="m-card">
+                ${lib.folders.map(f => `
+                  <button type="button" class="m-list-row" data-drill-folder="${f.id}">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                      <i data-lucide="folder" style="width:17px;height:17px;color:${lib.color};"></i>
+                      <div>
+                        <div style="font-size:13.5px;font-weight:600;color:var(--m-ink);">${escapeHtml(f.name)}</div>
+                        ${f.children && f.children.length ? `<div style="font-size:11px;color:var(--m-ink-3);">包含：${escapeHtml(f.children.join(" · "))}</div>` : ""}
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                      <span style="font-family:var(--m-font-mono);font-size:11.5px;color:var(--m-ink-3);">${f.count}</span>
+                      <i data-lucide="chevron-right" style="width:15px;height:15px;color:var(--m-ink-3);"></i>
+                    </div>
+                  </button>
+                `).join("")}
+              </div>
+            </div>
+          ` : ""}
+
+          <!-- Documents List in Current Library/Folder -->
+          <div class="m-section">
+            <div class="m-section-header">
+              <span class="m-section-title">${activeFolder ? `${escapeHtml(activeFolder.name)} 下的文档` : "最新同步文档"} (${docsInView.length})</span>
+            </div>
+            ${docsInView.map(doc => `
+              <article class="m-result-card" data-push-open-doc="${doc.id}">
+                <div class="m-result-top">
+                  <span class="m-source-badge">📁 ${escapeHtml(doc.folderPath)}</span>
+                  <span style="font-size:11px;color:var(--m-ink-3);">${escapeHtml(doc.date)}</span>
+                </div>
+                <div class="m-result-title">${highlightText(doc.title, state.collectionQuery)}</div>
+                <div class="m-result-snippet">${highlightText(doc.snippet, state.collectionQuery)}</div>
+              </article>
+            `).join("")}
+          </div>
+        `;
+
+        document.getElementById("btn-push-back").onclick = closePushView;
+
+        const colInput = document.getElementById("push-collection-search");
+        colInput.oninput = (e) => {
+          state.collectionQuery = e.target.value;
+          const pos = e.target.selectionStart;
+          renderPushLayer();
+          if (window.lucide) window.lucide.createIcons();
+          const next = document.getElementById("push-collection-search");
+          if (next) { next.focus(); next.setSelectionRange(pos, pos); }
+        };
+
+        document.getElementById("btn-search-this-scope").onclick = () => {
+          if (activeFolder) {
+            state.selectedLibIds = [lib.id];
+            state.selectedFolder = { libId: lib.id, folderId: activeFolder.id, name: activeFolder.name, libName: lib.shortName };
+          } else {
+            state.selectedLibIds = [lib.id];
+            state.selectedFolder = null;
+          }
+          state.pushStack = [];
+          state.activeTab = "search";
+          showToast(`已限定搜索范围：${getScopeSummaryLabel()}`);
+          renderAll();
+        };
+
+        body.querySelectorAll("[data-switch-folder]").forEach(btn => {
+          btn.onclick = () => {
+            const fId = btn.getAttribute("data-switch-folder") || null;
+            openPushView("library-detail", { libId: lib.id, folderId: fId }, true);
+          };
+        });
+
+        body.querySelectorAll("[data-drill-folder]").forEach(btn => {
+          btn.onclick = () => {
+            openPushView("library-detail", { libId: lib.id, folderId: btn.getAttribute("data-drill-folder") }, true);
+          };
+        });
+
+        body.querySelectorAll("[data-push-open-doc]").forEach(card => {
+          card.onclick = () => openPushView("doc-detail", card.getAttribute("data-push-open-doc"));
+        });
+        return;
+      }
+
+      // 2. DOCUMENT / ARTICLE DETAIL + 4-BUTTON CONTEXT ACTION DOCK
+      if (type === "doc-detail") {
+        const doc = DOCUMENTS.find(d => d.id === payload);
+        if (!doc) { detailHeader(header, "资料详情"); body.textContent = "原文已不可用"; return; }
+        header.innerHTML = `
+          <div class="m-header-left">
+            <button type="button" class="m-icon-btn" id="btn-push-back" aria-label="返回">
+              <i data-lucide="arrow-left" style="width:18px;height:18px;"></i>
+            </button>
+            <div>
+              <div class="m-header-title" style="font-size:14.5px;">${escapeHtml(doc.libraryName)}</div>
+              <div class="m-header-subtitle">${escapeHtml(doc.folderPath)} · ${escapeHtml(doc.date)}</div>
+            </div>
+          </div>
+          <div class="m-header-actions">
+            <button type="button" class="m-scope-trigger" id="btn-doc-fontsize" title="切换阅读正文字号 (17px / 19px)">
+              <span>${state.readingLargeFont ? "A-" : "A+"}</span>
+            </button>
+            <button type="button" class="m-icon-btn" id="btn-doc-fav" aria-label="收藏文档">
+              <i data-lucide="star" style="width:17px;height:17px;color:${doc.favorite ? "#F59E0B" : "var(--m-ink-3)"};"></i>
+            </button>
+          </div>
+        `;
+
+        body.innerHTML = `
+          <article class="m-card m-card-padded" style="padding:18px 16px;">
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+              <span class="m-source-badge">${escapeHtml(doc.typeLabel)}</span>
+              ${doc.tags.map(t => `<span style="font-size:11px;color:var(--m-accent-ink);background:var(--m-accent-soft);padding:2px 7px;border-radius:6px;">${escapeHtml(t)}</span>`).join("")}
+            </div>
+            <h1 style="font-size:18px;font-weight:700;line-height:1.45;color:var(--m-ink);margin:0 0 12px;">${escapeHtml(doc.title)}</h1>
+            <div style="padding:10px 12px;border-radius:10px;background:var(--m-surface-subtle);border-left:3px solid var(--m-accent);font-size:13px;line-height:1.6;color:var(--m-ink-2);margin-bottom:14px;">
+              <strong>核心摘要：</strong>${escapeHtml(doc.snippet)}
+            </div>
+            <div class="m-doc-prose" style="display:flex;flex-direction:column;gap:12px;font-size:${state.readingLargeFont ? "18px" : "15.5px"};line-height:1.78;color:var(--m-ink);">
+              ${doc.content.map(p => `<p style="margin:0;">${escapeHtml(p)}</p>`).join("")}
+            </div>
+          </article>
+        `;
+
+        footer.innerHTML = `
+          <div class="m-context-dock">
+            <button type="button" class="m-context-btn" id="ctx-ask-agent">
+              <i data-lucide="sparkles" style="width:13px;height:13px;color:var(--m-accent);"></i>
+              <span>问助手</span>
+            </button>
+            <button type="button" class="m-context-btn" id="ctx-note-idea">
+              <i data-lucide="pen-line" style="width:13px;height:13px;color:#059669;"></i>
+              <span>记想法</span>
+            </button>
+            <button type="button" class="m-context-btn" id="ctx-create-task">
+              <i data-lucide="check-square" style="width:13px;height:13px;color:#D97706;"></i>
+              <span>转任务</span>
+            </button>
+            <button type="button" class="m-context-btn" id="ctx-make-card">
+              <i data-lucide="layers" style="width:13px;height:13px;color:#7C3AED;"></i>
+              <span>提炼卡</span>
+            </button>
+          </div>
+        `;
+
+        document.getElementById("btn-push-back").onclick = () => closePushView();
+        document.getElementById("btn-doc-fontsize").onclick = () => {
+          state.readingLargeFont = !state.readingLargeFont;
+          renderPushLayer();
+          if (window.lucide) window.lucide.createIcons();
+        };
+        document.getElementById("btn-doc-fav").onclick = () => {
+          doc.favorite = !doc.favorite;
+          showToast(doc.favorite ? "已加入收藏夹" : "已取消收藏");
+          renderAll();
+        };
+
+        document.getElementById("ctx-ask-agent").onclick = () => {
+          if (!state.attachedMaterialIds.includes(doc.id)) {
+            state.attachedMaterialIds.push(doc.id);
+          }
+          state.pushStack = [];
+          state.activeTab = "agents";
+          state.agentContextMode = "manual";
+          showToast(`已将《${doc.title.slice(0, 12)}...》带入助手材料草稿`);
+          renderAll();
+        };
+
+        document.getElementById("ctx-note-idea").onclick = () => {
+          state.captureQuote = { docId: doc.id, title: doc.title, snippet: doc.snippet };
+          openQuickCaptureSheet();
+        };
+
+        document.getElementById("ctx-create-task").onclick = () => openNewTaskSheet(doc);
+
+        document.getElementById("ctx-make-card").onclick = () => {
+          state.inboxCards.unshift({
+            id: "ib-" + Date.now(),
+            front: `《${doc.title.slice(0, 16)}...》的核心要点是什么？`,
+            back: doc.snippet,
+            docId: doc.id,
+            source: `${doc.libraryName} / ${doc.folderPath}`
+          });
+          persist(); showToast("已送入闪卡 AI 收件箱");
+        };
+        return;
+      }
+
+      // 3. MOBILE JOURNAL STUDIO (日志 · 按天 + 独立搜索 + 五行折叠 + 语音补录 + 三阶段回执)
+      if (type === "journals" || type === "journal-detail") {
+        const q = state.collectionQuery.trim().toLowerCase();
+        const filteredJournals = type === "journal-detail" ? JOURNALS.filter(j => j.id === payload) : JOURNALS.filter(j => !q || `${j.text} ${j.tags.join(" ")} ${j.date}`.toLowerCase().includes(q));
+
+        header.innerHTML = `
+          <div class="m-header-left">
+            <button type="button" class="m-icon-btn" id="btn-push-back"><i data-lucide="arrow-left" style="width:18px;height:18px;"></i></button>
+            <div>
+              <div class="m-header-title" style="font-size:15.5px;">${type === "journal-detail" ? "日志详情" : "日志 · 按天"}</div>
+              <div class="m-header-subtitle">本机速记与 Obsidian 日记统一时间线</div>
+            </div>
+          </div>
+          <div class="m-header-actions">
+            <button type="button" class="m-scope-trigger is-filtered" id="btn-journal-new">+ 记一条</button>
+          </div>
+        `;
+
+        body.innerHTML = `
+          <div class="m-search-box" style="height:38px;margin-bottom:10px;${type === "journal-detail" ? "display:none" : ""}">
+            <i data-lucide="search" style="width:14px;height:14px;color:var(--m-ink-3);"></i>
+            <input type="search" id="push-collection-search" class="m-search-input" style="font-size:13px;" placeholder="搜索日志正文、标签或日期..." value="${escapeHtml(state.collectionQuery)}" />
+          </div>
+          ${filteredJournals.map(j => {
+            const pillClass = j.receipt === "os" ? "m-receipt-os" : j.receipt === "cloud" ? "m-receipt-cloud" : "m-receipt-local";
+            const isExpanded = type === "journal-detail" || Boolean(state.expandedJournals[j.id]);
+            const isLong = j.text.length > 88;
+            return `
+              <article class="m-result-card">
+                <div class="m-result-top">
+                  <span style="font-size:12px;font-weight:700;color:var(--m-ink);">${escapeHtml(j.date)} · ${escapeHtml(j.time)}</span>
+                  <span class="m-receipt-pill ${pillClass}">${escapeHtml(j.receiptText)}</span>
+                </div>
+                <div class="${!isExpanded && isLong ? "m-clamp-5" : ""}" style="font-size:13.5px;line-height:1.65;color:var(--m-ink);margin:6px 0 6px;">
+                  ${highlightText(j.text, state.collectionQuery)}
+                </div>
+                ${isLong && type !== "journal-detail" ? `
+                  <button type="button" data-toggle-journal-expand="${j.id}" style="background:none;border:none;color:var(--m-accent-ink);font-size:11.5px;font-weight:600;padding:0 0 6px;cursor:pointer;">
+                    ${isExpanded ? "收起全文 ↑" : "展开全文 ↓"}
+                  </button>
+                ` : ""}
+                ${j.quote ? `<p>关联原文：<button class="text-btn" data-journal-doc="${escapeHtml(j.quote.docId)}">${escapeHtml(j.quote.title)}</button></p>` : ""}
+                ${(j.segments || []).map((v,i) => `<p>模拟语音 ${i+1} · ${v.seconds} 秒</p>`).join("")}
+                ${j.simulatedSync && j.receipt !== "os" ? `<button class="flow-btn" data-journal-receipt="${j.id}">${j.receipt === "failed" ? "重试" : "模拟同步"}</button>` : ""}
+                ${j.voice ? `
+                  <div style="padding:8px 10px;border-radius:10px;background:var(--m-surface-subtle);border:0.5px solid var(--m-hairline-strong);margin-bottom:8px;font-size:12px;color:var(--m-ink-2);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                      <span style="font-weight:600;color:var(--m-accent-ink);display:flex;align-items:center;gap:5px;">
+                        <i data-lucide="mic" style="width:13px;height:13px;"></i> 语音附件 · ${j.voice.duration}
+                      </span>
+                      <span style="font-family:var(--m-font-mono);font-size:10.5px;color:var(--m-ink-3);">▂▄▆▃▅▇▄▂</span>
+                    </div>
+                    <div style="font-size:11.5px;color:var(--m-ink-2);">${escapeHtml(j.voice.transcript)}</div>
+                  </div>
+                ` : ""}
+                ${j.attachments && j.attachments.length ? `
+                  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+                    ${j.attachments.map(att => `
+                      <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:7px;background:var(--m-surface-subtle);border:0.5px solid var(--m-hairline-strong);color:var(--m-ink-2);">
+                        ${typeof att === "string" ? escapeHtml(att) : `<img class="journal-photo" data-photo="${att.id}" alt="${escapeHtml(att.name)}">${escapeHtml(att.name)}`}
+                      </span>
+                    `).join("")}
+                  </div>
+                ` : ""}
+                <div style="display:flex;gap:6px;">
+                  ${j.tags.map(t => `<span style="font-size:11px;color:var(--m-accent-ink);background:var(--m-accent-soft);padding:2px 7px;border-radius:6px;">${escapeHtml(t)}</span>`).join("")}
+                </div>
+              </article>
+            `;
+          }).join("")}
+        `;
+
+        document.getElementById("btn-push-back").onclick = () => closePushView();
+        body.querySelectorAll("[data-photo]").forEach(img => displayPhoto(img,img.dataset.photo));
+        body.querySelectorAll("[data-journal-doc]").forEach(b => b.onclick = () => openPushView("doc-detail",b.dataset.journalDoc));
+        body.querySelectorAll("[data-journal-receipt]").forEach(b => b.onclick = () => openReceiptSheet(JOURNALS.find(j => j.id === b.dataset.journalReceipt)));
+        document.getElementById("btn-journal-new").onclick = () => openQuickCaptureSheet();
+        const colInput = document.getElementById("push-collection-search");
+        colInput.oninput = (e) => {
+          state.collectionQuery = e.target.value;
+          const pos = e.target.selectionStart;
+          renderPushLayer();
+          if (window.lucide) window.lucide.createIcons();
+          const next = document.getElementById("push-collection-search");
+          if (next) { next.focus(); next.setSelectionRange(pos, pos); }
+        };
+        body.querySelectorAll("[data-toggle-journal-expand]").forEach(btn => {
+          btn.onclick = () => {
+            const id = btn.getAttribute("data-toggle-journal-expand");
+            state.expandedJournals[id] = !state.expandedJournals[id];
+            renderPushLayer();
+          };
+        });
+        return;
+      }
+
+      // 4. INSIGHTS (洞察 · 依据文档与一键转任务)
+      if (type === "insights") {
+        header.innerHTML = `
+          <div class="m-header-left">
+            <button type="button" class="m-icon-btn" id="btn-push-back"><i data-lucide="arrow-left" style="width:18px;height:18px;"></i></button>
+            <div>
+              <div class="m-header-title" style="font-size:15.5px;">洞察 · 发现与阶段回顾</div>
+              <div class="m-header-subtitle">每一条结论均附带可回溯的本地原文依据</div>
+            </div>
+          </div>
+        `;
+
+        body.innerHTML = `
+          ${INSIGHTS.map(ins => `
+            <article class="m-result-card">
+              <div class="m-result-top">
+                <span class="m-source-badge" style="color:#7C3AED;">✦ ${escapeHtml(ins.category)}</span>
+                <span style="font-size:11px;color:var(--m-ink-3);">${escapeHtml(ins.date)}</span>
+              </div>
+              <div class="m-result-title">${escapeHtml(ins.title)}</div>
+              <div style="font-size:12.5px;line-height:1.6;color:var(--m-ink-2);margin:6px 0 10px;">${escapeHtml(ins.summary)}</div>
+              <div style="padding-top:8px;border-top:0.5px solid var(--m-hairline);display:flex;flex-direction:column;gap:6px;">
+                <span style="font-size:11px;font-weight:600;color:var(--m-ink-3);">原文依据 (${ins.evidenceDocs.length})：</span>
+                ${ins.evidenceDocs.map(docId => {
+                  const d = DOCUMENTS.find(item => item.id === docId);
+                  if (!d) return "";
+                  return `
+                    <button type="button" data-ins-doc="${d.id}" style="text-align:left;padding:6px 9px;border-radius:8px;background:var(--m-surface-subtle);border:0.5px solid var(--m-hairline);font-size:11.5px;color:var(--m-ink);cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+                      <span class="m-truncate">📄 ${escapeHtml(d.title)}</span>
+                      <i data-lucide="chevron-right" style="width:13px;height:13px;flex-shrink:0;"></i>
+                    </button>
+                  `;
+                }).join("")}
+              </div>
+              <div style="margin-top:10px;display:flex;justify-content:flex-end;">
+                <button type="button" class="m-scope-trigger is-filtered" data-ins-to-task="${ins.id}">
+                  ${ins.convertedTask ? "✓ 已建立关联任务（点击查看）" : "+ 转化为待办任务"}
+                </button>
+              </div>
+            </article>
+          `).join("")}
+        `;
+
+        document.getElementById("btn-push-back").onclick = () => closePushView();
+        body.querySelectorAll("[data-ins-doc]").forEach(btn => {
+          btn.onclick = () => openPushView("doc-detail", btn.getAttribute("data-ins-doc"));
+        });
+        body.querySelectorAll("[data-ins-to-task]").forEach(btn => {
+          btn.onclick = () => {
+            const ins = INSIGHTS.find(i => i.id === btn.getAttribute("data-ins-to-task"));
+            if (ins && !ins.convertedTask) {
+              ins.convertedTask = crypto.randomUUID();
+              TASKS.unshift({
+                id: ins.convertedTask,
+                title: ins.title,
+                done: false,
+                due: "本周",
+                priority: "中优",
+                sourceType: "insight",
+                sourceLabel: "来自：洞察发现",
+                docId: ins.evidenceDocs[0],
+                isLocal: true
+              });
+              showToast("已从洞察创建关联任务（幂等防重）");
+              renderAll();
+            } else {
+              openPushView("task-detail", ins.convertedTask);
+            }
+          };
+        });
+        return;
+      }
+
+      // 5. READING / FAVORITES / TAGS COLLECTION VIEW (In-Collection Local Search & Tag Filtering!)
+      const titleMap = {
+        reading: "阅读 · 稍后读",
+        favorites: payload && payload.mode === "history" ? "最近浏览" : "我的收藏",
+        tags: "标签目录与过滤"
+      };
+      header.innerHTML = `
+        <div class="m-header-left">
+          <button type="button" class="m-icon-btn" id="btn-push-back"><i data-lucide="arrow-left" style="width:18px;height:18px;"></i></button>
+          <div>
+            <div class="m-header-title" style="font-size:15.5px;">${titleMap[type] || "集合浏览"}</div>
+            <div class="m-header-subtitle">当前集合内独立过滤 · 输入不跳回全局搜索</div>
+          </div>
+        </div>
+      `;
+
+      const allTags = Array.from(new Set(DOCUMENTS.flatMap(d => d.tags)));
+      const q = state.collectionQuery.trim().toLowerCase();
+
+      const browsingHistory = type === "favorites" && payload?.mode === "history";
+      const candidates = browsingHistory ? state.recentDocs.map(id => DOCUMENTS.find(d => d.id === id)).filter(Boolean) : DOCUMENTS;
+      const listDocs = candidates.filter(d => {
+        if (type === "reading" && d.type !== "reading" && d.type !== "pdf") return false;
+        if (type === "favorites" && !browsingHistory && !d.favorite) return false;
+        if (type === "tags" && state.selectedTagFilter && !d.tags.includes(state.selectedTagFilter)) return false;
+        if (q && !`${d.title} ${d.snippet} ${d.tags.join(" ")}`.toLowerCase().includes(q)) return false;
+        return true;
+      });
+
+      body.innerHTML = `
+        <div class="m-search-box" style="height:38px;margin-bottom:8px;">
+          <i data-lucide="search" style="width:14px;height:14px;color:var(--m-ink-3);"></i>
+          <input type="search" id="push-collection-search" class="m-search-input" style="font-size:13px;" placeholder="在${titleMap[type] || "当前集合"}内搜索..." value="${escapeHtml(state.collectionQuery)}" />
+        </div>
+
+        ${type === "tags" ? `
+          <div class="m-chip-rail" style="margin-bottom:8px;">
+            <button type="button" class="m-chip ${!state.selectedTagFilter ? "is-active" : ""}" data-pick-tag="">全部标签 (${allTags.length})</button>
+            ${allTags.map(tag => `
+              <button type="button" class="m-chip ${state.selectedTagFilter === tag ? "is-active" : ""}" data-pick-tag="${escapeHtml(tag)}">${escapeHtml(tag)}</button>
+            `).join("")}
+          </div>
+        ` : ""}
+
+        ${listDocs.length ? "" : '<p class="flow-empty">暂无符合条件的内容</p>'}
+        ${listDocs.map(doc => `
+          <article class="m-result-card" data-push-open-doc="${doc.id}">
+            <div class="m-result-top">
+              <span class="m-source-badge">${escapeHtml(doc.libraryName)}</span>
+              <span style="font-size:11px;color:var(--m-ink-3);">${escapeHtml(doc.date)}</span>
+            </div>
+            <div class="m-result-title">${highlightText(doc.title, state.collectionQuery)}</div>
+            <div class="m-result-snippet">${highlightText(doc.snippet, state.collectionQuery)}</div>
+          </article>
+        `).join("")}
+      `;
+
+      document.getElementById("btn-push-back").onclick = () => closePushView();
+      const colInput = document.getElementById("push-collection-search");
+      colInput.oninput = (e) => {
+        state.collectionQuery = e.target.value;
+        const pos = e.target.selectionStart;
+        renderPushLayer();
+        if (window.lucide) window.lucide.createIcons();
+        const next = document.getElementById("push-collection-search");
+        if (next) { next.focus(); next.setSelectionRange(pos, pos); }
+      };
+      body.querySelectorAll("[data-pick-tag]").forEach(btn => {
+        btn.onclick = () => {
+          state.selectedTagFilter = btn.getAttribute("data-pick-tag") || null;
+          renderPushLayer();
+        };
+      });
+      body.querySelectorAll("[data-push-open-doc]").forEach(card => {
+        card.onclick = () => openPushView("doc-detail", card.getAttribute("data-push-open-doc"));
+      });
+    }
+
+    /* ========================================================================
+       SPRING BOTTOM SHEETS (Scope Filter, Flomo Quick Capture, Dual Connection Status, Material Picker)
+       ======================================================================== */
+    function openSheet(htmlBuilder, name = "sheet") {
+      rememberRoute();
+      const id = name + "-" + crypto.randomUUID();
+      sheets.set(id,htmlBuilder);
+      mountSheet(id, htmlBuilder);
+      scheduleRoute();
+    }
+    function mountSheet(id, builder) {
+      sheetId = id;
+      const layer = document.getElementById("m-sheet-layer"), box = document.getElementById("m-sheet-content");
+      box.replaceChildren();
+      builder(box);
+      layer.classList.add("is-open"); layer.setAttribute("aria-hidden","false");
+      box.scrollTop = 0;
+      if (window.lucide) window.lucide.createIcons();
+    }
+    function hideSheet() {
+      endCaptureSegment();
+      sheetId = null;
+      const layer = document.getElementById("m-sheet-layer");
+      layer.classList.remove("is-open"); layer.setAttribute("aria-hidden","true");
+      document.getElementById("m-sheet-content").replaceChildren();
+    }
+    function closeSheet() { hideSheet(); scheduleRoute(); }
+
+    document.getElementById("m-sheet-scrim").onclick = () => closeSheet();
+
+    // 1. SCOPE MULTI-SELECT & FOLDER FILTER SHEET (对齐桌面端双轨范围筛选)
+    function openScopeFilterSheet() {
+      let draftLibIds = state.selectedLibIds === null ? LIBRARIES.map(l => l.id) : [...state.selectedLibIds];
+      let draftFolder = state.selectedFolder ? { ...state.selectedFolder } : null;
+
+      openSheet((box) => {
+        function renderDraft() {
+          box.innerHTML = `
+            <div style="padding:8px 16px 10px;border-bottom:0.5px solid var(--m-hairline);display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-size:15.5px;font-weight:700;color:var(--m-ink);">选择搜索资料范围</div>
+                <div style="font-size:11px;color:var(--m-ink-3);">仅过滤本地检索，不向云端 Agents 授权整库上传</div>
+              </div>
+              <button type="button" id="sheet-close-btn" style="background:none;border:none;color:var(--m-ink-2);font-size:13px;font-weight:600;cursor:pointer;">取消</button>
+            </div>
+
+            <!-- Quick Batch Actions: 全选 / 反选 / 清空 -->
+            <div style="padding:8px 16px;background:var(--m-surface-subtle);border-bottom:0.5px solid var(--m-hairline);display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-size:12px;font-weight:600;color:var(--m-ink-2);">
+                已选 ${draftLibIds.length} / ${LIBRARIES.length} 个资料库 ${draftFolder ? `· 文件夹：${escapeHtml(draftFolder.name)}` : ""}
+              </span>
+              <div style="display:flex;gap:8px;">
+                <button type="button" id="draft-select-all" style="background:none;border:none;color:var(--m-accent-ink);font-size:12px;font-weight:600;cursor:pointer;">全选</button>
+                <button type="button" id="draft-invert" style="background:none;border:none;color:var(--m-ink-2);font-size:12px;font-weight:600;cursor:pointer;">反选</button>
+                <button type="button" id="draft-clear" style="background:none;border:none;color:var(--m-ink-3);font-size:12px;font-weight:600;cursor:pointer;">全不选</button>
+              </div>
+            </div>
+
+            <!-- Scrollable Libraries + Folder Chips -->
+            <div style="flex:1;overflow-y:auto;padding:8px 14px;">
+              ${LIBRARIES.map(lib => {
+                const checked = draftLibIds.includes(lib.id);
+                return `
+                  <div style="padding:9px 6px;border-bottom:0.5px solid var(--m-hairline);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;">
+                      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;">
+                        <input type="checkbox" data-draft-lib="${lib.id}" ${checked ? "checked" : ""} style="width:17px;height:17px;accent-color:var(--m-accent);" />
+                        <span class="m-lib-icon" style="width:26px;height:26px;font-size:12px;background:${lib.bg};color:${lib.color};">${escapeHtml(lib.badge)}</span>
+                        <span style="font-size:13.5px;font-weight:600;color:var(--m-ink);">${escapeHtml(lib.name)}</span>
+                        <span style="font-family:var(--m-font-mono);font-size:11px;color:var(--m-ink-3);">${lib.count}</span>
+                      </label>
+                      <button type="button" data-draft-only="${lib.id}" style="background:var(--m-surface-subtle);border:0.5px solid var(--m-hairline-strong);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;color:var(--m-ink-2);cursor:pointer;">
+                        仅选
+                      </button>
+                    </div>
+                    ${checked ? `
+                      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;padding-left:28px;">
+                        ${lib.folders.map(f => {
+                          const fSelected = draftFolder && draftFolder.folderId === f.id;
+                          return `
+                            <button
+                              type="button"
+                              data-draft-folder="${lib.id}::${f.id}::${f.name}::${lib.shortName}"
+                              style="font-size:11px;padding:2px 8px;border-radius:6px;border:0.5px solid ${fSelected ? "var(--m-accent)" : "var(--m-hairline-strong)"};background:${fSelected ? "var(--m-accent-soft)" : "var(--m-surface)"};color:${fSelected ? "var(--m-accent-ink)" : "var(--m-ink-2)"};cursor:pointer;"
+                            >📁 ${escapeHtml(f.name)}</button>
+                          `;
+                        }).join("")}
+                      </div>
+                    ` : ""}
+                  </div>
+                `;
+              }).join("")}
+            </div>
+
+            <!-- Sticky Apply Footer -->
+            <div style="padding:10px 16px 18px;border-top:0.5px solid var(--m-hairline);display:flex;gap:10px;background:var(--m-surface);">
+              <button type="button" id="draft-reset-btn" style="flex:1;height:40px;border-radius:11px;border:0.5px solid var(--m-hairline-strong);background:var(--m-surface-subtle);color:var(--m-ink);font-size:13px;font-weight:600;cursor:pointer;">
+                重置全库
+              </button>
+              <button type="button" id="draft-apply-btn" style="flex:2;height:40px;border-radius:11px;border:none;background:var(--m-accent);color:#FFF;font-size:13.5px;font-weight:700;cursor:pointer;">
+                应用范围 (${draftLibIds.length}/6 库)
+              </button>
+            </div>
+          `;
+
+          box.querySelector("#sheet-close-btn").onclick = () => closeSheet();
+          box.querySelector("#draft-select-all").onclick = () => {
+            draftLibIds = LIBRARIES.map(l => l.id);
+            draftFolder = null;
+            renderDraft();
+          };
+          box.querySelector("#draft-invert").onclick = () => {
+            const all = LIBRARIES.map(l => l.id);
+            draftLibIds = all.filter(id => !draftLibIds.includes(id));
+            draftFolder = null;
+            renderDraft();
+          };
+          box.querySelector("#draft-clear").onclick = () => {
+            draftLibIds = [];
+            draftFolder = null;
+            renderDraft();
+          };
+
+          box.querySelectorAll("[data-draft-lib]").forEach(cb => {
+            cb.onchange = () => {
+              const id = cb.getAttribute("data-draft-lib");
+              if (cb.checked) {
+                if (!draftLibIds.includes(id)) draftLibIds.push(id);
+              } else {
+                draftLibIds = draftLibIds.filter(x => x !== id);
+                if (draftFolder && draftFolder.libId === id) draftFolder = null;
+              }
+              renderDraft();
+            };
+          });
+
+          box.querySelectorAll("[data-draft-only]").forEach(btn => {
+            btn.onclick = () => {
+              const id = btn.getAttribute("data-draft-only");
+              draftLibIds = [id];
+              draftFolder = null;
+              renderDraft();
+            };
+          });
+
+          box.querySelectorAll("[data-draft-folder]").forEach(btn => {
+            btn.onclick = () => {
+              const [libId, folderId, name, libName] = btn.getAttribute("data-draft-folder").split("::");
+              if (draftFolder && draftFolder.folderId === folderId) {
+                draftFolder = null;
+              } else {
+                draftLibIds = [libId];
+                draftFolder = { libId, folderId, name, libName };
+              }
+              renderDraft();
+            };
+          });
+
+          box.querySelector("#draft-reset-btn").onclick = () => {
+            state.selectedLibIds = null;
+            state.selectedFolder = null;
+            closeSheet();
+            showToast("已恢复全部 6 个资料库");
+            renderAll();
+          };
+
+          box.querySelector("#draft-apply-btn").onclick = () => {
+            state.selectedLibIds = draftLibIds.length === LIBRARIES.length ? null : [...draftLibIds];
+            state.selectedFolder = draftFolder;
+            closeSheet();
+            showToast(`已应用搜索范围：${getScopeSummaryLabel()}`);
+            renderAll();
+          };
+        }
+        renderDraft();
+      });
+    }
+
+    // 2. FLOMO-STYLE QUICK CAPTURE & VOICE RECORDING SHEET
+    let fileDatabase;
+    function photoStore() {
+      if (!fileDatabase) fileDatabase = new Promise((resolve, reject) => {
+        const req = indexedDB.open("hub.mobile.prototype.photos", 1);
+        req.onupgradeneeded = () => req.result.createObjectStore("photos");
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      }).catch(error => { fileDatabase = null; throw error; });
+      return fileDatabase;
+    }
+    async function savePhoto(file) {
+      const db = await photoStore(), id = crypto.randomUUID();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction("photos", "readwrite");
+        tx.objectStore("photos").put(file, id);
+        tx.oncomplete = resolve; tx.onabort = () => reject(tx.error);
+      });
+      return { id, name: file.name };
+    }
+    async function displayPhoto(img, id) {
+      try {
+        const db = await photoStore();
+        const blob = await new Promise((resolve, reject) => {
+          const req = db.transaction("photos").objectStore("photos").get(id);
+          req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
+        });
+        if (!blob || !img.isConnected) return;
+        const url = URL.createObjectURL(blob);
+        img.onload = img.onerror = () => URL.revokeObjectURL(url);
+        img.src = url;
+      } catch { img.alt += "（无法读取）"; }
+    }
+    let addingPhotos = false;
+    function openQuickCaptureSheet() {
+      openSheet(box => {
+        function renderCapture() {
+          box.innerHTML = `<form class="flow-form" id="capture-form">
+            <div class="task-toolbar"><h2>速记</h2><button type="button" id="cap-close" class="flow-btn">收起</button></div>
+            ${state.captureQuote ? `<div class="flow-actions">关联《${escapeHtml(state.captureQuote.title)}》<button class="text-btn" type="button" id="cap-remove-quote">移除</button></div>` : ""}
+            <label>正文<textarea id="cap-textarea" rows="4" placeholder="记下此刻的想法…">${escapeHtml(state.captureDraft)}</textarea></label>
+            <div class="flow-actions">${["#架构思考","#闪念","#阅读摘录","#待验证"].map(t =>
+              `<button type="button" class="flow-btn" data-cap-tag="${t}" aria-pressed="${state.captureTags.includes(t)}">${t}</button>`).join("")}</div>
+            <label>归属日期<input type="date" name="date" required value="${escapeHtml(state.captureDate || localDay())}"></label>
+            <div class="flow-actions"><label class="flow-btn file-label">添加图片<input type="file" id="cap-files" accept="image/*" multiple ${addingPhotos ? "disabled" : ""}></label>
+              <button type="button" class="flow-btn" id="cap-btn-voice">${state.captureRecording ? "结束本段" : "模拟录音"}</button></div>
+            ${state.captureFiles.map((f,i) => `<div class="capture-item"><img data-photo="${f.id}" alt="${escapeHtml(f.name)}"><span>${escapeHtml(f.name)}</span><button type="button" class="text-btn" data-remove-file="${i}">移除</button></div>`).join("")}
+            ${state.captureSegments.map((v,i) => `<div class="capture-item"><span>模拟语音 ${i+1} · ${v.seconds} 秒</span><button type="button" class="text-btn" data-remove-segment="${i}">移除</button></div>`).join("")}
+            <div class="task-toolbar"><small id="draft-status" role="status">${addingPhotos ? "正在保存图片…" : "草稿存于此浏览器"}</small>
+            <button class="flow-btn primary" id="cap-submit" ${addingPhotos || state.captureRecording ? "disabled" : ""}>记下</button></div></form>`;
+          const form = box.querySelector("form");
+          form.querySelectorAll("[data-photo]").forEach(img => displayPhoto(img,img.dataset.photo));
+          const update = () => { if (!persist()) form.querySelector("#draft-status").textContent = "保存失败，草稿仍在此页"; };
+          form.querySelector("#cap-textarea").oninput = e => { state.captureDraft = e.target.value; update(); };
+          form.elements.date.oninput = e => { state.captureDate = e.target.value; update(); };
+          form.querySelector("#cap-close").onclick = closeSheet;
+          const rm = form.querySelector("#cap-remove-quote");
+          if (rm) rm.onclick = () => { state.captureQuote = null; update(); renderCapture(); };
+          form.querySelectorAll("[data-cap-tag]").forEach(b => b.onclick = () => { const t = b.dataset.capTag;
+            state.captureTags = state.captureTags.includes(t) ? state.captureTags.filter(x => x !== t) : [...state.captureTags,t];
+            update(); renderCapture(); });
+          form.querySelectorAll("[data-remove-file],[data-remove-segment]").forEach(b => b.onclick = () => {
+            if (b.hasAttribute("data-remove-file")) state.captureFiles.splice(Number(b.dataset.removeFile),1);
+            else state.captureSegments.splice(Number(b.dataset.removeSegment),1);
+            update(); renderCapture();
+          });
+          form.querySelector("#cap-btn-voice").onclick = () => {
+            if (state.captureRecording) endCaptureSegment();
+            else state.captureRecording = Date.now();
+            update(); renderCapture();
+          };
+          form.querySelector("#cap-files").onchange = async e => {
+            const files = [...e.target.files];
+            if (state.captureFiles.length + files.length > 9 || files.some(f => !f.type.startsWith("image/") || f.size > 20*1024*1024)) {
+              showToast("最多 9 张图片，每张不超过 20 MB"); return;
+            }
+            addingPhotos = true; renderCapture();
+            try { for (const file of files) { state.captureFiles.push(await savePhoto(file)); persist(); } }
+            catch { showToast("图片保存失败，请重试"); }
+            finally { addingPhotos = false; if (document.querySelector("#capture-form")) renderCapture(); }
+          };
+          form.onsubmit = e => {
+            e.preventDefault();
+            if (addingPhotos || state.captureRecording) return;
+            if (!state.captureDraft.trim() && !state.captureSegments.length && !state.captureFiles.length) { showToast("请写正文或添加附件"); return; }
+            const draft = Object.fromEntries(draftKeys.map(key => [key,state[key]]));
+            const entry = { id: crypto.randomUUID(), date: state.captureDate || localDay(),
+              time: new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"}), createdAt: Date.now(),
+              receipt:"local", receiptText:"已存本机 · 待上传", tags:state.captureTags, text:state.captureDraft.trim(),
+              quote:state.captureQuote, segments:state.captureSegments, attachments:state.captureFiles, simulatedSync:true };
+            JOURNALS.unshift(entry);
+            Object.assign(state,{captureDraft:"",captureQuote:null,captureDate:"",captureTags:[],captureSegments:[],captureFiles:[]});
+            if (!persist()) { JOURNALS.shift(); Object.assign(state,draft); return; }
+            closeSheet(); openPushView("journal-detail",entry.id); showToast("已存本机");
+          };
+        }
+        persist(); renderCapture();
+      }, "capture");
+    }
+    function endCaptureSegment() {
+      if (!state.captureRecording) return;
+      state.captureSegments.push({ seconds: Math.max(1,Math.round((Date.now()-state.captureRecording)/1000)) });
+      state.captureRecording = false;
+      persist();
+    }
+    function openReceiptSheet(journal) {
+      openSheet(box => {
+        const choices = journal.receipt === "cloud" ? [["os","模拟桌面写入"]] :
+          [["cloud",journal.receipt === "failed" ? "重试上传（模拟）" : "模拟上传成功"],["failed","模拟上传失败"]];
+        box.innerHTML = `<div class="flow-form"><h2>模拟同步回执</h2><p>${escapeHtml(journal.receiptText)}</p>
+          ${choices.map(([key,label]) => `<button class="flow-btn" data-receipt="${key}">${label}</button>`).join("")}</div>`;
+        box.querySelectorAll("[data-receipt]").forEach(b => b.onclick = () => {
+          journal.receipt = b.dataset.receipt;
+          journal.receiptText = { failed:"模拟上传失败 · 可重试", cloud:"模拟已上传 · 等待桌面写入", os:"模拟桌面已写入 · " + journal.date }[journal.receipt];
+          closeSheet(); renderAll();
+        });
+      });
+    }
+
+    function openConnectionSheet() {
+      openSheet((box) => {
+        box.innerHTML = `
+          <div style="padding:10px 16px;border-bottom:0.5px solid var(--m-hairline);display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:15.5px;font-weight:700;color:var(--m-ink);">连接总览 · 双链路独立状态</div>
+              <div style="font-size:11px;color:var(--m-ink-3);">内容同步（OSS）与云端助手（VPS）互不阻塞</div>
+            </div>
+            <button type="button" id="conn-close" style="background:none;border:none;color:var(--m-ink-2);font-weight:600;cursor:pointer;">完成</button>
+          </div>
+          <div style="padding:14px 16px;display:flex;flex-direction:column;gap:12px;">
+            <div class="m-card m-card-padded">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                <span style="font-size:13.5px;font-weight:700;color:var(--m-ink);">1. 内容同步（阿里云 OSS ↔ 桌面 OS）</span>
+                <span class="m-receipt-pill ${state.ossStatus === "os" ? "m-receipt-os" : "m-receipt-local"}">
+                  ${state.ossStatus === "os" ? "模拟桌面已写入" : "模拟待上传"}
+                </span>
+              </div>
+              <div style="font-size:12px;color:var(--m-ink-2);line-height:1.55;">
+                负责将手机端速记、语音附件、闪卡复习进度加密传输至桌面端。即使桌面电脑暂时关机，速记也会先保存在本机与 OSS 队列中。
+              </div>
+            </div>
+
+            <div class="m-card m-card-padded">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                <span style="font-size:13.5px;font-weight:700;color:var(--m-ink);">2. 云端助手（个人 Linux VPS · Codex）</span>
+                <span class="m-receipt-pill m-receipt-cloud">${state.agentOfflineMode ? "模拟离线" : state.vpsStatus === "busy" ? "模拟运行中" : "模拟在线"}</span>
+              </div>
+              <div style="font-size:12px;color:var(--m-ink-2);line-height:1.55;">
+                手机直连个人 VPS 上的官方 Codex app-server。<strong>Windows 桌面电脑关机不影响手机发起新的云端助手会话</strong>。
+              </div>
+            </div>
+          </div>
+        `;
+        box.querySelector("#conn-close").onclick = () => closeSheet();
+      });
+    }
+
+    // 4. AGENTS 1-STEP MULTI-MATERIAL & SKILL PICKER SHEET (With Live 48 KB Budget Bar & Instant Preview)
+    function openMaterialPickerSheet() {
+      let previewDocId = null;
+      openSheet((box) => {
+        function renderPicker() {
+          const selectedDocs = DOCUMENTS.filter(d => state.attachedMaterialIds.includes(d.id));
+          const usedKb = selectedDocs.reduce((s, d) => s + parseFloat(getDocKb(d)), 0);
+          const pct = Math.min(100, Math.round((usedKb / 48) * 100));
+          const previewDoc = previewDocId ? DOCUMENTS.find(d => d.id === previewDocId) : null;
+
+          box.innerHTML = `
+            <div style="padding:10px 16px;border-bottom:0.5px solid var(--m-hairline);display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-size:15px;font-weight:700;">添加本机资料、照片或技能</div>
+                <div style="font-size:11px;color:var(--m-ink-3);">勾选即生效，无需二次弹窗确认 · 单次上限 48 KB</div>
+              </div>
+              <button type="button" id="mat-done" style="background:none;border:none;color:var(--m-accent-ink);font-weight:700;cursor:pointer;">完成 (${selectedDocs.length})</button>
+            </div>
+
+            <!-- Live 48 KB Context Budget Bar -->
+            <div style="padding:8px 16px;background:var(--m-surface-subtle);border-bottom:0.5px solid var(--m-hairline);">
+              <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;margin-bottom:4px;">
+                <span style="font-weight:600;color:var(--m-ink-2);">单次发送正文容量预算</span>
+                <span style="font-family:var(--m-font-mono);color:var(--m-accent-ink);font-weight:700;">${usedKb.toFixed(1)} KB / 48.0 KB</span>
+              </div>
+              <div class="m-budget-bar">
+                <div class="m-budget-fill" style="width:${pct}%;"></div>
+              </div>
+            </div>
+
+            <!-- Quick Media & Skill Row -->
+            <div style="padding:8px 16px;display:flex;gap:6px;border-bottom:0.5px solid var(--m-hairline);">
+              <button type="button" class="m-scope-trigger" id="mat-add-photo">📷 拍照/相册 (≤6张)</button>
+              <button type="button" class="m-scope-trigger" id="mat-add-keyframes">🎬 30s 视频关键帧</button>
+              <button type="button" class="m-scope-trigger ${state.activeSkill ? "is-filtered" : ""}" id="mat-toggle-skill">
+                ✨ ${state.activeSkill ? `/${state.activeSkill.name}` : "挂载 /技能"}
+              </button>
+            </div>
+
+            ${previewDoc ? `
+              <div style="padding:12px 16px;background:var(--m-surface-subtle);border-bottom:0.5px solid var(--m-hairline);">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                  <strong style="font-size:12.5px;">📄 快照预览：${escapeHtml(previewDoc.title)}</strong>
+                  <button type="button" id="mat-close-preview" style="background:none;border:none;color:var(--m-accent-ink);font-size:11.5px;font-weight:600;cursor:pointer;">关闭预览</button>
+                </div>
+                <div style="font-size:12px;color:var(--m-ink-2);line-height:1.55;">${escapeHtml(previewDoc.snippet)}</div>
+              </div>
+            ` : ""}
+
+            <div style="padding:6px 16px;overflow-y:auto;max-height:48vh;">
+              ${DOCUMENTS.map(d => {
+                const checked = state.attachedMaterialIds.includes(d.id);
+                const kb = getDocKb(d);
+                return `
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 0;border-bottom:0.5px solid var(--m-hairline);">
+                    <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;flex:1;min-width:0;">
+                      <input type="checkbox" data-pick-mat="${d.id}" ${checked ? "checked" : ""} style="width:17px;height:17px;margin-top:2px;accent-color:var(--m-accent);" />
+                      <div style="flex:1;min-width:0;">
+                        <div class="m-truncate" style="font-size:13.5px;font-weight:600;color:var(--m-ink);">${escapeHtml(d.title)}</div>
+                        <div style="font-size:11px;color:var(--m-ink-3);margin-top:2px;">${escapeHtml(d.libraryName)} · ${kb} KB</div>
+                      </div>
+                    </label>
+                    <button type="button" data-preview-mat="${d.id}" class="m-scope-trigger" style="height:25px;font-size:11px;padding:0 7px;">预览</button>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          `;
+
+          box.querySelector("#mat-done").onclick = () => {
+            state.agentContextMode = "manual";
+            closeSheet();
+            renderAll();
+          };
+          box.querySelector("#mat-add-photo").onclick = () => {
+            showToast("已附加上传照片预览（源码服务支持 6 张 × 4 MiB）");
+          };
+          box.querySelector("#mat-add-keyframes").onclick = () => {
+            showToast("已采样 ≤30 秒视频的 3 张带时间戳关键帧");
+          };
+          box.querySelector("#mat-toggle-skill").onclick = () => {
+            if (state.activeSkill) {
+              state.activeSkill = null;
+              showToast("已移除待发送技能");
+            } else {
+              state.activeSkill = { name: "arch-review", title: "架构一致性审查 (附 2 份参考文件 · 12 KB)" };
+              showToast("已挂载 /arch-review 技能，首次发送将锁定版本");
+            }
+            renderPicker();
+            renderAll();
+          };
+          const closePrev = box.querySelector("#mat-close-preview");
+          if (closePrev) closePrev.onclick = () => { previewDocId = null; renderPicker(); };
+          box.querySelectorAll("[data-preview-mat]").forEach(btn => {
+            btn.onclick = () => {
+              previewDocId = btn.getAttribute("data-preview-mat");
+              renderPicker();
+            };
+          });
+          box.querySelectorAll("[data-pick-mat]").forEach(cb => {
+            cb.onchange = () => {
+              const id = cb.getAttribute("data-pick-mat");
+              if (cb.checked) {
+                if (!state.attachedMaterialIds.includes(id)) state.attachedMaterialIds.push(id);
+              } else {
+                state.attachedMaterialIds = state.attachedMaterialIds.filter(x => x !== id);
+              }
+              state.agentContextMode = "manual";
+              renderPicker();
+            };
+          });
+        }
+        renderPicker();
+      });
+    }
+
+    // 4b. VPS NODE, MODEL, REASONING EFFORT, QUOTA & SEAMLESS OFFLINE OUTBOX SHEET
+    function openVpsModelAndQuotaSheet() {
+      openSheet((box) => {
+        function renderVpsSheet() {
+          box.innerHTML = `
+            <div style="padding:10px 16px;border-bottom:0.5px solid var(--m-hairline);display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-size:15px;font-weight:700;">个人 VPS Codex · 模型与额度</div>
+                <div style="font-size:11px;color:var(--m-ink-3);">ChatGPT Pro 订阅留存执行端 · Windows 关机不影响</div>
+              </div>
+              <button type="button" id="vps-sheet-close" style="background:none;border:none;color:var(--m-accent-ink);font-weight:700;cursor:pointer;">完成</button>
+            </div>
+            <div style="padding:12px 16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;max-height:66vh;">
+              <!-- Model Choice -->
+              <div>
+                <div style="font-size:11.5px;font-weight:600;color:var(--m-ink-3);margin-bottom:6px;">1. 执行端模型选择（用于下一条消息）</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                  ${["GPT-5.4 Sol", "GPT-5.4 Mini"].map(m => `
+                    <button type="button" data-pick-model="${m}" class="m-scope-trigger ${state.agentModel === m ? "is-filtered" : ""}" style="height:34px;justify-content:center;">
+                      ${m} ${m.includes("Sol") ? "· 默认" : "· 极速"}
+                    </button>
+                  `).join("")}
+                </div>
+              </div>
+
+              <!-- Reasoning Effort -->
+              <div>
+                <div style="font-size:11.5px;font-weight:600;color:var(--m-ink-3);margin-bottom:6px;">2. 推理强度 (Reasoning Effort)</div>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+                  ${["低 (Low)", "中 (Medium)", "高 (High)", "极高 (xHigh)"].map(ef => `
+                    <button type="button" data-pick-effort="${ef}" class="m-scope-trigger ${state.agentEffort === ef ? "is-filtered" : ""}" style="height:32px;justify-content:center;font-size:11px;">
+                      ${ef.split(" ")[0]}
+                    </button>
+                  `).join("")}
+                </div>
+              </div>
+
+              <!-- Subscription Usage Window -->
+              <div class="m-card m-card-padded">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                  <span style="font-size:12.5px;font-weight:700;">3. ChatGPT Pro 订阅额度周期读数</span>
+                  <span class="m-receipt-pill m-receipt-os">状态正常</span>
+                </div>
+                <div style="font-size:11.5px;color:var(--m-ink-2);display:flex;justify-content:space-between;margin-bottom:3px;">
+                  <span>本周已用（7 天统计窗口）</span>
+                  <strong style="font-family:var(--m-font-mono);">24%</strong>
+                </div>
+                <div class="m-budget-bar" style="margin-bottom:6px;"><div class="m-budget-fill" style="width:24%;"></div></div>
+                <div style="font-size:11px;color:var(--m-ink-3);">注：此处显示额度统计周期，额度耗尽或登录失效时不自动切换账号或转按量 API。</div>
+              </div>
+
+              <!-- WeChat-Style Seamless Offline Outbox Simulator -->
+              <div class="m-card m-card-padded">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <div>
+                    <div style="font-size:12.5px;font-weight:700;">4. 弱网离线发件箱无感自动续传</div>
+                    <div style="font-size:11px;color:var(--m-ink-3);margin-top:2px;">隐藏底层工程重试按钮，断网暂存本机、恢复网络按原 UUID 自动送达</div>
+                  </div>
+                  <button type="button" id="btn-toggle-offline-sim" class="m-scope-trigger ${state.agentOfflineMode ? "is-filtered" : ""}">
+                    ${state.agentOfflineMode ? "📡 恢复联网自动续传" : "模拟进电梯断网"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+
+          box.querySelector("#vps-sheet-close").onclick = () => closeSheet();
+          box.querySelectorAll("[data-pick-model]").forEach(btn => {
+            btn.onclick = () => {
+              state.agentModel = btn.getAttribute("data-pick-model");
+              renderVpsSheet();
+              renderAll();
+            };
+          });
+          box.querySelectorAll("[data-pick-effort]").forEach(btn => {
+            btn.onclick = () => {
+              state.agentEffort = btn.getAttribute("data-pick-effort");
+              renderVpsSheet();
+              renderAll();
+            };
+          });
+          box.querySelector("#btn-toggle-offline-sim").onclick = () => {
+            state.agentOfflineMode = !state.agentOfflineMode;
+            if (!state.agentOfflineMode) {
+              // Automatically flush any pending offline messages using their original turn ID!
+              const pendingMsgs = state.agentSessions.flatMap(session => {
+                const messages = sessionData(session).agentMessages;
+                return messages.filter(m => m.pendingOffline).map(pm => ({ messages, pm }));
+              });
+              pendingMsgs.forEach(({ messages, pm }) => {
+                pm.pendingOffline = false;
+                const replyId = "reply-" + pm.id;
+                messages.push({
+                  id: replyId,
+                  role: "assistant",
+                  localRagSummary: "断线恢复 · 原 UUID 续传完成",
+                  cotSteps: [
+                    { time: "10ms", text: "📡 网络已恢复，使用原请求 UUID 自动送达 VPS，未重复生成" },
+                    { time: "0.9s", text: `☁️ VPS Codex (${state.agentModel}) 返回完整结论` }
+                  ],
+                  cotDuration: "0.9s",
+                  text: `【网络恢复自动送达】已针对您离线暂存的提问「**${pm.text}**」完成云端推理，全程零手动工程重试干扰。`,
+                  citations: pm.recalledDocIds || []
+                });
+              });
+              showToast(pendingMsgs.length ? "网络已恢复 · 离线暂存消息已按原 UUID 自动送达！" : "已恢复在线状态");
+            } else {
+              showToast("已开启断网模拟：现在发送消息将进入无感离线暂存队列");
+            }
+            renderVpsSheet();
+            renderAll();
+          };
+        }
+        renderVpsSheet();
+      });
+    }
+
+    // 5. NEW LOCAL TASK SHEET
+    function openNewTaskSheet(doc = null) {
+      const existing = doc && TASKS.find(t => t.originKey === "document:" + doc.id);
+      if (existing) { openPushView("task-detail", existing.id); return; }
+      openSheet(box => {
+        box.innerHTML = `<form class="flow-form"><h2>${doc ? "从原文创建任务" : "新建本机任务"}</h2>
+          ${doc ? `<p>来源 · ${escapeHtml(doc.title)}</p>` : ""}
+          <label>任务名称<input name="title" required id="new-task-title" value="${doc ? escapeHtml("跟进《" + doc.title + "》") : ""}"></label>
+          <label>保存到清单<input name="list" required value="${escapeHtml(state.taskListFilter || "本机任务")}"></label>
+          <label class="check-label"><input type="checkbox" name="planned" checked>加入今日计划</label>
+          <div class="flow-actions"><button type="button" class="flow-btn" id="task-sheet-close">取消</button><button class="flow-btn primary">创建任务</button></div></form>`;
+        box.querySelector("#task-sheet-close").onclick = closeSheet;
+        box.querySelector("form").onsubmit = e => {
+          e.preventDefault(); const f = e.target.elements;
+          if (!f.title.value.trim() || !f.list.value.trim()) return;
+          const task = { id: crypto.randomUUID(), title: f.title.value.trim(), list: f.list.value.trim(), planned: f.planned.checked,
+            done: false, due: "无截止日", priority: "普通", sourceType: "local", isLocal: true,
+            docId: doc?.id || null, sourceLabel: doc ? doc.libraryName + " / " + doc.folderPath : "本机新建",
+            originKey: doc ? "document:" + doc.id : null };
+          TASKS.unshift(task); closeSheet(); openPushView("task-detail", task.id); showToast("已创建本机任务");
+        };
+      });
+    }
+
+    // 6. SPACE QUICK MENU & APPEARANCE SHEET + 7. AGENT SESSION SWITCHER SHEET
+    function openAgentSessionSheet() {
+      openSheet((box) => {
+        function renderSessList() {
+          box.innerHTML = `
+            <div style="padding:10px 16px;border-bottom:0.5px solid var(--m-hairline);display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-size:15px;font-weight:700;">云端助手会话列表 (${state.agentSessions.length})</div>
+                <div style="font-size:11px;color:var(--m-ink-3);">归档只收起会话，不删除消息、材料与成果</div>
+              </div>
+              <button type="button" id="sess-new-btn" class="m-scope-trigger is-filtered">+ 新会话</button>
+            </div>
+            <div style="padding:10px 16px;display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow-y:auto;">
+              ${state.agentSessions.map(s => `
+                <div class="m-card m-card-padded" style="display:flex;align-items:center;justify-content:space-between;gap:8px;border-color:${s.id === state.activeSessionId ? "var(--m-accent)" : "var(--m-hairline)"};">
+                  <button type="button" data-select-sess="${s.id}" style="background:none;border:none;text-align:left;padding:0;flex:1;min-width:0;cursor:pointer;color:inherit;">
+                    <div style="font-size:13.5px;font-weight:600;color:var(--m-ink);display:flex;align-items:center;gap:6px;">
+                      <span class="m-truncate">${escapeHtml(s.title)}</span>
+                      ${s.archived ? `<span class="m-source-badge">已归档</span>` : ""}
+                    </div>
+                    <div style="font-size:11px;color:var(--m-ink-3);margin-top:2px;">更新于 ${escapeHtml(s.updated)}</div>
+                  </button>
+                  <button type="button" data-toggle-archive-sess="${s.id}" class="m-scope-trigger" style="height:26px;font-size:11px;">
+                    ${s.archived ? "恢复" : "归档"}
+                  </button>
+                </div>
+              `).join("")}
+            </div>
+          `;
+          box.querySelector("#sess-new-btn").onclick = () => {
+            const newId = "sess-" + Date.now();
+            state.agentSessions.unshift({ id: newId, title: "新会话", updated: "刚刚", archived: false });
+            state.activeSessionId = newId;
+            closeSheet();
+            showToast("已新建云端助手会话");
+            renderAll();
+          };
+          box.querySelectorAll("[data-select-sess]").forEach(btn => {
+            btn.onclick = () => {
+              state.activeSessionId = btn.getAttribute("data-select-sess");
+              closeSheet();
+              renderAll();
+            };
+          });
+          box.querySelectorAll("[data-toggle-archive-sess]").forEach(btn => {
+            btn.onclick = () => {
+              const target = state.agentSessions.find(x => x.id === btn.getAttribute("data-toggle-archive-sess"));
+              if (target) {
+                target.archived = !target.archived;
+                renderSessList();
+                renderAll();
+              }
+            };
+          });
+        }
+        renderSessList();
+      });
+    }
+
+    function openSpaceMenuSheet() {
+      openSheet((box) => {
+        box.innerHTML = `
+          <div style="padding:10px 16px;border-bottom:0.5px solid var(--m-hairline);display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-size:15px;font-weight:700;">空间菜单与外观设置</span>
+            <button type="button" id="space-menu-close" style="background:none;border:none;color:var(--m-ink-2);font-weight:600;cursor:pointer;">完成</button>
+          </div>
+          <div style="padding:14px 16px;display:flex;flex-direction:column;gap:14px;">
+            <div>
+              <div style="font-size:11.5px;font-weight:600;color:var(--m-ink-3);margin-bottom:6px;">快捷工作流直达</div>
+              <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+                <button type="button" class="m-scope-trigger" id="menu-go-capture" style="justify-content:flex-start;height:36px;padding:0 12px;">✍️ 记一条速记</button>
+                <button type="button" class="m-scope-trigger" id="menu-go-scope" style="justify-content:flex-start;height:36px;padding:0 12px;">🎯 资料库搜索范围</button>
+                <button type="button" class="m-scope-trigger" id="menu-go-conn" style="justify-content:flex-start;height:36px;padding:0 12px;">☁️ 双链路连接总览</button>
+                <button type="button" class="m-scope-trigger" id="menu-toggle-font" style="justify-content:flex-start;height:36px;padding:0 12px;">📖 阅读字号：${state.readingLargeFont ? "大字 19px" : "标准 17px"}</button>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11.5px;font-weight:600;color:var(--m-ink-3);margin-bottom:6px;">主题表面（Base White / 暖纸 / 深色）</div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+                <button type="button" class="m-scope-trigger" data-menu-theme="light" style="justify-content:center;height:34px;">☀️ 纯净白</button>
+                <button type="button" class="m-scope-trigger" data-menu-theme="warm" style="justify-content:center;height:34px;">📜 暖纸</button>
+                <button type="button" class="m-scope-trigger" data-menu-theme="dark" style="justify-content:center;height:34px;">🌙 深色</button>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11.5px;font-weight:600;color:var(--m-ink-3);margin-bottom:6px;">强调色</div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+                <button type="button" class="m-scope-trigger" data-menu-accent="blue" style="justify-content:center;height:34px;">🔵 湖蓝</button>
+                <button type="button" class="m-scope-trigger" data-menu-accent="sage" style="justify-content:center;height:34px;">🌿 鼠尾草</button>
+                <button type="button" class="m-scope-trigger" data-menu-accent="iris" style="justify-content:center;height:34px;">🟣 鸢尾紫</button>
+              </div>
+            </div>
+          </div>
+        `;
+        box.querySelector("#space-menu-close").onclick = () => closeSheet();
+        box.querySelector("#menu-go-capture").onclick = () => openQuickCaptureSheet();
+        box.querySelector("#menu-go-scope").onclick = () => openScopeFilterSheet();
+        box.querySelector("#menu-go-conn").onclick = () => openConnectionSheet();
+        box.querySelector("#menu-toggle-font").onclick = () => {
+          state.readingLargeFont = !state.readingLargeFont;
+          document.documentElement.setAttribute("data-reading-size", state.readingLargeFont ? "large" : "normal");
+          showToast(`已切换阅读正文字号为 ${state.readingLargeFont ? "19px 大字" : "17px 标准"}`);
+          openSpaceMenuSheet();
+        };
+        box.querySelectorAll("[data-menu-theme]").forEach(btn => {
+          btn.onclick = () => {
+            document.documentElement.setAttribute("data-theme", btn.getAttribute("data-menu-theme"));
+          };
+        });
+        box.querySelectorAll("[data-menu-accent]").forEach(btn => {
+          btn.onclick = () => {
+            document.documentElement.setAttribute("data-accent", btn.getAttribute("data-menu-accent"));
+          };
+        });
+      });
+    }
+
+    /* ========================================================================
+       Studio Inspector & Global Bindings
+       ======================================================================== */
+    document.getElementById("btn-fab-capture").onclick = () => openQuickCaptureSheet();
+
+    document.getElementById("btn-toggle-frame").onclick = () => {
+      const html = document.documentElement;
+      const next = html.getAttribute("data-frame") === "fullscreen" ? "phone" : "fullscreen";
+      html.setAttribute("data-frame", next);
+      document.getElementById("frame-toggle-label").textContent = next === "fullscreen" ? "退出满屏" : "切换 1:1 真机满屏";
+    };
+
+    document.querySelectorAll("[data-set-theme]").forEach(btn => {
+      btn.onclick = () => document.documentElement.setAttribute("data-theme", btn.getAttribute("data-set-theme"));
+    });
+
+    document.querySelectorAll("[data-set-accent]").forEach(btn => {
+      btn.onclick = () => document.documentElement.setAttribute("data-accent", btn.getAttribute("data-set-accent"));
+    });
+
+    document.querySelectorAll("[data-scenario]").forEach(btn => {
+      btn.onclick = () => {
+        const sc = btn.getAttribute("data-scenario");
+        closeSheet();
+        state.pushStack = [];
+        if (sc === "browse-libs") {
+          state.activeTab = "browse";
+          state.expandedBrowseLibs.craft = true;
+          state.expandedBrowseLibs.obsidian = true;
+          renderAll();
+        } else if (sc === "folder-drill") {
+          state.activeTab = "browse";
+          openPushView("library-detail", { libId: "craft", folderId: "craft-arch" });
+        } else if (sc === "scope-sheet") {
+          state.activeTab = "search";
+          renderAll();
+          openScopeFilterSheet();
+        } else if (sc === "quick-capture") {
+          openQuickCaptureSheet();
+        } else if (sc === "agents-cot") {
+          state.activeTab = "agents";
+          state.agentSubTab = "chat";
+          state.cotExpandedMap["m-2"] = true;
+          renderAll();
+        } else if (sc === "doc-context") {
+          openPushView("doc-detail", "doc-1");
+        } else if (sc === "review-study") {
+          state.activeTab = "review";
+          state.reviewSubTab = "today";
+          state.cardFlipped = true;
+          renderAll();
+        }
+      };
+    });
+
+    // Global Escape & Android Hardware Back Key Simulation (Closes Sheet -> Pops Push Stack)
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        const sheetLayer = document.getElementById("m-sheet-layer");
+        if (sheetLayer && sheetLayer.classList.contains("is-open")) {
+          history.back();
+          return;
+        }
+        if (state.pushStack.length > 0) {
+          closePushView();
+        }
+      }
+    });
+
+    document.getElementById("sim-oss-btn").onclick = (e) => {
+      state.ossStatus = state.ossStatus === "os" ? "pending" : "os";
+      e.currentTarget.querySelector("span").textContent = state.ossStatus === "os" ? "☁️ OSS：已写入 OS" : "☁️ OSS：待上传 2 条";
+      renderAll();
+    };
+
+    document.getElementById("sim-vps-btn").onclick = (e) => {
+      state.vpsStatus = state.vpsStatus === "online" ? "busy" : "online";
+      e.currentTarget.querySelector("span").textContent = state.vpsStatus === "online" ? "⚡ VPS：在线可用" : "⚡ VPS：推理运行中";
+      renderAll();
+    };
+
+    document.getElementById("exit-fullscreen").onclick = () => document.getElementById("btn-toggle-frame").click();
+    restoreData();
+    if (history.state?.hubMobile === 5) restoreRoute(history.state,true);
+    else renderAll();
+  </script>
+</body>
+</html>
