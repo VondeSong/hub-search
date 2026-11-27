@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MobileHarvestDecision, localHarvestReceipts } from "./MobileHarvestDecision";
-import { mobileTasks } from "./MobileInsightTasks";
+import { MobileLocalTaskDetail, mobileTasks } from "./MobileInsightTasks";
 import type { Clue } from "./ActionEvidence";
 
 const { profile, flush } = vi.hoisted(() => ({ profile: new Map<string, string>(), flush: vi.fn() }));
@@ -65,4 +65,23 @@ it("retries a pending profile transaction before issuing the receipt and never d
   expect(saved).toHaveBeenCalledOnce();
   expect(mobileTasks()).toHaveLength(1);
   expect(localHarvestReceipts(mobileTasks())).toHaveLength(1);
+});
+
+it("restores the progress draft and retries a failed save without appending it twice", async () => {
+  await render(first); await click("确认清单并新建");
+  const detail = () => act(async () => root.render(<MobileLocalTaskDetail task={mobileTasks()[0]} back={vi.fn()} onChange={vi.fn()}/>));
+  await detail();
+  const area = host.querySelector("textarea")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(area, "follow up");
+    area.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await render(first, true); await detail();
+  expect(host.querySelector("textarea")!.value).toBe("follow up");
+  flush.mockRejectedValueOnce(Error("offline"));
+  await click("保存备注"); expect(host.querySelector("[role=alert]")?.textContent).toContain("offline");
+  await click("保存备注");
+  expect(mobileTasks()[0].progressNotes).toEqual(["follow up"]);
+  expect(host.querySelector("textarea")!.value).toBe("");
+  expect(host.querySelector("[role=alert]")).toBeNull();
 });

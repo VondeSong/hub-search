@@ -469,7 +469,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
     window.addEventListener("popstate",pop,true);return ()=>window.removeEventListener("popstate",pop,true);
   },[mobile,selected,localId,compose,mobileTarget]);
   const closeDetail=()=>{if(mobile&&window.history.state?.hubActionDetail) window.history.back();else setSelected("");};
-  if(mobile && localTask) return <MobileLocalTaskDetail task={localTask} onChange={bump} back={()=>mobileTarget?onBackToInsight?.():closeDetail()}/>;
+  if(mobile && localTask) return <MobileLocalTaskDetail key={localTask.id} task={localTask} onChange={bump} back={()=>mobileTarget?onBackToInsight?.():closeDetail()}/>;
   const quickEntry = (
     <form
       className="aw-add"

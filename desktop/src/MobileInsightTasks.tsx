@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { todayKey } from "./ActionEvidence";
 import { useEffect, useRef, useState } from "react";
 import { flushUserProfileStorage } from "./UserProfileStorage";
@@ -9,6 +10,8 @@ import type { HarvestEntry } from "./MobileHarvestDecision";
 
 export type LocalTask = {
   harvestEntries?: HarvestEntry[];
+  progressNotes?: string[];
+  noteDraft?: string;
   list?: string;
   plannedDay?: string;
   waiting?: { who: string; date: string };
@@ -41,9 +44,17 @@ export function MobileLocalTaskDetail({
   const today = todayKey(),
     [who, setWho] = useState(task.waiting?.who || ""),
     [date, setDate] = useState(task.waiting?.date || "");
+  const header = document.querySelector(".mobile-hub-header");
+  const subhead = <div className="bw-task-subhead"><button type="button" aria-label="返回" onClick={back}>‹ 返回</button><strong>任务详情</strong></div>;
+  const [draft, setDraft] = useState(task.noteDraft ?? "");
+  const latest = () => mobileTasks().find(row => row.id === task.id) ?? task;
+  const evidence = (mode: HarvestEntry["mode"]) => task.harvestEntries?.filter(entry => entry.mode === mode).map(entry =>
+    <section key={entry.key}>{entry.note && <p>{entry.note}</p>}
+      <blockquote>{entry.quote}<cite>行动捕手 · {entry.source}</cite></blockquote>
+    </section>);
   async function update(patch: Partial<LocalTask>) {
     try {
-      await saveMobileTask({ ...task, ...patch });
+      await saveMobileTask({ ...latest(), ...patch });
       setError("");
       setEdit(false);
       onChange();
@@ -53,9 +64,8 @@ export function MobileLocalTaskDetail({
   }
   return (
     <section className="bw-local-detail">
-      <button onClick={back}>‹ 返回</button>
-      <h2>任务详情</h2>
-      <h3>{task.title}</h3>
+      {header ? createPortal(subhead, header) : subhead}
+      <h2>{task.title}</h2>
       <small>{task.list || "本机任务"} · 普通 · 无截止日</small>
       <div className="bw-buttons">
         <button onClick={() => void update({ done: !task.done })}>
@@ -73,7 +83,7 @@ export function MobileLocalTaskDetail({
       <h3>来源与依据</h3>
       <p>{task.source}</p>
       {task.note && <blockquote>{task.note}</blockquote>}
-      {task.harvestEntries?.map(entry=><section key={entry.key}><h3>行动捕手 · {entry.mode==="new"?"新建任务":"补充任务"}</h3>{entry.note && <p>{entry.note}</p>}<blockquote>{entry.quote}<cite>{entry.source}</cite></blockquote></section>)}
+      {evidence("new")}
       <h3>等待跟进</h3>
       <p>
         {task.waiting
@@ -121,6 +131,30 @@ export function MobileLocalTaskDetail({
           <button>保存等待</button>
         </form>
       )}
+      <h3>续办备注</h3>
+      {task.progressNotes?.map((text, index) => <p key={index}>{text}</p>)}
+      {evidence("append")}
+      <form className="bw-task-progress" onSubmit={async event => {
+        event.preventDefault();
+        const current = latest();
+        const note = current.noteDraft?.trim();
+        if (!draft.trim()) return;
+        try {
+          if (note) {
+            await saveMobileTask({ ...current, progressNotes: [...(current.progressNotes ?? []), note], noteDraft: "" });
+          } else {
+            await flushUserProfileStorage();
+          }
+          setDraft(latest().noteDraft ?? ""); setError(""); onChange();
+        } catch (reason) { setError(String(reason)); }
+      }}>
+        <label>补充进展<textarea rows={2} placeholder="下次接着做什么？" value={draft} onChange={event => {
+          const value = event.target.value;
+          setDraft(value);
+          void saveMobileTask({ ...latest(), noteDraft: value }).catch(reason => setError(String(reason)));
+        }}/></label>
+        <button type="submit" disabled={!draft.trim()}>保存备注</button>
+      </form>
       {error && <p role="alert">{error}</p>}
     </section>
   );
