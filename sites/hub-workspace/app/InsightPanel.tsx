@@ -25,6 +25,10 @@ import {
   type ReportFixture, type ReportFinding, type ReportEvidence,
 } from "./insight-reports";
 
+import {useDidaTasks} from "./useDidaTasks";
+import {didaTasks,taskProject,taskStates,taskStatus} from "./task-data";
+import {PROTO_DIDA_LIBRARY_ID,PROTO_DIDA_LISTS,useInsightTaskLinks} from "./insight-task-links";
+
 export type InsightScope = "all" | "review" | "starred" | "knowledge" | "life" | "decision" | "cases";
 type Props = InsightsProps & {
   onExplore: () => void;
@@ -33,6 +37,10 @@ type Props = InsightsProps & {
   navigationOpen?: boolean;
   onOpenNavigation?: () => void;
   onQueryChange?: (value: string) => void;
+  initialInsightId?: string;
+  onInitialInsightHandled?: () => void;
+  onOpenTask?: (taskId: string) => void;
+  onCreateDidaTask?: (args: { title: string; project: string; body: string; insightId: string; workId?: string; sourceIds?: string[] }) => string;
 };
 type Modal =
   | { type: "discovery" }
@@ -127,7 +135,17 @@ function contextFor(state: LedgerState, insight: LedgerInsight): AssistantContex
 
 export default function InsightPanel(props: Props) {
   const { filter, onFilterChange, query, notify, onOverlayOpen, onAssistant, onOpenSource, onExplore, onCreateDraft,
-    scope = "all", onScopeChange, navigationOpen = true, onOpenNavigation, onQueryChange } = props;
+    scope = "all", onScopeChange, navigationOpen = true, onOpenNavigation, onQueryChange,
+    initialInsightId, onInitialInsightHandled, onOpenTask, onCreateDidaTask } = props;
+  const didaShared = useDidaTasks();
+  const taskLinksStore = useInsightTaskLinks();
+  const [taskPanelOpen, setTaskPanelOpen] = useState(false);
+  const [taskPanelTab, setTaskPanelTab] = useState<"create" | "link">("create");
+  const [taskTitleDraft, setTaskTitleDraft] = useState("");
+  const [taskListDraft, setTaskListDraft] = useState<string>(PROTO_DIDA_LISTS[0]);
+  const [taskSearch, setTaskSearch] = useState("");
+  const [chosenTaskId, setChosenTaskId] = useState("");
+  const [taskFeedback, setTaskFeedback] = useState("");
   const [state, setState] = useState<LedgerState>(() => getLedger());
   const [selectedId, setSelectedId] = useState("");
   const [period, setPeriod] = useState("all");
@@ -230,6 +248,134 @@ export default function InsightPanel(props: Props) {
     document.addEventListener("click", closeMenus);
     return () => document.removeEventListener("click", closeMenus);
   }, []);
+  useEffect(() => {
+    if (!initialInsightId || initializing) return;
+    const match = state.insights.find(x => x.id === initialInsightId);
+    if (match) {
+      revealAfterNavigation.current = true;
+      onFilterChange("everything");
+      onScopeChange?.("all");
+      onQueryChange?.("");
+      setPeriod("all");
+      setWorkFilter("all");
+      setValidityFilter("all");
+      setSelectedId(match.id);
+      setViewMode("split");
+      setMobileDetail(true);
+    }
+    onInitialInsightHandled?.();
+  }, [initialInsightId, initializing, state.insights]);
+
+  useEffect(() => {
+    setTaskPanelOpen(false);
+    setTaskFeedback("");
+    setChosenTaskId("");
+    setTaskSearch("");
+  }, [selectedId]);
+
+  const protoTasks = useMemo(() => {
+    const builtIn = didaTasks.map(node => ({
+      id: node.id,
+      title: node.title,
+      listName: taskProject(node.id),
+      status: taskStatus(node.id, didaShared.checks, didaShared.status),
+      source: "滴答清单",
+    }));
+    const created = props.items
+      .filter(item => item.kind === "task")
+      .map(item => ({
+        id: item.id,
+        title: item.title,
+        listName: item.project || "收件箱",
+        status: (item.taskState || "todo") as keyof typeof taskStates,
+        source: item.source === "ticktick" ? "滴答清单" : item.source === "craft" ? "Craft" : item.source === "obsidian" ? "Obsidian" : "Hub",
+      }));
+    const seen = new Set<string>();
+    return [...created, ...builtIn].filter(row => {
+      if (seen.has(row.id)) return false;
+      seen.add(row.id);
+      return true;
+    });
+  }, [props.items, didaShared.checks, didaShared.status]);
+
+  const selectedTaskLinks = useMemo(
+    () => (selectedId ? taskLinksStore.links.filter(link => link.insightId === selectedId) : []),
+    [taskLinksStore.links, selectedId],
+  );
+
+  const openTaskCreator = (tab: "create" | "link" = "create") => {
+    const activeInsight = state.insights.find(x => x.id === selectedId);
+    const activeFinding = activeInsight ? getVisibleFinding(state, activeInsight) : null;
+    if (!activeInsight || !activeFinding) return;
+    setTaskTitleDraft(activeFinding.title.slice(0, 120));
+    setTaskListDraft(PROTO_DIDA_LISTS[0]);
+    setTaskSearch("");
+    setChosenTaskId("");
+    setTaskFeedback("");
+    setTaskPanelTab(tab);
+    setTaskPanelOpen(true);
+  };
+
+  const confirmCreateProtoTask = () => {
+    const activeInsight = state.insights.find(x => x.id === selectedId);
+    const activeFinding = activeInsight ? getVisibleFinding(state, activeInsight) : null;
+    if (!activeInsight || !activeFinding || !taskTitleDraft.trim()) return;
+    const sourceLabel = `${activeInsight.workTitle} · 修订 ${activeInsight.headRevision} · ${activeFinding.evidence.length} 处依据`;
+    const body = `来源洞察：${activeFinding.title}\n关联工作：${activeInsight.workTitle}\n摘要：${activeFinding.summary}\n待确认：${activeFinding.condition}`;
+    const sourceIds = activeFinding.evidence.map(e => e.sourceId);
+    const createdId = onCreateDidaTask
+      ? onCreateDidaTask({
+          title: taskTitleDraft.trim(),
+          project: taskListDraft,
+          body,
+          insightId: activeInsight.id,
+          workId: activeInsight.ownerWorkId,
+          sourceIds,
+        })
+      : onCreateDraft("task", taskTitleDraft.trim(), body, {
+          insightId: activeInsight.id,
+          workId: activeInsight.ownerWorkId,
+          sourceIds,
+        });
+    if (!createdId) {
+      setTaskFeedback("创建未完成，请核对来源状态后重试。");
+      return;
+    }
+    taskLinksStore.save({
+      insightId: activeInsight.id,
+      taskId: createdId,
+      libraryId: PROTO_DIDA_LIBRARY_ID,
+      insightTitle: activeFinding.title,
+      taskTitle: taskTitleDraft.trim(),
+      listName: taskListDraft,
+      sourceLabel,
+    });
+    setTaskPanelOpen(false);
+    setTaskFeedback(`已创建并关联示例滴答任务「${taskTitleDraft.trim()}」（清单：${taskListDraft}）。`);
+    notify(`已创建并关联示例滴答任务「${taskTitleDraft.trim()}」`);
+  };
+
+  const confirmLinkProtoTask = () => {
+    const activeInsight = state.insights.find(x => x.id === selectedId);
+    const activeFinding = activeInsight ? getVisibleFinding(state, activeInsight) : null;
+    if (!activeInsight || !activeFinding || !chosenTaskId) return;
+    const picked = protoTasks.find(t => t.id === chosenTaskId);
+    if (!picked) return;
+    const sourceLabel = `${activeInsight.workTitle} · 修订 ${activeInsight.headRevision}`;
+    taskLinksStore.save({
+      insightId: activeInsight.id,
+      taskId: picked.id,
+      libraryId: PROTO_DIDA_LIBRARY_ID,
+      insightTitle: activeFinding.title,
+      taskTitle: picked.title,
+      listName: picked.listName,
+      sourceLabel,
+    });
+    setTaskPanelOpen(false);
+    setTaskFeedback(`已关联滴答任务「${picked.title}」（${picked.listName} · ${taskStates[picked.status]}）。`);
+    notify(`已关联任务「${picked.title}」`);
+  };
+
   useEffect(() => {
     if (filter !== "reports") return;
     openReports();
@@ -574,7 +720,88 @@ export default function InsightPanel(props: Props) {
               {inspectedFinding.caseStudy && <ol className="ip-practice-steps">{inspectedFinding.caseStudy.actionSteps.map((step, index) => <li key={index}><span>{String(index + 1).padStart(2, "0")}</span><p>{step}</p></li>)}</ol>}
               {inspectedFinding.caseStudy && <button className="ip-button ip-primary" disabled={inspectingOld} onClick={() => openPractice(selected)}><PencilLine size={15}/>准备实践清单</button>}
               <button className={"ip-button" + (!inspectedFinding.caseStudy ? " ip-primary" : "")} disabled={inspectingOld} onClick={() => continueWork(selected)}><MessageSquare size={15}/>{inspectedFinding.caseStudy ? "带着依据继续" : "在原工作中继续"}<ArrowUpRight size={14}/></button>
+              <button className="ip-button" disabled={inspectingOld} onClick={() => (taskPanelOpen ? setTaskPanelOpen(false) : openTaskCreator("create"))}><ListChecks size={14}/>创建 / 关联滴答任务</button>
               {!inspectedFinding.caseStudy && <button className="ip-button" disabled={inspectingOld} onClick={() => openReports(selected)}><RefreshCw size={14}/>更新这条发现</button>}
+            </section>
+            <section className="ip-task-links" aria-label="关联滴答任务">
+              <div className="ip-section-heading">
+                <h3>关联滴答任务</h3>
+                <span>{selectedTaskLinks.length} 项</span>
+              </div>
+              {selectedTaskLinks.length > 0 ? (
+                <div className="ip-task-link-list">
+                  {selectedTaskLinks.map(link => {
+                    const live = protoTasks.find(t => t.id === link.taskId);
+                    const statusText = live ? taskStates[live.status] : "示例记录";
+                    const done = live?.status === "done";
+                    return (
+                      <div className="ip-task-link-card" key={link.taskId + link.libraryId}>
+                        <div className="ip-task-link-info">
+                          <div className="ip-task-link-top">
+                            <span className={"ip-pill " + (done ? "ip-status-done" : "ip-validity-available")}>{statusText}</span>
+                            <strong>{live?.title || link.taskTitle || link.taskId}</strong>
+                          </div>
+                          <small>滴答清单 · {live?.listName || link.listName || "收件箱"}{link.sourceLabel ? ` · 来源：${link.sourceLabel}` : ""}</small>
+                        </div>
+                        {onOpenTask && (
+                          <button type="button" className="ip-button" onClick={() => onOpenTask(link.taskId)}>
+                            前往任务<ArrowUpRight size={13}/>
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="ip-muted">尚未关联滴答任务。可确认标题、目标清单与来源后新建，或关联已有滴答任务并支持双向跳转。</p>
+              )}
+              {taskFeedback && <p className="ip-task-feedback" role="status">{taskFeedback}</p>}
+              {taskPanelOpen && !inspectingOld && (
+                <div className="ip-task-drawer" role="region" aria-label="创建或关联滴答任务确认">
+                  <div className="ip-task-drawer-tabs" role="tablist">
+                    <button type="button" role="tab" aria-selected={taskPanelTab === "create"} onClick={() => setTaskPanelTab("create")}>新建滴答任务</button>
+                    <button type="button" role="tab" aria-selected={taskPanelTab === "link"} onClick={() => setTaskPanelTab("link")}>关联已有任务</button>
+                  </div>
+                  {taskPanelTab === "create" ? (
+                    <div className="ip-task-drawer-form">
+                      <label>任务标题<input value={taskTitleDraft} maxLength={180} onChange={e => setTaskTitleDraft(e.target.value)} placeholder="确认要创建的滴答任务标题"/></label>
+                      <label>目标清单
+                        <select value={taskListDraft} onChange={e => setTaskListDraft(e.target.value)}>
+                          {PROTO_DIDA_LISTS.map(name => <option key={name} value={name}>滴答清单 · {name}</option>)}
+                        </select>
+                      </label>
+                      <div className="ip-task-source-confirm">
+                        <span>来源确认</span>
+                        <p>洞察「{inspectedFinding.title}」 · {selected.workTitle} · 修订 {selected.headRevision}（{inspectedFinding.evidence.length} 处依据）</p>
+                      </div>
+                      <div className="ip-task-drawer-actions">
+                        <button type="button" className="ip-button" onClick={() => setTaskPanelOpen(false)}>取消</button>
+                        <button type="button" className="ip-button ip-primary" disabled={!taskTitleDraft.trim()} onClick={confirmCreateProtoTask}><Check size={14}/>确认创建并关联</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="ip-task-drawer-form">
+                      <label>筛选已有滴答任务<input value={taskSearch} onChange={e => setTaskSearch(e.target.value)} placeholder="按标题或清单搜索…"/></label>
+                      <label>选择任务
+                        <select aria-label="选择要关联的滴答任务" value={chosenTaskId} onChange={e => setChosenTaskId(e.target.value)}>
+                          <option value="">请选择一项任务</option>
+                          {protoTasks.filter(t => !taskSearch.trim() || `${t.title} ${t.listName}`.toLowerCase().includes(taskSearch.trim().toLowerCase())).map(t => (
+                            <option key={t.id} value={t.id}>{t.title} · {t.listName} · {taskStates[t.status]}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="ip-task-source-confirm">
+                        <span>来源确认</span>
+                        <p>建立与「{inspectedFinding.title}」的双向导航关联，不改动滴答原任务内容。</p>
+                      </div>
+                      <div className="ip-task-drawer-actions">
+                        <button type="button" className="ip-button" onClick={() => setTaskPanelOpen(false)}>取消</button>
+                        <button type="button" className="ip-button ip-primary" disabled={!chosenTaskId} onClick={confirmLinkProtoTask}><Link2 size={14}/>确认关联</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
             <section className="ip-condition"><Info size={16}/><div><h3>使用前，还要确认</h3><p>{inspectedFinding.condition}</p></div></section>
             <div className="ip-detail-actions"><button className="ip-text-button" onClick={() => {

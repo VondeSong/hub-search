@@ -29,7 +29,7 @@ fn public(v: &Value) -> Value {
 fn mark(path: &PathBuf, id: &str, state: &str, error: Option<&str>) -> Result<Value, String> {
     let (c, _writer) = open_write_database(path)?;
     c.execute(
-        "UPDATE task_planning_actions SET state=?2,error=?3,updated_at=?4 WHERE id=?1",
+        "UPDATE task_planning_actions SET state=?2,error=?3,updated_at=?4 WHERE id=?1 AND state <> 'cancelled'",
         params![id, state, error, now_timestamp()],
     )
     .map_err(|e| e.to_string())?;
@@ -314,7 +314,7 @@ async fn submit(
         table(&c)?;
         read(&c, id)?
     };
-    if inspect && v["state"] == "prepared" {
+    if v["state"] == "cancelled" || (inspect && v["state"] == "prepared") {
         return Ok(public(&v));
     }
     if v["state"] == "confirmed" && v["error"].is_null() {
@@ -444,6 +444,21 @@ async fn submit(
     );
     Ok(public(&result))
 }
+fn cancel_in_db(c: &Connection, id: &str) -> Result<Value, String> {
+    c.execute(
+        "UPDATE task_planning_actions SET state='cancelled',error=NULL,updated_at=?2 WHERE id=?1 AND state IN ('prepared','retryable')",
+        params![id, now_timestamp()],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(public(&read(c, id)?))
+}
+fn cancel(app: &AppHandle, args: &Value) -> Result<Value, String> {
+    let id = strarg(args, "id")?;
+    let path = database_path(app)?;
+    let (c, _writer) = open_write_database(&path)?;
+    table(&c)?;
+    cancel_in_db(&c, id)
+}
 pub(super) async fn dispatch(
     app: &AppHandle,
     state: &State<'_, AppState>,
@@ -480,6 +495,7 @@ pub(super) async fn dispatch(
         "prepareNote" | "prepareFields" => prepare(app, state, args).await,
         "submitNote" => submit(app, state, args, false).await,
         "inspectNote" => submit(app, state, args, true).await,
+        "cancelNote" => cancel(app, args),
         _ => Err("未知建议写入操作".into()),
     }
 }
@@ -663,5 +679,39 @@ mod tests {
             ),
             "retryable"
         );
+    }
+    #[test]
+    fn cancel_only_discards_prepared_or_retryable_previews_and_protects_unknown_writes() {
+        let c = Connection::open_in_memory().unwrap();
+        table(&c).unwrap();
+        for (id, state) in [
+            ("prep", "prepared"),
+            ("retry", "retryable"),
+            ("inflight", "writing"),
+            ("uncertain", "unknown"),
+            ("done", "confirmed"),
+        ] {
+            let payload = json!({
+                "id": id,
+                "taskId": "task-1",
+                "libraryId": "lib-1",
+                "libraryName": "滴答",
+                "sourceId": "src-1",
+                "before": {"title": "原标题", "content": ""},
+                "after": "",
+                "changes": {"title": "新标题"}
+            })
+            .to_string();
+            c.execute(
+                "INSERT INTO task_planning_actions VALUES(?1,'task-1','lib-1','src-1',?2,?3,NULL,1)",
+                params![id, state, payload],
+            )
+            .unwrap();
+        }
+        assert_eq!(cancel_in_db(&c, "prep").unwrap()["state"], "cancelled");
+        assert_eq!(cancel_in_db(&c, "retry").unwrap()["state"], "cancelled");
+        assert_eq!(cancel_in_db(&c, "inflight").unwrap()["state"], "writing");
+        assert_eq!(cancel_in_db(&c, "uncertain").unwrap()["state"], "unknown");
+        assert_eq!(cancel_in_db(&c, "done").unwrap()["state"], "confirmed");
     }
 }

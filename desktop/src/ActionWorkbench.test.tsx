@@ -29,11 +29,13 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("./QuickJournal", () => ({ QuickJournalCard: () => null }));
 const profile = vi.hoisted(() => new Map<string, string>());
 const flush = vi.hoisted(() => vi.fn(async () => {}));
-const dashboard = vi.hoisted(() => ({ tasks: [] as UnifiedTask[] }));
+const dashboard = vi.hoisted(() => ({ tasks: [] as UnifiedTask[], loading: false, ready: true }));
 vi.mock("./UnifiedTaskData", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./UnifiedTaskData")>()),
   useUnifiedTasks: () => ({
-    dashboard,
+    dashboard: { tasks: dashboard.tasks },
+    loading: dashboard.loading,
+    ready: dashboard.ready,
     refresh: async () => {},
     taskBusyIds: new Set(),
     taskStatusTargets: new Map(),
@@ -45,10 +47,16 @@ vi.mock("./UserProfileStorage", () => ({
     setItem: (k: string, v: string) => profile.set(k, v),
     flush: async () => {},
   },
+  userProfileKeys: (prefix: string) => [...profile.keys()].filter((k) => k.startsWith(prefix)),
   flushUserProfileStorage: flush,
 }));
 let root: Root;
 let host: HTMLDivElement;
+const defaultSuiteSnapshot = {
+  settings: { provider: "codex" as const, model: "gpt-5.3-codex", reasoningEffort: "medium", fast: false, maxConcurrent: 2 },
+  jobs: [],
+  revision: 1,
+};
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   host = document.createElement("div");
@@ -370,11 +378,15 @@ describe("行动工作台", () => {
     expect(pack.recent.map((m) => m.id)).toEqual(["field"]);
     expect(pack.long.map((m) => m.id)).toEqual(["spec"]);
   });
-  it("默认收合线索，关联已有任务只追加来源，不创建任务或改变排期", async () => {
-    vi.mocked(invoke)
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce({ state: "prepared", id: "receipt" })
-      .mockResolvedValueOnce({ state: "confirmed", id: "receipt" });
+  it("默认收合线索，关联已有任务先预览再追加来源，不创建任务或改变排期，并分开回执", async () => {
+    vi.mocked(invoke).mockImplementation(async (_command, params) => {
+      const action = workbenchAction(params);
+      if (action === "prepareNote") {
+        return { state: "prepared", id: "receipt", before: "原任务备注", after: "原任务备注\n\n---\nHub 建议\n120mm" };
+      }
+      if (action === "submitNote") return { state: "confirmed", id: "receipt", before: "原任务备注", after: "原任务备注\n\n---\nHub 建议\n120mm" };
+      return [];
+    });
     let meta = emptyMeta();
     await render(
       <ActionHarvester
@@ -395,10 +407,19 @@ describe("行动工作台", () => {
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     await click(toggle);
     await click(button("关联并补充至已有任务"));
+    // Preview must open BEFORE submitNote or local mutation
+    expect(host.querySelector('[aria-label="滴答远端追加预览"]')).not.toBeNull();
+    expect(meta.links.length).toBe(0);
+    expect(vi.mocked(invoke).mock.calls.map((call) => (call[1] as any)?.args?.action)).not.toContain("submitNote");
+
+    await click(button("确认追加到滴答"));
     expect(meta.links.length).toBe(1);
     expect(meta.note).toContain("120mm");
     expect(meta.day).toBeUndefined();
     expect(vi.mocked(invoke).mock.calls.map((call) => (call[1] as any)?.args?.action)).not.toContain("createTask");
+    const splitReceipt = host.querySelector('[aria-label="行动捕手分开回执"]');
+    expect(splitReceipt?.textContent).toContain("本地回执");
+    expect(splitReceipt?.textContent).toContain("滴答远端回执");
   });
   it("线索只展示来源标签，点开后才挂载日志照片预览", async () => {
     const item = {
@@ -1193,5 +1214,235 @@ describe("行动工作台", () => {
     expect(payloads).toHaveLength(2);
     expect(payloads[1]).toEqual(payloads[0]);
     expect(savedMeta.day).toBe(day);
+  });
+
+  it("今日聚焦优先今日计划与今日到期、折叠历史逾期，并区分异步加载与真实 0 项", async () => {
+    vi.mocked(invoke).mockImplementation(async (command) => {
+      if (command === "model_runtime") return defaultSuiteSnapshot;
+      if (command === "shared_memory") return { projects: [], entries: [] };
+      return [];
+    });
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const localToday = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
+    // 1. Async loading must NOT show true zero
+    dashboard.tasks = [];
+    dashboard.loading = true;
+    dashboard.ready = false;
+    await render(
+      <TaskWorkspace
+        libraries={[dida]}
+        selectedLibraryIds={null}
+        desktopSidebarVisible={true}
+      />,
+    );
+    expect(host.querySelector('[aria-label="异步读取滴答任务"]')).not.toBeNull();
+    expect(host.textContent).not.toContain("真实 0 项");
+
+    // 2. Loaded with 0 tasks explicitly indicates Dida scope and true zero
+    dashboard.loading = false;
+    dashboard.ready = true;
+    await render(
+      <TaskWorkspace
+        libraries={[dida]}
+        selectedLibraryIds={null}
+        desktopSidebarVisible={true}
+      />,
+    );
+    expect(host.textContent).toContain("滴答范围");
+    expect(host.textContent).toContain("真实 0 项");
+
+    // 3. With today commitment + historical overdue: historical overdue is collapsed inside <details>
+    const dueTodayTask: UnifiedTask = {
+      ...t,
+      id: "task-due-today",
+      sourceId: "task-due-today",
+      documentId: "task-due-today",
+      title: "今日到期的核心评审",
+      dueAt: `${localToday}T10:00:00`,
+    };
+    const overdueTask: UnifiedTask = {
+      ...t,
+      id: "task-old-overdue",
+      sourceId: "task-old-overdue",
+      documentId: "task-old-overdue",
+      title: "十天前的历史逾期任务",
+      dueAt: "2020-01-05T10:00:00",
+    };
+    dashboard.tasks = [dueTodayTask, overdueTask];
+    expect(todayStr).toBeTruthy();
+    await render(
+      <TaskWorkspace
+        libraries={[dida]}
+        selectedLibraryIds={null}
+        desktopSidebarVisible={true}
+      />,
+    );
+    const todaySection = host.querySelector('section[aria-label="今日到期与到点催办"]');
+    expect(todaySection?.textContent).toContain("今日到期的核心评审");
+    expect(todaySection?.textContent).not.toContain("十天前的历史逾期任务");
+    const overdueDetails = host.querySelector<HTMLDetailsElement>('details[aria-label="历史逾期"]');
+    expect(overdueDetails).not.toBeNull();
+    expect(overdueDetails!.open).toBe(false);
+    expect(overdueDetails!.textContent).toContain("十天前的历史逾期任务");
+  });
+
+  it("行动捕手远端追加预览支持取消与仅保留本地关联，均调用 cancelNote 并分开回执", async () => {
+    const cancelledIds: string[] = [];
+    vi.mocked(invoke).mockImplementation(async (_command, params) => {
+      const action = workbenchAction(params);
+      if (action === "prepareNote") return { state: "prepared", id: "note-preview-1", before: "原内容", after: "原内容\n\n---\nHub 建议\n新线索" };
+      if (action === "cancelNote") {
+        cancelledIds.push((params as { args: { id: string } }).args.id);
+        return { state: "cancelled", id: "note-preview-1", before: "原内容", after: "原内容" };
+      }
+      if (action === "submitNote") throw new Error("should not submit when cancelled or local-only");
+      return [];
+    });
+    let meta = emptyMeta();
+    await render(
+      <ActionHarvester
+        tasks={[t]}
+        journals={[journal]}
+        scope={null}
+        libraries={[]}
+        day={day}
+        onUpdate={async (_, f) => {
+          meta = f(meta);
+        }}
+        onRefresh={async () => {}}
+        onSelect={() => {}}
+        revision={0}
+      />,
+    );
+    await click(button("行动捕手 · 1 条"));
+    await click(button("关联并补充至已有任务"));
+    expect(host.querySelector('[aria-label="滴答远端追加预览"]')).not.toBeNull();
+
+    // Cancel leaves local & remote untouched
+    await click(button("取消"));
+    expect(cancelledIds).toEqual(["note-preview-1"]);
+    expect(meta.links).toHaveLength(0);
+    expect(host.querySelector('[aria-label="行动捕手分开回执"]')?.textContent).toContain("已取消关联");
+    expect(host.querySelector('[aria-label="行动捕手分开回执"]')?.textContent).toContain("已取消滴答远端追加预览");
+
+    // Open preview again and choose local-only
+    await click(button("关联并补充至已有任务"));
+    await click(button("仅保留本地关联"));
+    expect(cancelledIds).toEqual(["note-preview-1", "note-preview-1"]);
+    expect(meta.links).toHaveLength(1);
+    expect(host.querySelector('[aria-label="行动捕手分开回执"]')?.textContent).toContain("已关联至");
+    expect(host.querySelector('[aria-label="行动捕手分开回执"]')?.textContent).toContain("原任务内容未改动");
+  });
+
+  it("每周回顾集中展示到期等待、长期逾期与无下一步重点专题，支持直接处理与设回看", async () => {
+    vi.mocked(invoke).mockImplementation(async (command, params) => {
+      if (command === "model_runtime") return defaultSuiteSnapshot;
+      if (command === "shared_memory") return { projects: [], entries: [] };
+      const action = workbenchAction(params);
+      if (action === "createTask") {
+        const args = (params as { args: { title: string; libraryId: string; projectId?: string } }).args;
+        return {
+          state: "confirmed",
+          id: "req-weekly-1",
+          libraryId: args.libraryId,
+          projectId: args.projectId || "",
+          projectName: "尾盖项目",
+          taskId: "created-next-step",
+          title: args.title,
+          priority: 0,
+          updatedAt: Date.now(),
+        };
+      }
+      return [];
+    });
+    const dueWaitTask: UnifiedTask = {
+      ...t,
+      id: "task-wait-due",
+      sourceId: "task-wait-due",
+      documentId: "task-wait-due",
+      title: "等待客户确认端子型号",
+      collectionId: "col-a",
+      collectionName: "尾盖项目",
+    };
+    const longOverdueTask: UnifiedTask = {
+      ...t,
+      id: "task-long-overdue",
+      sourceId: "task-long-overdue",
+      documentId: "task-long-overdue",
+      title: "补齐旧版试验报告",
+      dueAt: "2020-02-01T10:00:00",
+      collectionId: "col-a",
+      collectionName: "尾盖项目",
+    };
+    await write("task." + identity(dueWaitTask), {
+      ...emptyMeta(),
+      waits: [{ id: "w-due-1", who: "客户", what: "端子型号确认", review: "2020-01-01", blocking: true }],
+    });
+    dashboard.tasks = [dueWaitTask, longOverdueTask];
+    dashboard.loading = false;
+    dashboard.ready = true;
+    await render(
+      <TaskWorkspace
+        libraries={[dida]}
+        selectedLibraryIds={null}
+        desktopSidebarVisible={true}
+      />,
+    );
+    await click(button("每周回顾"));
+    expect(host.querySelector('[aria-label="每周回顾"]')).not.toBeNull();
+    expect(host.querySelector('section[aria-label="到期等待"]')?.textContent).toContain("等待客户确认端子型号");
+    expect(host.querySelector('section[aria-label="长期逾期"]')?.textContent).toContain("补齐旧版试验报告");
+    expect(host.querySelector('section[aria-label="无下一步的重点专题"]')?.textContent).toContain("尾盖项目");
+
+    // Mark due waiting as received directly
+    await click(button("标记已收到"));
+    const savedWaitMeta = read<ActionMeta>("task." + identity(dueWaitTask), emptyMeta());
+    expect(savedWaitMeta.waits[0].resolved).toBeTruthy();
+
+    // Set local review date on long overdue task
+    const reviewBtn = host.querySelector('section[aria-label="长期逾期"]')?.querySelectorAll("button");
+    const nextMonBtn = Array.from(reviewBtn || []).find((b) => b.textContent?.includes("下周一"))!;
+    await click(nextMonBtn);
+    const savedOverdueMeta = read<ActionMeta>("task." + identity(longOverdueTask), emptyMeta());
+    expect(savedOverdueMeta.reviewDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("任务详情读取关联洞察并支持点击回跳到对应洞察详情", async () => {
+    const onOpenInsight = vi.fn();
+    profile.set(
+      'hub.tasks.insight-link.v1.["dida","task-1","ins-99"]',
+      JSON.stringify({ insightId: "ins-99", taskId: t.id, libraryId: t.libraryId }),
+    );
+    vi.mocked(invoke).mockImplementation(async (command, params) => {
+      if (command === "agent_investigation" && (params as any)?.args?.action === "insightDetail") {
+        return {
+          id: "ins-99",
+          workTitle: "台架专项",
+          processingState: "attention",
+          validity: "available",
+          snapshot: { text: "图纸已完成静态核对，需补台架验证。" },
+        };
+      }
+      return [];
+    });
+    await render(
+      <ActionDetail
+        task={t}
+        topicClick={() => {}}
+        completion={null}
+        topics={[]}
+        meta={emptyMeta()}
+        update={async () => {}}
+        journals={[]}
+        scope={null}
+        day={day}
+        onOpenInsight={onOpenInsight}
+        onClose={() => {}}
+      />,
+    );
+    const section = host.querySelector('section[aria-label="关联洞察"]');
+    expect(section?.textContent).toContain("图纸已完成静态核对，需补台架验证。");
+    await click(button("回到洞察详情"));
+    expect(onOpenInsight).toHaveBeenCalledWith("ins-99");
   });
 });

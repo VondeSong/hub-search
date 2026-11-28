@@ -143,7 +143,7 @@ pub(super) async fn task_planning_source(
                 serde_json::from_value(args["taskIds"].clone()).map_err(|_| "任务范围无效")?;
             refresh(&app, &state, &ids).await
         }
-        "prepareNote" | "prepareFields" | "listFields" | "submitNote" | "inspectNote" | "listNotes" => {
+        "prepareNote" | "prepareFields" | "listFields" | "submitNote" | "inspectNote" | "cancelNote" | "listNotes" => {
             notes::dispatch(&app, &state, &args).await
         }
         "createTask" => create::dispatch(&app, &state, &args).await,

@@ -9,8 +9,10 @@ import {StageReview} from "./StageReview";
 import {InsightRecall} from "./InsightRecall";
 import {InsightDiscovery} from "./InsightDiscovery";
 import {InsightMethods} from "./InsightMethods";
+import {InsightTaskLinkSection} from "./InsightTaskLinkSection";
 import {findingSections} from "./InsightFindingText";
 import type {Insight,InsightCandidates,InsightDelivery,InsightEvent,InsightSource} from "./InsightTypes";
+import type {LibrarySummary} from "./SearchTypes";
 import type {WorkSummary} from "./AgentConversationHistoryData";
 import {AgentPanelContext} from "./StandaloneAgentLauncher";
 import {AgentCitationPreview} from "./AgentCitationPreview";
@@ -99,7 +101,7 @@ function ResultPicker({data,target,onClose,onOpenWork}:{data:Data;target?:Insigh
  </InsightDialog>;
 }
 
-function InsightDetail({data,item,onClose,onUpdate,onOpenWork,inline=false,onPrevious,onNext,focus,onFocus,initialFeedback,onFeedback,onSnooze,desktop=false,closeRef,onReview}:{data:Data;desktop?:boolean;closeRef?:Ref<HTMLButtonElement>;onReview:()=>void;item:Insight;initialFeedback:string;onFeedback:(value:string)=>void;onSnooze:()=>void;onPrevious?:()=>void;onNext?:()=>void;focus:boolean;onFocus:()=>void;onClose:()=>void;onUpdate:()=>void;onOpenWork:(id:string)=>void;inline?:boolean}){
+function InsightDetail({data,item,onClose,onUpdate,onOpenWork,libraries,onOpenTask,inline=false,onPrevious,onNext,focus,onFocus,initialFeedback,onFeedback,onSnooze,desktop=false,closeRef,onReview}:{data:Data;desktop?:boolean;closeRef?:Ref<HTMLButtonElement>;onReview:()=>void;item:Insight;initialFeedback:string;onFeedback:(value:string)=>void;onSnooze:()=>void;onPrevious?:()=>void;onNext?:()=>void;focus:boolean;onFocus:()=>void;onClose:()=>void;onUpdate:()=>void;onOpenWork:(id:string)=>void;libraries?:LibrarySummary[];onOpenTask?:(target:{taskId:string;libraryId:string;insightId:string})=>void;inline?:boolean}){
  const [drawer,setDrawer]=useState<"sources"|"inspect"|null>(null);
  const citationTicket=useRef(0);
  const [feedback,setFeedbackState]=useState(initialFeedback),[kind,setKind]=useState("correction"),[source,setSource]=useState<InsightSource|null>(null),[error,setError]=useState(""),[sendFeedbackIds,setSendFeedbackIds]=useState<string[]>([]),[restoreConfirmed,setRestoreConfirmed]=useState(false);
@@ -160,6 +162,7 @@ function InsightDetail({data,item,onClose,onUpdate,onOpenWork,inline=false,onPre
     </section>}
     <div className="insights-finding-text"><ReactMarkdown skipHtml allowedElements={["p","strong","em","code","br","ul","ol","li","blockquote"]} unwrapDisallowed>{displayedText}</ReactMarkdown></div>
     <section className="insights-review-outcome">{item.snapshot.reviewOutcome&&<details><summary>{item.snapshot.reviewOutcome.kind==="maintain"?"本次核对：维持原判断":"本次核对：采用修订"}</summary><p className="insights-muted">对照修订 {item.snapshot.reviewOutcome.previousRevision}；原判断与本次新依据均在历史中保留。</p><ReactMarkdown skipHtml allowedElements={["p","strong","em","code","br","ul","ol","li","blockquote"]} unwrapDisallowed>{item.snapshot.reviewOutcome.comparison}</ReactMarkdown></details>}</section><div className="insights-detail-actions"><button type="button" onClick={()=>onOpenWork(item.workId)}><ArrowUpRight size={15}/>原事项</button><button type="button" disabled={!current||data.busy} onClick={()=>void act("insightFollow",{followed:!item.followed})}>{desktop?<Bell size={15}/>:<Star size={15}/>}{item.followed?"不再关注":"重新关注"}</button><button type="button" disabled={!current||data.busy} onClick={onUpdate}><RefreshCw size={15}/>选择新成果更新</button></div>
+    <InsightTaskLinkSection insight={item} insightTitle={title} libraries={libraries} onOpenTask={onOpenTask} disabled={!current||data.busy}/>
     {item.snapshot.reviewDependency&&<section><h4>回顾依据 · {{fact:"资料陈述",selfReported:"用户自述",coOccurrence:"共同出现",inference:"模型推测"}[item.snapshot.reviewDependency.nature]}</h4><p className="insights-muted">性质保留于保存时；“依据已核对”表示出处可用。</p>{item.snapshot.reviewDependency.dependencies.filter(d=>d.kind==="userInput").map((d,i)=><blockquote key={i}>{d.quote}<small>贴入材料 · {inputNatureNames[d.nature??"unknown"]} · 版本 {d.version}</small></blockquote>)}</section>}
     {current&&<label className="insights-perspective-field"><span>发现视角</span><select aria-label="发现视角" value={item.perspective??""} disabled={data.busy} onChange={e=>void act("insightPerspective",{perspective:e.target.value})}><option value="">未指定</option><option value="knowledge">知识与工作</option><option value="life">生活与进展</option><option value="decision">决定与变化</option></select></label>}
     <InsightMethods entries={item.snapshot.methodDependencies}/><h4>资料依据</h4><p className="insights-muted">保存时的精确引文；查看原文时会再次核对当前权限和版本。</p>
@@ -242,7 +245,15 @@ function findingPreview(text:string){
  return {title,body:rest};
 }
 
-export function InsightsWorkspace(){
+export type InsightsWorkspaceProps = {
+ libraries?: LibrarySummary[];
+ initialInsightId?: string;
+ onInitialInsightHandled?: () => void;
+ onOpenTask?: (target: { taskId: string; libraryId: string; insightId: string }) => void;
+};
+
+export function InsightsWorkspace(props: InsightsWorkspaceProps = {}){
+ const { libraries, initialInsightId, onInitialInsightHandled, onOpenTask } = props;
  const [section,setSection]=useState<"discoveries"|"stageReview"|"cases"|"topic"|"draft"|"decision"|"history">("discoveries");
  const data=useInsights(),openAgent=useContext(AgentPanelContext),chrome=useContext(WorkspaceHeaderContext);
  const desktop=document.documentElement.dataset.runtimePlatform!=="android";
@@ -293,6 +304,20 @@ export function InsightsWorkspace(){
   initialPreviewOpened.current=true;
   void data.open(first.id).catch(()=>undefined);
  },[desktop,section,layout,visible,data.detail,data.open]);
+ useEffect(()=>{
+  if(!initialInsightId)return;
+  setSection("discoveries");
+  setScope("all");
+  setPerspectiveFilter("");
+  setFilter("all");
+  setQuery("");
+  setValidity("all");
+  setDays(0);
+  setWorkFilter("");
+  initialPreviewOpened.current=true;
+  void data.open(initialInsightId).catch(()=>undefined);
+  onInitialInsightHandled?.();
+ },[initialInsightId,data.open,onInitialInsightHandled]);
  const position=visible.findIndex(i=>i.id===data.detail?.id);
  const go=(delta:number)=>{const item=visible[position+delta];if(item)openFinding(item);};
  const navigate=(value:typeof section)=>{setSection(value);setCheckedIds([]);setFocus(false);data.closeDetail();};
@@ -486,7 +511,7 @@ export function InsightsWorkspace(){
      onPointerCancel={event=>{const drag=splitDrag.current;if(!drag||event.pointerId!==drag.pointerId)return;if(drag.dragged)saveInsightsListWidth(listWidth);document.body.classList.remove("resizing-panes");if(event.currentTarget.hasPointerCapture?.(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);splitDrag.current=null;}}
      onLostPointerCapture={()=>{document.body.classList.remove("resizing-panes");splitDrag.current=null;}}
      onKeyDown={event=>{if(event.key==="Home"){event.preventDefault();setListWidth(minimumListWidth);saveInsightsListWidth(minimumListWidth);return;}if(event.key==="End"){event.preventDefault();setListWidth(maximumListWidth);saveInsightsListWidth(maximumListWidth);return;}if(event.key==="Enter"){event.preventDefault();setListWidth(defaultListWidth);saveInsightsListWidth(defaultListWidth);return;}if(event.key!=="ArrowLeft"&&event.key!=="ArrowRight")return;event.preventDefault();const next=clampListWidth(listWidth+(event.key==="ArrowRight"?16:-16));setListWidth(next);saveInsightsListWidth(next);}}/>}
-    {data.detail&&<InsightDetail key={data.detail.id} desktop={desktop} closeRef={layout==="table"?tableClose:undefined} onReview={()=>setDiscovery({target:data.detail!})} inline={layout!=="cards"&&(desktop||!focus)} onSnooze={()=>openSnooze(data.detail!)} initialFeedback={detailDrafts.current[data.detail.id]??""} onFeedback={value=>{detailDrafts.current[data.detail!.id]=value;}} focus={focus} onFocus={()=>setFocus(!focus)} onPrevious={position>0?()=>go(-1):undefined} onNext={position>=0&&position<visible.length-1?()=>go(1):undefined} data={data} item={data.detail} onClose={closeFinding} onUpdate={()=>setPicker({target:data.detail!})} onOpenWork={openWork}/>}
+    {data.detail&&<InsightDetail key={data.detail.id} desktop={desktop} closeRef={layout==="table"?tableClose:undefined} onReview={()=>setDiscovery({target:data.detail!})} inline={layout!=="cards"&&(desktop||!focus)} onSnooze={()=>openSnooze(data.detail!)} initialFeedback={detailDrafts.current[data.detail.id]??""} onFeedback={value=>{detailDrafts.current[data.detail!.id]=value;}} focus={focus} onFocus={()=>setFocus(!focus)} onPrevious={position>0?()=>go(-1):undefined} onNext={position>=0&&position<visible.length-1?()=>go(1):undefined} data={data} item={data.detail} libraries={libraries} onOpenTask={onOpenTask} onClose={closeFinding} onUpdate={()=>setPicker({target:data.detail!})} onOpenWork={openWork}/>}
     {layout==="split"&&!data.detail&&<div className="insights-detail-empty"><Sparkles size={30}/><h2>从一条发现，接着看下去</h2><p>选择左侧发现，查看资料依据与处理记录。</p></div>}
    </div><p className="insights-footnote">{data.more?"当前数量仅含已载入发现 · ":""}保存在本机 · 资料按 Hub 当前同步内容核对 · 打开和筛选不会启动分析</p></>}
   </div>

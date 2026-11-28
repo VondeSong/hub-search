@@ -624,3 +624,24 @@
 .ip-dependency-confirmation{padding-top:18px;border-top:1px solid var(--line)}
 .ip-dependency-confirmation h4{font-size:14px}
 .ip-dependency-confirmation>p,.ip-dependency-confirmation label{font-size:12px}
+
+/* Feature 2: Insight Detail <-> Dida Task Creation & Bidirectional Links */
+.ip-task-links{margin:20px 0;padding:16px 18px;border:1px solid var(--line);border-radius:10px;background:color-mix(in srgb,var(--surface-2) 55%,var(--surface))}
+.ip-task-link-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.ip-task-link-card{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.ip-task-link-info{min-width:0;flex:1}
+.ip-task-link-top{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.ip-task-link-top strong{font-size:12px;font-weight:550;color:var(--text)}
+.ip-task-link-info small{display:block;font-size:10px;color:var(--muted);margin-top:4px}
+.ip-task-feedback{margin-top:10px;font-size:11px;color:var(--accent)}
+.ip-task-drawer{margin-top:12px;padding:14px;border:1px solid var(--line);border-radius:9px;background:var(--surface);display:flex;flex-direction:column;gap:12px}
+.ip-task-drawer-tabs{display:inline-flex;gap:4px;padding:3px;border-radius:8px;background:var(--surface-2);width:fit-content}
+.ip-task-drawer-tabs button{padding:5px 11px;border-radius:6px;font-size:11px;color:var(--muted)}
+.ip-task-drawer-tabs button[aria-selected="true"]{background:var(--surface);color:var(--text);font-weight:550;box-shadow:0 1px 2px rgba(15,23,42,.08)}
+.ip-task-drawer-form{display:flex;flex-direction:column;gap:10px}
+.ip-task-drawer-form label{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--subtle)}
+.ip-task-drawer-form input,.ip-task-drawer-form select{padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--surface-2);color:var(--text);font-size:12px}
+.ip-task-source-confirm{padding:9px 11px;border-radius:7px;background:var(--surface-2);border:1px solid var(--line)}
+.ip-task-source-confirm span{display:block;font-size:10px;font-weight:550;color:var(--muted);margin-bottom:3px}
+.ip-task-source-confirm p{margin:0;font-size:11px;line-height:1.65;color:var(--subtle)}
+.ip-task-drawer-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:2px}

@@ -515,6 +515,73 @@
                 </blockquote>
               </div>
 
+              <!-- Insight -> Action: Create / Link Dida Tasks -->
+              <section id="section-linked-tasks" class="p-4 bg-white border border-[var(--hair-strong)] rounded-xl space-y-3 shadow-sm" aria-label="发现转行动与关联滴答任务">
+                <div class="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <div class="text-xs font-semibold text-[var(--ink)] flex items-center gap-1.5">
+                      <i data-lucide="list-todo" class="w-3.5 h-3.5 text-blue-600"></i>
+                      <span>发现 → 行动（关联滴答任务）</span>
+                      <span id="linked-tasks-count" class="px-1.5 py-0.5 rounded-full bg-black/5 text-[10px] font-mono-tech text-[var(--ink-secondary)]">0 项</span>
+                    </div>
+                    <p class="text-[11px] text-[var(--ink-muted)] mt-0.5">从当前发现创建或关联滴答任务，确认标题、目标清单与来源，支持双向回跳与实时状态。</p>
+                  </div>
+                  <button type="button" id="btn-toggle-task-drawer" onclick="toggleLinkedTaskDrawer()" class="px-2.5 py-1 bg-white hover:bg-black/5 text-[var(--ink)] border border-[var(--hair-strong)] rounded-lg text-xs font-medium transition-colors flex items-center gap-1">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                    <span id="txt-toggle-task-drawer">创建 / 关联滴答任务</span>
+                  </button>
+                </div>
+
+                <div id="linked-tasks-list" class="space-y-1.5"></div>
+                <div id="linked-tasks-feedback" class="hidden px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px]" role="status"></div>
+
+                <div id="linked-task-drawer" class="hidden p-3 rounded-lg bg-[var(--paper-well)] border border-[var(--hair-strong)] space-y-3">
+                  <div class="inline-flex p-0.5 rounded-lg bg-black/5 text-[11px]" role="tablist">
+                    <button type="button" id="tab-task-create" role="tab" aria-selected="true" onclick="setLinkedTaskTab('create')" class="px-2.5 py-1 rounded-md bg-white text-[var(--ink)] font-medium shadow-sm">新建滴答任务</button>
+                    <button type="button" id="tab-task-link" role="tab" aria-selected="false" onclick="setLinkedTaskTab('link')" class="px-2.5 py-1 rounded-md text-[var(--ink-secondary)]">关联已有任务</button>
+                  </div>
+
+                  <div id="panel-task-create" class="space-y-2.5 text-xs">
+                    <label class="block space-y-1">
+                      <span class="text-[11px] text-[var(--ink-secondary)]">任务标题</span>
+                      <input type="text" id="ipt-link-task-title" aria-label="滴答任务标题" class="w-full px-2.5 py-1.5 text-xs bg-white border border-[var(--hair-strong)] rounded-lg outline-none focus:ring-1 focus:ring-blue-500">
+                    </label>
+                    <label class="block space-y-1">
+                      <span class="text-[11px] text-[var(--ink-secondary)]">目标滴答清单</span>
+                      <select id="sel-link-task-list" aria-label="目标滴答清单" class="w-full px-2.5 py-1.5 text-xs bg-white border border-[var(--hair-strong)] rounded-lg outline-none">
+                        <option value="线束项目">线束项目</option>
+                        <option value="学习安排">学习安排</option>
+                        <option value="收件箱">收件箱</option>
+                        <option value="稍后处理">稍后处理</option>
+                      </select>
+                    </label>
+                    <div class="p-2 rounded-lg bg-white border border-[var(--hair)] text-[11px] text-[var(--ink-secondary)]">
+                      <div class="font-semibold text-[var(--ink)] mb-0.5">来源确认</div>
+                      <p id="txt-link-task-source"></p>
+                    </div>
+                    <div class="flex justify-end gap-2">
+                      <button type="button" onclick="toggleLinkedTaskDrawer(false)" class="px-2.5 py-1 bg-white hover:bg-black/5 border border-[var(--hair-strong)] rounded-lg text-xs">取消</button>
+                      <button type="button" onclick="confirmCreateLinkedTask()" class="px-3 py-1 bg-neutral-900 hover:bg-black text-white rounded-lg text-xs font-medium">确认创建并关联</button>
+                    </div>
+                  </div>
+
+                  <div id="panel-task-link" class="hidden space-y-2.5 text-xs">
+                    <label class="block space-y-1">
+                      <span class="text-[11px] text-[var(--ink-secondary)]">选择已有滴答任务</span>
+                      <select id="sel-link-existing-task" aria-label="选择已有滴答任务" class="w-full px-2.5 py-1.5 text-xs bg-white border border-[var(--hair-strong)] rounded-lg outline-none"></select>
+                    </label>
+                    <div class="p-2 rounded-lg bg-white border border-[var(--hair)] text-[11px] text-[var(--ink-secondary)]">
+                      <div class="font-semibold text-[var(--ink)] mb-0.5">来源确认</div>
+                      <p id="txt-link-existing-source"></p>
+                    </div>
+                    <div class="flex justify-end gap-2">
+                      <button type="button" onclick="toggleLinkedTaskDrawer(false)" class="px-2.5 py-1 bg-white hover:bg-black/5 border border-[var(--hair-strong)] rounded-lg text-xs">取消</button>
+                      <button type="button" onclick="confirmLinkExistingTask()" class="px-3 py-1 bg-neutral-900 hover:bg-black text-white rounded-lg text-xs font-medium">确认关联</button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
               <!-- Feedback / Correction Form (Disabled if v1 or security masked) -->
               <div id="section-feedback" class="pt-4 border-t border-[var(--hair)] space-y-3">
                 <div class="text-xs font-semibold text-[var(--ink)] flex items-center justify-between">

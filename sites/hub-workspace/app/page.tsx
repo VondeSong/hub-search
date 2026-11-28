@@ -11,7 +11,8 @@ import LibraryBrowser from "./LibraryBrowser";
 import SidebarResize,{useSidebarWidths} from "./SidebarResize";
 import FlashcardsSite from "./FlashcardsSite";
 import CloudSyncCenter, {type CloudPage,type RelatedSetting} from "./CloudSyncCenter";
-import {localTaskSamples} from "./task-data";
+import {localTaskSamples,didaTasks,taskProject,taskDate,taskStatus} from "./task-data";
+import {saveInsightTaskLink,PROTO_DIDA_LIBRARY_ID} from "./insight-task-links";
 import TaskWorkspace from "./TaskWorkspace";
 import JournalSite from "./JournalSite";
 import {localJournalDate} from "./journal-local/JournalViews";
@@ -83,6 +84,7 @@ export default function Hub() {
  const [ledger,setLedger]=useState<LedgerState>(()=>getLedger());
  const [libraryTarget,setLibraryTarget]=useState("");
  const [taskTarget,setTaskTarget]=useState("");
+ const [insightTarget,setInsightTarget]=useState("");
  const [view,setView]=useState<View>("all");
  const [filter,setFilter]=useState("all");
  const [query,setQuery]=useState("");
@@ -125,20 +127,88 @@ export default function Hub() {
  const [insightMode,setInsightMode]=useState<InsightMode>("reference");
  const isInsightReference=view==="insights"&&insightMode==="reference";
  const insightReferenceRef=useRef<HTMLIFrameElement>(null);
+ const buildReferenceTasksPayload=()=>{
+  const didaSaved=JSON.parse(localStorage.getItem("hub-dida-task-demo-v1")||"null")||{};
+  const statusMap=(didaSaved&&didaSaved.status)||{};
+  const checksMap=(didaSaved&&didaSaved.checks)||{};
+  const datesMap=(didaSaved&&didaSaved.dates)||{};
+  return [
+   ...didaTasks.map(n=>({
+    id:n.id,
+    title:n.title,
+    project:taskProject(n.id),
+    status:taskStatus(n.id,checksMap,statusMap),
+    due:taskDate(n.id,datesMap),
+   })),
+   ...items.filter(item=>item.kind==="task"&&item.source==="ticktick").map(item=>({
+    id:item.id,
+    title:item.title,
+    project:item.project||item.space||"收件箱",
+    status:item.taskState||"todo",
+    due:item.due||"",
+   })),
+  ];
+ };
+ const syncInsightReferenceFrame=(targetId?:string)=>{
+  const win=insightReferenceRef.current?.contentWindow;
+  if(!win)return;
+  try{
+   win.postMessage({type:"hub:tasks-sync",tasks:buildReferenceTasksPayload()},window.location.origin);
+   if(targetId&&targetId.startsWith("INS-")){
+    win.postMessage({type:"hub:select-insight",insightId:targetId},window.location.origin);
+   }
+  }catch{}
+ };
  useEffect(()=>{
   if(!isInsightReference)return;
-  const openInsightWorkflow=(event:MessageEvent)=>{
-   if(event.origin!==window.location.origin||event.source!==insightReferenceRef.current?.contentWindow||event.data!=="hub:open-insight-workflow")return;
-   const url=new URL(window.location.href);
-   url.searchParams.set("view","insights");
-   url.searchParams.set("section","workflow");
-   window.history.replaceState(null,"",url);
-   setInsightMode("current");
-   setSidebar(window.innerWidth>=1100);
+  const onReferenceMessage=(event:MessageEvent)=>{
+   if(event.origin!==window.location.origin||event.source!==insightReferenceRef.current?.contentWindow)return;
+   if(event.data==="hub:open-insight-workflow"){
+    const url=new URL(window.location.href);
+    url.searchParams.set("view","insights");
+    url.searchParams.set("section","workflow");
+    window.history.replaceState(null,"",url);
+    setInsightMode("current");
+    setSidebar(window.innerWidth>=1100);
+    return;
+   }
+   const payload=event.data;
+   if(!payload||typeof payload!=="object")return;
+   if(payload.type==="hub:insights-ready"){
+    syncInsightReferenceFrame(insightTarget);
+    if(insightTarget&&insightTarget.startsWith("INS-"))setInsightTarget("");
+   }else if(payload.type==="hub:open-task"&&typeof payload.taskId==="string"){
+    setTaskTarget(payload.taskId);
+    setView("tasks");
+    setMobileDetail(false);
+   }else if(payload.type==="hub:create-dida-task"&&payload.payload&&typeof payload.payload.title==="string"){
+    const req=payload.payload;
+    const id=createDidaDemoTask({
+     title:req.title,
+     project:req.project||"收件箱",
+     body:req.body||"",
+     insightId:req.insightId||"",
+     workId:req.workId,
+    });
+    saveInsightTaskLink({
+     insightId:req.insightId||"",
+     taskId:id,
+     libraryId:PROTO_DIDA_LIBRARY_ID,
+     insightTitle:req.insightTitle||req.insightId||"",
+     taskTitle:req.title.trim(),
+     listName:req.project||"收件箱",
+     sourceLabel:req.sourceLabel||"",
+    });
+    notify(`已从洞察创建并关联滴答任务「${req.title.trim()}」`);
+    window.setTimeout(()=>syncInsightReferenceFrame(),40);
+   }else if(payload.type==="hub:insight-links-updated"){
+    window.dispatchEvent(new Event("hub-proto-insight-task-links-change"));
+   }
   };
-  window.addEventListener("message",openInsightWorkflow);
-  return ()=>window.removeEventListener("message",openInsightWorkflow);
- },[isInsightReference]);
+  window.addEventListener("message",onReferenceMessage);
+  syncInsightReferenceFrame(insightTarget);
+  return ()=>window.removeEventListener("message",onReferenceMessage);
+ },[isInsightReference,insightTarget,items]);
  const [insightScope,setInsightScope]=useState<InsightScope>("all");
  const [returnToInsights,setReturnToInsights]=useState(false);
  const insightReturn=useRef({filter:"all",review:false,mode:"current" as InsightMode,scope:"all" as InsightScope,query:""});
@@ -362,6 +432,46 @@ export default function Hub() {
   }));
   setItems(all=>[...created,...all]);
  };
+ const createDidaDemoTask=(args:{title:string;project:string;body:string;insightId:string;workId?:string;sourceIds?:string[]})=>{
+  const id="dida-insight-"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  const item:WorkspaceItem={
+   id,title:args.title.trim(),kind:"task",source:"ticktick",space:args.project||"收件箱",project:args.project||"收件箱",
+   group:"今天",date:localJournalDate(),dateLabel:"刚刚",tags:["洞察任务"],excerpt:args.body.trim().slice(0,160),
+   sections:args.body.trim().split(/\n\s*\n/).filter(Boolean).map(text=>({type:"p" as const,text})),
+   taskState:"todo",due:"",originInsightId:args.insightId,workId:args.workId,originSourceIds:args.sourceIds,
+  };
+  setItems(all=>[item,...all]);
+  return id;
+ };
+ const createQuickProjectTask=(title:string,project:string)=>{
+  const id="dida-quick-"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  const item:WorkspaceItem={
+   id,title:title.trim(),kind:"task",source:"ticktick",space:project||"收件箱",project:project||"收件箱",
+   group:"今天",date:localJournalDate(),dateLabel:"刚刚",tags:[],excerpt:"从每周回顾补充的专题下一步。",
+   sections:[{type:"p",text:"从每周回顾补充的专题下一步（原型示例）。"}],taskState:"todo",due:"",
+  };
+  setItems(all=>[item,...all]);
+  return id;
+ };
+ const openTaskFromInsight=(taskId:string)=>{
+  setTaskTarget(taskId);
+  setView("tasks");
+  setMobileDetail(false);
+ };
+ const openInsightFromTask=(insightId:string)=>{
+  setInsightTarget(insightId);
+  setView("insights");
+  if(insightId.startsWith("INS-")){
+   setInsightMode("reference");
+  }else{
+   setInsightMode("current");
+   setReview(false);
+   setFilter("everything");
+   setInsightScope("all");
+   setQuery("");
+  }
+  setMobileDetail(false);
+ };
  const addItem=(kind:ItemKind,title:string,body:string,origin?:DraftOrigin)=>{
   const id=createLocalItem(kind,title,body,origin);if(!id)return "";changeView(kind==="task"?"tasks":kind==="journal"?"journal":"all");setSelectedId(id);setMobileDetail(true);rememberOpen(id);notify(kind==="task"?"任务已保存在当前浏览器的演示清单":"记录已保存在当前浏览器");return id;
  };
@@ -496,7 +606,7 @@ export default function Hub() {
     </div><div className="toolbar-right"><span className="prototype-label"><span/>交互原型</span>{view!=="insights"&&view!=="flashcards"&&<><div className="toolbar-divider"/><IconButton label="筛选资料来源" onClick={()=>setFilterOpen(v=>!v)} active={filterOpen||!!sources.length}><SlidersHorizontal size={17}/></IconButton><IconButton label={density==="compact"?"切换宽松列表":"切换紧凑列表"} onClick={()=>setDensity(d=>d==="compact"?"comfortable":"compact")}><LayoutList size={17}/></IconButton><IconButton label={preview?"隐藏阅读面板":"显示阅读面板"} active={preview} onClick={()=>{setPreview(v=>!v);setFocused(false);}}><PanelRight size={17}/></IconButton></>}</div>
    {filterOpen&&<div className="source-popover"><h3>资料来源</h3><p>选择本次浏览的范围</p>{(Object.keys(sourceMeta) as SourceId[]).map(s=><label key={s}><SourceIcon source={s} small/><span>{sourceMeta[s].name}</span><input type="checkbox" checked={sources.includes(s)} onChange={()=>setSources(prev=>prev.includes(s)?prev.filter(x=>x!==s):[...prev,s])}/></label>)}<footer><button onClick={()=>setSources([])}>全部资料库</button><button className="primary-button small-button" onClick={()=>setFilterOpen(false)}>完成</button></footer></div>}
    </header>}
-   {isInsightReference?<iframe ref={insightReferenceRef} className="hub-reading-frame" title="洞察工作区 v4" src="/insights-workspace/index.html"/>:view==="reading"?<iframe className="hub-reading-frame" title="阅读工作区" src="/reading-workspace/index.html"/>:view==="tags"?<TagWorkspace searchRef={searchRef} review={tagReview} reviewTarget={tagReviewTarget} onOpenAssistant={openTagChat} initialTag={filter} navigationOpen={sidebar} navigationResizer={navigationResizer} onToggleNavigation={()=>setSidebar(v=>!v)} renderIcon={source=><SourceIcon source={source}/>} sources={sources} onSources={setSources} query={query} onQuery={setQuery} notify={notify}/>:view==="cloud"||view==="settings"?<CloudSyncCenter initialPage={view==="settings"?relatedSetting:cloudPage} standalone={view==="settings"} onOpenSettings={openRelatedSettings} onOpenCloud={openCloudSection} onExit={()=>changeView(view==="settings"?settingsReturn.current:cloudReturn.current)}/>:view==="libraries"?<LibraryBrowser navigationResizer={navigationResizer} initialNodeId={libraryTarget} navigationOpen={sidebar} onToggleNavigation={()=>setSidebar(value=>!value)} onExit={()=>changeView("all")} notify={notify}/>:view==="tasks"?<TaskWorkspace onDiscussAnalysis={context=>openDiscussion("task",context)} onOpenAnalysis={openOriginalTaskAnalysis} navigationResizer={navigationResizer} initialTaskId={taskTarget} items={availableItems} onUpdate={updateItem} onNew={()=>openNew("task")} onLocate={id=>{setLibraryTarget(id);setView("libraries");}} navigationOpen={sidebar} onToggleNavigation={()=>setSidebar(v=>!v)}/>:view==="journal"?<JournalSite onOpenSettings={()=>openRelatedSettings("journal")} onOpenCloud={openCloud} navigationResizer={navigationResizer} items={availableItems} onCreateTasks={createJournalTasks} onUpdateTask={updateItem} onTaskOpen={id=>{setTaskTarget(id);setView("tasks");}} navigationOpen={sidebar} onToggleNavigation={()=>setSidebar(v=>!v)}/>:view==="insights"?<div className={"insights-host "+(insightMode==="explore"?"legacy-insights-host":"")}>{insightMode==="current"?<InsightPanel onOpenSource={openSource} onAssistant={openInsightDiscussion} onCreateDraft={createLocalItem} onSourceVersionChange={sourceVersionChanged} onOverlayOpen={()=>setAgentsContextOpen(false)} onFilterChange={setFilter} items={availableItems} notify={notify} query={query} onQueryChange={setQuery} filter={filter} review={review} onReviewChange={setReview} scope={insightScope} onScopeChange={scope=>{if(["all","review","starred","knowledge","life","decision","cases"].includes(scope))setInsightScope(scope as InsightScope);}} navigationOpen={sidebar} onOpenNavigation={()=>setSidebar(true)} onExplore={()=>changeInsightSection("examples")}/>:<><div className="insight-exploration-banner"><span>{review?"阶段回顾":filter==="topics"?"关注主题":filter==="drafts"?"工作草稿":"更多发现"}<i/>探索示例</span><button onClick={()=>changeInsightSection("discoveries")}><ArrowLeft size={13}/>返回发现</button></div>{explorationBlocked?<div className="empty-state"><FileText size={28}/><h3>部分示例来源当前不可用</h3><p>相关历史演示暂时隐藏。恢复来源后，可以继续浏览。</p><button className="secondary-button" onClick={()=>changeInsightSection("discoveries")}>返回发现核对来源</button></div>:<Insights onOpenSource={openSource} onAssistant={openInsightDiscussion} onCreateDraft={createLocalItem} onSourceVersionChange={sourceVersionChanged} onOverlayOpen={()=>setAgentsContextOpen(false)} onFilterChange={setFilter} items={availableItems} notify={notify} query={query} filter={filter} review={review} onReviewChange={setReview}/>}</>}</div>:view==="flashcards"?<FlashcardsSite onCloud={openCloud} navigationResizer={navigationResizer} navigationWidth={sidebarWidth} navigationOpen={sidebar} onToggleNavigation={()=>setSidebar(v=>!v)} onExit={()=>changeView("all")}/>:<div className={"content-workspace "+(!preview?"no-preview ":"")+(focused?"reader-focused":"")}>
+   {isInsightReference?<iframe ref={insightReferenceRef} className="hub-reading-frame" title="洞察工作区 v4" src="/insights-workspace/index.html" onLoad={()=>{syncInsightReferenceFrame(insightTarget);if(insightTarget&&insightTarget.startsWith("INS-"))setInsightTarget("");}}/>:view==="reading"?<iframe className="hub-reading-frame" title="阅读工作区" src="/reading-workspace/index.html"/>:view==="tags"?<TagWorkspace searchRef={searchRef} review={tagReview} reviewTarget={tagReviewTarget} onOpenAssistant={openTagChat} initialTag={filter} navigationOpen={sidebar} navigationResizer={navigationResizer} onToggleNavigation={()=>setSidebar(v=>!v)} renderIcon={source=><SourceIcon source={source}/>} sources={sources} onSources={setSources} query={query} onQuery={setQuery} notify={notify}/>:view==="cloud"||view==="settings"?<CloudSyncCenter initialPage={view==="settings"?relatedSetting:cloudPage} standalone={view==="settings"} onOpenSettings={openRelatedSettings} onOpenCloud={openCloudSection} onExit={()=>changeView(view==="settings"?settingsReturn.current:cloudReturn.current)}/>:view==="libraries"?<LibraryBrowser navigationResizer={navigationResizer} initialNodeId={libraryTarget} navigationOpen={sidebar} onToggleNavigation={()=>setSidebar(value=>!value)} onExit={()=>changeView("all")} notify={notify}/>:view==="tasks"?<TaskWorkspace onDiscussAnalysis={context=>openDiscussion("task",context)} onOpenAnalysis={openOriginalTaskAnalysis} onOpenInsight={openInsightFromTask} onQuickAddTask={createQuickProjectTask} navigationResizer={navigationResizer} initialTaskId={taskTarget} items={availableItems} onUpdate={updateItem} onNew={()=>openNew("task")} onLocate={id=>{setLibraryTarget(id);setView("libraries");}} navigationOpen={sidebar} onToggleNavigation={()=>setSidebar(v=>!v)}/>:view==="journal"?<JournalSite onOpenSettings={()=>openRelatedSettings("journal")} onOpenCloud={openCloud} navigationResizer={navigationResizer} items={availableItems} onCreateTasks={createJournalTasks} onUpdateTask={updateItem} onTaskOpen={id=>{setTaskTarget(id);setView("tasks");}} navigationOpen={sidebar} onToggleNavigation={()=>setSidebar(v=>!v)}/>:view==="insights"?<div className={"insights-host "+(insightMode==="explore"?"legacy-insights-host":"")}>{insightMode==="current"?<InsightPanel onOpenSource={openSource} onAssistant={openInsightDiscussion} onCreateDraft={createLocalItem} onCreateDidaTask={createDidaDemoTask} onOpenTask={openTaskFromInsight} initialInsightId={insightTarget} onInitialInsightHandled={()=>setInsightTarget("")} onSourceVersionChange={sourceVersionChanged} onOverlayOpen={()=>setAgentsContextOpen(false)} onFilterChange={setFilter} items={availableItems} notify={notify} query={query} onQueryChange={setQuery} filter={filter} review={review} onReviewChange={setReview} scope={insightScope} onScopeChange={scope=>{if(["all","review","starred","knowledge","life","decision","cases"].includes(scope))setInsightScope(scope as InsightScope);}} navigationOpen={sidebar} onOpenNavigation={()=>setSidebar(true)} onExplore={()=>changeInsightSection("examples")}/>:<><div className="insight-exploration-banner"><span>{review?"阶段回顾":filter==="topics"?"关注主题":filter==="drafts"?"工作草稿":"更多发现"}<i/>探索示例</span><button onClick={()=>changeInsightSection("discoveries")}><ArrowLeft size={13}/>返回发现</button></div>{explorationBlocked?<div className="empty-state"><FileText size={28}/><h3>部分示例来源当前不可用</h3><p>相关历史演示暂时隐藏。恢复来源后，可以继续浏览。</p><button className="secondary-button" onClick={()=>changeInsightSection("discoveries")}>返回发现核对来源</button></div>:<Insights onOpenSource={openSource} onAssistant={openInsightDiscussion} onCreateDraft={createLocalItem} onSourceVersionChange={sourceVersionChanged} onOverlayOpen={()=>setAgentsContextOpen(false)} onFilterChange={setFilter} items={availableItems} notify={notify} query={query} filter={filter} review={review} onReviewChange={setReview}/>}</>}</div>:view==="flashcards"?<FlashcardsSite onCloud={openCloud} navigationResizer={navigationResizer} navigationWidth={sidebarWidth} navigationOpen={sidebar} onToggleNavigation={()=>setSidebar(v=>!v)} onExit={()=>changeView("all")}/>:<div className={"content-workspace "+(!preview?"no-preview ":"")+(focused?"reader-focused":"")}>
     <section className="results-pane" aria-label={viewTitle+"列表"}>
      <div className="list-toolbar"><div><span className="list-caption">{query?"搜索结果":journalDate||caption}</span><span className="list-count">{visibleItems.length}</span></div><div className="list-toolbar-actions"><IconButton label="新建记录" onClick={()=>openNew()}><Plus size={17}/></IconButton></div></div>
      {!!sources.length&&<div className="active-filters">{sources.map(s=><button key={s} onClick={()=>setSources(all=>all.filter(x=>x!==s))}><SourceIcon source={s} small/>{sourceMeta[s].name}<X size={11}/></button>)}</div>}

@@ -3,7 +3,7 @@ import { mobileTasks } from "./MobileInsightTasks";
 import { createPortal } from "react-dom";
 import { runtimeCapabilities } from "./RuntimePlatform";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Hourglass, Link2, Sparkles } from "lucide-react";
+import { Loader2, Hourglass, Link2, Sparkles } from "lucide-react";
 import type { QuickJournalItem } from "./JournalRecords";
 import type { LibrarySummary, SearchResult } from "./SearchTypes";
 import type { UnifiedTask } from "./TaskWorkspacePresentation";
@@ -22,7 +22,7 @@ import {
   type Clue,
   type Material,
 } from "./ActionEvidence";
-import { read, write, identity, type ActionMeta, type Decision, type Wait } from "./ActionState";
+import { metaFor, legacyRecords, read, write, identity, type ActionMeta, type Decision, type Wait } from "./ActionState";
 import { Materials } from "./ActionMaterials";
 import { sourceNoteStatus, type TaskNoteAction } from "./TaskPlanningSource";
 
@@ -30,6 +30,22 @@ type AdoptionOptions = Pick<Decision, "projectId" | "priority">;
 type DecisionMap = Record<string, Decision>;
 type AdoptionMode = "backlog" | "today" | "wait";
 type Receipt = { state: string; task?: UnifiedTask; error?: string; sourceId?: string };
+type PendingAppendPreview = {
+  mode: "link" | "resolveWait" | "recovery";
+  task: UnifiedTask;
+  clue: Clue;
+  noteText: string;
+  targetWait?: Wait;
+  nextStepText?: string;
+  pending?: Decision;
+  prepared?: TaskNoteAction;
+  prepareError?: string;
+};
+type SplitReceipt = {
+  local: { status: "ok" | "cancelled" | "unchanged"; text: string };
+  remote: { status: "ok" | "cancelled" | "pending" | "error"; text: string };
+  task?: UnifiedTask;
+};
 const CLUES_PER_PAGE = 3;
 export function ActionHarvester({
   tasks,
@@ -67,6 +83,8 @@ export function ActionHarvester({
   const [busy, setBusy] = useState(""),
     [msg, setMsg] = useState(""),
     [messageKey, setMessageKey] = useState(""),
+    [pendingAppend, setPendingAppend] = useState<PendingAppendPreview | null>(null),
+    [splitReceipt, setSplitReceipt] = useState<SplitReceipt | null>(null),
     [mobileReceipt, setMobileReceipt] = useState<{task: UnifiedTask; linked: boolean} | null>(null),
     [mobileClue, setMobileClue] = useState<string>(()=>runtimeCapabilities.mobile ? window.history.state?.hubHarvestClue || "" : ""),
     [showScanOptions, setShowScanOptions] = useState(false),
@@ -238,7 +256,7 @@ export function ActionHarvester({
     if (runtimeCapabilities.mobile) setMobileReceipt({task: t, linked: linking});
     else onSelect(t);
   }
-  async function writeClueNote(t: UnifiedTask, c: Clue, text: string, pending?: Decision) {
+  async function prepareClueNoteAction(t: UnifiedTask, text: string, pending?: Decision) {
     let noteId = pending?.noteId;
     if (pending && !pending.noteText && !noteId) {
       // Earlier versions only saved the clue. Recover its receipt from the appended text.
@@ -252,32 +270,225 @@ export function ActionHarvester({
       if (candidates.length > 1) throw Error("找到多条对应回执，请在来源操作记录中核对。");
       noteId = candidates[0]?.id;
     }
-    const prepared = noteId
+    return noteId
       ? await native<TaskNoteAction>("inspectNote", { id: noteId })
       : await native<TaskNoteAction>("prepareNote", {
-          taskId: t.id, contentRevision: t.contentRevision, workId: "workbench-clue-" + t.sourceId, text,
+          taskId: t.id,
+          contentRevision: t.contentRevision,
+          workId: "workbench-clue-" + t.sourceId,
+          text,
         });
-    if (!pending?.noteId) {
-      await decide(c.key, { state: "linking", taskKey: identity(t), clue: c, noteText: text, noteId: prepared.id });
-    }
-    const result = ["prepared", "retryable"].includes(prepared.state)
-      ? await native<TaskNoteAction>("submitNote", { id: prepared.id })
-      : !noteId && ["unknown", "writing"].includes(prepared.state)
-        ? await native<TaskNoteAction>("inspectNote", { id: prepared.id })
-        : prepared;
-    if (result.state === "confirmed") await decide(c.key, { state: "linked", taskKey: identity(t) });
-    return result;
   }
+
+  async function openAppendPreview(draft: Omit<PendingAppendPreview, "prepared" | "prepareError">) {
+    setPanelKey("");
+    setPicker("");
+    try {
+      const prepared = await prepareClueNoteAction(draft.task, draft.noteText, draft.pending);
+      if (draft.mode === "recovery" && prepared.state === "confirmed") {
+        await decide(draft.clue.key, { state: "linked", taskKey: identity(draft.task) });
+        setPendingAppend(null);
+        setSplitReceipt({ local: { status: "ok", text: "???????" }, remote: { status: "ok", text: "??????????" }, task: draft.task });
+        return;
+      }
+      if (draft.mode === "recovery" && draft.pending && !draft.pending.noteId) {
+        await decide(draft.clue.key, {
+          state: "linking",
+          taskKey: identity(draft.task),
+          clue: draft.clue,
+          noteText: draft.noteText,
+          noteId: prepared.id,
+        });
+      }
+      setPendingAppend({ ...draft, prepared });
+      setMsg("已生成滴答远端追加预览，请确认后再写入远端任务，或取消/仅保留本地关联。");
+    } catch (e) {
+      setPendingAppend({ ...draft, prepareError: String(e) });
+      setMsg("滴答远端追加预览准备失败，可改为仅保留本地关联或取消。");
+    }
+  }
+
+  async function applyLocalResolveWait(t: UnifiedTask, targetWait: Wait, c: Clue, nextStepText: string, linking: boolean, noteText: string, noteId?: string) {
+    const evidence = c.material.title + "\n" + c.material.text;
+    const cleanStep = nextStepText.trim();
+    await onUpdate(t, (m) => ({
+      ...m,
+      waits: m.waits.map((w) => (w.id === targetWait.id ? { ...w, resolved: day } : w)),
+      steps:
+        cleanStep && !m.steps.some((step) => step.text.trim() === cleanStep)
+          ? [...m.steps, { id: crypto.randomUUID(), text: cleanStep, done: false }]
+          : m.steps,
+      links: [...m.links.filter((x) => x.id !== c.material.id || x.text !== c.material.text), c.material],
+      note: m.note?.includes(evidence) ? m.note : [m.note, evidence].filter(Boolean).join("\n\n"),
+    }));
+    await decide(
+      c.key,
+      linking
+        ? { state: "linking", taskKey: identity(t), clue: c, noteText, ...(noteId ? { noteId } : {}) }
+        : { state: "linked", taskKey: identity(t) },
+    );
+    if (runtimeCapabilities.mobile) setMobileReceipt({ task: t, linked: true });
+    else onSelect(t);
+  }
+
+  async function confirmAppendPreview() {
+    const preview = pendingAppend;
+    if (!preview) return;
+    const cleanStep = preview.nextStepText?.trim() || "";
+    const localSummary =
+      preview.mode === "resolveWait" && preview.targetWait
+        ? cleanStep
+          ? `已将「${preview.targetWait.what}」标为已收到，并添加下一步「${cleanStep}」与来源备料`
+          : `已将「${preview.targetWait.what}」标为已收到并关联来源备料`
+        : `已关联至「${preview.task.title}」并保留来源与本地备注`;
+
+    if (preview.mode === "link") {
+      await attach(preview.task, preview.clue, false, undefined, true);
+    } else if (preview.mode === "resolveWait" && preview.targetWait) {
+      await applyLocalResolveWait(
+        preview.task,
+        preview.targetWait,
+        preview.clue,
+        cleanStep,
+        true,
+        preview.noteText,
+        preview.prepared?.id,
+      );
+    } else if (runtimeCapabilities.mobile) {
+      setMobileReceipt({ task: preview.task, linked: true });
+    }
+
+    try {
+      const prepared = preview.prepared ?? (await prepareClueNoteAction(preview.task, preview.noteText, preview.pending));
+      await decide(preview.clue.key, {
+        state: "linking",
+        taskKey: identity(preview.task),
+        clue: preview.clue,
+        noteText: preview.noteText,
+        noteId: prepared.id,
+      });
+      const result = ["prepared", "retryable"].includes(prepared.state)
+        ? await native<TaskNoteAction>("submitNote", { id: prepared.id })
+        : ["unknown", "writing"].includes(prepared.state)
+          ? await native<TaskNoteAction>("inspectNote", { id: prepared.id })
+          : prepared;
+      if (result.state === "confirmed") {
+        await decide(preview.clue.key, { state: "linked", taskKey: identity(preview.task) });
+      }
+      const remoteText = sourceNoteStatus(result);
+      setPendingAppend(null);
+      setSplitReceipt({
+        local: { status: "ok", text: localSummary },
+        remote: {
+          status: result.state === "confirmed" ? "ok" : result.state === "cancelled" ? "cancelled" : "pending",
+          text: remoteText,
+        },
+        task: preview.task,
+      });
+      const summary = `${localSummary}。${remoteText}`;
+      setMsg(summary);
+    } catch (e) {
+      const remoteErr = "滴答备注待处理：" + String(e);
+      setPendingAppend(null);
+      setSplitReceipt({
+        local: { status: "ok", text: localSummary },
+        remote: { status: "error", text: remoteErr },
+        task: preview.task,
+      });
+      const summary = `${localSummary}。${remoteErr}`;
+      setMsg(summary);
+    }
+  }
+
+  async function confirmPreviewCancelled(preview: PendingAppendPreview) {
+    if (!preview.prepared) {
+      if (preview.mode === "recovery") throw Error("????????????");
+      return;
+    }
+    const receipt = preview.prepared;
+    if (receipt.state === "cancelled") return;
+    if (!["prepared", "retryable"].includes(receipt.state)) throw Error("???????????????");
+    const result = await native<TaskNoteAction>("cancelNote", { id: receipt.id });
+    if (result.state !== "cancelled") throw Error("????????????????");
+  }
+
+  async function keepLocalOnlyFromPreview() {
+    const preview = pendingAppend;
+    if (!preview) return;
+    const cleanStep = preview.nextStepText?.trim() || "";
+    await confirmPreviewCancelled(preview);
+    if (preview.mode === "link") {
+      await attach(preview.task, preview.clue, false, undefined, false);
+    } else if (preview.mode === "resolveWait" && preview.targetWait) {
+      await applyLocalResolveWait(
+        preview.task,
+        preview.targetWait,
+        preview.clue,
+        cleanStep,
+        false,
+        preview.noteText,
+      );
+    } else {
+      await decide(preview.clue.key, { state: "linked", taskKey: identity(preview.task) });
+      onSelect(preview.task);
+    }
+    const localSummary =
+      preview.mode === "resolveWait" && preview.targetWait
+        ? cleanStep
+          ? `已将「${preview.targetWait.what}」标为已收到，并添加本地下一步「${cleanStep}」`
+          : `已将「${preview.targetWait.what}」标为已收到并完成本地关联`
+        : `已关联至「${preview.task.title}」并保留来源与本地备注`;
+    setPendingAppend(null);
+    setSplitReceipt({
+      local: { status: "ok", text: localSummary },
+      remote: { status: "cancelled", text: "已取消滴答远端追加，原任务内容未改动" },
+      task: preview.task,
+    });
+    const summary = `${localSummary}；滴答远端未改动。`;
+    setMsg(summary);
+  }
+
+  async function cancelAppendPreview() {
+    const preview = pendingAppend;
+    if (!preview) return;
+    await confirmPreviewCancelled(preview);
+    setPendingAppend(null);
+    setSplitReceipt({
+      local: {
+        status: "unchanged",
+        text: preview.mode === "recovery" ? "保持待核对状态，本地关联未变更" : "已取消关联，本地备注与等待状态未改动",
+      },
+      remote: { status: "cancelled", text: "已取消滴答远端追加预览，远端任务未改动" },
+      task: preview.task,
+    });
+    const summary = "已取消远端追加预览，本地与滴答均未改动。";
+    setMsg(summary);
+  }
+
   async function link(t: UnifiedTask, c: Clue, pending?: Decision) {
     const noteText = pending?.noteText ?? (c.material.title + "\n" + c.material.text);
-    if (!pending) await attach(t, c, false, undefined, true);
-    else if (runtimeCapabilities.mobile) setMobileReceipt({task: t, linked: true});
-    try {
-      const result = await writeClueNote(t, c, noteText, pending);
-      setMsg("已关联到备料与推进备注。" + sourceNoteStatus(result));
-    } catch (e) {
-      setMsg("已保留来源及本地备注。滴答备注待处理：" + String(e));
-    }
+    await openAppendPreview({
+      mode: pending ? "recovery" : "link",
+      task: t,
+      clue: c,
+      noteText,
+      pending,
+    });
+  }
+
+  async function resolveWaitAndAdvance(t: UnifiedTask, targetWait: Wait, c: Clue, nextStepText?: string) {
+    const cleanStep = nextStepText?.trim() || "";
+    const noteText = cleanStep
+      ? `${c.material.title}\n${c.material.text}\n（已收到「${targetWait.what}」，下一步：${cleanStep}）`
+      : `${c.material.title}\n${c.material.text}\n（已收到「${targetWait.what}」）`;
+    await openAppendPreview({
+      mode: "resolveWait",
+      task: t,
+      clue: c,
+      noteText,
+      targetWait,
+      nextStepText: cleanStep,
+    });
   }
   async function create(
     c: Clue,
@@ -501,6 +712,24 @@ export function ActionHarvester({
               </div>
             </div>
           )}
+          {splitReceipt && (
+            <section className="aw-harvester-split-receipt" aria-label="行动捕手分开回执" role="status">
+              <div className="aw-harvester-split-head">
+                <strong>处理回执（本地 / 滴答远端已分开）</strong>
+                <button type="button" aria-label="关闭分开回执" onClick={() => setSplitReceipt(null)}>
+                  ×
+                </button>
+              </div>
+              <div className={`aw-harvester-receipt-row is-${splitReceipt.local.status}`}>
+                <span>本地回执</span>
+                <p>{splitReceipt.local.text}</p>
+              </div>
+              <div className={`aw-harvester-receipt-row is-${splitReceipt.remote.status}`}>
+                <span>滴答远端回执</span>
+                <p>{splitReceipt.remote.text}</p>
+              </div>
+            </section>
+          )}
           <div className="aw-clue-list">
             {visibleClues.map((c) => {
               const actionStatus = messageKey === c.key && (busy || msg) && (
@@ -518,25 +747,111 @@ export function ActionHarvester({
                 setPicker(choosing ? "" : c.key);
                 setMatchSearch("");
               };
-              if (saved?.state === "linking") {
+              const isCardBusy = busy === c.key;
+              const activeAppendPreview = pendingAppend?.clue.key === c.key ? pendingAppend : null;
+              const appendPreviewBox = activeAppendPreview && (
+                <section className="aw-harvester-append-preview" aria-label="滴答远端追加预览">
+                  <div className="aw-harvester-append-head">
+                    <strong>远端追加预览（确认后才写入滴答任务）</strong>
+                    <small>
+                      目标任务：{activeAppendPreview.task.title} ·{" "}
+                      {activeAppendPreview.task.collectionName || activeAppendPreview.task.documentTitle || "收件箱"} ·{" "}
+                      {activeAppendPreview.task.libraryName}
+                    </small>
+                  </div>
+                  {activeAppendPreview.prepared ? (
+                    <div className="aw-harvester-append-diff">
+                      <div>
+                        <span>追加前</span>
+                        <pre>{activeAppendPreview.prepared.before || "（原任务当前无备注）"}</pre>
+                      </div>
+                      <div>
+                        <span>追加后预览</span>
+                        <pre>{activeAppendPreview.prepared.after}</pre>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="aw-harvester-append-error" role="alert">
+                      <strong>滴答远端预览准备失败</strong>
+                      <p>{activeAppendPreview.prepareError || "无法读取远端任务版本，暂不可写入远端。"}</p>
+                      <small>待保留本地内容：{activeAppendPreview.noteText}</small>
+                    </div>
+                  )}
+                  <div className="aw-harvester-append-actions">
+                    <button
+                      type="button"
+                      className="aw-primary"
+                      disabled={
+                        !!busy ||
+                        !activeAppendPreview.prepared ||
+                        !["prepared", "retryable", "unknown", "writing"].includes(activeAppendPreview.prepared.state)
+                      }
+                      onClick={() => void run(c.key, () => confirmAppendPreview())}
+                    >
+                      {isCardBusy ? <Loader2 size={13} className="aw-spin" aria-hidden="true" /> : null}
+                      {isCardBusy ? "正在写入滴答…" : "确认追加到滴答"}
+                    </button>
+                    <button
+                      type="button"
+                      className="aw-clue-pill"
+                      disabled={!!busy}
+                      onClick={() => void run(c.key, () => keepLocalOnlyFromPreview())}
+                    >
+                      仅保留本地关联
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!!busy}
+                      onClick={() => void run(c.key, () => cancelAppendPreview())}
+                    >
+                      取消
+                    </button>
+                  </div>
+                </section>
+              );
+              if (!isCardBusy && saved?.state === "linking") {
                 const linked = tasks.find((t) => identity(t) === saved.taskKey);
                 return (
                   <article key={c.key}>
                     <strong>{c.title}</strong>
                     <p>已关联本地备料，滴答备注待核对。</p>
-                    {linked && (
-                      <button disabled={!!busy} onClick={() => void run(c.key, () => link(linked, c, saved))}>
-                        继续核对并追加到原任务
-                      </button>
-                    )}
-                    <button
-                      disabled={!!busy}
-                      onClick={() =>
-                        void run(c.key, () => decide(c.key, { state: "linked", taskKey: saved.taskKey }))
-                      }
-                    >
-                      仅保留本地关联
-                    </button>
+                    <div className="aw-clue-bar">
+                      <div className="aw-clue-primary-group">
+                        {linked && (
+                          <button
+                            className="aw-primary"
+                            disabled={!!busy}
+                            onClick={() => void run(c.key, () => link(linked, c, saved))}
+                          >
+                            继续核对并追加到原任务
+                          </button>
+                        )}
+                        <button
+                          className="aw-clue-pill"
+                          disabled={!!busy}
+                          onClick={() =>
+                            void run(c.key, async () => {
+                              if (!activeAppendPreview) {
+                                if (!linked) throw Error("???????????????");
+                                await link(linked, c, saved);
+                                return;
+                              }
+                              await confirmPreviewCancelled(activeAppendPreview);
+                              setPendingAppend(null);
+                              await decide(c.key, { state: "linked", taskKey: saved.taskKey });
+                              setSplitReceipt({
+                                local: { status: "ok", text: "已保留本地关联与备料" },
+                                remote: { status: "cancelled", text: "已跳过滴答远端追加，远端任务未改动" },
+                                task: linked,
+                              });
+                            })
+                          }
+                        >
+                          仅保留本地关联
+                        </button>
+                      </div>
+                    </div>
+                    {appendPreviewBox}
                     {actionStatus}
                   </article>
                 );
@@ -833,6 +1148,12 @@ export function ActionHarvester({
                       </div>
                     </form>
                   )}
+                  {selected && metaFor(selected, legacyRecords()).waits.filter(w => !w.resolved).map(w => (
+                    <button key={w.id} disabled={!!busy} onClick={() => void run(c.key, () => resolveWaitAndAdvance(selected, w, c))}>
+                      ?????????? ? {w.what}
+                    </button>
+                  ))}
+                  {appendPreviewBox}
                   {actionStatus}
                 </article>
               );

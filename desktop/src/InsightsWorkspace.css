@@ -983,3 +983,261 @@ body.resizing-panes .insights-split-gutter::after {
   .insights-sweep-bar::after { animation: none; width: 100%; opacity: 0.35; }
   .insights-v4 :is(.insights-card, .insights-reading-drawer, .insights-mode-switch > button, .insights-split-gutter::after) { transition: none; }
 }
+
+/* Insight Detail: Linked Dida Tasks (Bidirectional) */
+.insights-task-links {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 0.5px solid var(--insights-hairline-strong, rgba(15, 23, 42, 0.14));
+  border-radius: 12px;
+  background: #fafafb;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.insights-task-links-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.insights-task-links-head h4 {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--hub-text-primary, #18181b);
+}
+.insights-task-links-head h4 small {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--hub-text-secondary, #52525b);
+}
+.insights-task-links-head .insights-muted {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--hub-text-tertiary, #71717a);
+}
+.insights-task-links-head > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 8px;
+  border: 0.5px solid var(--insights-hairline-strong, rgba(15, 23, 42, 0.16));
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--hub-text-primary, #18181b);
+  cursor: pointer;
+}
+.insights-task-link-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.insights-task-link-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  border: 0.5px solid var(--insights-hairline, rgba(15, 23, 42, 0.1));
+  background: #ffffff;
+}
+.insights-task-link-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.insights-task-link-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.insights-task-link-title strong {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--hub-text-primary, #18181b);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.insights-task-link-info small {
+  font-size: 11.5px;
+  color: var(--hub-text-tertiary, #71717a);
+}
+.insights-task-status-pill {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.insights-task-status-pill.is-open {
+  background: rgba(0, 122, 255, 0.1);
+  color: #1d4ed8;
+}
+.insights-task-status-pill.is-done {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+}
+.insights-task-status-pill.is-muted {
+  background: rgba(15, 23, 42, 0.06);
+  color: #52525b;
+}
+.insights-task-link-card > button {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 7px;
+  border: 0.5px solid var(--insights-hairline-strong, rgba(15, 23, 42, 0.16));
+  background: #ffffff;
+  font-size: 12px;
+  color: var(--hub-text-primary, #18181b);
+  cursor: pointer;
+}
+.insights-task-feedback {
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 0.5px solid rgba(16, 185, 129, 0.24);
+  color: #065f46;
+  font-size: 12px;
+}
+.insights-task-drawer {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 0.5px solid var(--insights-hairline-strong, rgba(15, 23, 42, 0.16));
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.insights-task-drawer-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 2px;
+  border-radius: 8px;
+  background: #f4f4f5;
+  align-self: flex-start;
+}
+.insights-task-drawer-tabs button {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+  color: #52525b;
+  cursor: pointer;
+}
+.insights-task-drawer-tabs button[aria-selected="true"] {
+  background: #ffffff;
+  color: #18181b;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+.insights-task-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.insights-task-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--hub-text-secondary, #52525b);
+}
+.insights-task-form input,
+.insights-task-form select {
+  height: 32px;
+  padding: 0 9px;
+  border-radius: 8px;
+  border: 0.5px solid var(--insights-hairline-strong, rgba(15, 23, 42, 0.18));
+  background: #ffffff;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--hub-text-primary, #18181b);
+}
+.insights-task-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+.insights-task-readonly-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--hub-text-secondary, #52525b);
+}
+.insights-task-readonly-field strong {
+  height: 32px;
+  padding: 0 9px;
+  border-radius: 8px;
+  border: 0.5px solid var(--insights-hairline, rgba(15, 23, 42, 0.12));
+  background: #f8f9fa;
+  display: flex;
+  align-items: center;
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--hub-text-primary, #18181b);
+}
+.insights-task-source-confirm {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f8f9fa;
+  border: 0.5px solid var(--insights-hairline, rgba(15, 23, 42, 0.1));
+  font-size: 12px;
+}
+.insights-task-source-confirm span {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #52525b;
+  margin-bottom: 2px;
+}
+.insights-task-source-confirm p {
+  margin: 0;
+  line-height: 1.5;
+  color: #3f3f46;
+}
+.insights-task-drawer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.insights-task-drawer-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 0.5px solid var(--insights-hairline-strong, rgba(15, 23, 42, 0.18));
+  background: #ffffff;
+  font-size: 12px;
+  color: #18181b;
+  cursor: pointer;
+}
+.insights-task-drawer-actions button.insights-primary {
+  background: #18181b;
+  border-color: #18181b;
+  color: #ffffff;
+}
+.insights-task-drawer-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

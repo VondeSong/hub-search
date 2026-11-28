@@ -3,9 +3,9 @@
   "site": "workspace",
   "project_id": "appgprj_6aeffedbff408191858a4bbb6643e4f6",
   "site_url": "https://hub-workspace-von11.song02211368537057.chatgpt.site",
-  "source_commit": "ad84e9f3b0e82379f645ca6462c5b6e884535813",
-  "published_version": 158,
-  "deployment_id": "appgdep_6b02c4a7662481919d3e552633c2fffd",
+  "source_commit": "a7ebd18faf28dfce32e1ca6f62b6c4597b244602",
+  "published_version": 159,
+  "deployment_id": "appgdep_6b0a2ade72b48191ad4b7af4c2c8981c",
   "files": {
     ".gitignore": {
       "sha256": "ca0e1575efb181d784f15bf6c86e3c012fd5c7ede4daa34b924d0d8b590d4e77",
@@ -178,9 +178,9 @@
       "bytes": 3626
     },
     "app/InsightPanel.tsx": {
-      "sha256": "d2aa3aff84aa4b4ffc80a8f2d3894ba26ae02b7f0afd2d2ce22a831f04858bea",
+      "sha256": "e8e58bd88869da403a60fb4506685722878eeb1dcddb5e8d303ace73877e189b",
       "mode": "100644",
-      "bytes": 84480
+      "bytes": 96449
     },
     "app/InsightRecall.tsx": {
       "sha256": "cbad40b7f053cf97e8b3981ec61ae6b84e526d3b6fbf79bf78794d346b88d632",
@@ -258,14 +258,19 @@
       "bytes": 26798
     },
     "app/TaskAnalysis.tsx": {
-      "sha256": "1ce85d818655aee51242b0d75e050db1847a4eeeea72d3b17c3c5e7f09d5b7d1",
+      "sha256": "1d237f3cb923a6ccb335edd6e0340647a0c2acac239304f5844f0fc9c5226022",
       "mode": "100644",
-      "bytes": 12845
+      "bytes": 17233
+    },
+    "app/TaskHarvesterWritePreview.tsx": {
+      "sha256": "6f28a3ba5112a181c758a4e638e8140f32c1ed0d852c64c7c45039a1a3146482",
+      "mode": "100644",
+      "bytes": 10941
     },
     "app/TaskWorkspace.tsx": {
-      "sha256": "8408dd04b759144508a78821486fb8706026e1c2bebe27e545ab03b6554728d3",
+      "sha256": "cd36f792d479b44b64c5b7a2decbf60fef8bca87283533ebf6cc75b53659c392",
       "mode": "100644",
-      "bytes": 26578
+      "bytes": 53861
     },
     "app/agents/AgentsDemos.d.ts": {
       "sha256": "356ee22d29f24d91187c1a800faa3963ed6c7eaa25974525e888f87188186258",
@@ -448,9 +453,9 @@
       "bytes": 35435
     },
     "app/insight-panel.css": {
-      "sha256": "5b64cae855fccf76adfb19a755e19ac47f851ae461249bc11409776c18e65857",
+      "sha256": "92deb8c047262430c47972960053e95788deab4a6da3cd095cc9a83f211714ca",
       "mode": "100644",
-      "bytes": 74296
+      "bytes": 76437
     },
     "app/insight-recall.ts": {
       "sha256": "eea19b98bfdf710a74373e8a01ef2ddafeea92ca658ea8da9df3643c56d15d0b",
@@ -461,6 +466,11 @@
       "sha256": "863919b5f582532ae3279980a12c0231af2c83b67d8a950d20d9c622a2f26113",
       "mode": "100644",
       "bytes": 61978
+    },
+    "app/insight-task-links.ts": {
+      "sha256": "393430a58d2334252b05270445a1993fcdc27fa764e8351c596e40d675f401e6",
+      "mode": "100644",
+      "bytes": 2567
     },
     "app/insight-workflow.ts": {
       "sha256": "3aad86324f9e4d7052e47c5de378d6ba5787be025e095c16643967c89f022955",
@@ -573,9 +583,9 @@
       "bytes": 12137
     },
     "app/page.tsx": {
-      "sha256": "7952769241750a4c315beef2f7a349788403c58d07b3ab05a9995a011ee562a4",
+      "sha256": "a0b40cc3c5c8448504b659552c6539b4d0b74f54085dca6737d2fc326adca5b0",
       "mode": "100644",
-      "bytes": 76852
+      "bytes": 81707
     },
     "app/pdf-preview-model.ts": {
       "sha256": "e1f72df40daff0d29d0c63cd3552edbfc47d851a2a5d0bbe3184e0371f178970",
@@ -623,14 +633,14 @@
       "bytes": 1121
     },
     "app/task-analysis-model.ts": {
-      "sha256": "22bd27bd98c23aaa3b9ee26706cee41e1c6b1be3067b2c8292f672ed49a7771b",
+      "sha256": "59338d9dd0c1435d90c95d65b606fd17492d6296675fd1300e3d78ed98299925",
       "mode": "100644",
-      "bytes": 5280
+      "bytes": 8590
     },
     "app/task-analysis.css": {
-      "sha256": "4d8bb34b7a89d1d92cb4f027e02e39b72ecbd356d64dfc57c1e9b45fb64e2601",
+      "sha256": "c36759849332082e92e36c907634b3bce4f276e478738c4df828816277b68599",
       "mode": "100644",
-      "bytes": 8482
+      "bytes": 52871
     },
     "app/task-data.ts": {
       "sha256": "89774044dac6d00619e2029d44fd252b795b5da0db24a9dede10256177d8b592",
@@ -1108,9 +1118,9 @@
       "bytes": 74961
     },
     "docs/task-analysis-workspace.md": {
-      "sha256": "af05641cb367281fd0002d11e6b965d70bd3ee157f2f2121839364c92114befd",
+      "sha256": "57a4fae4ffcf63b75695a759575c0b92d60f6f621fd46417019463ec96ab4c59",
       "mode": "100644",
-      "bytes": 4813
+      "bytes": 6909
     },
     "docs/task-journal-prototype.md": {
       "sha256": "3f9a10ba2e688506039a01011db473fb52b32f59bc29c5e6dbf3301bbf847450",
@@ -1258,9 +1268,9 @@
       "bytes": 133251
     },
     "public/insights-workspace/index.html": {
-      "sha256": "159183448287da689d394e1271b92f8fb3cef42f1182ac85215b58f5f8e9b07d",
+      "sha256": "c2efe42dcc5ae10c34c86b948c749f3bf09d14168a8800d6a7935baaf3bd2356",
       "mode": "100644",
-      "bytes": 58904
+      "bytes": 64741
     },
     "public/insights-workspace/insights.css": {
       "sha256": "d043614eccddfa9930c21b592d0b11c1fa26d8acec3e7fe81a74f8b3200bab7a",
@@ -1268,9 +1278,9 @@
       "bytes": 7624
     },
     "public/insights-workspace/insights.js": {
-      "sha256": "4a8dc6aabd16411966c881c5390913de349e6021d5c17bfc3a2a0eca47c08aa0",
+      "sha256": "09f0f9051b0b75f33ba26d863cea28f1327652ae695d2bb142fad126a4dc3eb4",
       "mode": "100644",
-      "bytes": 48227
+      "bytes": 60833
     },
     "public/insights-workspace/utilities.css": {
       "sha256": "02174ec4bb0f0e448f6a783fde1677759bf289844fb199771a09f55209431c7b",
@@ -1513,5 +1523,5 @@
       "bytes": 1303
     }
   },
-  "imported_at": "2026-11-22T10:33:05.459150+00:00"
+  "imported_at": "2026-11-28T01:16:33.345739+00:00"
 }

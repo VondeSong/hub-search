@@ -112,3 +112,10 @@ export async function stopPlanningWork(id: string) {
   const view = await planningCall<PlanningView>({ action: "status", id });
   if (view.lifecycle && (view.lifecycle.activeRunId || view.work.state === "ready" && !view.work.report)) await planningCall({ action: "cancel", id, ...lifecycleRequest(view.lifecycle, crypto.randomUUID()) });
 }
+
+export function localDateKey(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}

@@ -78,6 +78,7 @@ export class UserProfileStore implements Storage {
   }
 
   get length() { this.requireReady(); return this.values.size; }
+  keys(prefix: string) { this.requireReady(); return [...this.values.keys()].filter(key => key.startsWith(prefix)); }
   key(index: number) { this.requireReady(); return [...this.values.keys()][index] ?? null; }
   getItem(key: string) { this.requireReady(); return this.values.get(key) ?? null; }
   setItem(key: string, value: string) {
@@ -151,6 +152,12 @@ function activeStorage(): Storage {
   if (nativeHost()) throw new Error("个人数据尚未加载，请稍后重试");
   // Explicit adapter for the Vite browser preview; native runs never fall back here.
   return window.localStorage;
+}
+
+export function userProfileKeys(prefix: string): string[] {
+  if (store) return store.keys(prefix);
+  const storage = activeStorage();
+  return Object.keys(storage).filter(key => key.startsWith(prefix));
 }
 
 export const userProfileStorage: Storage = {

@@ -1,11 +1,16 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Clock3, Layers3, Plus, Sparkles, Target, X } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
+import { ArrowUpRight, CalendarClock, Clock3, Layers3, Plus, Sparkles, Target, X } from "lucide-react";
 import { AgentPanelContext, AgentTextMaterialContext } from "./StandaloneAgentLauncher";
 import { resolveTaskResult } from "./TaskWorkspaceResult";
 import { TaskPlanningPanel } from "./TaskPlanningPanel";
 import { ActionSourceFields } from "./ActionSourceFields";
 import { archiveAction } from "./ActionJournal";
 import { dueDay, identity } from "./ActionState";
+import { listInsightTaskLinks, type InsightTaskLink } from "./InsightActionLinks";
+import { INSIGHT_TASK_LINKS_CHANGED } from "./InsightTaskLinkSection";
+import type { Insight } from "./InsightTypes";
+import { findingSections } from "./InsightFindingText";
 import type { UnifiedTask } from "./TaskWorkspacePresentation";
 import type { QuickJournalItem } from "./JournalRecords";
 import type { SearchResult } from "./SearchTypes";
@@ -131,6 +136,7 @@ export function ActionDetail({
   scope,
   day,
   onOpen,
+  onOpenInsight,
   topicClick,
   completion,
   waitInitially = false,
@@ -149,6 +155,7 @@ export function ActionDetail({
   scope: string[] | null;
   day: string;
   onOpen?: (r: SearchResult) => void;
+  onOpenInsight?: (insightId: string) => void;
   topicClick?: () => void;
   completion?: React.ReactNode;
   waitInitially?: boolean;
@@ -161,6 +168,79 @@ export function ActionDetail({
   const materialContext = useContext(AgentTextMaterialContext);
   const recall = useRecall(task.title, scope, [], recallCache);
   const [planning, setPlanning] = useState("");
+  const [insightLinks, setInsightLinks] = useState<InsightTaskLink[]>(() => {
+    try {
+      return listInsightTaskLinks().filter(
+        (link) => link.libraryId === task.libraryId && (link.taskId === task.id || link.taskId === task.sourceId),
+      );
+    } catch {
+      return [];
+    }
+  });
+  const [linkedInsightMeta, setLinkedInsightMeta] = useState<
+    Record<string, { title: string; status: string; validity: string }>
+  >({});
+  useEffect(() => {
+    const refreshLinks = () => {
+      try {
+        setInsightLinks(
+          listInsightTaskLinks().filter(
+            (link) =>
+              link.libraryId === task.libraryId && (link.taskId === task.id || link.taskId === task.sourceId),
+          ),
+        );
+      } catch {
+        setInsightLinks([]);
+      }
+    };
+    refreshLinks();
+    window.addEventListener(INSIGHT_TASK_LINKS_CHANGED, refreshLinks);
+    return () => window.removeEventListener(INSIGHT_TASK_LINKS_CHANGED, refreshLinks);
+  }, [task.id, task.sourceId, task.libraryId]);
+  useEffect(() => {
+    if (!insightLinks.length) {
+      setLinkedInsightMeta({});
+      return;
+    }
+    let active = true;
+    const stateLabel: Record<string, string> = { attention: "待关注", later: "稍后", done: "已处理" };
+    const validityLabel: Record<string, string> = {
+      available: "依据已核对",
+      review: "待复核",
+      unavailable: "来源不可用",
+    };
+    void Promise.all(
+      insightLinks.map(async (link) => {
+        try {
+          const detail = await invoke<Insight>("agent_investigation", {
+            args: { action: "insightDetail", insightId: link.insightId },
+          });
+          const body = detail?.snapshot?.text ? findingSections(detail.snapshot.text).body : "";
+          const firstLine = body.split(/\n/)[0]?.replace(/\*\*/g, "").trim() || "";
+          const title = firstLine
+            ? firstLine.length <= 68
+              ? firstLine
+              : firstLine.slice(0, 60) + "…"
+            : detail?.workTitle || `洞察 ${link.insightId}`;
+          return [
+            link.insightId,
+            {
+              title,
+              status: stateLabel[detail?.processingState || ""] || "已保存",
+              validity: validityLabel[detail?.validity || ""] || "",
+            },
+          ] as const;
+        } catch {
+          return [link.insightId, { title: `洞察 ${link.insightId}`, status: "已关联", validity: "" }] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (active) setLinkedInsightMeta(Object.fromEntries(entries));
+    });
+    return () => {
+      active = false;
+    };
+  }, [insightLinks]);
   const pack = useMemo(
     () => assembleMaterials(task.title, journals, recall.items, meta.links, day),
     [task.title, journals, recall.items, meta.links, day],
@@ -379,7 +459,49 @@ export function ActionDetail({
               截止：{due === day ? "今天" : due || "未排期"}
               {dueTime && " " + dueTime}
             </small>
+            {meta.reviewDate && (
+              <span className="aw-review-pill">
+                <CalendarClock size={11} aria-hidden="true" />
+                回看：{meta.reviewDate}
+                <button
+                  type="button"
+                  aria-label="清除本地回看日"
+                  disabled={!!busy}
+                  onClick={() => change((m) => ({ ...m, reviewDate: undefined }))}
+                >
+                  ×
+                </button>
+              </span>
+            )}
           </div>
+          {insightLinks.length > 0 && (
+            <section className="aw-linked-insights" aria-label="关联洞察">
+              <h3>
+                <Layers3 size={13} aria-hidden="true" /> 关联洞察（{insightLinks.length}）
+              </h3>
+              <div className="aw-linked-insight-list">
+                {insightLinks.map((link) => {
+                  const info = linkedInsightMeta[link.insightId];
+                  return (
+                    <div className="aw-linked-insight-card" key={`${link.insightId}:${link.taskId}`}>
+                      <div className="aw-linked-insight-copy">
+                        <strong>{info?.title || `洞察 ${link.insightId}`}</strong>
+                        <small>
+                          {info?.status || "已关联"}
+                          {info?.validity ? ` · ${info.validity}` : ""}
+                        </small>
+                      </div>
+                      {onOpenInsight && (
+                        <button type="button" onClick={() => onOpenInsight(link.insightId)}>
+                          回到洞察详情 <ArrowUpRight size={12} aria-hidden="true" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
           {!!meta.waits.length && (
             <section>
               <h3>等待交付</h3>

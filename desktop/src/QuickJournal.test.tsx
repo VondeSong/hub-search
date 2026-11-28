@@ -255,6 +255,15 @@ it("appends a document citation once and preserves existing text, date and white
   const writes=()=>invoke.mock.calls.filter(c=>c[0]==="save_quick_journal_draft").map(c=>JSON.parse(c[1].draft));
   expect(writes().slice(-1)[0]).toMatchObject({text,date:record.date});
   await act(async()=>root.render(compose("文档原句")));await act(async()=>root.render(compose("文档原句")));
-  expect(writes().filter(d=>d.text.includes("文档原句"))).toHaveLength(1);
-  expect(writes().slice(-1)[0].text).toBe(text+"\n\n文档原句");
+  expect(writes().filter(d=>d.citation==="文档原句")).toHaveLength(1);
+  const restored = writes().slice(-1)[0];
+  expect(restored).toMatchObject({text, date:record.date});
+  await act(async()=>root.render(null));
+  invoke.mockImplementation(async(cmd:string,args:unknown)=>cmd==="get_quick_journal_draft"
+    ? JSON.stringify(restored)
+    : cmd==="get_quick_journal_settings" ? {...await original(cmd,args),mobile:true} : original(cmd,args));
+  await act(async()=>root.render(compose()));
+  expect(node.querySelector('[aria-label="关联文档摘录"]')?.textContent).toContain("文档原句");
+  await act(async()=>node.querySelector("form")!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
+  expect(invoke.mock.calls.find(c=>c[0]==="capture_quick_journal")?.[1].record.text).toBe(text+"\n\n文档原句");
 });

@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useState, type ComponentProps } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
+  AlertTriangle,
   CalendarCheck,
+  CalendarRange,
   CheckCheck,
+  ChevronDown,
   Clock3,
   Columns3,
   List,
+  Loader2,
   PanelLeft,
   Plus,
   Search,
@@ -20,12 +24,13 @@ import type { UnifiedTask } from "./TaskWorkspacePresentation";
 import type { QuickJournalItem } from "./JournalRecords";
 import { QUICK_JOURNAL_UPDATED } from "./QuickJournalEvents";
 import { ActionEodReview, ActionTodayPlan } from "./ActionTodayPlan";
+import { ActionWeeklyReview } from "./ActionWeeklyReview";
 import { MobileLocalTaskDetail, mobileTasks, MobileTaskForm, MobileTaskFilter } from "./MobileInsightTasks";
 import { ActionHarvester } from "./ActionHarvester";
 import { ActionDetail } from "./ActionDetail";
 import { ActionTopic } from "./ActionTopic";
 import type { RecallCache } from "./ActionMaterials";
-import { native, todayKey } from "./ActionEvidence";
+import { native, shiftDay, todayKey } from "./ActionEvidence";
 import {
   dueDay,
   groupsFor,
@@ -46,6 +51,9 @@ import "./ActionWorkbench.css";
 type Props = ComponentProps<typeof SourceTasks> & {
   mobileTarget?:string;
   onBackToInsight?:()=>void;
+  initialTaskTarget?: { taskId: string; libraryId: string; insightId?: string } | null;
+  onInitialTaskTargetHandled?: () => void;
+  onOpenInsight?: (insightId: string) => void;
   sourceDocumentFilter?: { provider: string; libraryId: string; documentId: string; title: string } | null;
 };
 type QuickRequest = {
@@ -57,14 +65,14 @@ type QuickRequest = {
   day?: string;
   priority?: number;
 };
-type View = "focus" | "waiting" | "all" | "done";
+type View = "focus" | "review" | "waiting" | "all" | "done";
 export function TaskWorkspace(props: Props) {
   const [sources,setSources]=useState(false);
   if(runtimeCapabilities.mobile && sources) return <div className="bw-source-tasks"><button onClick={()=>setSources(false)}>‹ 今日聚焦</button><SourceTasks {...props}/></div>;
   if (props.sourceDocumentFilter) return <SourceTasks {...props} />;
   return <DesktopActions key={JSON.stringify(props.selectedLibraryIds ?? null)} {...props} onSources={()=>setSources(true)} />;
 }
-function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibraryScope, onOpenResult, mobileTarget, onBackToInsight, onSources }: Props & {onSources:()=>void}) {
+function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibraryScope, onOpenResult, mobileTarget, onBackToInsight, initialTaskTarget, onInitialTaskTargetHandled, onOpenInsight, onSources }: Props & {onSources:()=>void}) {
   const store = useUnifiedTasks();
   const mobile=runtimeCapabilities.mobile;
   const [receiptTask,setReceiptTask]=useState<UnifiedTask | null>(null);
@@ -238,17 +246,50 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
   const grouped = useMemo(() => scoped === tasks ? counts : groupsFor(scoped, meta, day), [scoped, tasks, counts, meta, day]);
   const activeWait = (t: UnifiedTask) => t.status === "open" && meta(t).waits.some((w) => !w.resolved);
   // Each section owns disjoint rows, even when a planned task is due today.
-  const writable = libraries.filter(
-    (l) => l.provider === "dida365" && (!selectedLibraryIds || selectedLibraryIds.includes(l.id)),
+  const allDidaLibraries = libraries.filter((l) => l.provider === "dida365");
+  const writable = allDidaLibraries.filter(
+    (l) => !selectedLibraryIds || selectedLibraryIds.includes(l.id),
   );
+  const isAsyncLoading = Boolean(store.loading) && !store.ready && !tasks.length;
+  const didaScopeMissing = !mobile && libraries.length > 0 && allDidaLibraries.length === 0;
+  const didaExcludedByScope = !mobile && allDidaLibraries.length > 0 && writable.length === 0;
+  const didaScopeLabel = writable.length
+    ? writable.map((l) => l.name).join("、")
+    : allDidaLibraries.length
+      ? allDidaLibraries.map((l) => l.name).join("、")
+      : "滴答清单";
+  useEffect(() => {
+    if (!initialTaskTarget) return;
+    if (isAsyncLoading) return;
+    const found = tasks.find(
+      (t) =>
+        t.libraryId === initialTaskTarget.libraryId &&
+        (t.id === initialTaskTarget.taskId || t.sourceId === initialTaskTarget.taskId),
+    );
+    if (found) {
+      setProject(null);
+      setSearch("");
+      setView(found.completed ? "done" : "all");
+      setSelected(identity(found));
+      onInitialTaskTargetHandled?.();
+    } else if (store.ready !== false && !store.loading) {
+      setNotice("未在当前滴答范围内找到关联任务，可能已归档或被资料库筛选排除。");
+      onInitialTaskTargetHandled?.();
+    }
+  }, [initialTaskTarget, tasks, isAsyncLoading, store.ready, store.loading, onInitialTaskTargetHandled]);
   const preferred = project?.libraryId || destination;
   const lib = writable.some((l) => l.id === preferred) ? preferred : !project && writable.length === 1 ? writable[0].id : "";
+  const dueToday = grouped.due.filter(
+    (t) => dueDay(t) === day || meta(t).waits.some((w) => !w.resolved && w.review && w.review <= day),
+  );
+  const dueIds = new Set(dueToday.map(identity));
+  const overdue = grouped.due.filter((t) => !dueIds.has(identity(t)));
   const initialTask =
     view === "done"
       ? grouped.done[0]
       : view === "waiting"
         ? scoped.find(activeWait)
-        : grouped.due[0] || grouped.plan[0] || scoped.find((t) => !t.completed) || scoped[0];
+        : grouped.plan[0] || dueToday[0] || overdue[0] || scoped.find((t) => !t.completed) || scoped[0];
   const selectedTask =
     selected === null ? (wide ? initialTask : undefined) : (mobile ? tasks : scoped).find((t) => identity(t) === selected) || (mobile && receiptTask && identity(receiptTask) === selected ? receiptTask : undefined);
   const pendingRequests = read<Record<string, QuickRequest>>("quick.requests", {});
@@ -330,10 +371,46 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
   };
   const views = [
     ["focus", "今日聚焦", CalendarCheck],
+    ["review", "每周回顾", CalendarRange],
     ["waiting", "等待催办", Clock3],
     ["all", "全部行动", List],
     ["done", "已闭环", CheckCheck],
   ] as const;
+  const longOverdueCutoff = shiftDay(day, -7);
+  const weeklyDueWaitCount = tasks.filter(
+    (t) => !t.completed && t.status === "open" && meta(t).waits.some((w) => !w.resolved && (!w.review || w.review <= day)),
+  ).length;
+  const weeklyLongOverdueCount = tasks.filter(
+    (t) => !t.completed && t.status === "open" && Boolean(dueDay(t)) && dueDay(t) < longOverdueCutoff,
+  ).length;
+  const weeklyStalledTopicsCount = chosen.filter((topic) => {
+    const openInTopic = tasks.filter((t) => !t.completed && t.status === "open" && inTopic(t, topic, meta(t)));
+    const unblocked = openInTopic.filter((t) => !hasBlockingWait(meta(t)));
+    return !unblocked.some((t) => meta(t).day === day || meta(t).steps.some((s) => !s.done));
+  }).length;
+  const weeklyReviewCount = weeklyDueWaitCount + weeklyLongOverdueCount + weeklyStalledTopicsCount;
+  async function createTopicNextStep(topic: Topic, nextTitle: string) {
+    const clean = nextTitle.trim();
+    if (!clean) throw Error("请输入行动标题。");
+    if (!writable.some((l) => l.id === topic.libraryId)) throw Error("当前专题所属滴答资料库不可写入。");
+    const result = await native<{ state: string; error?: string; task?: UnifiedTask }>("createTask", {
+      requestId: crypto.randomUUID(),
+      title: clean,
+      libraryId: topic.libraryId,
+      projectId: topic.collection,
+      priority: 0,
+    });
+    if (result.state !== "confirmed" || !result.task) {
+      throw Error(result.error || "滴答写入尚未确认，请稍后核对。");
+    }
+    await update(result.task, (m) => ({
+      ...m,
+      topics: topic.tag ? [...new Set([...(m.topics || []), topic.key])] : m.topics,
+      steps: m.steps.length ? m.steps : [{ id: crypto.randomUUID(), text: clean, done: false }],
+    }));
+    setSelected(identity(result.task));
+    await store.refresh();
+  }
   const [rowLimits, setRowLimits] = useState<Record<string, number>>({});
   function rows(label: string, items: UnifiedTask[], empty?: string) {
     const listKey = JSON.stringify([scopeKey, view, project?.key, label]);
@@ -444,14 +521,79 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
       </section>
     );
   }
-  const dueToday = grouped.due.filter(
-    (t) => dueDay(t) === day || meta(t).waits.some((w) => !w.resolved && w.review && w.review <= day),
-  );
-  const dueIds = new Set(dueToday.map(identity));
-  const overdue = grouped.due.filter((t) => !dueIds.has(identity(t)));
-  const focusCount = counts.due.length + counts.plan.length + counts.waiting.length;
+  const todayFocusCount = dueToday.length + grouped.plan.length;
   const localRow=(task:(typeof localRows)[number])=><button className="bw-reading-row" key={task.id} onClick={()=>setLocalId(task.id)}><strong>{task.title}</strong><small>{task.source} · {task.list || "本机任务"}</small></button>;
-  const focus = rows(mobile?"到期承诺":"今日到期与到点催办", [...dueToday, ...overdue], "今日无到期承诺或到点催办项");
+  const dueEmptyMessage = store.error ? "????????????????" : isAsyncLoading
+    ? "正在读取滴答任务…"
+    : didaScopeMissing
+      ? "尚未接入滴答清单资料库，桌面今日聚焦仅读取滴答主档"
+      : didaExcludedByScope
+        ? "当前资料库筛选未包含滴答清单，未计入滴答到期承诺"
+        : "已核对当前滴答范围：今日无到期承诺或到点催办（真实 0 项）";
+  const planEmptyMessage = store.error ? "????????????????" : isAsyncLoading
+    ? "正在读取滴答任务…"
+    : didaScopeMissing
+      ? "接入滴答清单后即可将任务排入今日计划"
+      : didaExcludedByScope
+        ? "当前资料库筛选未包含滴答清单"
+        : `已核对当前滴答范围：今天已排入 ${plannedCount} 项（真实 ${plannedCount} 项），最多 ${TODAY_PLAN_LIMIT} 项。`;
+  const focusCommitments = rows(mobile ? "到期承诺" : "今日到期与到点催办", dueToday, dueEmptyMessage);
+  const overdueDisclosure = overdue.length > 0 && (
+    <details className="aw-overdue-disclosure" aria-label="历史逾期">
+      <summary>
+        <span className="aw-overdue-summary-left">
+          <AlertTriangle size={13} aria-hidden="true" />
+          <span>历史逾期（已折叠，优先展示今日）</span>
+        </span>
+        <span className="aw-overdue-summary-right">
+          <small>{overdue.length} 项</small>
+          <ChevronDown size={13} aria-hidden="true" />
+        </span>
+      </summary>
+      <div className="aw-overdue-bar">
+        <span>避免历史积压淹没今日安排，可逐条加入今日或转入每周回顾统一处理。</span>
+        <button type="button" onClick={() => navigate("review")}>
+          去每周回顾处理 →
+        </button>
+      </div>
+      {rows("历史逾期任务", overdue)}
+    </details>
+  );
+  const scopeStrip = !mobile && (
+    <div
+      className={
+        "aw-scope-strip" +
+        (isAsyncLoading ? " is-loading" : didaScopeMissing || didaExcludedByScope ? " is-warn" : "")
+      }
+      role="status"
+      aria-label="滴答范围与读取状态"
+    >
+      <span className="aw-scope-strip-text">
+        {isAsyncLoading ? (
+          <>
+            <Loader2 size={12} className="aw-spin" aria-hidden="true" />
+            <span>正在异步读取滴答清单任务（完成前不显示 0 项）…</span>
+          </>
+        ) : didaScopeMissing ? (
+          <span>滴答范围：尚未接入滴答清单资料库（桌面行动工作台仅读写滴答主档）</span>
+        ) : didaExcludedByScope ? (
+          <span>滴答范围：当前资料库筛选已排除滴答清单（{didaScopeLabel}）</span>
+        ) : store.error ? (
+          <span>滴答范围：{didaScopeLabel} · 读取异常，以下不代表真实 0 项</span>
+        ) : (
+          <span>
+            滴答范围：{didaScopeLabel} · 已核对 {tasks.filter((t) => !t.completed).length} 项未完
+            {overdue.length > 0 ? `（含 ${overdue.length} 项历史逾期已折叠）` : ""}
+          </span>
+        )}
+      </span>
+      {didaExcludedByScope && onClearLibraryScope && (
+        <button type="button" onClick={onClearLibraryScope}>
+          恢复滴答范围
+        </button>
+      )}
+    </div>
+  );
   const boardColumns = (
     <div className="aw-columns">
       {rows(
@@ -507,7 +649,13 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
       </button>
     </form>
   );
-  const mobileViews = {focus: "今日聚焦", waiting: "等待跟进", all: "全部任务", done: "已完成"};
+  const mobileViews: Record<View, string> = {
+    focus: "今日聚焦",
+    review: "每周回顾",
+    waiting: "等待跟进",
+    all: "全部任务",
+    done: "已完成",
+  };
   const harvester = (
     <ActionHarvester
     tasks={harvestTasks}
@@ -544,6 +692,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
               {label}
               <small className="aw-count">
                 {((id === "focus" && clueCount > 0) ||
+                  (id === "review" && weeklyReviewCount > 0) ||
                   (id === "waiting" &&
                     tasks.some(
                       (t) =>
@@ -551,10 +700,16 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
                         meta(t).waits.some((w) => !w.resolved && w.review && w.review <= day),
                     ))) && <i className="aw-alert-dot" />}
                 {id === "focus"
-                  ? focusCount
-                  : id === "waiting"
-                    ? tasks.filter(activeWait).length
-                    : tasks.filter((t) => (id === "done" ? t.completed : !t.completed)).length}
+                  ? isAsyncLoading
+                    ? "…"
+                    : todayFocusCount
+                  : id === "review"
+                    ? isAsyncLoading
+                      ? "…"
+                      : weeklyReviewCount
+                    : id === "waiting"
+                      ? tasks.filter(activeWait).length
+                      : tasks.filter((t) => (id === "done" ? t.completed : !t.completed)).length}
               </small>
             </button>
           ))}
@@ -622,7 +777,9 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
             <button onClick={() => navigate("focus")}>← 今日聚焦</button>
           ) : (
             <small className="aw-total">
-              今日共 {focusCount} 项 · 计划 {plannedCount}/{TODAY_PLAN_LIMIT}
+              {isAsyncLoading
+                ? "正在读取滴答任务…"
+                : `今日共 ${todayFocusCount} 项 · 计划 ${plannedCount}/${TODAY_PLAN_LIMIT}${overdue.length > 0 ? ` · 历史逾期 ${overdue.length}` : ""}`}
             </small>
           )}
           <label>
@@ -686,9 +843,11 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
             </p>
           )}
           {selectedLibraryIds && <button onClick={onClearLibraryScope}>清除资料库范围</button>}
-          {store.loading && !tasks.length && <p>正在读取滴答任务…</p>}
+          {store.loading && !tasks.length && (mobile || (view !== "focus" && view !== "review")) && (
+            <p>正在读取滴答任务…</p>
+          )}
           {mobile && compose && <MobileTaskForm initialList={mobileList} onCancel={closeDetail} onSave={task=>{setCompose(false);setLocalId(task.id);bump();}}/>}
-          {!mobile && !project && view !== "done" && quickEntry}
+          {!mobile && !project && view !== "done" && view !== "review" && quickEntry}
           {project ? (
             <ActionTopic
               key={project.key}
@@ -714,19 +873,53 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
             </ActionTopic>
           ) : view === "focus" ? (
             <>
+              {scopeStrip}
               {!mobile && harvester}
-              {board ? (
+              {isAsyncLoading ? (
+                <section className="aw-loading-state" role="status" aria-label="异步读取滴答任务">
+                  <Loader2 size={15} className="aw-spin" aria-hidden="true" />
+                  <span>正在读取滴答任务…（加载完成前不会按 0 项显示）</span>
+                </section>
+              ) : board ? (
                 boardColumns
               ) : (
                 <>
-                  {focus}
                   {rows(
-                    mobile?"今日计划":"今日计划（额外自选）",
+                    mobile ? "今日计划" : "今日计划（额外自选）",
                     grouped.plan,
-                    `今天已排入 ${plannedCount} 项，最多 ${TODAY_PLAN_LIMIT} 项。`,
+                    planEmptyMessage,
                   )}
-                  {(mobile || grouped.waiting.length > 0) && rows(mobile?"等待跟进":"等待他人", grouped.waiting)}
+                  {focusCommitments}
+                  {overdueDisclosure}
+                  {(mobile || grouped.waiting.length > 0) && rows(mobile ? "等待跟进" : "等待他人", grouped.waiting)}
                 </>
+              )}
+            </>
+          ) : view === "review" ? (
+            <>
+              {scopeStrip}
+              {isAsyncLoading ? (
+                <section className="aw-loading-state" role="status" aria-label="异步读取滴答任务">
+                  <Loader2 size={15} className="aw-spin" aria-hidden="true" />
+                  <span>正在读取滴答任务…（加载完成前不汇总每周回顾）</span>
+                </section>
+              ) : (
+                <ActionWeeklyReview
+                  tasks={tasks}
+                  topics={chosen}
+                  meta={meta}
+                  day={day}
+                  planFull={planFull}
+                  writable={writable}
+                  onSelectTask={(t) => setSelected(identity(t))}
+                  onUpdateTask={update}
+                  onCompleteTask={async (t) => {
+                    const ok = await store.setTaskCompleted(t, true);
+                    if (!ok) setNotice("完成状态尚待滴答核对");
+                  }}
+                  onOpenTopic={(topic) => navigate("all", topic)}
+                  onCreateTopicNextStep={createTopicNextStep}
+                />
               )}
             </>
           ) : board && view === "all" ? (
@@ -831,6 +1024,7 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
             scope={selectedLibraryIds}
             day={day}
             onOpen={onOpenResult}
+            onOpenInsight={onOpenInsight}
             onClose={closeDetail}
           />
         </>

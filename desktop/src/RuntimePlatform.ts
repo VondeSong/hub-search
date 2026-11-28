@@ -15,7 +15,7 @@ export type RuntimeCapabilities = {
 };
 
 function detectRuntimePlatform(): RuntimePlatform {
-  const userAgent = window.navigator.userAgent;
+  const userAgent = globalThis.navigator?.userAgent ?? "";
   if (/Android/i.test(userAgent)) return "android";
   if (/Windows/i.test(userAgent)) return "windows";
   return "other";
@@ -41,4 +41,4 @@ export const runtimeCapabilities: RuntimeCapabilities = {
 
 // CSS uses this stable platform marker instead of inferring the runtime from
 // viewport width. A narrow Windows window must remain a desktop window.
-document.documentElement.dataset.runtimePlatform = platform;
+if (typeof document !== "undefined") document.documentElement.dataset.runtimePlatform = platform;

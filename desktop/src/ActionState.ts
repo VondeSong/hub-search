@@ -1,5 +1,5 @@
 import { userProfileStorage, flushUserProfileStorage } from "./UserProfileStorage";
-import { loadPlanningRecords, taskIdentity } from "./TaskPlanning";
+import { loadPlanningRecords, localDateKey, taskIdentity } from "./TaskPlanning";
 import type { UnifiedTask } from "./TaskWorkspacePresentation";
 import type { Claim, Material } from "./ActionEvidence";
 
@@ -15,6 +15,7 @@ export type Step = { id: string; text: string; done: boolean };
 export type Draft = { mode: string; claims: Claim[]; sources: Material[]; revision?: string; waitId?: string };
 export type ActionMeta = {
   day?: string;
+  reviewDate?: string;
   waits: Wait[];
   topics?: string[];
   links: Material[];
@@ -50,6 +51,17 @@ export function read<T>(key: string, fallback: T): T {
 export async function write<T>(key: string, value: T) {
   userProfileStorage.setItem(prefix + key, JSON.stringify(value));
   await flushUserProfileStorage();
+}
+export function readTopicReviews(): Record<string, string> {
+  return read<Record<string, string>>("topic.reviews", {});
+}
+export async function saveTopicReview(topicKey: string, reviewDate: string): Promise<Record<string, string>> {
+  const current = readTopicReviews();
+  const next = { ...current };
+  if (!reviewDate) delete next[topicKey];
+  else next[topicKey] = reviewDate;
+  await write("topic.reviews", next);
+  return next;
 }
 export function legacyRecords() {
   return new Map(loadPlanningRecords().map((r) => [r.identity, r]));
@@ -115,17 +127,22 @@ export function groupsFor(tasks: UnifiedTask[], meta: (t: UnifiedTask) => Action
   }
   return groups;
 }
+const dueDateFormatters = new Map<string, Intl.DateTimeFormat>();
 export function dueDay(task: UnifiedTask) {
   if (!task.dueAt) return "";
   const value = task.dueAt;
   if (/^\d{4}-\d\d-\d\d$/.test(value)) return value;
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return "";
-  try {
-    return new Intl.DateTimeFormat("sv-SE", {
-      timeZone: task.isAllDay ? task.timeZone || undefined : undefined,
-    }).format(date);
-  } catch {
-    return new Intl.DateTimeFormat("sv-SE").format(date);
+  if (!task.isAllDay || !task.timeZone) return localDateKey(date);
+  let formatter = dueDateFormatters.get(task.timeZone);
+  if (!formatter) {
+    try {
+      formatter = new Intl.DateTimeFormat("sv-SE", { timeZone: task.timeZone });
+    } catch {
+      return localDateKey(date);
+    }
+    dueDateFormatters.set(task.timeZone, formatter);
   }
+  return formatter.format(date);
 }

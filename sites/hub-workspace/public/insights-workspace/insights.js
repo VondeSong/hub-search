@@ -180,6 +180,270 @@ const revisionHistory = new Map([
   ['INS-03', [{ revision: 'v1', body: '早期方案使用全内存索引，仍需对比磁盘分页在大文本场景中的内存占用。', quote: '内存峰值与切换条件仍待验证。' }]],
 ]);
 let searchKeyword = '';
+const LINK_STORAGE_KEY = 'hub-proto-insight-task-links-v1';
+let syncedTasks = [
+  { id: 'd-review', title: '确认评审会时间并发送日程', project: '线束项目', status: 'doing', due: '' },
+  { id: 'd-supplier-confirm', title: '核对线束端子最新阶梯报价', project: '线束项目', status: 'waiting', due: '' },
+  { id: 'd-inbox-task', title: '整理台架振动测试补充条款', project: '收件箱', status: 'todo', due: '' },
+];
+let linkedTaskDrawerOpen = false;
+let linkedTaskTab = 'create';
+
+function readProtoTaskLinks() {
+  try {
+    const raw = localStorage.getItem(LINK_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveProtoTaskLink(link) {
+  const current = readProtoTaskLinks();
+  const exists = current.some(
+    row => row.insightId === link.insightId && row.taskId === link.taskId && row.libraryId === link.libraryId
+  );
+  const next = exists
+    ? current.map(row =>
+        row.insightId === link.insightId && row.taskId === link.taskId && row.libraryId === link.libraryId
+          ? { ...row, ...link }
+          : row
+      )
+    : [{ ...link, createdAt: new Date().toISOString() }, ...current];
+  try {
+    localStorage.setItem(LINK_STORAGE_KEY, JSON.stringify(next));
+  } catch {}
+  if (window.parent !== window) {
+    window.parent.postMessage({ type: 'hub:insight-links-updated' }, window.location.origin);
+  }
+  return next;
+}
+
+function selectInsightByExternalId(targetId) {
+  if (!targetId) return;
+  if (!insights.some(item => item.id === targetId) && typeof extraInsights !== 'undefined') {
+    const extra = extraInsights.find(item => item.id === targetId);
+    if (extra) insights.push(extra);
+  }
+  if (!insights.some(item => item.id === targetId)) return;
+  activeModule = 'INSIGHTS';
+  if (typeof switchModule === 'function') switchModule('INSIGHTS');
+  currentFilterStatus = 'ALL';
+  currentScope = 'ALL';
+  currentPerspective = 'ALL';
+  searchKeyword = '';
+  const searchEl = document.getElementById('ipt-search');
+  if (searchEl) searchEl.value = '';
+  selectedId = targetId;
+  currentViewRevision = null;
+  renderAll();
+}
+
+function renderLinkedTasksSection(item) {
+  const section = document.getElementById('section-linked-tasks');
+  if (!section || !item) return;
+  const restricted = item.evidenceState === 'RESTRICTED';
+  const versions = restricted ? [] : revisionHistory.get(item.id) || [];
+  const historical = versions.find(version => version.revision === currentViewRevision);
+  section.classList.toggle('hidden', restricted);
+  if (restricted) return;
+
+  const links = readProtoTaskLinks().filter(row => row.insightId === item.id);
+  const countEl = document.getElementById('linked-tasks-count');
+  if (countEl) countEl.textContent = `${links.length} 项`;
+  const toggleBtn = document.getElementById('btn-toggle-task-drawer');
+  if (toggleBtn) toggleBtn.disabled = Boolean(historical);
+
+  const listEl = document.getElementById('linked-tasks-list');
+  if (listEl) {
+    const statusLabel = s => (s === 'done' ? '已完成' : s === 'doing' ? '进行中' : s === 'waiting' ? '等待中' : '待办');
+    const statusCls = s =>
+      s === 'done'
+        ? 'bg-emerald-50 text-emerald-700'
+        : s === 'waiting'
+          ? 'bg-amber-50 text-amber-800'
+          : 'bg-blue-50 text-blue-700';
+    listEl.replaceChildren(
+      ...links.map(link => {
+        const live = syncedTasks.find(t => t.id === link.taskId);
+        const card = document.createElement('div');
+        card.className = 'flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg bg-[var(--paper-well)] border border-[var(--hair)] text-xs';
+        const left = document.createElement('div');
+        left.className = 'min-w-0 flex-1';
+        const top = document.createElement('div');
+        top.className = 'flex items-center gap-1.5';
+        const badge = document.createElement('span');
+        const st = live ? live.status : 'todo';
+        badge.className = `px-1.5 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${statusCls(st)}`;
+        badge.textContent = statusLabel(st);
+        const title = document.createElement('strong');
+        title.className = 'truncate text-[var(--ink)]';
+        title.textContent = live?.title || link.taskTitle || `滴答任务 ${link.taskId}`;
+        top.append(badge, title);
+        const sub = document.createElement('div');
+        sub.className = 'text-[10px] text-[var(--ink-muted)] mt-0.5';
+        sub.textContent = `滴答清单 · ${live?.project || link.listName || '收件箱'}${live?.due ? ` · 截止 ${live.due}` : ''}`;
+        left.append(top, sub);
+
+        const jump = document.createElement('button');
+        jump.type = 'button';
+        jump.className = 'px-2 py-1 bg-white hover:bg-black/5 border border-[var(--hair-strong)] rounded-md text-[11px] text-[var(--ink)] shrink-0';
+        jump.textContent = '前往任务 →';
+        jump.addEventListener('click', () => {
+          if (window.parent !== window) {
+            window.parent.postMessage({ type: 'hub:open-task', taskId: link.taskId, insightId: item.id }, window.location.origin);
+          } else {
+            showToast(`已定位任务「${title.textContent}」（独立打开模式）`, 'info');
+          }
+        });
+        card.append(left, jump);
+        return card;
+      })
+    );
+  }
+
+  const drawer = document.getElementById('linked-task-drawer');
+  if (drawer) drawer.classList.toggle('hidden', !linkedTaskDrawerOpen || Boolean(historical));
+  const toggleTxt = document.getElementById('txt-toggle-task-drawer');
+  if (toggleTxt) toggleTxt.textContent = linkedTaskDrawerOpen ? '收起' : '创建 / 关联滴答任务';
+
+  const titleInput = document.getElementById('ipt-link-task-title');
+  if (titleInput && titleInput.dataset.forInsight !== item.id) {
+    titleInput.value = item.title;
+    titleInput.dataset.forInsight = item.id;
+  }
+  const listSel = document.getElementById('sel-link-task-list');
+  const sourceConfirm = document.getElementById('txt-link-task-source');
+  if (sourceConfirm) {
+    sourceConfirm.textContent = `来源洞察：${item.title}（${item.workId} · ${item.revision} · 依据 ${item.sourceNote}）。确认后写入滴答清单「${listSel?.value || '线束项目'}」并建立双向关联。`;
+  }
+  const existingSource = document.getElementById('txt-link-existing-source');
+  if (existingSource) {
+    existingSource.textContent = `将洞察「${item.title}」（${item.revision}）与所选滴答任务双向关联，不改动滴答原任务内容。`;
+  }
+  const existingSel = document.getElementById('sel-link-existing-task');
+  if (existingSel) {
+    const prevVal = existingSel.value;
+    existingSel.replaceChildren(
+      ...[
+        (() => {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = '选择已有滴答任务…';
+          return opt;
+        })(),
+        ...syncedTasks.map(t => {
+          const opt = document.createElement('option');
+          opt.value = t.id;
+          opt.textContent = `${t.title} · ${t.project || '收件箱'} · ${t.status === 'done' ? '已完成' : '待办'}`;
+          return opt;
+        }),
+      ]
+    );
+    if (prevVal && syncedTasks.some(t => t.id === prevVal)) existingSel.value = prevVal;
+  }
+}
+
+function toggleLinkedTaskDrawer(forceState) {
+  const item = insights.find(i => i.id === selectedId);
+  if (!item || item.evidenceState === 'RESTRICTED' || currentViewRevision) return;
+  linkedTaskDrawerOpen = typeof forceState === 'boolean' ? forceState : !linkedTaskDrawerOpen;
+  renderLinkedTasksSection(item);
+}
+
+function setLinkedTaskTab(tab) {
+  linkedTaskTab = tab;
+  const createBtn = document.getElementById('tab-task-create');
+  const linkBtn = document.getElementById('tab-task-link');
+  const createPanel = document.getElementById('panel-task-create');
+  const linkPanel = document.getElementById('panel-task-link');
+  if (createBtn && linkBtn && createPanel && linkPanel) {
+    createBtn.setAttribute('aria-selected', String(tab === 'create'));
+    linkBtn.setAttribute('aria-selected', String(tab === 'link'));
+    createBtn.className = tab === 'create' ? 'px-2.5 py-1 rounded-md bg-white text-[var(--ink)] font-medium shadow-sm' : 'px-2.5 py-1 rounded-md text-[var(--ink-secondary)]';
+    linkBtn.className = tab === 'link' ? 'px-2.5 py-1 rounded-md bg-white text-[var(--ink)] font-medium shadow-sm' : 'px-2.5 py-1 rounded-md text-[var(--ink-secondary)]';
+    createPanel.classList.toggle('hidden', tab !== 'create');
+    linkPanel.classList.toggle('hidden', tab !== 'link');
+  }
+}
+
+function showLinkedTaskFeedback(text) {
+  const el = document.getElementById('linked-tasks-feedback');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove('hidden');
+}
+
+function confirmCreateLinkedTask() {
+  const item = insights.find(i => i.id === selectedId);
+  if (!item) return;
+  const title = (document.getElementById('ipt-link-task-title')?.value || '').trim();
+  const project = document.getElementById('sel-link-task-list')?.value || '收件箱';
+  if (!title) {
+    showToast('请先确认滴答任务标题', 'warn');
+    return;
+  }
+  const sourceLabel = `${item.workId} · ${item.revision} · ${item.sourceNote}`;
+  if (window.parent !== window) {
+    window.parent.postMessage(
+      {
+        type: 'hub:create-dida-task',
+        payload: {
+          title,
+          project,
+          body: `来自洞察「${item.title}」（${sourceLabel}）\n${item.quote || ''}`,
+          insightId: item.id,
+          insightTitle: item.title,
+          workId: item.workId,
+          sourceLabel,
+        },
+      },
+      window.location.origin
+    );
+  } else {
+    const taskId = 'dida-ref-' + Date.now().toString(36);
+    syncedTasks = [{ id: taskId, title, project, status: 'todo', due: '' }, ...syncedTasks];
+    saveProtoTaskLink({
+      insightId: item.id,
+      taskId,
+      libraryId: 'dida',
+      insightTitle: item.title,
+      taskTitle: title,
+      listName: project,
+      sourceLabel,
+    });
+  }
+  linkedTaskDrawerOpen = false;
+  showLinkedTaskFeedback(`已创建滴答任务「${title}」至「${project}」，并建立双向关联。`);
+  logAudit('发现转行动', `${item.id} 创建并关联滴答任务「${title}」（${project}）`);
+  renderLinkedTasksSection(item);
+}
+
+function confirmLinkExistingTask() {
+  const item = insights.find(i => i.id === selectedId);
+  if (!item) return;
+  const taskId = document.getElementById('sel-link-existing-task')?.value || '';
+  const picked = syncedTasks.find(t => t.id === taskId);
+  if (!picked) {
+    showToast('请先选择一项要关联的滴答任务', 'warn');
+    return;
+  }
+  saveProtoTaskLink({
+    insightId: item.id,
+    taskId: picked.id,
+    libraryId: 'dida',
+    insightTitle: item.title,
+    taskTitle: picked.title,
+    listName: picked.project || '收件箱',
+    sourceLabel: `${item.workId} · ${item.revision} · ${item.sourceNote}`,
+  });
+  linkedTaskDrawerOpen = false;
+  showLinkedTaskFeedback(`已关联滴答任务「${picked.title}」（${picked.project || '收件箱'}）。`);
+  logAudit('发现关联行动', `${item.id} 关联已有滴答任务「${picked.title}」`);
+  renderLinkedTasksSection(item);
+}
 
 // INITIALIZATION
 window.addEventListener('DOMContentLoaded', () => {
@@ -191,9 +455,39 @@ window.addEventListener('DOMContentLoaded', () => {
     event.preventDefault();
     window.parent.postMessage('hub:open-insight-workflow', window.location.origin);
   });
+  document.getElementById('sel-link-task-list')?.addEventListener('change', () => {
+    const item = insights.find(i => i.id === selectedId);
+    if (item) renderLinkedTasksSection(item);
+  });
+  window.addEventListener('message', event => {
+    if (event.origin !== window.location.origin) return;
+    const data = event.data;
+    if (!data || typeof data !== 'object') return;
+    if (data.type === 'hub:tasks-sync' && Array.isArray(data.tasks)) {
+      syncedTasks = data.tasks;
+      const item = insights.find(i => i.id === selectedId);
+      if (item) renderLinkedTasksSection(item);
+    } else if (data.type === 'hub:select-insight' && typeof data.insightId === 'string') {
+      selectInsightByExternalId(data.insightId);
+    }
+  });
+  window.addEventListener('storage', event => {
+    if (event.key === LINK_STORAGE_KEY) {
+      const item = insights.find(i => i.id === selectedId);
+      if (item) renderLinkedTasksSection(item);
+    }
+  });
   narrowViewport.addEventListener('change', updateCompactLayout);
   updateCompactLayout();
-  renderAll();
+  const initialInsightParam = new URLSearchParams(window.location.search).get('insightId');
+  if (initialInsightParam) {
+    selectInsightByExternalId(initialInsightParam);
+  } else {
+    renderAll();
+  }
+  if (window.parent !== window) {
+    window.parent.postMessage({ type: 'hub:insights-ready' }, window.location.origin);
+  }
   logAudit('系统启动', 'Hub 洞察工作区 v4 初始化完成');
 });
 
@@ -472,6 +766,7 @@ function renderDetailView() {
   document.getElementById('quote-snippet').classList.toggle('hidden', restricted || item.id === 'INS-01');
   document.getElementById('quote-example').classList.toggle('hidden', restricted || item.id !== 'INS-01');
   document.getElementById('drawer-diff-block').classList.toggle('hidden', restricted || !item.diffUpdated);
+  renderLinkedTasksSection(item);
 }
 
 function renderRevisionOptions(item, history) {

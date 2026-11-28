@@ -1528,3 +1528,595 @@
     display: none;
   }
 }
+
+
+
+/* Feature 1, 2, 3, 4 Prototype Extensions (Base White / Apple HIG / Notion Restraint) */
+.task-v2-surface .tw-scope-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--t-canvas);
+  border: var(--t-hairline);
+  font-size: 11.5px;
+  color: var(--t-ink-2);
+}
+.task-v2-surface .tw-scope-strip-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.task-v2-surface .tw-scope-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.task-v2-surface .tw-scope-dot.is-ok { background: var(--t-ok); }
+.task-v2-surface .tw-scope-dot.is-warn { background: var(--t-warn); }
+.task-v2-surface .tw-scope-dot.is-loading { background: var(--t-accent); }
+.task-v2-surface .tw-scope-link {
+  color: var(--t-accent);
+  font-size: 11px;
+  font-weight: 500;
+}
+.task-v2-surface .tw-scope-demo-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.05);
+}
+.task-v2-surface .tw-scope-demo-switch button {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  color: var(--t-ink-3);
+}
+.task-v2-surface .tw-scope-demo-switch button[aria-pressed="true"] {
+  background: var(--t-paper);
+  color: var(--t-ink-1);
+  font-weight: 550;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.07);
+}
+.task-v2-surface .tw-loading-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--t-canvas);
+  border: var(--t-hairline);
+  color: var(--t-ink-2);
+}
+.task-v2-surface .tw-loading-card strong { display: block; font-size: 13px; color: var(--t-ink-1); margin-bottom: 3px; }
+.task-v2-surface .tw-loading-card p { margin: 0; font-size: 11.5px; color: var(--t-ink-3); }
+.task-v2-surface .tw-spin { animation: twSpin 1s linear infinite; color: var(--t-accent); flex-shrink: 0; margin-top: 2px; }
+@keyframes twSpin { to { transform: rotate(360deg); } }
+
+.task-v2-surface .tw-overdue-disclosure {
+  border: var(--t-hairline);
+  border-radius: 12px;
+  background: var(--t-canvas);
+  overflow: hidden;
+}
+.task-v2-surface .tw-overdue-disclosure > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--t-ink-2);
+  cursor: pointer;
+  list-style: none;
+}
+.task-v2-surface .tw-overdue-disclosure > summary::-webkit-details-marker { display: none; }
+.task-v2-surface .tw-overdue-summary-left,
+.task-v2-surface .tw-overdue-summary-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.task-v2-surface .tw-overdue-summary-left svg { color: var(--t-danger); }
+.task-v2-surface .tw-overdue-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 14px 10px;
+  font-size: 11px;
+  color: var(--t-ink-3);
+}
+.task-v2-surface .tw-overdue-toolbar button {
+  color: var(--t-accent);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.task-v2-surface .tw-overdue-disclosure .tw-inset-card {
+  margin: 0 10px 10px;
+}
+
+/* Feature 3: Harvester Remote Append Preview & Separate Receipts */
+.task-v2-surface .tw-harvester-append-preview {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--t-paper);
+  border: 0.5px solid rgba(15, 23, 42, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.task-v2-surface .tw-append-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+}
+.task-v2-surface .tw-append-preview-head span { color: var(--t-ink-3); font-size: 11px; }
+.task-v2-surface .tw-append-preview-note { margin: 0; font-size: 11px; color: var(--t-ink-3); }
+.task-v2-surface .tw-append-preview-diff {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--t-code-bg);
+  border: var(--t-hairline);
+  font-family: var(--t-font-mono);
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  max-height: 180px;
+  overflow: auto;
+  color: var(--t-ink-1);
+}
+.task-v2-surface .tw-append-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.task-v2-surface .tw-append-preview-actions button {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 0.5px solid rgba(15, 23, 42, 0.14);
+  background: var(--t-paper);
+  font-size: 11.5px;
+  color: var(--t-ink-2);
+}
+.task-v2-surface .tw-append-preview-actions button.is-primary {
+  background: #18181b;
+  border-color: #18181b;
+  color: #ffffff;
+}
+.task-v2-surface .tw-append-preview-actions button.is-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--t-ink-3);
+}
+.task-v2-surface .tw-harvester-split-receipt {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--t-paper);
+  border: 0.5px solid rgba(15, 23, 42, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.task-v2-surface .tw-split-receipt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+}
+.task-v2-surface .tw-split-receipt-rows {
+  display: grid;
+  gap: 5px;
+}
+.task-v2-surface .tw-receipt-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  font-size: 11px;
+  background: var(--t-canvas);
+}
+.task-v2-surface .tw-receipt-row span {
+  flex-shrink: 0;
+  font-weight: 600;
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.task-v2-surface .tw-receipt-row p { margin: 0; color: var(--t-ink-2); line-height: 1.5; }
+.task-v2-surface .tw-receipt-row.is-local span { background: var(--t-accent-soft); color: var(--t-accent); }
+.task-v2-surface .tw-receipt-row.is-confirmed span { background: var(--t-ok-soft); color: var(--t-ok); }
+.task-v2-surface .tw-receipt-row.is-skipped span,
+.task-v2-surface .tw-receipt-row.is-cancelled span { background: var(--t-warn-soft); color: var(--t-warn); }
+
+/* Feature 4: Weekly Review & Feature 2 Task-side Insight Link */
+.task-v2-surface .tw-weekly-review {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 860px;
+}
+.task-v2-surface .tw-review-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: var(--t-hairline);
+}
+.task-v2-surface .tw-review-header h2 { margin: 0 0 4px; font-size: 18px; font-weight: 600; color: var(--t-ink-1); }
+.task-v2-surface .tw-review-header p { margin: 0; font-size: 12px; color: var(--t-ink-3); }
+.task-v2-surface .tw-review-metrics {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--t-ink-3);
+}
+.task-v2-surface .tw-review-metrics strong { color: var(--t-ink-1); font-weight: 600; }
+.task-v2-surface .tw-group-head-right { display: inline-flex; align-items: center; gap: 8px; }
+.task-v2-surface .tw-subtle-toggle { font-size: 11px; color: var(--t-accent); }
+.task-v2-surface .tw-review-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 11px 14px;
+  border-bottom: var(--t-hairline);
+}
+.task-v2-surface .tw-review-row:last-child { border-bottom: 0; }
+.task-v2-surface .tw-review-row-main {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.task-v2-surface .tw-review-title,
+.task-v2-surface .tw-review-topic-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  text-align: left;
+}
+.task-v2-surface .tw-review-row-main strong { font-size: 13px; font-weight: 550; color: var(--t-ink-1); }
+.task-v2-surface .tw-review-row-main small { font-size: 11px; color: var(--t-ink-3); }
+.task-v2-surface .tw-overdue-badge {
+  font-style: normal;
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--t-danger-soft);
+  color: var(--t-danger);
+  font-weight: 550;
+}
+.task-v2-surface .tw-review-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.task-v2-surface .tw-review-row-actions button {
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: var(--t-hairline-strong);
+  background: var(--t-paper);
+  font-size: 11px;
+  color: var(--t-ink-2);
+}
+.task-v2-surface .tw-review-row-actions button.tw-review-primary {
+  background: var(--t-action-bg);
+  border-color: var(--t-action-bg);
+  color: var(--t-action-fg);
+}
+.task-v2-surface .tw-review-row-actions button.tw-review-active {
+  background: var(--t-accent-soft);
+  border-color: transparent;
+  color: var(--t-accent);
+}
+.task-v2-surface .tw-review-row-actions input[type="date"] {
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 7px;
+  border: var(--t-hairline-strong);
+  background: var(--t-paper);
+  font-size: 11px;
+  color: var(--t-ink-2);
+}
+.task-v2-surface .tw-topic-next-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.task-v2-surface .tw-topic-next-form input {
+  flex: 1;
+  min-width: 160px;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 7px;
+  border: var(--t-hairline-strong);
+  background: var(--t-canvas);
+  font-size: 11.5px;
+}
+.task-v2-surface .tw-topic-next-form button {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--t-action-bg);
+  color: var(--t-action-fg);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.task-v2-surface .tw-linked-insights {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--t-canvas);
+  border: var(--t-hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.task-v2-surface .tw-linked-insights-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--t-ink-2);
+}
+.task-v2-surface .tw-linked-insights-head span { display: inline-flex; align-items: center; gap: 5px; font-weight: 550; }
+.task-v2-surface .tw-linked-insight-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: var(--t-paper);
+  border: var(--t-hairline);
+}
+.task-v2-surface .tw-linked-insight-row strong { display: block; font-size: 12px; font-weight: 550; color: var(--t-ink-1); }
+.task-v2-surface .tw-linked-insight-row small { display: block; font-size: 10.5px; color: var(--t-ink-3); }
+.task-v2-surface .tw-review-date-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: var(--t-accent-soft);
+  color: var(--t-accent);
+  font-size: 11.5px;
+  margin: 8px 0;
+}
+.task-v2-surface .tw-review-date-banner span { display: inline-flex; align-items: center; gap: 5px; }
+
+/* Standalone Action Harvester Write Preview (v158-ready, zero memory dep) */
+.task-v2-surface .tw-harvester-preview-shell {
+  margin-bottom: 12px;
+  border-radius: 12px;
+  border: var(--t-hairline-strong);
+  background: var(--t-paper);
+  overflow: hidden;
+}
+.task-v2-surface .tw-harvester-preview-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 13px;
+  background: rgba(15, 23, 42, 0.02);
+  text-align: left;
+}
+.task-v2-surface .tw-harvester-preview-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--t-ink-1);
+}
+.task-v2-surface .tw-harvester-preview-title small {
+  font-size: 11px;
+  color: var(--t-ink-3);
+}
+.task-v2-surface .tw-harvester-preview-chevron {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--t-ink-3);
+}
+.task-v2-surface .tw-harvester-preview-body {
+  padding: 10px 13px 13px;
+  border-top: var(--t-hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.task-v2-surface .tw-harvester-preview-card {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: var(--t-hairline);
+  background: var(--t-canvas);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.task-v2-surface .tw-harvester-preview-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.task-v2-surface .tw-harvester-preview-card-head strong { font-size: 12.5px; color: var(--t-ink-1); }
+.task-v2-surface .tw-harvester-preview-card-head span { font-size: 11px; color: var(--t-ink-3); }
+.task-v2-surface .tw-harvester-preview-quote {
+  margin: 0;
+  padding: 6px 9px;
+  border-left: 2px solid var(--t-accent);
+  background: var(--t-paper);
+  border-radius: 0 7px 7px 0;
+  font-size: 12px;
+  color: var(--t-ink-2);
+}
+.task-v2-surface .tw-harvester-preview-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--t-ink-2);
+}
+.task-v2-surface .tw-harvester-preview-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  font-size: 10.5px;
+  font-weight: 550;
+}
+.task-v2-surface .tw-harvester-preview-actions,
+.task-v2-surface .tw-harvester-append-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.task-v2-surface .tw-harvester-preview-actions button,
+.task-v2-surface .tw-harvester-append-actions button,
+.task-v2-surface .tw-harvester-preview-empty button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: var(--t-hairline-strong);
+  background: var(--t-paper);
+  font-size: 11.5px;
+  color: var(--t-ink-1);
+}
+.task-v2-surface .tw-primary-btn {
+  background: var(--t-action-bg) !important;
+  border-color: var(--t-action-bg) !important;
+  color: var(--t-action-fg) !important;
+}
+.task-v2-surface .tw-harvester-preview-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--t-ink-3);
+}
+.task-v2-surface .tw-harvester-split-receipt {
+  margin: 8px 13px 10px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  border: var(--t-hairline-strong);
+  background: var(--t-canvas);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11.5px;
+}
+.task-v2-surface .tw-harvester-split-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.task-v2-surface .tw-harvester-receipt-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: var(--t-paper);
+}
+.task-v2-surface .tw-harvester-receipt-row > span {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  background: var(--t-subtle-fill);
+  color: var(--t-ink-2);
+}
+.task-v2-surface .tw-harvester-receipt-row.is-ok > span {
+  background: rgba(16, 185, 129, 0.14);
+  color: #047857;
+}
+.task-v2-surface .tw-harvester-receipt-row.is-cancelled > span,
+.task-v2-surface .tw-harvester-receipt-row.is-unchanged > span {
+  background: rgba(100, 116, 139, 0.14);
+  color: #475569;
+}
+.task-v2-surface .tw-harvester-receipt-row > p {
+  margin: 0;
+  line-height: 1.45;
+  color: var(--t-ink-1);
+}
+.task-v2-surface .tw-harvester-append-preview {
+  padding: 9px 11px;
+  border-radius: 9px;
+  border: 0.5px solid rgba(0, 122, 255, 0.28);
+  background: var(--t-paper);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.task-v2-surface .tw-harvester-append-head strong { display: block; font-size: 12px; color: var(--t-ink-1); }
+.task-v2-surface .tw-harvester-append-head small { display: block; font-size: 11px; color: var(--t-ink-3); }
+.task-v2-surface .tw-harvester-append-diff {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.task-v2-surface .tw-harvester-append-diff span {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--t-ink-3);
+  margin-bottom: 3px;
+}
+.task-v2-surface .tw-harvester-append-diff pre {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 7px;
+  border: var(--t-hairline);
+  background: var(--t-canvas);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--t-ink-1);
+}
+@media (max-width: 720px) {
+  .task-v2-surface .tw-harvester-append-diff { grid-template-columns: 1fr; }
+}

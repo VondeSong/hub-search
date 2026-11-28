@@ -8,8 +8,20 @@ export type TaskEvidence={id:string;title:string;source:string;text:string};
 export type TaskAdvice={id:string;taskId:string;title:string;reason:string;text:string;kind:'today'|'note'|'source';revision:string;evidence:TaskEvidence[]};
 export type AdoptionReceipt={id:string;taskId:string;message:string;at:string;before?:string;after?:string;revision?:string};
 export type WaitingCondition={person:string;reason:string;reviewDate?:string};
-export type AnalysisMemory={today:Record<string,string>;notes:Record<string,string>;waiting?:Record<string,WaitingCondition>;receipts:AdoptionReceipt[]};
-export const emptyAnalysisMemory=():AnalysisMemory=>({today:{},notes:{},waiting:{},receipts:[]});
+export type AnalysisMemory={today:Record<string,string>;notes:Record<string,string>;waiting?:Record<string,WaitingCondition>;reviewDates?:Record<string,string>;topicReviewDates?:Record<string,string>;receipts:AdoptionReceipt[]};
+export const emptyAnalysisMemory=():AnalysisMemory=>({today:{},notes:{},waiting:{},reviewDates:{},topicReviewDates:{},receipts:[]});
+export function shiftDay(day:string,deltaDays:number):string {
+ const d=new Date(day+'T12:00:00');
+ if(!Number.isFinite(d.getTime()))return day;
+ d.setDate(d.getDate()+deltaDays);
+ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+export function nextMonday(day:string):string {
+ const d=new Date(day+'T12:00:00');
+ if(!Number.isFinite(d.getTime()))return day;
+ const diff=(8-d.getDay())%7||7;
+ return shiftDay(day,diff);
+}
 export function parseAnalysisMemory(raw:string|null):AnalysisMemory|null {
  if(!raw)return emptyAnalysisMemory();
  try{const value=JSON.parse(raw);const record=(x:unknown)=>!!x&&typeof x==='object'&&!Array.isArray(x);
@@ -27,7 +39,16 @@ export function parseAnalysisMemory(raw:string|null):AnalysisMemory|null {
     }
    }
   }
-  return {today:value.today,notes:value.notes,waiting,receipts:value.receipts};
+  const parseDateMap=(rawMap:unknown)=>{
+   const out:Record<string,string>={};
+   if(record(rawMap)){
+    for(const [k,v] of Object.entries(rawMap as Record<string,unknown>)){
+     if(typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v))out[k]=v;
+    }
+   }
+   return out;
+  };
+  return {today:value.today,notes:value.notes,waiting,reviewDates:parseDateMap(value.reviewDates),topicReviewDates:parseDateMap(value.topicReviewDates),receipts:value.receipts};
  }catch{return null;}
 }
 export const analysisRevision=(task:AnalysisTask)=>JSON.stringify([task.id,task.title,task.description,task.project,task.source,task.date,task.status,task.priority,task.parent]);
@@ -47,6 +68,18 @@ export function setWaitingCondition(memory:AnalysisMemory,taskId:string,conditio
  if(!condition||(!condition.person.trim()&&!condition.reason.trim()))delete nextWaiting[taskId];
  else nextWaiting[taskId]={person:condition.person.trim()||'外部协作者',reason:condition.reason.trim()||'等待确认条件',...(condition.reviewDate?{reviewDate:condition.reviewDate}:{})};
  return {...memory,waiting:nextWaiting};
+}
+export function setTaskReviewDate(memory:AnalysisMemory,taskId:string,reviewDate:string):AnalysisMemory {
+ const nextDates={...(memory.reviewDates||{})};
+ if(!reviewDate)delete nextDates[taskId];
+ else nextDates[taskId]=reviewDate;
+ return {...memory,reviewDates:nextDates};
+}
+export function setTopicReviewDate(memory:AnalysisMemory,topicKey:string,reviewDate:string):AnalysisMemory {
+ const nextDates={...(memory.topicReviewDates||{})};
+ if(!reviewDate)delete nextDates[topicKey];
+ else nextDates[topicKey]=reviewDate;
+ return {...memory,topicReviewDates:nextDates};
 }
 export function buildTaskAdvice(tasks:AnalysisTask[],request:AnalysisRequest,evidence:Record<string,TaskEvidence[]>,readMode:ReadMode,day:string):TaskAdvice[]{
  const ids=new Set(request.taskIds);

@@ -216,6 +216,8 @@ function AppContent() {
     return () => window.removeEventListener("hub:open-cloud-sync-settings", openCloudSettings);
   }, []);
 
+  const [pendingTaskTarget, setPendingTaskTarget] = useState<{ taskId: string; libraryId: string; insightId?: string } | null>(null);
+  const [pendingInsightId, setPendingInsightId] = useState<string>("");
   const moduleQueries = useRef<Partial<Record<DesktopSidebarView, string>>>({});
   const selectDesktopSidebarView = useCallback((view: DesktopSidebarView) => {
     if (view === desktopSidebarView) return;
@@ -376,7 +378,7 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
   const librariesActive = !isMobileLayout && desktopSidebarView === "libraries" && !flashcardsStandaloneOpen;
   const browseLibraries = spaces;
   const browsingPreview = browseLibraries.some(space => space.id === libraryPreview?.libraryId) ? libraryPreview : undefined;
-  const sharedTasks = useUnifiedTasks({ enabled: ready && !flashcardsStandaloneOpen && (tasksActive || desktopSidebarView === "journals") });
+  const sharedTasks = useUnifiedTasks({ enabled: ready && !flashcardsStandaloneOpen && (tasksActive || insightsActive || desktopSidebarView === "journals") });
   useEffect(() => { if (sharedTasks.ready && !sharedTasks.loading) updateTaskOpenCount(sharedTasks.dashboard.tasks.filter(task=>task.provider==="dida365"&&!task.isProject&&task.status==="open").length); }, [sharedTasks.dashboard.tasks, sharedTasks.ready, sharedTasks.loading, updateTaskOpenCount]);
   const taskRegistryKey = JSON.stringify(spaces.map(space => [space.id, space.name, space.provider, space.connected]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
   const taskRegistryVersion = useRef("");
@@ -1545,7 +1547,15 @@ useEffect(() => {
       focusMode={previewFocusMode}
       onExitFocusMode={() => setPreviewFocusMode(false)}
       preview={browsingPreview && <PreviewPane {...workspaceProps.previewPaneProps} label="文档预览" onClose={() => setLibraryPreview(undefined)} />}
-    /> : insightsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开洞察…</div>}>{isMobileLayout && !advancedInsights ? <LazyMobileInsights advanced={()=>pushMobileRoute("insight-tools")} openTask={id=>{window.history.pushState({hubMobileRoute:"tasks",hubInsightTask:id},"");applyMobileRoute("tasks");}}/> : <LazyInsightsWorkspace/>}</Suspense> : collectionsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开阅读…</div>}><LazyCollectionsWorkspace
+    /> : insightsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开洞察…</div>}>{isMobileLayout && !advancedInsights ? <LazyMobileInsights advanced={()=>pushMobileRoute("insight-tools")} openTask={id=>{window.history.pushState({hubMobileRoute:"tasks",hubInsightTask:id},"");applyMobileRoute("tasks");}}/> : <LazyInsightsWorkspace
+      libraries={spaces}
+      initialInsightId={pendingInsightId || undefined}
+      onInitialInsightHandled={() => setPendingInsightId("")}
+      onOpenTask={(target) => {
+        setPendingTaskTarget(target);
+        selectDesktopSidebarView("tasks");
+      }}
+    />}</Suspense> : collectionsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开阅读…</div>}><LazyCollectionsWorkspace
       initialItemKey={moduleTarget?.kind==="reading"?moduleTarget.id:undefined}
       initialQuery={moduleTarget?.query} initialContext={moduleTarget?.context}
       onSearchTargetHandled={clearModuleTarget}
@@ -1553,6 +1563,12 @@ useEffect(() => {
       onToggleDesktopSidebar={!isMobileLayout ? () => changeDesktopSidebarSetting(!desktopSidebarEnabled) : undefined}
     /></Suspense> : tasksActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开任务…</div>}><LazyTaskWorkspace
       mobileTarget={mobileTaskTarget} onBackToInsight={()=>window.history.back()}
+      initialTaskTarget={pendingTaskTarget}
+      onInitialTaskTargetHandled={() => setPendingTaskTarget(null)}
+      onOpenInsight={(insightId) => {
+        setPendingInsightId(insightId);
+        selectDesktopSidebarView("insights");
+      }}
       libraries={spaces}
       selectedLibraryIds={selectedLibraryIds}
       onClearLibraryScope={selectAllLibraries}

@@ -612,3 +612,102 @@ it("keeps Android mobile unmounted per section with original query forwarding an
   else document.documentElement.dataset.runtimePlatform=previousPlatform;
  }
 });
+
+it("creates and links real Dida tasks from insight detail with confirmation and bidirectional jump",async()=>{
+ const createdCalls:Record<string,unknown>[]=[];
+ const onOpenTask=vi.fn();
+ const didaLib={id:"dida-work",name:"滴答工作",provider:"dida365",status:"connected",path:"",documentCount:2,enabled:true};
+ const existingTask={
+  id:"dida-existing-1",
+  sourceId:"dida-existing-1",
+  libraryId:"dida-work",
+  libraryName:"滴答工作",
+  provider:"dida365",
+  documentId:"dida-existing-1",
+  documentTitle:"核对台架测试方案",
+  collectionId:"proj-1",
+  collectionName:"台架项目",
+  title:"核对台架测试方案",
+  status:"open",
+  completed:false,
+  isProject:false,
+  priority:0,
+ };
+ const baseImpl=invoke.getMockImplementation()!;
+ invoke.mockImplementation(async(command:string,payload?:{args?:Record<string,unknown>})=>{
+  if(command==="list_unified_tasks"){
+   return {tasks:[existingTask],total:1,open:1,completed:0,craft:0,dida365:1,obsidian:0,linked:0,syncEnabled:true,backgroundSyncIntervalMinutes:15,lastSyncFailed:0,syncReviews:[]};
+  }
+  if(command==="task_planning_source"&&payload?.args?.action==="createTask"){
+   createdCalls.push(payload.args);
+   return {
+    id:String(payload.args.requestId),
+    state:"confirmed",
+    libraryId:String(payload.args.libraryId),
+    libraryName:"滴答工作",
+    projectId:String(payload.args.projectId||""),
+    projectName:"台架项目",
+    sourceId:"dida-new-1",
+    taskId:"dida-new-1",
+    title:String(payload.args.title),
+    priority:Number(payload.args.priority||0),
+    task:{...existingTask,id:"dida-new-1",sourceId:"dida-new-1",title:String(payload.args.title)},
+    updatedAt:Date.now(),
+   };
+  }
+  return baseImpl(command,payload as {args:Record<string,unknown>});
+ });
+
+ host=document.createElement("div");document.body.append(host);root=createRoot(host);
+ await act(async()=>root.render(
+  <AgentPanelContext.Provider value={openWork}>
+   <InsightsWorkspace libraries={[didaLib as any]} initialInsightId="one" onOpenTask={onOpenTask}/>
+  </AgentPanelContext.Provider>,
+ ));
+
+ // Detail opened directly via initialInsightId
+ const section=host.querySelector('section[aria-label="关联滴答任务"]');
+ expect(section).not.toBeNull();
+
+ // 1. Create a real Dida task with title, target list, and source confirmation
+ await click("创建 / 关联滴答任务");
+ const titleInput=host.querySelector<HTMLInputElement>('input[aria-label="滴答任务标题"]')!;
+ await act(async()=>{
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(titleInput,"补充实机台架验证");
+  titleInput.dispatchEvent(new Event("input",{bubbles:true}));
+ });
+ const listSelect=host.querySelector<HTMLSelectElement>('select[aria-label="目标滴答清单"]')!;
+ await act(async()=>{
+  listSelect.value="proj-1";
+  listSelect.dispatchEvent(new Event("change",{bubbles:true}));
+ });
+ expect(host.textContent).toContain("来源确认");
+ await click("确认创建并关联");
+
+ expect(createdCalls).toHaveLength(1);
+ expect(createdCalls[0]).toMatchObject({
+  action:"createTask",
+  title:"补充实机台架验证",
+  libraryId:"dida-work",
+  projectId:"proj-1",
+ });
+ expect(host.querySelector('section[aria-label="关联滴答任务"]')?.textContent).toContain("已创建滴答任务");
+
+ // 2. Link an existing real Dida task without creating a duplicate task
+ await click("创建 / 关联滴答任务");
+ await click("关联已有任务");
+ const existingSelect=host.querySelector<HTMLSelectElement>('select[aria-label="选择已有滴答任务"]')!;
+ await act(async()=>{
+  existingSelect.value="dida-work::dida-existing-1";
+  existingSelect.dispatchEvent(new Event("change",{bubbles:true}));
+ });
+ await click("确认关联");
+ expect(createdCalls).toHaveLength(1);
+ expect(host.querySelector('section[aria-label="关联滴答任务"]')?.textContent).toContain("核对台架测试方案");
+
+ // 3. Bidirectional jump to task
+ const jumpBtns=[...host.querySelectorAll<HTMLButtonElement>('section[aria-label="关联滴答任务"] button')].filter(b=>b.textContent?.includes("前往任务"));
+ expect(jumpBtns.length).toBeGreaterThanOrEqual(2);
+ await act(async()=>jumpBtns[0].click());
+ expect(onOpenTask).toHaveBeenCalledWith(expect.objectContaining({libraryId:"dida-work",insightId:"one"}));
+});

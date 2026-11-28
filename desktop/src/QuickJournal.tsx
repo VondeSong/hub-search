@@ -19,7 +19,7 @@ import "./MobileJournal.css";
 import { useJournalDesktopRecording } from "./useJournalDesktopRecording";
 
 type Attachment = { hash: string; name: string; size: number; image: boolean };
-type Record = { version: 1; id: string; date: string; text: string; attachments: Attachment[] };
+type Record = { version: 1; id: string; date: string; text: string; attachments: Attachment[]; citation?: string };
 type Item = QuickJournalItem;
 type Settings = { libraryId: string; folder: string; sync: boolean; dateFolders: boolean };
 type SyncReport = { pendingUpload: number; awaitingOs: number; written: number };
@@ -132,26 +132,27 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
   const recording = useJournalDesktopRecording(file => void attach([file]), setError);
   const persist = (value: Record) => {
     draftLatest.current = value; setDraft(value);
-    if (value.text.trim() || value.attachments.length) onDraftEdited?.();
+    if (value.text.trim() || value.citation?.trim() || value.attachments.length) onDraftEdited?.();
     const sequence = ++draftSequence.current; setDraftStatus("正在保存草稿…");
     draftWrites = draftWrites.catch(() => {}).then(() => invoke<void>("save_quick_journal_draft", { draft: JSON.stringify(value), ...(slot?{slot}:{}) }));
     void draftWrites.then(() => { if (mounted.current && sequence === draftSequence.current) setDraftStatus("草稿已保存"); }).catch(e => { if (mounted.current) setError(`草稿保存失败：${message(e)}`); });
   };
-  const insertedCitation = useRef("");
+  const activeQuote = draft.citation ?? "";
+  const receivedCitation = useRef<string | undefined>(undefined);
   const addedTags = useRef(new Map<string,{before:string;after:string}>());
   useEffect(() => {
-    if (!ready || !citation || insertedCitation.current === citation) return;
-    insertedCitation.current = citation;
-    const current = draftLatest.current;
-    persist({...current, text:[current.text,citation].filter(Boolean).join("\n\n")});
-  },[ready,citation]);
+    if (!ready || receivedCitation.current === citation) return;
+    receivedCitation.current = citation;
+    if (!citation || draftLatest.current.citation === citation) return;
+    persist({ ...draftLatest.current, citation });
+  }, [ready, citation]);
   async function refresh() {
     const result = await invoke<{ items: Item[]; error: string }>("list_quick_journal");
     if (mounted.current) { setItems(result.items); setListError(result.error || ""); }
   }
   useEffect(() => {
     mounted.current = true;
-    if (mode === "all" || mode === "compose" || mode === "calendar") void attachmentWrites.catch(() => {}).then(() => draftWrites.catch(() => {})).then(() => invoke<string>("get_quick_journal_draft",slot?{slot}:undefined)).then(raw => { if (!mounted.current) return; if (raw) { const saved = JSON.parse(raw) as Record; if (saved.version !== 1 || !Array.isArray(saved.attachments)) throw new Error("草稿格式无法识别"); if (!saved.text.trim() && !saved.attachments.length) saved.date = captureDate || localJournalDate(); setDraft(saved); draftLatest.current = saved; } if(!raw&&captureDate){const value={...blank(),date:captureDate};setDraft(value);draftLatest.current=value;} setReady(true); }).catch(e => { if (mounted.current) setError(message(e)); });
+    if (mode === "all" || mode === "compose" || mode === "calendar") void attachmentWrites.catch(() => {}).then(() => draftWrites.catch(() => {})).then(() => invoke<string>("get_quick_journal_draft",slot?{slot}:undefined)).then(raw => { if (!mounted.current) return; if (raw) { const saved = JSON.parse(raw) as Record; if (saved.version !== 1 || !Array.isArray(saved.attachments)) throw new Error("草稿格式无法识别"); if (!saved.text.trim() && !saved.citation?.trim() && !saved.attachments.length) saved.date = captureDate || localJournalDate(); setDraft(saved); draftLatest.current = saved; } if(!raw&&captureDate){const value={...blank(),date:captureDate};setDraft(value);draftLatest.current=value;} setReady(true); }).catch(e => { if (mounted.current) setError(message(e)); });
     void invoke<SettingsResult>("get_quick_journal_settings").then(v => { if (mounted.current) {
       const value = { ...v.settings, dateFolders: v.settings.dateFolders ?? false };
       setSettings(value); setSavedSettings(value); setMobile(v.mobile); setSettingsReady(true);
@@ -208,7 +209,9 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
     try {
       draftWrites = draftWrites.catch(() => invoke<void>("save_quick_journal_draft", { draft: JSON.stringify(draftLatest.current), ...(slot?{slot}:{}) }));
       await draftWrites;
-      const captured = draftLatest.current;
+      const current = draftLatest.current;
+      const { citation: quote, ...body } = current;
+      const captured = quote?.trim() ? { ...body, text: [body.text, quote].filter(Boolean).join("\n\n") } : body;
       const result = await invoke<{ warning: string | null;tasks?:number }>(mode==="calendar"?"capture_calendar_journal":"capture_quick_journal", { record: captured, ...(mode==="calendar"?{libraryId:taskLibrary,projectId:taskProject}:{}) });
       persist({...blank(),date:captureDate||localJournalDate()});
       // A clear failure must not turn an already durable record into a failed save.
@@ -286,7 +289,13 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
     <button className="journal-compose-settings" type="button" title="日志保存设置" aria-label="日志保存设置" aria-expanded={settingsOpen} onClick={()=>setSettingsOpen(open=>!open)}><MoreHorizontal size={15}/></button>
   </div>;
   const compose = <form className={`quick-journal-compose ${mobile ? "is-mobile" : ""}${desktopComposer ? " journal-desktop-compose" : ""}`} onSubmit={e => { e.preventDefault(); void save(); }}>
-    {desktopComposer?<JournalRichEditor ref={richInput} desktop value={draft.text} onChange={text=>persist({...draftLatest.current,text})} disabled={!ready||saving} onPhotos={()=>fileInput.current?.click()} onMore={()=>setSettingsOpen(open=>!open)} onSubmit={()=>{if(draft.text.trim()||draft.attachments.length)void save();}}/>:mode==="compose"&&mobile?<JournalRichEditor ref={richInput} value={draft.text} onChange={text=>persist({...draftLatest.current,text})} disabled={!ready||saving||uploading} onPhotos={()=>photoInput.current?.click()} onMore={()=>setMoreOpen(!moreOpen)} moreOpen={moreOpen} onSubmit={()=>void save()} actions={<><button type="button" aria-label="进入录音模式" disabled={!ready||saving||uploading} onClick={()=>void draftWrites.then(()=>openJournalVoice({record:draftLatest.current,sourceDraft:true})).catch(e=>setError(message(e)))}><Mic size={21}/></button><button type="submit" className="journal-rich-send" aria-label="保存记录" disabled={!ready||saving||uploading||(!draft.text.trim()&&!draft.attachments.length)}><Send size={20}/></button></>}/>:<>
+    {mobile && mode === "compose" && activeQuote.trim() && (
+      <div className="bw-capture-quote" role="note" aria-label="关联文档摘录">
+        <span>关联：{activeQuote.split("\n")[0]}</span>
+        <button type="button" onClick={() => persist({ ...draftLatest.current, citation: undefined })}>移除</button>
+      </div>
+    )}
+    {desktopComposer?<JournalRichEditor ref={richInput} desktop value={draft.text} onChange={text=>persist({...draftLatest.current,text})} disabled={!ready||saving} onPhotos={()=>fileInput.current?.click()} onMore={()=>setSettingsOpen(open=>!open)} onSubmit={()=>{if(draft.text.trim()||activeQuote.trim()||draft.attachments.length)void save();}}/>:mode==="compose"&&mobile?<JournalRichEditor ref={richInput} value={draft.text} onChange={text=>persist({...draftLatest.current,text})} disabled={!ready||saving||uploading} onPhotos={()=>photoInput.current?.click()} onMore={()=>setMoreOpen(!moreOpen)} moreOpen={moreOpen} onSubmit={()=>void save()} actions={<><button type="button" aria-label="进入录音模式" disabled={!ready||saving||uploading} onClick={()=>void draftWrites.then(()=>openJournalVoice({record:draftLatest.current,sourceDraft:true})).catch(e=>setError(message(e)))}><Mic size={21}/></button><button type="submit" className="journal-rich-send" aria-label="保存记录" disabled={!ready||saving||uploading||(!draft.text.trim()&&!activeQuote.trim()&&!draft.attachments.length)}><Send size={20}/></button></>}/>:<>
     <label className="sr-only" htmlFor="quick-journal-text">此刻的想法</label>
     <textarea ref={textInput} id="quick-journal-text" rows={inlineCapture ? 2 : undefined} placeholder={inlineCapture === "day" ? "输入补记内容（支持 - [ ] 拆分任务）…" : inlineCapture === "top" ? "随手记下今日思考或工程备忘…（Ctrl+Enter 保存）" : "现在的想法是…"} value={draft.text} disabled={!ready || saving} maxLength={100000} onChange={e => persist({ ...draftLatest.current, text: e.target.value })} onKeyDown={e => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); void save(); } }} />
     </>}
@@ -321,7 +330,7 @@ export function QuickJournal({ libraries, scope, view, dataVersion, mode = "all"
       {!mobile && mode!=="calendar" && <button type="button" disabled={!ready || saving || uploading} onClick={() => fileInput.current?.click()}><Paperclip size={16} />{uploading ? "保存附件…" : "照片 / 附件"}</button>}
       {onCancelCapture && <button type="button" className="journal-inline-cancel" onClick={onCancelCapture}>取消</button>}
       {desktopComposer&&<span className="journal-compose-count" aria-label="正文字数">{draft.text.length}</span>}
-      <button type="submit" disabled={!ready || saving || uploading || recording.state !== "idle" || (!draft.text.trim() && !draft.attachments.length) || (mode==="calendar"&&!capture.text.trim()&&!capture.tasks.length&&!draft.attachments.length)}><Send size={desktopComposer ? 13 : 17} />{saving ? "保存中…" : inlineCapture === "day" ? "写入当日" : inlineCapture === "top" ? "记录" : mode==="calendar"?"创建":"记下"}</button>
+      <button type="submit" disabled={!ready || saving || uploading || recording.state !== "idle" || (!draft.text.trim() && !activeQuote.trim() && !draft.attachments.length) || (mode==="calendar"&&!capture.text.trim()&&!capture.tasks.length&&!draft.attachments.length)}><Send size={desktopComposer ? 13 : 17} />{saving ? "保存中…" : inlineCapture === "day" ? "写入当日" : inlineCapture === "top" ? "记录" : mode==="calendar"?"创建":"记下"}</button>
     </footer>
     {mobile && moreOpen && <div className="quick-journal-more">{mode!=="compose" && <label>记录日期<input type="date" aria-label="记录日期" value={draft.date} disabled={!ready || saving} onChange={e => persist({ ...draftLatest.current, date: e.target.value })} /></label>}<div><button type="button" disabled={!ready || saving || uploading} onClick={() => fileInput.current?.click()}><Paperclip size={17} />添加文件</button>{mode!=="compose"&&<><button type="button" disabled={!ready || saving} onClick={() => insert("bold")}><Bold size={17} />加粗</button><button type="button" disabled={!ready || saving} onClick={() => insert("list")}><List size={17} />列表</button></>}</div><small>每条最多 9 个附件，单个 20 MB。</small></div>}
     {mobile && <div className="quick-journal-draft-status"><span role="status">{uploading ? "正在保存附件…" : draftStatus}</span><button type="button" onClick={() => setMoreOpen(!moreOpen)}><CalendarDays size={13} />{draft.date === localJournalDate() ? "今天" : draft.date}</button></div>}
