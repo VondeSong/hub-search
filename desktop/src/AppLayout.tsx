@@ -31,6 +31,8 @@ export type AppLayoutProps = {
   mainContent?: ReactNode;
   mobileHeader?: ReactNode;
   mobileOverview?: ReactNode;
+  mobileJournalFilter?: boolean;
+  onMobileJournalFilter?: (enabled: boolean) => void;
   mobileCollectionSearch?: MobileCollectionSearchProps;
   mobileFilterLibraryOnly?: boolean;
   onSelectMobileLibraries?: (ids: string[] | null) => void;
@@ -55,7 +57,7 @@ function AppLayoutContent({
   settingsDialog,
   mainContent,
   mobileHeader,
-  mobileOverview,
+  mobileOverview, mobileJournalFilter, onMobileJournalFilter,
   mobileCollectionSearch,
   mobileFilterLibraryOnly = false,
   onSelectMobileLibraries,
@@ -67,7 +69,7 @@ function AppLayoutContent({
     <AppEntry filtersOpen={filtersOpen} previewOpen={mobilePreviewOpen} style={style}>
       <div className="drag-strip" onMouseDown={startWindowDrag} />
       {mainContent ? <>{mobile && mobileHeader}<div className="main-content-override">{mainContent}</div><FooterStatus {...footerStatusProps} /></> : <>
-        {mobile ? <div className="mobile-top-area">{mobileHeader}{mobileCollectionSearch ? <MobileCollectionSearch {...mobileCollectionSearch}/> : <SearchHeader {...headerProps} mobileScopeControl={!workspaceProps.resultsPaneProps.collectionView && <MobileScopeButton filters={filterBarProps} onOpen={() => headerProps.setFiltersOpen(true)} />} />}{!workspaceProps.resultsPaneProps.collectionView && <MobileSearchControls inlineScope={!mobileCollectionSearch} results={headerProps.query.trim() && workspaceProps.resultsPaneProps.contextReady ? workspaceProps.resultsPaneProps.results : undefined} filters={filterBarProps} onSelectLibraries={onSelectMobileLibraries} onOpenFilters={()=>headerProps.setFiltersOpen(true)} />}{mobileOverview}</div> : <SearchHeader {...headerProps} />}
+        {mobile ? <div className="mobile-top-area">{mobileHeader}{mobileCollectionSearch ? <MobileCollectionSearch {...mobileCollectionSearch}/> : <SearchHeader {...headerProps} mobileScopeControl={!workspaceProps.resultsPaneProps.collectionView && <MobileScopeButton filters={filterBarProps} onOpen={() => headerProps.setFiltersOpen(true)} />} />}{!workspaceProps.resultsPaneProps.collectionView && <MobileSearchControls journalFilter={mobileJournalFilter} onJournalFilter={onMobileJournalFilter} inlineScope={!mobileCollectionSearch} results={headerProps.query.trim() && workspaceProps.resultsPaneProps.contextReady ? workspaceProps.resultsPaneProps.results : undefined} filters={filterBarProps} onSelectLibraries={onSelectMobileLibraries} onOpenFilters={()=>headerProps.setFiltersOpen(true)} />}{mobileOverview}</div> : <SearchHeader {...headerProps} />}
         {!mobile && filtersOpen && <FilterBar {...filterBarProps} />}
         <Workspace {...workspaceProps} />
         <FooterStatus {...footerStatusProps} />

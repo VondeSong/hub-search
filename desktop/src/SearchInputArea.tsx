@@ -184,7 +184,7 @@ export function SearchInputArea<TSelected>({
               if (event.button !== 0) return;
               event.preventDefault();
               event.stopPropagation();
-              clearQuery();
+              if (!isMobileLayout) clearQuery();
             }}
             onClick={(event) => {
               event.stopPropagation();

@@ -2040,7 +2040,10 @@ html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-ar
   padding: 0 11px; background: var(--mobile-surface); border: 1px solid color-mix(in srgb,var(--mobile-ink) 13%,transparent);
   border-radius: 13px; box-shadow: var(--bw-shadow-card);
 }
-html[data-runtime-platform="android"] .search-box:has(.mobile-inline-scope) .search-input-wrap { position: static; flex: 1; min-width: 0; }
+html[data-runtime-platform="android"] .search-box:has(.mobile-inline-scope) .search-input-wrap { display: flex; align-items: center; position: static; flex: 1; min-width: 0; }
+html[data-runtime-platform="android"] .search-box:has(.mobile-inline-scope) input { min-width: 0; flex: 1; }
+html[data-runtime-platform="android"] .search-box:has(.mobile-inline-scope) .search-clear { position: static; transform: none; flex: none; }
+html[data-runtime-platform="android"] .mobile-top-area:has(.search-suggestions) { position: relative; z-index: 10; }
 html[data-runtime-platform="android"] .app-shell .search-box .mobile-inline-scope {
   display: inline-flex; align-items: center; flex: none; gap: 4px; height: 27px; min-height: 27px;
   max-width: 42%; padding: 0 9px; border-radius: 8px; font-size: 11.5px; font-weight: 600;
@@ -2373,3 +2376,43 @@ html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-wo
   font-weight: 650;
   margin: 0 0 8px 3px;
 }
+
+html[data-runtime-platform="android"] .app-shell:has(.bw-library-screen) > .mobile-navigation-footer { display: none; }
+html[data-runtime-platform="android"] .bw-library-screen .bw-breadcrumbs button {
+  flex: none; padding: 5px 10px; border: 1px solid var(--mobile-separator); border-radius: 999px;
+}
+html[data-runtime-platform="android"] .bw-library-screen .bw-breadcrumbs :is([aria-pressed="true"],[aria-current="page"]) {
+  color: var(--mobile-accent); background: var(--mobile-selected);
+}
+html[data-runtime-platform="android"] .bw-lib-list > h2 { margin: 12px; font-size: 13px; }
+html[data-runtime-platform="android"] .app-shell .aw-shell .bw-filter-form button[type="submit"] { justify-content: center; text-align: center; }
+html[data-runtime-platform="android"] .cloud-agents-sheet header:has(.cloud-agents-primary) > div { flex: 1; }
+html[data-runtime-platform="android"] .cloud-agents-sheet header > div > small { font-size: 11px; color: var(--mobile-secondary); }
+html[data-runtime-platform="android"] .cloud-agents-sheet .bw-session-sheet-card .bw-session-sheet-pick {
+  display: grid; align-content: center; justify-content: start; justify-items: start; text-align: left;
+}
+html[data-runtime-platform="android"] .mobile-preview-open .preview-content .preview-document {
+  padding: 18px 16px; background: var(--mobile-surface); border: 1px solid var(--mobile-separator); border-radius: 13px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android.is-reviewing .flashcards-review-card {
+  min-height: 0; justify-content: flex-start; text-align: left;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android.is-reviewing .flashcards-review-card > small { display: block; }
+html[data-runtime-platform="android"] .flashcards-review-card .flashcards-mobile-reveal-hint { align-self: flex-start; padding: 4px 0; border: 0; background: transparent; text-align: left; }
+html[data-runtime-platform="android"] .flashcards-review .mobile-flashcard-more { order: 11; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-pane .recent-list-compact .recent-item { background: var(--mobile-surface); border: 1px solid var(--mobile-separator); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-header:has(.mobile-inline-scope) .mobile-search-cancel { display: block; flex: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell.mobile-preview-open .preview-content:has(.preview-document) { background: var(--mobile-canvas); padding: 12px 14px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-review-card .flashcards-answer-label { display: block; font-size: 12px; color: var(--mobile-secondary); }
+html[data-runtime-platform="android"] .mobile-recent-library { display: none; }
+html[data-runtime-platform="android"] .mobile-recent-cards .recent-row > .library-icon { display: none; }
+html[data-runtime-platform="android"] .app-shell .mobile-recent-cards .recent-row { display: block; padding: 12px 44px 12px 14px; }
+html[data-runtime-platform="android"] .mobile-recent-cards .recent-copy { display: flex; flex-direction: column; align-items: stretch; gap: 5px; }
+html[data-runtime-platform="android"] .mobile-recent-cards .mobile-recent-meta { order: -1; display: flex; align-items: center; justify-content: space-between; }
+html[data-runtime-platform="android"] .mobile-recent-cards .mobile-recent-library { display: inline-block; padding: 2px 6px; border-radius: 5px; background: var(--mobile-fill); font-size: 11px; }
+html[data-runtime-platform="android"] .mobile-recent-cards .mobile-recent-meta .recent-path { display: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-preview-open .preview-actions .mobile-reader-location {
+  display: grid !important; flex: 1; min-width: 0; gap: 2px; text-align: left;
+}
+html[data-runtime-platform="android"] .mobile-reader-location small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--mobile-secondary); }
+html[data-runtime-platform="android"] .preview-heading-top:has(.mobile-reader-location) > .preview-source-row { display: none; }

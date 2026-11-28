@@ -27,7 +27,7 @@ export function MobileScopeButton({filters, onOpen}: {filters: Filters; onOpen: 
   return <button type="button" className="mobile-inline-scope" aria-label="选择搜索资料范围" aria-haspopup="dialog" data-filtered={filters.selectedLibraryIds !== null || Boolean(filters.folderId)} onClick={onOpen}><ListFilter size={12}/><span>{mobileScopeLabel(filters)}</span></button>;
 }
 
-export function MobileSearchControls({ filters, results, onSelectLibraries, onOpenFilters, inlineScope }: { filters: Filters; results?: SearchResult[]; onSelectLibraries?: (ids: string[] | null) => void;onOpenFilters?:()=>void; inlineScope?:boolean }) {
+export function MobileSearchControls({ filters, results, onSelectLibraries, onOpenFilters, inlineScope, journalFilter, onJournalFilter }: { filters: Filters; results?: SearchResult[]; onSelectLibraries?: (ids: string[] | null) => void;onOpenFilters?:()=>void; inlineScope?:boolean; journalFilter?:boolean; onJournalFilter?:(enabled:boolean)=>void }) {
   const resolvedSources=normalizeSourceFilters(filters.sourceFilters);
   const all = Object.values(resolvedSources).every(Boolean);
   const selectedType = all ? "all" : types.find(([id]) => resolvedSources[id] && Object.values(resolvedSources).filter(Boolean).length === 1)?.[0] ?? "custom";
@@ -49,7 +49,17 @@ export function MobileSearchControls({ filters, results, onSelectLibraries, onOp
     <select className="mobile-search-type-select" aria-label="内容类型" value={selectedType} onChange={event => filters.setSourceFilters(event.target.value === "all" ? { ...allTypes } : Object.fromEntries(types.map(([id]) => [id, id === event.target.value])) as SourceFilters)}>
       <option value="all">全部类型</option>{selectedType === "custom" && <option value="custom">自定义类型</option>}{types.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
     </select><button type="button" aria-label="更多搜索筛选" onClick={onOpenFilters}><ListFilter size={18}/></button></div>}
-    <nav className="bw-tabs bw-search-types" aria-label="搜索内容类型">{([["all","全部"],...types] as const).map(([id,label])=><button key={id} type="button" aria-pressed={selectedType===id} onClick={()=>filters.setSourceFilters(id==="all"?{...allTypes}:Object.fromEntries(types.map(([key])=>[key,key===id])) as SourceFilters)}>{label}{results && (filters.sourceFacetCounts ? (id==="all" || resolvedSources[id]) : true) && <small title="当前搜索结果中的条数">{counts[id]}</small>}</button>)}</nav>
+    <nav className="bw-tabs bw-search-types" aria-label="搜索内容类型">
+      {([["all", "全部"], ["craft", "资料"], ["journal", "日志"], ["task", "任务"], ["reading", "阅读"], ["flashcard", "闪卡"],
+        ...types.filter(([id]) => ["pdf", "media", "attachment"].includes(id) && selectedType === id)] as const).map(([id, label]) => {
+        const selected = journalFilter ? id === "journal" : id === selectedType;
+        return <button key={id} type="button" aria-pressed={selected} onClick={() => {
+          if (id === "journal") { filters.setSourceFilters({...allTypes}); onJournalFilter?.(true); }
+          else { onJournalFilter?.(false); filters.setSourceFilters(id === "all" ? {...allTypes} : Object.fromEntries(types.map(([key]) => [key, key === id])) as SourceFilters); }
+        }}>{label}{results && (journalFilter ? selected : id !== "journal" && (id === "all" || resolvedSources[id] || !filters.sourceFacetCounts)) &&
+          <small title="当前搜索结果中的条数">{id === "journal" ? results.length : counts[id]}</small>}</button>;
+      })}
+    </nav>
     <div className="mobile-applied-scope" aria-label="当前搜索范围与筛选">
       {scopeFiltered && <div className="bw-applied-strip">
         <span>

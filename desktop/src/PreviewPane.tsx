@@ -209,6 +209,7 @@ export const PreviewPane = memo(function PreviewPane({
               openDisabled={!canOpenSource} onOpen={() => openSelectedResult(selected, "preview")}
             >
                   <button className="mobile-preview-back" title="返回结果列表" onClick={onCloseMobilePreview}><ChevronLeft size={20} /><span>返回</span></button>
+                  {runtimeCapabilities.mobile && mobileDock && <span className="mobile-reader-location"><strong>{selected.libraryName || selected.spaceName}</strong><small title={selected.path}>{selected.path}</small></span>}
                   {runtimeCapabilities.mobile && mobileDock && <MobileReaderFontButton/>}
                   {previewMatchCount > 0 && <>
                     <span className="match-counter" aria-label={`第 ${previewMatchIndex + 1} 个命中，共 ${previewMatchCount} 个`}>{previewMatchIndex + 1}/{previewMatchCount}</span>

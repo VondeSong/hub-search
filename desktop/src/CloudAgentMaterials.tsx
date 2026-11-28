@@ -13,7 +13,7 @@ type Candidate={key:Key;title:string;source:string;chars:number;bytes?:number;pr
 const MAX_MULTI_MATERIALS=8;
 const keyId=(key:Key)=>`${key.kind}\u0000${key.libraryId??''}\u0000${key.id}`;
 const materialMatchesKey=(item:MaterialSnapshot,key:Key)=>Boolean(item.key&&keyId(item.key)===keyId(key));
-export function CloudAgentSheet({title,onClose,children,busy=false,compact=false,expanded=false,onBack}:{title:string;onClose:()=>void;children:ReactNode;busy?:boolean;compact?:boolean;expanded?:boolean;onBack?:()=>void}){
+export function CloudAgentSheet({title,onClose,children,busy=false,compact=false,expanded=false,onBack,headerAction,subtitle}:{headerAction?:ReactNode;subtitle?:string;title:string;onClose:()=>void;children:ReactNode;busy?:boolean;compact?:boolean;expanded?:boolean;onBack?:()=>void}){
  const ref=useRef<HTMLElement>(null);
  const dismiss=useRef(onClose),locked=useRef(busy);dismiss.current=onClose;locked.current=busy;
  const previous=useRef(onBack);previous.current=onBack;
@@ -37,7 +37,7 @@ export function CloudAgentSheet({title,onClose,children,busy=false,compact=false
   };
  },[]);
  useModalFocus({active:true,containerRef:ref,onDismiss:onBack||onClose,suspended:busy});
- return <div className="cloud-agents-sheet-layer" onPointerDown={event=>{if(event.target===event.currentTarget&&!busy)onClose();}}><section className={`cloud-agents-sheet${compact?' is-compact':''}${expanded?' is-expanded':''}`} role="dialog" aria-modal="true" aria-label={title} ref={ref} tabIndex={-1}><header>{onBack&&<button type="button" className="cloud-sheet-back" aria-label="返回上一级" onClick={onBack} disabled={busy}><ArrowLeft size={20}/></button>}<h2>{title}</h2><button type="button" className="cloud-sheet-close" aria-label="关闭" onClick={onClose} disabled={busy}><X size={20}/></button></header>{children}</section></div>;
+ return <div className="cloud-agents-sheet-layer" onPointerDown={event=>{if(event.target===event.currentTarget&&!busy)onClose();}}><section className={`cloud-agents-sheet${compact?' is-compact':''}${expanded?' is-expanded':''}`} role="dialog" aria-modal="true" aria-label={title} ref={ref} tabIndex={-1}><header>{onBack&&<button type="button" className="cloud-sheet-back" aria-label="返回上一级" onClick={onBack} disabled={busy}><ArrowLeft size={20}/></button>}{subtitle ? <div><h2>{title}</h2><small>{subtitle}</small></div> : <h2>{title}</h2>}{headerAction}<button type="button" className="cloud-sheet-close" aria-label="关闭" onClick={onClose} disabled={busy}><X size={20}/></button></header>{children}</section></div>;
 }
 export function CloudMaterialPicker({
  onClose,

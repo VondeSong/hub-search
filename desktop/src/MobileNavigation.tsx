@@ -1,6 +1,6 @@
 import { Layers, Bookmark, BookOpen, ChevronDown, Compass, SquareCheck, ChevronRight, Clock3, Cloud, FolderOpen, MessageSquare, Search, Sparkles, Star, Tags } from "lucide-react";
 import { createPortal } from "react-dom";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { todayKey } from "./ActionEvidence";
 import type { QuickJournalItem } from "./JournalRecords";
@@ -168,6 +168,9 @@ export function MobileBrowse({
   }
   const activeEntry = location.id ? trees[location.id] : undefined;
   const activeTree = activeEntry?.tree;
+  const libraryDocuments = useMemo(() => activeTree
+    ? Array.from(activeTree.pages.values()).flat().sort((a, b) => (b.modifiedAt ?? 0) - (a.modifiedAt ?? 0))
+    : [], [activeTree]);
   if (location.id) {
     const lib = libraries.find(item => item.id === location.id);
     const breadcrumbs: { id: string; name: string }[] = [];
@@ -178,7 +181,7 @@ export function MobileBrowse({
     }
     const q = libFilter.trim().toLowerCase();
     const rawFolders = activeTree?.children.get(location.folder) || [];
-    const rawDocs = activeTree?.pages.get(location.folder) || [];
+    const rawDocs = location.folder ? activeTree?.pages.get(location.folder) || [] : libraryDocuments;
     const folders = q ? rawFolders.filter(folder => folder.name.toLowerCase().includes(q)) : rawFolders;
     const docs = q ? rawDocs.filter(doc => doc.title.toLowerCase().includes(q)) : rawDocs;
     const header = document.querySelector(".mobile-hub-header");
@@ -187,22 +190,13 @@ export function MobileBrowse({
         <button type="button" aria-label={location.folder ? "返回上一级" : "返回浏览"} onClick={() => window.history.state?.hubBrowseLocation?.id ? window.history.back() : setLocation({ id: "", folder: "" })}>‹ 返回</button>
         <strong>{lib?.name || "资料库"}</strong>
         <span className="bw-subhead-actions">
-          <button type="button" className="bw-subhead-action" onClick={onOpenLibraries}>范围</button>
-          <button type="button" className="bw-subhead-action" onClick={() => onScope?.(location.id, location.folder)}>仅搜此范围</button>
+          <button type="button" className="bw-subhead-action" onClick={() => onScope?.(location.id, location.folder)}>{location.folder ? "仅搜此夹" : "仅搜此库"}</button>
         </span>
       </div>
     );
     return (
       <section className="bw-browse bw-library-screen" aria-label={lib ? `${lib.name} 目录浏览` : "资料库浏览"}>
         {header ? createPortal(subhead, header) : subhead}
-        <nav className="bw-breadcrumbs" aria-label="文件夹路径">
-          <button type="button" aria-current={!location.folder ? "page" : undefined} onClick={() => location.folder && drill(location.id, "")}>{lib?.name || "根目录"}</button>
-          {breadcrumbs.map((crumb, idx) => (
-            <button key={crumb.id} type="button" aria-current={idx === breadcrumbs.length - 1 ? "page" : undefined} onClick={() => idx < breadcrumbs.length - 1 && drill(location.id, crumb.id)}>
-              › {crumb.name}
-            </button>
-          ))}
-        </nav>
         <label className="bw-lib-search">
           <Search size={15} aria-hidden="true" />
           <input
@@ -213,13 +207,24 @@ export function MobileBrowse({
             onChange={e => setLibFilter(e.target.value)}
           />
         </label>
+        <nav className="bw-breadcrumbs" aria-label="文件夹路径">
+          <button type="button" aria-current={!location.folder ? "page" : undefined} onClick={() => location.folder && drill(location.id, "")}>全部目录</button>
+          {(activeTree?.children.get("") ?? []).map(folder => <button key={folder.id} type="button" aria-pressed={breadcrumbs[0]?.id === folder.id} onClick={() => drill(location.id, folder.id)}>{folder.name}</button>)}
+          {breadcrumbs.slice(1).map((crumb, idx) => (
+            <button key={crumb.id} type="button" aria-current={idx === breadcrumbs.length - 2 ? "page" : undefined} onClick={() => idx < breadcrumbs.length - 2 && drill(location.id, crumb.id)}>
+              › {crumb.name}
+            </button>
+          ))}
+        </nav>
         <div className="bw-card bw-lib-list">
           {activeEntry?.error ? <p role="alert">{activeEntry.error}</p> : !activeTree ? <p>正在读取目录…</p> : <>
+            {!!folders.length && <h2>文件夹层级 ({folders.length})</h2>}
             {folders.map(folder => (
               <button key={folder.id} type="button" className="bw-row" onClick={() => drill(location.id, folder.id)}>
                 <FolderOpen /><span><b>{folder.name}</b><small>文件夹</small></span><ChevronRight />
               </button>
             ))}
+            {!!docs.length && <h2>{location.folder ? "文档" : "最新同步文档"} ({docs.length})</h2>}
             {docs.slice(0, limit).map(doc => (
               <button key={doc.nodeId || doc.id} type="button" className="bw-row bw-doc-row" onClick={() => lib && onDocument?.(rootResult(lib, doc))}>
                 <span><b>{doc.title}</b></span><ChevronRight />

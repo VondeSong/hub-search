@@ -2570,9 +2570,13 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
               <span>{isAndroid ? "专注复习" : reviewLabel}</span><small>{isAndroid ? mobileReviewProgress : `还剩 ${reviewQueue.length} 张`}</small>
             </div>
             {!isAndroid && reviewActions}
-            {isAndroid && <div className="mobile-flashcard-study-meta"><span>{decks.find(deck=>deck.id===currentCard.deckId)?.name||"当前牌组"} · 还剩 {reviewQueue.length} 张</span><button type="button" disabled={reviewingCard} onClick={()=>openGridCard(currentCard)}>编辑</button></div>}
+            {isAndroid && <div className="mobile-flashcard-study-meta"><span>还剩 {reviewQueue.length} 张</span><button type="button" disabled={reviewingCard} onClick={()=>openGridCard(currentCard)}>编辑</button></div>}
             {isAndroid && <h2 className="mobile-flashcard-face-label">{answerVisible ? "答案" : "问题"}</h2>}
-            <article data-card-type={currentCard.cardType} className={`flashcards-review-card ${answerVisible ? "revealed" : ""} ${!answerVisible && (currentCard.cardType === "qa" || currentCard.cardType === "cloze" || currentCard.cardType === "image_occlusion") ? "tap-to-reveal" : ""}`} onClick={() => { if (!answerVisible && (currentCard.cardType === "qa" || currentCard.cardType === "cloze" || currentCard.cardType === "image_occlusion")) setAnswerVisible(true); }}>
+            <article data-card-type={currentCard.cardType} className={`flashcards-review-card ${answerVisible ? "revealed" : ""} ${!answerVisible && (currentCard.cardType === "qa" || currentCard.cardType === "cloze" || currentCard.cardType === "image_occlusion") ? "tap-to-reveal" : ""}`} onClick={(event) => {
+              if (isAndroid && (event.target as Element).closest("button, input, a, video, audio, canvas")) return;
+              if (isAndroid && answerVisible) setAnswerVisible(false);
+              else if (!answerVisible && ["qa", "cloze", "image_occlusion"].includes(currentCard.cardType)) setAnswerVisible(true);
+            }}>
               <small>{isAndroid ? decks.find(deck => deck.id === currentCard.deckId)?.name || `${CARD_TYPE_LABELS[currentCard.cardType]}卡` : `${CARD_TYPE_LABELS[currentCard.cardType]}卡`}</small>
               <h2>{flashcardFrontPreview(currentCard)}</h2>
               {renderReviewMedia(mediaAt(currentCard, "question").filter(item => currentCard.cardType !== "image_occlusion" || !item.mimeType.startsWith("image/")), "flashcards-media flashcards-question-media")}
@@ -2582,7 +2586,7 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
               </div>}
               {currentCard.cardType === "typed_answer" && !answerVisible && <div className="flashcards-typed-response"><input value={typedResponse} onChange={(event) => setTypedResponse(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && typedResponse.trim()) setAnswerVisible(true); }} placeholder="输入答案后检查" autoFocus /><button disabled={!typedResponse.trim()} onClick={() => setAnswerVisible(true)}>检查答案</button></div>}
               {currentCard.cardType === "ordering" && !answerVisible && <div className="flashcards-ordering-response">{orderingResponse.map((item, index) => <div key={`${item}-${index}`}><span>{index + 1}</span><strong>{item}</strong><button disabled={index === 0} onClick={() => moveOrderingItem(index, -1)} title="上移"><ChevronUp size={15} /></button><button disabled={index === orderingResponse.length - 1} onClick={() => moveOrderingItem(index, 1)} title="下移"><ChevronDown size={15} /></button></div>)}<button className="check-order" onClick={() => setAnswerVisible(true)}>检查顺序</button></div>}
-              {!answerVisible && isAndroid && (currentCard.cardType === "qa" || currentCard.cardType === "cloze" || currentCard.cardType === "image_occlusion") && <div className="flashcards-mobile-reveal-hint">点击卡片显示答案</div>}
+              {!answerVisible && isAndroid && (currentCard.cardType === "qa" || currentCard.cardType === "cloze" || currentCard.cardType === "image_occlusion") && <button type="button" className="flashcards-mobile-reveal-hint" onClick={() => setAnswerVisible(true)}>点击卡片显示答案</button>}
               {answerVisible && <div className="flashcards-answer">
                 <div className="flashcards-answer-label">答案</div>
                 {currentCard.cardType === "ordering" ? <ol>{correctOrderingItems.map((item) => <li key={item}>{item}</li>)}</ol> : <p>{currentCard.answer}</p>}
@@ -2591,11 +2595,11 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
                 {currentCard.cardType === "ordering" && <div className={`flashcards-response-result ${orderingMatches ? "correct" : "wrong"}`}>{orderingMatches ? <Check size={15} /> : <X size={15} />}{orderingMatches ? "顺序正确" : "顺序不正确，请对照正确顺序"}</div>}
                 {currentCard.explanation && <blockquote>{currentCard.explanation}</blockquote>}
                 {renderReviewMedia(mediaAt(currentCard, "explanation").filter(item => currentCard.cardType !== "image_occlusion" || !item.mimeType.startsWith("image/")))}
-                {!isAndroid && (currentCard.sourceTitle || currentCard.sourcePath) && <div className="flashcards-source"><span>来源：</span>{renderCardSource(currentCard, "来源")}</div>}
+                {(currentCard.sourceTitle || currentCard.sourcePath) && <div className="flashcards-source"><span>来源：</span>{renderCardSource(currentCard, "来源")}</div>}
                 {currentCard.sourceChanged && <div className="flashcards-source-changed">来源笔记已变化，这张卡片可能需要更新。</div>}
               </div>}
             </article>
-            {!answerVisible && (currentCard.cardType === "qa" || currentCard.cardType === "cloze" || currentCard.cardType === "image_occlusion" || (currentCard.cardType === "multiple_choice" && (currentCard.cardData.options?.length ?? 0) < 2)) ? <button className="flashcards-reveal" onClick={() => setAnswerVisible(true)}>{currentCard.cardType === "image_occlusion" ? "揭晓原图" : "显示答案"}</button> : answerVisible ? <div className="flashcards-ratings">
+            {!answerVisible && (currentCard.cardType === "qa" || currentCard.cardType === "cloze" || currentCard.cardType === "image_occlusion" || (currentCard.cardType === "multiple_choice" && (currentCard.cardData.options?.length ?? 0) < 2)) ? (!isAndroid || currentCard.cardType === "multiple_choice") && <button className="flashcards-reveal" onClick={() => setAnswerVisible(true)}>{currentCard.cardType === "image_occlusion" ? "揭晓原图" : "显示答案"}</button> : answerVisible ? <div className="flashcards-ratings">
               {schedulePreview.error && <p className="flashcards-rating-recommendation" role="alert">{schedulePreview.error} <button disabled={reviewingCard} onClick={() => void reloadReviewCards()}>重新加载卡片</button></p>}
               {recommendedRating && <p className={`flashcards-rating-recommendation rating-${recommendedRating}`}>客观题判定：建议{recommendedRating === 1 ? "重来" : "记得"}</p>}
               {[
@@ -2607,10 +2611,7 @@ export function FlashcardsWorkspace({ onClose, onDueCountChange, desktopSidebarV
                 <strong>{item.label}</strong><small>{schedulePreview.preview ? formatReviewInterval(schedulePreview.preview.choices.find(choice => choice.rating === item.rating)!.intervalSeconds) : "加载间隔…"}</small>
               </button>)}
             </div> : null}
-            {isAndroid && <>
-              {answerVisible && (currentCard.sourceTitle || currentCard.sourcePath) && <section className="mobile-flashcard-section mobile-flashcard-review-source"><h2>来源</h2><div className="mobile-flashcard-group">{renderCardSource(currentCard, "来源")}</div></section>}
-              <details className="mobile-flashcard-more"><summary>更多复习操作</summary>{reviewActions}</details>
-            </>}
+            {isAndroid && <details className="mobile-flashcard-more"><summary>更多复习操作</summary>{reviewActions}</details>}
           </>}
         </div> : <>
           {isAndroid && activeView === "due" && <>

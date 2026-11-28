@@ -94,7 +94,7 @@ html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .
 html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review-card > small::before { display: none; }
 html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review-card h2,
 html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-answer > p { margin: 0; font-size: 21px; line-height: 1.7; letter-spacing: -.01em; font-weight: 400; color: var(--mobile-ink); overflow-wrap: anywhere; }
-html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review-card.revealed:is([data-card-type="qa"],[data-card-type="cloze"],[data-card-type="typed_answer"]) > h2 { display: none; }
+
 html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-review-card .flashcards-answer { margin: 0; padding: 0; border: 0; }
 html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-answer-label,
 html[data-runtime-platform="android"] .flashcards-workspace.flashcards-android .flashcards-mobile-reveal-hint { display: none; }

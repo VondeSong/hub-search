@@ -1112,9 +1112,8 @@ export default function CloudAgents({
         onClose={() => { setSheet(undefined); setMaterialPicker(false); }}
       />
     </CloudAgentSheet>}
-    {mobile && sheet === "sessions" && <CloudAgentSheet title={`云端助手会话 (${catalog.length})`} compact expanded onClose={() => setSheet(undefined)}>
+    {mobile && sheet === "sessions" && <CloudAgentSheet title={`云端助手会话列表 (${catalog.length})`} subtitle="归档只收起会话，保留消息、材料与成果" headerAction={<button type="button" className="cloud-agents-primary" disabled={busy || preparing} onClick={() => { setSheet(undefined); select(); }}><Plus size={15}/>新会话</button>} compact expanded onClose={() => setSheet(undefined)}>
       <div className="bw-multi-picker-footer">
-        <button type="button" className="cloud-agents-primary" disabled={busy || preparing} onClick={() => { setSheet(undefined); select(); }}><Plus size={15}/>新会话</button>
         <button type="button" aria-label="返回会话列表" onClick={closeSheetAndShowList}>全部会话与搜索</button>
       </div>
       <div className="bw-session-sheet-list">

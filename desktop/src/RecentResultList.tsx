@@ -105,6 +105,7 @@ const RecentResultRow = memo(function RecentResultRow({
           </>}
           {isMobileLayout && result.favoriteKind!=="snippet" && result.snippet.trim() && <span className="mobile-result-summary">{cleanSearchSnippet(result.snippet).slice(0,120)}</span>}
           {isMobileLayout && <span className="mobile-recent-meta">
+            <span className="mobile-recent-library">{result.libraryName}</span>
             {showContextPath && <span className="recent-path" title={`${result.libraryName} / ${result.path}`}>{contextPath}</span>}
             {result.modifiedAt && absoluteDate && !hideEntryDate && <time className="recent-date" dateTime={new Date(result.modifiedAt * 1000).toISOString()} title={absoluteDate}>{displayedDate}</time>}
           </span>}
@@ -144,9 +145,9 @@ export function RecentResultList({
   onToggleFavorite,
 }: RecentResultListProps) {
   return (
-    <div className="recent-list" role="listbox">
+    <div className={isMobileLayout ? "recent-list recent-list-compact" : "recent-list"} role="listbox">
       {recentGroups.map((group) => (
-        <section className={`recent-group ${group.hideEntryDates ? "journal-day-group" : ""}`} key={group.key}>
+        <section className={`recent-group ${isMobileLayout && group.key === "recent" ? "mobile-recent-cards" : ""} ${group.hideEntryDates ? "journal-day-group" : ""}`} key={group.key}>
           {group.label && <h2 className="recent-group-label">{group.label}<small>{group.entries.length > 1 ? `${group.entries.length} ${isMobileLayout ? "项" : "个来源"}` : ""}</small></h2>}
           {group.entries.map(({ result, index }) => <RecentResultRow
               key={result.entityKey}

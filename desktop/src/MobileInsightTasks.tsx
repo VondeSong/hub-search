@@ -478,12 +478,13 @@ export function MobileInsightList({
   );
 }
 
-export function MobileTaskFilter({ source, list, options, onApply, onSources }: {
+export function MobileTaskFilter({ source, list, options, onApply, onSources, onWeeklyReview }: {
   source: string;
   list: string;
   options: {source: string; list: string}[];
   onApply: (source: string, list: string) => void;
   onSources: () => void;
+  onWeeklyReview?: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [draftSource, setSource] = useState(source);
@@ -496,7 +497,7 @@ export function MobileTaskFilter({ source, list, options, onApply, onSources }: 
     }}>{[source, list].filter(Boolean).join(" · ") || "全部来源与清单"} ▾</button>
     <dialog ref={dialog} className="bw-task-sheet" aria-label="筛选任务">
       <form method="dialog" className="bw-filter-form" onSubmit={() => onApply(draftSource, draftList)}>
-        <header><h2>筛选任务</h2><button type="button" onClick={() => {dialog.current?.close(); onSources();}}>查看来源任务</button><button type="button" onClick={() => dialog.current?.close()}>取消</button></header>
+        <header><h2>筛选任务</h2><button type="button" onClick={() => dialog.current?.close()}>取消</button></header>
         <label>来源<select value={draftSource} onChange={event => {setSource(event.target.value); setList("");}}>
           <option value="">全部来源</option>{sources.map(s => <option key={s}>{s}</option>)}
         </select></label>
@@ -504,6 +505,10 @@ export function MobileTaskFilter({ source, list, options, onApply, onSources }: 
           <option value="">全部清单</option>{lists.map(l => <option key={l}>{l}</option>)}
         </select></label>
         <button type="submit">应用筛选</button>
+        <details><summary>更多任务视图</summary>
+          <button type="button" onClick={() => {dialog.current?.close(); onSources();}}>查看来源任务</button>
+          {onWeeklyReview && <button type="button" onClick={() => {dialog.current?.close(); onWeeklyReview();}}>每周回顾</button>}
+        </details>
       </form>
     </dialog>
   </>;

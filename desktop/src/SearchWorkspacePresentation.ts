@@ -148,6 +148,9 @@ export function deriveSearchWorkspaceResults({
   if (!normalizedQuery && useSidebarSource) {
     return { visibleResults, groups: [{ key: view, label: "", entries }], journalDayCount: 0 };
   }
+  if (isMobileLayout && view === "home" && !normalizedQuery) {
+    return { visibleResults, groups: [{ key: "recent", label: "最近更新与命中", entries }], journalDayCount: 0 };
+  }
   if (normalizedQuery || (dateFilter === "any" && !groupRecentByDateWhenUnlimited)) {
     return { visibleResults, groups: [{ key: "recent", label: "", entries }], journalDayCount: 0 };
   }

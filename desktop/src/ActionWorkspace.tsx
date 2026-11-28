@@ -66,6 +66,7 @@ type QuickRequest = {
   priority?: number;
 };
 type View = "focus" | "review" | "waiting" | "all" | "done";
+const mobileTaskViews = new Map<string, {view: View; source: string; list: string}>();
 export function TaskWorkspace(props: Props) {
   const [sources,setSources]=useState(false);
   if(runtimeCapabilities.mobile && sources) return <div className="bw-source-tasks"><button onClick={()=>setSources(false)}>‹ 今日聚焦</button><SourceTasks {...props}/></div>;
@@ -79,7 +80,9 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
   const [compose,setCompose]=useState(false),[localId,setLocalId]=useState("");
   const localRows=mobile ? mobileTasks() : [];
   const localTask=localRows.find(t=>t.id===(mobileTarget || localId));
-  const [view, setView] = useState<View>("focus"),
+  const mobileScopeKey = JSON.stringify(selectedLibraryIds?.slice().sort() ?? null);
+  const savedView = mobile ? mobileTaskViews.get(mobileScopeKey) : undefined;
+  const [view, setView] = useState<View>(savedView?.view ?? "focus"),
     [project, setProject] = useState<Topic | null>(null),
     [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string | null>(null),
@@ -226,8 +229,11 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
           .sort((a, b) => (topicCounts.get(b.key) || 0) - (topicCounts.get(a.key) || 0))
           .slice(0, 4)
       : topics.filter((t) => pins.includes(t.key));
-  const [mobileList,setMobileList]=useState("");
-  const [mobileSource, setMobileSource] = useState("");
+  const [mobileList,setMobileList]=useState(savedView?.list ?? "");
+  const [mobileSource, setMobileSource] = useState(savedView?.source ?? "");
+  useEffect(() => {
+    if (mobile) mobileTaskViews.set(mobileScopeKey, {view, source: mobileSource, list: mobileList});
+  }, [mobile, mobileScopeKey, view, mobileSource, mobileList]);
   const localSource = (task: typeof localRows[number]) => task.id.startsWith("document:") ? "原文转化" : task.source;
   const localListRows = localRows.filter(t => (!mobileList || mobileList === (t.list || "本机任务")) && (!mobileSource || mobileSource === localSource(t)));
   const scoped = useMemo(() => {
@@ -757,14 +763,14 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
       <section className="aw-center">
         {mobile && <section className="bw-task-head">
           <header><h2>{mobileViews[view]}</h2><button onClick={() => setCompose(true)}>＋ 新建任务</button></header>
-          <nav className="bw-tabs" aria-label="任务视图">{views.map(([id]) =>
+          <nav className="bw-tabs" aria-label="任务视图">{views.filter(([id]) => id !== "review").map(([id]) =>
             <button key={id} aria-pressed={view === id} onClick={() => navigate(id)}>{mobileViews[id]}</button>)}</nav>
           <div className="bw-task-tools">
             <MobileTaskFilter source={mobileSource} list={mobileList}
               options={[...tasks.map(t => ({source: providerName(t.provider), list: topicOf(t).name})),
                 ...localRows.map(t => ({source: localSource(t), list: t.list || "本机任务"}))]}
               onApply={(source, list) => {setMobileSource(source); setMobileList(list);}}
-              onSources={onSources}/>
+              onSources={onSources} onWeeklyReview={() => navigate("review")}/>
             {harvester}
           </div>
         </section>}
@@ -884,12 +890,13 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
                 boardColumns
               ) : (
                 <>
+                  {mobile && focusCommitments}
                   {rows(
                     mobile ? "今日计划" : "今日计划（额外自选）",
                     grouped.plan,
                     planEmptyMessage,
                   )}
-                  {focusCommitments}
+                  {!mobile && focusCommitments}
                   {overdueDisclosure}
                   {(mobile || grouped.waiting.length > 0) && rows(mobile ? "等待跟进" : "等待他人", grouped.waiting)}
                 </>

@@ -57,10 +57,11 @@ export function MobileSearchOverview({
       </div>
       <header>
         <strong>
-          {topics.length ? "试试搜索 · 跨库主题" : "最近更新与命中"}
+          试试搜索 · 跨库高频主题
         </strong>
         <button onClick={() => onGo("browse")}>浏览资料库目录 →</button>
       </header>
+      {!topics.length && <small>当前范围暂无已索引主题</small>}
       {!!topics.length && (
         <div className="bw-tabs">
           {topics.map((q) => (

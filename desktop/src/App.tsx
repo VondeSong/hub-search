@@ -25,6 +25,7 @@ import { useWindowLifecycleControls } from "./useWindowLifecycleControls";
 import { useStorageMaintenance } from "./useStorageMaintenance";
 import { useSavedResults } from "./useSavedResults";
 import { useSearchWorkspaceState, updatedAfter } from "./useSearchWorkspaceState";
+import { useJournalPage } from "./useJournalPage";
 import { useSidebarTags } from "./useSidebarTags";
 import { canOpenResultSource } from "./ResultOpening";
 import IsolatedRuntimeProbe from "./IsolatedRuntimeProbe";
@@ -170,6 +171,7 @@ function AppContent() {
   const [previewFocusMode, setPreviewFocusMode] = useState(false);
   const isMobileLayout = runtimeCapabilities.mobile;
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [mobileJournalFilter, setMobileJournalFilter] = useState(false);
   const [desktopSidebarView, setDesktopSidebarView] = useState<DesktopSidebarView>("home");
   const { position: libraryPosition, setPosition: setLibraryPosition, preview: libraryPreview, setPreview: setLibraryPreview } = useLibraryBrowseNavigation();
   const [mobileBrowseOpen, setMobileBrowseOpen] = useState(false);
@@ -354,12 +356,29 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
   const journalDates = journalSummary.dates;
   const [mobileCollectionQueries, setMobileCollectionQueries] = useState({ favorites: "", tags: "" });
   const mobileFavorites = useMemo(() => isMobileLayout ? filterMobileFavorites(filteredFavorites, mobileCollectionQueries.favorites) : filteredFavorites, [filteredFavorites, isMobileLayout, mobileCollectionQueries.favorites]);
+  const searchingJournals = isMobileLayout && desktopSidebarView === "home" && mobileJournalFilter;
+  const mobileJournalPage = useJournalPage(
+    { ...journalViewStore.view, layout: "stream", period: "all", libraries: null, query },
+    effectiveSpaceIds, journalDataVersion(indexStatus, effectiveSpaceIds), searchingJournals,
+  );
+  const searchItems = useMemo(() => {
+    if (!searchingJournals) return results;
+    const after = updatedAfter(dateFilter);
+    const folder = selectedFolder?.path.replace(/\\/g, "/").replace(/\/$/, "");
+    if (mobileJournalPage.loading || mobileJournalPage.error) return [];
+    return mobileJournalPage.items.filter(item => {
+      if (after && (item.modifiedAt ?? 0) < after) return false;
+      if (folder && !item.path.replace(/\\/g, "/").startsWith(folder + "/")) return false;
+      if (searchScope !== "all" && query.trim()) return findMatchingResultIndex(results, item) >= 0;
+      return true;
+    });
+  }, [searchingJournals, results, mobileJournalPage, dateFilter, selectedFolder, searchScope, query]);
   const searchWorkspacePresentation = useMemo(() => deriveSearchWorkspaceResults({
     desktopSidebarEnabled,
     isMobileLayout,
     query,
     view: desktopSidebarView === "collections" || desktopSidebarView === "insights" || desktopSidebarView === "libraries" ? "home" : desktopSidebarView,
-    results,
+    results: searchItems,
     journalResults,
     favoriteResults: mobileFavorites,
     historyResults: viewHistory,
@@ -368,10 +387,12 @@ const { results, searching, resultsCurrent, selectedIndex, setSelectedIndex } = 
     selectedJournalDate,
     dateFilter,
     groupRecentByDateWhenUnlimited: appSettings.groupRecentByDateWhenUnlimited,
-  }), [appSettings.groupRecentByDateWhenUnlimited, dateFilter, desktopSidebarEnabled, desktopSidebarView, mobileFavorites, isMobileLayout, journalResults, query, results, selectedJournalDate, selectedLibraryIdSet, tagResults, viewHistory]);
+  }), [appSettings.groupRecentByDateWhenUnlimited, dateFilter, desktopSidebarEnabled, desktopSidebarView, mobileFavorites, isMobileLayout, journalResults, query, searchItems, selectedJournalDate, selectedLibraryIdSet, tagResults, viewHistory]);
   const { visibleResults, groups: recentGroups, journalDayCount } = searchWorkspacePresentation;
   const selected = visibleResults[selectedIndex];
   const flashcardsActive = flashcardsStandaloneOpen || desktopSidebarView === "flashcards";
+  const showMobileHeader = isMobileLayout && !mobilePreviewOpen
+    && (flashcardsActive || (!mobileAgentsOpen && desktopSidebarView !== "journals"));
   const { flashcardDueCount, taskOpenCount, updateFlashcardDueCount, updateTaskOpenCount } = useNavigationBadges({ ready, flashcardsActive });
 
   const insightsActive = desktopSidebarView === "insights" && !flashcardsStandaloneOpen;
@@ -1201,8 +1222,8 @@ useEffect(() => {
       selectedTagLibraryIds: selectedLibraryIds,
       onChangeTagLibraries: selectLibraries,
       onClearScope: selectedLibraryIds === null ? undefined : () => selectAllLibraries(),
-      error,
-      searching: searching || (journalsLoading && desktopSidebarView === "journals"),
+      error: searchingJournals ? mobileJournalPage.error || error : error,
+      searching: (searchingJournals && mobileJournalPage.loading) || searching || (journalsLoading && desktopSidebarView === "journals"),
       query,
       results: visibleResults,
       recentGroups,
@@ -1515,13 +1536,14 @@ useEffect(() => {
     mobilePreviewOpen,
     mobileFilterLibraryOnly: isMobileLayout && mobileAgentsOpen && !flashcardsActive,
     onSelectMobileLibraries: selectLibraries,
+    mobileJournalFilter, onMobileJournalFilter: setMobileJournalFilter,
     mobileCollectionSearch: isMobileLayout && (desktopSidebarView === "favorites" || (desktopSidebarView === "tags" && !selectedSidebarTag)) ? {
       label: desktopSidebarView === "favorites" ? "搜索收藏" : "搜索标签",
       value: mobileCollectionQueries[desktopSidebarView as "favorites" | "tags"],
       onChange: (value: string) => setMobileCollectionQueries(current => ({ ...current, [desktopSidebarView]: value })),
     } : undefined,
-    mobileOverview: isMobileLayout && desktopSidebarView==="home" && !query.trim() && !searchFocused ? <MobileSearchOverview due={flashcardDueCount} tasks={taskOpenCount} topics={sidebarTags.slice(0,6).map(t=>t.name)} onSearch={setQuery} onGo={dest=>dest==="insights"?pushMobileRoute(dest):navigateMobile(dest)}/> : undefined,
-    mobileHeader: isMobileLayout && !mobilePreviewOpen && !mobileAgentsOpen && desktopSidebarView!=="journals" ? <MobileHeader connection={linkStatus} title={flashcardsActive?"复习":mobileConnectionsOpen?"连接总览":mobileBrowseOpen?"浏览":({home:"搜索",tasks:"任务",collections:"阅读",favorites:"收藏",history:"最近浏览",tags:"标签",insights:"洞察"} as {[key:string]:string})[desktopSidebarView]} onBack={!flashcardsActive && ((!["home", "tasks"].includes(desktopSidebarView) && !mobileBrowseOpen) || mobileConnectionsOpen) ? () => window.history.state?.hubMobileRoute ? window.history.back() : navigateMobile("browse") : undefined} onSettings={() => setShowConnection(true)} spaceActions={mobileSpaceActions} /> : undefined,
+    mobileOverview: isMobileLayout && desktopSidebarView==="home" && !query.trim() && !searchFocused ? <MobileSearchOverview due={flashcardDueCount} tasks={taskOpenCount} topics={sidebarTags.filter(tag => tag.count > 0).sort((a,b) => b.count - a.count).slice(0,6).map(t=>t.name)} onSearch={setQuery} onGo={dest=>dest==="insights"?pushMobileRoute(dest):navigateMobile(dest)}/> : undefined,
+    mobileHeader: showMobileHeader ? <MobileHeader connection={linkStatus} title={flashcardsActive?"复习":mobileConnectionsOpen?"连接总览":mobileBrowseOpen?"浏览":({home:"搜索",tasks:"任务",collections:"阅读",favorites:"收藏",history:"最近浏览",tags:"标签",insights:"洞察"} as {[key:string]:string})[desktopSidebarView]} onBack={!flashcardsActive && ((!["home", "tasks"].includes(desktopSidebarView) && !mobileBrowseOpen) || mobileConnectionsOpen) ? () => window.history.state?.hubMobileRoute ? window.history.back() : navigateMobile("browse") : undefined} onSettings={() => setShowConnection(true)} spaceActions={mobileSpaceActions} /> : undefined,
     style: shellStyle,
     startWindowDrag,
     mainContent: isMobileLayout && mobileAgentsOpen && !flashcardsActive ? <Suspense fallback={<div className="workspace-lazy-loading">正在打开助手…</div>}><LazyCloudAgents openRecentOnEntry onClose={closeMobileAgents} selectedLibraryIds={effectiveMobileLibraryIds} scopeLabel={mobileAgentsScopeLabel} onOpenScope={() => setFiltersOpen(true)} onOpenJournal={id => { setJournalTarget(id); pushMobileRoute("journals"); }} onOpenTask={id => { window.history.pushState({ hubMobileRoute: "tasks", hubInsightTask: id }, ""); applyMobileRoute("tasks"); }} headerActions={<MobileHeaderControls connection={linkStatus} onSettings={() => setShowConnection(true)} spaceActions={mobileSpaceActions} />} /></Suspense> : isMobileLayout && mobileConnectionsOpen && !flashcardsActive ? <MobileConnections onContent={() => { setSettingsCategory("cloud"); setShowConnection(true); }} onAgents={() => navigateMobile("agents")} /> : isMobileLayout && mobileBrowseOpen && !flashcardsActive ? <MobileBrowse
@@ -1672,7 +1694,7 @@ useEffect(() => {
       setFolderMenuOpen,
       setSearchScope,
       setSearchScopeMenuOpen,
-      setSourceFilters,
+      setSourceFilters: isMobileLayout ? next => { setMobileJournalFilter(false); setSourceFilters(next); } : setSourceFilters,
       startWindowDrag,
     },
     workspaceProps,
