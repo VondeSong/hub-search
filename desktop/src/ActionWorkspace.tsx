@@ -523,14 +523,14 @@ function DesktopActions({ libraries = [], selectedLibraryIds = null, onClearLibr
   }
   const todayFocusCount = dueToday.length + grouped.plan.length;
   const localRow=(task:(typeof localRows)[number])=><button className="bw-reading-row" key={task.id} onClick={()=>setLocalId(task.id)}><strong>{task.title}</strong><small>{task.source} · {task.list || "本机任务"}</small></button>;
-  const dueEmptyMessage = store.error ? "????????????????" : isAsyncLoading
+  const dueEmptyMessage = store.error ? "滴答任务读取失败，暂时无法核对今日到期承诺。" : isAsyncLoading
     ? "正在读取滴答任务…"
     : didaScopeMissing
       ? "尚未接入滴答清单资料库，桌面今日聚焦仅读取滴答主档"
       : didaExcludedByScope
         ? "当前资料库筛选未包含滴答清单，未计入滴答到期承诺"
         : "已核对当前滴答范围：今日无到期承诺或到点催办（真实 0 项）";
-  const planEmptyMessage = store.error ? "????????????????" : isAsyncLoading
+  const planEmptyMessage = store.error ? "滴答任务读取失败，暂时无法核对今日计划。" : isAsyncLoading
     ? "正在读取滴答任务…"
     : didaScopeMissing
       ? "接入滴答清单后即可将任务排入今日计划"

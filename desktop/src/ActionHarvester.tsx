@@ -288,7 +288,7 @@ export function ActionHarvester({
       if (draft.mode === "recovery" && prepared.state === "confirmed") {
         await decide(draft.clue.key, { state: "linked", taskKey: identity(draft.task) });
         setPendingAppend(null);
-        setSplitReceipt({ local: { status: "ok", text: "???????" }, remote: { status: "ok", text: "??????????" }, task: draft.task });
+        setSplitReceipt({ local: { status: "ok", text: "已保存本地关联" }, remote: { status: "ok", text: "已核对滴答，备注已追加" }, task: draft.task });
         return;
       }
       if (draft.mode === "recovery" && draft.pending && !draft.pending.noteId) {
@@ -402,14 +402,14 @@ export function ActionHarvester({
 
   async function confirmPreviewCancelled(preview: PendingAppendPreview) {
     if (!preview.prepared) {
-      if (preview.mode === "recovery") throw Error("????????????");
+      if (preview.mode === "recovery") throw Error("尚未取得回执，请先核对上次写入结果。");
       return;
     }
     const receipt = preview.prepared;
     if (receipt.state === "cancelled") return;
-    if (!["prepared", "retryable"].includes(receipt.state)) throw Error("???????????????");
+    if (!["prepared", "retryable"].includes(receipt.state)) throw Error("当前回执无法取消，请先核对远端状态。");
     const result = await native<TaskNoteAction>("cancelNote", { id: receipt.id });
-    if (result.state !== "cancelled") throw Error("????????????????");
+    if (result.state !== "cancelled") throw Error("滴答追加预览未确认取消，请核对来源操作记录。");
   }
 
   async function keepLocalOnlyFromPreview() {
@@ -832,7 +832,7 @@ export function ActionHarvester({
                           onClick={() =>
                             void run(c.key, async () => {
                               if (!activeAppendPreview) {
-                                if (!linked) throw Error("???????????????");
+                                if (!linked) throw Error("未找到关联的滴答任务，请重新选择。");
                                 await link(linked, c, saved);
                                 return;
                               }
@@ -1150,7 +1150,7 @@ export function ActionHarvester({
                   )}
                   {selected && metaFor(selected, legacyRecords()).waits.filter(w => !w.resolved).map(w => (
                     <button key={w.id} disabled={!!busy} onClick={() => void run(c.key, () => resolveWaitAndAdvance(selected, w, c))}>
-                      ?????????? ? {w.what}
+                      标为已收到并加下一步 · {w.what}
                     </button>
                   ))}
                   {appendPreviewBox}
