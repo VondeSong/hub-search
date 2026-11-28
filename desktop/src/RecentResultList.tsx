@@ -1,6 +1,6 @@
 import { cleanSearchSnippet } from "./ResultExcerpt";
 import "./ResultFavoriteToggle.css";
-import { Star } from "lucide-react";
+import { ChevronRight, Star } from "lucide-react";
 import { memo, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { TaskCompletionIcon } from "./TaskCompletionIcon";
 import {
@@ -8,8 +8,11 @@ import {
   didaResultStatusLabel,
   formatDate,
   formatSemanticDate,
+  recentDateGroup,
   resultDisplayTitle,
+  sourceTypeLabel,
 } from "./SearchResultPresentation";
+import { providerName } from "./ProviderLabels";
 import type { SearchResult } from "./SearchTypes";
 import { pageFavoriteKey, snippetFavoriteKey } from "./PageFavorites";
 import { journalEntryTitle } from "./JournalPresentation";
@@ -20,6 +23,15 @@ export type RecentGroup = {
   entries: Array<{ result: SearchResult; index: number }>;
   hideEntryDates?: boolean;
 };
+
+const MOBILE_RESULT_TIME = new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+function mobileRecentSourceLabel(result: SearchResult, path: string) {
+  const type = sourceTypeLabel(result);
+  const category = result.journalDate ? "日志" : ["页面", "子页面", "Markdown", "飞书文档"].includes(type) ? "资料" : type;
+  const folder = path.split(" / ").pop();
+  return [...new Set([category, result.libraryName, providerName(result.provider), folder].filter(Boolean))].join(" · ");
+}
 
 export type RecentResultListProps = {
   recentGroups: RecentGroup[];
@@ -44,6 +56,7 @@ type RecentResultRowProps = {
   selected: boolean;
   hideEntryDate: boolean;
   isMobileLayout: boolean;
+  mobileCard: boolean;
   semanticRecentDates: boolean;
   favorite: boolean;
   onHoverResult: (index: number) => void;
@@ -57,14 +70,19 @@ type RecentResultRowProps = {
 };
 
 const RecentResultRow = memo(function RecentResultRow({
-  result, index, selected, hideEntryDate, isMobileLayout, semanticRecentDates, favorite,
+  result, index, selected, hideEntryDate, isMobileLayout, mobileCard, semanticRecentDates, favorite,
   onHoverResult, onSelectResult, onOpenResult, onContextResult, onPrepareResultLink,
   onDragResult, renderLibraryIcon, onToggleFavorite,
 }: RecentResultRowProps) {
   const absoluteDate = formatDate(result.modifiedAt);
-  const displayedDate = semanticRecentDates ? formatSemanticDate(result.modifiedAt) : absoluteDate;
+  const mobileDay = mobileCard ? recentDateGroup(result.modifiedAt) : undefined;
+  const displayedDate = result.modifiedAt && (mobileDay?.key === "today" || mobileDay?.key === "yesterday")
+    ? `${mobileDay.label} ${MOBILE_RESULT_TIME.format(result.modifiedAt * 1000)}`
+    : semanticRecentDates ? formatSemanticDate(result.modifiedAt) : absoluteDate;
   const contextPath = compactRecentPath(result).trim();
   const showContextPath = Boolean(contextPath) && contextPath !== resultDisplayTitle(result).trim();
+  const mobileSourceLabel = mobileCard ? mobileRecentSourceLabel(result, showContextPath ? contextPath : "") : "";
+  const canFavorite = !mobileCard && Boolean(onToggleFavorite) && result.provider !== "hub";
   const taskStatusLabel = didaResultStatusLabel(result);
   const taskCompleted = taskStatusLabel === "已完成";
   // Page favorites deliberately omit search snippets; that is not empty-page evidence.
@@ -73,7 +91,7 @@ const RecentResultRow = memo(function RecentResultRow({
 
   return (
     <div
-      className={`recent-item ${result.favoriteKind === "snippet" ? "saved-snippet" : ""} ${result.provider} ${onToggleFavorite && result.provider !== "hub" ? "has-favorite-action" : ""} ${dimEmptyContent ? "empty-content" : ""} ${taskCompleted ? "task-completed" : ""} ${selected ? "selected" : ""}`}
+      className={`recent-item ${result.favoriteKind === "snippet" ? "saved-snippet" : ""} ${result.provider} ${canFavorite ? "has-favorite-action" : ""} ${dimEmptyContent ? "empty-content" : ""} ${taskCompleted ? "task-completed" : ""} ${selected ? "selected" : ""}`}
       onMouseEnter={() => {
         if (!isMobileLayout) onHoverResult(index);
         if (result.provider !== "hub") onPrepareResultLink(result);
@@ -105,8 +123,12 @@ const RecentResultRow = memo(function RecentResultRow({
           </>}
           {isMobileLayout && result.favoriteKind!=="snippet" && result.snippet.trim() && <span className="mobile-result-summary">{cleanSearchSnippet(result.snippet).slice(0,120)}</span>}
           {isMobileLayout && <span className="mobile-recent-meta">
-            <span className="mobile-recent-library">{result.libraryName}</span>
-            {showContextPath && <span className="recent-path" title={`${result.libraryName} / ${result.path}`}>{contextPath}</span>}
+            {mobileCard
+              ? <span className="mobile-recent-library" title={mobileSourceLabel}><span>{mobileSourceLabel}</span></span>
+              : <>
+                <span className="mobile-recent-library">{result.libraryName}</span>
+                {showContextPath && <span className="recent-path" title={`${result.libraryName} / ${result.path}`}>{contextPath}</span>}
+              </>}
             {result.modifiedAt && absoluteDate && !hideEntryDate && <time className="recent-date" dateTime={new Date(result.modifiedAt * 1000).toISOString()} title={absoluteDate}>{displayedDate}</time>}
           </span>}
         </span>
@@ -115,9 +137,11 @@ const RecentResultRow = memo(function RecentResultRow({
             {displayedDate}
           </time>
         )}
-        {isMobileLayout && <span className="mobile-result-disclosure" aria-hidden="true">›</span>}
+        {mobileCard
+          ? <span className="mobile-recent-details">详情与操作 <ChevronRight size={12} aria-hidden="true" /></span>
+          : isMobileLayout && <span className="mobile-result-disclosure" aria-hidden="true">›</span>}
       </button>
-      {onToggleFavorite && result.provider !== "hub" && <button
+      {canFavorite && onToggleFavorite && <button
         className={`result-favorite-toggle recent ${favorite ? "active" : ""}`}
         onClick={(event) => { event.stopPropagation(); onToggleFavorite(result); }}
         aria-label={result.favoriteKind === "snippet" ? "取消收藏此片段" : favorite ? "取消收藏页面" : "收藏页面"}
@@ -156,6 +180,7 @@ export function RecentResultList({
               selected={index === selectedIndex}
               hideEntryDate={Boolean(group.hideEntryDates)}
               isMobileLayout={isMobileLayout}
+              mobileCard={isMobileLayout && group.key === "recent"}
               semanticRecentDates={semanticRecentDates}
               favorite={result.favoriteKind === "snippet" ? snippetFavoriteIds?.has(snippetFavoriteKey(result)) ?? false : favoriteIds?.has(pageFavoriteKey(result)) ?? false}
               onHoverResult={onHoverResult}

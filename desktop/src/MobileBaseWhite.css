@@ -506,7 +506,7 @@ html[data-runtime-platform="android"] .app-shell .aw-harvester {
 
 .bw-overview {
   background: var(--bw-bg);
-  padding: 4px 14px 8px;
+  padding: 10px 14px 0;
 }
 .bw-pulse {
   display: grid;
@@ -538,14 +538,16 @@ html[data-runtime-platform="android"] .app-shell .aw-harvester {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 12px 0 3px;
+  margin: 14px 0 0;
+  padding: 0 4px 7px;
   font-size: 13px;
 }
 .bw-overview header button {
   background: none;
   border: 0;
   color: var(--bw-accent);
-  padding: 4px;
+  min-height: 0;
+  padding: 2px 6px;
 }
 html[data-runtime-platform="android"]
   .app-shell
@@ -2067,30 +2069,87 @@ html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.flashcard
   border-radius: 999px;
 }
 
-/* Search: input sizing, 29px chips, 17px pulse cards, muted section titles, rounded result cards on canvas */
+/* Search page follows the phone prototype's shared canvas and insets. */
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-search-page {
+  background: var(--bw-bg);
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-search-page .search-header {
+  padding: 12px 14px 0;
+  background: transparent;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-search-page .search-header:not(.mobile-search-expanded) {
+  gap: 0;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-search-page .search-header .mobile-search-controls {
+  min-height: 0;
+}
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-box:has(.mobile-inline-scope) > svg {
   width: 16px;
+  min-width: 16px;
   height: 16px;
   color: var(--bw-muted);
   flex-shrink: 0;
 }
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-box:has(.mobile-inline-scope) input {
   font-size: 14px;
-  padding-right: 4px;
+  padding-inline: 0;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-search-page .search-box input::placeholder {
+  color: var(--bw-muted);
+  -webkit-text-fill-color: var(--bw-muted);
+  opacity: 1;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-search-page .mobile-search-facets {
+  padding: 0 14px;
 }
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-search-facets .bw-search-types {
   gap: 6px;
-  padding: 6px 14px 4px;
+  padding: 9px 1px 4px;
 }
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-search-facets .bw-search-types button {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
   height: 29px;
   min-height: 29px;
-  padding: 0 11px;
+  padding: 0 clamp(4px, 2.65vw, 11px);
   font-size: 12px;
   font-weight: 500;
   border-radius: 999px;
 }
+@media (max-width: 380px) {
+  html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-search-facets .bw-search-types button {
+    gap: 2px;
+    padding-inline: 3px;
+  }
+}
+html[data-runtime-platform="android"] .app-shell .bw-search-types small {
+  min-width: 0;
+  margin-left: 0;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+html[data-runtime-platform="android"] .app-shell .mobile-search-page .workspace-filter-summary {
+  margin: 6px 0 0;
+  padding: 7px 11px;
+  border: 1px solid color-mix(in srgb, var(--mobile-accent) 18%, transparent);
+  border-radius: 11px;
+  background: var(--mobile-selected);
+  color: var(--mobile-accent);
+  font-size: 11.5px;
+}
+html[data-runtime-platform="android"] .app-shell .mobile-search-page .workspace-filter-summary button {
+  background: transparent;
+  color: inherit;
+  border-color: transparent;
+}
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell .bw-pulse button {
+  border-width: 0.5px;
   border-radius: 13px;
   padding: 10px 11px;
   display: flex;
@@ -2102,6 +2161,9 @@ html[data-runtime-platform="android"] .app-shell.mobile-app-shell .bw-pulse b {
   line-height: 1.2;
   font-weight: 700;
 }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .bw-pulse small {
+  line-height: 1.2;
+}
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell .bw-overview header strong {
   font-size: 11.5px;
   font-weight: 600;
@@ -2112,6 +2174,25 @@ html[data-runtime-platform="android"] .app-shell.mobile-app-shell .bw-overview h
   font-size: 12px;
   font-weight: 500;
 }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .bw-search-topics {
+  flex-wrap: wrap;
+  gap: 6px;
+  overflow: visible;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .bw-search-topics button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  height: 27px;
+  min-height: 27px;
+  padding: 0 11px;
+  font-size: 11.5px;
+}
+.bw-search-topics button > svg { flex: none; color: var(--bw-muted); }
+.bw-search-topics button > span { overflow: hidden; text-overflow: ellipsis; }
+.bw-search-topic-empty { color: var(--bw-muted); font-size: 11.5px; }
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-pane,
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-list,
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-list {
@@ -2404,13 +2485,123 @@ html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-pane 
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-header:has(.mobile-inline-scope) .mobile-search-cancel { display: block; flex: none; }
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell.mobile-preview-open .preview-content:has(.preview-document) { background: var(--mobile-canvas); padding: 12px 14px; }
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-review-card .flashcards-answer-label { display: block; font-size: 12px; color: var(--mobile-secondary); }
-html[data-runtime-platform="android"] .mobile-recent-library { display: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-pane.mobile-search-results {
+  padding: 12px 14px calc(92px + env(safe-area-inset-bottom, 0px));
+}
+html[data-runtime-platform="android"] .app-shell .mobile-search-results > .recent-list {
+  margin: 0;
+  padding: 0;
+}
+.bw-search-section-title {
+  margin: 0;
+  padding: 0 4px 7px;
+  color: var(--bw-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.bw-search-empty {
+  padding: 28px 16px;
+  border: 0.5px solid var(--bw-line);
+  border-radius: 15px;
+  background: var(--bw-card);
+  box-shadow: var(--bw-shadow-card);
+  text-align: center;
+}
+.bw-search-empty strong { font-size: 14px; font-weight: 600; }
+.bw-search-empty p { margin: 4px 0 12px; color: var(--bw-muted); font-size: 12px; }
+html[data-runtime-platform="android"] .app-shell .bw-search-empty button {
+  min-height: 27px;
+  padding: 0 9px;
+  border: 0.5px solid color-mix(in srgb, var(--mobile-accent) 18%, transparent);
+  border-radius: 8px;
+  background: var(--mobile-selected);
+  color: var(--mobile-accent);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-search-results .mobile-recent-cards .recent-item {
+  margin: 0 0 9px;
+  border: 0.5px solid var(--bw-line);
+  border-radius: 14px;
+  background: var(--bw-card);
+  box-shadow: var(--bw-shadow-card);
+}
 html[data-runtime-platform="android"] .mobile-recent-cards .recent-row > .library-icon { display: none; }
-html[data-runtime-platform="android"] .app-shell .mobile-recent-cards .recent-row { display: block; padding: 12px 44px 12px 14px; }
-html[data-runtime-platform="android"] .mobile-recent-cards .recent-copy { display: flex; flex-direction: column; align-items: stretch; gap: 5px; }
-html[data-runtime-platform="android"] .mobile-recent-cards .mobile-recent-meta { order: -1; display: flex; align-items: center; justify-content: space-between; }
-html[data-runtime-platform="android"] .mobile-recent-cards .mobile-recent-library { display: inline-block; padding: 2px 6px; border-radius: 5px; background: var(--mobile-fill); font-size: 11px; }
-html[data-runtime-platform="android"] .mobile-recent-cards .mobile-recent-meta .recent-path { display: none; }
+html[data-runtime-platform="android"] .app-shell .mobile-recent-cards .recent-row {
+  display: block;
+  min-height: 0;
+  padding: 12px 14px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-recent-cards .recent-item.selected .recent-row {
+  background: transparent;
+}
+html[data-runtime-platform="android"] .mobile-recent-cards .recent-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-recent-cards .mobile-recent-meta {
+  order: -1;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 1px;
+}
+.mobile-recent-cards .mobile-recent-library {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  width: max-content;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--mobile-fill);
+  color: var(--mobile-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+.mobile-recent-cards .mobile-recent-library::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mobile-accent);
+}
+.mobile-recent-cards .mobile-recent-library > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-recent-cards .mobile-recent-meta .recent-date {
+  color: var(--bw-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+html[data-runtime-platform="android"] .app-shell .mobile-recent-cards .recent-title-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  white-space: normal;
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+html[data-runtime-platform="android"] .app-shell .mobile-recent-cards .mobile-result-summary {
+  color: var(--mobile-secondary);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.mobile-recent-details {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  margin-top: 8px;
+  color: var(--bw-muted);
+  font-size: 11px;
+}
 html[data-runtime-platform="android"] .app-shell.mobile-preview-open .preview-actions .mobile-reader-location {
   display: grid !important; flex: 1; min-width: 0; gap: 2px; text-align: left;
 }

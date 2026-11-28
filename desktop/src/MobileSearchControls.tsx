@@ -1,6 +1,6 @@
 import { useEffect, useState, type ComponentProps } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { ChevronDown, ListFilter } from "lucide-react";
+import { ChevronDown, ListFilter, SlidersHorizontal } from "lucide-react";
 import type { FilterBar } from "./FilterBar";
 import { WorkspaceFilterSummary } from "./WorkspaceFilterSummary";
 import type { FolderSummary, LibrarySummary, SearchResult } from "./SearchTypes";
@@ -9,7 +9,15 @@ import { normalizeSourceFilters } from "./SearchSourceFilters";
 
 type Filters = ComponentProps<typeof FilterBar>;
 const types = [["craft", "资料"], ["task", "任务"], ["pdf", "PDF"], ["media", "媒体"], ["attachment", "附件"], ["reading", "阅读"], ["flashcard", "闪卡"]] as const;
+const primaryTypes = [["all", "全部"], ["craft", "资料"], ["journal", "日志"], ["task", "任务"], ["reading", "阅读"], ["flashcard", "闪卡"]] as const;
 const allTypes: SourceFilters = { craft: true, task: true, pdf: true, media: true, attachment: true, reading: true, flashcard: true };
+
+export function resetMobileSearchFilters(filters: Filters) {
+  filters.setDateFilter("any");
+  filters.setFolderId("");
+  filters.setSearchScope("all");
+  filters.setSourceFilters({ ...allTypes });
+}
 
 function mobileScopeLabel(filters: Filters) {
   return filters.selectedFolder
@@ -24,23 +32,23 @@ function mobileScopeLabel(filters: Filters) {
 }
 
 export function MobileScopeButton({filters, onOpen}: {filters: Filters; onOpen: () => void}) {
-  return <button type="button" className="mobile-inline-scope" aria-label="选择搜索资料范围" aria-haspopup="dialog" data-filtered={filters.selectedLibraryIds !== null || Boolean(filters.folderId)} onClick={onOpen}><ListFilter size={12}/><span>{mobileScopeLabel(filters)}</span></button>;
+  return <button type="button" className="mobile-inline-scope" aria-label="选择搜索资料范围" aria-haspopup="dialog" data-filtered={filters.selectedLibraryIds !== null || Boolean(filters.folderId)} onClick={onOpen}><SlidersHorizontal size={12}/><span>{mobileScopeLabel(filters)}</span></button>;
 }
 
 export function MobileSearchControls({ filters, results, onSelectLibraries, onOpenFilters, inlineScope, journalFilter, onJournalFilter }: { filters: Filters; results?: SearchResult[]; onSelectLibraries?: (ids: string[] | null) => void;onOpenFilters?:()=>void; inlineScope?:boolean; journalFilter?:boolean; onJournalFilter?:(enabled:boolean)=>void }) {
   const resolvedSources=normalizeSourceFilters(filters.sourceFilters);
   const all = Object.values(resolvedSources).every(Boolean);
   const selectedType = all ? "all" : types.find(([id]) => resolvedSources[id] && Object.values(resolvedSources).filter(Boolean).length === 1)?.[0] ?? "custom";
-  // The native library facets exclude reading and flashcards. Count the current result set.
-  const counts = { all: 0, craft: 0, task: 0, pdf: 0, media: 0, attachment: 0, reading: 0, flashcard: 0 };
+  const activeType = journalFilter ? "journal" : selectedType;
+  const advancedType = !primaryTypes.some(([id]) => id === activeType);
+  // Count the result set supplied by the current search, including local content.
+  const counts = { all: results?.length ?? 0, craft: 0, journal: 0, task: 0, reading: 0, flashcard: 0 };
   for (const hit of results ?? []) {
     const type = hit.contentType;
-    const kind = type === "reading" || type === "flashcard" ? type
-      : type === "dida_task" ? "task" : type.startsWith("pdf_") ? "pdf"
-      : type === "image_ocr" || type === "media_attachment" ? "media"
-      : type === "file_attachment" ? "attachment" : "craft";
-    counts[kind]++;
-    counts.all++;
+    if (journalFilter || hit.journalDate) counts.journal++;
+    else if (type === "reading" || type === "flashcard") counts[type]++;
+    else if (type === "dida_task") counts.task++;
+    else if (!type.startsWith("pdf_") && !["image_ocr", "media_attachment", "file_attachment"].includes(type)) counts.craft++;
   }
   const scopeFiltered = filters.selectedLibraryIds !== null || Boolean(filters.folderId);
   const scopeSummary = mobileScopeLabel(filters);
@@ -50,14 +58,12 @@ export function MobileSearchControls({ filters, results, onSelectLibraries, onOp
       <option value="all">全部类型</option>{selectedType === "custom" && <option value="custom">自定义类型</option>}{types.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
     </select><button type="button" aria-label="更多搜索筛选" onClick={onOpenFilters}><ListFilter size={18}/></button></div>}
     <nav className="bw-tabs bw-search-types" aria-label="搜索内容类型">
-      {([["all", "全部"], ["craft", "资料"], ["journal", "日志"], ["task", "任务"], ["reading", "阅读"], ["flashcard", "闪卡"],
-        ...types.filter(([id]) => ["pdf", "media", "attachment"].includes(id) && selectedType === id)] as const).map(([id, label]) => {
-        const selected = journalFilter ? id === "journal" : id === selectedType;
-        return <button key={id} type="button" aria-pressed={selected} onClick={() => {
+      {primaryTypes.map(([id, label]) => {
+        const showCount = results !== undefined && (activeType === "all" || activeType === id);
+        return <button key={id} type="button" aria-pressed={activeType === id} onClick={() => {
           if (id === "journal") { filters.setSourceFilters({...allTypes}); onJournalFilter?.(true); }
           else { onJournalFilter?.(false); filters.setSourceFilters(id === "all" ? {...allTypes} : Object.fromEntries(types.map(([key]) => [key, key === id])) as SourceFilters); }
-        }}>{label}{results && (journalFilter ? selected : id !== "journal" && (id === "all" || resolvedSources[id] || !filters.sourceFacetCounts)) &&
-          <small title="当前搜索结果中的条数">{id === "journal" ? results.length : counts[id]}</small>}</button>;
+        }}><span>{label}</span>{showCount && <small title="当前列表中的条数">{counts[id]}</small>}</button>;
       })}
     </nav>
     <div className="mobile-applied-scope" aria-label="当前搜索范围与筛选">
@@ -72,11 +78,10 @@ export function MobileSearchControls({ filters, results, onSelectLibraries, onOp
       </div>}
     </div>
     <WorkspaceFilterSummary filters={[
-      ...(!all ? [{ label: `类型：${types.filter(([key]) => resolvedSources[key]).map(([, label]) => label).join("、") || "未选择"}`, clear: () => filters.setSourceFilters({ ...allTypes }) }] : []),
+      ...(advancedType ? [{ label: `类型：${types.filter(([key]) => resolvedSources[key]).map(([, label]) => label).join("、") || "未选择"}`, clear: () => filters.setSourceFilters({ ...allTypes }) }] : []),
       ...(filters.dateFilter !== "any" ? [{ label: `近 ${filters.dateFilter} 天`, clear: () => filters.setDateFilter("any") }] : []),
       ...(filters.searchScope !== "all" ? [{ label: filters.searchScope === "title" ? "仅名称" : "名称与章节", clear: () => filters.setSearchScope("all") }] : []),
-      ...(filters.folderId ? [{ label: `文件夹：${filters.selectedFolder?.path ?? "所选文件夹"}`, clear: () => filters.setFolderId("") }] : []),
-    ]} onReset={() => { filters.setDateFilter("any"); filters.setFolderId(""); filters.setSearchScope("all"); filters.setSourceFilters({ ...allTypes }); }} />
+    ]} onReset={() => { onJournalFilter?.(false); resetMobileSearchFilters(filters); }} />
   </div>;
 }
 

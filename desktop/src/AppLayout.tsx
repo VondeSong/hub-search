@@ -14,7 +14,7 @@ import { useSidebarLayout } from "./useSidebarLayout";
 import { PanelRight } from "lucide-react";
 import "./SearchToolbar.css";
 import { SearchFilterReveal } from "./SearchFilterReveal";
-import { MobileScopeButton, MobileSearchControls, MobileSearchFilterForm } from "./MobileSearchControls";
+import { MobileScopeButton, MobileSearchControls, MobileSearchFilterForm, resetMobileSearchFilters } from "./MobileSearchControls";
 import { MobileFilterSheet } from "./MobileFilterSheet";
 import { MobileCollectionSearch, type MobileCollectionSearchProps } from "./MobileCollectionSearch";
 
@@ -65,13 +65,46 @@ function AppLayoutContent({
   Workspace,
   mobile = false,
 }: AppLayoutContentProps) {
+  const resultsPane = workspaceProps.resultsPaneProps;
+  const mobileSearchPage = mobile && !mobileCollectionSearch && !resultsPane.collectionView;
+  const openMobileFilters = () => headerProps.setFiltersOpen(true);
+  const mobileFiltersActive = mobileJournalFilter || filterBarProps.selectedLibraryIds !== null ||
+    Boolean(filterBarProps.folderId) || filterBarProps.dateFilter !== "any" ||
+    filterBarProps.searchScope !== "all" || Object.values(filterBarProps.sourceFilters).some(enabled => !enabled);
+  const mobileEmptyAction = mobileFiltersActive ? {
+    label: "清除筛选",
+    onClick: () => {
+      onSelectMobileLibraries?.(null);
+      onMobileJournalFilter?.(false);
+      resetMobileSearchFilters(filterBarProps);
+    },
+  } : { label: "调整搜索范围", onClick: openMobileFilters };
+  const mobileCounts = resultsPane.contextReady && !resultsPane.searching && !resultsPane.error
+    ? resultsPane.results
+    : undefined;
+
   return (
     <AppEntry filtersOpen={filtersOpen} previewOpen={mobilePreviewOpen} style={style}>
       <div className="drag-strip" onMouseDown={startWindowDrag} />
       {mainContent ? <>{mobile && mobileHeader}<div className="main-content-override">{mainContent}</div><FooterStatus {...footerStatusProps} /></> : <>
-        {mobile ? <div className="mobile-top-area">{mobileHeader}{mobileCollectionSearch ? <MobileCollectionSearch {...mobileCollectionSearch}/> : <SearchHeader {...headerProps} mobileScopeControl={!workspaceProps.resultsPaneProps.collectionView && <MobileScopeButton filters={filterBarProps} onOpen={() => headerProps.setFiltersOpen(true)} />} />}{!workspaceProps.resultsPaneProps.collectionView && <MobileSearchControls journalFilter={mobileJournalFilter} onJournalFilter={onMobileJournalFilter} inlineScope={!mobileCollectionSearch} results={headerProps.query.trim() && workspaceProps.resultsPaneProps.contextReady ? workspaceProps.resultsPaneProps.results : undefined} filters={filterBarProps} onSelectLibraries={onSelectMobileLibraries} onOpenFilters={()=>headerProps.setFiltersOpen(true)} />}{mobileOverview}</div> : <SearchHeader {...headerProps} />}
+        {mobile ? <div className={`mobile-top-area${mobileSearchPage ? " mobile-search-page" : ""}`}>
+          {mobileHeader}
+          {mobileCollectionSearch ? <MobileCollectionSearch {...mobileCollectionSearch} /> : (
+            <SearchHeader {...headerProps} mobileScopeControl={mobileSearchPage && <MobileScopeButton filters={filterBarProps} onOpen={openMobileFilters} />} />
+          )}
+          {!resultsPane.collectionView && <MobileSearchControls
+            journalFilter={mobileJournalFilter}
+            onJournalFilter={onMobileJournalFilter}
+            inlineScope={!mobileCollectionSearch}
+            results={mobileCounts}
+            filters={filterBarProps}
+            onSelectLibraries={onSelectMobileLibraries}
+            onOpenFilters={openMobileFilters}
+          />}
+          {mobileOverview}
+        </div> : <SearchHeader {...headerProps} />}
         {!mobile && filtersOpen && <FilterBar {...filterBarProps} />}
-        <Workspace {...workspaceProps} />
+        <Workspace {...workspaceProps} resultsPaneProps={mobileSearchPage ? { ...resultsPane, mobileEmptyAction } : resultsPane} />
         <FooterStatus {...footerStatusProps} />
       </>}
       {mobile && <MobileFilterSheet open={filtersOpen} onClose={() => headerProps.setFiltersOpen(false)} draft title={mobileFilterLibraryOnly ? "选择助手自动关联资料库" : undefined}>{filtersOpen && <MobileSearchFilterForm filters={filterBarProps} libraryOnly={mobileFilterLibraryOnly} onSelectLibraries={onSelectMobileLibraries} onApply={() => headerProps.setFiltersOpen(false)} />}</MobileFilterSheet>}

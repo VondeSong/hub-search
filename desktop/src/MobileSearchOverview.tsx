@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Layers, SquareCheck, Sparkles } from "lucide-react";
+import { Layers, SquareCheck, Sparkles, TrendingUp } from "lucide-react";
 import type { InsightList } from "./InsightTypes";
 
 export function MobileSearchOverview({
@@ -56,17 +56,16 @@ export function MobileSearchOverview({
         ))}
       </div>
       <header>
-        <strong>
-          试试搜索 · 跨库高频主题
-        </strong>
+        <strong>试试搜索 · 跨库高频主题</strong>
         <button onClick={() => onGo("browse")}>浏览资料库目录 →</button>
       </header>
-      {!topics.length && <small>当前范围暂无已索引主题</small>}
+      {!topics.length && <small className="bw-search-topic-empty">当前范围暂无已索引主题</small>}
       {!!topics.length && (
-        <div className="bw-tabs">
+        <div className="bw-tabs bw-search-topics">
           {topics.map((q) => (
             <button key={q} onClick={() => onSearch(q)}>
-              {q}
+              <TrendingUp size={11} aria-hidden="true" />
+              <span>{q}</span>
             </button>
           ))}
         </div>

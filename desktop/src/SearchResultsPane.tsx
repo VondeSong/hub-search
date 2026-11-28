@@ -90,6 +90,7 @@ type SearchResultsPaneProps = {
   onClearJournalDate?: () => void;
   scopeLabel?: string;
   onClearScope?: () => void;
+  mobileEmptyAction?: { label: string; onClick: () => void };
   onTagTabChange?: (management: boolean) => void;
   onPreviewEvidence?: (result: SearchResult) => void;
 };
@@ -110,7 +111,7 @@ export function SearchResultsPane({
   selectedTagLibraryCount = 0, selectedTagLastUpdated = "暂无", selectedTagRelated = [],
   selectedTagFavorite = false, onChangeSelectedTagColor, onChangeSelectedTagDescription,
   onToggleSelectedTagFavorite, onSelectedTagTaxonomyChanged, onCreateJournal,
-  scopeLabel, onClearScope, onTagTabChange, onPreviewEvidence,
+  scopeLabel, onClearScope, mobileEmptyAction, onTagTabChange, onPreviewEvidence,
 }: SearchResultsPaneProps) {
   const journalViews = useJournalViews();
   const resultMemory = useResultContextMemory(navigationContext, results, selectedIndex, contextReady && !searching, onRestoreSelection, selectionManagedByData);
@@ -158,6 +159,7 @@ export function SearchResultsPane({
         : "尝试更短的关键词，或清除筛选条件";
 
   const searchLanding = !query.trim() && !collectionView;
+  const mobileSearchPage = isMobileLayout && !collectionView;
   const collectionList = !query.trim() && (collectionView === "journals" || collectionView === "favorites" || collectionView === "history");
   const emptyResults = showContent && !error && !searching && !showTagOverview && results.length === 0;
   const displayedSelectedIndex = showSelection ? selectedIndex : -1;
@@ -169,11 +171,11 @@ export function SearchResultsPane({
     renderIcon={renderLibraryIcon} favoriteIds={favoriteIds} onFavorite={onToggleFavorite} />;
 
   return (
-    <div ref={resultMemory.ref} onScroll={resultMemory.onScroll} className={`results-pane ${compact ? "compact-results" : ""} ${collectionView === "journals" ? "journal-results" : ""} ${searchLanding ? "search-home-results" : ""} ${collectionList ? "collection-list-results" : ""} ${emptyResults ? "empty-results" : ""} ${scopeLabel && scopeLabel !== "全部资料库" ? "scoped-results" : ""}`}>
+    <div ref={resultMemory.ref} onScroll={resultMemory.onScroll} className={`results-pane ${compact ? "compact-results" : ""} ${collectionView === "journals" ? "journal-results" : ""} ${searchLanding ? "search-home-results" : ""} ${collectionList ? "collection-list-results" : ""} ${emptyResults ? "empty-results" : ""} ${scopeLabel && scopeLabel !== "全部资料库" ? "scoped-results" : ""} ${mobileSearchPage ? "mobile-search-results" : ""}`}>
       {collectionView === "favorites" && !query.trim() && <div className="favorite-kind-filter" role="group" aria-label="收藏类型">
         {([['all', '全部'], ['page', '页面'], ['snippet', '片段']] as const).map(([value, label]) => <button key={value} className="result-density" aria-pressed={favoriteFilter === value} onClick={() => onFavoriteFilterChange?.(value)}>{label}</button>)}
       </div>}
-      {scopeLabel && scopeLabel !== "全部资料库" && <div className="workspace-scope"><span>当前范围：{scopeLabel}</span>{onClearScope && <button onClick={onClearScope}>查看全部资料库</button>}</div>}
+      {!mobileSearchPage && scopeLabel && scopeLabel !== "全部资料库" && <div className="workspace-scope"><span>当前范围：{scopeLabel}</span>{onClearScope && <button onClick={onClearScope}>查看全部资料库</button>}</div>}
       {collectionView === "tags" && selectedCollectionTag && !query.trim() && (
         <>
         <TagPropertiesCard
@@ -219,7 +221,7 @@ export function SearchResultsPane({
           {onCreateJournal && <button className="journal-create-action" onClick={onCreateJournal}><Plus size={15} />写这一天</button>}
         </div>
       </header>}
-      {showContent && resultLabel && !(collectionView === "journals" && !query.trim()) && <div className={`section-label ${collectionView === "journals" ? "journal-section-label" : ""}`}>
+      {showContent && resultLabel && !mobileSearchPage && !(collectionView === "journals" && !query.trim()) && <div className={`section-label ${collectionView === "journals" ? "journal-section-label" : ""}`}>
         <span className="section-label-text">{resultLabel}</span>
         {!showTagOverview && results.length > 0 && <button className="result-density" aria-label={`显示模式：${compact ? "紧凑" : "详情"}，切换为${compact ? "详情" : "紧凑"}`} aria-pressed={compact} onClick={() => { setCompact(!compact); try { userProfileStorage.setItem("hub.results.compact", String(!compact)); } catch { /* Keep the selection for this session. */ } }}>{compact ? "紧凑" : "详情"}</button>}
         {collectionView === "journals" && results.length === 0 && onCreateJournal && (
@@ -227,7 +229,17 @@ export function SearchResultsPane({
         )}
       </div>}
       {error && <div className="message error-message">{error}</div>}
-      {emptyResults && (
+      {mobileSearchPage && showContent && !error && !searching && (
+        <h2 className="bw-search-section-title">{searchLanding ? "最近更新与命中" : "检索结果"} ({results.length})</h2>
+      )}
+      {emptyResults && mobileSearchPage && (
+        <section className="bw-search-empty">
+          <strong>当前范围内未找到匹配内容</strong>
+          <p>可尝试放宽资料库范围或切换内容类型。</p>
+          {mobileEmptyAction && <button type="button" onClick={mobileEmptyAction.onClick}>{mobileEmptyAction.label}</button>}
+        </section>
+      )}
+      {emptyResults && !mobileSearchPage && (
         <div className="empty-state">{collectionView === "journals" ? <CalendarDays size={30} /> : <Search size={30} />}<strong>{emptyTitle}</strong><span>{emptyHint}</span></div>
       )}
       {showTagOverview ? (
@@ -270,7 +282,7 @@ export function SearchResultsPane({
             <div className="empty-state"><Tags size={30} /><strong>{collectionQuery.trim() ? "没有匹配的标签" : "当前资料库暂无标签"}</strong></div>
           )}
         </section>
-      ) : !showContent ? null : !query.trim() ? (
+      ) : !showContent || (mobileSearchPage && emptyResults) ? null : !query.trim() ? (
         <RecentResultList
           recentGroups={recentGroups}
           selectedIndex={displayedSelectedIndex}

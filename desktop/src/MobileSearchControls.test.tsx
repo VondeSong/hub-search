@@ -54,6 +54,20 @@ it("switches content type without changing query, date or library range; clears 
   expect(props.setDateFilter).toHaveBeenCalledWith("any");
 });
 
+it("keeps six primary tabs when an advanced type is active", async () => {
+  const props = filters();
+  props.sourceFilters = { craft: false, task: false, pdf: false, media: true, attachment: false, reading: false, flashcard: false };
+  await act(async () => root.render(<MobileSearchControls filters={props} inlineScope results={[]} />));
+
+  const tabs = host.querySelector("nav[aria-label='搜索内容类型']")!;
+  expect([...tabs.querySelectorAll("button")].map(button => button.textContent)).toEqual(["全部", "资料", "日志", "任务", "阅读", "闪卡"]);
+  expect(tabs.querySelector('[aria-pressed="true"]')).toBeNull();
+  const mediaFilter = host.querySelector<HTMLButtonElement>("[aria-label='移除筛选：类型：媒体']")!;
+  await act(async () => mediaFilter.click());
+  expect(props.setSourceFilters).toHaveBeenCalledWith({ craft: true, task: true, pdf: true, media: true, attachment: true, reading: true, flashcard: true });
+  expect(props.setDateFilter).not.toHaveBeenCalled();
+});
+
 it("keeps the five prototype destinations reachable with Agents in the center", async () => {
   const navigate = vi.fn();
   await act(async () => root.render(<MobileNavigation active="agents" onSelect={navigate} dueCount={3}/>));
