@@ -175,3 +175,70 @@ it("keeps the selected article when an earlier full-text read finishes late", as
   expect(container.textContent).toContain("第二篇完整正文");
   expect(container.textContent).not.toContain("第一篇过期正文");
 });
+
+it("checks the revision without rereading an unchanged page and reuses it after returning", async () => {
+  const version={rows:"local:1",properties:0};
+  invoke.mockImplementation(async command => {
+    if(command==="list_collection_items") return {...page,viewRevision:version};
+    if(command==="reading_collection_changes") return {version,auxiliary:0,activity:{}};
+    return command==="get_collection_storage" ? storage : [];
+  });
+  await mount();
+  const first = row();
+  expect(first).toBeTruthy();
+  await act(async () => vi.advanceTimersByTimeAsync(60_000));
+  expect(row()).toBe(first);
+  const calls = (name: string) => invoke.mock.calls.filter(([command])=>command===name);
+  expect(calls("reading_collection_changes").length).toBeGreaterThan(1);
+  expect(calls("list_collection_items")).toHaveLength(1);
+  await click("离开阅读");
+  await click("回到阅读");
+  expect(row()?.textContent).toContain(item.post.text);
+  await act(async () => vi.advanceTimersByTimeAsync(160));
+  expect(calls("list_collection_items")).toHaveLength(1);
+});
+
+it.each([false,true])("rereads only if status affects the row order (sorted by status: %s)", async sorted => {
+  let read=false;
+  const stamp=()=>({rows:"local:1",properties:Number(read)});
+  invoke.mockImplementation(async (command,args) => {
+    if(command==="list_collection_items") return {...page,viewRevision:stamp(),
+      items:[{...item,read,status:read?"read":"unread"}]};
+    if(command==="reading_collection_changes") return {version:stamp(),auxiliary:0,activity:{},
+      property:read && args.known.properties===0 ? {key:item.key,read:true,status:"read",tags:[]} : null};
+    if(command==="set_collection_read") { read=true; return "已保存"; }
+    return command==="get_collection_storage" ? storage : [];
+  });
+  await mount();
+  if(sorted) {
+    await act(async()=>model.updateView({sorts:[{id:"status",field:"status",ascending:true}]}));
+    await act(async()=>vi.advanceTimersByTimeAsync(160));
+  }
+  const before=invoke.mock.calls.filter(([command])=>command==="list_collection_items").length;
+  await click(`标为已读：${item.post.text}`);
+  expect(row()?.dataset.readingState).toBe("read");
+  expect(invoke.mock.calls.filter(([command])=>command==="list_collection_items"))
+    .toHaveLength(before+Number(sorted));
+});
+
+it("applies a single refresh for a committed batch while keeping the reader and list position", async () => {
+  let revision=1;
+  invoke.mockImplementation(async command => {
+    const version={rows:`local:${revision}`,properties:0};
+    if(command==="list_collection_items") return {...page,viewRevision:version,
+      items:revision===1 ? [item] : [{...item,key:"x:new",post:{...item.post,text:"新增文章"}},item]};
+    if(command==="reading_collection_changes") return {version,auxiliary:0,activity:{}};
+    return command==="get_collection_storage" ? storage : [];
+  });
+  await mount();
+  await act(async()=>row()!.click());
+  const database=container.querySelector<HTMLElement>(".collection-database")!;
+  database.scrollTop=280;
+  await act(async()=>database.dispatchEvent(new Event("scroll")));
+  revision=5;
+  await act(async()=>vi.advanceTimersByTimeAsync(6_000));
+  expect(row()?.textContent).toContain("新增文章");
+  expect(container.querySelector(".collection-row.selected")?.textContent).toContain(item.post.text);
+  expect(database.scrollTop).toBe(280);
+  expect(invoke.mock.calls.filter(([command])=>command==="list_collection_items")).toHaveLength(2);
+});

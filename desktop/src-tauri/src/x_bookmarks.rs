@@ -13,6 +13,7 @@ pub(crate) use query::{evidence_entries, evidence_link_identities, EvidenceEntry
 mod sorting;
 pub(super) mod storage;
 pub(super) mod threads;
+pub(crate) mod view_revision;
 pub(super) use jobs::start_scheduler;
 pub(super) fn launch_collection_export(
     app: AppHandle,
@@ -1224,12 +1225,17 @@ pub(super) fn list_collection_items_blocking(
     filters: Option<query::Filters>,
 ) -> Result<Value, String> {
     let c = open_database(&database_path(&app)?)?;
-    let filters = filters.unwrap_or_default();
+    let mut filters = filters.unwrap_or_default();
     let compact = filters.compact;
     if compact {
         query::ensure_list_index(&c)?;
     }
     let _snapshot = c.unchecked_transaction().map_err(|e| e.to_string())?;
+    let version = view_revision::version(&c)?;
+    if filters.previous_counts_revision.as_ref() != Some(&version) {
+        filters.previous_counts = None;
+    }
+    let separate_overview = filters.separate_overview;
     let (total, unread, matched, items) = query::items(
         &c,
         query,
@@ -1243,15 +1249,30 @@ pub(super) fn list_collection_items_blocking(
         sorts,
         filters,
     )?;
-    if compact {
-        return Ok(json!({"items":items,"total":total,"unread":unread,"matched":matched}));
+    if compact || separate_overview {
+        return Ok(json!({"items":items,"total":total,"unread":unread,"matched":matched,"viewRevision":version}));
     }
     let mut overview = collection_overview(&app, &c, source)?;
     overview["items"] = json!(items);
     overview["total"] = json!(total);
     overview["unread"] = json!(unread);
     overview["matched"] = json!(matched);
+    overview["viewRevision"] = json!(version);
     Ok(overview)
+}
+
+#[tauri::command]
+pub(super) async fn reading_collection_changes(
+    app: AppHandle,
+    known: Option<view_revision::Version>,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let c = open_database(&database_path(&app)?)?;
+        let _snapshot = c.unchecked_transaction().map_err(|e| e.to_string())?;
+        view_revision::changes(&c, known.as_ref())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

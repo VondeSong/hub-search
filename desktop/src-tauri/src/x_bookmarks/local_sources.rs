@@ -46,6 +46,10 @@ pub(crate) fn status(c: &Connection) -> Value {
     value["running"] = json!(schedule::running());
     value
 }
+pub(super) fn running() -> bool {
+    schedule::running()
+}
+
 pub(crate) fn wake() {
     schedule::wake();
 }

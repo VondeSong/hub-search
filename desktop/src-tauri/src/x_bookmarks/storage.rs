@@ -1320,6 +1320,10 @@ pub(crate) async fn get_collection_storage(app: AppHandle) -> Result<Value, Stri
         .await
         .map_err(|e| e.to_string())?
 }
+pub(super) fn exporting() -> bool {
+    EXPORTING.load(Ordering::Relaxed)
+}
+
 pub(crate) fn get_collection_storage_blocking(app: AppHandle) -> Result<Value, String> {
     let c = open_database(&database_path(&app)?)?;
     Ok(

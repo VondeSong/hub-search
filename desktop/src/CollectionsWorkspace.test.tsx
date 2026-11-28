@@ -364,7 +364,7 @@ it("opens an exact search target outside the current reading page and restores t
  await act(async()=>root.render(<CollectionViewsProvider><CollectionsWorkspace initialItemKey={lifecycleItem.key} onSearchTargetHandled={handled}/></CollectionViewsProvider>));
  await act(async()=>vi.advanceTimersByTimeAsync(160));
  expect(handled).toHaveBeenCalledOnce();
- expect(invoke).toHaveBeenCalledWith("list_collection_items",expect.objectContaining({offset:0,filters:{itemKey:lifecycleItem.key}}));
+ expect(invoke).toHaveBeenCalledWith("list_collection_items",expect.objectContaining({offset:0,filters:{itemKey:lifecycleItem.key,separateOverview:true}}));
  expect(container.textContent).toContain(lifecycleItem.post.text);
  await click("返回阅读列表");await act(async()=>vi.advanceTimersByTimeAsync(160));
  const calls=invoke.mock.calls.filter(([command])=>command==="list_collection_items");

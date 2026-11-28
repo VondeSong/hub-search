@@ -5,7 +5,9 @@ use super::*;
 #[serde(rename_all = "camelCase", default)]
 pub(crate) struct Filters {
     pub(crate) compact: bool,
+    pub(crate) separate_overview: bool,
     pub(crate) previous_counts: Option<[i64; 3]>,
+    pub(crate) previous_counts_revision: Option<super::view_revision::Version>,
     pub(crate) item_key: Option<String>,
     pub(crate) tags: Vec<String>,
     pub(crate) library_id: Option<String>,

@@ -2317,6 +2317,7 @@ pub(crate) fn initialize_database(path: &PathBuf) -> Result<Connection, String> 
         .map_err(|error| format!("无法初始化附件成本索引：{error}"))?;
     x_bookmarks::storage::schema(&connection)?;
     x_bookmarks::library::refresh_names(&connection)?;
+    x_bookmarks::view_revision::install(&connection)?;
     connection
         .execute_batch(
             "CREATE TRIGGER IF NOT EXISTS collection_destination_library_renamed

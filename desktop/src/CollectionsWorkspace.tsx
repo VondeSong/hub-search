@@ -6,7 +6,7 @@ import { CollectionSyncPanel, type CollectionSyncSource, type CollectionSyncJob 
 import { CollectionDestination, CollectionLibraryBadge, CollectionConversionPreview, type CollectionLibraryOperation } from "./CollectionDestination";
 import type { LibrarySummary } from "./SearchTypes";
 import { collectionEntryLabels, useCollectionViews, type CollectionBuiltinEntry, type CollectionView as View } from "./CollectionViews";
-import type { CollectionItem, CollectionPage } from "./CollectionPage";
+import { patchCollectionStatus, type CollectionChanges, type CollectionItem, type CollectionPage, type CollectionVersion } from "./CollectionPage";
 import { CollectionColumnResize } from "./CollectionColumnResize";
 import { CollectionProperties } from "./CollectionProperties";
 import { publishCodexNotice } from "./CodexSuite";
@@ -32,10 +32,14 @@ import { PreviewTocPopover } from "./PreviewTocPopover";
 import { usePreviewLinkCopy } from "./usePreviewLinkCopy";
 import { open as chooseDirectory } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { ArrowLeft, ArrowUpRight, Bookmark, Archive, GripVertical, PanelRight, Circle, PanelLeft, RefreshCw, Search, FolderOpen, X, LoaderCircle, LayoutList, Table2, Columns3, LayoutGrid, Paperclip, MoreHorizontal, Link2, Check, RotateCcw, Layers, Heart, Send, CircleCheck, Maximize2, Minimize2 } from "lucide-react";
 import { WorkspaceHeaderContext } from "./WorkspaceChrome";
 import { useVisiblePolling } from "./useVisiblePolling";
+import { useVisibleChange } from "./useVisibleChange";
+import { isWindowVisible } from "./WindowVisibility";
+import { startReadingTiming } from "./ReadingPerformance";
 import { SerialRefresh } from "./SerialRefresh";
 import "./CollectionsWorkspace.css";
 import "./ReadingWorkspaceReference.css";
@@ -120,7 +124,8 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
   const compactList = !runtimeCapabilities.mobile && view.layout !== "gallery" && !searchItemKey;
   const countKey = JSON.stringify([query,includeAbandoned,view.source,view.status,view.attentionOnly,view.destinationId,view.dateFilter,view.media,view.sort,view.ascending,sortingKey,tagsKey,searchItemKey]);
   const loadKey = JSON.stringify([countKey,offset]);
-  const previousCounts = useRef<{key:string;offset:number;values:number[];time:number} | undefined>(undefined);
+  const requestKey = JSON.stringify([loadKey,compactList]);
+  const previousCounts = useRef<{key:string;offset:number;values:number[];time:number;version?:CollectionVersion} | undefined>(undefined);
   const overviewSource = useRef(view.source);
   overviewSource.current = view.source;
   const [libraries,setLibraries]=useState<LibrarySummary[]>([]);
@@ -137,11 +142,23 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
   const pageLoadKey = useRef(pageSnapshot.current?.key === loadKey ? loadKey : null);
   const [overview,setOverview] = useState<Partial<CollectionPage>>(()=>pageSnapshot.current?.overview ?? {});
   const overviewRef = useRef(overview);
+  const loadedOverviewSource = useRef(pageSnapshot.current?.overviewSource);
+  const lastOverviewAttempt = useRef(0);
   const [rowsState, setPage] = useState<CollectionPage | null>(() => pageSnapshot.current?.key === loadKey ? pageSnapshot.current.page : null);
-  const pageState = useMemo(()=>rowsState && (compactList ? {...overview,...rowsState} : rowsState),[rowsState,compactList,overview]);
+  const pageState = useMemo(()=>rowsState && {...overview,...rowsState},[rowsState,overview]);
   const page = pageLoadKey.current === loadKey ? pageState : null;
   const latestPage=useRef(page);latestPage.current=page;
   const latestLoad=useRef<(fresh?: boolean)=>Promise<void>>(async()=>{});
+  const latestCheck=useRef<(afterWrite?: boolean)=>Promise<void>>(async()=>{});
+  const timing = useRef<ReturnType<typeof startReadingTiming> | null>(null);
+  const retainedAtEntry = useRef(Boolean(page));
+  useEffect(()=>{ timing.current ??= startReadingTiming(); },[]);
+  const firstRowCount = page?.items.length;
+  useEffect(()=>{
+    if(firstRowCount === undefined) return;
+    const frame = requestAnimationFrame(()=>timing.current?.ready(retainedAtEntry.current ? "retained" : "database",firstRowCount === 0));
+    return ()=>cancelAnimationFrame(frame);
+  },[firstRowCount]);
   const [storage, setStorage] = useState<StorageState>({config:defaultStorage,running:false,status:""});
   const [draft,setDraft] = useState<StorageConfig>(defaultStorage);
   const [settings,setSettings] = useState(false);
@@ -247,71 +264,208 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
   const dialog = useRef<HTMLDialogElement>(null);
   const settingsDialog = useRef<HTMLDialogElement>(null);
   const generation = useRef(0);
-  const statusGeneration = useRef(0);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const refreshQueue = useRef(new SerialRefresh());
+  const changesQueue = useRef(new SerialRefresh());
   const statusRefreshQueue = useRef(new SerialRefresh());
-  const loadLocation = useRef({ key: loadKey });
-  if (loadLocation.current.key !== loadKey) loadLocation.current = { key: loadKey };
-  const overviewGeneration = useRef(0);
-  const refreshOverview = useCallback(async () => {
-    const request = ++overviewGeneration.current;
-    if (!compactList) return;
-    const source = view.source;
-    const result = await invoke<Partial<CollectionPage>>("reading_collection_overview",{source:view.source});
-    if (!mounted.current || request !== overviewGeneration.current || overviewSource.current !== source || !result?.sources) return;
+  const detailsRefreshQueue = useRef(new SerialRefresh());
+  const overviewQueue = useRef(new SerialRefresh());
+  const loadLocation = useRef({ key: requestKey });
+  if (loadLocation.current.key !== requestKey) loadLocation.current = { key: requestKey };
+
+  const refreshOverview = useCallback((fresh = false) => overviewQueue.current.run(view.source, async () => {
+    if (!mounted.current || overviewSource.current !== view.source) return;
+    const revision = dataRevision.current;
+    loadedOverviewSource.current = undefined;
+    if (pageSnapshot.current) pageSnapshot.current.overviewSource=undefined;
+    lastOverviewAttempt.current = Date.now();
+    const result = await invoke<Partial<CollectionPage>>("reading_collection_overview", {source:view.source});
+    if (!mounted.current || dataRevision.current !== revision || overviewSource.current !== view.source || !result?.sources) return;
     overviewRef.current=result;
-    if(pageSnapshot.current)pageSnapshot.current.overview=result;
+    loadedOverviewSource.current=view.source;
+    if (pageSnapshot.current) {
+      pageSnapshot.current.overview=result;
+      pageSnapshot.current.overviewSource=view.source;
+    }
     setOverview(result);
-    if(result.navigationCounts)setNavigationCounts(result.navigationCounts);
-  },[compactList,view.source,setNavigationCounts,pageSnapshot]);
-  const load = useCallback((fresh = true) => {
+    if (result.navigationCounts) setNavigationCounts(result.navigationCounts);
+  },fresh).catch(() => { /* The next committed change or source selection can retry. */ }),
+  [view.source,setNavigationCounts,pageSnapshot,dataRevision]);
+  useEffect(() => {
+    if (loadedOverviewSource.current === view.source) return;
+    const timer = window.setTimeout(() => void refreshOverview(), 300);
+    return () => window.clearTimeout(timer);
+  },[refreshOverview,view.source]);
+
+  const refreshStatus = useCallback((fresh = false, storageOnly = false) => {
+    const storageRead = statusRefreshQueue.current.run("storage", async () => {
+      if (!mounted.current) return;
+      const revision = dataRevision.current;
+      try {
+        const state = await invoke<StorageState>("get_collection_storage");
+        if (mounted.current && revision === dataRevision.current && state?.config) {
+          setStorage({...state,config:{...defaultStorage,...state.config}});
+        }
+      } catch (error) {
+        if (mounted.current && revision === dataRevision.current) setError(String(error));
+      }
+    },fresh);
+    if (storageOnly) return storageRead;
+    const details = detailsRefreshQueue.current.run("details", async () => {
+      if (!mounted.current) return;
+      const revision = dataRevision.current;
+      const apply = () => mounted.current && revision === dataRevision.current;
+      await Promise.all([
+        invoke<LibrarySummary[]>("list_libraries").catch(()=>[]).then(libs => { if (apply()) setLibraries(Array.isArray(libs)?libs:[]); }),
+        invoke<CollectionLibraryOperation[]>("collection_library_operations").catch(()=>[]).then(ops => { if (apply()) setOperations(Array.isArray(ops)?ops:[]); }),
+      ]);
+    },fresh);
+    return Promise.all([storageRead, details]);
+  },[dataRevision]);
+
+  const acceptPage = useCallback((value: CollectionPage, readMinute: number) => {
+    pageSnapshot.current = { key:loadKey, page:value, overview:overviewRef.current,
+      overviewSource:loadedOverviewSource.current, compact:compactList, readMinute };
+    pageLoadKey.current = loadKey;
+    setPage(value);
+  },[pageSnapshot,loadKey,compactList]);
+
+  const load = useCallback((fresh = true, auxiliary = true) => {
     const location = loadLocation.current;
-    // A pending write can finish after another filter or workspace is opened.
-    // Keep its invalidation, but never let that old owner restart an old query.
+    // A late write in a closed workspace must invalidate its retained page.
     if (!mounted.current) {
       if (fresh) { pageSnapshot.current = null; dataRevision.current++; }
       return Promise.resolve();
     }
-    if (location.key !== loadKey) return latestLoad.current(fresh);
-    // A write or explicit refresh invalidates retained rows immediately, also
-    // preventing an older in-flight poll from repopulating the return snapshot.
-    if (fresh) { pageSnapshot.current = null; dataRevision.current++; generation.current++; statusGeneration.current++; previousCounts.current=undefined; void refreshOverview().catch(e=>setError(String(e))); }
-    const statusRead = statusRefreshQueue.current.run(loadKey, async () => {
-      if (location !== loadLocation.current) return;
-      const current = ++statusGeneration.current;
+    if (location.key !== requestKey) return latestLoad.current(fresh);
+    if (fresh) {
+      loadedOverviewSource.current = undefined;
+      pageSnapshot.current = null;
+      dataRevision.current++;
+      generation.current++;
+      previousCounts.current=undefined;
+      void refreshOverview(true);
+    }
+    if (auxiliary) void refreshStatus(fresh);
+    return refreshQueue.current.run(requestKey, async () => {
+      if (!mounted.current || location !== loadLocation.current) return;
+      const current = ++generation.current;
       const revision = dataRevision.current;
-      const apply = () => mounted.current && dataRevision.current === revision && statusGeneration.current === current && location === loadLocation.current;
-      await Promise.all([
-        invoke<StorageState>("get_collection_storage").then(state => { if (apply() && state?.config) setStorage({...state,config:{...defaultStorage,...state.config}}); }).catch(e => { if (apply()) setError(String(e)); }),
-        invoke<LibrarySummary[]>("list_libraries").catch(()=>[]).then(libs => { if (apply()) setLibraries(Array.isArray(libs)?libs:[]); }),
-        invoke<CollectionLibraryOperation[]>("collection_library_operations").catch(()=>[]).then(ops => { if (apply()) setOperations(Array.isArray(ops)?ops:[]); }),
-      ]);
-    }, fresh);
-    const pageRead = refreshQueue.current.run(loadKey, async () => {
-    if (location !== loadLocation.current) return;
-    const current=++generation.current;
-    const revision = dataRevision.current;
-    try {
-      const cached = previousCounts.current;
-      const reuseCounts = compactList && !fresh && cached?.key === countKey && cached.offset !== offset && Date.now()-cached.time < 15000;
-      const next = await invoke<CollectionPage>("list_collection_items", searchItemKey?{query:"",unreadOnly:false,offset:0,source:"all",status:"all",filters:{itemKey:searchItemKey}}:{query,unreadOnly:false,offset,source:view.source,status:view.attentionOnly?"needs_attention":view.status,media:view.media,sort:view.sort,ascending:view.ascending,sorts:JSON.parse(sortingKey),filters:{...(compactList ? {compact:true, ...(reuseCounts ? {previousCounts:cached.values} : {})} : {}),includeAbandoned,tags:JSON.parse(tagsKey),libraryId:view.destinationId||null,collectedWithinDays:view.dateFilter==="any"?null:Number(view.dateFilter)}});
-      if (!mounted.current || dataRevision.current !== revision || generation.current !== current || location !== loadLocation.current) return;
-      previousCounts.current = {key:countKey,offset,values:[next.total,next.unread,next.matched],time:reuseCounts ? cached.time : Date.now()};
-      if(next.navigationCounts)setNavigationCounts(next.navigationCounts);
-      if (offset>0 && offset>=next.matched) setOffset(Math.max(0,Math.floor((next.matched-1)/60)*60));
-      else { pageSnapshot.current = { key: loadKey, page: next, overview:overviewRef.current }; pageLoadKey.current = loadKey; setPage(next); }
-    } catch(e) {if (mounted.current && dataRevision.current === revision && generation.current===current && location === loadLocation.current) setError(String(e));}
-  }, fresh);
-    // Auxiliary status must neither delay the rows nor hold up another query.
-    void statusRead.catch(e => { if (location === loadLocation.current) setError(String(e)); });
-    return pageRead;
-  },[refreshOverview,compactList,countKey,loadKey,query,offset,includeAbandoned,view.source,view.status,view.attentionOnly,view.destinationId,view.dateFilter,view.media,view.sort,view.ascending,sortingKey,tagsKey,setNavigationCounts,pageSnapshot,dataRevision,searchItemKey]);
-  useVisiblePolling(refreshOverview, compactList, 15000, {refreshKey:refreshOverview,initialDelayMs:300});
+      try {
+        const cached = previousCounts.current;
+        const dateFilter = view.dateFilter === "any" ? null : Number(view.dateFilter);
+        const reuseCounts = compactList && !fresh && dateFilter === null && cached?.version &&
+          cached.key === countKey && cached.offset !== offset && Date.now()-cached.time < 15000;
+        const filters = searchItemKey ? { itemKey:searchItemKey } : {
+          compact:compactList, includeAbandoned, tags:JSON.parse(tagsKey),
+          libraryId:view.destinationId||null, collectedWithinDays:dateFilter,
+          ...(reuseCounts ? {previousCounts:cached.values,previousCountsRevision:cached.version} : {}),
+        };
+        const readMinute = Math.floor(Date.now()/60_000);
+        timing.current?.request();
+        const next = await invoke<CollectionPage>("list_collection_items",searchItemKey ? {
+          query:"", unreadOnly:false, offset:0, source:"all", status:"all",
+          filters:{...filters,separateOverview:true},
+        } : {
+          query, unreadOnly:false, offset, source:view.source, status:view.attentionOnly?"needs_attention":view.status,
+          media:view.media, sort:view.sort, ascending:view.ascending, sorts:JSON.parse(sortingKey),
+          filters:{...filters,separateOverview:true},
+        });
+        if (!mounted.current || dataRevision.current !== revision || generation.current !== current || location !== loadLocation.current) return;
+        timing.current?.response();
+        previousCounts.current = {key:countKey,offset,values:[next.total,next.unread,next.matched],
+          time:reuseCounts ? cached.time : Date.now(),version:next.viewRevision};
+        if(next.navigationCounts)setNavigationCounts(next.navigationCounts);
+        if (offset>0 && offset>=next.matched) updateSession({offset:Math.max(0,Math.floor((next.matched-1)/60)*60)});
+        else acceptPage(next,readMinute);
+      } catch (error) {
+        if (mounted.current && dataRevision.current === revision && generation.current===current && location === loadLocation.current) setError(String(error));
+      }
+    },fresh);
+  },[requestKey,refreshOverview,refreshStatus,acceptPage,compactList,countKey,query,offset,includeAbandoned,view.source,view.status,view.attentionOnly,view.destinationId,view.dateFilter,view.media,view.sort,view.ascending,sortingKey,tagsKey,setNavigationCounts,pageSnapshot,dataRevision,searchItemKey,updateSession]);
   latestLoad.current=load;
-  useVisiblePolling(() => load(false), true, 2000, { refreshKey: load, initialDelayMs: 150 });
-  useEffect(() => () => { generation.current++; statusGeneration.current++; }, [load]);
+
+  const observedStatus = useRef<{auxiliary:number;activity:string} | undefined>(undefined);
+  const canPatchStatus = view.status === "all" && !view.attentionOnly && !searchItemKey && !sorts.some(rule => rule.field === "status");
+  const checkChanges = useCallback((afterWrite = false) => {
+    const location = loadLocation.current;
+    if (!mounted.current || location.key !== requestKey) {
+      return afterWrite ? latestLoad.current() : Promise.resolve();
+    }
+    return changesQueue.current.run(requestKey, async () => {
+      if (!mounted.current || location !== loadLocation.current) {
+        if (afterWrite) await latestLoad.current();
+        return;
+      }
+      const retained = pageSnapshot.current;
+      const known = retained?.key === loadKey && retained.compact === compactList ? retained.page.viewRevision : undefined;
+      if (!retained || !known) {
+        await load(afterWrite,!observedStatus.current || afterWrite);
+        return;
+      }
+
+      const revision = dataRevision.current;
+      let next: CollectionChanges;
+      try {
+        next = await invoke<CollectionChanges>("reading_collection_changes",{known});
+      } catch {
+        if (afterWrite) await latestLoad.current();
+        return;
+      }
+      if (!mounted.current || location !== loadLocation.current || revision !== dataRevision.current || retained !== pageSnapshot.current) {
+        if (afterWrite) await latestLoad.current();
+        return;
+      }
+      if (!next?.version) {
+        if (afterWrite) await latestLoad.current();
+        return;
+      }
+
+      const activity = JSON.stringify(next.activity);
+      const previous = observedStatus.current;
+      observedStatus.current = {auxiliary:next.auxiliary,activity};
+      const auxiliaryChanged = previous?.auxiliary !== next.auxiliary;
+      if (auxiliaryChanged || previous?.activity !== activity) {
+        void refreshStatus(true,!auxiliaryChanged);
+      }
+      const rowsChanged = known.rows !== next.version.rows || known.properties !== next.version.properties;
+      const timeChanged = view.dateFilter !== "any" && retained.readMinute !== Math.floor(Date.now()/60_000);
+      if (rowsChanged || (previous && auxiliaryChanged)) void refreshOverview(true);
+      else if (loadedOverviewSource.current !== view.source && Date.now() - lastOverviewAttempt.current >= 15000) {
+        void refreshOverview();
+      }
+      if (!rowsChanged && !timeChanged) return;
+      previousCounts.current = undefined;
+      const patch = canPatchStatus && !timeChanged && next.property
+        ? patchCollectionStatus(retained.page,next.property,next.version) : undefined;
+      if (patch) acceptPage(patch,retained.readMinute ?? Math.floor(Date.now()/60_000));
+      else await load(false,false);
+    },afterWrite);
+  },[requestKey,loadKey,compactList,pageSnapshot,dataRevision,load,refreshStatus,refreshOverview,view.source,view.dateFilter,canPatchStatus,acceptPage]);
+  latestCheck.current=checkChanges;
+  useVisiblePolling(checkChanges, true, 2000, { refreshKey: checkChanges, initialDelayMs: 150 });
+  const refreshFromEvent = useCallback(() => void latestCheck.current(), []);
+  useVisibleChange("hub:reading-data-changed", refreshFromEvent);
+  useVisibleChange("hub:reading-attachment-ready", refreshFromEvent);
+  useEffect(() => {
+    if (!("__TAURI_INTERNALS__" in window)) return;
+    let disposed = false;
+    let timer = 0;
+    const stops: (() => void)[] = [];
+    const wake = () => {
+      if (timer || !isWindowVisible()) return;
+      timer = window.setTimeout(() => {
+        timer = 0;
+        if (isWindowVisible()) refreshFromEvent();
+      },100);
+    };
+    for (const name of ["collections-updated","hub-reading-cloud-changed"]) {
+      void listen(name,wake).then(stop => { if (disposed) stop(); else stops.push(stop); })
+        .catch(() => { /* Version checks also catch missed native notifications. */ });
+    }
+    return () => { disposed = true; window.clearTimeout(timer); stops.forEach(stop => stop()); };
+  },[refreshFromEvent]);
   useEffect(()=>{if(connecting) dialog.current?.showModal();else {dialog.current?.close();setRequest("");}},[connecting]);
   useEffect(()=>{if(settings) settingsDialog.current?.showModal();else settingsDialog.current?.close();},[settings]);
   useEffect(()=>{if(deleting){deleteDialog.current?.showModal();void invoke<string[]>("collection_delete_preview",{key:deleting.key}).then(setDeleteFiles).catch(e=>setError(String(e)));}else{deleteDialog.current?.close();setDeleteFiles([]);}},[deleting]);
@@ -448,7 +602,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
     try {
       const result=await invoke<{files:number;changed:number;errors:number}>("check_local_reading_sources");
       setNotice(`本地素材检查完成：已检查 ${result.files} 个文件，新增或更新 ${result.changed} 条${result.errors?`，${result.errors} 个文件待重试`:""}`);
-      await load();
+      await latestCheck.current(true);
       return result.errors ? "部分本地素材检查未通过，请重试或查看同步详情。" : undefined;
     } catch(e) {setError(String(e));return String(e);} finally {setCheckingSources(false);}
   };
@@ -496,7 +650,29 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
     const update=(current:CollectionPage|null)=>current?{...current,items:current.items.map(item=>item.key===key?{...item,status,tags:[...tags],read:status==="read"||status==="abandoned"}:item)}:current;
     latestPage.current=update(latestPage.current);setPage(update);
   };
-  const toggleRead=async(item:CollectionItem)=>{if(propertyWrite.current)return;propertyWrite.current=true;setPropertyBusy(true);setError("");try {await invoke("set_collection_read",{key:item.key,read:!item.read});commitProperties(item.key,item.read?"unread":"read",latestPage.current?.items.find(value=>value.key===item.key)?.tags||[]);await latestLoad.current();}catch(e){setError(String(e));}finally{propertyWrite.current=false;setPropertyBusy(false);}};
+  const finishPropertyWrite = async (key:string,status:string,tags:string[]) => {
+    if (pageSnapshot.current?.page.viewRevision) {
+      await latestCheck.current(true);
+    } else {
+      commitProperties(key,status,tags);
+      await latestLoad.current();
+    }
+  };
+  const toggleRead = async (item: CollectionItem) => {
+    if (propertyWrite.current) return;
+    propertyWrite.current=true;
+    setPropertyBusy(true);
+    setError("");
+    try {
+      await invoke("set_collection_read",{key:item.key,read:!item.read});
+      await finishPropertyWrite(item.key,item.read?"unread":"read",item.tags||[]);
+    } catch (error) {
+      setError(String(error));
+    } finally {
+      propertyWrite.current=false;
+      setPropertyBusy(false);
+    }
+  };
   const pause=async()=>{try {await invoke("cancel_x_bookmark_sync");setNotice("正在暂停，已完成的内容会保留。");await load();}catch(e){setError(String(e));}};
   const resetFilters=()=>{setSearchOpen(false);changeView({media:"all",query:"",tags:[],dateFilter:"any"});};
   const hasQueryFilters=!!query||view.media!=="all"||view.dateFilter!=="any"||view.tags.length>0;
@@ -505,7 +681,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
   const renderIssues=(item:CollectionItem)=>view.attentionOnly&&<div className="collection-attention-actions">{issues(item).map(o=><button key={o.target} onClick={e=>{e.stopPropagation();openReview(item.key,o.target);}}><span>{libraries.find(l=>l.id===o.target)?.name||o.plan?.libraryName||"资料库"}</span>：{o.phase==="unknown"?"待核对":o.phase==="needs_review"?"需要补充":o.phase==="partial"?"继续补齐":"查看失败记录"}</button>)}{item.attentionIssues?.map(issue=><button key={issue.kind} onClick={e=>{e.stopPropagation();setSyncMenu(true);}}>{issue.kind==="sourceCancellation"?"来源取消失败":"内容更新失败"}：查看同步记录</button>)}{issues(item).length===0&&!item.attentionIssues?.length&&<span>来源或附件处理需要检查，可查看同步与连接记录。</span>}</div>;
   const readControl=(item:CollectionItem)=><button className="collection-read-control" data-status={readingStatus(item)} type="button" disabled={propertyBusy} aria-label={`${item.read?"标为待读":"标为已读"}：${title(item)}`} aria-pressed={item.read} onClick={e=>{e.stopPropagation();void toggleRead(item);}}>{statusIcon(item.lifecycle==="archived"?"archived":readingStatus(item))}</button>;
   const badge=(item:CollectionItem)=><span className={`collection-source-badge ${item.post.source||"bookmarks"}`}>{sourceName(item.post.source||"bookmarks")}</span>;
-  const saveProperties=async(item:CollectionItem,status:string,tags:string[],prefix="")=>{if(propertyWrite.current)return false;propertyWrite.current=true;setPropertyBusy(true);setError("");setNotice("");try{const message=await invoke<string>("set_collection_properties",{key:item.key,status,tags,expectedStatus:readingStatus(item),expectedTags:item.tags||[]});commitProperties(item.key,status,tags);setNotice(`${prefix}${message||"状态与标签已保存"}`);await latestLoad.current();return true;}catch(e){setError(String(e));return false;}finally{propertyWrite.current=false;setPropertyBusy(false);}};
+  const saveProperties=async(item:CollectionItem,status:string,tags:string[],prefix="")=>{if(propertyWrite.current)return false;propertyWrite.current=true;setPropertyBusy(true);setError("");setNotice("");try{const message=await invoke<string>("set_collection_properties",{key:item.key,status,tags,expectedStatus:readingStatus(item),expectedTags:item.tags||[]});setNotice(`${prefix}${message||"状态与标签已保存"}`);await finishPropertyWrite(item.key,status,tags);return true;}catch(e){setError(String(e));return false;}finally{propertyWrite.current=false;setPropertyBusy(false);}};
   const applyBatch=async(action:"read"|"in_progress"|"archived")=>{
     if(propertyWrite.current)return;
     propertyWrite.current=true;

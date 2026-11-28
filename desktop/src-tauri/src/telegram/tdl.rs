@@ -123,6 +123,13 @@ fn session_root(app: &AppHandle, cfg: &Inbox) -> Result<PathBuf, String> {
     }
     Ok(root)
 }
+pub(crate) fn activity() -> Value {
+    PROGRESS
+        .lock()
+        .map(|progress| json!(*progress))
+        .unwrap_or(Value::Null)
+}
+
 pub(crate) fn state(app: &AppHandle, c: &Connection) -> Result<Value, String> {
     let cfg = settings(c)?;
     let effective_proxy = selected_proxy(&cfg.proxy, windows_system_proxy_url());

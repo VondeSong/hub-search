@@ -88,6 +88,7 @@ import { usePreviewController } from "./usePreviewController";
 import { useResultOpener } from "./useResultOpener";
 import { browseSubpage, LibraryBrowse, useLibraryBrowseNavigation } from "./LibraryBrowse";
 import { PreviewPane } from "./PreviewPane";
+import { markReadingEntry } from "./ReadingPerformance";
 import { journalDataVersion, useJournalData } from "./useJournalData";
 const LazyPreviewRenderer = lazy(() => import("./PreviewRenderer").then((module) => ({ default: module.PreviewRenderer })));
 const LazyMobileQuickCapture = lazy(() => import("./MobileQuickCapture").then(m => ({ default: m.MobileQuickCapture })));
@@ -221,6 +222,7 @@ function AppContent() {
   const moduleQueries = useRef<Partial<Record<DesktopSidebarView, string>>>({});
   const selectDesktopSidebarView = useCallback((view: DesktopSidebarView) => {
     if (view === desktopSidebarView) return;
+    if (view === "collections") markReadingEntry();
     moduleQueries.current[desktopSidebarView] = query;
     setPreviewHistoryActive(false);
     setQuery(moduleQueries.current[view] ?? "");
