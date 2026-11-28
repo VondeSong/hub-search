@@ -144,9 +144,16 @@ class MainActivity : TauriActivity() {
         if (!window.dispatchEvent(event)) return true;
         const dialogs = [...document.querySelectorAll('dialog[open]')];
         const dialog = dialogs[dialogs.length - 1];
-        if (!dialog) return false;
-        if (dialog.dispatchEvent(new Event('cancel', {cancelable:true}))) dialog.close();
-        return true;
+        if (dialog) {
+          if (dialog.dispatchEvent(new Event('cancel', {cancelable:true}))) dialog.close();
+          return true;
+        }
+        // The app pushes a same-document history entry when opening a preview.
+        if (window.history.state?.hubMobilePreview) {
+          window.history.back();
+          return true;
+        }
+        return false;
       })()
     """.trimIndent()) { handled ->
       // App history also includes entries opened without a WebView touch gesture.
