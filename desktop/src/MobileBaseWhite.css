@@ -2032,3 +2032,344 @@ html[data-runtime-platform="android"] .app-shell .bw-local-detail { margin: 12px
 .bw-harvest-decision blockquote,.bw-harvest-receipt blockquote { margin: 0; padding: 12px; background: var(--mobile-canvas); border-radius: 10px; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
 .bw-harvest-decision cite,.bw-harvest-receipt cite,.bw-local-detail cite { display: block; font-style: normal; margin-top: 6px; font-size: 12px; color: var(--mobile-secondary); }
 html[data-runtime-platform="android"] .app-shell .aw-shell .bw-task-head .bw-harvest-decision button[type="submit"] { min-height: 44px; border-radius: 10px; background: var(--mobile-ink); color: var(--mobile-surface); }
+
+/* Local phone prototype: the scope picker shares the search field. */
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-box:has(.mobile-inline-scope) {
+  position: relative;
+  display: flex; align-items: center; gap: 8px; height: 42px; min-height: 42px;
+  padding: 0 11px; background: var(--mobile-surface); border: 1px solid color-mix(in srgb,var(--mobile-ink) 13%,transparent);
+  border-radius: 13px; box-shadow: var(--bw-shadow-card);
+}
+html[data-runtime-platform="android"] .search-box:has(.mobile-inline-scope) .search-input-wrap { position: static; flex: 1; min-width: 0; }
+html[data-runtime-platform="android"] .app-shell .search-box .mobile-inline-scope {
+  display: inline-flex; align-items: center; flex: none; gap: 4px; height: 27px; min-height: 27px;
+  max-width: 42%; padding: 0 9px; border-radius: 8px; font-size: 11.5px; font-weight: 600;
+  color: var(--mobile-secondary); background: var(--mobile-fill); border: 1px solid var(--mobile-separator);
+}
+.mobile-inline-scope span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-runtime-platform="android"] .app-shell .search-box .mobile-inline-scope[data-filtered="true"] { color: var(--mobile-accent); background: var(--mobile-selected); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-hub-actions .bw-connection { height: 28px; min-height: 28px; padding: 0 9px; font-size: 11px; border-radius: 999px; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-hub-actions .bw-space-trigger { width: 32px; min-width: 32px; height: 32px; min-height: 32px; }
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.flashcards-workspace.flashcards-android) .mobile-tab-bar svg { width: 20px; height: 20px; }
+
+/* 1:1 Base White Mobile prototype parity across Search, Browse, Agents, Review, Sheets & TabBar */
+html[data-runtime-platform="android"] :is(.app-shell.mobile-app-shell,.flashcards-workspace.flashcards-android) .mobile-tab-bar .mobile-primary-icon small {
+  background: var(--mobile-accent);
+  color: #ffffff;
+  min-width: 16px;
+  height: 15px;
+  padding: 0 4px;
+  font-size: 9.5px;
+  font-weight: 700;
+  border-radius: 999px;
+}
+
+/* Search: input sizing, 29px chips, 17px pulse cards, muted section titles, rounded result cards on canvas */
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-box:has(.mobile-inline-scope) > svg {
+  width: 16px;
+  height: 16px;
+  color: var(--bw-muted);
+  flex-shrink: 0;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-top-area .search-box:has(.mobile-inline-scope) input {
+  font-size: 14px;
+  padding-right: 4px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-search-facets .bw-search-types {
+  gap: 6px;
+  padding: 6px 14px 4px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .mobile-search-facets .bw-search-types button {
+  height: 29px;
+  min-height: 29px;
+  padding: 0 11px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 999px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .bw-pulse button {
+  border-radius: 13px;
+  padding: 10px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .bw-pulse b {
+  font-size: 17px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .bw-overview header strong {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--bw-muted);
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .bw-overview header button {
+  font-size: 12px;
+  font-weight: 500;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-pane,
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .results-list,
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-list {
+  background: var(--bw-bg);
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-group-heading {
+  background: transparent;
+  padding: 6px 18px 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--bw-muted);
+  border: 0;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-item,
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .result-item {
+  margin: 0 14px 9px;
+  border-radius: 14px;
+  background: var(--mobile-surface);
+  border: 0.5px solid var(--mobile-separator);
+  box-shadow: var(--bw-shadow-card);
+  overflow: hidden;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .recent-item::after,
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .result-item::after {
+  display: none;
+}
+
+/* Scope sheet: stack folder label above select so it never wraps vertically */
+html[data-runtime-platform="android"] .bw-scope-libraries > label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
+  padding: 10px 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--mobile-secondary);
+}
+html[data-runtime-platform="android"] .bw-scope-libraries > label select {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+}
+
+/* Browse: muted 11.5px section titles + vertical dividers in 3-column quick bar */
+html[data-runtime-platform="android"] .bw-browse header h2 {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--bw-muted);
+}
+html[data-runtime-platform="android"] .bw-browse header button {
+  font-size: 12px;
+  font-weight: 500;
+}
+html[data-runtime-platform="android"] .bw-three button + button {
+  border-left: 0.5px solid var(--bw-line);
+}
+
+/* Agents: clean 48px single-line header + sleek single-line composer scope pill */
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .cloud-agents.is-mobile .cloud-agents-header {
+  height: calc(48px + env(safe-area-inset-top, 0px));
+  min-height: calc(48px + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) 16px 0;
+  justify-content: flex-end;
+  gap: 6px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .cloud-agents.is-mobile .cloud-agents-header-title {
+  flex: 1 1 auto;
+  margin-right: auto;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0;
+  text-align: left;
+  justify-content: flex-start;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .cloud-agents.is-mobile .cloud-agents-header-title :is(h1, strong) {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .cloud-agents.is-mobile .cloud-agents-header-title span {
+  display: none;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .cloud-agents.is-mobile .bw-agent-header-controls {
+  gap: 6px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .cloud-agents.is-mobile .bw-agent-header-controls .bw-connection {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 9px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .cloud-agents.is-mobile .bw-agent-header-controls .bw-space-trigger {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .cloud-agents.is-mobile .cloud-agents-menu > summary {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .cloud-agents.is-mobile .bw-composer-scope-btn {
+  min-height: 24px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+/* Review (Flashcards): 1:1 prototype canvas, segmented 3-tab bar, white study card, visible reveal & 4-col ratings */
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android,
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcards-main,
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android.is-reviewing .flashcards-review,
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android.mobile-page-library .flashcards-decks,
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcard-inbox {
+  background: var(--mobile-canvas);
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android:not(.is-reviewing) .flashcards-main,
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android.mobile-page-library .flashcards-decks,
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcards-main.flashcards-main-inbox {
+  padding: 12px 14px 32px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android.is-reviewing .flashcards-main {
+  padding: 12px 14px 28px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android.is-reviewing .flashcards-review {
+  padding: 0 0 20px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .mobile-flashcard-intro h1 {
+  display: none;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .mobile-flashcard-tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px;
+  padding: 3px;
+  margin: 0 0 12px;
+  background: var(--mobile-surface);
+  border: 1px solid var(--mobile-separator);
+  border-radius: 13px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .mobile-flashcard-tabs button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 42px;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--mobile-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .mobile-flashcard-tabs button[aria-pressed="true"] {
+  background: var(--mobile-ink);
+  color: var(--mobile-surface);
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcards-review-progress {
+  display: none;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .mobile-flashcard-study-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 10px;
+  padding: 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mobile-ink);
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .mobile-flashcard-study-meta button {
+  min-height: 32px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--mobile-accent);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .mobile-flashcard-face-label {
+  display: none;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcards-review-card {
+  min-height: 220px;
+  padding: 16px;
+  border: 1px solid var(--mobile-separator);
+  border-radius: 13px;
+  background: var(--mobile-surface);
+  box-shadow: var(--bw-shadow-card);
+  gap: 16px;
+  justify-content: flex-start;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcards-review-card > small {
+  padding: 0;
+  background: transparent;
+  color: var(--mobile-secondary);
+  font-size: 12px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcards-review-card h2 {
+  font-size: 16px;
+  line-height: 1.55;
+  font-weight: 700;
+  color: var(--mobile-ink);
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcards-mobile-reveal-hint {
+  display: block;
+  font-size: 14px;
+  color: var(--mobile-secondary);
+  margin-top: 4px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android.is-reviewing .flashcards-review > .flashcards-reveal {
+  position: static;
+  width: 100%;
+  min-height: 46px;
+  margin: 12px 0 0;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--mobile-ink);
+  color: var(--mobile-surface);
+  font-size: 14px;
+  font-weight: 600;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android.is-reviewing .flashcards-review > .flashcards-ratings {
+  position: static;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 12px 0 12px;
+  padding: 0;
+  background: transparent;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcards-ratings > button {
+  min-height: 54px;
+  padding: 8px 4px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--mobile-selected);
+  color: var(--mobile-accent);
+  font-size: 13px;
+  font-weight: 650;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .flashcards-ratings > button small {
+  color: var(--mobile-accent);
+  opacity: 0.85;
+  font-size: 11px;
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .mobile-flashcard-group {
+  border-radius: 13px;
+  background: var(--mobile-surface);
+  border: 1px solid var(--mobile-separator);
+  box-shadow: var(--bw-shadow-card);
+}
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android .mobile-flashcard-section > h2 {
+  font-size: 14px;
+  font-weight: 650;
+  margin: 0 0 8px 3px;
+}

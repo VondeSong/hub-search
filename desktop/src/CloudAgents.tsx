@@ -1160,8 +1160,8 @@ export default function CloudAgents({
         </button> : mobile && connection ? <button type="button" className="cloud-agents-header-title cloud-agents-home-connection" onClick={showSettings} aria-label={`查看连接与设备：${warning || connectionLabel}`}>
           <h1>云端助手</h1><span><Cloud size={13}/>{warning || connectionLabel}<ChevronRight size={13}/></span>
         </button> : <div><h1>{chatOpen ? title : mobile ? "云端助手" : "助手"}</h1><span>{connectionLabel}</span></div>}
-        {connection && (!mobile || !chatOpen) && <button type="button" onClick={() => select()} disabled={busy || preparing} aria-label="新对话"><Plus size={22}/></button>}
-        {connection && (!mobile || !chatOpen) && <button type="button" onClick={settings ? closeSettings : showSettings} disabled={busy || preparing} aria-label="VPS 连接设置"><Settings2 size={20}/></button>}
+        {connection && (!mobile || (!chatOpen && !headerActions)) && <button type="button" onClick={() => select()} disabled={busy || preparing} aria-label="新对话"><Plus size={22}/></button>}
+        {connection && (!mobile || (!chatOpen && !headerActions)) && <button type="button" onClick={settings ? closeSettings : showSettings} disabled={busy || preparing} aria-label="VPS 连接设置"><Settings2 size={20}/></button>}
         {mobile && !settings && headerActions && <div className="bw-agent-header-controls">{headerActions}</div>}
         {chatOpen && (mobile || known && management) && <details className="cloud-agents-menu"><summary aria-label="会话选项"><MoreHorizontal size={20}/></summary><div>
           {mobile && <button type="button" disabled={busy || preparing} onClick={event => { event.currentTarget.closest("details")!.open = false; select(); }}>新对话</button>}
@@ -1174,7 +1174,7 @@ export default function CloudAgents({
           {mobile && <button type="button" onClick={event => { event.currentTarget.closest("details")!.open = false; changeView(view === "results" ? "chat" : "results"); }}>{view === "results" ? "返回对话" : "查看会话成果"}</button>}
           {mobile && <button type="button" onClick={event => { event.currentTarget.closest("details")!.open = false; showSettings(); }}>连接与设备</button>}
         </div></details>}
-        {onClose && (!mobile || !chatOpen) && <button type="button" onClick={onClose} aria-label="关闭云端助手"><X size={21}/></button>}
+        {onClose && (!mobile || (!chatOpen && !headerActions)) && <button type="button" onClick={onClose} aria-label="关闭云端助手"><X size={21}/></button>}
       </>}
     </header>
     {mobile && connection && chatOpen && !settings && <div className="bw-chat-tools">

@@ -11,7 +11,23 @@ type Filters = ComponentProps<typeof FilterBar>;
 const types = [["craft", "资料"], ["task", "任务"], ["pdf", "PDF"], ["media", "媒体"], ["attachment", "附件"], ["reading", "阅读"], ["flashcard", "闪卡"]] as const;
 const allTypes: SourceFilters = { craft: true, task: true, pdf: true, media: true, attachment: true, reading: true, flashcard: true };
 
-export function MobileSearchControls({ filters, results, onSelectLibraries, onOpenFilters }: { filters: Filters; results?: SearchResult[]; onSelectLibraries?: (ids: string[] | null) => void;onOpenFilters?:()=>void }) {
+function mobileScopeLabel(filters: Filters) {
+  return filters.selectedFolder
+    ? `${filters.selectedFolder.libraryName} / ${filters.selectedFolder.path}`
+    : filters.selectedLibraryIds === null
+      ? "全部资料库"
+      : filters.selectedLibraryIds.length === 0
+        ? `未选资料库 (0/${filters.spaces.length})`
+        : filters.activeSpaces.length === 1
+          ? filters.activeSpaces[0].name
+          : `已选 ${filters.activeSpaces.length}/${filters.spaces.length} 库`;
+}
+
+export function MobileScopeButton({filters, onOpen}: {filters: Filters; onOpen: () => void}) {
+  return <button type="button" className="mobile-inline-scope" aria-label="选择搜索资料范围" aria-haspopup="dialog" data-filtered={filters.selectedLibraryIds !== null || Boolean(filters.folderId)} onClick={onOpen}><ListFilter size={12}/><span>{mobileScopeLabel(filters)}</span></button>;
+}
+
+export function MobileSearchControls({ filters, results, onSelectLibraries, onOpenFilters, inlineScope }: { filters: Filters; results?: SearchResult[]; onSelectLibraries?: (ids: string[] | null) => void;onOpenFilters?:()=>void; inlineScope?:boolean }) {
   const resolvedSources=normalizeSourceFilters(filters.sourceFilters);
   const all = Object.values(resolvedSources).every(Boolean);
   const selectedType = all ? "all" : types.find(([id]) => resolvedSources[id] && Object.values(resolvedSources).filter(Boolean).length === 1)?.[0] ?? "custom";
@@ -26,21 +42,13 @@ export function MobileSearchControls({ filters, results, onSelectLibraries, onOp
     counts[kind]++;
     counts.all++;
   }
-  const scopeSummary = filters.selectedFolder
-    ? `${filters.selectedFolder.libraryName} / ${filters.selectedFolder.path}`
-    : filters.selectedLibraryIds === null
-      ? "全部资料库"
-      : filters.selectedLibraryIds.length === 0
-        ? `未选资料库 (0/${filters.spaces.length})`
-        : filters.activeSpaces.length === 1
-          ? filters.activeSpaces[0].name
-          : `已选 ${filters.activeSpaces.length}/${filters.spaces.length} 库`;
   const scopeFiltered = filters.selectedLibraryIds !== null || Boolean(filters.folderId);
+  const scopeSummary = mobileScopeLabel(filters);
   return <div className="mobile-search-facets">
-    <div className="mobile-search-compact-filters"><button type="button" className={scopeFiltered ? "is-filtered" : undefined} onClick={onOpenFilters} aria-label="选择搜索资料范围">{scopeSummary}<ChevronDown size={13}/></button>
+    {!inlineScope && <div className="mobile-search-compact-filters"><button type="button" className={scopeFiltered ? "is-filtered" : undefined} onClick={onOpenFilters} aria-label="选择搜索资料范围">{scopeSummary}<ChevronDown size={13}/></button>
     <select className="mobile-search-type-select" aria-label="内容类型" value={selectedType} onChange={event => filters.setSourceFilters(event.target.value === "all" ? { ...allTypes } : Object.fromEntries(types.map(([id]) => [id, id === event.target.value])) as SourceFilters)}>
       <option value="all">全部类型</option>{selectedType === "custom" && <option value="custom">自定义类型</option>}{types.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-    </select><button type="button" aria-label="更多搜索筛选" onClick={onOpenFilters}><ListFilter size={18}/></button></div>
+    </select><button type="button" aria-label="更多搜索筛选" onClick={onOpenFilters}><ListFilter size={18}/></button></div>}
     <nav className="bw-tabs bw-search-types" aria-label="搜索内容类型">{([["all","全部"],...types] as const).map(([id,label])=><button key={id} type="button" aria-pressed={selectedType===id} onClick={()=>filters.setSourceFilters(id==="all"?{...allTypes}:Object.fromEntries(types.map(([key])=>[key,key===id])) as SourceFilters)}>{label}{results && (filters.sourceFacetCounts ? (id==="all" || resolvedSources[id]) : true) && <small title="当前搜索结果中的条数">{counts[id]}</small>}</button>)}</nav>
     <div className="mobile-applied-scope" aria-label="当前搜索范围与筛选">
       {scopeFiltered && <div className="bw-applied-strip">

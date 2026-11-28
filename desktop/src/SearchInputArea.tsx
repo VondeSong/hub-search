@@ -9,6 +9,7 @@ import type {
 import type { SearchSuggestion, SearchSuggestionKind, SearchSyntaxHint } from "./SearchSuggestions";
 
 type SearchInputAreaProps<TSelected> = {
+  trailingControl?: import('react').ReactNode;
   onCancelSearch?: () => void;
   scopeLabel?: string;
   hasSpaces: boolean;
@@ -36,6 +37,7 @@ type SearchInputAreaProps<TSelected> = {
 
 export function SearchInputArea<TSelected>({
   onCancelSearch,
+  trailingControl,
   scopeLabel = "全部资料库",
   hasSpaces,
   isMobileLayout,
@@ -248,6 +250,7 @@ export function SearchInputArea<TSelected>({
           </div>
         )}
       </div>
+      {trailingControl}
     </div>
   );
 }

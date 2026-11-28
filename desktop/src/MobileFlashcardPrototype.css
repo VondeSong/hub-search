@@ -1,15 +1,14 @@
 /* Mobile Site v10: use the existing phone tokens, with its measured layout. */
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android) {
-  grid-template-rows: auto minmax(0,1fr) calc(74px + env(safe-area-inset-bottom,0px));
+  grid-template-rows: auto minmax(0,1fr) calc(68px + env(safe-area-inset-bottom,0px));
 }
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android) > .main-content-override {
   grid-row: 2; height: auto; min-height: 0; padding-bottom: 0;
 }
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android) > .footer-bar { display: block; }
-html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android:is(.is-reviewing,.mobile-page-deck,.mobile-page-stats)) > .mobile-hub-header { display: none; }
-html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android.is-reviewing) { grid-template-rows: minmax(0,1fr); }
-html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android.is-reviewing) > .main-content-override { grid-row: 1; height: 100%; }
-html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android.is-reviewing) > .footer-bar { display: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android:is(.mobile-page-deck,.mobile-page-stats)) > .mobile-hub-header { display: none; }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android:is(.mobile-page-deck,.mobile-page-stats)) { grid-template-rows: minmax(0,1fr) calc(68px + env(safe-area-inset-bottom,0px)); }
+html[data-runtime-platform="android"] .app-shell.mobile-app-shell:has(.flashcards-android:is(.mobile-page-deck,.mobile-page-stats)) > .main-content-override { grid-row: 1; height: 100%; }
 html[data-runtime-platform="android"] .app-shell.mobile-app-shell .flashcards-workspace.flashcards-android {
   height: 100%; background: var(--mobile-surface); color: var(--mobile-ink);
   --flashcards-text: var(--mobile-ink); --flashcards-secondary: var(--mobile-secondary);

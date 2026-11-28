@@ -14,6 +14,7 @@ import type { SearchSuggestion, SearchSyntaxHint } from "./SearchSuggestions";
 import type { LibrarySummary, SearchResult } from "./SearchTypes";
 
 type SearchHeaderProps = {
+  mobileScopeControl?: ReactNode;
   mobileSearchExpanded?: boolean;
   onCancelMobileSearch?: () => void;
   hidePreviewToggle?: boolean;
@@ -68,6 +69,7 @@ type SearchHeaderProps = {
 };
 
 export function SearchHeader({
+  mobileScopeControl,
   mobileSearchExpanded = false,
   onCancelMobileSearch,
   hidePreviewToggle = false,
@@ -153,6 +155,7 @@ export function SearchHeader({
       />}
       <div className="mobile-search-controls">
       <SearchInputArea
+        trailingControl={mobileScopeControl}
         onCancelSearch={onCancelMobileSearch}
         scopeLabel={currentSpaceName}
         hasSpaces={spaces.length > 0 || (isMobileLayout && selectedLibraryIds === null)}
