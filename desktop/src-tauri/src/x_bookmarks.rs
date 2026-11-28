@@ -1224,6 +1224,11 @@ pub(super) fn list_collection_items_blocking(
     filters: Option<query::Filters>,
 ) -> Result<Value, String> {
     let c = open_database(&database_path(&app)?)?;
+    let filters = filters.unwrap_or_default();
+    let compact = filters.compact;
+    if compact {
+        query::ensure_list_index(&c)?;
+    }
     let _snapshot = c.unchecked_transaction().map_err(|e| e.to_string())?;
     let (total, unread, matched, items) = query::items(
         &c,
@@ -1236,8 +1241,55 @@ pub(super) fn list_collection_items_blocking(
         sort,
         ascending,
         sorts,
-        filters.unwrap_or_default(),
+        filters,
     )?;
+    if compact {
+        return Ok(json!({"items":items,"total":total,"unread":unread,"matched":matched}));
+    }
+    let mut overview = collection_overview(&app, &c, source)?;
+    overview["items"] = json!(items);
+    overview["total"] = json!(total);
+    overview["unread"] = json!(unread);
+    overview["matched"] = json!(matched);
+    Ok(overview)
+}
+
+#[tauri::command]
+pub(super) async fn reading_collection_overview(
+    app: AppHandle,
+    source: Option<String>,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let c = open_database(&database_path(&app)?)?;
+        let _snapshot = c.unchecked_transaction().map_err(|e| e.to_string())?;
+        collection_overview(&app, &c, source)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub(super) async fn reading_collection_post(app: AppHandle, key: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let c = open_database(&database_path(&app)?)?;
+        let raw: String = c
+            .query_row(
+                "SELECT post_json FROM collection_x_items WHERE item_key=?1",
+                [key],
+                |r| r.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        serde_json::from_str(&raw).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn collection_overview(
+    app: &AppHandle,
+    c: &Connection,
+    source: Option<String>,
+) -> Result<Value, String> {
     let selected_source = source.clone().unwrap_or_else(|| "bookmarks".into());
     let mut sources = Vec::new();
     let interval = storage::config(&c)?.auto_sync_minutes;
@@ -1305,8 +1357,7 @@ pub(super) fn list_collection_items_blocking(
     }
     let navigation_counts = query::navigation_counts(&c, source.as_deref())?;
     Ok(
-        json!({"navigationCounts":navigation_counts,"archived":archived,"pendingCancellations":pending_cancellations,"availableTags":tags,"sources":sources,"items":items,"total":total,"unread":unread,"matched":matched,
-        "connected":selected["connected"],"running":RUNNING.load(Ordering::Relaxed),
+        json!({"navigationCounts":navigation_counts,"archived":archived,"pendingCancellations":pending_cancellations,"availableTags":tags,"sources":sources,"connected":selected["connected"],"running":RUNNING.load(Ordering::Relaxed),
         "canResume":selected["canResume"],
         "status":selected["status"]}),
     )

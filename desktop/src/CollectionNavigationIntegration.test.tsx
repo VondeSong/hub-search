@@ -79,7 +79,7 @@ async function changeField(label: string, value: string) {
   });
 }
 const latestQuery = () => { const calls = invoke.mock.calls.filter(([command]) => command === "list_collection_items"); return calls[calls.length - 1]?.[1]; };
-const localCommands = new Set(["list_collection_items", "get_collection_storage", "list_libraries", "collection_library_operations"]);
+const localCommands = new Set(["list_collection_items", "reading_collection_overview", "reading_collection_post", "get_collection_storage", "list_libraries", "collection_library_operations"]);
 // The existing model footer may read local settings/status. Generation and
 // remote-content commands remain outside this allowlist.
 const localCallsOnly = () => invoke.mock.calls.every(([command, payload]) => localCommands.has(command)

@@ -34944,6 +34944,8 @@ pub fn run() {
                 x_bookmarks::sync_x_bookmarks,
                 x_bookmarks::cancel_x_bookmark_sync,
                 x_bookmarks::list_collection_items,
+                x_bookmarks::reading_collection_overview,
+                x_bookmarks::reading_collection_post,
                 x_bookmarks::set_collection_read,
                 x_bookmarks::properties::set_collection_properties,
                 x_bookmarks::library::set_collection_lifecycle,

@@ -1204,3 +1204,41 @@ fn collection_navigation_rejects_invalid_view_filters() {
     }
     assert!(navigation_counts(&c, Some("unknown")).is_err());
 }
+
+#[test]
+fn compact_list_preserves_search_and_updates_its_excerpt_after_a_post_edit() {
+    let c = database();
+    seed(&c, "summary-test", "bookmarks", NOW_MS);
+    ensure_list_index(&c).unwrap();
+    let long = format!("{}deep-search-hit", "正文".repeat(500));
+    c.execute("UPDATE collection_x_items SET post_json=json_set(post_json,'$.text',?1),content_hash='rev2' WHERE item_key='summary-test'", [&long]).unwrap();
+    let filters = Filters {
+        compact: true,
+        ..Default::default()
+    };
+    let (_, _, matched, rows) = items_at(
+        &c,
+        "deep-search-hit".into(),
+        false,
+        0,
+        Some("all".into()),
+        None,
+        None,
+        None,
+        None,
+        None,
+        filters,
+        NOW_MS,
+    )
+    .unwrap();
+    assert_eq!(matched, 1);
+    assert_eq!(rows[0]["summaryRevision"], "rev2");
+    assert_eq!(
+        rows[0]["post"]["text"].as_str().unwrap().chars().count(),
+        480
+    );
+    assert_eq!(
+        run(&c, "all", "all", 0, Filters::default()).3[0]["post"]["text"],
+        long
+    );
+}

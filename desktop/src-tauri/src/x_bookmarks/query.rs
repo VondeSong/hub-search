@@ -4,6 +4,8 @@ use super::*;
 #[derive(Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub(crate) struct Filters {
+    pub(crate) compact: bool,
+    pub(crate) previous_counts: Option<[i64; 3]>,
     pub(crate) item_key: Option<String>,
     pub(crate) tags: Vec<String>,
     pub(crate) library_id: Option<String>,
@@ -13,6 +15,21 @@ pub(crate) struct Filters {
     pub(crate) collected_from: Option<i64>,
     pub(crate) collected_to: Option<i64>,
     pub(crate) include_abandoned: bool,
+}
+
+// Keep first-page reads on a covering index. SQLite maintains this projection on
+// post changes and backfills existing collections once when creating the index.
+const LIST_POST: &str = "CASE WHEN json_valid(post_json) THEN json_set(
+    json_remove(post_json,'$.thread','$.quote','$.threadCursors','$.threadSeenCursors'),
+    '$.text',substr(trim(json_extract(post_json,'$.text')),1,480),
+    '$.quotedText','','$.links',json('[]')) ELSE post_json END";
+
+pub(super) fn ensure_list_index(c: &Connection) -> Result<(), String> {
+    c.execute_batch(&format!(
+        "CREATE INDEX IF NOT EXISTS collection_list_summary_v1
+        ON collection_x_items(item_key,{LIST_POST},content_hash)"
+    ))
+    .map_err(|e| e.to_string())
 }
 
 const STATE: &str = "COALESCE((SELECT state FROM collection_lifecycle l WHERE l.item_key=collection_x_items.item_key),'active')";
@@ -286,7 +303,14 @@ fn items_at(
     }
     // Keep legacy summary fields compatible; dedicated navigation counts use
     // actual status and exclude abandoned content from the normal collection.
-    let (total, unread): (i64, i64) = c.query_row(&format!("SELECT COALESCE(SUM({STATE}='active'),0),COALESCE(SUM({STATE}='active' AND read_at=0),0) FROM collection_x_items"), [], |r|Ok((r.get(0)?,r.get(1)?))).map_err(|e|e.to_string())?;
+    let cached_counts = filters
+        .previous_counts
+        .filter(|v| filters.compact && v.iter().all(|n| *n >= 0));
+    let (total, unread): (i64, i64) = if let Some([total, unread, _]) = cached_counts {
+        (total, unread)
+    } else {
+        c.query_row(&format!("SELECT COALESCE(SUM({STATE}='active'),0),COALESCE(SUM({STATE}='active' AND read_at=0),0) FROM collection_x_items"), [], |r|Ok((r.get(0)?,r.get(1)?))).map_err(|e|e.to_string())?
+    };
     let order = sorting::order(sorts, sort, ascending)?;
     let search = query.trim().chars().take(200).collect::<String>();
     let include_abandoned = filters.include_abandoned;
@@ -321,8 +345,10 @@ fn items_at(
         AND (?10 IS NULL OR collected_at<?10)
         AND (?11='' OR item_key=?11)");
     let prefix = format!("WITH saved_copies AS ({copies})");
-    let matched: i64 = c
-        .query_row(
+    let matched: i64 = if let Some([_, _, matched]) = cached_counts {
+        matched
+    } else {
+        c.query_row(
             &format!("{prefix} SELECT count(*) FROM collection_x_items WHERE {where_sql}"),
             params![
                 search,
@@ -339,8 +365,14 @@ fn items_at(
             ],
             |r| r.get(0),
         )
-        .map_err(|e| e.to_string())?;
-    let mut statement = c.prepare(&format!("{prefix} SELECT item_key,post_json,collected_at,read_at FROM collection_x_items WHERE {where_sql} ORDER BY {order} LIMIT 60 OFFSET ?3")).map_err(|e|e.to_string())?;
+        .map_err(|e| e.to_string())?
+    };
+    let body = if filters.compact {
+        format!("(SELECT {LIST_POST} FROM collection_x_items AS summary INDEXED BY collection_list_summary_v1 WHERE summary.item_key=collection_x_items.item_key)")
+    } else {
+        "post_json".to_string()
+    };
+    let mut statement = c.prepare(&format!("{prefix} SELECT item_key,{body},collected_at,read_at,content_hash FROM collection_x_items WHERE {where_sql} ORDER BY {order} LIMIT 60 OFFSET ?3")).map_err(|e|e.to_string())?;
     let rows = statement
         .query_map(
             params![
@@ -362,6 +394,7 @@ fn items_at(
                     r.get::<_, String>(1)?,
                     r.get::<_, i64>(2)?,
                     r.get::<_, i64>(3)?,
+                    r.get::<_, String>(4)?,
                 ))
             },
         )
@@ -442,13 +475,17 @@ fn items_at(
     }
     let mut items = Vec::new();
     let cloud_namespace = crate::reading_sync::object_store::namespace(c).unwrap_or_default();
-    let mut cloud_previews = crate::reading_sync::media::ready_previews_page(
-        c,
-        rows.iter().map(|row| (row.0.as_str(), row.1.as_str())),
-        &cloud_namespace,
-    )?;
+    let mut cloud_previews = if filters.compact {
+        Default::default()
+    } else {
+        crate::reading_sync::media::ready_previews_page(
+            c,
+            rows.iter().map(|row| (row.0.as_str(), row.1.as_str())),
+            &cloud_namespace,
+        )?
+    };
     for row in rows {
-        let (key, body, collected_at, read_at) = row;
+        let (key, body, collected_at, read_at, revision) = row;
         let mut item = serde_json::to_value(Item {
             key,
             post: serde_json::from_str(&body).map_err(|_| "收藏内容损坏")?,
@@ -457,6 +494,9 @@ fn items_at(
         })
         .map_err(|e| e.to_string())?;
         let key = item["key"].as_str().unwrap_or("").to_string();
+        if filters.compact {
+            item["summaryRevision"] = json!(revision);
+        }
         item["savedMedia"] = json!(saved_media.remove(&key).unwrap_or_default());
         item["cloudPreviewUrls"] = json!(cloud_previews.remove(&key).unwrap_or_default());
         let (status, tags, cloud_imported) = page_properties

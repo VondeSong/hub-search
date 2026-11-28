@@ -157,3 +157,21 @@ it("invalidates the retained page when cloud or recovery changes local reading d
   await click("回到阅读"); expect(row()).toBeNull();
   expect(container.querySelector(".collections-empty")).toBeTruthy();
 });
+
+it("keeps the selected article when an earlier full-text read finishes late", async () => {
+  const first = pending(), second = pending();
+  const rows = [item, {...item,key:"x:second",post:{...item.post,text:"第二篇摘要"}}].map(row=>({...row,summaryRevision:"r1"}));
+  invoke.mockImplementation(async (command,args) => {
+    if(command==="list_collection_items") return {...page,items:rows};
+    if(command==="reading_collection_post") return args.key===item.key ? first.promise : second.promise;
+    return command==="get_collection_storage" ? storage : [];
+  });
+  await mount();
+  const entries=container.querySelectorAll<HTMLElement>(".collection-row");
+  await act(async()=>entries[0].click());
+  await act(async()=>entries[1].click());
+  await act(async()=>second.resolve({...item.post,text:"第二篇摘要\n第二篇完整正文"}));
+  await act(async()=>first.resolve({...item.post,text:"第一篇过期正文"}));
+  expect(container.textContent).toContain("第二篇完整正文");
+  expect(container.textContent).not.toContain("第一篇过期正文");
+});

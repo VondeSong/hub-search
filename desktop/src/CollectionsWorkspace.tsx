@@ -32,7 +32,7 @@ import { PreviewTocPopover } from "./PreviewTocPopover";
 import { usePreviewLinkCopy } from "./usePreviewLinkCopy";
 import { open as chooseDirectory } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { useCallback, useContext, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { ArrowLeft, ArrowUpRight, Bookmark, Archive, GripVertical, PanelRight, Circle, PanelLeft, RefreshCw, Search, FolderOpen, X, LoaderCircle, LayoutList, Table2, Columns3, LayoutGrid, Paperclip, MoreHorizontal, Link2, Check, RotateCcw, Layers, Heart, Send, CircleCheck, Maximize2, Minimize2 } from "lucide-react";
 import { WorkspaceHeaderContext } from "./WorkspaceChrome";
 import { useVisiblePolling } from "./useVisiblePolling";
@@ -117,7 +117,12 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
   const sortingKey = JSON.stringify(sorts.map(({field,ascending})=>({field,ascending})));
   const tagsKey=JSON.stringify(view.tags);
   const includeAbandoned = view.layout === "board" && view.status === "all" && !view.attentionOnly;
-  const loadKey = JSON.stringify([query,offset,includeAbandoned,view.source,view.status,view.attentionOnly,view.destinationId,view.dateFilter,view.media,view.sort,view.ascending,sortingKey,tagsKey,searchItemKey]);
+  const compactList = !runtimeCapabilities.mobile && view.layout !== "gallery" && !searchItemKey;
+  const countKey = JSON.stringify([query,includeAbandoned,view.source,view.status,view.attentionOnly,view.destinationId,view.dateFilter,view.media,view.sort,view.ascending,sortingKey,tagsKey,searchItemKey]);
+  const loadKey = JSON.stringify([countKey,offset]);
+  const previousCounts = useRef<{key:string;offset:number;values:number[];time:number} | undefined>(undefined);
+  const overviewSource = useRef(view.source);
+  overviewSource.current = view.source;
   const [libraries,setLibraries]=useState<LibrarySummary[]>([]);
   const [operations,setOperations]=useState<CollectionLibraryOperation[]>([]);
   const [reviewKey,setReviewKey]=useState<string|null>(null);
@@ -130,7 +135,10 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
   const deleteDialog=useRef<HTMLDialogElement>(null);
   const [deleteFiles,setDeleteFiles]=useState<string[]>([]);
   const pageLoadKey = useRef(pageSnapshot.current?.key === loadKey ? loadKey : null);
-  const [pageState, setPage] = useState<CollectionPage | null>(() => pageSnapshot.current?.key === loadKey ? pageSnapshot.current.page : null);
+  const [overview,setOverview] = useState<Partial<CollectionPage>>(()=>pageSnapshot.current?.overview ?? {});
+  const overviewRef = useRef(overview);
+  const [rowsState, setPage] = useState<CollectionPage | null>(() => pageSnapshot.current?.key === loadKey ? pageSnapshot.current.page : null);
+  const pageState = useMemo(()=>rowsState && (compactList ? {...overview,...rowsState} : rowsState),[rowsState,compactList,overview]);
   const page = pageLoadKey.current === loadKey ? pageState : null;
   const latestPage=useRef(page);latestPage.current=page;
   const latestLoad=useRef<(fresh?: boolean)=>Promise<void>>(async()=>{});
@@ -211,6 +219,21 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
     else if(event.key==="Enter"){event.preventDefault();resetPreviewWidth();return;}
     else return;event.preventDefault();persistPreviewWidth(width);
   };
+  const pendingScroll = useRef<{key:string;top:number;timer:number} | null>(null);
+  const scrollViewKey = useRef(loadKey);
+  scrollViewKey.current = loadKey;
+  const flushScroll = useCallback(()=>{
+    const pending = pendingScroll.current;
+    if (!pending) return;
+    window.clearTimeout(pending.timer);
+    pendingScroll.current = null;
+    if (pending.key === scrollViewKey.current) updateSession({scrollTop:pending.top});
+  },[updateSession]);
+  useEffect(()=>flushScroll,[flushScroll,loadKey]);
+  const rememberScroll = (top:number)=>{
+    if(pendingScroll.current) window.clearTimeout(pendingScroll.current.timer);
+    pendingScroll.current = {key:loadKey,top,timer:window.setTimeout(flushScroll,120)};
+  };
   const positionRestored=useRef(false);
   const settingsRequest=useRef(settingsRevision);
   useEffect(()=>{if(settingsRevision!==settingsRequest.current){settingsRequest.current=settingsRevision;setDraft(storage.config);setSyncMenu(false);setError("");if(runtimeCapabilities.mobile)openCloudSyncSettings();else setSettings(true);}},[settingsRevision,storage.config]);
@@ -231,6 +254,18 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
   const statusRefreshQueue = useRef(new SerialRefresh());
   const loadLocation = useRef({ key: loadKey });
   if (loadLocation.current.key !== loadKey) loadLocation.current = { key: loadKey };
+  const overviewGeneration = useRef(0);
+  const refreshOverview = useCallback(async () => {
+    const request = ++overviewGeneration.current;
+    if (!compactList) return;
+    const source = view.source;
+    const result = await invoke<Partial<CollectionPage>>("reading_collection_overview",{source:view.source});
+    if (!mounted.current || request !== overviewGeneration.current || overviewSource.current !== source || !result?.sources) return;
+    overviewRef.current=result;
+    if(pageSnapshot.current)pageSnapshot.current.overview=result;
+    setOverview(result);
+    if(result.navigationCounts)setNavigationCounts(result.navigationCounts);
+  },[compactList,view.source,setNavigationCounts,pageSnapshot]);
   const load = useCallback((fresh = true) => {
     const location = loadLocation.current;
     // A pending write can finish after another filter or workspace is opened.
@@ -242,7 +277,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
     if (location.key !== loadKey) return latestLoad.current(fresh);
     // A write or explicit refresh invalidates retained rows immediately, also
     // preventing an older in-flight poll from repopulating the return snapshot.
-    if (fresh) { pageSnapshot.current = null; dataRevision.current++; generation.current++; statusGeneration.current++; }
+    if (fresh) { pageSnapshot.current = null; dataRevision.current++; generation.current++; statusGeneration.current++; previousCounts.current=undefined; void refreshOverview().catch(e=>setError(String(e))); }
     const statusRead = statusRefreshQueue.current.run(loadKey, async () => {
       if (location !== loadLocation.current) return;
       const current = ++statusGeneration.current;
@@ -259,17 +294,21 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
     const current=++generation.current;
     const revision = dataRevision.current;
     try {
-      const next = await invoke<CollectionPage>("list_collection_items", searchItemKey?{query:"",unreadOnly:false,offset:0,source:"all",status:"all",filters:{itemKey:searchItemKey}}:{query,unreadOnly:false,offset,source:view.source,status:view.attentionOnly?"needs_attention":view.status,media:view.media,sort:view.sort,ascending:view.ascending,sorts:JSON.parse(sortingKey),filters:{includeAbandoned,tags:JSON.parse(tagsKey),libraryId:view.destinationId||null,collectedWithinDays:view.dateFilter==="any"?null:Number(view.dateFilter)}});
+      const cached = previousCounts.current;
+      const reuseCounts = compactList && !fresh && cached?.key === countKey && cached.offset !== offset && Date.now()-cached.time < 15000;
+      const next = await invoke<CollectionPage>("list_collection_items", searchItemKey?{query:"",unreadOnly:false,offset:0,source:"all",status:"all",filters:{itemKey:searchItemKey}}:{query,unreadOnly:false,offset,source:view.source,status:view.attentionOnly?"needs_attention":view.status,media:view.media,sort:view.sort,ascending:view.ascending,sorts:JSON.parse(sortingKey),filters:{...(compactList ? {compact:true, ...(reuseCounts ? {previousCounts:cached.values} : {})} : {}),includeAbandoned,tags:JSON.parse(tagsKey),libraryId:view.destinationId||null,collectedWithinDays:view.dateFilter==="any"?null:Number(view.dateFilter)}});
       if (!mounted.current || dataRevision.current !== revision || generation.current !== current || location !== loadLocation.current) return;
+      previousCounts.current = {key:countKey,offset,values:[next.total,next.unread,next.matched],time:reuseCounts ? cached.time : Date.now()};
       if(next.navigationCounts)setNavigationCounts(next.navigationCounts);
       if (offset>0 && offset>=next.matched) setOffset(Math.max(0,Math.floor((next.matched-1)/60)*60));
-      else { pageSnapshot.current = { key: loadKey, page: next }; pageLoadKey.current = loadKey; setPage(next); }
+      else { pageSnapshot.current = { key: loadKey, page: next, overview:overviewRef.current }; pageLoadKey.current = loadKey; setPage(next); }
     } catch(e) {if (mounted.current && dataRevision.current === revision && generation.current===current && location === loadLocation.current) setError(String(e));}
   }, fresh);
     // Auxiliary status must neither delay the rows nor hold up another query.
     void statusRead.catch(e => { if (location === loadLocation.current) setError(String(e)); });
     return pageRead;
-  },[loadKey,query,offset,includeAbandoned,view.source,view.status,view.attentionOnly,view.destinationId,view.dateFilter,view.media,view.sort,view.ascending,sortingKey,tagsKey,setNavigationCounts,pageSnapshot,dataRevision,searchItemKey]);
+  },[refreshOverview,compactList,countKey,loadKey,query,offset,includeAbandoned,view.source,view.status,view.attentionOnly,view.destinationId,view.dateFilter,view.media,view.sort,view.ascending,sortingKey,tagsKey,setNavigationCounts,pageSnapshot,dataRevision,searchItemKey]);
+  useVisiblePolling(refreshOverview, compactList, 15000, {refreshKey:refreshOverview,initialDelayMs:300});
   latestLoad.current=load;
   useVisiblePolling(() => load(false), true, 2000, { refreshKey: load, initialDelayMs: 150 });
   useEffect(() => () => { generation.current++; statusGeneration.current++; }, [load]);
@@ -305,13 +344,29 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
   const sources: SourceState[] = (["bookmarks","likes","telegram","dida"] as Source[]).map(id=>pageState?.sources?.find(source=>source.id===id)||{id,count:id==="bookmarks"?(pageState?.total||0):0,connected:id==="bookmarks"?!!pageState?.connected:id==="dida"?libraries.some(l=>l.provider==="dida365"&&l.connected):false,canResume:id==="bookmarks"?!!pageState?.canResume:false,status:id==="bookmarks"?(pageState?.status||""):""});
   const activeTotal=pageState?.sources?.length?sources.reduce((sum,source)=>sum+source.count,0):pageState?.total||0;
   const connection=sources.find(s=>s.id===connectionSource);
-  const selected=page?.items.find(item=>item.key===selectedKey)||(useSplitReading&&!searchItemKey?page?.items[0]:undefined);
-  const selectedSource=selected?.post.source||"bookmarks";
-  const detailOpen=!!selected&&previewEnabled&&!useSplitReading&&(runtimeCapabilities.mobile||openReadingKey===selected.key||searchItemKey===selected.key);
-  const showReading=!!selected&&previewEnabled&&(useSplitReading||detailOpen);
+  const row=page?.items.find(item=>item.key===selectedKey)||(useSplitReading&&!searchItemKey?page?.items[0]:undefined);
+  const selectedSource=row?.post.source||"bookmarks";
+  const detailOpen=!!row&&previewEnabled&&!useSplitReading&&(runtimeCapabilities.mobile||openReadingKey===row.key||searchItemKey===row.key);
+  const showReading=!!row&&previewEnabled&&(useSplitReading||detailOpen);
+  const bodyKey = showReading && row?.summaryRevision !== undefined ? row.key : undefined;
+  const bodyRevision = row?.summaryRevision;
+  const [body,setBody] = useState<{key:string;revision?:string;post?:CollectionItem["post"];error?:string}>();
+  const [retryBody,setRetryBody] = useState(0);
+  useEffect(()=>{
+    if(!bodyKey)return;
+    let current=true;
+    invoke<CollectionItem["post"]>("reading_collection_post",{key:bodyKey}).then(
+      post=>{if(current)setBody({key:bodyKey,revision:bodyRevision,post});},
+      error=>{if(current)setBody({key:bodyKey,revision:bodyRevision,error:String(error)});}
+    );
+    return ()=>{current=false;};
+  },[bodyKey,bodyRevision,retryBody]);
+  const detail = bodyKey && body?.key===bodyKey && body.revision===bodyRevision ? body : undefined;
+  const selected = row && detail?.post ? {...row,post:detail.post} : row;
   useEffect(()=>{if(!showReading)setReadingFocusMode(false);},[showReading]);
   const reading = useMobileReadingPosition(readingContentRef, runtimeCapabilities.mobile && showReading ? selected?.key : undefined, selected ? fullTitle(selected) : "");
   const openItem=(key:string)=>{
+    flushScroll();
     if (runtimeCapabilities.mobile && !reading.pending.current) reading.pending.current={query};
     setArticleMenu(false);
     setOpenReadingKey(key);
@@ -617,8 +672,8 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
         {!runtimeCapabilities.mobile&&toggleReadingNavigation&&<button className="task-icon-button workspace-panel-toggle" aria-label="切换侧边栏" aria-expanded={shellHeader?.readingNavigationExpanded} onClick={toggleReadingNavigation}><PanelLeft size={16}/></button>}
         <strong className="reading-window-title">阅读</strong>
         <div className="reading-source-segment">
-        <button className={`task-source-chip ${view.source==="all"?"active":""}`} aria-pressed={view.source==="all"} onClick={()=>changeView({source:"all"})}><Layers size={12}/><span>全部</span><strong>{activeTotal.toLocaleString("en-US")}</strong></button>
-        {sources.map(s=>{const Icon=readingSourceIcons[s.id];return <button key={s.id} className={`task-source-chip collection-chip-${s.id} ${view.source===s.id?"active":""}`} aria-pressed={view.source===s.id} onClick={()=>changeView({source:s.id})}><Icon size={12}/><span>{readingSourceLabel(s.id)}</span><strong>{s.count.toLocaleString("en-US")}</strong></button>;})}
+        <button className={`task-source-chip ${view.source==="all"?"active":""}`} aria-pressed={view.source==="all"} onClick={()=>changeView({source:"all"})}><Layers size={12}/><span>全部</span><strong>{pageState ? activeTotal.toLocaleString("en-US") : "…"}</strong></button>
+        {sources.map(s=>{const Icon=readingSourceIcons[s.id];return <button key={s.id} className={`task-source-chip collection-chip-${s.id} ${view.source===s.id?"active":""}`} aria-pressed={view.source===s.id} onClick={()=>changeView({source:s.id})}><Icon size={12}/><span>{readingSourceLabel(s.id)}</span><strong>{pageState?.sources ? s.count.toLocaleString("en-US") : "…"}</strong></button>;})}
         </div>
       </div>
       {!runtimeCapabilities.mobile&&<div className="collection-header-tools">
@@ -674,7 +729,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
       onConnect={source=>{setSyncOverview(null);setError("");if(source==="dida"){if(onOpenLibrarySettings)onOpenLibrarySettings();else setSyncMenu(true);}else{setConnectionSource(source);setConnecting(true);}}}/>}
     {syncOverview==="cloud"&&<ReadingCloudOverview onClose={()=>setSyncOverview(null)} onNotice={setNotice}/>}
         </>}
-      <div ref={databaseRef} data-reading-layout={view.layout} className={`collection-database density-${view.density}`} aria-hidden={detailOpen||undefined} inert={detailOpen} onScroll={e=>{if(!detailOpen)updateSession({scrollTop:e.currentTarget.scrollTop});}}>
+      <div ref={databaseRef} data-reading-layout={view.layout} className={`collection-database density-${view.density}`} aria-hidden={detailOpen||undefined} inert={detailOpen} onScroll={e=>{if(!detailOpen)rememberScroll(e.currentTarget.scrollTop);}}>
         {!page&&<div className="collections-empty">正在读取本地阅读内容…</div>}
         {page?.items.length===0&&<div className="collections-empty"><Bookmark size={28}/><h2>{page.total?"没有符合筛选条件的内容":"把值得读的内容留在这里"}</h2><p>{page.total?"调整筛选，或搜索其他作者和正文。":"在右上角管理 X、Telegram 和滴答来源，把待读内容放在一起。"}</p>{page.total>0&&hasQueryFilters&&<button onClick={resetFilters}>清除筛选</button>}{view.source==="telegram"&&!sources.find(s=>s.id==="telegram")?.connected&&<button onClick={()=>{setConnectionSource("telegram");setError("");setConnecting(true);}}>连接 Telegram</button>}</div>}
         {view.attentionOnly&&attentionRows.length>0&&<div className="reading-triage">
@@ -724,7 +779,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
         <PreviewHeading source={<>{badge(selected)}<span className="preview-path" title={selected.post.authorName}>{selected.post.authorName}{selected.post.authorHandle&&` / @${selected.post.authorHandle}`}</span></>} actions={<PreviewToolbar
           copied={previewLink.copiedKey===selected.key} onCopy={()=>previewLink.copy(selected.key,()=>selected.post.url)}
           openTitle="打开原文" openDisabled={!selected.post.url} hideOpen={selected.post.source==="dida"} onOpen={()=>void open(selected.post.url)}
-        >{compactPreview&&<button ref={previewBackRef} className="collection-preview-back mobile-preview-back" aria-label="返回阅读列表" title="返回阅读列表" onClick={closeReading}><ArrowLeft size={20}/><span>返回</span></button>}<ReadingArticleTools key={selected.key} itemKey={selected.key} revision={JSON.stringify([selected.post,readingStatus(selected),selected.tags||[],selected.lifecycle])}/>{!runtimeCapabilities.mobile&&<button className="collection-refresh-content" aria-label="更新内容" title="更新内容" disabled={selected.post.source==="dida"?sourceConnectionRunning("dida"):jobRunning} onClick={()=>selected.post.source==="dida"?void sync("dida",false):selected.post.source==="telegram"?void sync("telegram",false):void refreshContent(selected.key)}><RefreshCw size={17}/></button>}<ReadingInvestigation itemKey={selected.key} title={fullTitle(selected)}/></PreviewToolbar>}><PreviewTitle agentSource={{itemKey:selected.key,title:fullTitle(selected)}} key={selected.key} text={fullTitle(selected)}>{title(selected)}</PreviewTitle></PreviewHeading>
+        >{compactPreview&&<button ref={previewBackRef} className="collection-preview-back mobile-preview-back" aria-label="返回阅读列表" title="返回阅读列表" onClick={closeReading}><ArrowLeft size={20}/><span>返回</span></button>}<ReadingArticleTools key={selected.key} itemKey={selected.key} revision={JSON.stringify([selected.summaryRevision ?? selected.post,readingStatus(selected),selected.tags||[],selected.lifecycle])}/>{!runtimeCapabilities.mobile&&<button className="collection-refresh-content" aria-label="更新内容" title="更新内容" disabled={selected.post.source==="dida"?sourceConnectionRunning("dida"):jobRunning} onClick={()=>selected.post.source==="dida"?void sync("dida",false):selected.post.source==="telegram"?void sync("telegram",false):void refreshContent(selected.key)}><RefreshCw size={17}/></button>}<ReadingInvestigation itemKey={selected.key} title={fullTitle(selected)}/></PreviewToolbar>}><PreviewTitle agentSource={{itemKey:selected.key,title:fullTitle(selected)}} key={selected.key} text={fullTitle(selected)}>{title(selected)}</PreviewTitle></PreviewHeading>
         </>:<>
         <div className="reading-article-toolbar">
           {detailOpen&&<button ref={previewBackRef} className="collection-preview-back" aria-label="返回阅读列表" onClick={closeReading}><ArrowLeft size={14}/>{compactPreview?"返回列表":"收起阅读"}</button>}
@@ -734,7 +789,7 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
             <button type="button" className={`preview-focus-btn${readingFocusMode?" active":""}`} aria-label={readingFocusMode?"退出专注阅读":"全宽专注阅读"} title={readingFocusMode?"退出专注阅读（Esc）":"全宽专注阅读"} aria-pressed={readingFocusMode} onClick={()=>setReadingFocusMode(v=>!v)}>{readingFocusMode?<Minimize2 size={15}/>:<Maximize2 size={15}/>}</button>
             {selected.post.source!=="dida"&&selected.post.url&&<button type="button" className="preview-copy-action" aria-label={previewLink.copiedKey===selected.key?"已复制":"复制来源链接"} title="复制来源链接" onClick={()=>void previewLink.copy(selected.key,()=>selected.post.url)}>{previewLink.copiedKey===selected.key?<Check size={15}/>:<Link2 size={15}/>}</button>}
             <ReadingInvestigation itemKey={selected.key} title={fullTitle(selected)}/>
-            <ReadingArticleTools key={selected.key} ref={inspectorRef} reference needsAttention={issues(selected).length>0||Boolean(selected.attentionIssues?.length)} itemKey={selected.key} revision={JSON.stringify([selected.post,readingStatus(selected),selected.tags||[],selected.lifecycle])}/>
+            <ReadingArticleTools key={selected.key} ref={inspectorRef} reference needsAttention={issues(selected).length>0||Boolean(selected.attentionIssues?.length)} itemKey={selected.key} revision={JSON.stringify([selected.summaryRevision ?? selected.post,readingStatus(selected),selected.tags||[],selected.lifecycle])}/>
             <div className="reading-article-menu" onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))setArticleMenu(false);}}>
               <button type="button" aria-label="归档或更多阅读操作" title="归档 / 永久删除" aria-expanded={articleMenu} onClick={()=>setArticleMenu(!articleMenu)}><MoreHorizontal size={17}/></button>
               <div className="reading-article-menu-panel" hidden={!articleMenu}>
@@ -751,9 +806,9 @@ export function CollectionsWorkspace({ onToggleDesktopSidebar, initialItemKey, i
         <div ref={readingContentRef} className="preview-content collection-detail-content preview-document" key={selected.key}>{!runtimeCapabilities.mobile&&<>
           {selected.lifecycle==="archived"&&<div className="reading-context-alert"><span>已归档 · 已保存的资料库副本保持不变</span><button disabled={propertyBusy} onClick={()=>void lifecycle(selected,"active")}>恢复到阅读</button></div>}
           {selected.lifecycle!=="archived"&&issues(selected).length>0&&<div className="reading-context-alert warning"><span>{issues(selected)[0]?.detail||"这篇内容有待处理的资料库副本"}</span><button onClick={()=>openReview(selected.key,issues(selected)[0]?.target)}>查看处理记录</button></div>}
-          <div className="reading-article-kicker"><strong>{readingSourceLabel(selectedSource)}</strong><span aria-hidden="true">·</span><span>约 {readingMinutes(selected.post.text)} 分钟阅读</span></div>
+          <div className="reading-article-kicker"><strong>{readingSourceLabel(selectedSource)}</strong><span aria-hidden="true">·</span>{(!bodyKey || detail?.post) && <span>约 {readingMinutes(selected.post.text)} 分钟阅读</span>}</div>
           <PreviewTitle agentSource={{itemKey:selected.key,title:fullTitle(selected)}} text={fullTitle(selected)}>{title(selected)}</PreviewTitle>
-        </>}<dl><div><dt>作者</dt><dd>{selected.post.authorName}{selected.post.authorHandle&&` @${selected.post.authorHandle}`}</dd></div><CollectionProperties key={selected.key} status={readingStatus(selected)} tags={selected.tags||[]} options={page?.availableTags||[]} disabled={propertyBusy} reference={!runtimeCapabilities.mobile} icon={statusIcon} archived={selected.lifecycle==="archived"} allowDelete={!runtimeCapabilities.mobile} sourceActions={!runtimeCapabilities.mobile && !selected.cloudImported} onLifecycle={state=>void lifecycle(selected,state)} save={async(status,tags)=>{await saveProperties(selected,status,tags);}}/>{runtimeCapabilities.mobile?<div><dt>保存位置</dt><dd>在桌面端管理资料库副本</dd></div>:<CollectionDestination libraries={libraries} destinationId={selected.destinationId} storageLocation={selected.storageLocation} storageLocations={selected.storageLocations} defaultConfig={storage.config} operation={selected.operation} disabled={propertyBusy} onChange={id=>void move(selected,id)} onRemove={id=>void removeDestination(selected,id)} onReview={()=>openReview(selected.key,selected.operation?.target)}/>}<div><dt>{runtimeCapabilities.mobile?"发布时间":"收集时间"}</dt><dd title={"收集于 "+date(selected.collectedAt)}>{date(runtimeCapabilities.mobile?selected.post.publishedAt:selected.collectedAt)}</dd></div>{runtimeCapabilities.mobile&&<div><dt>创建日期</dt><dd>{date(selected.collectedAt)}</dd></div>}</dl><CollectionPostBody post={selected.post} itemKey={selected.key} open={open} inlineMedia={!runtimeCapabilities.mobile} savedMedia={selected.savedMedia} onInspect={()=>inspectorRef.current?.open()}/>
+        </>}<dl><div><dt>作者</dt><dd>{selected.post.authorName}{selected.post.authorHandle&&` @${selected.post.authorHandle}`}</dd></div><CollectionProperties key={selected.key} status={readingStatus(selected)} tags={selected.tags||[]} options={page?.availableTags||[]} disabled={propertyBusy} reference={!runtimeCapabilities.mobile} icon={statusIcon} archived={selected.lifecycle==="archived"} allowDelete={!runtimeCapabilities.mobile} sourceActions={!runtimeCapabilities.mobile && !selected.cloudImported} onLifecycle={state=>void lifecycle(selected,state)} save={async(status,tags)=>{await saveProperties(selected,status,tags);}}/>{runtimeCapabilities.mobile?<div><dt>保存位置</dt><dd>在桌面端管理资料库副本</dd></div>:<CollectionDestination libraries={libraries} destinationId={selected.destinationId} storageLocation={selected.storageLocation} storageLocations={selected.storageLocations} defaultConfig={storage.config} operation={selected.operation} disabled={propertyBusy} onChange={id=>void move(selected,id)} onRemove={id=>void removeDestination(selected,id)} onReview={()=>openReview(selected.key,selected.operation?.target)}/>}<div><dt>{runtimeCapabilities.mobile?"发布时间":"收集时间"}</dt><dd title={"收集于 "+date(selected.collectedAt)}>{date(runtimeCapabilities.mobile?selected.post.publishedAt:selected.collectedAt)}</dd></div>{runtimeCapabilities.mobile&&<div><dt>创建日期</dt><dd>{date(selected.collectedAt)}</dd></div>}</dl>{bodyKey && !detail?.post ? <p role="status">{detail?.error ? <>正文加载失败 <button onClick={()=>setRetryBody(n=>n+1)}>重试</button></> : "正在读取正文…"}</p> : <CollectionPostBody post={selected.post} itemKey={selected.key} open={open} inlineMedia={!runtimeCapabilities.mobile} savedMedia={selected.savedMedia} onInspect={()=>inspectorRef.current?.open()}/>}
         {!runtimeCapabilities.mobile&&<footer className="reading-end-actions" aria-label="读完处理">
           <button type="button" aria-pressed={readingStatus(selected)==="read"} disabled={propertyBusy} onClick={()=>void saveProperties(selected,readingStatus(selected)==="read"?"unread":"read",selected.tags||[])}><Check size={14}/>{readingStatus(selected)==="read"?"已读":"标为已读"}</button>
           <span aria-hidden="true">·</span>

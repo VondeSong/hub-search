@@ -4,6 +4,7 @@ import type { CollectionSyncSource } from "./CollectionSyncPanel";
 import type { CollectionNavigationCounts } from "./CollectionViews";
 
 export type CollectionItem = {
+  summaryRevision?: string;
   cloudImported?: boolean;
   cloudPreviewUrls?: string[];
   attentionOperations?: CollectionLibraryOperation[]; attentionIssues?: {kind:string;error:string}[];
@@ -11,4 +12,4 @@ export type CollectionItem = {
   post: CollectionPost & {liked?: boolean; source?: string};
 };
 export type CollectionPage = { navigationCounts?: CollectionNavigationCounts; archived?: number; availableTags?: string[]; pendingCancellations?: number; items: CollectionItem[]; total: number; unread: number; matched: number; sources?: CollectionSyncSource[]; connected: boolean; running: boolean; canResume: boolean; status: string };
-export type CollectionPageSnapshot = { key: string; page: CollectionPage };
+export type CollectionPageSnapshot = { key: string; page: CollectionPage; overview?: Partial<CollectionPage> };
